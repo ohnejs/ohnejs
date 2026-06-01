@@ -1,0 +1,32 @@
+{
+  "name": "ohne",
+  "version": "0.0.1",
+  "description": "A zero-dependency TypeScript framework for the web.",
+  "homepage": "https://ohne.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/murisceman/ohne.git"
+  },
+  "license": "MIT",
+  "author": "Muris Ceman <muris@ohne.dev>",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "engineStrict": true,
+  "exports": {
+    ".": {
+      "types": "./src/ohne/index.ts",
+      "default": "./src/ohne/index.ts"
+    },
+    "./utils": {
+      "types": "./src/utils/index.ts",
+      "default": "./src/utils/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {}
+}
