@@ -3,11 +3,9 @@ node_modules/
 
 # Environment / secrets
 .env
-.env.local
 
 # OS
 .DS_Store
 
-# Claude Code (local-only)
-.claude/**/*.local.*
-.claude/commands/
+# Claude
+.claude/
