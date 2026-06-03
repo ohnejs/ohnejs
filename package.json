@@ -3,18 +3,17 @@
   "version": "0.0.1",
   "description": "A zero-dependency TypeScript framework for the web.",
   "homepage": "https://ohne.dev",
+  "license": "MIT",
+  "author": "Muris Ceman <muris@ohne.dev>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/murisceman/ohne.git"
   },
-  "license": "MIT",
-  "author": "Muris Ceman <muris@ohne.dev>",
+  "files": [
+    "src"
+  ],
   "type": "module",
   "sideEffects": false,
-  "engines": {
-    "node": ">=26.0.0"
-  },
-  "engineStrict": true,
   "exports": {
     ".": {
       "types": "./src/ohne/index.ts",
@@ -25,8 +24,21 @@
       "default": "./src/utils/index.ts"
     }
   },
-  "files": [
-    "src"
-  ],
-  "scripts": {}
+  "scripts": {
+    "format": "oxfmt",
+    "lint": "oxlint",
+    "test": "node --test 'tests/**/*.test.ts'",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "oxfmt": "0.53.0",
+    "oxlint": "1.68.0",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "engineStrict": true,
+  "packageManager": "pnpm@11.5.1"
 }
