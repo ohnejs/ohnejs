@@ -3,6 +3,7 @@ export * from './array/group-by.ts';
 export * from './array/key-by.ts';
 export * from './array/last.ts';
 export * from './array/unique.ts';
+export * from './clone/clone.ts';
 export * from './coerce/coerce-to-array.ts';
 export * from './coerce/coerce-to-bigint.ts';
 export * from './coerce/coerce-to-boolean.ts';
