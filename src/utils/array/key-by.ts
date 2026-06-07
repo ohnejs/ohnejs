@@ -15,7 +15,7 @@ export function keyBy<T, K extends PropertyKey>(
   array: readonly T[],
   keyFn: (item: T, index: number) => K,
 ): Partial<Record<K, T>> {
-  const result: Partial<Record<K, T>> = {};
+  const result: Partial<Record<K, T>> = Object.create(null);
   for (let i = 0; i < array.length; i++) {
     const item = array[i] as T;
     result[keyFn(item, i)] = item;

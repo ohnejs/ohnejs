@@ -14,7 +14,7 @@ export function groupBy<T, K extends PropertyKey>(
   array: readonly T[],
   keyFn: (item: T, index: number) => K,
 ): Partial<Record<K, T[]>> {
-  const result: Partial<Record<K, T[]>> = {};
+  const result: Partial<Record<K, T[]>> = Object.create(null);
   for (let i = 0; i < array.length; i++) {
     const item = array[i] as T;
     const key = keyFn(item, i);

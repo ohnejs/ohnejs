@@ -3,13 +3,15 @@ import { describe, it } from 'node:test';
 
 import { keyBy } from '../../../src/utils/index.ts';
 
+const nullObj = <T extends object>(o: T): T => Object.assign(Object.create(null), o);
+
 describe('keyBy', () => {
   it('indexes objects by a property', () => {
     const a = { id: 'a', n: 1 };
     const b = { id: 'b', n: 2 };
     deepStrictEqual(
       keyBy([a, b], (x) => x.id),
-      { a, b },
+      nullObj({ a, b }),
     );
   });
 
@@ -21,28 +23,28 @@ describe('keyBy', () => {
     ];
     deepStrictEqual(
       keyBy(items, (x) => x.id),
-      { x: items[2] },
+      nullObj({ x: items[2] }),
     );
   });
 
   it('passes the index to keyFn', () => {
     deepStrictEqual(
       keyBy(['a', 'b', 'c'], (_, i) => i),
-      { 0: 'a', 1: 'b', 2: 'c' },
+      nullObj({ 0: 'a', 1: 'b', 2: 'c' }),
     );
   });
 
   it('supports numeric keys', () => {
     deepStrictEqual(
       keyBy([10, 20, 30], (n) => n / 10),
-      { 1: 10, 2: 20, 3: 30 },
+      nullObj({ 1: 10, 2: 20, 3: 30 }),
     );
   });
 
   it('returns an empty object for an empty input', () => {
     deepStrictEqual(
       keyBy([], () => 'x'),
-      {},
+      nullObj({}),
     );
   });
 
@@ -53,8 +55,29 @@ describe('keyBy', () => {
   });
 
   it('does not mutate the input', () => {
-    const input = [{ id: 'a' }, { id: 'b' }];
+    const a = { id: 'a' };
+    const b = { id: 'b' };
+    const input = [a, b];
     keyBy(input, (x) => x.id);
-    strictEqual(input.length, 2);
+    deepStrictEqual(input, [a, b]);
+  });
+
+  it('indexes correctly when keyFn returns inherited Object.prototype names', () => {
+    const a = { v: 'a' };
+    const b = { v: 'b' };
+    const c = { v: 'c' };
+    const d = { v: 'd' };
+    const out = keyBy(
+      [a, b, c, d],
+      (_, i) => (['toString', '__proto__', 'constructor', 'hasOwnProperty'] as const)[i]!,
+    );
+    deepStrictEqual(
+      out,
+      nullObj({ toString: a, ['__proto__']: b, constructor: c, hasOwnProperty: d }),
+    );
+  });
+
+  it('returns a null-prototype object', () => {
+    strictEqual(Object.getPrototypeOf(keyBy([{ id: 'a' }], (x) => x.id)), null);
   });
 });
