@@ -11,6 +11,7 @@ export * from './coerce/coerce-to-date.ts';
 export * from './coerce/coerce-to-integer.ts';
 export * from './coerce/coerce-to-number.ts';
 export * from './coerce/coerce-to-string.ts';
+export * from './defaults/with-defaults.ts';
 export * from './dot-notation/flatten.ts';
 export * from './dot-notation/get.ts';
 export * from './dot-notation/has.ts';
