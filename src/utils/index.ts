@@ -38,3 +38,4 @@ export * from './object/has-key.ts';
 export * from './object/has-keys.ts';
 export * from './object/map-keys.ts';
 export * from './object/map-values.ts';
+export * from './object/omit.ts';
