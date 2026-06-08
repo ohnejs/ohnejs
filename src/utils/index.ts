@@ -36,3 +36,4 @@ export * from './is/is-undefined.ts';
 export * from './merge/merge.ts';
 export * from './object/has-key.ts';
 export * from './object/has-keys.ts';
+export * from './object/map-keys.ts';
