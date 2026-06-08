@@ -34,3 +34,4 @@ export * from './is/is-string.ts';
 export * from './is/is-symbol.ts';
 export * from './is/is-undefined.ts';
 export * from './merge/merge.ts';
+export * from './object/has-key.ts';
