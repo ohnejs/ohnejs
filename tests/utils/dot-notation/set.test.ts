@@ -121,4 +121,12 @@ describe('set', () => {
     const out = set({ a: inner }, 'a.c', 2) as { a: Record<string, unknown> };
     strictEqual(Object.getPrototypeOf(out.a), null);
   });
+
+  it('ignores an own `__proto__` data property on the input', () => {
+    const input = JSON.parse('{"__proto__":{"polluted":true},"a":1}') as Record<string, unknown>;
+    strictEqual(Object.getPrototypeOf(input), Object.prototype);
+    const out = set(input, 'a', 2) as Record<string, unknown>;
+    strictEqual(Object.getPrototypeOf(out), Object.prototype);
+    strictEqual((out as { polluted?: unknown }).polluted, undefined);
+  });
 });

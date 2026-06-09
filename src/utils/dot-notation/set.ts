@@ -1,4 +1,5 @@
 import { isArray } from '../is/is-array.ts';
+import { isNull } from '../is/is-null.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
 import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.ts';
 
@@ -63,13 +64,8 @@ function setRecursive(
       unknown
     >;
   } else if (isPlainObject(current)) {
-    container = Object.assign(
-      Object.create(Object.getPrototypeOf(current) as object | null) as Record<
-        PropertyKey,
-        unknown
-      >,
-      current,
-    );
+    container = { ...(current as Record<PropertyKey, unknown>) };
+    if (isNull(Object.getPrototypeOf(current))) Object.setPrototypeOf(container, null);
   } else {
     container = {};
   }
