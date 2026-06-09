@@ -13,7 +13,7 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  * Removing an array element via `[n]` splices the array (shifts later indices down).
  * Removing a key from an array via `.name` deletes that named property and preserves the array.
  *
- * If the path does not resolve to an own property, the input is returned unchanged (same reference, no clones).
+ * If the path does not resolve to a configurable own property, the input is returned unchanged (same reference, no clones).
  *
  * @example
  * ```ts
@@ -40,6 +40,8 @@ function unsetRecursive(current: unknown, segments: DotNotationSegment[], index:
       return copy;
     }
     if (isArray(current)) {
+      const desc = Object.getOwnPropertyDescriptor(current, segment.value);
+      if (desc && !desc.configurable) return current;
       const copy = current.slice();
       delete (copy as unknown as Record<string, unknown>)[segment.value as string];
       return copy;

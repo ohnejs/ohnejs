@@ -88,4 +88,10 @@ describe('unset', () => {
     const input = { a: 1 };
     strictEqual(unset(input, 'constructor.prototype.x'), input);
   });
+
+  it('does not throw when the trailing key targets a non-configurable own property', () => {
+    const input = { a: [1, 2, 3] };
+    const out = unset(input, 'a.length') as { a: number[] };
+    deepStrictEqual(out.a, [1, 2, 3]);
+  });
 });
