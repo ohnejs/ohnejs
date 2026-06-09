@@ -1,4 +1,4 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { flatten } from '../../../src/utils/index.ts';
@@ -78,5 +78,18 @@ describe('flatten', () => {
   it('throws on keys containing "[" or "]"', () => {
     throws(() => flatten({ 'a[0]': 1 }), /reserved character/);
     throws(() => flatten({ 'a]': 1 }), /reserved character/);
+  });
+
+  it('skips an own `__proto__` key', () => {
+    const objLeaf = flatten(JSON.parse('{"__proto__":{},"a":1}') as Record<string, unknown>);
+    strictEqual(Object.getPrototypeOf(objLeaf), Object.prototype);
+
+    const arrLeaf = flatten(JSON.parse('{"__proto__":[],"a":1}') as Record<string, unknown>);
+    strictEqual(Object.getPrototypeOf(arrLeaf), Object.prototype);
+  });
+
+  it('skips own `constructor` and `prototype` keys', () => {
+    const input = JSON.parse('{"constructor":1,"prototype":2,"a":3}') as Record<string, unknown>;
+    deepStrictEqual(flatten(input), { a: 3 });
   });
 });

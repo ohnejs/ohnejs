@@ -11,6 +11,7 @@ export function omit<T extends object, K extends keyof T>(obj: T, keys: readonly
   const drop = new Set<PropertyKey>(keys);
   const result = {} as Omit<T, K>;
   for (const key of Object.keys(obj) as (keyof T)[]) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
     if (!drop.has(key)) {
       (result as T)[key] = obj[key];
     }

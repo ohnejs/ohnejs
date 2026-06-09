@@ -55,6 +55,7 @@ function flattenInto(value: unknown, prefix: string, result: Record<string, unkn
           `flatten: key "${key}" contains a reserved character (".", "[", "]") or is empty`,
         );
       }
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
       const next = prefix === '' ? key : `${prefix}.${key}`;
       flattenInto(value[key], next, result);
     }
