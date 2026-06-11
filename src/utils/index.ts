@@ -77,4 +77,5 @@ export * from './object/map-keys.ts';
 export * from './object/map-values.ts';
 export * from './object/omit.ts';
 export * from './object/pick.ts';
+export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
