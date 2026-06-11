@@ -37,6 +37,7 @@ export * from './dot-notation/unflatten.ts';
 export * from './dot-notation/unset.ts';
 export * from './duration/format-duration.ts';
 export * from './duration/parse-duration.ts';
+export * from './env/parse-env.ts';
 export * from './i18n/ast.ts';
 export * from './i18n/errors.ts';
 export * from './i18n/format.ts';
