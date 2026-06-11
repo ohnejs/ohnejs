@@ -79,3 +79,4 @@ export * from './object/omit.ts';
 export * from './object/pick.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
+export * from './uniquify/uniquify.ts';
