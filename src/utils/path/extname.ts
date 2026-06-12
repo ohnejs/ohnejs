@@ -23,5 +23,6 @@ export function extname(path: string): string {
   const lastDot = slashed.lastIndexOf('.');
   if (lastDot === -1 || lastDot < lastSlash) return '';
   if (lastDot === lastSlash + 1) return '';
+  if (slashed.slice(lastSlash + 1) === '..') return '';
   return slashed.slice(lastDot);
 }

@@ -39,4 +39,10 @@ describe('extname', () => {
   it('treats backslashes as separators', () => {
     strictEqual(extname('a\\b\\foo.txt'), '.txt');
   });
+
+  it('returns an empty string when the segment is exactly ".."', () => {
+    strictEqual(extname('..'), '');
+    strictEqual(extname('a/..'), '');
+    strictEqual(extname('/foo/..'), '');
+  });
 });
