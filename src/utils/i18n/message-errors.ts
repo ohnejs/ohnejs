@@ -33,8 +33,7 @@ export class MessageSyntaxError extends Error {
   readonly column: number;
 
   /**
-   * Multi-line snippet showing the offending line and a caret under
-   * the offending column.
+   * Multi-line snippet showing the offending line and a caret under the offending column.
    */
   readonly snippet: string;
 

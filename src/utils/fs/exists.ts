@@ -9,7 +9,7 @@ import { access } from 'node:fs/promises';
  *
  * @example
  * ```ts
- * await exists('./.env')    // -> true | false
+ * await exists('./.env') // -> true | false
  * ```
  */
 export async function exists(path: string): Promise<boolean> {

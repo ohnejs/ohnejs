@@ -35,7 +35,8 @@ export type DotNotationSegment =
  *
  * The grammar is strict.
  * Throws on empty paths, stray `.`, unbalanced brackets, or missing separators.
- * Indices must be non-negative safe integers in canonical form: no leading zeros, no whitespace, no hex, no exponent.
+ * Indices must be non-negative safe integers in canonical form.
+ * No leading zeros, no whitespace, no hex, no exponent.
  *
  * @example
  * ```ts

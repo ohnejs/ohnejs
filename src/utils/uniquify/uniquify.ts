@@ -1,6 +1,7 @@
 /**
  * Returns `base` if it is not in `taken`; otherwise appends `-2`, `-3`, ... until a free name is found.
  * Does not mutate `taken`.
+ * Throws when `base` is empty.
  *
  * If `base` already ends with `-N`, the suffix is peeled and incremented.
  * This avoids `foo-2-2`-style chains across calls.

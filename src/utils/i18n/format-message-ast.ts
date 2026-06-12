@@ -61,8 +61,7 @@ const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium',
  *
  * @example
  * ```ts
- * formatMessageAST(parseMessage('Hello {name}!'), { name: 'World' }, 'en')
- * // -> 'Hello World!'
+ * formatMessageAST(parseMessage('Hello {name}!'), { name: 'World' }, 'en') // -> 'Hello World!'
  *
  * formatMessageAST(
  *   parseMessage('{n, plural, one {# item} other {# items}}'),

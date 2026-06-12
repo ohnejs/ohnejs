@@ -23,8 +23,8 @@ export type MessageNode =
 
 /**
  * Raw text between arguments.
- * ICU escapes (`''`, quoted spans) are already resolved by the parser,
- * so renderers can emit `value` verbatim.
+ * ICU escapes (`''`, quoted spans) are already resolved by the parser.
+ * Renderers can emit `value` verbatim.
  */
 export interface MessageLiteralNode {
   /**
@@ -33,7 +33,8 @@ export interface MessageLiteralNode {
   readonly kind: 'literal';
 
   /**
-   * The text to emit. Already escape-resolved.
+   * The text to emit.
+   * Already escape-resolved.
    */
   readonly value: string;
 }
@@ -50,15 +51,15 @@ export interface MessageArgumentNode {
   readonly kind: 'argument';
 
   /**
-   * Argument name as written. Numeric names (`{0}`) are kept as their
-   * string form so positional and named arguments share one lookup path.
+   * Argument name as written.
+   * Numeric names (`{0}`) are kept as their string form.
+   * Positional and named arguments share one lookup path.
    */
   readonly name: string;
 }
 
 /**
- * Typed placeholder: `{n, number}` / `{n, number, integer}` /
- * `{n, number, ::currency/EUR .00}`.
+ * Typed placeholder: `{n, number}` / `{n, number, integer}` / `{n, number, ::currency/EUR .00}`.
  */
 export interface MessageNumberNode {
   /**
@@ -93,7 +94,8 @@ export interface MessageDateNode {
   readonly name: string;
 
   /**
-   * The argStyle text, trimmed. `null` when none was given.
+   * The argStyle text, trimmed.
+   * `null` when none was given.
    */
   readonly style: string | null;
 }
@@ -113,19 +115,18 @@ export interface MessageTimeNode {
   readonly name: string;
 
   /**
-   * The argStyle text, trimmed. `null` when none was given.
+   * The argStyle text, trimmed.
+   * `null` when none was given.
    */
   readonly style: string | null;
 }
 
 /**
  * Plural or selectordinal placeholder.
- * `ordinal` selects between `Intl.PluralRules({ type: 'cardinal' })`
- * and `'ordinal'` at format time.
+ * `ordinal` selects between `Intl.PluralRules({ type: 'cardinal' })` and `'ordinal'` at format time.
  *
- * Per ICU: `offset` is subtracted from the input number before both
- * category selection AND `#` substitution; `exact` (`=N`) matches are
- * checked against the raw input and always win over keyword matches.
+ * Per ICU: `offset` is subtracted from the input number before both category selection and `#` substitution.
+ * `exact` (`=N`) matches are checked against the raw input and always win over keyword matches.
  */
 export interface MessagePluralNode {
   /**
@@ -144,7 +145,8 @@ export interface MessagePluralNode {
   readonly ordinal: boolean;
 
   /**
-   * `offset:N` value. `0` when omitted.
+   * `offset:N` value.
+   * `0` when omitted.
    */
   readonly offset: number;
 
@@ -156,13 +158,13 @@ export interface MessagePluralNode {
 
 /**
  * One arm of a `plural` or `selectordinal`.
- * `exact` is the parsed `=N` value when the key is `=N`; `null` for
- * keyword cases (`one`, `other`, ...).
+ * `exact` is the parsed `=N` value when the key is `=N`.
+ * `null` for keyword cases (`one`, `other`, ...).
  */
 export interface MessagePluralCase {
   /**
-   * `'=N'` (with the leading `=`) for exact cases, otherwise the
-   * keyword (`'one'`, `'other'`, ...).
+   * `'=N'` (with the leading `=`) for exact cases.
+   * Otherwise the keyword (`'one'`, `'other'`, ...).
    */
   readonly keyword: string;
 
@@ -172,8 +174,8 @@ export interface MessagePluralCase {
   readonly exact: number | null;
 
   /**
-   * Body of this arm. Resolves with the enclosing plural value bound
-   * to `#`.
+   * Body of this arm.
+   * Resolves with the enclosing plural value bound to `#`.
    */
   readonly body: MessageAST;
 }
@@ -194,7 +196,8 @@ export interface MessageSelectNode {
   readonly name: string;
 
   /**
-   * Ordered case arms. `other` must be present (the parser enforces it).
+   * Ordered case arms.
+   * `other` must be present (the parser enforces it).
    */
   readonly cases: readonly MessageSelectCase[];
 }
@@ -216,8 +219,8 @@ export interface MessageSelectCase {
 
 /**
  * `#` substitution inside a `plural` / `selectordinal` body.
- * Resolves to the enclosing plural's value minus its offset, formatted
- * via `Intl.NumberFormat` for the active language.
+ * Resolves to the enclosing plural's value minus its offset.
+ * Formatted via `Intl.NumberFormat` for the active language.
  */
 export interface MessagePoundNode {
   /**

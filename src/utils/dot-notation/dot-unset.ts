@@ -8,12 +8,14 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  * The input is never mutated; only the touched path is cloned (structural sharing).
  *
  * Descends only plain objects and arrays.
- * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf and returned unchanged.
+ * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf.
+ * Such values are returned unchanged.
  *
  * Removing an array element via `[n]` splices the array (shifts later indices down).
  * Removing a key from an array via `.name` deletes that named property and preserves the array.
  *
- * If the path does not resolve to a configurable own property, the input is returned unchanged (same reference, no clones).
+ * If the path does not resolve to a configurable own property, the input is returned unchanged.
+ * Same reference, no clones.
  *
  * @example
  * ```ts

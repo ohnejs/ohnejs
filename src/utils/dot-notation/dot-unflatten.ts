@@ -6,7 +6,8 @@ import { dotSet } from './dot-set.ts';
  * Builds a nested structure from a flat map of dot/bracket paths.
  * Each entry is applied via `dotSet`; later keys can override or extend earlier branches.
  *
- * The root is inferred from the first key's first segment: a leading `[n]` produces an array, otherwise an object.
+ * The root is inferred from the first key's first segment.
+ * A leading `[n]` produces an array; anything else produces an object.
  * An empty input returns `{}`.
  *
  * @example

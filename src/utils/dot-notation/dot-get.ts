@@ -5,7 +5,8 @@ import { parseDotNotation } from './parse-dot-notation.ts';
 /**
  * Reads the value at `path` inside `value`.
  * Descends only plain objects and arrays.
- * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf; returns `undefined`.
+ * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf.
+ * Returns `undefined` in that case.
  *
  * Inside a plain object, inherited properties are returned (uses bracket access, not own-property check).
  * To distinguish "missing" from "present and undefined", use `dotHas`.

@@ -10,11 +10,9 @@ import { parseMessage } from './parse-message.ts';
  *
  * @example
  * ```ts
- * formatMessage('Hello {name}!', { name: 'World' }, 'en')
- * // -> 'Hello World!'
+ * formatMessage('Hello {name}!', { name: 'World' }, 'en') // -> 'Hello World!'
  *
- * formatMessage('{n, plural, one {# item} other {# items}}', { n: 3 }, 'en')
- * // -> '3 items'
+ * formatMessage('{n, plural, one {# item} other {# items}}', { n: 3 }, 'en') // -> '3 items'
  * ```
  */
 export function formatMessage(
@@ -33,8 +31,7 @@ export function formatMessage(
  * @example
  * ```ts
  * const t = createMessageFormatter('en-GB');
- * t('Hello {name}!', { name: 'World' })
- * // -> 'Hello World!'
+ * t('Hello {name}!', { name: 'World' }) // -> 'Hello World!'
  *
  * const strict = createMessageFormatter('en', { onError: (e) => { throw e } });
  * strict('Hello {name}!', {}) // -> throws MessageFormatError

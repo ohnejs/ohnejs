@@ -37,7 +37,8 @@ export interface WithDefaultsOptions {
  * To reach inside an array, set its path to `'defaults'`, `'concat'`, or `'concat-unique'`.
  * Arrays do not auto-descend just because a child path is targeted.
  *
- * Non-plain values (`Date`, `RegExp`, `Set`, `Map`, class instances) are treated as leaves and replaced wholesale.
+ * Non-plain values (`Date`, `RegExp`, `Set`, `Map`, class instances) are treated as leaves.
+ * They are replaced wholesale.
  * Reach for `merge` if you need collection-aware merging.
  *
  * Neither input is mutated.
