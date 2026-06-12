@@ -13,16 +13,16 @@ import { parseDotNotation } from './parse-dot-notation.ts';
  *
  * @example
  * ```ts
- * has({ a: { b: 1 } }, 'a.b')         // -> true
- * has({ a: { b: undefined } }, 'a.b') // -> true
- * has({ a: { b: 1 } }, 'a.c')         // -> false
- * has({ a: [10] }, 'a[0]')            // -> true
- * has({ a: [10] }, 'a[5]')            // -> false
- * has({}, 'toString')                 // -> false
- * has(new Map([['k', 1]]), 'k')       // -> false (Map is a leaf)
+ * dotHas({ a: { b: 1 } }, 'a.b')         // -> true
+ * dotHas({ a: { b: undefined } }, 'a.b') // -> true
+ * dotHas({ a: { b: 1 } }, 'a.c')         // -> false
+ * dotHas({ a: [10] }, 'a[0]')            // -> true
+ * dotHas({ a: [10] }, 'a[5]')            // -> false
+ * dotHas({}, 'toString')                 // -> false
+ * dotHas(new Map([['k', 1]]), 'k')       // -> false (Map is a leaf)
  * ```
  */
-export function has(value: unknown, path: string): boolean {
+export function dotHas(value: unknown, path: string): boolean {
   const segments = parseDotNotation(path);
   let current: unknown = value;
   for (const segment of segments) {

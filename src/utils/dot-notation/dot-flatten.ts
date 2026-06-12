@@ -11,21 +11,21 @@ import { isPlainObject } from '../is/is-plain-object.ts';
  *
  * @example
  * ```ts
- * flatten({ a: { b: 1, c: [2, 3] } })
+ * dotFlatten({ a: { b: 1, c: [2, 3] } })
  * // -> { 'a.b': 1, 'a.c[0]': 2, 'a.c[1]': 3 }
  *
- * flatten({ a: {}, b: [] })
+ * dotFlatten({ a: {}, b: [] })
  * // -> { a: {}, b: [] }
  *
- * flatten([{ x: 1 }, { x: 2 }])
+ * dotFlatten([{ x: 1 }, { x: 2 }])
  * // -> { '[0].x': 1, '[1].x': 2 }
  * ```
  */
-export function flatten(
+export function dotFlatten(
   value: Record<string, unknown> | readonly unknown[],
 ): Record<string, unknown> {
   if (!isPlainObject(value) && !isArray(value)) {
-    throw new TypeError('flatten: input must be a plain object or array');
+    throw new TypeError('dotFlatten: input must be a plain object or array');
   }
   const result: Record<string, unknown> = {};
   flattenInto(value, '', result);
@@ -52,7 +52,7 @@ function flattenInto(value: unknown, prefix: string, result: Record<string, unkn
     for (const key of keys) {
       if (key === '' || key.includes('.') || key.includes('[') || key.includes(']')) {
         throw new Error(
-          `flatten: key "${key}" contains a reserved character (".", "[", "]") or is empty`,
+          `dotFlatten: key "${key}" contains a reserved character (".", "[", "]") or is empty`,
         );
       }
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;

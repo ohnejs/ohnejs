@@ -8,7 +8,7 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  * The input is never mutated; only the touched path is cloned (structural sharing).
  *
  * Missing parents are auto-created based on the next segment: `[n]` -> array, `.key` -> object.
- * So `set({}, 'a[0].b', 1)` yields `{ a: [{ b: 1 }] }`.
+ * So `dotSet({}, 'a[0].b', 1)` yields `{ a: [{ b: 1 }] }`.
  *
  * Type mismatches along the path are replaced wholesale to match the path expression's intent.
  * A key segment on a non-plain-object replaces with `{}`.
@@ -18,23 +18,23 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  *
  * @example
  * ```ts
- * set({ a: { b: 1 } }, 'a.b', 2)       // -> { a: { b: 2 } }
- * set({}, 'a[0].b', 1)                 // -> { a: [{ b: 1 }] }
- * set({ a: { b: 1, c: 2 } }, 'a.b', 9) // -> { a: { b: 9, c: 2 } }
- * set(undefined, '[0][0]', 'x')        // -> [['x']]
+ * dotSet({ a: { b: 1 } }, 'a.b', 2)       // -> { a: { b: 2 } }
+ * dotSet({}, 'a[0].b', 1)                 // -> { a: [{ b: 1 }] }
+ * dotSet({ a: { b: 1, c: 2 } }, 'a.b', 9) // -> { a: { b: 9, c: 2 } }
+ * dotSet(undefined, '[0][0]', 'x')        // -> [['x']]
  * ```
  */
-export function set<T extends Record<string, unknown> | unknown[]>(
+export function dotSet<T extends Record<string, unknown> | unknown[]>(
   value: T,
   path: string,
   newValue: unknown,
 ): T;
-export function set(
+export function dotSet(
   value: unknown,
   path: string,
   newValue: unknown,
 ): Record<string, unknown> | unknown[];
-export function set(value: unknown, path: string, newValue: unknown): unknown {
+export function dotSet(value: unknown, path: string, newValue: unknown): unknown {
   const segments = parseDotNotation(path);
   for (const segment of segments) {
     if (

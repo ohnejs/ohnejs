@@ -8,19 +8,19 @@ import { parseDotNotation } from './parse-dot-notation.ts';
  * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf; returns `undefined`.
  *
  * Inside a plain object, inherited properties are returned (uses bracket access, not own-property check).
- * To distinguish "missing" from "present and undefined", use `has`.
+ * To distinguish "missing" from "present and undefined", use `dotHas`.
  *
  * @example
  * ```ts
- * get({ a: { b: [10, 20] } }, 'a.b[1]') // -> 20
- * get({ a: { b: [10, 20] } }, 'a.c')    // -> undefined
- * get({ a: null }, 'a.b')               // -> undefined
- * get(new Map([['k', 1]]), 'k')         // -> undefined (Map is a leaf)
+ * dotGet({ a: { b: [10, 20] } }, 'a.b[1]') // -> 20
+ * dotGet({ a: { b: [10, 20] } }, 'a.c')    // -> undefined
+ * dotGet({ a: null }, 'a.b')               // -> undefined
+ * dotGet(new Map([['k', 1]]), 'k')         // -> undefined (Map is a leaf)
  *
- * get<number>({ a: 1 }, 'a')            // -> 1 (typed as number | undefined)
+ * dotGet<number>({ a: 1 }, 'a')            // -> 1 (typed as number | undefined)
  * ```
  */
-export function get<T = unknown>(value: unknown, path: string): T | undefined {
+export function dotGet<T = unknown>(value: unknown, path: string): T | undefined {
   const segments = parseDotNotation(path);
   let current: unknown = value;
   for (const segment of segments) {

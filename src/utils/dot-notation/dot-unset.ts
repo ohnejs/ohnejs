@@ -17,12 +17,12 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  *
  * @example
  * ```ts
- * unset({ a: { b: 1, c: 2 } }, 'a.b') // -> { a: { c: 2 } }
- * unset({ a: [1, 2, 3] }, 'a[1]')     // -> { a: [1, 3] }
- * unset({ a: 1 }, 'b')                // -> { a: 1 } (same reference)
+ * dotUnset({ a: { b: 1, c: 2 } }, 'a.b') // -> { a: { c: 2 } }
+ * dotUnset({ a: [1, 2, 3] }, 'a[1]')     // -> { a: [1, 3] }
+ * dotUnset({ a: 1 }, 'b')                // -> { a: 1 } (same reference)
  * ```
  */
-export function unset<T>(value: T, path: string): T {
+export function dotUnset<T>(value: T, path: string): T {
   const segments = parseDotNotation(path);
   return unsetRecursive(value, segments, 0) as T;
 }
