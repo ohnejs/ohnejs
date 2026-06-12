@@ -94,6 +94,8 @@ export * from './path/with-trailing-slash.ts';
 export * from './path/without-leading-slash.ts';
 export * from './path/without-trailing-slash.ts';
 export * from './route/compile-route.ts';
+export * from './route/path-to-route-pattern.ts';
+export * from './route/path-to-route.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
 export * from './uniquify/uniquify.ts';
