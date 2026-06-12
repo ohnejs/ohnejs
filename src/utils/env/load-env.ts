@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-
+import { readFile } from '../fs/read-file.ts';
+import { isNull } from '../is/is-null.ts';
 import { parseEnv } from './parse-env.ts';
 
 /**
@@ -12,17 +12,12 @@ import { parseEnv } from './parse-env.ts';
  *
  * @example
  * ```ts
- * loadEnv()             // reads ./.env, returns {} if missing
- * loadEnv('.env.local') // reads ./.env.local
+ * await loadEnv()             // reads ./.env, returns {} if missing
+ * await loadEnv('.env.local') // reads ./.env.local
  * ```
  */
-export function loadEnv(path: string = '.env'): Record<string, string> {
-  let text: string;
-  try {
-    text = readFileSync(path, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
-    throw err;
-  }
+export async function loadEnv(path: string = '.env'): Promise<Record<string, string>> {
+  const text = await readFile(path);
+  if (isNull(text)) return {};
   return parseEnv(text);
 }

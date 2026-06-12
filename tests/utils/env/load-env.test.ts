@@ -1,4 +1,4 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual, rejects } from 'node:assert';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,43 +21,43 @@ describe('loadEnv', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('reads `.env` from the current working directory by default', () => {
+  it('reads `.env` from the current working directory by default', async () => {
     writeFileSync(join(dir, '.env'), 'FOO=bar\nBAZ=qux\n');
-    deepStrictEqual(loadEnv(), { FOO: 'bar', BAZ: 'qux' });
+    deepStrictEqual(await loadEnv(), { FOO: 'bar', BAZ: 'qux' });
   });
 
-  it('reads a custom relative path', () => {
+  it('reads a custom relative path', async () => {
     writeFileSync(join(dir, '.env.local'), 'A=1\n');
-    deepStrictEqual(loadEnv('.env.local'), { A: '1' });
+    deepStrictEqual(await loadEnv('.env.local'), { A: '1' });
   });
 
-  it('reads an absolute path', () => {
+  it('reads an absolute path', async () => {
     const abs = join(dir, '.env.abs');
     writeFileSync(abs, 'X=y\n');
-    deepStrictEqual(loadEnv(abs), { X: 'y' });
+    deepStrictEqual(await loadEnv(abs), { X: 'y' });
   });
 
-  it('returns an empty object when the file is missing', () => {
-    deepStrictEqual(loadEnv('.env.missing'), {});
+  it('returns an empty object when the file is missing', async () => {
+    deepStrictEqual(await loadEnv('.env.missing'), {});
   });
 
-  it('returns an empty object for an empty file', () => {
+  it('returns an empty object for an empty file', async () => {
     writeFileSync(join(dir, '.env.empty'), '');
-    deepStrictEqual(loadEnv('.env.empty'), {});
+    deepStrictEqual(await loadEnv('.env.empty'), {});
   });
 
-  it('propagates parse errors from malformed input', () => {
+  it('propagates parse errors from malformed input', async () => {
     writeFileSync(join(dir, '.env.bad'), 'NOEQUALS\n');
-    throws(() => loadEnv('.env.bad'), /Invalid env/);
+    await rejects(loadEnv('.env.bad'), /Invalid env/);
   });
 
-  it('propagates non-ENOENT read errors', () => {
+  it('propagates non-ENOENT read errors', async () => {
     if (process.getuid?.() === 0) return; // root bypasses perms
     const denied = join(dir, '.env.denied');
     writeFileSync(denied, 'A=1\n');
     chmodSync(denied, 0o000);
     try {
-      throws(() => loadEnv(denied), /EACCES|EPERM/);
+      await rejects(loadEnv(denied), /EACCES|EPERM/);
     } finally {
       chmodSync(denied, 0o600);
     }
