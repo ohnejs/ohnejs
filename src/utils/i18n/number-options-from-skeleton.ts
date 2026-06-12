@@ -1,5 +1,5 @@
 import { isNull } from '../is/is-null.ts';
-import { MessageFormatError } from './errors.ts';
+import { MessageFormatError } from './message-errors.ts';
 
 const ROUNDING_INCREMENTS: ReadonlySet<number> = new Set([
   1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000,

@@ -1,8 +1,8 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MessageFormatError } from '../../../src/utils/i18n/errors.ts';
-import { numberOptionsFromSkeleton } from '../../../src/utils/i18n/skeleton-number.ts';
+import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
+import { numberOptionsFromSkeleton } from '../../../src/utils/i18n/number-options-from-skeleton.ts';
 
 const opts = numberOptionsFromSkeleton;
 

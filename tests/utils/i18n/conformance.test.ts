@@ -1,7 +1,7 @@
 import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { formatMessage } from '../../../src/utils/i18n/formatter.ts';
+import { formatMessage } from '../../../src/utils/i18n/format-message.ts';
 
 type Case = {
   name: string;

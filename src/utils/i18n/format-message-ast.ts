@@ -1,15 +1,15 @@
 import type {
-  ArgumentNode,
-  DateNode,
+  MessageArgumentNode,
   MessageAST,
-  Node,
-  NumberNode,
-  PluralCase,
-  PluralNode,
-  SelectCase,
-  SelectNode,
-  TimeNode,
-} from './ast.ts';
+  MessageDateNode,
+  MessageNode,
+  MessageNumberNode,
+  MessagePluralCase,
+  MessagePluralNode,
+  MessageSelectCase,
+  MessageSelectNode,
+  MessageTimeNode,
+} from './message-ast.ts';
 
 import { coerceToDate } from '../coerce/coerce-to-date.ts';
 import { coerceToNumber } from '../coerce/coerce-to-number.ts';
@@ -18,9 +18,9 @@ import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
 import { hasKey } from '../object/has-key.ts';
-import { MessageFormatError } from './errors.ts';
-import { dateOptionsFromSkeleton } from './skeleton-date.ts';
-import { numberOptionsFromSkeleton } from './skeleton-number.ts';
+import { dateOptionsFromSkeleton } from './date-options-from-skeleton.ts';
+import { MessageFormatError } from './message-errors.ts';
+import { numberOptionsFromSkeleton } from './number-options-from-skeleton.ts';
 
 type Context = {
   params: Record<string, unknown> | undefined;
@@ -30,13 +30,13 @@ type Context = {
 };
 
 /**
- * Options accepted by `format`.
+ * Options accepted by `formatMessageAST`.
  */
-export interface FormatOptions {
+export interface FormatMessageOptions {
   /**
    * Hook invoked on every soft format failure.
    * Soft failures: a missing parameter, an uncoercible value, a plural with no keyword match.
-   * The default is a no-op; `format` emits the fallback render and keeps going.
+   * The default is a no-op; `formatMessageAST` emits the fallback render and keeps going.
    * Throw from `onError` to opt into strict mode.
    *
    * @default
@@ -61,22 +61,22 @@ const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium',
  *
  * @example
  * ```ts
- * format(parse('Hello {name}!'), { name: 'World' }, 'en')
+ * formatMessageAST(parseMessage('Hello {name}!'), { name: 'World' }, 'en')
  * // -> 'Hello World!'
  *
- * format(
- *   parse('{n, plural, one {# item} other {# items}}'),
+ * formatMessageAST(
+ *   parseMessage('{n, plural, one {# item} other {# items}}'),
  *   { n: 3 },
  *   'en',
  * )
  * // -> '3 items'
  * ```
  */
-export function format(
+export function formatMessageAST(
   ast: MessageAST,
   params: Record<string, unknown> | undefined,
   language: string,
-  options?: FormatOptions,
+  options?: FormatMessageOptions,
 ): string {
   return renderNodes(ast, {
     params,
@@ -92,7 +92,7 @@ function renderNodes(nodes: MessageAST, ctx: Context): string {
   return out;
 }
 
-function renderNode(node: Node, ctx: Context): string {
+function renderNode(node: MessageNode, ctx: Context): string {
   switch (node.kind) {
     case 'literal':
       return node.value;
@@ -113,13 +113,13 @@ function renderNode(node: Node, ctx: Context): string {
   }
 }
 
-function renderArgument(node: ArgumentNode, ctx: Context): string {
+function renderArgument(node: MessageArgumentNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
   return String(value);
 }
 
-function renderNumber(node: NumberNode, ctx: Context): string {
+function renderNumber(node: MessageNumberNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
   const coerced = coerceToNumber(value);
@@ -128,7 +128,7 @@ function renderNumber(node: NumberNode, ctx: Context): string {
   return numberFormat(node.style, ctx.language).format(num);
 }
 
-function renderDate(node: DateNode, ctx: Context): string {
+function renderDate(node: MessageDateNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
   const date = coerceToDate(value);
@@ -136,7 +136,7 @@ function renderDate(node: DateNode, ctx: Context): string {
   return dateFormat(node.style, ctx.language).format(date);
 }
 
-function renderTime(node: TimeNode, ctx: Context): string {
+function renderTime(node: MessageTimeNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
   const date = coerceToDate(value);
@@ -144,14 +144,14 @@ function renderTime(node: TimeNode, ctx: Context): string {
   return timeFormat(node.style, ctx.language).format(date);
 }
 
-function renderPlural(node: PluralNode, ctx: Context): string {
+function renderPlural(node: MessagePluralNode, ctx: Context): string {
   const value = pluralValue(node, ctx);
   const adjusted = value - node.offset;
   const chosen = matchPluralCase(node, value, adjusted, ctx.language);
   return renderNodes(chosen.body, { ...ctx, pound: { value, offset: node.offset } });
 }
 
-function renderSelect(node: SelectNode, ctx: Context): string {
+function renderSelect(node: MessageSelectNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   const nullish = isNullish(value);
   if (nullish) notify(ctx, `missing parameter \`${node.name}\``);
@@ -165,7 +165,7 @@ function renderPound(ctx: Context): string {
   return new Intl.NumberFormat(ctx.language).format(adjusted);
 }
 
-function pluralValue(node: PluralNode, ctx: Context): number {
+function pluralValue(node: MessagePluralNode, ctx: Context): number {
   const raw = lookup(node.name, ctx);
   if (isNullish(raw)) {
     notify(ctx, `missing parameter \`${node.name}\``);
@@ -182,11 +182,11 @@ function pluralValue(node: PluralNode, ctx: Context): number {
 }
 
 function matchPluralCase(
-  node: PluralNode,
+  node: MessagePluralNode,
   raw: number,
   adjusted: number,
   language: string,
-): PluralCase {
+): MessagePluralCase {
   for (const c of node.cases) {
     if (!isNull(c.exact) && c.exact === raw) return c;
   }
@@ -199,7 +199,7 @@ function matchPluralCase(
   return node.cases.find((c) => c.keyword === 'other')!;
 }
 
-function matchSelectCase(cases: readonly SelectCase[], key: string): SelectCase {
+function matchSelectCase(cases: readonly MessageSelectCase[], key: string): MessageSelectCase {
   for (const c of cases) if (c.keyword === key) return c;
   return cases.find((c) => c.keyword === 'other')!;
 }

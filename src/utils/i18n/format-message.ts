@@ -1,12 +1,12 @@
-import type { FormatOptions } from './format.ts';
+import type { FormatMessageOptions } from './format-message-ast.ts';
 
-import { format } from './format.ts';
-import { parse } from './parse.ts';
+import { formatMessageAST } from './format-message-ast.ts';
+import { parseMessage } from './parse-message.ts';
 
 /**
  * Parses `template` and formats it against `params` in `language`.
- * Convenience over `parse` + `format`; parses on every call.
- * Reach for `createFormatter` when rendering one template many times.
+ * Convenience over `parseMessage` + `formatMessageAST`; parses on every call.
+ * Reach for `createMessageFormatter` when rendering one template many times.
  *
  * @example
  * ```ts
@@ -21,28 +21,28 @@ export function formatMessage(
   template: string,
   params: Record<string, unknown> | undefined,
   language: string,
-  options?: FormatOptions,
+  options?: FormatMessageOptions,
 ): string {
-  return format(parse(template), params, language, options);
+  return formatMessageAST(parseMessage(template), params, language, options);
 }
 
 /**
- * Curried translator bound to one BCP 47 language and one `FormatOptions` set.
+ * Curried translator bound to one BCP 47 language and one `FormatMessageOptions` set.
  * The returned function parses each call's template fresh; the module holds no AST cache.
  *
  * @example
  * ```ts
- * const t = createFormatter('en-GB');
+ * const t = createMessageFormatter('en-GB');
  * t('Hello {name}!', { name: 'World' })
  * // -> 'Hello World!'
  *
- * const strict = createFormatter('en', { onError: (e) => { throw e } });
+ * const strict = createMessageFormatter('en', { onError: (e) => { throw e } });
  * strict('Hello {name}!', {}) // -> throws MessageFormatError
  * ```
  */
-export function createFormatter(
+export function createMessageFormatter(
   language: string,
-  options?: FormatOptions,
+  options?: FormatMessageOptions,
 ): (template: string, params?: Record<string, unknown>) => string {
   return (template, params) => formatMessage(template, params, language, options);
 }

@@ -1,8 +1,8 @@
 import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MessageFormatError, MessageSyntaxError } from '../../../src/utils/i18n/errors.ts';
-import { createFormatter, formatMessage } from '../../../src/utils/i18n/formatter.ts';
+import { createMessageFormatter, formatMessage } from '../../../src/utils/i18n/format-message.ts';
+import { MessageFormatError, MessageSyntaxError } from '../../../src/utils/i18n/message-errors.ts';
 
 describe('formatMessage', () => {
   it('parses + formats in one call', () => {
@@ -33,28 +33,28 @@ describe('formatMessage', () => {
   });
 });
 
-describe('createFormatter', () => {
+describe('createMessageFormatter', () => {
   it('binds the language across calls', () => {
-    const t = createFormatter('de-DE');
+    const t = createMessageFormatter('de-DE');
     const out = t('{n, number}', { n: 1234.5 });
     strictEqual(out.includes('1.234'), true);
   });
 
   it('binds onError across calls', () => {
     const errors: MessageFormatError[] = [];
-    const t = createFormatter('en', { onError: (e) => errors.push(e) });
+    const t = createMessageFormatter('en', { onError: (e) => errors.push(e) });
     t('Hello {name}!', {});
     t('Bye {who}!', {});
     strictEqual(errors.length, 2);
   });
 
   it('accepts a template with no params', () => {
-    const t = createFormatter('en');
+    const t = createMessageFormatter('en');
     strictEqual(t('plain text'), 'plain text');
   });
 
   it('returns a function, callable many times', () => {
-    const t = createFormatter('en');
+    const t = createMessageFormatter('en');
     strictEqual(t('{a}', { a: 'x' }), 'x');
     strictEqual(t('{a}', { a: 'y' }), 'y');
   });

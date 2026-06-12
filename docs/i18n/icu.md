@@ -244,9 +244,9 @@ An apostrophe only opens an escape when the next character would otherwise be sp
 A realistic message uses several of these at once.
 
 ```ts
-import { createFormatter } from './src/utils/index.ts';
+import { createMessageFormatter } from './src/utils/index.ts';
 
-const t = createFormatter('en');
+const t = createMessageFormatter('en');
 
 const msg = `{user} {n, plural, offset:1
   =0 {is here alone}

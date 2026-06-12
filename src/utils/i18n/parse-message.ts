@@ -1,7 +1,14 @@
-import type { MessageAST, Node, PluralCase, PluralNode, SelectCase, SelectNode } from './ast.ts';
+import type {
+  MessageAST,
+  MessageNode,
+  MessagePluralCase,
+  MessagePluralNode,
+  MessageSelectCase,
+  MessageSelectNode,
+} from './message-ast.ts';
 
 import { last } from '../array/last.ts';
-import { MessageSyntaxError } from './errors.ts';
+import { MessageSyntaxError } from './message-errors.ts';
 
 type Cursor = {
   src: string;
@@ -29,7 +36,7 @@ const NAME_STOP = new Set([
  *
  * @example
  * ```ts
- * parse('Hello {name}!')
+ * parseMessage('Hello {name}!')
  * // -> [
  * //      { kind: 'literal', value: 'Hello ' },
  * //      { kind: 'argument', name: 'name' },
@@ -37,9 +44,9 @@ const NAME_STOP = new Set([
  * //    ]
  * ```
  */
-export function parse(template: string): MessageAST {
+export function parseMessage(template: string): MessageAST {
   const c: Cursor = { src: template, pos: 0 };
-  const ast = parseMessage(c, false, true);
+  const ast = parseBody(c, false, true);
 
   if (c.pos < c.src.length) {
     throw new MessageSyntaxError("unexpected '}'", c.src, c.pos);
@@ -48,8 +55,8 @@ export function parse(template: string): MessageAST {
   return ast;
 }
 
-function parseMessage(c: Cursor, inPluralBody: boolean, topLevel: boolean): MessageAST {
-  const nodes: Node[] = [];
+function parseBody(c: Cursor, inPluralBody: boolean, topLevel: boolean): MessageAST {
+  const nodes: MessageNode[] = [];
   let literal = '';
 
   const flushLiteral = () => {
@@ -128,7 +135,7 @@ function readQuoted(c: Cursor, inPluralBody: boolean): string {
   return out;
 }
 
-function parseArgument(c: Cursor, inPluralBody: boolean): Node {
+function parseArgument(c: Cursor, inPluralBody: boolean): MessageNode {
   c.pos++;
   skipWhitespace(c);
 
@@ -187,7 +194,7 @@ function parseArgument(c: Cursor, inPluralBody: boolean): Node {
   }
 }
 
-function parseSimpleArg(c: Cursor, name: string, type: 'number' | 'date' | 'time'): Node {
+function parseSimpleArg(c: Cursor, name: string, type: 'number' | 'date' | 'time'): MessageNode {
   skipWhitespace(c);
 
   let style: string | null = null;
@@ -209,7 +216,7 @@ function parseSimpleArg(c: Cursor, name: string, type: 'number' | 'date' | 'time
   return { kind: type, name, style };
 }
 
-function parsePlural(c: Cursor, name: string, ordinal: boolean): PluralNode {
+function parsePlural(c: Cursor, name: string, ordinal: boolean): MessagePluralNode {
   const argStart = c.pos;
   skipWhitespace(c);
   if (c.src[c.pos] !== ',') {
@@ -225,7 +232,7 @@ function parsePlural(c: Cursor, name: string, ordinal: boolean): PluralNode {
   const offset = readOffset(c);
   skipWhitespace(c);
 
-  const cases: PluralCase[] = [];
+  const cases: MessagePluralCase[] = [];
   let hasOther = false;
 
   while (c.pos < c.src.length && c.src[c.pos] !== '}') {
@@ -254,7 +261,7 @@ function parsePlural(c: Cursor, name: string, ordinal: boolean): PluralNode {
   return { kind: 'plural', name, ordinal, offset, cases };
 }
 
-function parseSelect(c: Cursor, name: string, inPluralBody: boolean): SelectNode {
+function parseSelect(c: Cursor, name: string, inPluralBody: boolean): MessageSelectNode {
   const argStart = c.pos;
   skipWhitespace(c);
   if (c.src[c.pos] !== ',') {
@@ -263,7 +270,7 @@ function parseSelect(c: Cursor, name: string, inPluralBody: boolean): SelectNode
   c.pos++;
   skipWhitespace(c);
 
-  const cases: SelectCase[] = [];
+  const cases: MessageSelectCase[] = [];
   let hasOther = false;
 
   while (c.pos < c.src.length && c.src[c.pos] !== '}') {
@@ -301,7 +308,7 @@ function readOffset(c: Cursor): number {
   return Number(raw);
 }
 
-function readPluralCase(c: Cursor): PluralCase {
+function readPluralCase(c: Cursor): MessagePluralCase {
   let keyword: string;
   let exact: number | null = null;
 
@@ -331,7 +338,7 @@ function readPluralCase(c: Cursor): PluralCase {
   }
   c.pos++;
 
-  const body = parseMessage(c, true, false);
+  const body = parseBody(c, true, false);
 
   if (c.src[c.pos] !== '}') {
     throw new MessageSyntaxError("expected '}' to close case body", c.src, c.pos);
@@ -341,7 +348,7 @@ function readPluralCase(c: Cursor): PluralCase {
   return { keyword, exact, body };
 }
 
-function readSelectCase(c: Cursor, inPluralBody: boolean): SelectCase {
+function readSelectCase(c: Cursor, inPluralBody: boolean): MessageSelectCase {
   const start = c.pos;
   const keyword = readName(c);
   if (!keyword) throw new MessageSyntaxError('expected case selector', c.src, start);
@@ -352,7 +359,7 @@ function readSelectCase(c: Cursor, inPluralBody: boolean): SelectCase {
   }
   c.pos++;
 
-  const body = parseMessage(c, inPluralBody, false);
+  const body = parseBody(c, inPluralBody, false);
 
   if (c.src[c.pos] !== '}') {
     throw new MessageSyntaxError("expected '}' to close case body", c.src, c.pos);

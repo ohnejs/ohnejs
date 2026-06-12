@@ -3,7 +3,7 @@
  * An ordered sequence of nodes.
  * Bodies of `plural` / `select` cases are themselves `MessageAST`, so recursion is uniform.
  */
-export type MessageAST = readonly Node[];
+export type MessageAST = readonly MessageNode[];
 
 /**
  * Any node in a `MessageAST`.
@@ -11,22 +11,22 @@ export type MessageAST = readonly Node[];
  * Styles for `number` / `date` / `time` are carried as raw strings.
  * The formatter decodes ICU skeletons at render time.
  */
-export type Node =
-  | LiteralNode
-  | ArgumentNode
-  | NumberNode
-  | DateNode
-  | TimeNode
-  | PluralNode
-  | SelectNode
-  | PoundNode;
+export type MessageNode =
+  | MessageLiteralNode
+  | MessageArgumentNode
+  | MessageNumberNode
+  | MessageDateNode
+  | MessageTimeNode
+  | MessagePluralNode
+  | MessageSelectNode
+  | MessagePoundNode;
 
 /**
  * Raw text between arguments.
  * ICU escapes (`''`, quoted spans) are already resolved by the parser,
  * so renderers can emit `value` verbatim.
  */
-export interface LiteralNode {
+export interface MessageLiteralNode {
   /**
    * Discriminant.
    */
@@ -43,7 +43,7 @@ export interface LiteralNode {
  * Renders the value of `params[name]` coerced to string.
  * Missing params default to re-emitting `{name}` so the gap is visible to the caller.
  */
-export interface ArgumentNode {
+export interface MessageArgumentNode {
   /**
    * Discriminant.
    */
@@ -60,7 +60,7 @@ export interface ArgumentNode {
  * Typed placeholder: `{n, number}` / `{n, number, integer}` /
  * `{n, number, ::currency/EUR .00}`.
  */
-export interface NumberNode {
+export interface MessageNumberNode {
   /**
    * Discriminant.
    */
@@ -81,7 +81,7 @@ export interface NumberNode {
 /**
  * Typed placeholder: `{d, date}` / `{d, date, short}` / `{d, date, ::yMMMd}`.
  */
-export interface DateNode {
+export interface MessageDateNode {
   /**
    * Discriminant.
    */
@@ -101,7 +101,7 @@ export interface DateNode {
 /**
  * Typed placeholder: `{d, time}` / `{d, time, short}`.
  */
-export interface TimeNode {
+export interface MessageTimeNode {
   /**
    * Discriminant.
    */
@@ -127,7 +127,7 @@ export interface TimeNode {
  * category selection AND `#` substitution; `exact` (`=N`) matches are
  * checked against the raw input and always win over keyword matches.
  */
-export interface PluralNode {
+export interface MessagePluralNode {
   /**
    * Discriminant.
    */
@@ -151,7 +151,7 @@ export interface PluralNode {
   /**
    * Ordered case arms.
    */
-  readonly cases: readonly PluralCase[];
+  readonly cases: readonly MessagePluralCase[];
 }
 
 /**
@@ -159,7 +159,7 @@ export interface PluralNode {
  * `exact` is the parsed `=N` value when the key is `=N`; `null` for
  * keyword cases (`one`, `other`, ...).
  */
-export interface PluralCase {
+export interface MessagePluralCase {
   /**
    * `'=N'` (with the leading `=`) for exact cases, otherwise the
    * keyword (`'one'`, `'other'`, ...).
@@ -182,7 +182,7 @@ export interface PluralCase {
  * Select placeholder: `{role, select, admin {...} other {...}}`.
  * String-keyed lookup against `params[name]`; falls back to `other`.
  */
-export interface SelectNode {
+export interface MessageSelectNode {
   /**
    * Discriminant.
    */
@@ -196,13 +196,13 @@ export interface SelectNode {
   /**
    * Ordered case arms. `other` must be present (the parser enforces it).
    */
-  readonly cases: readonly SelectCase[];
+  readonly cases: readonly MessageSelectCase[];
 }
 
 /**
  * One arm of a `select`.
  */
-export interface SelectCase {
+export interface MessageSelectCase {
   /**
    * Keyword matched against the string value of the argument.
    */
@@ -219,7 +219,7 @@ export interface SelectCase {
  * Resolves to the enclosing plural's value minus its offset, formatted
  * via `Intl.NumberFormat` for the active language.
  */
-export interface PoundNode {
+export interface MessagePoundNode {
   /**
    * Discriminant.
    */

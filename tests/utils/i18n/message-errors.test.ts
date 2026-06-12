@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MessageFormatError, MessageSyntaxError } from '../../../src/utils/i18n/errors.ts';
+import { MessageFormatError, MessageSyntaxError } from '../../../src/utils/i18n/message-errors.ts';
 
 describe('MessageSyntaxError', () => {
   it('locates position 0 at line 1, column 1', () => {

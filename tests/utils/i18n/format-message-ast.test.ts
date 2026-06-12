@@ -1,14 +1,14 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MessageFormatError } from '../../../src/utils/i18n/errors.ts';
-import { format } from '../../../src/utils/i18n/format.ts';
-import { parse } from '../../../src/utils/i18n/parse.ts';
+import { formatMessageAST } from '../../../src/utils/i18n/format-message-ast.ts';
+import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
+import { parseMessage } from '../../../src/utils/i18n/parse-message.ts';
 
 const render = (template: string, params?: Record<string, unknown>, language = 'en-US'): string =>
-  format(parse(template), params, language);
+  formatMessageAST(parseMessage(template), params, language);
 
-describe('format - literals and arguments', () => {
+describe('formatMessageAST - literals and arguments', () => {
   it('emits literals verbatim', () => {
     strictEqual(render('Hello, world!'), 'Hello, world!');
   });
@@ -51,7 +51,7 @@ describe('format - literals and arguments', () => {
   });
 });
 
-describe('format - apostrophe escapes via parse', () => {
+describe('formatMessageAST - apostrophe escapes via parseMessage', () => {
   it("renders `''` as a literal apostrophe", () => {
     strictEqual(render("it''s"), "it's");
   });
@@ -65,7 +65,7 @@ describe('format - apostrophe escapes via parse', () => {
   });
 });
 
-describe('format - number', () => {
+describe('formatMessageAST - number', () => {
   it('formats with default style', () => {
     strictEqual(render('{n, number}', { n: 1234.5 }, 'en-US'), '1,234.5');
   });
@@ -115,7 +115,7 @@ describe('format - number', () => {
   });
 });
 
-describe('format - date and time', () => {
+describe('formatMessageAST - date and time', () => {
   const epoch = new Date(Date.UTC(2026, 5, 7, 14, 30, 0));
 
   it('formats `{d, date}` with default (medium) style', () => {
@@ -163,7 +163,7 @@ describe('format - date and time', () => {
   });
 });
 
-describe('format - plural', () => {
+describe('formatMessageAST - plural', () => {
   it('selects `one` for n=1 in English', () => {
     strictEqual(render('{n, plural, one {# item} other {# items}}', { n: 1 }, 'en-US'), '1 item');
   });
@@ -242,7 +242,7 @@ describe('format - plural', () => {
   });
 });
 
-describe('format - select', () => {
+describe('formatMessageAST - select', () => {
   it('matches by keyword', () => {
     strictEqual(render('{g, select, male {he} female {she} other {they}}', { g: 'female' }), 'she');
   });
@@ -263,7 +263,7 @@ describe('format - select', () => {
   });
 });
 
-describe('format - nesting', () => {
+describe('formatMessageAST - nesting', () => {
   it('renders a simple argument inside a select branch', () => {
     strictEqual(
       render('{role, select, admin {Welcome, {name}!} other {Hi}}', {
@@ -286,10 +286,10 @@ describe('format - nesting', () => {
   });
 });
 
-describe('format - onError', () => {
+describe('formatMessageAST - onError', () => {
   it('calls onError on a missing simple argument', () => {
     const errors: MessageFormatError[] = [];
-    const out = format(parse('Hello, {name}!'), {}, 'en-US', {
+    const out = formatMessageAST(parseMessage('Hello, {name}!'), {}, 'en-US', {
       onError: (e) => errors.push(e),
     });
     strictEqual(out, 'Hello, {name}!');
@@ -299,7 +299,7 @@ describe('format - onError', () => {
 
   it('calls onError on a missing plural argument', () => {
     const errors: MessageFormatError[] = [];
-    format(parse('{n, plural, other {x}}'), {}, 'en-US', {
+    formatMessageAST(parseMessage('{n, plural, other {x}}'), {}, 'en-US', {
       onError: (e) => errors.push(e),
     });
     strictEqual(errors.length, 1);
@@ -307,7 +307,7 @@ describe('format - onError', () => {
 
   it('calls onError on a plural argument that cannot be coerced', () => {
     const errors: MessageFormatError[] = [];
-    format(parse('{n, plural, other {#}}'), { n: 'abc' }, 'en-US', {
+    formatMessageAST(parseMessage('{n, plural, other {#}}'), { n: 'abc' }, 'en-US', {
       onError: (e) => errors.push(e),
     });
     strictEqual(errors.length, 1);
@@ -316,7 +316,7 @@ describe('format - onError', () => {
 
   it('calls onError on a number argument that cannot be coerced', () => {
     const errors: MessageFormatError[] = [];
-    const out = format(parse('{n, number}'), { n: {} }, 'en-US', {
+    const out = formatMessageAST(parseMessage('{n, number}'), { n: {} }, 'en-US', {
       onError: (e) => errors.push(e),
     });
     strictEqual(out, '{n}');
@@ -325,7 +325,7 @@ describe('format - onError', () => {
 
   it('calls onError on a missing select argument', () => {
     const errors: MessageFormatError[] = [];
-    const out = format(parse('{g, select, male {he} other {they}}'), {}, 'en-US', {
+    const out = formatMessageAST(parseMessage('{g, select, male {he} other {they}}'), {}, 'en-US', {
       onError: (e) => errors.push(e),
     });
     strictEqual(out, 'they');
@@ -335,7 +335,7 @@ describe('format - onError', () => {
   it('throws when onError throws (strict mode opt-in)', () => {
     throws(
       () =>
-        format(parse('Hello, {name}!'), {}, 'en-US', {
+        formatMessageAST(parseMessage('Hello, {name}!'), {}, 'en-US', {
           onError: (e) => {
             throw e;
           },
@@ -346,16 +346,16 @@ describe('format - onError', () => {
 
   it('does not notify on successful formats', () => {
     let count = 0;
-    format(parse('Hello, {name}!'), { name: 'Anna' }, 'en-US', {
+    formatMessageAST(parseMessage('Hello, {name}!'), { name: 'Anna' }, 'en-US', {
       onError: () => count++,
     });
     strictEqual(count, 0);
   });
 });
 
-describe('format - structural sanity', () => {
+describe('formatMessageAST - structural sanity', () => {
   it('returns a string for an empty AST', () => {
-    strictEqual(format([], {}, 'en-US'), '');
+    strictEqual(formatMessageAST([], {}, 'en-US'), '');
   });
 
   it('preserves ordering across many interleaved nodes', () => {
@@ -365,7 +365,7 @@ describe('format - structural sanity', () => {
   it('does not mutate the params object', () => {
     const params = { name: 'Anna' };
     const snapshot = structuredClone(params);
-    format(parse('Hello, {name}!'), params, 'en-US');
+    formatMessageAST(parseMessage('Hello, {name}!'), params, 'en-US');
     deepStrictEqual(params, snapshot);
   });
 });

@@ -1,13 +1,13 @@
 import { clamp } from '../number/clamp.ts';
 
 /**
- * Thrown by `parse` when the template violates ICU MessageFormat grammar.
+ * Thrown by `parseMessage` when the template violates ICU MessageFormat grammar.
  * Carries the character offset, a 1-indexed line/column, and a snippet with a caret.
  * The snippet is appended to `message` so an uncaught throw prints a useful diagnostic.
  *
  * @example
  * ```ts
- * try { parse('Hello }'); }
+ * try { parseMessage('Hello }'); }
  * catch (e) {
  *   e.position // -> 6
  *   e.line     // -> 1
@@ -50,7 +50,7 @@ export class MessageSyntaxError extends Error {
 }
 
 /**
- * Thrown by `format` when rendering hits a feature with no `Intl` mapping.
+ * Thrown by `formatMessage` and `formatMessageAST` when rendering hits a feature with no `Intl` mapping.
  * Examples: a skeleton stem like `permille`, the bare `currency` predefined style.
  * Soft failures (missing param, uncoercible value) never throw.
  * They call `onError` and emit a fallback render instead.

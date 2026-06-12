@@ -1,5 +1,5 @@
 import { clamp } from '../number/clamp.ts';
-import { MessageFormatError } from './errors.ts';
+import { MessageFormatError } from './message-errors.ts';
 
 /**
  * Parses an ICU CLDR date/time skeleton (without `::`) into `Intl.DateTimeFormatOptions`.

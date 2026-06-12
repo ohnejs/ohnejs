@@ -1,8 +1,8 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MessageFormatError } from '../../../src/utils/i18n/errors.ts';
-import { dateOptionsFromSkeleton } from '../../../src/utils/i18n/skeleton-date.ts';
+import { dateOptionsFromSkeleton } from '../../../src/utils/i18n/date-options-from-skeleton.ts';
+import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
 
 const opts = dateOptionsFromSkeleton;
 
