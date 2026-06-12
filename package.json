@@ -26,6 +26,10 @@
     "./utils/env": {
       "types": "./src/utils/env/index.ts",
       "default": "./src/utils/env/index.ts"
+    },
+    "./utils/fs": {
+      "types": "./src/utils/fs/index.ts",
+      "default": "./src/utils/fs/index.ts"
     }
   },
   "scripts": {
