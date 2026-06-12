@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { parseEnv } from '../../utils/index.ts';
+import { parseEnv } from './parse-env.ts';
 
 /**
  * Reads a `.env` file from disk and parses it into a flat record of strings.

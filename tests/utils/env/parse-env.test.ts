@@ -1,7 +1,7 @@
 import { deepStrictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { parseEnv } from '../../../src/utils/index.ts';
+import { parseEnv } from '../../../src/utils/env/index.ts';
 
 describe('parseEnv', () => {
   describe('basic assignment', () => {

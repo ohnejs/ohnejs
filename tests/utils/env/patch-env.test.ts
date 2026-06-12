@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { patchEnv } from '../../../src/ohne/index.ts';
+import { patchEnv } from '../../../src/utils/env/index.ts';
 
 describe('patchEnv', () => {
   it('adds keys that are missing from the target', () => {

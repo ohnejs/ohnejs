@@ -37,7 +37,6 @@ export * from './dot-notation/dot-unset.ts';
 export * from './dot-notation/parse-dot-notation.ts';
 export * from './duration/format-duration.ts';
 export * from './duration/parse-duration.ts';
-export * from './env/parse-env.ts';
 export * from './i18n/date-options-from-skeleton.ts';
 export * from './i18n/format-message-ast.ts';
 export * from './i18n/format-message.ts';

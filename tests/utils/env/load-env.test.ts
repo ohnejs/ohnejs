@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { loadEnv } from '../../../src/ohne/index.ts';
+import { loadEnv } from '../../../src/utils/env/index.ts';
 
 describe('loadEnv', () => {
   let dir: string;
