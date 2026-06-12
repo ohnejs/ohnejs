@@ -381,6 +381,8 @@ function skipStyle(c: Cursor): void {
         c.pos++;
         continue;
       }
+      const peek = c.src[c.pos];
+      if (peek !== '{' && peek !== '}') continue;
       while (c.pos < c.src.length && c.src[c.pos] !== "'") {
         c.pos++;
       }
@@ -399,6 +401,8 @@ function skipStyle(c: Cursor): void {
             c.pos++;
             continue;
           }
+          const peek = c.src[c.pos];
+          if (peek !== '{' && peek !== '}') continue;
           while (c.pos < c.src.length && c.src[c.pos] !== "'") c.pos++;
           if (c.pos < c.src.length) c.pos++;
           continue;

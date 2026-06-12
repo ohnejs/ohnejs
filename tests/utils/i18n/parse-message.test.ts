@@ -149,6 +149,24 @@ describe('parseMessage - number / date / time', () => {
       { kind: 'date', name: 'd', style: '{year}' },
     ]);
   });
+
+  it("treats a lone `'` inside argStyle as a literal under DOUBLE_OPTIONAL", () => {
+    deepStrictEqual(parseMessage("{x, number, can't}"), [
+      { kind: 'number', name: 'x', style: "can't" },
+    ]);
+  });
+
+  it("treats a lone `'` inside a nested-brace argStyle as a literal", () => {
+    deepStrictEqual(parseMessage("{d, date, {can't}}"), [
+      { kind: 'date', name: 'd', style: "{can't}" },
+    ]);
+  });
+
+  it("still opens a literal span on `'` before `{` inside argStyle", () => {
+    deepStrictEqual(parseMessage("{d, date, '{lit}'}"), [
+      { kind: 'date', name: 'd', style: "'{lit}'" },
+    ]);
+  });
 });
 
 describe('parseMessage - plural', () => {
