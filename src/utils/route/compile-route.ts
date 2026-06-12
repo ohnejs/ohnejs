@@ -88,12 +88,14 @@ export function compileRoute(pattern: string): RouteMatcher {
     cursor = token.index + token[0].length;
   }
   regexSrc += normalized.slice(cursor).replace(META_RE, '\\$&');
-  regexSrc += '/?$';
+  regexSrc += '$';
 
   const regex = new RegExp(regexSrc);
 
   function match(path: string): RouteParams | null {
-    const m = regex.exec(path);
+    const trimmed =
+      path.length > 1 && path.charCodeAt(path.length - 1) === 47 ? path.slice(0, -1) : path;
+    const m = regex.exec(trimmed);
     if (isNull(m)) return null;
     const out: RouteParams = {};
     for (let i = 0; i < params.length; i++) {

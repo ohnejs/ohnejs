@@ -51,6 +51,11 @@ describe('compileRoute', () => {
     deepStrictEqual(m('/users/42/'), { id: '42' });
   });
 
+  it('strips the tolerated trailing slash from a catch-all capture', () => {
+    const m = compileRoute('/files/[...path]');
+    deepStrictEqual(m('/files/a/b/c/'), { path: 'a/b/c' });
+  });
+
   it('escapes regex metacharacters in static segments', () => {
     const m = compileRoute('/a.b/[id]');
     deepStrictEqual(m('/a.b/42'), { id: '42' });
