@@ -1,3 +1,5 @@
+import { isInteger } from '../is/is-integer.ts';
+
 /**
  * A single segment of a parsed dot-notation path.
  * `key` segments come from `.name` notation and address object properties.
@@ -69,7 +71,7 @@ export function parseDotNotation(path: string): DotNotationSegment[] {
       }
       const inside = path.slice(start, i);
       const num = Number(inside);
-      if (inside.length === 0 || !Number.isSafeInteger(num) || num < 0 || String(num) !== inside) {
+      if (inside.length === 0 || !isInteger(num) || num < 0 || String(num) !== inside) {
         throw new Error(
           `Invalid path: "[${inside}]" is not a non-negative integer index in "${path}"`,
         );

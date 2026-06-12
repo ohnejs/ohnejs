@@ -1,3 +1,5 @@
+import { isSet } from '../is/is-set.ts';
+
 /**
  * Returns `base` if it is not in `taken`; otherwise appends `-2`, `-3`, ... until a free name is found.
  * Does not mutate `taken`.
@@ -22,7 +24,7 @@ export function uniquify(base: string, taken: ReadonlySet<string> | readonly str
     throw new Error('Invalid base: empty');
   }
 
-  const takenSet: ReadonlySet<string> = taken instanceof Set ? taken : new Set(taken);
+  const takenSet: ReadonlySet<string> = isSet<Set<string>>(taken) ? taken : new Set(taken);
   if (!takenSet.has(base)) return base;
 
   let root = base;
