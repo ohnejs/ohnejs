@@ -27,6 +27,7 @@ export * from './coerce/coerce-to-date.ts';
 export * from './coerce/coerce-to-integer.ts';
 export * from './coerce/coerce-to-number.ts';
 export * from './coerce/coerce-to-string.ts';
+export * from './debug/is-debug-enabled.ts';
 export * from './defaults/with-defaults.ts';
 export * from './dot-notation/dot-flatten.ts';
 export * from './dot-notation/dot-get.ts';
