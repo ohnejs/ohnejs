@@ -45,6 +45,7 @@ export * from './i18n/message-ast.ts';
 export * from './i18n/message-errors.ts';
 export * from './i18n/number-options-from-skeleton.ts';
 export * from './i18n/parse-message.ts';
+export * from './i18n/suggest-message-params.ts';
 export * from './is/is-array.ts';
 export * from './is/is-bigint.ts';
 export * from './is/is-boolean.ts';
