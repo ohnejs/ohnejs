@@ -99,4 +99,5 @@ export * from './route/path-to-route-pattern.ts';
 export * from './route/path-to-route.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
+export * from './suggest/suggest.ts';
 export * from './uniquify/uniquify.ts';
