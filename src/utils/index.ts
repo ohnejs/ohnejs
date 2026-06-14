@@ -95,6 +95,8 @@ export * from './path/with-leading-slash.ts';
 export * from './path/with-trailing-slash.ts';
 export * from './path/without-leading-slash.ts';
 export * from './path/without-trailing-slash.ts';
+export * from './registry/create-layer-registry.ts';
+export * from './registry/create-registry.ts';
 export * from './route/compile-route.ts';
 export * from './route/path-to-route-pattern.ts';
 export * from './route/path-to-route.ts';
