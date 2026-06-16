@@ -1,4 +1,4 @@
-import { cleanup, type Effect, runWithEffect, track, trigger } from './_runtime.ts';
+import { type Effect, runEffect, track, trigger } from './_runtime.ts';
 
 /**
  * Lazy, cached derivation.
@@ -56,8 +56,7 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
       if (dirty) {
         evaluating = true;
         try {
-          cleanup(runner);
-          cached = runWithEffect(runner, getter);
+          runEffect(runner);
           dirty = false;
         } finally {
           evaluating = false;
