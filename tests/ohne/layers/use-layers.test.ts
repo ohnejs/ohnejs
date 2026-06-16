@@ -31,7 +31,7 @@ describe('useLayers / useConfig', () => {
 
   it('applies a strategy set via the registry', () => {
     const layers = useLayers();
-    layers.strategy('tags', 'concat-unique');
+    layers.setStrategy('tags', 'concat-unique');
     layers.add({ path: '/test-tags-base', defaults: { tags: ['a'] } });
     layers.add({ path: '/test-tags-add', input: { tags: ['b'] } });
 

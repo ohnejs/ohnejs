@@ -16,7 +16,7 @@ export type LayerStrategies = Record<string, WithDefaultsStrategy>;
 export interface LayerRegistryOptions {
   /**
    * Initial `withDefaults` strategies.
-   * Extend later via `strategy(path, value)`.
+   * Extend later via `setStrategy(path, value)`.
    *
    * @default
    * {}
@@ -86,7 +86,7 @@ export interface Layer<C extends object> {
  * Layers are registered in insertion order; closer = later.
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies are shared between per-layer and cross-layer merges.
- * Results are cached and invalidated on `add`, `remove`, or `strategy`.
+ * Results are cached and invalidated on `add`, `remove`, or `setStrategy`.
  */
 export interface LayerRegistry<C extends object> {
   /**
@@ -111,11 +111,28 @@ export interface LayerRegistry<C extends object> {
   layers(): readonly Layer<C>[];
 
   /**
-   * Sets the `withDefaults` strategy at `path`.
-   * Overwrites any existing strategy.
-   * Invalidates the cache.
+   * Sets the merge strategy at `path` for both per-layer and cross-layer merges.
+   * Overwrites any existing strategy at the same path and invalidates the cache.
+   *
+   * `path` is dot-notation: `'tags'`, `'server.routes'`, `'items[0].tag'`.
+   * See `WithDefaultsStrategy` for the available strategies.
+   *
+   * @example
+   * ```ts
+   * const registry = createLayerRegistry<{ tags: string[] }>()
+   *
+   * registry.add({ path: '/base', defaults: { tags: ['core'] } })
+   * registry.add({ path: '/user', input:    { tags: ['custom'] } })
+   *
+   * registry.resolve()
+   * // -> { tags: ['custom'] }
+   *
+   * registry.setStrategy('tags', 'concat-unique')
+   * registry.resolve()
+   * // -> { tags: ['custom', 'core'] }
+   * ```
    */
-  strategy(path: string, strategy: WithDefaultsStrategy): void;
+  setStrategy(path: string, strategy: WithDefaultsStrategy): void;
 
   /**
    * Returns a shallow copy of every configured strategy.
@@ -138,8 +155,8 @@ export interface LayerRegistry<C extends object> {
  *
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies apply to per-layer and cross-layer merges alike.
- * Extend them at any time via `strategy`.
- * Results are cached and invalidated on `add`, `remove`, or `strategy`.
+ * Extend them at any time via `setStrategy`.
+ * Results are cached and invalidated on `add`, `remove`, or `setStrategy`.
  *
  * @example
  * ```ts
@@ -154,7 +171,7 @@ export interface LayerRegistry<C extends object> {
  *
  * registry.resolve() // -> { tags: ['user', 'core'], routes: [] }
  *
- * registry.strategy('tags', 'replace')
+ * registry.setStrategy('tags', 'replace')
  * registry.resolve() // -> { tags: ['user'], routes: [] }
  * ```
  */
@@ -205,7 +222,7 @@ export function createLayerRegistry<C extends object>(
       void version.value;
       return ensureFresh();
     },
-    strategy(path, value) {
+    setStrategy(path, value) {
       strategies[path] = value;
       invalidate();
     },

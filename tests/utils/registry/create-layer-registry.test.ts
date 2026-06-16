@@ -72,14 +72,14 @@ describe('createLayerRegistry', () => {
     deepStrictEqual(r.resolve(), { tags: ['b', 'a'] });
   });
 
-  it('strategy() extends and overrides strategies', () => {
+  it('setStrategy() extends and overrides strategies', () => {
     interface Config {
       tags: string[];
     }
     const r = createLayerRegistry<Config>({ strategies: { tags: 'concat' } });
     r.add({ path: '/p', defaults: { tags: ['a'] }, input: { tags: ['a', 'b'] } });
     deepStrictEqual(r.layers()[0]!.resolved, { tags: ['a', 'b', 'a'] });
-    r.strategy('tags', 'concat-unique');
+    r.setStrategy('tags', 'concat-unique');
     deepStrictEqual(r.layers()[0]!.resolved, { tags: ['a', 'b'] });
   });
 
@@ -104,7 +104,7 @@ describe('createLayerRegistry', () => {
     const r = createLayerRegistry<{ a: number }>();
     r.add({ path: '/p', input: { a: 1 } });
     const first = r.layers();
-    r.strategy('a', 'replace');
+    r.setStrategy('a', 'replace');
     const second = r.layers();
     strictEqual(first === second, false);
   });
@@ -243,7 +243,7 @@ describe('createLayerRegistry', () => {
         snapshot = r.resolve().tags ?? [];
       });
       deepStrictEqual(snapshot, ['b']);
-      r.strategy('tags', 'concat-unique');
+      r.setStrategy('tags', 'concat-unique');
       deepStrictEqual(snapshot, ['b', 'a']);
     });
 

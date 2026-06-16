@@ -21,7 +21,7 @@ const registry: LayerRegistry<Config> = createLayerRegistry<Config>();
  *
  * const layers = useLayers()
  *
- * layers.strategy('tags', 'concat-unique')
+ * layers.setStrategy('tags', 'concat-unique')
  * layers.add({ path: '/base', defaults: { tags: ['core'] } })
  * layers.add({ path: '/user', input:    { tags: ['custom'] } })
  *
