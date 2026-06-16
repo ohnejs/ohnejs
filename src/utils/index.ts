@@ -106,6 +106,7 @@ export * from './reactive/computed.ts';
 export * from './reactive/effect.ts';
 export * from './reactive/ref.ts';
 export * from './reactive/untracked.ts';
+export * from './registry/create-env-registry.ts';
 export * from './registry/create-layer-registry.ts';
 export * from './registry/create-registry.ts';
 export * from './route/compile-route.ts';
