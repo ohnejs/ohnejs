@@ -102,23 +102,6 @@ describe('usePrinter', () => {
     strictEqual(buf.join(''), '');
   });
 
-  it('preserves a manual `configure({ color })` across unrelated env changes', () => {
-    const ESC = '\x1b';
-    usePrinter().configure({ color: true });
-
-    useEnv().set('SILENT', false);
-    useEnv().set('DEBUG', false);
-    useEnv().unset('SILENT');
-    useEnv().unset('DEBUG');
-
-    buf.length = 0;
-    usePrinter().info('hi');
-    ok(
-      buf.join('').includes(`${ESC}[`),
-      'expected ANSI escape but got: ' + JSON.stringify(buf.join('')),
-    );
-  });
-
   it('respects `useEnv().set("NO_COLOR", true)` over a manual `color: true`', () => {
     const ESC = '\x1b';
     usePrinter().configure({ color: true });

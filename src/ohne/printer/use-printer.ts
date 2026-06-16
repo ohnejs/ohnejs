@@ -1,5 +1,5 @@
-import { computed, effect, isUndefined } from '../../utils/index.ts';
-import { createPrinter, type Printer, type PrinterConfig } from '../../utils/print/index.ts';
+import { computed, effect } from '../../utils/index.ts';
+import { createPrinter, type Printer } from '../../utils/print/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { useConfig } from '../layers/use-config.ts';
 
@@ -14,10 +14,7 @@ const debug = computed(() =>
 const color = computed(() => (useEnv().get('NO_COLOR') ? false : useEnv().get('FORCE_COLOR')));
 
 effect(() => {
-  const partial: PrinterConfig = { silent: silent.value, debug: debug.value };
-  const c = color.value;
-  if (!isUndefined(c)) partial.color = c;
-  printer.configure(partial);
+  printer.configure({ silent: silent.value, debug: debug.value, color: color.value });
 });
 
 /**
