@@ -1,12 +1,14 @@
 import type { Config } from './config.ts';
 
+import { computed, type ComputedRef } from '../../utils/index.ts';
 import { useLayers } from './use-layers.ts';
 
+const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
+
 /**
- * Returns the resolved `Config`: the closest layer's cumulative resolved view.
+ * Returns the current `Config`, merged from every active layer.
  *
- * Backed by the cache in `useLayers()`.
- * Consecutive calls without an `add` or `strategy` change return the same object in O(1).
+ * Reactive: reads inside an `effect` or `computed` re-run when layers change.
  *
  * @example
  * ```ts
@@ -22,5 +24,5 @@ import { useLayers } from './use-layers.ts';
  * ```
  */
 export function useConfig(): Config {
-  return useLayers().resolve();
+  return cached.value;
 }

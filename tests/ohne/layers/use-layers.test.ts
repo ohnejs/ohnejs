@@ -1,6 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 import { useConfig, useLayers } from 'ohne';
+import { effect } from 'ohne/utils';
 
 declare module 'ohne' {
   interface Config {
@@ -42,5 +43,17 @@ describe('useLayers / useConfig', () => {
     const first = layers.layers();
     const second = layers.layers();
     strictEqual(first, second);
+  });
+
+  it('useConfig inside an effect re-runs on layer mutations', () => {
+    let runs = 0;
+    effect(() => {
+      useConfig();
+      runs++;
+    });
+    const before = runs;
+    useLayers().add({ path: '/test-reactive-effect', defaults: { foo: 99 } });
+    strictEqual(runs, before + 1);
+    useLayers().remove('/test-reactive-effect');
   });
 });
