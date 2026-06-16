@@ -26,7 +26,7 @@ effect(() => {
  * - `NO_COLOR`, `FORCE_COLOR` - ANSI colors (env-only).
  *
  * Env wins when set; `Config.printer` is the fallback.
- * The same instance reflects later changes - call `usePrinter()` once.
+ * The instance reconfigures live as env or `Config.printer` change.
  *
  * @example
  * ```ts

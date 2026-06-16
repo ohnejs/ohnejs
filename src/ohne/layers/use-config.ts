@@ -8,7 +8,7 @@ const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
 /**
  * Returns the current `Config`, merged from every active layer.
  *
- * Reactive: reads inside an `effect` or `computed` re-run when layers change.
+ * Reads inside an `effect` or `computed` re-run when layers change.
  *
  * @example
  * ```ts

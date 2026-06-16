@@ -7,9 +7,14 @@ const registry: LayerRegistry<Config> = createLayerRegistry<Config>();
 /**
  * Returns the process-wide layer registry for the ohne `Config`.
  *
- * Use it to register layers and configure `withDefaults` strategies.
- * Inspect the cumulative resolved chain via `layers()` or `resolve()`.
- * Augment `Config` via `declare module 'ohne'` to add typed fields.
+ * Layers stack in registration order.
+ * Later layers override earlier ones; earlier layers fill in what's missing.
+ * Add a layer with `add`, read the merged config with `resolve`, walk the stack with `layers`.
+ *
+ * Merge: plain objects combine per key; arrays and other values are replaced by the later layer.
+ * Override per-field via `setStrategy`.
+ *
+ * Extend the typed shape via `declare module 'ohne'`.
  *
  * @example
  * ```ts
