@@ -4,6 +4,8 @@ import { useEnv, useLayers, usePrinter } from 'ohne';
 
 function capture(): string[] {
   const buf: string[] = [];
+  useEnv().set('NO_COLOR', false);
+  useEnv().set('FORCE_COLOR', undefined);
   usePrinter().configure({ stream: { write: (s: string) => buf.push(s) }, color: false });
   return buf;
 }
