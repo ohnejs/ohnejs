@@ -4,7 +4,7 @@ import { isString } from '../is/is-string.ts';
 /**
  * Decides whether `namespace` is enabled by a `DEBUG`-style filter `pattern`.
  *
- * `pattern` is typically a raw env-var value (e.g. `process.env.DEBUG`).
+ * `pattern` is typically a raw env-var value (e.g. `process.env['DEBUG']`).
  *
  * Returns `true` when any of:
  * - `pattern` is booleanish-true (`1`, `true`, case-insensitive).
