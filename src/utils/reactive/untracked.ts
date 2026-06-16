@@ -1,9 +1,11 @@
-import { runWithEffect } from './_runtime.ts';
+import { runUntracked } from './_runtime.ts';
 
 /**
- * Runs `fn` with no active effect.
+ * Runs `fn` with reactive tracking suspended.
  *
  * Reads of `Ref.value` or `ComputedRef.value` inside `fn` do NOT subscribe the outer effect.
+ * Writes still trigger subscribers as usual.
+ * The outer effect is not re-triggered by its own self-write inside `fn`.
  * Returns whatever `fn` returns.
  *
  * @example
@@ -19,5 +21,5 @@ import { runWithEffect } from './_runtime.ts';
  * ```
  */
 export function untracked<T>(fn: () => T): T {
-  return runWithEffect(null, fn);
+  return runUntracked(fn);
 }

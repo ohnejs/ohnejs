@@ -13,7 +13,8 @@ export interface Effect {
   active: boolean;
 }
 
-const effectStack: (Effect | null)[] = [];
+const effectStack: Effect[] = [];
+let shouldTrack = true;
 
 /**
  * Returns the effect at the top of the stack, or `null` if none is active.
@@ -24,14 +25,32 @@ export function activeEffect(): Effect | null {
 
 /**
  * Runs `fn` with `e` pushed as the active effect, then pops it.
- * Pass `null` to suppress tracking (used by `untracked`).
+ * Tracking is forced on for the duration.
+ * An effect or computed nested inside an `untracked` block still subscribes to its deps.
  */
-export function runWithEffect<T>(e: Effect | null, fn: () => T): T {
+export function runWithEffect<T>(e: Effect, fn: () => T): T {
   effectStack.push(e);
+  const prevTrack = shouldTrack;
+  shouldTrack = true;
   try {
     return fn();
   } finally {
+    shouldTrack = prevTrack;
     effectStack.pop();
+  }
+}
+
+/**
+ * Runs `fn` with reactive tracking suspended, then restores the prior state.
+ * The active effect stays on the stack so `trigger` still skips it on a self-write.
+ */
+export function runUntracked<T>(fn: () => T): T {
+  const prev = shouldTrack;
+  shouldTrack = false;
+  try {
+    return fn();
+  } finally {
+    shouldTrack = prev;
   }
 }
 
@@ -56,9 +75,10 @@ export function runEffect(e: Effect): void {
 
 /**
  * Registers the active effect as a subscriber of `subs`.
- * No-op when no effect is active or when already subscribed.
+ * No-op when tracking is suspended, when no effect is active, or when already subscribed.
  */
 export function track(subs: Set<Effect>): void {
+  if (!shouldTrack) return;
   const e = activeEffect();
   if (isNull(e) || subs.has(e)) return;
   subs.add(e);
