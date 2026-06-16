@@ -23,10 +23,16 @@ export function effect(fn: () => void): () => void {
     deps: new Set(),
     active: true,
   };
-  runEffect(e);
-  return () => {
+  const stop = () => {
     if (!e.active) return;
     e.active = false;
     cleanup(e);
   };
+  try {
+    runEffect(e);
+  } catch (err) {
+    stop();
+    throw err;
+  }
+  return stop;
 }

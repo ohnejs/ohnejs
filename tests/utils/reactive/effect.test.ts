@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { doesNotThrow, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { effect } from '../../../src/utils/reactive/effect.ts';
@@ -97,5 +97,18 @@ describe('effect', () => {
     a.value = 1;
     strictEqual(outerRuns, 2);
     strictEqual(innerRuns, 3);
+  });
+
+  it('does not leave a zombie subscriber when `fn` throws on creation', () => {
+    const r = ref(0);
+    try {
+      effect(() => {
+        void r.value;
+        throw new Error('init');
+      });
+    } catch {}
+    doesNotThrow(() => {
+      r.value = 1;
+    });
   });
 });
