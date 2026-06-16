@@ -12,13 +12,13 @@ import { pathNameSegments } from './path-name-segments.ts';
  *
  * @example
  * ```ts
- * pathToCamelName('foo/bar-baz.ts')    // -> 'fooBarBaz'
- * pathToCamelName('foo/index.ts')      // -> 'foo'
- * pathToCamelName('HTML/content.ts')   // -> 'htmlContent'
- * pathToCamelName('content/HTML.ts')   // -> 'contentHTML'
- * pathToCamelName('foo/BAR.ts')        // -> 'fooBAR'
- * pathToCamelName('index.ts')          // -> ''
- * pathToCamelName('')                  // -> ''
+ * pathToCamelName('foo/bar-baz.ts')  // -> 'fooBarBaz'
+ * pathToCamelName('foo/index.ts')    // -> 'foo'
+ * pathToCamelName('HTML/content.ts') // -> 'htmlContent'
+ * pathToCamelName('content/HTML.ts') // -> 'contentHTML'
+ * pathToCamelName('foo/BAR.ts')      // -> 'fooBAR'
+ * pathToCamelName('index.ts')        // -> ''
+ * pathToCamelName('')                // -> ''
  * ```
  */
 export function pathToCamelName(relativePath: string): string {

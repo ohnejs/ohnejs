@@ -14,13 +14,13 @@ import { isUndefined } from '../is/is-undefined.ts';
  *
  * @example
  * ```ts
- * normalizePath('foo//bar/./baz')          // -> 'foo/bar/baz'
- * normalizePath('foo/bar/../baz')          // -> 'foo/baz'
- * normalizePath('/foo/../..')              // -> '/'
- * normalizePath('foo/../..')               // -> '..'
- * normalizePath('C:\\foo\\..\\bar')        // -> 'C:/bar'
- * normalizePath('//server/share/a/../b')   // -> '//server/share/b'
- * normalizePath('')                        // -> '.'
+ * normalizePath('foo//bar/./baz')        // -> 'foo/bar/baz'
+ * normalizePath('foo/bar/../baz')        // -> 'foo/baz'
+ * normalizePath('/foo/../..')            // -> '/'
+ * normalizePath('foo/../..')             // -> '..'
+ * normalizePath('C:\\foo\\..\\bar')      // -> 'C:/bar'
+ * normalizePath('//server/share/a/../b') // -> '//server/share/b'
+ * normalizePath('')                      // -> '.'
  * ```
  */
 export function normalizePath(path: string): string {

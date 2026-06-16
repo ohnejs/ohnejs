@@ -10,12 +10,12 @@ import { pathNameSegments } from './path-name-segments.ts';
  *
  * @example
  * ```ts
- * pathToPascalName('foo/bar-baz.ts')   // -> 'FooBarBaz'
- * pathToPascalName('foo/index.ts')     // -> 'Foo'
- * pathToPascalName('HTML/parser.ts')   // -> 'HTMLParser'
- * pathToPascalName('parser/HTML.ts')   // -> 'ParserHTML'
- * pathToPascalName('index.ts')         // -> ''
- * pathToPascalName('')                 // -> ''
+ * pathToPascalName('foo/bar-baz.ts') // -> 'FooBarBaz'
+ * pathToPascalName('foo/index.ts')   // -> 'Foo'
+ * pathToPascalName('HTML/parser.ts') // -> 'HTMLParser'
+ * pathToPascalName('parser/HTML.ts') // -> 'ParserHTML'
+ * pathToPascalName('index.ts')       // -> ''
+ * pathToPascalName('')               // -> ''
  * ```
  */
 export function pathToPascalName(relativePath: string): string {

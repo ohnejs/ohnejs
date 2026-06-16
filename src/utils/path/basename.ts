@@ -10,12 +10,12 @@ import { pathRoot } from './path-root.ts';
  *
  * @example
  * ```ts
- * basename('/foo/bar.txt')               // -> 'bar.txt'
- * basename('/foo/bar.txt', '.txt')       // -> 'bar'
- * basename('/foo/bar/')                  // -> 'bar'
- * basename('C:/foo')                     // -> 'foo'
- * basename('.hidden', '.hidden')         // -> '.hidden'
- * basename('/')                          // -> ''
+ * basename('/foo/bar.txt')         // -> 'bar.txt'
+ * basename('/foo/bar.txt', '.txt') // -> 'bar'
+ * basename('/foo/bar/')            // -> 'bar'
+ * basename('C:/foo')               // -> 'foo'
+ * basename('.hidden', '.hidden')   // -> '.hidden'
+ * basename('/')                    // -> ''
  * ```
  */
 export function basename(path: string, ext?: string): string {

@@ -18,15 +18,15 @@ import { isString } from '../is/is-string.ts';
  *
  * @example
  * ```ts
- * isDebugEnabled('ohne', '1')              // -> true
- * isDebugEnabled('ohne', 'true')           // -> true
- * isDebugEnabled('ohne', '*')              // -> true
- * isDebugEnabled('ohne', 'ohne')           // -> true
- * isDebugEnabled('ohne', 'ohne:*')         // -> true
- * isDebugEnabled('ohne:cli', 'ohne:*')     // -> true
- * isDebugEnabled('ohne', 'express:*')      // -> false
- * isDebugEnabled('ohne', 'false')          // -> false
- * isDebugEnabled('ohne', undefined)        // -> false
+ * isDebugEnabled('ohne', '1')          // -> true
+ * isDebugEnabled('ohne', 'true')       // -> true
+ * isDebugEnabled('ohne', '*')          // -> true
+ * isDebugEnabled('ohne', 'ohne')       // -> true
+ * isDebugEnabled('ohne', 'ohne:*')     // -> true
+ * isDebugEnabled('ohne:cli', 'ohne:*') // -> true
+ * isDebugEnabled('ohne', 'express:*')  // -> false
+ * isDebugEnabled('ohne', 'false')      // -> false
+ * isDebugEnabled('ohne', undefined)    // -> false
  * ```
  */
 export function isDebugEnabled(namespace: string, pattern: string | undefined): boolean {

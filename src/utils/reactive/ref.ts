@@ -23,9 +23,9 @@ export interface Ref<T> {
  * ```ts
  * const count = ref(0)
  *
- * effect(() => console.log(count.value))  // logs 0
- * count.value = 1                         // logs 1
- * count.value = 1                         // no-op (Object.is equal)
+ * effect(() => console.log(count.value)) // logs 0
+ * count.value = 1                        // logs 1
+ * count.value = 1                        // no-op (Object.is equal)
  * ```
  */
 export function ref<T>(initial: T): Ref<T> {

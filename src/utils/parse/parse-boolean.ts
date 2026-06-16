@@ -8,13 +8,13 @@ import { isBoolean } from '../is/is-boolean.ts';
  *
  * @example
  * ```ts
- * parseBoolean(true)    // -> true
- * parseBoolean(0)       // -> false
- * parseBoolean('TRUE')  // -> true
- * parseBoolean('0')     // -> false
- * parseBoolean('yes')   // throws
- * parseBoolean(2)       // throws
- * parseBoolean(null)    // throws
+ * parseBoolean(true)   // -> true
+ * parseBoolean(0)      // -> false
+ * parseBoolean('TRUE') // -> true
+ * parseBoolean('0')    // -> false
+ * parseBoolean('yes')  // throws
+ * parseBoolean(2)      // throws
+ * parseBoolean(null)   // throws
  * ```
  */
 export function parseBoolean(raw: unknown): boolean {

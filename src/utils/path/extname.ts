@@ -8,12 +8,12 @@
  *
  * @example
  * ```ts
- * extname('foo.txt')             // -> '.txt'
- * extname('/a/b/foo.txt')        // -> '.txt'
- * extname('archive.tar.gz')      // -> '.gz'
- * extname('.hidden')             // -> ''
- * extname('foo')                 // -> ''
- * extname('foo.')                // -> '.'
+ * extname('foo.txt')        // -> '.txt'
+ * extname('/a/b/foo.txt')   // -> '.txt'
+ * extname('archive.tar.gz') // -> '.gz'
+ * extname('.hidden')        // -> ''
+ * extname('foo')            // -> ''
+ * extname('foo.')           // -> '.'
  * ```
  */
 export function extname(path: string): string {

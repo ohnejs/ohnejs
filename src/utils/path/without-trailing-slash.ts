@@ -6,11 +6,11 @@
  *
  * @example
  * ```ts
- * withoutTrailingSlash('foo/')         // -> 'foo'
- * withoutTrailingSlash('foo')          // -> 'foo'
- * withoutTrailingSlash('foo//')        // -> 'foo'
- * withoutTrailingSlash('foo//bar')     // -> 'foo/bar'
- * withoutTrailingSlash('/')            // -> ''
+ * withoutTrailingSlash('foo/')     // -> 'foo'
+ * withoutTrailingSlash('foo')      // -> 'foo'
+ * withoutTrailingSlash('foo//')    // -> 'foo'
+ * withoutTrailingSlash('foo//bar') // -> 'foo/bar'
+ * withoutTrailingSlash('/')        // -> ''
  * ```
  */
 export function withoutTrailingSlash(path: string): string {

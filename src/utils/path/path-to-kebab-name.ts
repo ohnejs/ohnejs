@@ -11,12 +11,12 @@ import { pathNameSegments } from './path-name-segments.ts';
  *
  * @example
  * ```ts
- * pathToKebabName('foo/bar-baz.ts')    // -> 'foo-bar-baz'
- * pathToKebabName('foo/index.ts')      // -> 'foo'
- * pathToKebabName('HTML/parser.ts')    // -> 'html-parser'
- * pathToKebabName('FooBar/baz.ts')     // -> 'foo-bar-baz'
- * pathToKebabName('index.ts')          // -> ''
- * pathToKebabName('')                  // -> ''
+ * pathToKebabName('foo/bar-baz.ts') // -> 'foo-bar-baz'
+ * pathToKebabName('foo/index.ts')   // -> 'foo'
+ * pathToKebabName('HTML/parser.ts') // -> 'html-parser'
+ * pathToKebabName('FooBar/baz.ts')  // -> 'foo-bar-baz'
+ * pathToKebabName('index.ts')       // -> ''
+ * pathToKebabName('')               // -> ''
  * ```
  */
 export function pathToKebabName(relativePath: string): string {

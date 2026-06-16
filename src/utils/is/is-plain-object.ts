@@ -7,10 +7,10 @@ import { isObject } from './is-object.ts';
  *
  * @example
  * ```ts
- * isPlainObject({})                    // -> true
- * isPlainObject(Object.create(null))   // -> true
- * isPlainObject(new Map())             // -> false
- * isPlainObject([])                    // -> false
+ * isPlainObject({})                  // -> true
+ * isPlainObject(Object.create(null)) // -> true
+ * isPlainObject(new Map())           // -> false
+ * isPlainObject([])                  // -> false
  * ```
  */
 export function isPlainObject<T extends Record<string, unknown> = Record<string, unknown>>(

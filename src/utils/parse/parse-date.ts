@@ -8,12 +8,12 @@ import { isDate } from '../is/is-date.ts';
  *
  * @example
  * ```ts
- * parseDate(new Date())       // -> Date
- * parseDate(1718000000000)    // -> Date(2024-06-10T...)
- * parseDate('2024-06-10')     // -> Date(2024-06-10T...)
- * parseDate('2024-02-30')     // throws (impossible calendar date)
- * parseDate('not-a-date')     // throws
- * parseDate(true)             // throws
+ * parseDate(new Date())    // -> Date
+ * parseDate(1718000000000) // -> Date(2024-06-10T...)
+ * parseDate('2024-06-10')  // -> Date(2024-06-10T...)
+ * parseDate('2024-02-30')  // throws (impossible calendar date)
+ * parseDate('not-a-date')  // throws
+ * parseDate(true)          // throws
  * ```
  */
 export function parseDate(raw: unknown): Date {

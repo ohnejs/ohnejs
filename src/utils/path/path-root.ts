@@ -10,11 +10,11 @@
  *
  * @example
  * ```ts
- * pathRoot('/foo/bar')               // -> '/'
- * pathRoot('C:/foo')                 // -> 'C:/'
- * pathRoot('C:foo')                  // -> 'C:'
- * pathRoot('\\\\srv\\sh\\foo')       // -> '//srv/sh'
- * pathRoot('foo/bar')                // -> ''
+ * pathRoot('/foo/bar')         // -> '/'
+ * pathRoot('C:/foo')           // -> 'C:/'
+ * pathRoot('C:foo')            // -> 'C:'
+ * pathRoot('\\\\srv\\sh\\foo') // -> '//srv/sh'
+ * pathRoot('foo/bar')          // -> ''
  * ```
  */
 export function pathRoot(path: string): string {

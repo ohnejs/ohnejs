@@ -11,11 +11,11 @@ import { pathRoot } from './path-root.ts';
  *
  * @example
  * ```ts
- * relativePath('/a/b/c', '/a/b/d')         // -> '../d'
- * relativePath('/a/b', '/a/b/c')           // -> 'c'
- * relativePath('a/b', 'a/b')               // -> ''
- * relativePath('a/b', 'a/c')               // -> '../c'
- * relativePath('C:/a/b', 'D:/x')           // -> 'D:/x'
+ * relativePath('/a/b/c', '/a/b/d') // -> '../d'
+ * relativePath('/a/b', '/a/b/c')   // -> 'c'
+ * relativePath('a/b', 'a/b')       // -> ''
+ * relativePath('a/b', 'a/c')       // -> '../c'
+ * relativePath('C:/a/b', 'D:/x')   // -> 'D:/x'
  * ```
  */
 export function relativePath(from: string, to: string): string {

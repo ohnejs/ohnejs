@@ -14,12 +14,12 @@ import { pathNameSegments } from '../path/path-name-segments.ts';
  *
  * @example
  * ```ts
- * pathToRoutePattern('./foo/[bar]/index.ts')   // -> '/foo/[bar]'
- * pathToRoutePattern('./foo/bar.tsx')          // -> '/foo/bar'
- * pathToRoutePattern('./[id]/posts.ts')        // -> '/[id]/posts'
- * pathToRoutePattern('./files/[...path].ts')   // -> '/files/[...path]'
- * pathToRoutePattern('./users/:id.ts')         // -> '/users/:id'
- * pathToRoutePattern('./index.ts')             // -> '/'
+ * pathToRoutePattern('./foo/[bar]/index.ts') // -> '/foo/[bar]'
+ * pathToRoutePattern('./foo/bar.tsx')        // -> '/foo/bar'
+ * pathToRoutePattern('./[id]/posts.ts')      // -> '/[id]/posts'
+ * pathToRoutePattern('./files/[...path].ts') // -> '/files/[...path]'
+ * pathToRoutePattern('./users/:id.ts')       // -> '/users/:id'
+ * pathToRoutePattern('./index.ts')           // -> '/'
  * ```
  */
 export function pathToRoutePattern(relativePath: string): string {

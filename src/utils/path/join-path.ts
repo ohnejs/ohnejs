@@ -10,11 +10,11 @@ import { normalizePath } from './normalize-path.ts';
  *
  * @example
  * ```ts
- * joinPath('foo', 'bar', 'baz')         // -> 'foo/bar/baz'
- * joinPath('/foo/', '/bar/', 'baz')     // -> '/foo/bar/baz'
- * joinPath('foo', '..', 'bar')          // -> 'bar'
- * joinPath('C:\\foo', 'bar')            // -> 'C:/foo/bar'
- * joinPath()                            // -> '.'
+ * joinPath('foo', 'bar', 'baz')     // -> 'foo/bar/baz'
+ * joinPath('/foo/', '/bar/', 'baz') // -> '/foo/bar/baz'
+ * joinPath('foo', '..', 'bar')      // -> 'bar'
+ * joinPath('C:\\foo', 'bar')        // -> 'C:/foo/bar'
+ * joinPath()                        // -> '.'
  * ```
  */
 export function joinPath(...segments: string[]): string {

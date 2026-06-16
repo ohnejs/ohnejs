@@ -8,8 +8,8 @@ import { readFile as fsReadFile } from 'node:fs/promises';
  *
  * @example
  * ```ts
- * await readFile('./.env')      // -> string contents
- * await readFile('./missing')   // -> null
+ * await readFile('./.env')    // -> string contents
+ * await readFile('./missing') // -> null
  * ```
  */
 export async function readFile(path: string): Promise<string | null> {

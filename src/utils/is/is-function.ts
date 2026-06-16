@@ -4,8 +4,8 @@
  *
  * @example
  * ```ts
- * isFunction(() => 1)                       // -> true
- * isFunction(1)                             // -> false
+ * isFunction(() => 1)                             // -> true
+ * isFunction(1)                                   // -> false
  * if (isFunction<(x: number) => string>(v)) v(42) // typed as string
  * ```
  */

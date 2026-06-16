@@ -9,14 +9,14 @@ const INTEGER = /^[+-]?(?:0|[1-9]\d*)$/;
  *
  * @example
  * ```ts
- * isIntegerString('0')      // -> true
- * isIntegerString('-7')     // -> true
- * isIntegerString('+5')     // -> true
- * isIntegerString('1.5')    // -> false
- * isIntegerString('1e3')    // -> false
- * isIntegerString('007')    // -> false
- * isIntegerString('0x10')   // -> false
- * isIntegerString(42)       // -> false
+ * isIntegerString('0')    // -> true
+ * isIntegerString('-7')   // -> true
+ * isIntegerString('+5')   // -> true
+ * isIntegerString('1.5')  // -> false
+ * isIntegerString('1e3')  // -> false
+ * isIntegerString('007')  // -> false
+ * isIntegerString('0x10') // -> false
+ * isIntegerString(42)     // -> false
  * ```
  */
 export function isIntegerString(value: unknown): value is string {

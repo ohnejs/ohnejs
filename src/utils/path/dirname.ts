@@ -10,14 +10,14 @@ import { pathRoot } from './path-root.ts';
  *
  * @example
  * ```ts
- * dirname('/foo/bar/baz')        // -> '/foo/bar'
- * dirname('/foo')                // -> '/'
- * dirname('foo/bar')             // -> 'foo'
- * dirname('foo')                 // -> '.'
- * dirname('C:/foo/bar')          // -> 'C:/foo'
- * dirname('C:/foo')              // -> 'C:/'
- * dirname('//srv/sh/foo')        // -> '//srv/sh'
- * dirname('')                    // -> '.'
+ * dirname('/foo/bar/baz') // -> '/foo/bar'
+ * dirname('/foo')         // -> '/'
+ * dirname('foo/bar')      // -> 'foo'
+ * dirname('foo')          // -> '.'
+ * dirname('C:/foo/bar')   // -> 'C:/foo'
+ * dirname('C:/foo')       // -> 'C:/'
+ * dirname('//srv/sh/foo') // -> '//srv/sh'
+ * dirname('')             // -> '.'
  * ```
  */
 export function dirname(path: string): string {
