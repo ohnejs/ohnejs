@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { createLayerRegistry, last } from '../../../src/utils/index.ts';
+import { createLayerRegistry, effect, last } from '../../../src/utils/index.ts';
 
 describe('createLayerRegistry', () => {
   it('starts empty', () => {
@@ -207,5 +207,63 @@ describe('createLayerRegistry', () => {
     r.remove('/p');
     r.add({ path: '/p', input: { a: 99 } });
     deepStrictEqual(r.resolve(), { a: 99 });
+  });
+
+  describe('reactivity', () => {
+    it('`resolve` inside an effect re-runs on `add`', () => {
+      const r = createLayerRegistry<{ a: number }>();
+      let seen: number | undefined;
+      effect(() => {
+        seen = r.resolve().a;
+      });
+      strictEqual(seen, undefined);
+      r.add({ path: '/p', defaults: { a: 1 } });
+      strictEqual(seen, 1);
+    });
+
+    it('`resolve` inside an effect re-runs on `remove`', () => {
+      const r = createLayerRegistry<{ a: number }>();
+      r.add({ path: '/p', defaults: { a: 1 } });
+      let runs = 0;
+      effect(() => {
+        r.resolve();
+        runs++;
+      });
+      strictEqual(runs, 1);
+      r.remove('/p');
+      strictEqual(runs, 2);
+    });
+
+    it('`resolve` inside an effect re-runs on `strategy`', () => {
+      const r = createLayerRegistry<{ tags: string[] }>();
+      r.add({ path: '/base', defaults: { tags: ['a'] } });
+      r.add({ path: '/over', input: { tags: ['b'] } });
+      let snapshot: string[] = [];
+      effect(() => {
+        snapshot = r.resolve().tags ?? [];
+      });
+      deepStrictEqual(snapshot, ['b']);
+      r.strategy('tags', 'concat-unique');
+      deepStrictEqual(snapshot, ['b', 'a']);
+    });
+
+    it('`layers` and `strategies` reads also subscribe', () => {
+      const r = createLayerRegistry<{ a: number }>();
+      let layersRuns = 0;
+      let stratsRuns = 0;
+      effect(() => {
+        r.layers();
+        layersRuns++;
+      });
+      effect(() => {
+        r.strategies();
+        stratsRuns++;
+      });
+      strictEqual(layersRuns, 1);
+      strictEqual(stratsRuns, 1);
+      r.add({ path: '/p', defaults: { a: 1 } });
+      strictEqual(layersRuns, 2);
+      strictEqual(stratsRuns, 2);
+    });
   });
 });

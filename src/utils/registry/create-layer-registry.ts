@@ -2,6 +2,7 @@ import { last } from '../array/last.ts';
 import { withDefaults, type WithDefaultsStrategy } from '../defaults/with-defaults.ts';
 import { isNull } from '../is/is-null.ts';
 import { isUndefined } from '../is/is-undefined.ts';
+import { ref } from '../reactive/ref.ts';
 
 /**
  * `withDefaults` strategies keyed by dot-notation path.
@@ -163,6 +164,12 @@ export function createLayerRegistry<C extends object>(
   const specs: LayerSpec<C>[] = [];
   const strategies: LayerStrategies = { ...options?.strategies };
   let cached: Layer<C>[] | null = null;
+  const version = ref(0);
+
+  function invalidate(): void {
+    cached = null;
+    version.value++;
+  }
 
   function ensureFresh(): Layer<C>[] {
     if (!isNull(cached)) return cached;
@@ -185,26 +192,29 @@ export function createLayerRegistry<C extends object>(
         throw new Error(`Layer already registered at path: ${spec.path}`);
       }
       specs.push(spec);
-      cached = null;
+      invalidate();
     },
     remove(path) {
       const idx = specs.findIndex((s) => s.path === path);
       if (idx === -1) return false;
       specs.splice(idx, 1);
-      cached = null;
+      invalidate();
       return true;
     },
     layers() {
+      void version.value;
       return ensureFresh();
     },
     strategy(path, value) {
       strategies[path] = value;
-      cached = null;
+      invalidate();
     },
     strategies() {
+      void version.value;
       return { ...strategies };
     },
     resolve() {
+      void version.value;
       const all = ensureFresh();
       if (all.length === 0) return {} as C;
       return last(all)!.resolved as C;
