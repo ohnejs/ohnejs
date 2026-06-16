@@ -351,52 +351,35 @@ describe('createPrinter', () => {
   });
 
   describe('color detection', () => {
-    function envSandbox(vars: Record<string, string | undefined>, run: () => void): void {
-      const prev: Record<string, string | undefined> = {};
-      for (const k of Object.keys(vars)) prev[k] = process.env[k];
-      try {
-        for (const [k, v] of Object.entries(vars)) {
-          if (v === undefined) delete process.env[k];
-          else process.env[k] = v;
-        }
-        run();
-      } finally {
-        for (const [k, v] of Object.entries(prev)) {
-          if (v === undefined) delete process.env[k];
-          else process.env[k] = v;
-        }
-      }
-    }
+    it('emits ANSI when the stream is a TTY', () => {
+      const buf: string[] = [];
+      const printer = createPrinter({ stream: { write: (s) => buf.push(s), isTTY: true } });
+      printer.success('x');
+      ok(buf.join('').includes(`${E}[`));
+    });
 
-    function colorOn(env: Record<string, string | undefined>): boolean {
-      let result = false;
-      envSandbox(env, () => {
-        const buf: string[] = [];
-        const printer = createPrinter({ stream: { write: (s) => buf.push(s) } });
-        printer.success('x');
-        result = buf.join('').includes(`${E}[`);
+    it('strips ANSI when the stream is not a TTY', () => {
+      const buf: string[] = [];
+      const printer = createPrinter({ stream: { write: (s) => buf.push(s) } });
+      printer.success('x');
+      ok(!buf.join('').includes(`${E}[`));
+    });
+
+    it('honors an explicit `color: true` override even without a TTY', () => {
+      const buf: string[] = [];
+      const printer = createPrinter({ color: true, stream: { write: (s) => buf.push(s) } });
+      printer.success('x');
+      ok(buf.join('').includes(`${E}[`));
+    });
+
+    it('honors an explicit `color: false` override on a TTY', () => {
+      const buf: string[] = [];
+      const printer = createPrinter({
+        color: false,
+        stream: { write: (s) => buf.push(s), isTTY: true },
       });
-      return result;
-    }
-
-    it('treats `FORCE_COLOR=0` as disabled', () => {
-      strictEqual(colorOn({ NO_COLOR: undefined, FORCE_COLOR: '0' }), false);
-    });
-
-    it('treats `FORCE_COLOR=false` as disabled', () => {
-      strictEqual(colorOn({ NO_COLOR: undefined, FORCE_COLOR: 'false' }), false);
-    });
-
-    it('treats `FORCE_COLOR=1` as enabled', () => {
-      strictEqual(colorOn({ NO_COLOR: undefined, FORCE_COLOR: '1' }), true);
-    });
-
-    it('treats `FORCE_COLOR=true` as enabled', () => {
-      strictEqual(colorOn({ NO_COLOR: undefined, FORCE_COLOR: 'true' }), true);
-    });
-
-    it('lets `NO_COLOR` win over auto-detect', () => {
-      strictEqual(colorOn({ NO_COLOR: '1', FORCE_COLOR: undefined }), false);
+      printer.success('x');
+      ok(!buf.join('').includes(`${E}[`));
     });
   });
 });

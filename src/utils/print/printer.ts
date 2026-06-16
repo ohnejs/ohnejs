@@ -1,5 +1,3 @@
-import { coerceToBoolean } from '../coerce/coerce-to-boolean.ts';
-import { isDebugEnabled } from '../debug/is-debug-enabled.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 
@@ -77,7 +75,6 @@ export interface BlockOptions {
 export interface PrinterConfig {
   /**
    * When `true`, every print call is dropped.
-   * Used by the singleton to honor `SILENT` without affecting test-owned printers.
    *
    * @default
    * false
@@ -94,9 +91,9 @@ export interface PrinterConfig {
   debug?: boolean | undefined;
 
   /**
-   * When set, overrides auto-detection.
+   * When set, overrides TTY auto-detection.
    * `true` always emits ANSI; `false` strips.
-   * Leave unset for the standard TTY / `NO_COLOR` / `FORCE_COLOR` detection.
+   * Leave unset to fall back to the stream's `isTTY`.
    */
   color?: boolean | undefined;
 
@@ -110,7 +107,7 @@ export interface PrinterConfig {
 /**
  * Terminal-UX writer.
  *
- * Use `print` for the global singleton (env-gated) or `createPrinter` to build an isolated instance.
+ * Build instances via `createPrinter`.
  *
  * Each severity has two methods:
  * - The bare name (`success`, `info`, ...) renders one line: `●` + message.
@@ -292,23 +289,6 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
   };
 }
 
-/**
- * Process-wide singleton.
- * `SILENT` drops every call when set to a truthy value (`1`, `true`, case-insensitive).
- * `DEBUG` enables `Printer.debug` and `Printer.debugBlock` when its filter matches namespace `ohne`.
- * Matching follows `isDebugEnabled`: booleanish values, `*`, exact name, or `ohne:*` all enable.
- *
- * @example
- * ```ts
- * print.info('starting build')
- * print.errorBlock({ title: 'Build failed', body: 'see logs above', path: 'dist/app.js' })
- * ```
- */
-export const print: Printer = createPrinter({
-  silent: coerceToBoolean(process.env['SILENT']) === true,
-  debug: isDebugEnabled('ohne', process.env['DEBUG']),
-});
-
 function renderLine(level: PrintLevel, message: string, colors: Colors): string {
   const tint = levelTint(level, colors);
   const isError = level === 'error';
@@ -417,8 +397,5 @@ function isColorEnabled(
   stream: { isTTY?: boolean } | undefined,
 ): boolean {
   if (!isUndefined(override)) return override;
-  if (process.env['NO_COLOR']) return false;
-  const force = process.env['FORCE_COLOR'];
-  if (force) return coerceToBoolean(force) !== false;
   return Boolean(stream?.isTTY);
 }
