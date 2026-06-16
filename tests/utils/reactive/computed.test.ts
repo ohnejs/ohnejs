@@ -84,4 +84,22 @@ describe('computed', () => {
     void c.value;
     strictEqual(runs, 1);
   });
+
+  it('an effect that caught a throw recovers when the dep changes', () => {
+    const cond = ref(true);
+    const c = computed(() => {
+      if (cond.value) throw new Error('not ready');
+      return 42;
+    });
+    let lastValue = -1;
+    effect(() => {
+      try {
+        lastValue = c.value;
+      } catch {}
+    });
+    strictEqual(lastValue, -1);
+
+    cond.value = false;
+    strictEqual(lastValue, 42);
+  });
 });

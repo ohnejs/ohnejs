@@ -42,7 +42,6 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
       cached = getter();
     },
     scheduler() {
-      if (dirty) return;
       dirty = true;
       trigger(subs);
     },
@@ -53,6 +52,7 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
   return {
     get value() {
       if (evaluating) throw new Error('Cyclic computed');
+      track(subs);
       if (dirty) {
         evaluating = true;
         try {
@@ -63,7 +63,6 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
           evaluating = false;
         }
       }
-      track(subs);
       return cached;
     },
   };
