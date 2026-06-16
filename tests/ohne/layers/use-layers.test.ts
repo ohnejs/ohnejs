@@ -5,7 +5,14 @@ import { effect } from 'ohne/utils';
 
 declare module 'ohne' {
   interface Config {
+    /**
+     * Test: `foo`
+     */
     foo?: number;
+
+    /**
+     * Test: `tags`
+     */
     tags?: string[];
   }
 }
