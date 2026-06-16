@@ -36,7 +36,7 @@ export interface LayerSpec<C extends object> {
   path: string;
 
   /**
-   * Defaults the layer ships with.
+   * Default config the layer ships with.
    *
    * @default
    * {}
@@ -44,7 +44,7 @@ export interface LayerSpec<C extends object> {
   defaults?: Partial<C>;
 
   /**
-   * Config the layer's author provided.
+   * Input config the layer's author provided.
    *
    * @default
    * {}
@@ -65,12 +65,12 @@ export interface Layer<C extends object> {
   path: string;
 
   /**
-   * Defaults the layer was registered with, normalised to `{}` if omitted.
+   * Default config the layer was registered with, normalised to `{}` if omitted.
    */
   defaults: Partial<C>;
 
   /**
-   * Input the layer was registered with, normalised to `{}` if omitted.
+   * Input config the layer was registered with, normalised to `{}` if omitted.
    */
   input: Partial<C>;
 
@@ -93,26 +93,24 @@ export interface LayerRegistry<C extends object> {
    * Appends a layer.
    * Closer than every layer added before it.
    * Throws when a layer is already registered at `spec.path`.
-   * Invalidates the cache.
    */
   add(spec: LayerSpec<C>): void;
 
   /**
    * Removes the layer registered at `path`.
    * Returns `true` if a layer was removed.
-   * Invalidates the cache.
    */
   remove(path: string): boolean;
 
   /**
    * Returns every registered layer in insertion order, with cumulative `resolved` filled in.
-   * Cached between mutations.
+   * Base layer first, closest layer last.
    */
   layers(): readonly Layer<C>[];
 
   /**
    * Sets the merge strategy at `path` for both per-layer and cross-layer merges.
-   * Overwrites any existing strategy at the same path and invalidates the cache.
+   * Overwrites any existing strategy at the same path.
    *
    * `path` is dot-notation: `'tags'`, `'server.routes'`, `'items[0].tag'`.
    * See `WithDefaultsStrategy` for the available strategies.
@@ -140,7 +138,7 @@ export interface LayerRegistry<C extends object> {
   strategies(): LayerStrategies;
 
   /**
-   * Returns the final resolved config: the closest layer's `resolved`, cast to `C`.
+   * Returns the final merged config.
    * Returns `{} as C` if no layers are registered.
    */
   resolve(): C;
@@ -167,7 +165,7 @@ export interface LayerRegistry<C extends object> {
  * })
  *
  * registry.add({ path: '/base', defaults: { tags: ['core'], routes: [] } })
- * registry.add({ path: '/user', input: { tags: ['user'] } })
+ * registry.add({ path: '/user', input:    { tags: ['user'] } })
  *
  * registry.resolve() // -> { tags: ['user', 'core'], routes: [] }
  *
