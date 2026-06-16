@@ -93,9 +93,19 @@ export function track(subs: Set<Effect>): void {
 export function trigger(subs: Set<Effect>): void {
   const current = activeEffect();
   const snapshot = Array.from(subs);
+  let firstError: unknown;
+  let captured = false;
   for (const e of snapshot) {
     if (e === current) continue;
-    if (e.scheduler) e.scheduler();
-    else runEffect(e);
+    try {
+      if (e.scheduler) e.scheduler();
+      else runEffect(e);
+    } catch (err) {
+      if (!captured) {
+        firstError = err;
+        captured = true;
+      }
+    }
   }
+  if (captured) throw firstError;
 }

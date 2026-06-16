@@ -66,4 +66,29 @@ describe('ref', () => {
     strictEqual(a, 2);
     strictEqual(b, 2);
   });
+
+  it('notifies later subscribers even when an earlier one throws on re-run', () => {
+    const r = ref(0);
+    let aRuns = 0;
+    let cRuns = 0;
+    let throws = false;
+    effect(() => {
+      void r.value;
+      aRuns++;
+    });
+    effect(() => {
+      void r.value;
+      if (throws) throw new Error('boom');
+    });
+    effect(() => {
+      void r.value;
+      cRuns++;
+    });
+    throws = true;
+    try {
+      r.value = 1;
+    } catch {}
+    strictEqual(aRuns, 2);
+    strictEqual(cRuns, 2);
+  });
 });
