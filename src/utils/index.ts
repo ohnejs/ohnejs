@@ -118,4 +118,7 @@ export * from './route/path-to-route.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
 export * from './suggest/suggest.ts';
+export * from './types/deep-prettify.ts';
+export * from './types/defined.ts';
+export * from './types/require-by-shape.ts';
 export * from './uniquify/uniquify.ts';
