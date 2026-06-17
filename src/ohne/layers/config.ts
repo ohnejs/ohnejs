@@ -30,8 +30,8 @@ export interface Config {
 
   /**
    * Printer settings consumed by `usePrinter`.
-   * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value;
-   * these fields only apply when the matching env var is unset.
+   * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value.
+   * These fields only apply when the matching env var is unset.
    */
   printer?: {
     /**
