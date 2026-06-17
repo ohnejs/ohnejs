@@ -23,6 +23,10 @@
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
     },
+    "./utils/cli": {
+      "types": "./src/utils/cli/index.ts",
+      "default": "./src/utils/cli/index.ts"
+    },
     "./utils/codegen": {
       "types": "./src/utils/codegen/index.ts",
       "default": "./src/utils/codegen/index.ts"
