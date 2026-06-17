@@ -5,3 +5,5 @@ export * from './layers/use-config.ts';
 export * from './layers/use-layers.ts';
 export * from './meta/version.ts';
 export * from './printer/use-printer.ts';
+export * from './project/is-ohne-project.ts';
+export * from './project/resolve-ohne-apps.ts';
