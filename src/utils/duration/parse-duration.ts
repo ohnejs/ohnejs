@@ -52,8 +52,8 @@ const SEGMENT =
  * Compact (`'7d'`), verbose (`'7 days'`), decimal (`'1.5h'`), and mixed (`'1h 30m'`) forms all work.
  * Units are case-insensitive.
  *
- * Recognized units: `ms`, `s`/`sec(s)`/`second(s)`, `m`/`min(s)`/`minute(s)`, `h`/`hr(s)`/`hour(s)`,
- * `d`/`day(s)`, `w`/`week(s)`, `mo`/`month(s)`, `y`/`yr`/`year(s)`.
+ * Recognized units: `ms`, `s`/`sec(s)`/`second(s)`, `m`/`min(s)`/`minute(s)`, `h`/`hr(s)`/`hour(s)`.
+ * Longer units: `d`/`day(s)`, `w`/`week(s)`, `mo`/`month(s)`, `y`/`yr`/`year(s)`.
  *
  * `mo` and `y` are fixed approximations: 30 days and 365 days.
  * They are meant for configuration values like session lifetimes and cache TTLs, not calendar arithmetic.
