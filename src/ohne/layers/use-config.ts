@@ -1,4 +1,4 @@
-import type { Config } from './config.ts';
+import type { Config, ResolvedConfig } from './config.ts';
 
 import { computed, type ComputedRef } from '../../utils/index.ts';
 import { useLayers } from './use-layers.ts';
@@ -6,7 +6,7 @@ import { useLayers } from './use-layers.ts';
 const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
 
 /**
- * Returns the current `Config`, merged from every active layer.
+ * Returns the current `ResolvedConfig`, merged from every active layer.
  *
  * Reads inside an `effect` or `computed` re-run when layers change.
  *
@@ -23,6 +23,6 @@ const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
  * useConfig() // -> { tags: ['core'] }
  * ```
  */
-export function useConfig(): Config {
+export function useConfig(): ResolvedConfig {
   return cached.value;
 }

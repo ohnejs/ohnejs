@@ -1,3 +1,5 @@
+import type { DeepPrettify, RequireByShape } from '../../utils/index.ts';
+
 /**
  * Typed ohne config.
  * Add fields by augmenting it from a layer with `declare module 'ohne'`.
@@ -49,3 +51,34 @@ export interface Config {
     debug?: boolean;
   };
 }
+
+/**
+ * Codegen extension point for the resolved config shape.
+ * Empty until codegen runs.
+ * The `resolved-config.ts` it emits adds a `defaults` tree marking every field a layer defaults.
+ *
+ * `type` aliases cannot be augmented, so the overridable shape lives on this interface instead.
+ *
+ * @example
+ * ```ts
+ * declare module 'ohne' {
+ *   interface ConfigExtensions {
+ *     defaults: {
+ *       dirs: {
+ *         codegen: true;
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ */
+export interface ConfigExtensions {}
+
+/**
+ * The config returned by `useConfig`, after every layer is merged.
+ * A field a layer defaults becomes required while keeping its declared type; the rest stay as in `Config`.
+ * Falls back to `Config` until codegen has run.
+ */
+export type ResolvedConfig = ConfigExtensions extends { defaults: infer D }
+  ? DeepPrettify<RequireByShape<Config, D>>
+  : Config;
