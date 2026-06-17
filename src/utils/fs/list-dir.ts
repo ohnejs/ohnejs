@@ -6,10 +6,9 @@ import { isArray } from '../is/is-array.ts';
 import { isNull } from '../is/is-null.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 import { extname } from '../path/extname.ts';
-import { isAbsolutePath } from '../path/is-absolute-path.ts';
 import { joinPath } from '../path/join-path.ts';
-import { normalizePath } from '../path/normalize-path.ts';
 import { relativePath } from '../path/relative-path.ts';
+import { resolvePath } from '../path/resolve-path.ts';
 
 /**
  * A single entry returned by `listDir`.
@@ -146,7 +145,7 @@ export async function listDir(
     followSymlinks = false,
   } = options;
 
-  const root = isAbsolutePath(path) ? normalizePath(path) : joinPath(process.cwd(), path);
+  const root = resolvePath(path);
   const allowedExts = isUndefined(ext) ? null : normalizeExtensions(ext);
 
   let rootDir: Dir;

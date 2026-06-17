@@ -3,10 +3,9 @@ import { removeFile } from '../fs/remove-file.ts';
 import { writeFileIfChanged } from '../fs/write-file-if-changed.ts';
 import { isNull } from '../is/is-null.ts';
 import { isUndefined } from '../is/is-undefined.ts';
-import { isAbsolutePath } from '../path/is-absolute-path.ts';
 import { joinPath } from '../path/join-path.ts';
-import { normalizePath } from '../path/normalize-path.ts';
 import { relativePath as toRelative } from '../path/relative-path.ts';
+import { resolvePath } from '../path/resolve-path.ts';
 
 /**
  * Options for `createGenerator`.
@@ -84,7 +83,7 @@ export interface Generator {
  */
 export function createGenerator(options: GeneratorOptions): Generator {
   const { dir, banner } = options;
-  const root = isAbsolutePath(dir) ? normalizePath(dir) : joinPath(process.cwd(), dir);
+  const root = resolvePath(dir);
   const written = new Set<string>();
 
   const generator: Generator = {
