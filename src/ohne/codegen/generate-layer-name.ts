@@ -1,4 +1,4 @@
-import { createCode, createGenerator, union } from '../../utils/codegen/index.ts';
+import { createCodeBuilder, createCodeGenerator, literalUnion } from '../../utils/codegen/index.ts';
 import { findUp } from '../../utils/fs/index.ts';
 import { dirname, isNull, joinPath } from '../../utils/index.ts';
 import { useConfig } from '../layers/use-config.ts';
@@ -23,10 +23,10 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
   const names = await resolveOhneApps(from);
   const dir = joinPath(dirname(manifestPath), useConfig().dirs?.codegen ?? '.ohne');
 
-  const code = createCode();
-  code.line(`export type LayerName = ${union(names)};`);
+  const code = createCodeBuilder();
+  code.line(`export type LayerName = ${literalUnion(names)};`);
 
-  const gen = createGenerator({ dir, banner: BANNER });
+  const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('layer-name.ts', code.toString());
   return gen.path('layer-name.ts');
 }
