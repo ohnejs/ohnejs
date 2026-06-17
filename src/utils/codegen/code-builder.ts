@@ -1,7 +1,7 @@
 /**
- * Options for `createCode`.
+ * Options for `createCodeBuilder`.
  */
-export interface CodeOptions {
+export interface CodeBuilderOptions {
   /**
    * Spaces per indentation level.
    *
@@ -12,29 +12,29 @@ export interface CodeOptions {
 }
 
 /**
- * A source-text builder returned by `createCode`.
+ * A source-text builder returned by `createCodeBuilder`.
  *
  * Lines are appended at the current indentation level.
  * Every method returns the same builder, so calls chain.
  */
-export interface Code {
+export interface CodeBuilder {
   /**
    * Appends one line at the current indent.
    * Pass nothing for a blank line.
    * Multi-line text is split and each line is indented; embedded blank lines stay blank.
    */
-  line(text?: string): Code;
+  line(text?: string): CodeBuilder;
 
   /**
    * Appends each item as its own line at the current indent.
    */
-  lines(items: string[]): Code;
+  lines(items: string[]): CodeBuilder;
 
   /**
    * Runs `build` with the indent raised one level, then restores it.
    * Nest calls for deeper levels.
    */
-  indent(build: () => void): Code;
+  indent(build: () => void): CodeBuilder;
 
   /**
    * Renders the accumulated lines, joined by `\n`, with a trailing newline.
@@ -51,19 +51,19 @@ export interface Code {
  *
  * @example
  * ```ts
- * const c = createCode()
+ * const c = createCodeBuilder()
  * c.line('const list = [')
  * c.indent(() => c.line('1,'))
  * c.line(']')
  * c.toString() // -> 'const list = [\n  1,\n]\n'
  * ```
  */
-export function createCode(options: CodeOptions = {}): Code {
+export function createCodeBuilder(options: CodeBuilderOptions = {}): CodeBuilder {
   const { size = 2 } = options;
   const out: string[] = [];
   let level = 0;
 
-  const code: Code = {
+  const code: CodeBuilder = {
     line(text = '') {
       if (text.length === 0) {
         out.push('');

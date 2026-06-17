@@ -20,11 +20,11 @@ const ESCAPE_PATTERN = /[\\'\n\r\t\u2028\u2029]/g;
  *
  * @example
  * ```ts
- * quote('./pages/index.ts') // -> "'./pages/index.ts'"
- * quote("it's")             // -> "'it\\'s'"
- * quote('C:\\app')          // -> "'C:\\\\app'"
+ * literalString('./pages/index.ts') // -> "'./pages/index.ts'"
+ * literalString("it's")             // -> "'it\\'s'"
+ * literalString('C:\\app')          // -> "'C:\\\\app'"
  * ```
  */
-export function quote(value: string): string {
+export function literalString(value: string): string {
   return `'${value.replace(ESCAPE_PATTERN, (char) => ESCAPES[char]!)}'`;
 }

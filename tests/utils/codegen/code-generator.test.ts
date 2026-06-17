@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { createGenerator } from '../../../src/utils/codegen/index.ts';
+import { createCodeGenerator } from '../../../src/utils/codegen/index.ts';
 
-describe('createGenerator', () => {
+describe('createCodeGenerator', () => {
   let root: string;
 
   before(() => {
@@ -18,30 +18,30 @@ describe('createGenerator', () => {
   });
 
   it('writes a file and reports the change', async () => {
-    const gen = createGenerator({ dir: join(root, 'write') });
+    const gen = createCodeGenerator({ dir: join(root, 'write') });
     strictEqual(await gen.write('imports.ts', 'export const x = 1\n'), true);
     strictEqual(readFileSync(gen.path('imports.ts'), 'utf8'), 'export const x = 1\n');
   });
 
   it('skips an unchanged file on a second run', async () => {
     const dir = join(root, 'unchanged');
-    const first = createGenerator({ dir });
+    const first = createCodeGenerator({ dir });
     await first.write('a.ts', 'same\n');
     const mtime = statSync(first.path('a.ts')).mtimeMs;
 
-    const second = createGenerator({ dir });
+    const second = createCodeGenerator({ dir });
     strictEqual(await second.write('a.ts', 'same\n'), false);
     strictEqual(statSync(second.path('a.ts')).mtimeMs, mtime);
   });
 
   it('prepends the banner to written files', async () => {
-    const gen = createGenerator({ dir: join(root, 'banner'), banner: '// generated' });
+    const gen = createCodeGenerator({ dir: join(root, 'banner'), banner: '// generated' });
     await gen.write('a.ts', 'body\n');
     strictEqual(readFileSync(gen.path('a.ts'), 'utf8'), '// generated\nbody\n');
   });
 
   it('tracks written paths in order', async () => {
-    const gen = createGenerator({ dir: join(root, 'tracked') });
+    const gen = createCodeGenerator({ dir: join(root, 'tracked') });
     await gen.write('a.ts', '1');
     await gen.write('nested/b.ts', '2');
     deepStrictEqual(gen.written(), ['a.ts', 'nested/b.ts']);
@@ -49,11 +49,11 @@ describe('createGenerator', () => {
 
   it('prunes files it did not write', async () => {
     const dir = join(root, 'prune');
-    const first = createGenerator({ dir });
+    const first = createCodeGenerator({ dir });
     await first.write('keep.ts', '1');
     await first.write('drop.ts', '2');
 
-    const second = createGenerator({ dir });
+    const second = createCodeGenerator({ dir });
     await second.write('keep.ts', '1');
     const removed = await second.prune();
 
@@ -64,7 +64,7 @@ describe('createGenerator', () => {
 
   it('prunes a file left behind by something else', async () => {
     const dir = join(root, 'prune-foreign');
-    const gen = createGenerator({ dir });
+    const gen = createCodeGenerator({ dir });
     await gen.write('mine.ts', '1');
     writeFileSync(join(dir, 'stale.ts'), 'old');
 
@@ -72,7 +72,7 @@ describe('createGenerator', () => {
   });
 
   it('prunes nothing when the directory does not exist', async () => {
-    const gen = createGenerator({ dir: join(root, 'absent') });
+    const gen = createCodeGenerator({ dir: join(root, 'absent') });
     deepStrictEqual(await gen.prune(), []);
   });
 });

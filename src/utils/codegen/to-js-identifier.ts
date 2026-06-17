@@ -58,13 +58,13 @@ const RESERVED = new Set([
  *
  * @example
  * ```ts
- * toIdentifier('foo-bar')      // -> 'foo_bar'
- * toIdentifier('2cool')        // -> '_2cool'
- * toIdentifier('class')        // -> '_class'
- * toIdentifier('user.profile') // -> 'user_profile'
+ * toJSIdentifier('foo-bar')      // -> 'foo_bar'
+ * toJSIdentifier('2cool')        // -> '_2cool'
+ * toJSIdentifier('class')        // -> '_class'
+ * toJSIdentifier('user.profile') // -> 'user_profile'
  * ```
  */
-export function toIdentifier(name: string): string {
+export function toJSIdentifier(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9_$]+/g, '_');
   if (cleaned.length === 0 || /^[0-9]/.test(cleaned) || RESERVED.has(cleaned)) {
     return `_${cleaned}`;
