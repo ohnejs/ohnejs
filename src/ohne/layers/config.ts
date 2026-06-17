@@ -13,6 +13,20 @@
  */
 export interface Config {
   /**
+   * Configurable directories.
+   * Relative paths resolve against the app root.
+   */
+  dirs?: {
+    /**
+     * Directory ohne writes generated `.ts` files to.
+     *
+     * @default
+     * '.ohne'
+     */
+    codegen?: string;
+  };
+
+  /**
    * Printer settings consumed by `usePrinter`.
    * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value;
    * these fields only apply when the matching env var is unset.
