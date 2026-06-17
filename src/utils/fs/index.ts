@@ -6,5 +6,6 @@ export * from './read-file.ts';
 export * from './read-json.ts';
 export * from './remove-dir.ts';
 export * from './remove-file.ts';
+export * from './write-file-if-changed.ts';
 export * from './write-file.ts';
 export * from './write-json.ts';
