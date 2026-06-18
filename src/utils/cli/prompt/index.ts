@@ -1,7 +1,15 @@
 export type { PromptOptions } from './_prompt.ts';
+export type { ConfirmOptions } from './confirm.ts';
 export { createPrompt } from './create-prompt.ts';
 export type { Prompt } from './create-prompt.ts';
+export { group } from './group.ts';
+export type { GroupSteps } from './group.ts';
 export { CANCEL, isCancel } from './is-cancel.ts';
 export type { PromptResult } from './is-cancel.ts';
+export type { MultiselectOptions } from './multiselect.ts';
+export type { SelectOption } from './option.ts';
+export type { SelectOptions } from './select.ts';
+export { createSpinner } from './spinner.ts';
+export type { Spinner, SpinnerOptions } from './spinner.ts';
 export type { TextOptions } from './text.ts';
 export type { Validate } from './validate.ts';
