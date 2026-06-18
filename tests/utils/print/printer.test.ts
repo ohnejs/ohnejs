@@ -146,7 +146,7 @@ describe('createPrinter', () => {
   describe('block - error tinting', () => {
     it('red-tints the title in errorBlock; body markup processes as cyan', () => {
       const { printer, out } = capture({ color: true });
-      printer.errorBlock({ title: 'boom', body: 'detail "foo" body' });
+      printer.errorBlock({ title: 'boom', body: 'detail `foo` body' });
       match(out(), new RegExp(`${E}\\[31m.*boom.*${E}\\[39m`));
       match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
     });
@@ -161,7 +161,7 @@ describe('createPrinter', () => {
   describe('block - warn tinting', () => {
     it('yellow-tints the title in warnBlock; body markup processes as cyan', () => {
       const { printer, out } = capture({ color: true });
-      printer.warnBlock({ title: 'careful', body: 'detail "foo" body' });
+      printer.warnBlock({ title: 'careful', body: 'detail `foo` body' });
       match(out(), new RegExp(`${E}\\[33m.*careful.*${E}\\[39m`));
       match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
     });
@@ -183,16 +183,16 @@ describe('createPrinter', () => {
   });
 
   describe('inline markup', () => {
-    it('strips and styles `"..."` as cyan in non-error single-line', () => {
+    it('strips and styles a backtick span as cyan in non-error single-line', () => {
       const { printer, out } = capture({ color: true });
-      printer.info('open "foo" close');
-      ok(!out().includes('"foo"'));
+      printer.info('open `foo` close');
+      ok(!out().includes('`foo`'));
       match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
     });
 
-    it('renders `"..."` as bold inside error single-line (not cyan)', () => {
+    it('renders a backtick span as bold inside error single-line (not cyan)', () => {
       const { printer, out } = capture({ color: true });
-      printer.error('bad "thing" found');
+      printer.error('bad `thing` found');
       match(out(), new RegExp(`${E}\\[1mthing${E}\\[22m`));
       doesNotMatch(out(), new RegExp(`${E}\\[36mthing${E}\\[39m`));
     });
@@ -344,7 +344,7 @@ describe('createPrinter', () => {
       const { printer, out } = capture({ color: false });
       printer.info('plain');
       printer.configure({ color: true });
-      printer.info('"styled"');
+      printer.info('`styled`');
       ok(out().includes('●  plain\n'));
       match(out(), new RegExp(`${E}\\[36mstyled${E}\\[39m`));
     });

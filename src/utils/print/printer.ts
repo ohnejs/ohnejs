@@ -1,3 +1,8 @@
+import type { ANSIColors } from '../ansi/pick-ansi-colors.ts';
+
+import { applyANSIMarkup } from '../ansi/apply-ansi-markup.ts';
+import { isColorStream } from '../ansi/is-color-stream.ts';
+import { pickANSIColors } from '../ansi/pick-ansi-colors.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 
@@ -12,7 +17,7 @@ export type PrintLevel = 'success' | 'info' | 'warn' | 'error' | 'debug';
 export interface BlockOptions {
   /**
    * Single-line title rendered next to the head glyph.
-   * Inline markup (`"..."`, `**...**`, `__...__`) is processed.
+   * Inline markup is processed: backtick spans highlight, `**bold**` bolds, `__dim__` dims.
    *
    * @example
    * ```ts
@@ -55,7 +60,7 @@ export interface BlockOptions {
    * When set, the closing corner becomes `└─ <path>` tinted in the level color.
    * A blank rail row separates it from the body.
    * When omitted, the corner is the bare `└` glyph and there is no trailing blank rail.
-   * Markup is NOT processed - filenames may legitimately contain `"..."` or `__` segments.
+   * Markup is NOT processed - paths may legitimately contain backtick or `__` segments.
    *
    * @example
    * ```ts
@@ -176,24 +181,10 @@ export interface Printer {
   configure(config: Partial<PrinterConfig>): void;
 }
 
-interface Colors {
-  green(text: string): string;
-  cyan(text: string): string;
-  yellow(text: string): string;
-  red(text: string): string;
-  gray(text: string): string;
-  bold(text: string): string;
-  dim(text: string): string;
-}
-
 const GLYPH_HEAD = '●';
 const GLYPH_RAIL = '│';
 const GLYPH_CORNER = '└';
 const GLYPH_CORNER_DASH = '─';
-
-const DIM_PATTERN = /(?<![A-Za-z0-9])__([^_\n]+)__(?![A-Za-z0-9])/g;
-const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
-const QUOTE_PATTERN = /"([^"\n]+)"/g;
 
 /**
  * Builds an isolated `Printer`.
@@ -220,7 +211,7 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
     stream: config.stream ?? process.stderr,
   };
 
-  let colors: Colors = createColors(isColorEnabled(state.color, state.stream));
+  let colors: ANSIColors = pickANSIColors(state.color ?? isColorStream(state.stream));
 
   function emitLine(level: PrintLevel, message: string): void {
     if (state.silent) return;
@@ -283,21 +274,21 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
       const colorChanged = 'color' in partial;
       if (colorChanged) state.color = partial.color;
       if (streamChanged || colorChanged) {
-        colors = createColors(isColorEnabled(state.color, state.stream));
+        colors = pickANSIColors(state.color ?? isColorStream(state.stream));
       }
     },
   };
 }
 
-function renderLine(level: PrintLevel, message: string, colors: Colors): string {
+function renderLine(level: PrintLevel, message: string, colors: ANSIColors): string {
   const tint = levelTint(level, colors);
   const isError = level === 'error';
-  const styled = applyMarkup(message.trim(), isError, colors);
+  const styled = applyANSIMarkup(message.trim(), isError, colors);
   const final = isError ? colors.red(styled) : styled;
   return `${tint(GLYPH_HEAD)}  ${final}\n`;
 }
 
-function renderBlock(level: PrintLevel, options: BlockOptions, colors: Colors): string {
+function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColors): string {
   const tint = levelTint(level, colors);
   const isDebug = level === 'debug';
   const titleTinted = level === 'warn' || level === 'error' || isDebug;
@@ -312,7 +303,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: Colors): 
   const path = options.path?.trim() ?? '';
   const paragraphs = normalizeBody(options.body);
 
-  const styledTitle = applyMarkup(title, boldQuotes, colors);
+  const styledTitle = applyANSIMarkup(title, boldQuotes, colors);
   const titleLine = `${head}  ${titleTinted ? titleTint(styledTitle) : styledTitle}`;
 
   const lines: string[] = [titleLine];
@@ -322,7 +313,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: Colors): 
     for (let i = 0; i < paragraphs.length; i++) {
       if (i > 0) lines.push(rail);
       for (const line of paragraphs[i]!) {
-        lines.push(`${rail}  ${applyMarkup(line, false, colors)}`);
+        lines.push(`${rail}  ${applyANSIMarkup(line, false, colors)}`);
       }
     }
   }
@@ -349,7 +340,7 @@ function normalizeBody(body: string | string[]): string[][] {
   return result;
 }
 
-function levelTint(level: PrintLevel, colors: Colors): (text: string) => string {
+function levelTint(level: PrintLevel, colors: ANSIColors): (text: string) => string {
   switch (level) {
     case 'success':
       return colors.green;
@@ -366,36 +357,4 @@ function levelTint(level: PrintLevel, colors: Colors): (text: string) => string 
     case 'debug':
       return colors.gray;
   }
-}
-
-function applyMarkup(text: string, boldQuotes: boolean, colors: Colors): string {
-  const quoteStyle = boldQuotes ? colors.bold : colors.cyan;
-  return text
-    .replace(DIM_PATTERN, (_, inner: string) => colors.dim(inner))
-    .replace(BOLD_PATTERN, (_, inner: string) => colors.bold(inner))
-    .replace(QUOTE_PATTERN, (_, inner: string) => quoteStyle(inner));
-}
-
-function wrap(enabled: boolean, open: number, close: number, text: string): string {
-  return enabled ? `\x1b[${open}m${text}\x1b[${close}m` : text;
-}
-
-function createColors(enabled: boolean): Colors {
-  return {
-    green: (text) => wrap(enabled, 32, 39, text),
-    cyan: (text) => wrap(enabled, 36, 39, text),
-    yellow: (text) => wrap(enabled, 33, 39, text),
-    red: (text) => wrap(enabled, 31, 39, text),
-    gray: (text) => wrap(enabled, 90, 39, text),
-    bold: (text) => wrap(enabled, 1, 22, text),
-    dim: (text) => wrap(enabled, 2, 22, text),
-  };
-}
-
-function isColorEnabled(
-  override: boolean | undefined,
-  stream: { isTTY?: boolean } | undefined,
-): boolean {
-  if (!isUndefined(override)) return override;
-  return Boolean(stream?.isTTY);
 }
