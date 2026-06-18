@@ -12,14 +12,14 @@ import { isSet } from '../is/is-set.ts';
  *
  * @example
  * ```ts
- * uniquify('foo', new Set())                 // -> 'foo'
- * uniquify('foo', new Set(['foo']))          // -> 'foo-2'
- * uniquify('foo', new Set(['foo', 'foo-2'])) // -> 'foo-3'
- * uniquify('foo', ['foo', 'foo-2', 'foo-3']) // -> 'foo-4'
- * uniquify('foo-2', new Set(['foo-2']))      // -> 'foo-3' (suffix peeled)
+ * uniqueName('foo', new Set())                 // -> 'foo'
+ * uniqueName('foo', new Set(['foo']))          // -> 'foo-2'
+ * uniqueName('foo', new Set(['foo', 'foo-2'])) // -> 'foo-3'
+ * uniqueName('foo', ['foo', 'foo-2', 'foo-3']) // -> 'foo-4'
+ * uniqueName('foo-2', new Set(['foo-2']))      // -> 'foo-3' (suffix peeled)
  * ```
  */
-export function uniquify(base: string, taken: ReadonlySet<string> | readonly string[]): string {
+export function uniqueName(base: string, taken: ReadonlySet<string> | readonly string[]): string {
   if (base.length === 0) {
     throw new Error('Invalid base: empty');
   }

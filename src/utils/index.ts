@@ -127,4 +127,4 @@ export * from './slug/slugify.ts';
 export * from './types/deep-prettify.ts';
 export * from './types/defined.ts';
 export * from './types/require-by-shape.ts';
-export * from './uniquify/uniquify.ts';
+export * from './unique-name/unique-name.ts';
