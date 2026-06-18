@@ -1,4 +1,4 @@
-import { unique } from '../array/unique.ts';
+import { uniqueArray } from '../array/unique-array.ts';
 import { isArray } from '../is/is-array.ts';
 import { isMap } from '../is/is-map.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
@@ -7,7 +7,7 @@ import { isUndefined } from '../is/is-undefined.ts';
 
 interface MergeOptions {
   /**
-   * Deduplicate concatenated arrays via `unique`.
+   * Deduplicate concatenated arrays via `uniqueArray`.
    * Applies at every depth, not just the top level.
    *
    * @default
@@ -28,7 +28,7 @@ interface MergeOptions {
  * Deeply merges `source` into `target`, returning a new value; `source` wins at every leaf.
  *
  * - Plain objects merge recursively; `undefined` source values and symbol keys are skipped.
- * - Arrays concat; pass `{ dedupe: true }` to drop duplicates via `unique`.
+ * - Arrays concat; pass `{ dedupe: true }` to drop duplicates via `uniqueArray`.
  * - `Set`s union; `Map`s let `source` win per key, or recurse into values with `{ deep: true }`.
  * - Non-plain values (`Date`, `RegExp`, class instances, ...) and mismatched kinds replace wholesale.
  *
@@ -74,7 +74,7 @@ export function merge(target: unknown, source: unknown, options: MergeOptions = 
 
   if (isArray(target) && isArray(source)) {
     const combined = [...target, ...source];
-    return options.dedupe ? unique(combined) : combined;
+    return options.dedupe ? uniqueArray(combined) : combined;
   }
 
   if (isSet(target) && isSet(source)) {

@@ -3,9 +3,9 @@
  *
  * @example
  * ```ts
- * unique([1, 2, 2, 3, 1]) // -> [1, 2, 3]
+ * uniqueArray([1, 2, 2, 3, 1]) // -> [1, 2, 3]
  * ```
  */
-export function unique<T>(array: readonly T[]): T[] {
+export function uniqueArray<T>(array: readonly T[]): T[] {
   return [...new Set(array)];
 }

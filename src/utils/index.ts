@@ -3,7 +3,7 @@ export * from './array/group-by.ts';
 export * from './array/key-by.ts';
 export * from './array/last.ts';
 export * from './array/to-array.ts';
-export * from './array/unique.ts';
+export * from './array/unique-array.ts';
 export * from './case/capitalize.ts';
 export * from './case/is-camel-case.ts';
 export * from './case/is-kebab-case.ts';

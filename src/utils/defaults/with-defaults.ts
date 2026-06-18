@@ -1,4 +1,4 @@
-import { unique } from '../array/unique.ts';
+import { uniqueArray } from '../array/unique-array.ts';
 import { parseDotNotation } from '../dot-notation/parse-dot-notation.ts';
 import { isArray } from '../is/is-array.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
@@ -10,7 +10,7 @@ import { isUndefined } from '../is/is-undefined.ts';
  * - `'replace'` - input wins entirely; defaults are discarded.
  * - `'defaults'` - recurse into objects (per key) and arrays (per index); longer side fills the rest.
  * - `'concat'` - arrays only: `[...input, ...defaults]`. No-op on non-arrays.
- * - `'concat-unique'` - same as `'concat'`, then deduped via `unique`.
+ * - `'concat-unique'` - same as `'concat'`, then deduped via `uniqueArray`.
  */
 export type WithDefaultsStrategy = 'replace' | 'defaults' | 'concat' | 'concat-unique';
 
@@ -100,7 +100,7 @@ function apply(
   if (strategy === 'concat' || strategy === 'concat-unique') {
     if (isArray(input) && isArray(defaults)) {
       const combined = [...input, ...defaults];
-      return strategy === 'concat-unique' ? unique(combined) : combined;
+      return strategy === 'concat-unique' ? uniqueArray(combined) : combined;
     }
   }
 
