@@ -116,7 +116,7 @@ export interface PrinterConfig {
  *
  * Each severity has two methods:
  * - The bare name (`success`, `info`, ...) renders one line: `●` + message.
- * - The `Block` suffix (`successBlock`, ...) renders multiple lines: head, rail body, `└` corner.
+ * - The `Block` suffix (`successBlock`, ...) renders a head, an optional rail body, and a `└` corner.
  */
 export interface Printer {
   /**
@@ -321,7 +321,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
   if (path) {
     lines.push(rail);
     lines.push(tint(`${GLYPH_CORNER}${GLYPH_CORNER_DASH} ${path}`));
-  } else {
+  } else if (paragraphs.length > 0) {
     lines.push(corner);
   }
 

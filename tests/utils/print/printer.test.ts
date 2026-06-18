@@ -111,10 +111,10 @@ describe('createPrinter', () => {
       strictEqual(out(), ['●  H', '│', '└─ src/x.ts', ''].join('\n'));
     });
 
-    it('renders empty body without path as head + corner only', () => {
+    it('collapses empty body without path to the title line alone', () => {
       const { printer, out } = capture();
       printer.infoBlock({ title: 'H', body: '' });
-      strictEqual(out(), ['●  H', '└', ''].join('\n'));
+      strictEqual(out(), '●  H\n');
     });
 
     it('treats whitespace-only path as absent', () => {
