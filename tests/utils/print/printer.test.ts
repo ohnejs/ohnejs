@@ -148,7 +148,7 @@ describe('createPrinter', () => {
       const { printer, out } = capture({ color: true });
       printer.errorBlock({ title: 'boom', body: 'detail `foo` body' });
       match(out(), new RegExp(`${E}\\[31m.*boom.*${E}\\[39m`));
-      match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
+      match(out(), new RegExp(`${E}\\[96mfoo${E}\\[39m`));
     });
 
     it('tints the corner+path in red for errorBlock', () => {
@@ -163,7 +163,7 @@ describe('createPrinter', () => {
       const { printer, out } = capture({ color: true });
       printer.warnBlock({ title: 'careful', body: 'detail `foo` body' });
       match(out(), new RegExp(`${E}\\[33m.*careful.*${E}\\[39m`));
-      match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
+      match(out(), new RegExp(`${E}\\[96mfoo${E}\\[39m`));
     });
   });
 
@@ -187,14 +187,14 @@ describe('createPrinter', () => {
       const { printer, out } = capture({ color: true });
       printer.info('open `foo` close');
       ok(!out().includes('`foo`'));
-      match(out(), new RegExp(`${E}\\[36mfoo${E}\\[39m`));
+      match(out(), new RegExp(`${E}\\[96mfoo${E}\\[39m`));
     });
 
     it('renders a backtick span as bold inside error single-line (not cyan)', () => {
       const { printer, out } = capture({ color: true });
       printer.error('bad `thing` found');
       match(out(), new RegExp(`${E}\\[1mthing${E}\\[22m`));
-      doesNotMatch(out(), new RegExp(`${E}\\[36mthing${E}\\[39m`));
+      doesNotMatch(out(), new RegExp(`${E}\\[96mthing${E}\\[39m`));
     });
 
     it('strips and styles `**bold**` as bold', () => {
@@ -346,7 +346,7 @@ describe('createPrinter', () => {
       printer.configure({ color: true });
       printer.info('`styled`');
       ok(out().includes('●  plain\n'));
-      match(out(), new RegExp(`${E}\\[36mstyled${E}\\[39m`));
+      match(out(), new RegExp(`${E}\\[96mstyled${E}\\[39m`));
     });
   });
 

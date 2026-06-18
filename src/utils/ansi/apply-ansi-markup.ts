@@ -12,7 +12,7 @@ const HIGHLIGHT_PATTERN = /`([^`\n]+)`/g;
  * @example
  * ```ts
  * const color = pickANSIColors(true)
- * applyANSIMarkup('open `x` end', false, color) // -> 'open \x1b[36mx\x1b[39m end'
+ * applyANSIMarkup('open `x` end', false, color) // -> 'open \x1b[96mx\x1b[39m end'
  * applyANSIMarkup('open `x` end', true, color)  // -> 'open \x1b[1mx\x1b[22m end'
  * ```
  */

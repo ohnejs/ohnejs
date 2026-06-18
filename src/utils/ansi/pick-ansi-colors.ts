@@ -23,7 +23,7 @@ const identity = (text: string): string => text;
 
 const COLORED: ANSIColors = {
   green: wrap(32, 39),
-  cyan: wrap(36, 39),
+  cyan: wrap(96, 39),
   yellow: wrap(33, 39),
   red: wrap(31, 39),
   gray: wrap(90, 39),
@@ -49,7 +49,7 @@ const PLAIN: ANSIColors = {
  *
  * @example
  * ```ts
- * pickANSIColors(true).cyan('hi')  // -> '\x1b[36mhi\x1b[39m'
+ * pickANSIColors(true).cyan('hi')  // -> '\x1b[96mhi\x1b[39m'
  * pickANSIColors(false).cyan('hi') // -> 'hi'
  * ```
  */

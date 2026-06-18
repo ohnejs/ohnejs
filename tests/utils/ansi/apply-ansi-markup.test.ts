@@ -7,7 +7,7 @@ const color = pickANSIColors(true);
 
 describe('applyANSIMarkup', () => {
   it('highlights a backtick span as cyan', () => {
-    strictEqual(applyANSIMarkup('use `x`', false, color), 'use \x1b[36mx\x1b[39m');
+    strictEqual(applyANSIMarkup('use `x`', false, color), 'use \x1b[96mx\x1b[39m');
   });
 
   it('highlights a backtick span as bold when emphasized', () => {

@@ -186,8 +186,8 @@ describe('createPrompt().text', () => {
     const prompt = createPrompt({ input, output: { write: (s) => out.push(s) }, color: true });
     input.write('x\r');
     await prompt.text({ message: 'Name?' });
-    strictEqual(out[0].startsWith('\x1b[36m◆'), true);
-    strictEqual(out[0].includes('\x1b[36mName?\x1b[39m'), true);
+    strictEqual(out[0].startsWith('\x1b[96m◆'), true);
+    strictEqual(out[0].includes('\x1b[96mName?\x1b[39m'), true);
   });
 
   it('renders backtick markup in the message as bold while active', async () => {
