@@ -292,7 +292,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
   const tint = levelTint(level, colors);
   const isDebug = level === 'debug';
   const titleTinted = level === 'warn' || level === 'error' || isDebug;
-  const boldQuotes = level === 'warn' || level === 'error';
+  const emphasize = level === 'warn' || level === 'error';
   const titleTint = isDebug ? colors.dim : tint;
 
   const head = tint(GLYPH_HEAD);
@@ -303,7 +303,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
   const path = options.path?.trim() ?? '';
   const paragraphs = normalizeBody(options.body);
 
-  const styledTitle = applyANSIMarkup(title, boldQuotes, colors);
+  const styledTitle = applyANSIMarkup(title, emphasize, colors);
   const titleLine = `${head}  ${titleTinted ? titleTint(styledTitle) : styledTitle}`;
 
   const lines: string[] = [titleLine];
