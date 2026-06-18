@@ -31,6 +31,10 @@
       "types": "./src/utils/codegen/index.ts",
       "default": "./src/utils/codegen/index.ts"
     },
+    "./utils/ansi": {
+      "types": "./src/utils/ansi/index.ts",
+      "default": "./src/utils/ansi/index.ts"
+    },
     "./utils/env": {
       "types": "./src/utils/env/index.ts",
       "default": "./src/utils/env/index.ts"
