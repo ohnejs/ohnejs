@@ -2,10 +2,10 @@ import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import type { PromptDefinition, PromptState } from './_prompt.ts';
 import type { Validate } from './validate.ts';
 
-import { applyANSIMarkup } from '../../ansi/apply-ansi-markup.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 import { createKeymap } from '../../keys/create-keymap.ts';
 import { strokeFromReadlineKey } from '../../keys/stroke-from-readline-key.ts';
+import { leadIn, titleLine } from './_frame.ts';
 import { closingRail } from './validate.ts';
 
 /**
@@ -136,10 +136,6 @@ export function textDefinition(options: TextOptions): PromptDefinition<string> {
     render(state, { colors, lead, columns }) {
       const active = state.status === 'active';
       const rail = isUndefined(error) ? colors.dim('│') : colors.red('│');
-      const tint = isUndefined(error) ? colors.cyan : colors.red;
-      const message = active
-        ? tint(applyANSIMarkup(options.message, true, colors))
-        : applyANSIMarkup(options.message, false, colors);
       const hint = options.placeholder ?? options.defaultValue;
       const width = isUndefined(columns) ? undefined : Math.max(1, columns - 4);
       const value = active
@@ -149,8 +145,8 @@ export function textDefinition(options: TextOptions): PromptDefinition<string> {
       const valueLine = `${rail}  ${value}`;
       const close = closingRail(error, colors);
       const body = active ? `${rail}\n${valueLine}\n${close}` : valueLine;
-      const block = `${symbolFor(state, error, colors)}  ${message}\n${body}`;
-      return lead ? `${colors.dim('│')}\n${block}` : block;
+      const block = `${titleLine(options.message, state.status, error, colors)}\n${body}`;
+      return leadIn(block, lead, colors);
     },
 
     onKey(key, str, state) {
@@ -221,17 +217,6 @@ function nextWord(chars: string[], cursor: number): number {
 
 function isSpace(char: string): boolean {
   return char === ' ' || char === '\t';
-}
-
-function symbolFor(
-  state: PromptState<string>,
-  error: string | undefined,
-  colors: ANSIColors,
-): string {
-  if (state.status === 'submit') return colors.green('◇');
-  if (state.status === 'cancel') return colors.red('■');
-  if (!isUndefined(error)) return colors.red('◆');
-  return colors.cyan('◆');
 }
 
 function isPrintable(str: string | undefined): boolean {
