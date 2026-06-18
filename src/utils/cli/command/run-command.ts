@@ -57,12 +57,12 @@ export async function runCommand(
     return runCommand(sub[first]!, argv.slice(1), options);
   }
 
-  const peek = parseArgv(argv, { booleans: ['help', 'h', 'version'] });
+  const peek = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
   if (peek.flags.help || peek.flags.h) {
     stdout.write(renderHelp(command));
     return 0;
   }
-  if (command.meta.version && peek.flags.version) {
+  if (command.meta.version && (peek.flags.version || peek.flags.v)) {
     stdout.write(`${command.meta.name} ${command.meta.version}\n`);
     return 0;
   }

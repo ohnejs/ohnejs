@@ -41,7 +41,7 @@ function optionRows(command: Command, args: Command['args']): [string, string][]
   const rows: [string, string][] = [];
   for (const name of Object.keys(args ?? {}))
     rows.push([optionLabel(name, args![name]!), optionDesc(args![name]!)]);
-  if (command.meta.version) rows.push(['--version', 'Show version']);
+  if (command.meta.version) rows.push(['--version, -v', 'Show version']);
   rows.push(['--help, -h', 'Show help']);
   return rows;
 }

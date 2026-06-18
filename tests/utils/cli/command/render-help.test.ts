@@ -46,8 +46,8 @@ describe('renderHelp', () => {
         '  build  Build it\n' +
         '\n' +
         'OPTIONS\n' +
-        '  --version   Show version\n' +
-        '  --help, -h  Show help\n',
+        '  --version, -v  Show version\n' +
+        '  --help, -h     Show help\n',
     );
   });
 });
