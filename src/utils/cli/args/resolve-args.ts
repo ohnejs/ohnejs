@@ -7,12 +7,12 @@ import { toKebabCase } from '../../case/to-kebab-case.ts';
 import { coerceToBoolean } from '../../coerce/coerce-to-boolean.ts';
 import { coerceToInteger } from '../../coerce/coerce-to-integer.ts';
 import { coerceToNumber } from '../../coerce/coerce-to-number.ts';
+import { didYouMean } from '../../did-you-mean/did-you-mean.ts';
 import { isArray } from '../../is/is-array.ts';
 import { isBoolean } from '../../is/is-boolean.ts';
 import { isNumber } from '../../is/is-number.ts';
 import { isString } from '../../is/is-string.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
-import { suggest } from '../../suggest/suggest.ts';
 import { parseArgv } from './parse-argv.ts';
 
 /**
@@ -96,7 +96,7 @@ export function resolveArgs<const S extends ArgsSchema>(
 
   for (const flag of Object.keys(parsed.flags)) {
     if (aliasToName.has(flag) || canonByForm.has(toCamelCase(flag))) continue;
-    const suggestion = suggest(toCamelCase(flag), names);
+    const suggestion = didYouMean(toCamelCase(flag), names);
     errors.push({
       kind: 'unknown',
       name: flag,
@@ -172,7 +172,7 @@ function coerceValue(
     case 'enum': {
       if (isString(raw) && def.options.includes(raw)) return { value: raw };
       const list = def.options.map((option) => `\`${option}\``).join(', ');
-      const hint = isString(raw) ? suggest(raw, def.options) : undefined;
+      const hint = isString(raw) ? didYouMean(raw, def.options) : undefined;
       const suffix = hint ? `. Did you mean \`${hint}\`?` : '';
       return { error: `Flag \`--${name}\` must be one of ${list}${suffix}` };
     }

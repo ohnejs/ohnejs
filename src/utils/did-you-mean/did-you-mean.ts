@@ -11,15 +11,15 @@
  *
  * @example
  * ```ts
- * suggest('Filesy', ['Files', 'Users', 'Posts']) // -> 'Files'
- * suggest('Fiels',  ['Files', 'Tags'])           // -> 'Files'
- * suggest('zzzz',   ['Files', 'Users'])          // -> undefined
+ * didYouMean('Filesy', ['Files', 'Users', 'Posts']) // -> 'Files'
+ * didYouMean('Fiels',  ['Files', 'Tags'])           // -> 'Files'
+ * didYouMean('zzzz',   ['Files', 'Users'])          // -> undefined
  *
- * suggest('Posts', ['Roasts'], 2) // -> 'Roasts'
- * suggest('Posts', ['Roasts'], 1) // -> undefined
+ * didYouMean('Posts', ['Roasts'], 2) // -> 'Roasts'
+ * didYouMean('Posts', ['Roasts'], 1) // -> undefined
  * ```
  */
-export function suggest(
+export function didYouMean(
   input: string,
   candidates: Iterable<string>,
   maxDistance = 2,

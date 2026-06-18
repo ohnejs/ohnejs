@@ -1,9 +1,9 @@
 import type { ArgsSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
+import { didYouMean } from '../../did-you-mean/did-you-mean.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 import { hasKey } from '../../object/has-key.ts';
-import { suggest } from '../../suggest/suggest.ts';
 import { parseArgv } from '../args/parse-argv.ts';
 import { resolveArgs } from '../args/resolve-args.ts';
 import { renderHelp } from './render-help.ts';
@@ -68,7 +68,7 @@ export async function runCommand(
   }
 
   if (sub && isCommandToken && !command.run) {
-    const hint = suggest(first, Object.keys(sub));
+    const hint = didYouMean(first, Object.keys(sub));
     stderr.write(`Unknown command \`${first}\`${hint ? `. Did you mean \`${hint}\`?` : ''}\n`);
     return 1;
   }
