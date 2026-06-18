@@ -4,9 +4,9 @@
  *
  * @example
  * ```ts
- * clone({ x: [1, 2] }) // -> { x: [1, 2] }
+ * jsonClone({ x: [1, 2] }) // -> { x: [1, 2] }
  * ```
  */
-export function clone<T>(value: T): T {
+export function jsonClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
