@@ -13,7 +13,8 @@
     "ohne": "./src/ohne/cli/main.ts"
   },
   "files": [
-    "src"
+    "src",
+    "tsconfig.base.json"
   ],
   "type": "module",
   "sideEffects": false,
@@ -49,7 +50,8 @@
     "./utils/print": {
       "types": "./src/utils/print/index.ts",
       "default": "./src/utils/print/index.ts"
-    }
+    },
+    "./tsconfig.base.json": "./tsconfig.base.json"
   },
   "scripts": {
     "format": "oxfmt",
