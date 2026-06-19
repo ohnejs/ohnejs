@@ -58,9 +58,9 @@
     "typecheck": "tsc"
   },
   "devDependencies": {
-    "@types/node": "25.9.1",
-    "oxfmt": "0.53.0",
-    "oxlint": "1.68.0",
+    "@types/node": "26.0.0",
+    "oxfmt": "0.55.0",
+    "oxlint": "1.70.0",
     "typescript": "6.0.3"
   },
   "engines": {
