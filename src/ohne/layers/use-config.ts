@@ -24,5 +24,5 @@ const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
  * ```
  */
 export function useConfig(): ResolvedConfig {
-  return cached.value;
+  return cached.value as ResolvedConfig;
 }
