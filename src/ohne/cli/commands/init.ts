@@ -21,7 +21,7 @@ const CONFIG_FILE = `import type { Config } from 'ohne';\n\nexport default {} sa
 
 const TSCONFIG_FILE = `{
   "extends": "ohne/tsconfig.base.json",
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", ".ohne/**/*.ts"]
 }
 `;
 
