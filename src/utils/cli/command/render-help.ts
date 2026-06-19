@@ -57,7 +57,11 @@ export function renderHelp(command: Command, colors: ANSIColors): string {
 
 function optionRows(command: Command, args: Command['args'], colors: ANSIColors): Row[] {
   const rows: Row[] = [];
-  for (const name of Object.keys(args ?? {})) rows.push(optionRow(name, args![name]!, colors));
+  for (const name of Object.keys(args ?? {})) {
+    const def = args![name]!;
+    if (def.hidden) continue;
+    rows.push(optionRow(name, def, colors));
+  }
   if (command.meta.version)
     rows.push({
       label: '--version, -v',

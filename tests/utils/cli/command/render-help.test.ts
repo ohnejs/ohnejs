@@ -74,4 +74,17 @@ describe('renderHelp', () => {
         '  \x1b[96m--help, -h\x1b[39m     Show help\n',
     );
   });
+
+  it('omits a hidden option from the option list', () => {
+    const build = {
+      meta: { name: 'build' },
+      args: {
+        out: { type: 'string' },
+        secret: { type: 'string', hidden: true },
+      },
+    } as const;
+    const help = renderHelp(build, plain);
+    strictEqual(help.includes('--out'), true);
+    strictEqual(help.includes('--secret'), false);
+  });
 });

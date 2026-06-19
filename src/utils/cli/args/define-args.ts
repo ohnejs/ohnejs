@@ -8,6 +8,7 @@ export type ArgType = 'string' | 'number' | 'boolean' | 'enum';
 interface CommonArg {
   alias?: string | string[];
   description?: string;
+  hidden?: boolean;
 }
 
 interface StringArg extends CommonArg {
