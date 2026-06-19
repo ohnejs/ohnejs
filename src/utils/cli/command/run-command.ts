@@ -73,7 +73,7 @@ export async function runCommand(
     return 0;
   }
   if (command.meta.version && (peek.flags.version || peek.flags.v)) {
-    stdout.write(`${colors.bold(command.meta.name)} ${colors.dim(command.meta.version)}\n`);
+    stdout.write(`${command.meta.version}\n`);
     return 0;
   }
 

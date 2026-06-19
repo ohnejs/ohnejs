@@ -30,12 +30,12 @@ describe('runCommand', () => {
     deepStrictEqual(ctx, { values: { out: 'public' }, positionals: ['x'] });
   });
 
-  it('prints version for --version and -v and exits 0', async () => {
+  it('prints the bare version for --version and -v and exits 0', async () => {
     const cli = defineCommand({ meta: { name: 'app', version: '2.0.0' }, run() {} });
     for (const flag of ['--version', '-v']) {
       const { out, options } = capture();
       strictEqual(await runCommand(cli, [flag], options), 0);
-      deepStrictEqual(out, ['app 2.0.0\n']);
+      deepStrictEqual(out, ['2.0.0\n']);
     }
   });
 
