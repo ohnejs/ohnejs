@@ -1,6 +1,8 @@
 import type { ArgsSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
+import { isColorStream } from '../../ansi/is-color-stream.ts';
+import { pickANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import { didYouMean } from '../../did-you-mean/did-you-mean.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 import { hasKey } from '../../object/has-key.ts';
@@ -15,11 +17,12 @@ import { renderHelp } from './render-help.ts';
 export interface RunOptions {
   /**
    * Where help and version output is written.
+   * A truthy `isTTY` opts the stream into colored output.
    *
    * @default
    * process.stdout
    */
-  stdout?: { write(text: string): void };
+  stdout?: { write(text: string): void; isTTY?: boolean };
 
   /**
    * Where argument and command errors are written.
@@ -49,6 +52,7 @@ export async function runCommand(
 ): Promise<number> {
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
+  const colors = pickANSIColors(isColorStream(stdout));
   const sub = command.subCommands;
   const first = argv[0];
   const isCommandToken = !isUndefined(first) && !first.startsWith('-');
@@ -59,11 +63,11 @@ export async function runCommand(
 
   const peek = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
   if (peek.flags.help || peek.flags.h) {
-    stdout.write(renderHelp(command));
+    stdout.write(renderHelp(command, colors));
     return 0;
   }
   if (command.meta.version && (peek.flags.version || peek.flags.v)) {
-    stdout.write(`${command.meta.name} ${command.meta.version}\n`);
+    stdout.write(`${colors.bold(command.meta.name)} ${colors.dim(command.meta.version)}\n`);
     return 0;
   }
 
@@ -74,7 +78,7 @@ export async function runCommand(
   }
 
   if (!command.run) {
-    stdout.write(renderHelp(command));
+    stdout.write(renderHelp(command, colors));
     return 0;
   }
 

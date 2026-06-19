@@ -1,3 +1,4 @@
+import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import type { ArgSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
@@ -5,54 +6,81 @@ import { toArray } from '../../array/to-array.ts';
 import { toKebabCase } from '../../case/to-kebab-case.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 
+interface Row {
+  label: string;
+  styled: string;
+  desc: string;
+}
+
 /**
- * Renders the help text for a command as a plain string, ending with a newline.
+ * Renders the help text for a command as a string, ending with a newline.
  * Includes the title, description, a usage line, the subcommand list, and the option list.
  * Long flags are shown in kebab-case; `--help` (and `--version` when set) are appended automatically.
+ * The `colors` styler set tints the output; pass the plain set to emit no codes.
  *
  * @example
  * ```ts
- * renderHelp({ meta: { name: 'app' } })
+ * renderHelp({ meta: { name: 'app' } }, pickANSIColors(false))
  * // -> 'app\n\nUSAGE\n  app [options]\n\nOPTIONS\n  --help, -h  Show help\n'
  * ```
  */
-export function renderHelp(command: Command): string {
+export function renderHelp(command: Command, colors: ANSIColors): string {
   const { meta, args, subCommands } = command;
-  const lines: string[] = [meta.version ? `${meta.name} ${meta.version}` : meta.name];
+  const title = meta.version
+    ? `${colors.bold(meta.name)} ${colors.dim(meta.version)}`
+    : colors.bold(meta.name);
+  const lines: string[] = [title];
 
   if (meta.description) lines.push('', meta.description);
 
-  lines.push('', 'USAGE', `  ${meta.name} ${subCommands ? '<command> ' : ''}[options]`);
+  lines.push(
+    '',
+    colors.bold('USAGE'),
+    `  ${meta.name} ${subCommands ? '<command> ' : ''}[options]`,
+  );
 
   if (subCommands) {
-    const rows = Object.entries(subCommands).map(([name, sub]): [string, string] => [
-      name,
-      sub.meta.description ?? '',
-    ]);
-    lines.push('', 'COMMANDS', ...renderRows(rows));
+    const rows = Object.entries(subCommands).map(
+      ([name, sub]): Row => ({
+        label: name,
+        styled: colors.cyan(name),
+        desc: sub.meta.description ?? '',
+      }),
+    );
+    lines.push('', colors.bold('COMMANDS'), ...renderRows(rows));
   }
 
-  lines.push('', 'OPTIONS', ...renderRows(optionRows(command, args)));
+  lines.push('', colors.bold('OPTIONS'), ...renderRows(optionRows(command, args, colors)));
 
   return lines.join('\n') + '\n';
 }
 
-function optionRows(command: Command, args: Command['args']): [string, string][] {
-  const rows: [string, string][] = [];
-  for (const name of Object.keys(args ?? {}))
-    rows.push([optionLabel(name, args![name]!), optionDesc(args![name]!)]);
-  if (command.meta.version) rows.push(['--version, -v', 'Show version']);
-  rows.push(['--help, -h', 'Show help']);
+function optionRows(command: Command, args: Command['args'], colors: ANSIColors): Row[] {
+  const rows: Row[] = [];
+  for (const name of Object.keys(args ?? {})) rows.push(optionRow(name, args![name]!, colors));
+  if (command.meta.version)
+    rows.push({
+      label: '--version, -v',
+      styled: colors.cyan('--version, -v'),
+      desc: 'Show version',
+    });
+  rows.push({ label: '--help, -h', styled: colors.cyan('--help, -h'), desc: 'Show help' });
   return rows;
 }
 
-function optionLabel(name: string, def: ArgSchema): string {
+function optionRow(name: string, def: ArgSchema, colors: ANSIColors): Row {
   const flags = [`--${toKebabCase(name)}`];
   for (const alias of toArray(def.alias ?? []))
     flags.push(alias.length === 1 ? `-${alias}` : `--${alias}`);
-  if (def.type === 'boolean') return flags.join(', ');
-  const placeholder = def.type === 'enum' ? def.options.join('|') : def.type;
-  return `${flags.join(', ')} <${placeholder}>`;
+  const joined = flags.join(', ');
+  const desc = optionDesc(def);
+  if (def.type === 'boolean') return { label: joined, styled: colors.cyan(joined), desc };
+  const placeholder = `<${def.type === 'enum' ? def.options.join('|') : def.type}>`;
+  return {
+    label: `${joined} ${placeholder}`,
+    styled: `${colors.cyan(joined)} ${colors.dim(placeholder)}`,
+    desc,
+  };
 }
 
 function optionDesc(def: ArgSchema): string {
@@ -63,7 +91,9 @@ function optionDesc(def: ArgSchema): string {
   return parts.join(' ');
 }
 
-function renderRows(rows: [string, string][]): string[] {
-  const width = Math.max(0, ...rows.map(([label]) => label.length));
-  return rows.map(([label, desc]) => (desc ? `  ${label.padEnd(width)}  ${desc}` : `  ${label}`));
+function renderRows(rows: Row[]): string[] {
+  const width = Math.max(0, ...rows.map(({ label }) => label.length));
+  return rows.map(({ label, styled, desc }) =>
+    desc ? `  ${styled}${' '.repeat(width - label.length)}  ${desc}` : `  ${styled}`,
+  );
 }
