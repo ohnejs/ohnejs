@@ -29,6 +29,8 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
   const dir = joinPath(dirname(manifestPath), useConfig().dirs?.codegen ?? '.ohne');
 
   const code = createCodeBuilder();
+  code.line("import type {} from 'ohne';");
+  code.line();
   code.line("declare module 'ohne' {");
   code.indent(() => {
     if (names.length === 0) {
@@ -42,7 +44,6 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
     }
   });
   code.line('}');
-  code.line('export {};');
 
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('layer-name.ts', code.toString());

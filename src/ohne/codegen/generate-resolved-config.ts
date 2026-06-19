@@ -44,6 +44,8 @@ export async function generateResolvedConfig(from: string = process.cwd()): Prom
     .reduce<Record<string, unknown>>((acc, layer) => merge(acc, layer.defaults), {});
 
   const code = createCodeBuilder();
+  code.line("import type {} from 'ohne';");
+  code.line();
   code.line("declare module 'ohne' {");
   code.indent(() => {
     if (isEmpty(defaults)) {
@@ -59,7 +61,6 @@ export async function generateResolvedConfig(from: string = process.cwd()): Prom
     }
   });
   code.line('}');
-  code.line('export {};');
 
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('resolved-config.ts', code.toString());
