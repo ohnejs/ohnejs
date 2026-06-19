@@ -7,6 +7,8 @@ import type { PromptDefinition, PromptState } from './_prompt.ts';
 import type { Validate } from './validate.ts';
 
 import { toArray } from '../../array/to-array.ts';
+import { fuzzyMatch } from '../../fuzzy/fuzzy.ts';
+import { isNull } from '../../is/is-null.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 import { createKeymap } from '../../keys/create-keymap.ts';
 import { strokeFromReadlineKey } from '../../keys/stroke-from-readline-key.ts';
@@ -137,10 +139,19 @@ export interface PathOptions {
 
 const WORD_SEPARATORS = '`~!@#$%^&*()-=+[{]}\\|;:\'",.<>/?';
 
+const plain = (char: string): string => char;
+
+interface Match {
+  entry: PathEntry;
+  score: number;
+  positions: number[];
+}
+
 /**
  * Builds the definition for a path prompt with live folder completion.
  * The typed value splits at its last separator.
- * The prefix names the directory to list, the rest filters its entries by case-insensitive prefix.
+ * The prefix names the directory to list.
+ * The rest fuzzy-matches its entries, ranking the matched run first.
  *
  * - `tab` fills in the highlighted entry, appending `/` for a directory so you keep descending.
  * - `up`/`down` move the highlight through the matches, which scroll past `maxItems`.
@@ -176,18 +187,21 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
     return entries;
   }
 
-  function complete(value: string): PathEntry[] {
+  function complete(value: string): Match[] {
     const fragment = endsWithSep(value) ? '' : basename(value);
     const prefix = value.slice(0, value.length - fragment.length);
     const dir = prefix === '' ? resolvePath('.', root) : resolvePath(prefix, root);
     const showHidden = options.hidden || fragment.startsWith('.');
-    const needle = fragment.toLowerCase();
 
-    return read(dir)
-      .filter((entry) => showHidden || !entry.name.startsWith('.'))
-      .filter((entry) => entry.name.toLowerCase().startsWith(needle))
-      .filter(keep)
-      .sort(byKind);
+    const scored: Match[] = [];
+    for (const entry of read(dir)) {
+      if (!showHidden && entry.name.startsWith('.')) continue;
+      if (!keep(entry)) continue;
+      const match = fuzzyMatch(fragment, entry.name);
+      if (isNull(match)) continue;
+      scored.push({ entry, score: match.score, positions: match.positions });
+    }
+    return scored.sort((a, b) => rank(a, b, fragment));
   }
 
   function keep(entry: PathEntry): boolean {
@@ -220,7 +234,7 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   };
 
   const fill = (): void => {
-    const entry = matches[cursor];
+    const entry = matches[cursor]?.entry;
     if (isUndefined(entry)) return;
     const value = editor.value;
     const prefix = endsWithSep(value)
@@ -314,7 +328,7 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
 }
 
 function listBody(
-  matches: PathEntry[],
+  matches: Match[],
   cursor: number,
   max: number,
   colors: ANSIColors,
@@ -331,9 +345,36 @@ function listBody(
   );
 }
 
-function row(entry: PathEntry, active: boolean, colors: ANSIColors): string {
-  const label = entry.type === 'directory' ? `${entry.name}/` : entry.name;
-  return active ? `${colors.cyan('●')} ${label}` : colors.dim(`○ ${label}`);
+function row(match: Match, active: boolean, colors: ANSIColors): string {
+  const { entry } = match;
+  const name = entry.type === 'directory' ? `${entry.name}/` : entry.name;
+  const base = active ? plain : colors.dim;
+  const mark = active ? (char: string): string => colors.cyan(colors.bold(char)) : colors.bold;
+  const label = highlight(name, match.positions, base, mark);
+  return active ? `${colors.cyan('●')} ${label}` : `${colors.dim('○')} ${label}`;
+}
+
+function highlight(
+  name: string,
+  positions: number[],
+  base: (char: string) => string,
+  mark: (char: string) => string,
+): string {
+  if (positions.length === 0) return base(name);
+  let out = '';
+  let next = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    const matched = positions[next] === i;
+    if (matched) next += 1;
+    out += matched ? mark(name[i]) : base(name[i]);
+  }
+  return out;
+}
+
+function rank(a: Match, b: Match, fragment: string): number {
+  if (fragment === '') return byKind(a.entry, b.entry);
+  if (a.score !== b.score) return b.score - a.score;
+  return byKind(a.entry, b.entry);
 }
 
 function byKind(a: PathEntry, b: PathEntry): number {
