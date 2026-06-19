@@ -5,34 +5,143 @@ import type { DeepPrettify } from '../../types/deep-prettify.ts';
  */
 export type ArgType = 'string' | 'number' | 'boolean' | 'enum';
 
+/**
+ * Fields shared by every argument definition.
+ */
 interface CommonArg {
+  /**
+   * Alternate name or names for the flag, in addition to its canonical key.
+   * A single-character alias becomes a short flag (`-p`); longer ones become extra long flags.
+   *
+   * @default
+   * undefined
+   */
   alias?: string | string[];
+
+  /**
+   * Help text shown next to the flag in `--help` output.
+   *
+   * @default
+   * undefined
+   */
   description?: string;
+
+  /**
+   * Omit the flag from `--help` output.
+   *
+   * @default
+   * false
+   */
   hidden?: boolean;
 }
 
+/**
+ * A string-valued argument.
+ */
 interface StringArg extends CommonArg {
+  /**
+   * Discriminant marking this as a string argument.
+   */
   type: 'string';
+
+  /**
+   * Value used when the flag is absent.
+   *
+   * @default
+   * undefined
+   */
   default?: string;
+
+  /**
+   * Fail parsing when the flag is absent and no `default` is set.
+   *
+   * @default
+   * false
+   */
   required?: boolean;
 }
 
+/**
+ * A number-valued argument.
+ */
 interface NumberArg extends CommonArg {
+  /**
+   * Discriminant marking this as a number argument.
+   */
   type: 'number';
+
+  /**
+   * Reject values that are not whole numbers.
+   *
+   * @default
+   * false
+   */
   integer?: boolean;
+
+  /**
+   * Value used when the flag is absent.
+   *
+   * @default
+   * undefined
+   */
   default?: number;
+
+  /**
+   * Fail parsing when the flag is absent and no `default` is set.
+   *
+   * @default
+   * false
+   */
   required?: boolean;
 }
 
+/**
+ * A boolean-valued argument.
+ * Always present in the resolved options, so it has no `required` field.
+ */
 interface BooleanArg extends CommonArg {
+  /**
+   * Discriminant marking this as a boolean argument.
+   */
   type: 'boolean';
+
+  /**
+   * Value used when the flag is absent.
+   *
+   * @default
+   * false
+   */
   default?: boolean;
 }
 
+/**
+ * An argument constrained to a fixed set of string values.
+ */
 interface EnumArg extends CommonArg {
+  /**
+   * Discriminant marking this as an enum argument.
+   */
   type: 'enum';
+
+  /**
+   * The allowed values. Parsing fails when the input is none of them.
+   */
   options: readonly string[];
+
+  /**
+   * Value used when the flag is absent. Must be one of `options`.
+   *
+   * @default
+   * undefined
+   */
   default?: string;
+
+  /**
+   * Fail parsing when the flag is absent and no `default` is set.
+   *
+   * @default
+   * false
+   */
   required?: boolean;
 }
 
