@@ -47,6 +47,7 @@ export function noteBlock(
   title: string,
   colors: ANSIColors,
   lead: boolean,
+  last: boolean = false,
 ): string {
   const lines = `\n${message}\n`.split('\n').map((line) => applyANSIMarkup(line, false, colors));
   const renderedTitle = applyANSIMarkup(title, false, colors);
@@ -60,7 +61,7 @@ export function noteBlock(
       return `${colors.dim('│')}  ${line}${pad}${colors.dim('│')}`;
     })
     .join('\n');
-  const base = colors.dim(`├${'─'.repeat(inner + 2)}╯`);
+  const base = colors.dim(`${last ? '└' : '├'}${'─'.repeat(inner + 2)}╯`);
   return leadIn(`${top}\n${body}\n${base}`, lead, colors);
 }
 

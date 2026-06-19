@@ -79,4 +79,12 @@ describe('createPrompt().note', () => {
     prompt.note('info', 'Note');
     strictEqual(out[before].startsWith('│\n'), true);
   });
+
+  it('closes with a terminal corner when it is the last note', () => {
+    const { out, prompt } = harness();
+    prompt.note('info', 'Done', true);
+    const frame = out[0];
+    strictEqual(frame.includes('└'), true);
+    strictEqual(frame.includes('├'), false);
+  });
 });

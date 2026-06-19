@@ -72,7 +72,7 @@ export interface Prompt {
   /**
    * Prints a boxed aside off the rail, for information shown between prompts.
    */
-  note(message: string, title?: string): void;
+  note(message: string, title?: string, last?: boolean): void;
 }
 
 /**
@@ -127,8 +127,8 @@ export function createPrompt(options: PromptOptions = {}): Prompt {
     outro(message = '') {
       output.write(`${outroBlock(message, colors, context().lead)}\n`);
     },
-    note(message, title = '') {
-      output.write(`${noteBlock(message, title, colors, context().lead)}\n`);
+    note(message, title = '', last = false) {
+      output.write(`${noteBlock(message, title, colors, context().lead, last)}\n`);
     },
   };
 }
