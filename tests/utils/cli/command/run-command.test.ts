@@ -47,6 +47,19 @@ describe('runCommand', () => {
     strictEqual(out[0].startsWith('app\n'), true);
   });
 
+  it('forces color on and off independent of the stream', async () => {
+    const cli = defineCommand({ meta: { name: 'app' }, run() {} });
+
+    const on = capture();
+    strictEqual(await runCommand(cli, ['--help'], { ...on.options, color: true }), 0);
+    strictEqual(on.out[0].includes('\x1b['), true);
+
+    const off: string[] = [];
+    const tty = { stdout: { write: (s: string) => off.push(s), isTTY: true } };
+    strictEqual(await runCommand(cli, ['--help'], { ...tty, color: false }), 0);
+    strictEqual(off[0].includes('\x1b['), false);
+  });
+
   it('shows help for a group invoked with no command', async () => {
     const child = defineCommand({ meta: { name: 'child', description: 'A child' }, run() {} });
     const cli = defineCommand({ meta: { name: 'app' }, subCommands: { child } });

@@ -11,13 +11,19 @@ import { resolveArgs } from '../args/resolve-args.ts';
 import { renderHelp } from './render-help.ts';
 
 /**
- * Output streams for `runCommand`.
- * Both default to the matching `process` stream.
+ * Options for `runCommand`.
+ * The streams default to the matching `process` stream.
  */
 export interface RunOptions {
   /**
+   * When set, overrides TTY auto-detection.
+   * `true` always emits ANSI; `false` strips.
+   * Leave unset to fall back to the stream's `isTTY`.
+   */
+  color?: boolean | undefined;
+
+  /**
    * Where help and version output is written.
-   * A truthy `isTTY` opts the stream into colored output.
    *
    * @default
    * process.stdout
@@ -52,7 +58,7 @@ export async function runCommand(
 ): Promise<number> {
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
-  const colors = pickANSIColors(isColorStream(stdout));
+  const colors = pickANSIColors(options.color ?? isColorStream(stdout));
   const sub = command.subCommands;
   const first = argv[0];
   const isCommandToken = !isUndefined(first) && !first.startsWith('-');
