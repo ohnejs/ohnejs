@@ -12,6 +12,7 @@ import {
   relativePath,
   resolvePath,
 } from '../../../utils/index.ts';
+import { colorOverride } from '../../env/color-override.ts';
 import { version } from '../../meta/version.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 
@@ -62,7 +63,8 @@ export const initCommand = defineCommand({
   },
   async run({ values, positionals }) {
     const print = usePrinter();
-    const prompt = createPrompt();
+    const color = colorOverride();
+    const prompt = createPrompt({ color });
     const interactive = !values.yes && Boolean(process.stdin.isTTY);
     if (interactive) process.stdout.write('\n');
 
@@ -148,7 +150,7 @@ export const initCommand = defineCommand({
     }
 
     if (interactive) {
-      const colors = pickANSIColors(isColorStream(process.stdout));
+      const colors = pickANSIColors(color ?? isColorStream(process.stdout));
       process.stdout.write(`${colors.dim('│')}\n`);
     }
 

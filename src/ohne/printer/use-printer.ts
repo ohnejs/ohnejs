@@ -1,5 +1,6 @@
 import { computed, effect } from '../../utils/index.ts';
 import { createPrinter, type Printer } from '../../utils/print/index.ts';
+import { colorOverride } from '../env/color-override.ts';
 import { useEnv } from '../env/use-env.ts';
 import { useConfig } from '../layers/use-config.ts';
 
@@ -11,7 +12,7 @@ const silent = computed(() =>
 const debug = computed(() =>
   useEnv().has('DEBUG') ? useEnv().get('DEBUG') : useConfig().printer?.debug === true,
 );
-const color = computed(() => (useEnv().get('NO_COLOR') ? false : useEnv().get('FORCE_COLOR')));
+const color = computed(() => colorOverride());
 
 effect(() => {
   printer.configure({ silent: silent.value, debug: debug.value, color: color.value });
