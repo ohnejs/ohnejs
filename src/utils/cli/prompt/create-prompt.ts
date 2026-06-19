@@ -2,6 +2,7 @@ import type { PromptContext, PromptOptions } from './_prompt.ts';
 import type { ConfirmOptions } from './confirm.ts';
 import type { PromptResult } from './is-cancel.ts';
 import type { MultiselectOptions } from './multiselect.ts';
+import type { PathOptions } from './path.ts';
 import type { SelectOptions } from './select.ts';
 import type { Spinner, SpinnerOptions } from './spinner.ts';
 import type { TextOptions } from './text.ts';
@@ -12,6 +13,7 @@ import { runPrompt } from './_prompt.ts';
 import { confirmDefinition } from './confirm.ts';
 import { introLine, noteBlock, outroBlock } from './flow.ts';
 import { multiselectDefinition } from './multiselect.ts';
+import { pathDefinition } from './path.ts';
 import { selectDefinition } from './select.ts';
 import { createSpinner } from './spinner.ts';
 import { textDefinition } from './text.ts';
@@ -25,6 +27,12 @@ export interface Prompt {
    * Resolves to the entered string, or `CANCEL` if the user cancels.
    */
   text(options: TextOptions): Promise<PromptResult<string>>;
+
+  /**
+   * Asks for a filesystem path, completing folders as you type.
+   * Resolves to the chosen path, or `CANCEL` if the user cancels.
+   */
+  path(options: PathOptions): Promise<PromptResult<string>>;
 
   /**
    * Asks a yes/no question.
@@ -91,6 +99,9 @@ export function createPrompt(options: PromptOptions = {}): Prompt {
   return {
     text(textOptions) {
       return runPrompt(options, textDefinition(textOptions), context());
+    },
+    path(pathOptions) {
+      return runPrompt(options, pathDefinition(pathOptions), context());
     },
     confirm(confirmOptions) {
       return runPrompt(options, confirmDefinition(confirmOptions), context());

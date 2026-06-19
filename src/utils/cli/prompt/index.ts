@@ -8,6 +8,7 @@ export { CANCEL, isCancel } from './is-cancel.ts';
 export type { PromptResult } from './is-cancel.ts';
 export type { MultiselectOptions } from './multiselect.ts';
 export type { SelectOption } from './option.ts';
+export type { PathEntry, PathOptions } from './path.ts';
 export type { SelectOptions } from './select.ts';
 export { createSpinner } from './spinner.ts';
 export type { Spinner, SpinnerOptions } from './spinner.ts';
