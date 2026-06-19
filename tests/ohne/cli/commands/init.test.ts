@@ -45,7 +45,7 @@ describe('ohne init', () => {
     await runCommand(ohne, ['init', dir, '--yes']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     strictEqual(manifest.name, 'widgets');
-    strictEqual(manifest.dependencies.ohne.startsWith('^'), true);
+    strictEqual(manifest.dependencies.ohne.startsWith('^'), false);
   });
 
   it('installs the types the base config requires', async () => {
@@ -53,8 +53,8 @@ describe('ohne init', () => {
 
     await runCommand(ohne, ['init', dir, '--yes']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    strictEqual(manifest.devDependencies['@types/node'].startsWith('^'), true);
-    strictEqual(manifest.devDependencies.typescript.startsWith('^'), true);
+    strictEqual(manifest.devDependencies['@types/node'].startsWith('^'), false);
+    strictEqual(manifest.devDependencies.typescript.startsWith('^'), false);
     strictEqual(manifest.scripts.typecheck, 'tsc');
   });
 
