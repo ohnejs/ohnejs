@@ -9,6 +9,9 @@
     "type": "git",
     "url": "git+https://github.com/murisceman/ohne.git"
   },
+  "bin": {
+    "ohne": "./src/ohne/cli/main.ts"
+  },
   "files": [
     "src"
   ],
