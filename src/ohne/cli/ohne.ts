@@ -1,5 +1,6 @@
 import { defineCommand } from '../../utils/cli/index.ts';
 import { version } from '../meta/version.ts';
+import { initCommand } from './commands/init.ts';
 import { prepareCommand } from './commands/prepare.ts';
 
 /**
@@ -13,6 +14,7 @@ export const ohne = defineCommand({
     description: 'A zero-dependency TypeScript framework for the web.',
   },
   subCommands: {
+    init: initCommand,
     prepare: prepareCommand,
   },
 });
