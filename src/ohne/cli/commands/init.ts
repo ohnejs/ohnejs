@@ -69,7 +69,10 @@ export const initCommand = defineCommand({
     const interactive = !values.yes && Boolean(process.stdin.isTTY);
     const cancel = (): undefined => void prompt.outro(colors.red('Cancelled'));
     const keep = (): undefined => void prompt.outro(colors.dim('No changes made'));
-    if (interactive) process.stdout.write('\n');
+    if (interactive) {
+      process.stdout.write('\n');
+      prompt.intro('Creating a new **ohne** project');
+    }
 
     let where = positionals[0];
     if (isUndefined(where) && interactive) {
