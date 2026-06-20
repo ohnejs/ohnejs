@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { resolveOhneApps } from '../../../src/ohne/index.ts';
+import { resolveDependencyLayerNames } from '../../../src/ohne/index.ts';
 
 interface PackageSpec {
   name: string;
@@ -15,7 +15,7 @@ interface PackageSpec {
   optionalDependencies?: Record<string, string>;
 }
 
-describe('resolveOhneApps', () => {
+describe('resolveDependencyLayerNames', () => {
   let dir: string;
   let app: string;
 
@@ -62,16 +62,16 @@ describe('resolveOhneApps', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('collects every ohne app across all dependency kinds, excluding the root', async () => {
-    deepStrictEqual(await resolveOhneApps(app), ['a', 'b', 'c', 'd', 'opt', 'p']);
+  it('collects every ohne layer across all dependency kinds, in registration order', async () => {
+    deepStrictEqual(await resolveDependencyLayerNames(app), ['b', 'a', 'c', 'p', 'opt', 'd']);
   });
 
   it('does not follow transitive dev dependencies', async () => {
-    const apps = await resolveOhneApps(app);
-    deepStrictEqual(apps.includes('devOfA'), false);
+    const names = await resolveDependencyLayerNames(app);
+    deepStrictEqual(names.includes('devOfA'), false);
   });
 
   it('returns [] when no package.json is found', async () => {
-    deepStrictEqual(await resolveOhneApps(join(dir, 'nowhere')), []);
+    deepStrictEqual(await resolveDependencyLayerNames(join(dir, 'nowhere')), []);
   });
 });

@@ -16,16 +16,53 @@ import type { DeepPrettify, RequireByShape } from '../../utils/index.ts';
 export interface Config {
   /**
    * Configurable directories.
-   * Relative paths resolve against the app root.
    */
   dirs?: {
     /**
      * Directory ohne writes generated `.ts` files to.
+     * Resolved against the app root.
      *
      * @default
      * '.ohne'
      */
     codegen?: string;
+
+    /**
+     * Directory each layer's API routes are read from.
+     * Files map to routes by their path, with a `.{method}` suffix selecting the HTTP method.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'api'
+     */
+    api?: string;
+  };
+
+  /**
+   * Components to disable, grouped by kind.
+   * Disabling happens after every layer is combined.
+   */
+  disable?: {
+    /**
+     * Route ids to drop, as globs.
+     * A glob without a method prefix matches the route's pattern regardless of method.
+     * A glob with one (e.g. `'GET /admin/**'`) matches only that method.
+     *
+     * @default
+     * []
+     *
+     * @example
+     * ```ts
+     * disable: {
+     *   routes: [
+     *     '/internal/**',     // every route nested under /internal/
+     *     'GET /admin/**',    // only GET, nested under /admin/
+     *     'POST /users/[id]', // a single method on one route
+     *   ],
+     * }
+     * ```
+     */
+    routes?: string[];
   };
 
   /**

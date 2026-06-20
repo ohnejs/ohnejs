@@ -9,6 +9,7 @@ import {
 } from '../../../utils/index.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
+import { generateRoutes } from '../../codegen/generate-routes.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
 
@@ -41,7 +42,13 @@ export const prepareCommand = defineCommand({
     }
 
     const { result: written, ms } = await measure(async () =>
-      (await Promise.all([generateLayerName(cwd), generateResolvedConfig(cwd)])).filter(isString),
+      (
+        await Promise.all([
+          generateLayerName(cwd),
+          generateResolvedConfig(cwd),
+          generateRoutes(cwd),
+        ])
+      ).filter(isString),
     );
 
     print.successBlock({
