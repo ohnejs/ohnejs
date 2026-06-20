@@ -3,7 +3,9 @@ import { pickANSIColors } from '../../ansi/pick-ansi-colors.ts';
 
 const HIDE_CURSOR = '\x1b[?25l';
 const SHOW_CURSOR = '\x1b[?25h';
-const ERASE_LINE = '\r\x1b[K';
+const ERASE_REST = '\x1b[K';
+const ERASE_LINE = `\r${ERASE_REST}`;
+const CURSOR_UP = '\x1b[1A';
 const ETX = '\x03';
 const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -52,6 +54,7 @@ export interface SpinnerOptions {
 
   /**
    * Whether to draw a connecting rail above the spinner, joining it to a prior prompt.
+   * While animating, a trailing rail sits below so the spinner does not hug the edge.
    *
    * @default
    * false
@@ -102,6 +105,7 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
   const interval = options.interval ?? 80;
   const animate = Boolean(output.isTTY);
   const capture = animate && Boolean(input.isTTY);
+  const lead = Boolean(options.lead);
 
   let timer: ReturnType<typeof setInterval> | undefined;
   let index = 0;
@@ -109,8 +113,12 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
   let active = false;
 
   const line = (glyph: string, message: string): void => {
-    if (animate) output.write(`${ERASE_LINE}${glyph}  ${message}`);
-    else output.write(`${glyph}  ${message}\n`);
+    if (!animate) {
+      output.write(`${glyph}  ${message}\n`);
+      return;
+    }
+    output.write(`${ERASE_LINE}${glyph}  ${message}`);
+    if (lead) output.write(`\n${ERASE_REST}${colors.dim('│')}${CURSOR_UP}`);
   };
 
   const onData = (chunk: Buffer | string): void => {
@@ -138,7 +146,7 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
       active = true;
       text = message;
       index = 0;
-      if (options.lead) output.write(`${colors.dim('│')}\n`);
+      if (lead) output.write(`${colors.dim('│')}\n`);
       if (capture) captureInput();
       if (animate) output.write(HIDE_CURSOR);
       line(colors.cyan(frames[index]), text);
@@ -164,6 +172,7 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
       const symbol = code === 0 ? colors.green('◇') : colors.red('■');
       if (animate) {
         output.write(`${ERASE_LINE}${symbol}  ${message}\n`);
+        if (lead) output.write(ERASE_REST);
         output.write(SHOW_CURSOR);
       } else {
         output.write(`${symbol}  ${message}\n`);

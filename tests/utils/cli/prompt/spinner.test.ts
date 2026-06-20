@@ -163,6 +163,26 @@ describe('createSpinner', () => {
     spin.start('Working');
     strictEqual(out[0], '│\n');
   });
+
+  it('frames the animating spinner with a trailing rail and clears it on stop', () => {
+    mock.timers.enable({ apis: ['setInterval'] });
+    const out: string[] = [];
+    const spin = createSpinner({
+      input: new PassThrough(),
+      output: { write: (s) => out.push(s), isTTY: true },
+      color: false,
+      lead: true,
+      frames: ['A'],
+    });
+
+    spin.start('Working');
+    strictEqual(out.join('').includes('\n\x1b[K│\x1b[1A'), true);
+
+    spin.stop('Done');
+    mock.timers.reset();
+
+    strictEqual(out.includes('\x1b[K'), true);
+  });
 });
 
 describe('createPrompt().spinner', () => {
