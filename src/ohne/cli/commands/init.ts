@@ -184,7 +184,7 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
     private: true,
     scripts: { dev: 'ohne dev', prepare: 'ohne prepare', typecheck: 'tsc' },
     dependencies: { ohne },
-    devDependencies: { '@types/node': '26.0.0', typescript: '6.0.0' },
+    devDependencies: { '@types/node': '26.0.0', typescript: '6.0.3' },
     engines: { node: '>=26.0.0' },
   });
   await writeFile(joinPath(target, 'tsconfig.json'), TSCONFIG_FILE);
