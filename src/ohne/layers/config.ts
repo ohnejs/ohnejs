@@ -65,7 +65,7 @@ export interface Config {
  *   interface ConfigExtensions {
  *     defaults: {
  *       dirs: {
- *         codegen: true;
+ *         codegen: true
  *       }
  *     }
  *   }
