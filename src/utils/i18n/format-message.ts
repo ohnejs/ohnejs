@@ -30,10 +30,10 @@ export function formatMessage(
  *
  * @example
  * ```ts
- * const t = createMessageFormatter('en-GB');
+ * const t = createMessageFormatter('en-GB')
  * t('Hello {name}!', { name: 'World' }) // -> 'Hello World!'
  *
- * const strict = createMessageFormatter('en', { onError: (e) => { throw e } });
+ * const strict = createMessageFormatter('en', { onError: (e) => { throw e } })
  * strict('Hello {name}!', {}) // -> throws MessageFormatError
  * ```
  */

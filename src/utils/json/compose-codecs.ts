@@ -76,11 +76,11 @@ export interface ComposedCodecs {
  *   test: (v): v is Date => v instanceof Date,
  *   encode: (d) => d.toISOString(),
  *   decode: (raw) => new Date(raw as string),
- * };
+ * }
  *
- * const { encode, reviver } = composeCodecs(dateCodec);
+ * const { encode, reviver } = composeCodecs(dateCodec)
  *
- * const text = jsonSerialize(encode({ at: new Date('2026-06-11') }));
+ * const text = jsonSerialize(encode({ at: new Date('2026-06-11') }))
  * // -> '{"at":{"$date":"2026-06-11T00:00:00.000Z"}}'
  *
  * jsonDeserialize<{ at: Date }>(text, reviver).at instanceof Date
