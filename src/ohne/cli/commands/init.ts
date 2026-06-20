@@ -65,7 +65,10 @@ export const initCommand = defineCommand({
     const print = usePrinter();
     const color = colorOverride();
     const prompt = createPrompt({ color });
+    const colors = pickANSIColors(color ?? isColorStream(process.stdout));
     const interactive = !values.yes && Boolean(process.stdin.isTTY);
+    const cancel = (): undefined => void prompt.outro(colors.red('Cancelled'));
+    const keep = (): undefined => void prompt.outro(colors.dim('No changes made'));
     if (interactive) process.stdout.write('\n');
 
     let where = positionals[0];
@@ -74,7 +77,7 @@ export const initCommand = defineCommand({
         message: 'Where should the project go?',
         only: 'directory',
       });
-      if (isCancel(answer)) return;
+      if (isCancel(answer)) return cancel();
       where = answer;
     }
 
@@ -97,12 +100,14 @@ export const initCommand = defineCommand({
           message: `The directory \`${dirName}\` is not empty. Delete its contents?`,
           initialValue: false,
         });
-        if (isCancel(clear) || !clear) return;
+        if (isCancel(clear)) return cancel();
+        if (!clear) return keep();
         const purge = await prompt.confirm({
           message: `This permanently deletes everything in \`${target}\`. Continue?`,
           initialValue: false,
         });
-        if (isCancel(purge) || !purge) return;
+        if (isCancel(purge)) return cancel();
+        if (!purge) return keep();
       }
       await removeDir(target);
     }
@@ -110,7 +115,7 @@ export const initCommand = defineCommand({
     let name = values.name ?? dirName;
     if (interactive && isUndefined(values.name)) {
       const answer = await prompt.text({ message: 'Project name?', defaultValue: dirName });
-      if (isCancel(answer)) return;
+      if (isCancel(answer)) return cancel();
       name = answer;
     }
 
@@ -124,14 +129,14 @@ export const initCommand = defineCommand({
         ],
         initialValue: pm,
       });
-      if (isCancel(answer)) return;
+      if (isCancel(answer)) return cancel();
       pm = answer;
     }
 
     let git = values.git;
     if (interactive && !values.git) {
       const answer = await prompt.confirm({ message: 'Initialize a git repository?' });
-      if (isCancel(answer)) return;
+      if (isCancel(answer)) return cancel();
       git = answer;
     }
 
@@ -150,7 +155,6 @@ export const initCommand = defineCommand({
     }
 
     if (interactive) {
-      const colors = pickANSIColors(color ?? isColorStream(process.stdout));
       process.stdout.write(`${colors.dim('│')}\n`);
     }
 
