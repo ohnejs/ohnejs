@@ -1,4 +1,5 @@
 import type { DeepPrettify, RequireByShape } from '../../utils/index.ts';
+import type { LayerName } from './layer-name.ts';
 
 /**
  * Typed ohne config.
@@ -14,6 +15,20 @@ import type { DeepPrettify, RequireByShape } from '../../utils/index.ts';
  * ```
  */
 export interface Config {
+  /**
+   * Layers this project extends, by name.
+   * Each name must be an ohne layer in the dependency closure; that closure types `LayerName`.
+   * Add a layer to your `package.json` dependencies to make it referenceable, then list it here to stack it.
+   *
+   * Listed furthest-first: a later entry overrides an earlier one, and this project overrides all.
+   * Resolution cascades - each listed layer's own `layers` load before it.
+   * A layer shared by several entries loads once, ahead of every entry that lists it.
+   *
+   * @default
+   * []
+   */
+  layers?: LayerName[];
+
   /**
    * Configurable directories.
    */
