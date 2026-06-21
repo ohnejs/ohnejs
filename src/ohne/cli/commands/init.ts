@@ -18,7 +18,12 @@ import { usePrinter } from '../../printer/use-printer.ts';
 
 const run = promisify(execFile);
 
-const CONFIG_FILE = `import type { Config } from 'ohne';\n\nexport default {} satisfies Config;\n`;
+const CONFIG_FILE = `import { defineConfig } from 'ohne';
+
+export default defineConfig({
+  layers: ['ohne'],
+});
+`;
 
 const TSCONFIG_FILE = `{
   "extends": "ohne/tsconfig.base.json",
