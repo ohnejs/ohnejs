@@ -7,12 +7,13 @@ import { isUndefined } from '../is/is-undefined.ts';
 /**
  * Per-path merging strategy for `withDefaults`.
  *
- * - `'replace'` - input wins entirely; defaults are discarded.
+ * - `'replace'` - input wins entirely; defaults are discarded, but a missing input still falls back.
+ * - `'own'` - input wins entirely and never falls back; an absent input leaves the key absent.
  * - `'defaults'` - recurse into objects (per key) and arrays (per index); longer side fills the rest.
  * - `'concat'` - arrays only: `[...input, ...defaults]`. No-op on non-arrays.
  * - `'concat-unique'` - same as `'concat'`, then deduped via `uniqueArray`.
  */
-export type WithDefaultsStrategy = 'replace' | 'defaults' | 'concat' | 'concat-unique';
+export type WithDefaultsStrategy = 'replace' | 'own' | 'defaults' | 'concat' | 'concat-unique';
 
 /**
  * Options for `withDefaults`.
@@ -97,6 +98,8 @@ function apply(
     return isUndefined(input) ? defaults : input;
   }
 
+  if (strategy === 'own') return input;
+
   if (strategy === 'concat' || strategy === 'concat-unique') {
     if (isArray(input) && isArray(defaults)) {
       const combined = [...input, ...defaults];
@@ -114,6 +117,7 @@ function apply(
     for (const k of Object.keys(defaults)) if (!POISONED.has(k)) keys.add(k);
     for (const key of keys) {
       const childPath = path === '' ? key : `${path}.${key}`;
+      if (strategies.get(childPath) === 'own' && isUndefined(input[key])) continue;
       result[key] = apply(input[key], defaults[key], childPath, strategies);
     }
     return result;

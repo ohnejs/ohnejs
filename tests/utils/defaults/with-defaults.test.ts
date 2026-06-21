@@ -55,6 +55,22 @@ describe('withDefaults', () => {
     });
   });
 
+  describe("strategy 'own'", () => {
+    it('forces input to win for a plain object that would otherwise recurse', () => {
+      deepStrictEqual(
+        withDefaults({ a: { x: 1 } }, { a: { x: 9, y: 2 } }, { strategies: { a: 'own' } }),
+        { a: { x: 1 } },
+      );
+    });
+
+    it('does not fall back to defaults when input is undefined; the key stays absent', () => {
+      deepStrictEqual(
+        withDefaults({} as { a?: { x: number } }, { a: { x: 1 } }, { strategies: { a: 'own' } }),
+        {},
+      );
+    });
+  });
+
   describe("strategy 'concat'", () => {
     it('concatenates input then defaults', () => {
       deepStrictEqual(
