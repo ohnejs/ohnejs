@@ -155,10 +155,15 @@ export const DIR_DEFAULTS = {
 
 /**
  * Framework merge strategies, seeded into the layer registry.
- * `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
+ *
+ * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
+ * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
+ * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
+  dirs: 'own',
   'disable.routes': 'concat-unique',
+  printer: 'own',
 };
 
 /**

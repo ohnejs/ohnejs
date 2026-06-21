@@ -30,8 +30,15 @@ describe('loadLayers', () => {
     mkdirSync(join(store, 'base'), { recursive: true });
     mkdirSync(app, { recursive: true });
 
-    writeManifest(join(store, 'base'), 'base', [], { dirs: { api: 'routes' } });
-    writeManifest(app, 'app', ['base'], { layers: ['base'], dirs: { codegen: 'gen' } });
+    writeManifest(join(store, 'base'), 'base', [], {
+      dirs: { api: 'routes' },
+      printer: { debug: true },
+    });
+    writeManifest(app, 'app', ['base'], {
+      layers: ['base'],
+      dirs: { codegen: 'gen' },
+      printer: { silent: true },
+    });
     link(app, 'base');
   });
 
@@ -45,6 +52,7 @@ describe('loadLayers', () => {
       stack.map((layer) => layer.name),
       ['base', 'app'],
     );
-    deepStrictEqual(useConfig().dirs, { api: 'routes', codegen: 'gen' });
+    deepStrictEqual(useConfig().dirs, { codegen: 'gen' });
+    deepStrictEqual(useConfig().printer, { silent: true });
   });
 });

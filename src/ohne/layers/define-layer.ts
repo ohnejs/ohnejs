@@ -20,7 +20,8 @@ export interface LayerDefinition {
   /**
    * Merge strategies for the keys this layer introduces, keyed by dot-notation path.
    *
-   * - `'replace'` - the closer layer wins entirely; lower layers are discarded.
+   * - `'replace'` - the closer layer wins entirely; a layer that omits the key still inherits it.
+   * - `'own'` - the closer layer wins entirely and never inherits; an omitted key stays unset.
    * - `'defaults'` - recurse into objects per key and arrays per index; the longer side fills the rest.
    * - `'concat'` - arrays only: the closer layer's items first, then the lower layers'.
    * - `'concat-unique'` - same as `'concat'`, then duplicates are dropped.
