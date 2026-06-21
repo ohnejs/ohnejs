@@ -1,4 +1,9 @@
-import type { DeepPrettify, RequireByShape } from '../../utils/index.ts';
+import type {
+  DeepPrettify,
+  DefaultsMarker,
+  LayerStrategies,
+  RequireByShape,
+} from '../../utils/index.ts';
 import type { LayerName } from './layer-name.ts';
 
 /**
@@ -116,8 +121,8 @@ export interface Config {
  * declare module 'ohne' {
  *   interface ConfigExtensions {
  *     defaults: {
- *       dirs: {
- *         codegen: true
+ *       myFeature: {
+ *         enabled: true
  *       }
  *     }
  *   }
@@ -127,10 +132,42 @@ export interface Config {
 export interface ConfigExtensions {}
 
 /**
+ * Framework config defaults, applied beneath every layer.
+ * Merged into the furthest layer's own defaults, so any layer or the app can override them.
+ *
+ * `dirs` is absent: a codegen or api directory is a per-layer preference, never inherited.
+ * Its defaults live in `DIR_DEFAULTS`, read from each layer's own config.
+ * `printer` is absent too: `usePrinter` reads it before layers load and supplies its own fallback.
+ */
+export const DEFAULTS = {
+  layers: [],
+  disable: { routes: [] },
+} satisfies Config;
+
+/**
+ * Default per-layer directories.
+ * Read from each layer's own config with this as the fallback, never through the cross-layer merge.
+ */
+export const DIR_DEFAULTS = {
+  codegen: '.ohne',
+  api: 'api',
+} satisfies NonNullable<Config['dirs']>;
+
+/**
+ * Framework merge strategies, seeded into the layer registry.
+ * `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
+ */
+export const BASE_STRATEGIES: LayerStrategies = {
+  'disable.routes': 'concat-unique',
+};
+
+/**
  * The config returned by `useConfig`, after every layer is merged.
- * A field a layer defaults becomes required while keeping its declared type; the rest stay as in `Config`.
- * Falls back to `Config` until codegen has run.
+ * A defaulted field becomes required while keeping its declared type; the rest stay as in `Config`.
+ *
+ * Once config codegen runs, `ConfigExtensions` carries the full defaults tree, framework and layers alike.
+ * Until then the framework `DEFAULTS` still apply, so their fields stay required.
  */
 export type ResolvedConfig = ConfigExtensions extends { defaults: infer D }
   ? DeepPrettify<RequireByShape<Config, D>>
-  : Config;
+  : DeepPrettify<RequireByShape<Config, DefaultsMarker<typeof DEFAULTS>>>;

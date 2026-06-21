@@ -1,17 +1,29 @@
+import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
 
-import { isUndefined, last } from '../../utils/index.ts';
+import { resolveModuleDir } from '../../utils/fs/index.ts';
+import { isNull, isUndefined, last } from '../../utils/index.ts';
 import { readLayerConfig } from './read-layer-config.ts';
 import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
 
 /**
- * A layer in the resolved stack, paired with its own config.
+ * A layer in the resolved stack, paired with its own config, split by ownership.
  */
 export interface ResolvedLayer extends OhneLayer {
   /**
-   * The layer's own config: the default export of its `ohne.config.ts`, before any merge.
+   * Values the layer sets, from its `ohne.config.ts`.
    */
-  config: Config;
+  input: Config;
+
+  /**
+   * Default values the layer owns, from its `ohne.layer.ts`, or `{}` when it ships none.
+   */
+  defaults: Config;
+
+  /**
+   * Merge strategies the layer owns, from its `ohne.layer.ts`, or `{}` when it ships none.
+   */
+  strategies: LayerStrategies;
 }
 
 /**
@@ -26,18 +38,17 @@ export interface ResolvedLayer extends OhneLayer {
  * Within one layer's `layers`, declaration order holds, with the later entry winning.
  * The app itself is the root and comes last; later overrides earlier everywhere.
  *
+ * Throws when a listed layer cannot be used: not installed, or installed without an `ohne.config.ts`.
+ *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Returns `[]` when no `package.json` is found.
  *
  * @example
  * ```ts
- * await resolveLayerStack()
- * // -> [
- * //      { name: 'ohne', dir: '...', config: {} },
- * //      { name: '@acme/base', dir: '...', config: { layers: ['ohne'] } },
- * //      { name: '@acme/auth', dir: '...', config: { layers: ['@acme/base'] } },
- * //      { name: 'app', dir: '...', config: { layers: ['@acme/auth'] } },
- * //    ]
+ * const stack = await resolveLayerStack()
+ *
+ * stack.map((layer) => layer.name)
+ * // -> ['ohne', '@acme/base', '@acme/auth', 'app']
  * ```
  */
 export async function resolveLayerStack(from: string = process.cwd()): Promise<ResolvedLayer[]> {
@@ -55,12 +66,22 @@ export async function resolveLayerStack(from: string = process.cwd()): Promise<R
     if (visited.has(layer.dir)) return;
     visited.add(layer.dir);
 
-    const config = (await readLayerConfig(layer.dir)) ?? {};
-    for (const name of config.layers ?? []) {
+    const config = (await readLayerConfig(layer.dir)) ?? {
+      input: {},
+      defaults: {},
+      strategies: {},
+    };
+    for (const name of config.input.layers ?? []) {
       const dir = dirByName.get(name);
-      if (isUndefined(dir)) continue;
+      if (isUndefined(dir)) {
+        const resolved = await resolveModuleDir(name, layer.dir);
+        const reason = isNull(resolved)
+          ? 'it is not installed'
+          : `it has no "ohne.config.ts" (resolved to "${resolved}")`;
+        throw new Error(`Layer "${name}" listed by "${layer.name}" cannot be used: ${reason}.`);
+      }
       await walk({ name, dir });
     }
-    stack.push({ ...layer, config });
+    stack.push({ ...layer, ...config });
   }
 }

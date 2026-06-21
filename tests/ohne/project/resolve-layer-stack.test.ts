@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, rejects } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,11 +75,25 @@ describe('resolveLayerStack', () => {
     );
   });
 
-  it('pairs each layer with its own config', async () => {
+  it('pairs each layer with its own input config', async () => {
     const stack = await resolveLayerStack(app);
-    const byName = Object.fromEntries(stack.map((layer) => [layer.name, layer.config]));
+    const byName = Object.fromEntries(stack.map((layer) => [layer.name, layer.input]));
     deepStrictEqual(byName.a, { layers: ['c'] });
     deepStrictEqual(byName.c, {});
+  });
+
+  it('throws when a listed layer has no ohne.config.ts', async () => {
+    const broken = join(root, 'broken');
+    mkdirSync(broken, { recursive: true });
+    writeManifest(broken, { name: 'broken', deps: ['plain'], layers: ['plain'] });
+    mkdirSync(join(store, 'plain'), { recursive: true });
+    writeFileSync(join(store, 'plain', 'package.json'), JSON.stringify({ name: 'plain' }));
+    link(broken, 'plain');
+
+    await rejects(
+      () => resolveLayerStack(broken),
+      /Layer "plain" listed by "broken" cannot be used/,
+    );
   });
 
   it('returns an empty list when no package.json is found', async () => {

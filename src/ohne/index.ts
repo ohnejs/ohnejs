@@ -4,6 +4,8 @@ export * from './codegen/generate-routes.ts';
 export * from './env/env.ts';
 export * from './env/use-env.ts';
 export * from './layers/config.ts';
+export * from './layers/define-config.ts';
+export * from './layers/define-layer.ts';
 export * from './layers/layer-name.ts';
 export * from './layers/load-layers.ts';
 export * from './layers/use-config.ts';

@@ -1,6 +1,7 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
 import { compileGlob, type HTTPMethod, isNull, naturalCompare } from '../../utils/index.ts';
+import { DIR_DEFAULTS } from '../layers/config.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { routeId, type RouteMeta } from './route.ts';
 import { scanLayerRoutes } from './scan-layer-routes.ts';
@@ -52,7 +53,7 @@ export async function collectRoutes(
 
   const table = new Map<string, RouteMeta>();
   for (const layer of layers) {
-    const dir = configByPath.get(layer.dir)?.dirs?.api ?? 'api';
+    const dir = configByPath.get(layer.dir)?.dirs?.api ?? DIR_DEFAULTS.api;
     for (const route of await scanLayerRoutes(layer, dir)) {
       table.set(routeId(route.method, route.pattern), route);
     }

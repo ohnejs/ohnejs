@@ -2,9 +2,9 @@ import { strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 
-import { generateRoutes } from '../../../src/ohne/index.ts';
+import { generateRoutes, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 
 interface PackageSpec {
   name: string;
@@ -36,6 +36,10 @@ describe('generateRoutes', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  afterEach(() => {
+    for (const layer of useLayers().layers()) useLayers().remove(layer.path);
+  });
+
   it('emits imports, types, and registrations for the combined table', async () => {
     const app = join(root, 'app');
     writePackage(app, { name: 'app', ohne: true, dependencies: { a: '*' } });
@@ -45,6 +49,7 @@ describe('generateRoutes', () => {
     writeRoute(app, 'health.ts');
     writeRoute(app, 'users/[id].get.ts');
 
+    await loadLayers(app);
     const path = await generateRoutes(app);
     strictEqual(path?.endsWith('/.ohne/routes.ts'), true);
     const out = readFileSync(path!, 'utf8');
@@ -71,6 +76,7 @@ describe('generateRoutes', () => {
     const app = join(root, 'empty');
     writePackage(app, { name: 'empty', ohne: true });
 
+    await loadLayers(app);
     const path = await generateRoutes(app);
     strictEqual(
       readFileSync(path!, 'utf8'),
