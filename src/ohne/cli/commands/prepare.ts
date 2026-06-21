@@ -10,6 +10,7 @@ import {
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../../codegen/generate-routes.ts';
+import { loadLayers } from '../../layers/load-layers.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
 
@@ -41,15 +42,16 @@ export const prepareCommand = defineCommand({
       return;
     }
 
-    const { result: written, ms } = await measure(async () =>
-      (
+    const { result: written, ms } = await measure(async () => {
+      await loadLayers(cwd);
+      return (
         await Promise.all([
           generateLayerName(cwd),
           generateResolvedConfig(cwd),
           generateRoutes(cwd),
         ])
-      ).filter(isString),
-    );
+      ).filter(isString);
+    });
 
     print.successBlock({
       title: `Project prepared __in ${formatDuration(ms)}__`,
