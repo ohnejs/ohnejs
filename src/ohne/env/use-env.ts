@@ -17,6 +17,7 @@ registry.define('FORCE_COLOR', {
   default: undefined,
   parse: (raw) => coerceToBoolean(raw) !== false,
 });
+registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
 
 /**
  * Returns the process-wide env registry for `Env`.

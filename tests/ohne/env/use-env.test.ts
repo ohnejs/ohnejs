@@ -3,7 +3,7 @@ import { afterEach, describe, it } from 'node:test';
 import { useEnv } from 'ohne';
 import { effect } from 'ohne/utils';
 
-const KEYS = ['SILENT', 'DEBUG', 'NO_COLOR', 'FORCE_COLOR'] as const;
+const KEYS = ['SILENT', 'DEBUG', 'NO_COLOR', 'FORCE_COLOR', 'SKIP_CODEGEN'] as const;
 
 describe('useEnv', () => {
   afterEach(() => {
@@ -32,6 +32,10 @@ describe('useEnv', () => {
 
     it('FORCE_COLOR defaults to `undefined`', () => {
       strictEqual(useEnv().get('FORCE_COLOR'), undefined);
+    });
+
+    it('SKIP_CODEGEN defaults to `false`', () => {
+      strictEqual(useEnv().get('SKIP_CODEGEN'), false);
     });
   });
 
@@ -92,6 +96,17 @@ describe('useEnv', () => {
       process.env['FORCE_COLOR'] = 'random';
       strictEqual(useEnv().get('FORCE_COLOR'), true);
     });
+
+    it('SKIP_CODEGEN parses `1`/`0`/`true`/`false` (case-insensitive)', () => {
+      process.env['SKIP_CODEGEN'] = '1';
+      strictEqual(useEnv().get('SKIP_CODEGEN'), true);
+
+      process.env['SKIP_CODEGEN'] = 'TRUE';
+      strictEqual(useEnv().get('SKIP_CODEGEN'), true);
+
+      process.env['SKIP_CODEGEN'] = '0';
+      strictEqual(useEnv().get('SKIP_CODEGEN'), false);
+    });
   });
 
   describe('overrides', () => {
@@ -110,7 +125,7 @@ describe('useEnv', () => {
   });
 
   describe('names', () => {
-    it('reports the four built-ins', () => {
+    it('reports the five built-ins', () => {
       const names = [...useEnv().names()];
       deepStrictEqual(
         names.filter((n) => (KEYS as readonly string[]).includes(n)).sort(),

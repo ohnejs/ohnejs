@@ -7,6 +7,7 @@
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
  * - `NO_COLOR` - non-empty value disables ANSI colors per the `no-color.org` standard.
  * - `FORCE_COLOR` - forces ANSI on (or off) regardless of TTY detection.
+ * - `SKIP_CODEGEN` - truthy skips codegen on startup, for when a parent process already ran it.
  *
  * @example
  * ```ts
@@ -52,4 +53,12 @@ export interface Env {
    * undefined
    */
   FORCE_COLOR: boolean | undefined;
+
+  /**
+   * When `true`, startup skips codegen.
+   *
+   * @default
+   * false
+   */
+  SKIP_CODEGEN: boolean;
 }
