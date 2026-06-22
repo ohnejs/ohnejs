@@ -2,6 +2,7 @@ import { defineCommand } from '../../utils/cli/index.ts';
 import { version } from '../meta/version.ts';
 import { initCommand } from './commands/init.ts';
 import { prepareCommand } from './commands/prepare.ts';
+import { serveCommand } from './commands/serve.ts';
 
 /**
  * The root `ohne` command.
@@ -16,5 +17,6 @@ export const ohne = defineCommand({
   subCommands: {
     init: initCommand,
     prepare: prepareCommand,
+    serve: serveCommand,
   },
 });
