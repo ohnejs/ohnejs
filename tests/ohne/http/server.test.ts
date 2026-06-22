@@ -1,0 +1,108 @@
+import type { AddressInfo } from 'node:net';
+
+import { strictEqual } from 'node:assert';
+import { once } from 'node:events';
+import { request } from 'node:http';
+import { before, describe, it } from 'node:test';
+
+import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
+import type { Gate, HTTPMethod } from '../../../src/utils/index.ts';
+
+import {
+  createRouter,
+  createServer,
+  useEvent,
+  usePrinter,
+  waitUntil,
+} from '../../../src/ohne/index.ts';
+import { sleep } from '../../../src/utils/index.ts';
+
+function makeRoute(method: HTTPMethod, pattern: string, handler: AnyHandler): Route {
+  return { method, pattern, file: `${pattern}.ts`, layer: 'test', handler };
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !condition(); i++) await sleep(5);
+}
+
+async function withServer(
+  routes: Route[],
+  run: (base: string, gate: Gate) => Promise<void>,
+): Promise<void> {
+  const { server, gate } = createServer(createRouter(routes));
+  server.listen(0);
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  try {
+    await run(`http://localhost:${port}`, gate);
+  } finally {
+    server.close();
+    server.closeAllConnections();
+  }
+}
+
+before(() => {
+  usePrinter().configure({ stream: { write() {} } });
+});
+
+describe('createServer', () => {
+  it('serializes a matched handler return', async () => {
+    await withServer(
+      [makeRoute('GET', '/users/[id]', () => ({ id: useEvent().params.id }))],
+      async (base) => {
+        const res = await fetch(`${base}/users/42`);
+        strictEqual(res.status, 200);
+        strictEqual(((await res.json()) as { id: string }).id, '42');
+      },
+    );
+  });
+
+  it('answers an unmatched path with 404', async () => {
+    await withServer([makeRoute('GET', '/', () => 'home')], async (base) => {
+      const res = await fetch(`${base}/nope`);
+      strictEqual(res.status, 404);
+      await res.body?.cancel();
+    });
+  });
+
+  it('answers a wrong method with 405 and an Allow header', async () => {
+    await withServer([makeRoute('GET', '/users', () => [])], async (base) => {
+      const res = await fetch(`${base}/users`, { method: 'DELETE' });
+      strictEqual(res.status, 405);
+      strictEqual(res.headers.get('allow'), 'GET');
+      await res.body?.cancel();
+    });
+  });
+
+  it('refuses a request with 503 and Connection close while the gate is closing', async () => {
+    await withServer([makeRoute('GET', '/', () => 'ok')], async (base, gate) => {
+      await gate.close();
+      const { port } = new URL(base);
+      const req = request({ port, method: 'GET' });
+      req.end();
+      const [res] = await once(req, 'response');
+      strictEqual(res.statusCode, 503);
+      strictEqual(res.headers.connection, 'close');
+      res.resume();
+    });
+  });
+
+  it('holds the gate ticket until waitUntil settles', async () => {
+    let resolveWork!: () => void;
+    const work = new Promise<void>((resolve) => (resolveWork = resolve));
+    const route = makeRoute('GET', '/bg', () => {
+      waitUntil(work);
+      return 'ok';
+    });
+
+    await withServer([route], async (base, gate) => {
+      const res = await fetch(`${base}/bg`);
+      strictEqual(await res.text(), 'ok');
+      strictEqual(gate.pending, 1);
+
+      resolveWork();
+      await waitFor(() => gate.pending === 0);
+      strictEqual(gate.pending, 0);
+    });
+  });
+});
