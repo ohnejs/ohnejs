@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
-import { usePrinter } from '../../../../src/ohne/index.ts';
+import { useEnv } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
 
 describe('ohne serve api', () => {
@@ -20,13 +20,13 @@ describe('ohne serve api', () => {
 
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-'));
-    usePrinter().configure({ silent: true });
+    useEnv().set('SILENT', true);
     process.exitCode = 0;
   });
 
   after(() => {
     rmSync(root, { recursive: true, force: true });
-    usePrinter().configure({ silent: false });
+    useEnv().unset('SILENT');
     process.exitCode = 0;
   });
 

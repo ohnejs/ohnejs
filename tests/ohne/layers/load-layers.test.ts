@@ -13,7 +13,10 @@ describe('loadLayers', () => {
 
   function writeManifest(dir: string, name: string, deps: string[], config: object): void {
     const dependencies = Object.fromEntries(deps.map((dep) => [dep, '*']));
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, dependencies }));
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name, type: 'module', dependencies }),
+    );
     writeFileSync(join(dir, 'ohne.config.ts'), `export default ${JSON.stringify(config)}\n`);
   }
 

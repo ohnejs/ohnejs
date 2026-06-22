@@ -22,7 +22,10 @@ describe('resolveLayerStack', () => {
   // strip types under node_modules.
   function writeManifest(dir: string, spec: LayerSpec): void {
     const dependencies = Object.fromEntries((spec.deps ?? []).map((dep) => [dep, '*']));
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: spec.name, dependencies }));
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: spec.name, type: 'module', dependencies }),
+    );
     const config = spec.layers ? { layers: spec.layers } : {};
     writeFileSync(join(dir, 'ohne.config.ts'), `export default ${JSON.stringify(config)}\n`);
   }
