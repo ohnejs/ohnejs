@@ -126,6 +126,8 @@ export * from './registry/create-registry.ts';
 export * from './route/compile-route.ts';
 export * from './route/path-to-route-pattern.ts';
 export * from './route/path-to-route.ts';
+export * from './search-params/parse-search-params.ts';
+export * from './search-params/stringify-search-params.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
 export * from './sort/natural-compare.ts';
