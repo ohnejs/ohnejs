@@ -56,6 +56,16 @@ export interface Config {
      * 'api'
      */
     api?: string;
+
+    /**
+     * Directory each layer's boot files are read from.
+     * Top-level `.ts` files run once at start in name order; an `index.ts` runs alone.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'boot'
+     */
+    boot?: string;
   };
 
   /**
@@ -151,6 +161,7 @@ export const DEFAULTS = {
 export const DIR_DEFAULTS = {
   codegen: '.ohne',
   api: 'api',
+  boot: 'boot',
 } satisfies NonNullable<Config['dirs']>;
 
 /**
