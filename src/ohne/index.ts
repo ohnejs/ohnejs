@@ -30,3 +30,4 @@ export * from './routes/route.ts';
 export * from './routes/scan-layer-routes.ts';
 export * from './routes/use-api.ts';
 export * from './routes/use-routes.ts';
+export * from './serve/api.ts';
