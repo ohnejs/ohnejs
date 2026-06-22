@@ -28,6 +28,8 @@ export * from './layers/layer-name.ts';
 export * from './layers/load-layers.ts';
 export * from './layers/use-config.ts';
 export * from './layers/use-layers.ts';
+export * from './lifecycle/on-shutdown.ts';
+export * from './lifecycle/use-shutdown.ts';
 export * from './meta/version.ts';
 export * from './printer/use-printer.ts';
 export * from './project/is-ohne-project.ts';
