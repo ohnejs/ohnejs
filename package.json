@@ -10,7 +10,7 @@
     "url": "git+https://github.com/murisceman/ohne.git"
   },
   "bin": {
-    "ohne": "./src/ohne/cli/main.ts"
+    "ohne": "./src/ohne/cli/bin.js"
   },
   "files": [
     "src",
@@ -24,6 +24,7 @@
       "types": "./src/ohne/index.ts",
       "default": "./src/ohne/index.ts"
     },
+    "./register": "./src/ohne/runtime/register.js",
     "./utils": {
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
