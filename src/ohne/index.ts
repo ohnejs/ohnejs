@@ -9,6 +9,7 @@ export * from './hooks/apply-hook.ts';
 export * from './hooks/hook.ts';
 export * from './hooks/hooks.ts';
 export * from './hooks/use-hooks.ts';
+export * from './http/adapter.ts';
 export * from './layers/config.ts';
 export * from './layers/define-config.ts';
 export * from './layers/define-layer.ts';
