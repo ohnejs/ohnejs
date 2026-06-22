@@ -11,6 +11,7 @@ export * from './hooks/hooks.ts';
 export * from './hooks/use-hooks.ts';
 export * from './http/adapter.ts';
 export * from './http/event.ts';
+export * from './http/router.ts';
 export * from './http/set-response-status.ts';
 export * from './http/use-event.ts';
 export * from './http/use-request.ts';
