@@ -66,6 +66,16 @@ export interface Config {
      * 'boot'
      */
     boot?: string;
+
+    /**
+     * Directory each layer's middleware is read from.
+     * Each `.ts` file is one middleware, named by its path (`foo/bar.ts` -> `foo-bar`); all run globally.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'middleware'
+     */
+    middleware?: string;
   };
 
   /**
@@ -162,6 +172,7 @@ export const DIR_DEFAULTS = {
   codegen: '.ohne',
   api: 'api',
   boot: 'boot',
+  middleware: 'middleware',
 } satisfies NonNullable<Config['dirs']>;
 
 /**

@@ -10,6 +10,7 @@ function makeEvent(url = 'http://localhost/'): Event {
     params: {},
     response: { status: 200, headers: new Headers() },
     context: {},
+    appliedMiddleware: [],
     waitUntil() {},
   };
 }

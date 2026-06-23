@@ -8,6 +8,7 @@ import {
   resolvePath,
 } from '../../../utils/index.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
+import { generateMiddleware } from '../../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../../codegen/generate-routes.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
@@ -48,6 +49,7 @@ export const prepareCommand = defineCommand({
         await Promise.all([
           generateLayerName(cwd),
           generateResolvedConfig(cwd),
+          generateMiddleware(cwd),
           generateRoutes(cwd),
         ])
       ).filter(isString);

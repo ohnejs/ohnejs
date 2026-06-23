@@ -1,5 +1,6 @@
 import { bootLayers } from '../boot/boot-layers.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
+import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { useEnv } from '../env/use-env.ts';
@@ -22,6 +23,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<void> {
     await Promise.all([
       generateLayerName(from),
       generateResolvedConfig(from),
+      generateMiddleware(from),
       generateRoutes(from),
     ]);
   }

@@ -10,6 +10,7 @@ function makeEvent(request: Request): Event {
     params: {},
     response: { status: 200, headers: new Headers() },
     context: {},
+    appliedMiddleware: [],
     waitUntil() {},
   };
 }

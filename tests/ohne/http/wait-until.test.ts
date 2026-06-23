@@ -10,6 +10,7 @@ function makeEvent(collected: Promise<unknown>[]): Event {
     params: {},
     response: { status: 200, headers: new Headers() },
     context: {},
+    appliedMiddleware: [],
     waitUntil: (promise) => collected.push(promise),
   };
 }

@@ -1,4 +1,5 @@
 import type { RouteParams } from '../../utils/index.ts';
+import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 
 /**
  * Extensible per-request context bag.
@@ -74,6 +75,12 @@ export interface Event {
    * The extensible per-request context bag.
    */
   context: EventContext;
+
+  /**
+   * Names of the middleware that have run for this request, in run order.
+   * A handler reads it to see which middleware applied; the pipeline appends each as it runs.
+   */
+  appliedMiddleware: MiddlewareKey[];
 
   /**
    * Keep background work alive past the response.

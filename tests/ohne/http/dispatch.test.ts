@@ -1,14 +1,17 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { before, describe, it } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
 
 import {
   badRequest,
   dispatch,
+  hook,
   notFound,
   setResponseStatus,
   useEvent,
+  useHooks,
+  useMiddleware,
   usePrinter,
   waitUntil,
 } from '../../../src/ohne/index.ts';
@@ -27,6 +30,11 @@ function url(href = 'http://localhost/'): URL {
 
 before(() => {
   usePrinter().configure({ stream: { write() {} } });
+});
+
+afterEach(() => {
+  useMiddleware().clear();
+  useHooks().clear();
 });
 
 describe('dispatch', () => {
@@ -124,6 +132,78 @@ describe('dispatch', () => {
     });
     const { drain } = await dispatch(route, req(), url(), {});
     await drain();
+  });
+
+  it('runs middleware before the handler, sharing the event', async () => {
+    useMiddleware().register('tag', (event) => {
+      event.response.headers.set('x-mw', 'on');
+      (event.context as Record<string, unknown>).role = 'admin';
+    });
+    const route = makeRoute('/', () => useEvent().context as Record<string, unknown>);
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.headers.get('x-mw'), 'on');
+    deepStrictEqual(await response.json(), { role: 'admin' });
+  });
+
+  it('short-circuits when a middleware returns a value', async () => {
+    let handlerRan = false;
+    useMiddleware().register('guard', () => badRequest('blocked'));
+    const route = makeRoute('/', () => {
+      handlerRan = true;
+      return 'ok';
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.status, 400);
+    strictEqual(handlerRan, false);
+  });
+
+  it('runs middleware in registration order, before the handler', async () => {
+    const order: string[] = [];
+    for (const name of ['10', '2', 'auth']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    const route = makeRoute('/', () => {
+      order.push('handler');
+      return 'ok';
+    });
+    await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['10', '2', 'auth', 'handler']);
+  });
+
+  it('maps an unexpected throw from middleware to a generic 500', async () => {
+    useMiddleware().register('boom', () => {
+      throw new Error('mw exploded');
+    });
+    const { response } = await dispatch(
+      makeRoute('/', () => 'ok'),
+      req(),
+      url(),
+      {},
+    );
+    strictEqual(response.status, 500);
+  });
+
+  it('records the middleware that ran on event.appliedMiddleware', async () => {
+    for (const name of ['a', 'b']) useMiddleware().register(name, () => undefined);
+    const route = makeRoute('/', () => useEvent().appliedMiddleware);
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(await response.json(), ['a', 'b']);
+  });
+
+  it('lets the middleware:resolve hook filter and reorder', async () => {
+    const order: string[] = [];
+    for (const name of ['a', 'b', 'c']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    hook('middleware:resolve', (names) => names.filter((name) => name !== 'b').reverse());
+    const route = makeRoute('/', () => useEvent().appliedMiddleware);
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['c', 'a']);
+    deepStrictEqual(await response.json(), ['c', 'a']);
   });
 
   it('drains a re-entrant waitUntil', async () => {

@@ -1,7 +1,12 @@
 import type { RouteParams } from '../../utils/index.ts';
+import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 import type { Handler, Route } from '../routes/route.ts';
 import type { Event } from './event.ts';
 
+import { isUndefined } from '../../utils/index.ts';
+import { applyHook } from '../hooks/apply-hook.ts';
+import { useHooks } from '../hooks/use-hooks.ts';
+import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { HTTPError } from './http-error.ts';
 import { toResponse } from './to-response.ts';
@@ -28,7 +33,10 @@ export interface Dispatched {
 /**
  * Runs a matched route to a response.
  *
- * Builds the request `Event`, binds it via `runWithEvent`, runs the handler, and serializes its return.
+ * Builds the request `Event` and binds it via `runWithEvent`.
+ * The `middleware:resolve` hook may filter or reorder the middleware first.
+ * Runs the resolved middleware in order, recording each on `event.appliedMiddleware`, then the handler.
+ * A middleware that returns a value short-circuits, and the handler never runs.
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
  * The returned `drain` defers background work past the response.
@@ -54,6 +62,7 @@ export async function dispatch(
     params,
     response: { status: 200, headers: new Headers() },
     context: {},
+    appliedMiddleware: [],
     waitUntil(promise) {
       background.push(promise);
     },
@@ -61,6 +70,12 @@ export async function dispatch(
 
   const response = await runWithEvent(event, async () => {
     try {
+      const registry = useMiddleware();
+      for (const name of await resolveMiddleware(registry.keys(), event)) {
+        event.appliedMiddleware.push(name as MiddlewareKey);
+        const result = await registry.get(name)!(event);
+        if (!isUndefined(result)) return toResponse(result, event.response);
+      }
       const result = await (route.handler as Handler)({ params });
       return toResponse(result, event.response);
     } catch (error) {
@@ -71,6 +86,12 @@ export async function dispatch(
   });
 
   return { response, drain: () => drain(background) };
+}
+
+async function resolveMiddleware(names: string[], event: Event): Promise<string[]> {
+  const callbacks = useHooks().get('middleware:resolve');
+  if (isUndefined(callbacks) || callbacks.length === 0) return names;
+  return applyHook('middleware:resolve', names as MiddlewareKey[], event);
 }
 
 async function drain(background: Promise<unknown>[]): Promise<void> {
