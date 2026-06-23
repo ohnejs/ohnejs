@@ -1,5 +1,6 @@
 export * from './code-builder.ts';
 export * from './code-generator.ts';
+export * from './import-specifier.ts';
 export * from './indent.ts';
 export * from './literal-string.ts';
 export * from './literal-union.ts';
