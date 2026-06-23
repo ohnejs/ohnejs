@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, rejects } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,5 +40,15 @@ describe('scanLayerRoutes', () => {
 
   it('returns an empty list when a layer has no api directory', async () => {
     deepStrictEqual(await scanLayerRoutes({ name: 'bare', dir: join(root, 'bare') }, 'api'), []);
+  });
+
+  it('throws when two files resolve to the same route', async () => {
+    const clashing: OhneLayer = { name: 'clash', dir: join(root, 'clash') };
+    writeRoute(clashing.dir, 'users.get.ts');
+    writeRoute(clashing.dir, 'users/index.get.ts');
+    await rejects(
+      scanLayerRoutes(clashing, 'api'),
+      /Duplicate route "GET \/users" in layer "clash"/,
+    );
   });
 });

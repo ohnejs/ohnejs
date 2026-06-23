@@ -1,8 +1,8 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
 import { listDir } from '../../utils/fs/index.ts';
-import { isNull, joinPath, naturalCompare, pathToRoute } from '../../utils/index.ts';
-import { type RouteMeta } from './route.ts';
+import { isNull, isUndefined, joinPath, naturalCompare, pathToRoute } from '../../utils/index.ts';
+import { routeId, type RouteMeta } from './route.ts';
 
 /**
  * Reads every route file in one layer's API directory.
@@ -10,6 +10,7 @@ import { type RouteMeta } from './route.ts';
  * Each `.ts` file under `<layer.dir>/<api>` maps to a route via `pathToRoute`.
  * Results are sorted by file path so the output is deterministic.
  * Returns `[]` when the layer has no API directory.
+ * Throws when two files in the layer resolve to the same route, since one would silently shadow the other.
  *
  * @example
  * ```ts
@@ -21,10 +22,19 @@ export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<Ro
   const entries = await listDir(joinPath(layer.dir, api), { ext: 'ts', files: true });
   if (isNull(entries)) return [];
 
+  const seen = new Map<string, string>();
   return entries
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
       const { method, pattern } = pathToRoute(entry.relativePath);
+      const id = routeId(method, pattern);
+      const clash = seen.get(id);
+      if (!isUndefined(clash)) {
+        throw new Error(
+          `Duplicate route "${id}" in layer "${layer.name}": "${clash}" and "${entry.path}" resolve to the same route.`,
+        );
+      }
+      seen.set(id, entry.path);
       return { method, pattern, file: entry.path, layer: layer.name };
     });
 }
