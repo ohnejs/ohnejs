@@ -115,6 +115,7 @@ export * from './path/path-to-kebab-name.ts';
 export * from './path/path-to-pascal-name.ts';
 export * from './path/relative-path.ts';
 export * from './path/resolve-path.ts';
+export * from './path/safe-resolve.ts';
 export * from './path/with-leading-slash.ts';
 export * from './path/with-trailing-slash.ts';
 export * from './path/without-leading-slash.ts';
