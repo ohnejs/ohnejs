@@ -88,6 +88,8 @@ export * from './keys/platform.ts';
 export * from './keys/stroke-from-keyboard-event.ts';
 export * from './keys/stroke-from-readline-key.ts';
 export * from './merge/merge.ts';
+export * from './net/create-cidr-matcher.ts';
+export * from './net/unmap-ip.ts';
 export * from './number/clamp.ts';
 export * from './object/has-key.ts';
 export * from './object/has-keys.ts';
