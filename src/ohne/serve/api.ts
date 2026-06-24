@@ -12,7 +12,7 @@ import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { useEnv } from '../env/use-env.ts';
 import { createRouter } from '../http/router.ts';
-import { createServer, type HttpServer } from '../http/server.ts';
+import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
 import { DEFAULT_PORT, offToUndefined } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
@@ -36,7 +36,7 @@ import { useRoutes } from '../routes/use-routes.ts';
  * Port and host come from `Config.server`, overridden by the `PORT` and `HOST` env vars when set.
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
-export async function serveAPI(from: string = process.cwd()): Promise<HttpServer> {
+export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer> {
   await loadLayers(from);
   await bootLayers();
 

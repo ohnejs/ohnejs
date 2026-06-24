@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import {
-  type HttpServer,
+  type HTTPServer,
   serveAPI,
   shutdownServer,
   useEnv,
@@ -33,7 +33,7 @@ function get(port: number, path: string): Promise<number> {
 
 describe('serveAPI', () => {
   let root: string;
-  let http: HttpServer | undefined;
+  let http: HTTPServer | undefined;
 
   function makeApp(name: string, mark: string): string {
     const dir = mkdtempSync(join(root, `${name}-`));

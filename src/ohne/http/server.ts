@@ -22,7 +22,7 @@ import { toResponse } from './to-response.ts';
 /**
  * A built HTTP server: the Node transport and the drain gate it admits requests through.
  */
-export interface HttpServer {
+export interface HTTPServer {
   /**
    * The Node server.
    * Call `listen` to start accepting; pass it and `gate` to `shutdownServer` to drain.
@@ -148,7 +148,7 @@ export interface CreateServerOptions {
  * onShutdown(() => shutdownServer(server, gate, { shutdownTimeout: '10s' }))
  * ```
  */
-export function createServer(router: Router, options: CreateServerOptions = {}): HttpServer {
+export function createServer(router: Router, options: CreateServerOptions = {}): HTTPServer {
   const gate = createGate();
   const limits: RequestLimits = {
     maxBodySize: isUndefined(options.maxBodySize) ? undefined : parseBytes(options.maxBodySize),
