@@ -22,6 +22,7 @@ export * from './http/shutdown-server.ts';
 export * from './http/to-response.ts';
 export * from './http/use-event.ts';
 export * from './http/use-request.ts';
+export * from './http/use-response.ts';
 export * from './http/use-route-params.ts';
 export * from './http/use-search-params.ts';
 export * from './http/wait-until.ts';
