@@ -57,6 +57,7 @@ export interface Router {
    * The path must be the URL pathname, with query and fragment already stripped.
    * Patterns are tried most-specific first: static segments beat named params, which beat catch-alls.
    * A method-agnostic route (no method suffix in its filename) answers any method.
+   * A `HEAD` with no `HEAD` route is served by the path's `GET` route; the body is dropped on the wire.
    * Captured params are URI-decoded before they reach the handler.
    */
   match(method: HTTPMethod, path: string): RouteMatch;
@@ -82,7 +83,7 @@ interface PatternEntry {
  * // -> { type: 'matched', route, params: { id: '42' } }
  *
  * router.match('DELETE', '/users/42')
- * // -> { type: 'method-not-allowed', allow: ['GET'] }
+ * // -> { type: 'method-not-allowed', allow: ['GET', 'HEAD'] }
  *
  * router.match('GET', '/nope')
  * // -> { type: 'not-found' }
@@ -112,12 +113,16 @@ export function createRouter(routes: Iterable<Route>): Router {
       const params = entry.matcher(path);
       if (isNull(params)) continue;
 
-      const route = entry.routes.get(method) ?? entry.routes.get(null);
+      const route =
+        entry.routes.get(method) ??
+        entry.routes.get(null) ??
+        (method === 'HEAD' ? entry.routes.get('GET') : undefined);
       if (!isUndefined(route)) return { type: 'matched', route, params: decodeParams(params) };
 
       for (const m of entry.routes.keys()) if (!isNull(m)) allow.add(m);
     }
 
+    if (allow.has('GET')) allow.add('HEAD');
     if (allow.size > 0) return { type: 'method-not-allowed', allow: [...allow].sort() };
     return { type: 'not-found' };
   }

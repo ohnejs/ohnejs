@@ -70,8 +70,17 @@ describe('createServer', () => {
     await withServer([makeRoute('GET', '/users', () => [])], async (base) => {
       const res = await fetch(`${base}/users`, { method: 'DELETE' });
       strictEqual(res.status, 405);
-      strictEqual(res.headers.get('allow'), 'GET');
+      strictEqual(res.headers.get('allow'), 'GET, HEAD');
       await res.body?.cancel();
+    });
+  });
+
+  it('serves a HEAD from the GET route with headers but no body', async () => {
+    await withServer([makeRoute('GET', '/page', () => '<h1>hi</h1>')], async (base) => {
+      const res = await fetch(`${base}/page`, { method: 'HEAD' });
+      strictEqual(res.status, 200);
+      strictEqual(res.headers.get('content-type'), 'text/html; charset=utf-8');
+      strictEqual(await res.text(), '');
     });
   });
 

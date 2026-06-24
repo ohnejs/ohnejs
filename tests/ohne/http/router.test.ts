@@ -72,8 +72,26 @@ describe('createRouter', () => {
     const router = createRouter([route('GET', '/x'), route('POST', '/x')]);
     deepStrictEqual(router.match('PUT', '/x'), {
       type: 'method-not-allowed',
-      allow: ['GET', 'POST'],
+      allow: ['GET', 'HEAD', 'POST'],
     });
+  });
+
+  it('serves HEAD from the GET route when no HEAD route exists', () => {
+    const router = createRouter([route('GET', '/users/[id]')]);
+    const result = router.match('HEAD', '/users/42');
+    deepStrictEqual(result.type === 'matched' && result.route.method, 'GET');
+    deepStrictEqual(result.type === 'matched' && result.params, { id: '42' });
+  });
+
+  it('prefers an explicit HEAD route over the GET fallback', () => {
+    const router = createRouter([route('GET', '/x'), route('HEAD', '/x')]);
+    const result = router.match('HEAD', '/x');
+    deepStrictEqual(result.type === 'matched' && result.route.method, 'HEAD');
+  });
+
+  it('does not invent HEAD for a path with no GET route', () => {
+    const router = createRouter([route('POST', '/x')]);
+    deepStrictEqual(router.match('HEAD', '/x'), { type: 'method-not-allowed', allow: ['POST'] });
   });
 
   it('returns not-found when no pattern matches', () => {
