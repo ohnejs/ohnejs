@@ -17,9 +17,6 @@ export interface ShutdownRunOptions {
   /**
    * Global deadline for every hook combined, as a `parseDuration` value.
    * Omitted means wait for the hooks indefinitely.
-   *
-   * @default
-   * undefined
    */
   deadline?: number | string;
 }

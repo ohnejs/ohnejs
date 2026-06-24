@@ -13,9 +13,6 @@ export interface ShutdownServerOptions {
    * Buys the load balancer time to deregister this instance before it stops accepting.
    * Omitted means stop accepting at once.
    *
-   * @default
-   * undefined
-   *
    * @example
    * ```ts
    * 5000    // 5 seconds, as raw milliseconds
@@ -29,9 +26,6 @@ export interface ShutdownServerOptions {
    * How long to wait for in-flight requests and their background work to drain, a `parseDuration` value.
    * Keep it below the orchestrator's kill window, or it `SIGKILL`s mid-drain.
    * Omitted means wait indefinitely.
-   *
-   * @default
-   * undefined
    *
    * @example
    * ```ts

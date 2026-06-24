@@ -36,9 +36,7 @@ export interface HttpServer {
 export interface CreateServerOptions {
   /**
    * How long the server waits for the complete request headers, as a `parseDuration` value.
-   *
-   * @default
-   * undefined
+   * Omitted keeps Node's default.
    *
    * @example
    * ```ts
@@ -51,9 +49,7 @@ export interface CreateServerOptions {
 
   /**
    * How long the server allows for the entire request, headers and body, as a `parseDuration` value.
-   *
-   * @default
-   * undefined
+   * Omitted keeps Node's default.
    *
    * @example
    * ```ts
@@ -66,9 +62,7 @@ export interface CreateServerOptions {
 
   /**
    * How long an idle keep-alive socket is held open between requests, as a `parseDuration` value.
-   *
-   * @default
-   * undefined
+   * Omitted keeps Node's default.
    *
    * @example
    * ```ts
@@ -81,9 +75,7 @@ export interface CreateServerOptions {
 
   /**
    * Maximum number of concurrent sockets the server accepts.
-   *
-   * @default
-   * undefined
+   * Omitted keeps Node's default of no limit.
    */
   maxConnections?: number;
 }
