@@ -8,6 +8,7 @@ function makeEvent(params: Record<string, string>): Event {
     request: new Request('http://localhost/'),
     url: new URL('http://localhost/'),
     params,
+    ip: '',
     response: { status: 200, headers: new Headers() },
     context: {},
     appliedMiddleware: [],

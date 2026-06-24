@@ -8,6 +8,7 @@ function makeEvent(url = 'http://localhost/'): Event {
     request: new Request(url),
     url: new URL(url),
     params: {},
+    ip: '',
     response: { status: 200, headers: new Headers() },
     context: {},
     appliedMiddleware: [],

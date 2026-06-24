@@ -268,6 +268,23 @@ export interface Config {
      * ```
      */
     handlerTimeout?: number | string | false;
+
+    /**
+     * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
+     * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
+     * They override the socket's own scheme and host, so `event.url` reflects the original client request.
+     * An empty list trusts no proxy, so forwarding headers are ignored and the socket is the only truth.
+     *
+     * @default
+     * []
+     *
+     * @example
+     * ```ts
+     * ['10.0.0.0/8']       // a private network of proxies
+     * ['127.0.0.1', '::1'] // a local reverse proxy
+     * ```
+     */
+    trustProxy?: string[];
   };
 
   /**
@@ -351,6 +368,7 @@ export const DEFAULTS = {
     maxConnections: false,
     maxBodySize: false,
     handlerTimeout: false,
+    trustProxy: [],
   },
 } satisfies Config;
 

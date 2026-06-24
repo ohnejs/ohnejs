@@ -64,6 +64,16 @@ describe('dispatch', () => {
     deepStrictEqual(await response.json(), { id: '42', path: '/users/42' });
   });
 
+  it('exposes the client IP on event.ip, defaulting to empty', async () => {
+    const route = makeRoute('/', () => useEvent().ip);
+
+    const withIP = await dispatch(route, req(), url(), {}, { ip: '203.0.113.9' });
+    strictEqual(await withIP.response.text(), '203.0.113.9');
+
+    const withoutIP = await dispatch(route, req(), url(), {});
+    strictEqual(await withoutIP.response.text(), '');
+  });
+
   it('applies setResponseStatus from the handler', async () => {
     const route = makeRoute('/', () => {
       setResponseStatus(201);

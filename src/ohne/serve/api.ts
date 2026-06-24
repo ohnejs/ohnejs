@@ -64,6 +64,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HttpServer
     maxConnections: offToUndefined(config.maxConnections),
     maxBodySize: offToUndefined(config.maxBodySize),
     handlerTimeout: offToUndefined(config.handlerTimeout),
+    trustProxy: config.trustProxy,
   });
 
   const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_PORT;

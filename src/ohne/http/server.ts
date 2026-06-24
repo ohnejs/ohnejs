@@ -2,12 +2,19 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 
 import { createServer as createNodeServer } from 'node:http';
 
-import type { HTTPMethod, Gate } from '../../utils/index.ts';
+import type { Gate, HTTPMethod } from '../../utils/index.ts';
 import type { RouteMatch, Router } from './router.ts';
 
-import { createGate, isNull, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
+import {
+  createCIDRMatcher,
+  createGate,
+  isNull,
+  isUndefined,
+  parseBytes,
+  parseDuration,
+} from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { toRequest, sendResponse } from './adapter.ts';
+import { clientIP, sendResponse, toRequest } from './adapter.ts';
 import { dispatch } from './dispatch.ts';
 import { HTTPError } from './http-error.ts';
 import { toResponse } from './to-response.ts';
@@ -107,6 +114,20 @@ export interface CreateServerOptions {
    * ```
    */
   handlerTimeout?: number | string;
+
+  /**
+   * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
+   * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
+   * They override the socket's own scheme and host.
+   * An empty list (the default) trusts no proxy.
+   *
+   * @example
+   * ```ts
+   * ['10.0.0.0/8']       // a private network of proxies
+   * ['127.0.0.1', '::1'] // a local reverse proxy
+   * ```
+   */
+  trustProxy?: string[];
 }
 
 /**
@@ -135,7 +156,10 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
       ? undefined
       : parseDuration(options.handlerTimeout),
   };
-  const server = createNodeServer((req, res) => void handle(router, gate, limits, req, res));
+  const trustProxy = createCIDRMatcher(options.trustProxy ?? []);
+  const server = createNodeServer(
+    (req, res) => void handle(router, gate, limits, trustProxy, req, res),
+  );
 
   if (!isUndefined(options.headersTimeout))
     server.headersTimeout = parseDuration(options.headersTimeout);
@@ -158,6 +182,7 @@ async function handle(
   router: Router,
   gate: Gate,
   limits: RequestLimits,
+  trustProxy: (ip: string) => boolean,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -170,13 +195,14 @@ async function handle(
   }
 
   try {
-    const request = toRequest(req, limits.maxBodySize);
+    const request = toRequest(req, { maxBodySize: limits.maxBodySize, trustProxy });
     const url = new URL(request.url);
     const match = router.match(request.method as HTTPMethod, url.pathname);
 
     if (match.type === 'matched') {
       const { response, drain } = await dispatch(match.route, request, url, match.params, {
         handlerTimeout: limits.handlerTimeout,
+        ip: clientIP(req, trustProxy),
       });
       await sendResponse(res, response);
       await drain();

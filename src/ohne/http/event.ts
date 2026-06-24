@@ -67,6 +67,12 @@ export interface Event {
   params: RouteParams;
 
   /**
+   * The client IP, resolved from the socket and any trusted `X-Forwarded-For` proxies.
+   * An empty string means the transport could not resolve one.
+   */
+  ip: string;
+
+  /**
    * Mutable response state the serializer reads once the handler returns.
    */
   response: ResponseInit;

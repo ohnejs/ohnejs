@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { request } from 'node:http';
 import { before, describe, it } from 'node:test';
 
-import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
+import type { AnyHandler, CreateServerOptions, Route } from '../../../src/ohne/index.ts';
 import type { Gate, HTTPMethod } from '../../../src/utils/index.ts';
 
 import {
@@ -28,8 +28,9 @@ async function waitFor(condition: () => boolean): Promise<void> {
 async function withServer(
   routes: Route[],
   run: (base: string, gate: Gate) => Promise<void>,
+  options: CreateServerOptions = {},
 ): Promise<void> {
-  const { server, gate } = createServer(createRouter(routes));
+  const { server, gate } = createServer(createRouter(routes), options);
   server.listen(0);
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
@@ -104,5 +105,31 @@ describe('createServer', () => {
       await waitFor(() => gate.pending === 0);
       strictEqual(gate.pending, 0);
     });
+  });
+
+  it('trusts X-Forwarded headers from a peer in the configured proxy CIDR', async () => {
+    await withServer(
+      [makeRoute('GET', '/p', () => useEvent().url.href)],
+      async (base) => {
+        const res = await fetch(`${base}/p`, {
+          headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'example.com' },
+        });
+        strictEqual(await res.text(), 'https://example.com/p');
+      },
+      { trustProxy: ['127.0.0.1', '::1'] },
+    );
+  });
+
+  it('exposes the resolved client IP on event.ip', async () => {
+    await withServer(
+      [makeRoute('GET', '/ip', () => useEvent().ip)],
+      async (base) => {
+        const res = await fetch(`${base}/ip`, {
+          headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' },
+        });
+        strictEqual(await res.text(), '203.0.113.9');
+      },
+      { trustProxy: ['10.0.0.0/8', '127.0.0.1', '::1'] },
+    );
   });
 });

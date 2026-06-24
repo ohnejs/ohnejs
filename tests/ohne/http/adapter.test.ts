@@ -1,11 +1,12 @@
 import type { AddressInfo } from 'node:net';
 
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
 
-import { HTTPError, sendResponse, toRequest } from '../../../src/ohne/index.ts';
+import { clientIP, HTTPError, sendResponse, toRequest } from '../../../src/ohne/index.ts';
+import { createCIDRMatcher } from '../../../src/utils/index.ts';
 
 async function withServer(
   handler: RequestListener,
@@ -71,7 +72,7 @@ describe('toRequest', () => {
   it('passes a body within maxBodySize', async () => {
     await withServer(
       async (req, res) => {
-        const request = toRequest(req, 64);
+        const request = toRequest(req, { maxBodySize: 64 });
         await sendResponse(res, new Response((await request.text()).toUpperCase()));
       },
       async (base) => {
@@ -85,7 +86,7 @@ describe('toRequest', () => {
     await withServer(
       async (req, res) => {
         try {
-          toRequest(req, 4);
+          toRequest(req, { maxBodySize: 4 });
           await sendResponse(res, new Response(null, { status: 200 }));
         } catch (error) {
           await sendResponse(
@@ -104,7 +105,7 @@ describe('toRequest', () => {
   it('aborts a streamed body that overruns the cap with 413', async () => {
     await withServer(
       async (req, res) => {
-        const request = toRequest(req, 4);
+        const request = toRequest(req, { maxBodySize: 4 });
         try {
           await request.text();
           await sendResponse(res, new Response(null, { status: 200 }));
@@ -132,6 +133,37 @@ describe('toRequest', () => {
     );
   });
 
+  it('honors X-Forwarded-Proto and Host when the peer is trusted', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, { trustProxy: () => true });
+        await sendResponse(res, new Response(request.url));
+      },
+      async (base) => {
+        const res = await fetch(`${base}/p`, {
+          headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'example.com' },
+        });
+        strictEqual(await res.text(), 'https://example.com/p');
+      },
+    );
+  });
+
+  it('ignores forwarding headers when the peer is not trusted', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, { trustProxy: () => false });
+        const url = new URL(request.url);
+        await sendResponse(res, new Response(`${url.protocol}//${url.host}`));
+      },
+      async (base) => {
+        const res = await fetch(`${base}/p`, {
+          headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'evil.com' },
+        });
+        strictEqual(await res.text(), `http://${new URL(base).host}`);
+      },
+    );
+  });
+
   it('appends every value of an array-valued header', async () => {
     await withServer(
       async (req, res) => {
@@ -146,6 +178,34 @@ describe('toRequest', () => {
         const chunks: Buffer[] = [];
         for await (const chunk of res) chunks.push(chunk);
         strictEqual(Buffer.concat(chunks).toString(), 'a=1, b=2');
+      },
+    );
+  });
+});
+
+describe('clientIP', () => {
+  it('walks X-Forwarded-For to the first untrusted address when the peer is trusted', async () => {
+    await withServer(
+      async (req, res) => {
+        const trusted = createCIDRMatcher(['10.0.0.0/8', '127.0.0.1', '::1']);
+        await sendResponse(res, new Response(clientIP(req, trusted)));
+      },
+      async (base) => {
+        const res = await fetch(base, { headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' } });
+        strictEqual(await res.text(), '203.0.113.9');
+      },
+    );
+  });
+
+  it('returns the socket peer when no proxy is trusted', async () => {
+    await withServer(
+      async (req, res) => {
+        await sendResponse(res, new Response(clientIP(req)));
+      },
+      async (base) => {
+        const res = await fetch(base, { headers: { 'x-forwarded-for': '203.0.113.9' } });
+        const ip = await res.text();
+        ok(ip === '127.0.0.1' || ip === '::1');
       },
     );
   });

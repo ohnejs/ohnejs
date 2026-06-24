@@ -31,7 +31,7 @@ export interface Dispatched {
 }
 
 /**
- * Per-dispatch limits applied around the handler run.
+ * Per-dispatch inputs applied around the handler run.
  */
 export interface DispatchOptions {
   /**
@@ -40,6 +40,12 @@ export interface DispatchOptions {
    * Omitted lets the handler run without a deadline.
    */
   handlerTimeout?: number;
+
+  /**
+   * The resolved client IP, exposed as `event.ip`.
+   * Omitted leaves `event.ip` an empty string, meaning the transport could not resolve one.
+   */
+  ip?: string;
 }
 
 /**
@@ -74,6 +80,7 @@ export async function dispatch(
     request,
     url,
     params,
+    ip: options.ip ?? '',
     response: { status: 200, headers: new Headers() },
     context: {},
     appliedMiddleware: [],

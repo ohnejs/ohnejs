@@ -9,6 +9,7 @@ function eventFor(pathname: string): Event {
     request: new Request(url),
     url,
     params: {},
+    ip: '',
     response: { status: 200, headers: new Headers() },
     context: {},
     appliedMiddleware: [],
