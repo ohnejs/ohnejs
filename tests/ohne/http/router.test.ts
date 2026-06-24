@@ -34,6 +34,24 @@ describe('createRouter', () => {
     deepStrictEqual(router.match('GET', '/posts').type, 'not-found');
   });
 
+  it('URI-decodes captured params', () => {
+    const router = createRouter([route('GET', '/users/[name]')]);
+    const result = router.match('GET', '/users/john%20doe');
+    deepStrictEqual(result.type === 'matched' && result.params, { name: 'john doe' });
+  });
+
+  it('decodes a percent-encoded catch-all, keeping its slashes', () => {
+    const router = createRouter([route('GET', '/files/[...path]')]);
+    const result = router.match('GET', '/files/a%20b/c%2Bd');
+    deepStrictEqual(result.type === 'matched' && result.params, { path: 'a b/c+d' });
+  });
+
+  it('leaves a malformed percent-sequence as its raw substring', () => {
+    const router = createRouter([route('GET', '/users/[name]')]);
+    const result = router.match('GET', '/users/%E0%A4%A');
+    deepStrictEqual(result.type === 'matched' && result.params, { name: '%E0%A4%A' });
+  });
+
   it('prefers a static route over a dynamic one', () => {
     const router = createRouter([route('GET', '/users/[id]'), route('GET', '/users/me')]);
     const result = router.match('GET', '/users/me');

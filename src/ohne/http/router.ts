@@ -23,7 +23,8 @@ export type RouteMatch =
       route: Route;
 
       /**
-       * Params captured from the route pattern, keyed by name.
+       * Params captured from the route pattern, keyed by name, URI-decoded.
+       * A malformed percent-sequence is left as its raw matched substring.
        */
       params: RouteParams;
     }
@@ -56,6 +57,7 @@ export interface Router {
    * The path must be the URL pathname, with query and fragment already stripped.
    * Patterns are tried most-specific first: static segments beat named params, which beat catch-alls.
    * A method-agnostic route (no method suffix in its filename) answers any method.
+   * Captured params are URI-decoded before they reach the handler.
    */
   match(method: HTTPMethod, path: string): RouteMatch;
 }
@@ -111,7 +113,7 @@ export function createRouter(routes: Iterable<Route>): Router {
       if (isNull(params)) continue;
 
       const route = entry.routes.get(method) ?? entry.routes.get(null);
-      if (!isUndefined(route)) return { type: 'matched', route, params };
+      if (!isUndefined(route)) return { type: 'matched', route, params: decodeParams(params) };
 
       for (const m of entry.routes.keys()) if (!isNull(m)) allow.add(m);
     }
@@ -121,6 +123,23 @@ export function createRouter(routes: Iterable<Route>): Router {
   }
 
   return { match };
+}
+
+function decodeParams(params: RouteParams): RouteParams {
+  const out: RouteParams = {};
+  for (const key in params) {
+    const value = params[key];
+    out[key] = value.includes('%') ? safeDecode(value) : value;
+  }
+  return out;
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function specificity(pattern: string): number[] {
