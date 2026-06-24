@@ -134,6 +134,7 @@ export * from './search-params/stringify-search-params.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify.ts';
 export * from './sort/natural-compare.ts';
+export * from './timeout/with-timeout.ts';
 export * from './types/deep-prettify.ts';
 export * from './types/defaults-marker.ts';
 export * from './types/defined.ts';
