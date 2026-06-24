@@ -2,9 +2,11 @@ import type { Env } from './env.ts';
 
 import {
   coerceToBoolean,
+  coerceToPositiveInteger,
   createEnvRegistry,
   type EnvRegistry,
   isDebugEnabled,
+  isNumber,
   parseBoolean,
 } from '../../utils/index.ts';
 
@@ -18,6 +20,14 @@ registry.define('FORCE_COLOR', {
   parse: (raw) => coerceToBoolean(raw) !== false,
 });
 registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
+registry.define('PORT', {
+  default: undefined,
+  parse: (raw) => {
+    const port = coerceToPositiveInteger(raw);
+    return isNumber(port) ? port : undefined;
+  },
+});
+registry.define('HOST', { default: undefined, parse: (raw) => raw });
 
 /**
  * Returns the process-wide env registry for `Env`.

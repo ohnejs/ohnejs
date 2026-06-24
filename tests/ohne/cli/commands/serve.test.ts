@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
-import { useEnv } from '../../../../src/ohne/index.ts';
+import { useEnv, useShutdown } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
 
 describe('ohne serve api', () => {
@@ -30,13 +30,18 @@ describe('ohne serve api', () => {
     process.exitCode = 0;
   });
 
-  it('boots and generates the codegen files for an ohne project', async () => {
+  it('starts the server for an ohne project', async () => {
     const dir = makeDir('app', true);
+    useEnv().set('PORT', 0);
 
     const code = await runCommand(ohne, ['serve', 'api', '--cwd', dir]);
     strictEqual(code, 0);
     strictEqual(process.exitCode, 0);
-    strictEqual(existsSync(join(dir, '.ohne', 'layer-name.ts')), true);
+
+    await useShutdown().run();
+    useShutdown().clear();
+    useShutdown().unwatch();
+    useEnv().unset('PORT');
   });
 
   it('refuses to run outside an ohne project', async () => {

@@ -3,6 +3,8 @@
  * Add fields by augmenting it from a layer with `declare module 'ohne'`.
  *
  * Built-ins:
+ * - `PORT` - overrides `Config.server.port` when set to a positive integer.
+ * - `HOST` - overrides `Config.server.host` when set.
  * - `SILENT` - truthy disables every printer call.
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
  * - `NO_COLOR` - non-empty value disables ANSI colors per the `no-color.org` standard.
@@ -19,6 +21,23 @@
  * ```
  */
 export interface Env {
+  /**
+   * Port override for the HTTP server, taking precedence over `Config.server.port`.
+   * A non-positive or non-numeric value is ignored, deferring to config.
+   *
+   * @default
+   * undefined
+   */
+  PORT: number | undefined;
+
+  /**
+   * Host override for the HTTP server, taking precedence over `Config.server.host`.
+   *
+   * @default
+   * undefined
+   */
+  HOST: string | undefined;
+
   /**
    * When `true`, every printer call is dropped.
    *

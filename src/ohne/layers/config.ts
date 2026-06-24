@@ -106,6 +106,136 @@ export interface Config {
   };
 
   /**
+   * HTTP server settings consumed by `serveAPI`.
+   * Every timeout accepts a `parseDuration` value: milliseconds as a number, or a string like `'10s'`.
+   * `false` disables the corresponding limit.
+   */
+  server?: {
+    /**
+     * Port the server listens on.
+     * The `PORT` env var overrides it when set.
+     *
+     * @default
+     * 9001
+     */
+    port?: number;
+
+    /**
+     * Host the server binds to.
+     * The `HOST` env var overrides it when set.
+     * Absent binds every interface.
+     */
+    host?: string;
+
+    /**
+     * How long to keep serving after a shutdown signal before refusing connections.
+     * Buys a load balancer time to deregister this instance first.
+     * `false` refuses connections at once.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 5000  // 5 seconds, as raw milliseconds
+     * '5s'  // 5 seconds
+     * false // refuse connections at once
+     * ```
+     */
+    preStopDelay?: number | string | false;
+
+    /**
+     * How long to wait for in-flight requests and their background work to drain.
+     * Keep it below the orchestrator's kill window, or it `SIGKILL`s mid-drain.
+     * `false` waits indefinitely.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 10000 // 10 seconds, as raw milliseconds
+     * '10s' // 10 seconds
+     * false // wait indefinitely
+     * ```
+     */
+    shutdownTimeout?: number | string | false;
+
+    /**
+     * Global deadline for every shutdown hook combined, passed to `useShutdown().watch`.
+     * `false` waits for the hooks indefinitely.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 30000 // 30 seconds, as raw milliseconds
+     * '30s' // 30 seconds
+     * false // wait indefinitely
+     * ```
+     */
+    deadline?: number | string | false;
+
+    /**
+     * How long the server waits for the complete request headers.
+     * `false` keeps Node's own default.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 10000 // 10 seconds, as raw milliseconds
+     * '10s' // 10 seconds
+     * false // keep Node's default
+     * ```
+     */
+    headersTimeout?: number | string | false;
+
+    /**
+     * How long the server allows for the entire request, headers and body.
+     * `false` keeps Node's own default.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 30000 // 30 seconds, as raw milliseconds
+     * '30s' // 30 seconds
+     * false // keep Node's default
+     * ```
+     */
+    requestTimeout?: number | string | false;
+
+    /**
+     * How long an idle keep-alive socket is held open between requests.
+     * `false` keeps Node's own default.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 5000  // 5 seconds, as raw milliseconds
+     * '5s'  // 5 seconds
+     * false // keep Node's default
+     * ```
+     */
+    keepAliveTimeout?: number | string | false;
+
+    /**
+     * Maximum number of concurrent sockets the server accepts.
+     * `false` leaves the count unbounded, Node's own default.
+     *
+     * @default
+     * false
+     */
+    maxConnections?: number | false;
+  };
+
+  /**
    * Printer settings consumed by `usePrinter`.
    * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value.
    * These fields only apply when the matching env var is unset.
@@ -155,13 +285,36 @@ export interface ConfigExtensions {}
  * Framework config defaults, applied beneath every layer.
  * Merged into the furthest layer's own defaults, so any layer or the app can override them.
  *
+ * ---
+ *
  * `dirs` is absent: a codegen or api directory is a per-layer preference, never inherited.
  * Its defaults live in `DIR_DEFAULTS`, read from each layer's own config.
+ *
+ * ---
+ *
  * `printer` is absent too: `usePrinter` reads it before layers load and supplies its own fallback.
+ *
+ * ---
+ *
+ * `server.port` and `server.host` are absent for the same reason: both are `'own'` (layer-private).
+ * A merged default never applies to an `'own'` key.
+ *
+ * ---
+ *
+ * `port` falls back to `DEFAULT_PORT`, read at point of use.
  */
 export const DEFAULTS = {
   layers: [],
   disable: { routes: [] },
+  server: {
+    preStopDelay: false,
+    shutdownTimeout: false,
+    deadline: false,
+    headersTimeout: false,
+    requestTimeout: false,
+    keepAliveTimeout: false,
+    maxConnections: false,
+  },
 } satisfies Config;
 
 /**
@@ -176,16 +329,25 @@ export const DIR_DEFAULTS = {
 } satisfies NonNullable<Config['dirs']>;
 
 /**
+ * Default port `serveAPI` listens on when no layer sets `server.port` and `PORT` is unset.
+ * Read at point of use, like `DIR_DEFAULTS`, because `server.port` is `'own'` (layer-private).
+ */
+export const DEFAULT_PORT = 9001;
+
+/**
  * Framework merge strategies, seeded into the layer registry.
  *
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
+ * - `server.port` and `server.host` stay each layer's own: both are private to the layer that sets them.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
   'disable.routes': 'concat-unique',
   printer: 'own',
+  'server.port': 'own',
+  'server.host': 'own',
 };
 
 /**
@@ -198,3 +360,18 @@ export const BASE_STRATEGIES: LayerStrategies = {
 export type ResolvedConfig = ConfigExtensions extends { defaults: infer D }
   ? DeepPrettify<RequireByShape<Config, D>>
   : DeepPrettify<RequireByShape<Config, DefaultsMarker<typeof DEFAULTS>>>;
+
+/**
+ * Maps a disableable setting's `false` "off" value to `undefined`.
+ * Config uses `false` to disable a limit, so a closer layer can override an inherited one.
+ * APIs that take the value read `undefined` as "off", so convert it at that boundary.
+ *
+ * @example
+ * ```ts
+ * offToUndefined('10s') // -> '10s'
+ * offToUndefined(false) // -> undefined
+ * ```
+ */
+export function offToUndefined<T>(value: T | false): T | undefined {
+  return value === false ? undefined : value;
+}
