@@ -80,18 +80,14 @@ export interface ListDirOptions {
    * Restrict file entries to these extensions.
    * Each value may be written with or without a leading dot (`'ts'` and `'.ts'` are equivalent).
    * Has no effect on directory entries.
-   *
-   * @default
-   * undefined
+   * Omitted lists files of every extension.
    */
   ext?: string | string[];
 
   /**
    * Predicate applied after the built-in filters.
    * Return `true` to keep the entry.
-   *
-   * @default
-   * undefined
+   * Omitted keeps every entry.
    */
   filter?: (entry: DirEntry) => boolean;
 

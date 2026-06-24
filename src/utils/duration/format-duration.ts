@@ -13,9 +13,6 @@ export interface FormatDurationOptions {
   /**
    * BCP-47 locale tag used for unit names, pluralization, and list joining.
    * Defaults to the runtime's default locale.
-   *
-   * @default
-   * undefined
    */
   locale?: string;
 

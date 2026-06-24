@@ -14,9 +14,6 @@ export interface RegistryOptions<V> {
   /**
    * Folds an incoming value into the existing one on key collision.
    * If omitted, the incoming value replaces the existing one wholesale.
-   *
-   * @default
-   * undefined
    */
   merge?: Merger<V>;
 }

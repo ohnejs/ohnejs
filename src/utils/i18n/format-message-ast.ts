@@ -38,9 +38,6 @@ export interface FormatMessageOptions {
    * Soft failures: a missing parameter, an uncoercible value, a plural with no keyword match.
    * The default is a no-op; `formatMessageAST` emits the fallback render and keeps going.
    * Throw from `onError` to opt into strict mode.
-   *
-   * @default
-   * undefined
    */
   onError?: (error: MessageFormatError) => void;
 }

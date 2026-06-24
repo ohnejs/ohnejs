@@ -71,9 +71,7 @@ export interface PathOptions {
    * Restrict what can be picked.
    * `'directory'` hides files.
    * `'file'` keeps directories visible for navigation, but only a file may be submitted.
-   *
-   * @default
-   * undefined
+   * Omitted lets a file or a directory be picked.
    */
   only?: 'file' | 'directory';
 
@@ -81,18 +79,14 @@ export interface PathOptions {
    * Restrict file completions to these extensions.
    * Each value may be written with or without a leading dot (`'ts'` and `'.ts'` are equivalent).
    * Has no effect on directories, which always show for navigation.
-   *
-   * @default
-   * undefined
+   * Omitted completes files of every extension.
    */
   ext?: string | string[];
 
   /**
    * Keep only the file entries the predicate accepts.
    * Runs after `only` and `ext`, and only for files; directories are never passed.
-   *
-   * @default
-   * undefined
+   * Omitted keeps every file.
    */
   filter?: (entry: PathEntry) => boolean;
 

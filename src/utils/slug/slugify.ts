@@ -16,9 +16,7 @@ export interface SlugifyOptions {
    * Character map (or ordered list of maps) applied after lowercasing and before NFD diacritic stripping.
    * Later maps see earlier maps' output.
    * Keys must match the lowercased input.
-   *
-   * @default
-   * undefined
+   * Omitted applies no custom mapping.
    */
   replace?: Record<string, string> | Record<string, string>[];
 }

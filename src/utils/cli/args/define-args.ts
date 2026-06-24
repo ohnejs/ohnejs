@@ -12,17 +12,11 @@ interface CommonArg {
   /**
    * Alternate name or names for the flag, in addition to its canonical key.
    * A single-character alias becomes a short flag (`-p`); longer ones become extra long flags.
-   *
-   * @default
-   * undefined
    */
   alias?: string | string[];
 
   /**
    * Help text shown next to the flag in `--help` output.
-   *
-   * @default
-   * undefined
    */
   description?: string;
 
@@ -46,9 +40,6 @@ interface StringArg extends CommonArg {
 
   /**
    * Value used when the flag is absent.
-   *
-   * @default
-   * undefined
    */
   default?: string;
 
@@ -80,9 +71,6 @@ interface NumberArg extends CommonArg {
 
   /**
    * Value used when the flag is absent.
-   *
-   * @default
-   * undefined
    */
   default?: number;
 
@@ -130,9 +118,6 @@ interface EnumArg extends CommonArg {
 
   /**
    * Value used when the flag is absent. Must be one of `options`.
-   *
-   * @default
-   * undefined
    */
   default?: string;
 

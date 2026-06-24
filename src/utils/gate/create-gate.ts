@@ -25,9 +25,6 @@ export interface GateCloseOptions {
    * How long to wait for in-flight work before giving up, as a `parseDuration` value.
    * Omitted means wait indefinitely.
    *
-   * @default
-   * undefined
-   *
    * @example
    * ```ts
    * 5000   // 5 seconds, as raw milliseconds
