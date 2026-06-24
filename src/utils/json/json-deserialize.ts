@@ -5,7 +5,7 @@ import { isString } from '../is/is-string.ts';
  * Same shape as the second argument of `JSON.parse`.
  * Called bottom-up for each key/value during parsing.
  */
-export type JsonReviver = (this: unknown, key: string, value: unknown) => unknown;
+export type JSONReviver = (this: unknown, key: string, value: unknown) => unknown;
 
 /**
  * Deserializes a JSON string.
@@ -21,7 +21,7 @@ export type JsonReviver = (this: unknown, key: string, value: unknown) => unknow
  * jsonDeserialize('not-json')          // -> 'not-json'
  * ```
  */
-export function jsonDeserialize<T = unknown>(value: unknown, reviver?: JsonReviver): T {
+export function jsonDeserialize<T = unknown>(value: unknown, reviver?: JSONReviver): T {
   if (!isString(value)) return value as T;
   try {
     return JSON.parse(value, reviver) as T;

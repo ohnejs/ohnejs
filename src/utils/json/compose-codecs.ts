@@ -1,4 +1,4 @@
-import type { JsonReviver } from './json-deserialize.ts';
+import type { JSONReviver } from './json-deserialize.ts';
 
 import { keyBy } from '../array/key-by.ts';
 import { isArray } from '../is/is-array.ts';
@@ -11,7 +11,7 @@ import { isPlainObject } from '../is/is-plain-object.ts';
  *
  * Used by `composeCodecs` to build the deep-walk encoder and the reviver.
  */
-export interface JsonCodec<T> {
+export interface JSONCodec<T> {
   /**
    * Unique identifier used as the sentinel key on the wire (`{ $<name>: ... }`).
    */
@@ -55,7 +55,7 @@ export interface ComposedCodecs {
    * `JSON.parse`-compatible reviver.
    * Pass as the second argument to `jsonDeserialize` to undo the tags produced by `encode`.
    */
-  reviver: JsonReviver;
+  reviver: JSONReviver;
 }
 
 /**
@@ -71,7 +71,7 @@ export interface ComposedCodecs {
  *
  * @example
  * ```ts
- * const dateCodec: JsonCodec<Date> = {
+ * const dateCodec: JSONCodec<Date> = {
  *   name: 'date',
  *   test: (v): v is Date => v instanceof Date,
  *   encode: (d) => d.toISOString(),
@@ -87,7 +87,7 @@ export interface ComposedCodecs {
  * // -> true
  * ```
  */
-export function composeCodecs(...codecs: JsonCodec<any>[]): ComposedCodecs {
+export function composeCodecs(...codecs: JSONCodec<any>[]): ComposedCodecs {
   const byName = keyBy(codecs, (c) => c.name);
 
   function encode(value: unknown): unknown {
@@ -109,7 +109,7 @@ export function composeCodecs(...codecs: JsonCodec<any>[]): ComposedCodecs {
     return value;
   }
 
-  const reviver: JsonReviver = function reviver(_key, value) {
+  const reviver: JSONReviver = function reviver(_key, value) {
     if (!isPlainObject(value)) return value;
 
     const keys = Object.keys(value);

@@ -7,7 +7,7 @@ import { isPlainObject } from '../is/is-plain-object.ts';
  * Same shape as the second argument of `JSON.stringify`.
  * Either a transform function, or a key allow-list.
  */
-export type JsonReplacer =
+export type JSONReplacer =
   | ((this: unknown, key: string, value: unknown) => unknown)
   | (string | number)[];
 
@@ -39,7 +39,7 @@ function sortKeys(value: unknown): unknown {
  * jsonSerialize([3, 1, 2])        // -> '[3,1,2]'
  * ```
  */
-export function jsonSerialize(value: unknown, replacer?: JsonReplacer): string {
+export function jsonSerialize(value: unknown, replacer?: JSONReplacer): string {
   const sorted = sortKeys(value);
   if (isFunction<(this: unknown, key: string, value: unknown) => unknown>(replacer)) {
     return JSON.stringify(sorted, replacer);

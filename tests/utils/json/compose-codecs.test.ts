@@ -3,26 +3,26 @@ import { describe, it } from 'node:test';
 
 import {
   composeCodecs,
-  type JsonCodec,
+  type JSONCodec,
   jsonDeserialize,
   jsonSerialize,
 } from '../../../src/utils/index.ts';
 
-const dateCodec: JsonCodec<Date> = {
+const dateCodec: JSONCodec<Date> = {
   name: 'date',
   test: (v): v is Date => v instanceof Date,
   encode: (d) => d.toISOString(),
   decode: (raw) => new Date(raw as string),
 };
 
-const bigIntCodec: JsonCodec<bigint> = {
+const bigIntCodec: JSONCodec<bigint> = {
   name: 'bigint',
   test: (v): v is bigint => typeof v === 'bigint',
   encode: (n) => n.toString(),
   decode: (raw) => BigInt(raw as string),
 };
 
-const mapCodec: JsonCodec<Map<unknown, unknown>> = {
+const mapCodec: JSONCodec<Map<unknown, unknown>> = {
   name: 'map',
   test: (v): v is Map<unknown, unknown> => v instanceof Map,
   encode: (m) => [...m.entries()],
@@ -65,13 +65,13 @@ describe('composeCodecs', () => {
   });
 
   it('first matching codec wins', () => {
-    const a: JsonCodec<string> = {
+    const a: JSONCodec<string> = {
       name: 'a',
       test: (v): v is string => typeof v === 'string',
       encode: (v) => `A:${v}`,
       decode: (raw) => (raw as string).slice(2),
     };
-    const b: JsonCodec<string> = { ...a, name: 'b', encode: (v) => `B:${v}` };
+    const b: JSONCodec<string> = { ...a, name: 'b', encode: (v) => `B:${v}` };
 
     const { encode } = composeCodecs(a, b);
     deepStrictEqual(encode('x'), { $a: 'A:x' });
