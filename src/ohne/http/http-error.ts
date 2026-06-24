@@ -78,6 +78,19 @@ export function notFound(message = 'Not Found', data?: unknown): HTTPError {
 }
 
 /**
+ * Builds a `413 Content Too Large` error.
+ * The status the server returns when a request body exceeds `server.maxBodySize`.
+ *
+ * @example
+ * ```ts
+ * throw payloadTooLarge()
+ * ```
+ */
+export function payloadTooLarge(message = 'Content Too Large', data?: unknown): HTTPError {
+  return new HTTPError(413, message, data);
+}
+
+/**
  * Builds a `422 Unprocessable Content` error.
  * The status for a well-formed request that fails validation.
  *

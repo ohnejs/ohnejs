@@ -15,6 +15,7 @@ import {
   usePrinter,
   waitUntil,
 } from '../../../src/ohne/index.ts';
+import { sleep } from '../../../src/utils/index.ts';
 
 function makeRoute(pattern: string, handler: AnyHandler): Route {
   return { method: 'GET', pattern, file: `${pattern}.ts`, layer: 'test', handler };
@@ -89,6 +90,26 @@ describe('dispatch', () => {
       {},
     );
     strictEqual(response.status, 400);
+  });
+
+  it('answers 503 when the handler overruns handlerTimeout', async () => {
+    const route = makeRoute('/', async () => {
+      await sleep(50);
+      return { ok: true };
+    });
+    const { response } = await dispatch(route, req(), url(), {}, { handlerTimeout: 5 });
+    strictEqual(response.status, 503);
+    deepStrictEqual(await response.json(), {
+      statusCode: 503,
+      message: 'Service Unavailable',
+    });
+  });
+
+  it('returns normally when the handler finishes within handlerTimeout', async () => {
+    const route = makeRoute('/', () => ({ ok: true }));
+    const { response } = await dispatch(route, req(), url(), {}, { handlerTimeout: 1000 });
+    strictEqual(response.status, 200);
+    deepStrictEqual(await response.json(), { ok: true });
   });
 
   it('maps an unexpected throw to a generic 500 without leaking it', async () => {

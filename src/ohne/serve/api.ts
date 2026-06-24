@@ -62,6 +62,8 @@ export async function serveAPI(from: string = process.cwd()): Promise<HttpServer
     requestTimeout: offToUndefined(config.requestTimeout),
     keepAliveTimeout: offToUndefined(config.keepAliveTimeout),
     maxConnections: offToUndefined(config.maxConnections),
+    maxBodySize: offToUndefined(config.maxBodySize),
+    handlerTimeout: offToUndefined(config.handlerTimeout),
   });
 
   const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_PORT;

@@ -5,7 +5,7 @@ import { createServer as createNodeServer } from 'node:http';
 import type { HTTPMethod, Gate } from '../../utils/index.ts';
 import type { RouteMatch, Router } from './router.ts';
 
-import { createGate, isNull, isUndefined, parseDuration } from '../../utils/index.ts';
+import { createGate, isNull, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { toRequest, sendResponse } from './adapter.ts';
 import { dispatch } from './dispatch.ts';
@@ -78,6 +78,35 @@ export interface CreateServerOptions {
    * Omitted keeps Node's default of no limit.
    */
   maxConnections?: number;
+
+  /**
+   * Largest request body to accept, as a `parseBytes` value.
+   * An over-cap `Content-Length` is refused with `413` before any body is read.
+   * A body that overruns mid-stream aborts with the same `413`.
+   * Omitted leaves the body size unbounded.
+   *
+   * @example
+   * ```ts
+   * 1048576 // one mebibyte, as raw bytes
+   * '1mb'   // one mebibyte
+   * '512kb' // half a mebibyte
+   * ```
+   */
+  maxBodySize?: number | string;
+
+  /**
+   * How long middleware and the handler may run before the request is answered with `503`.
+   * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+   * Omitted lets the handler run without a deadline.
+   *
+   * @example
+   * ```ts
+   * 30000 // 30 seconds, as raw milliseconds
+   * '30s' // 30 seconds
+   * '1m'  // one minute
+   * ```
+   */
+  handlerTimeout?: number | string;
 }
 
 /**
@@ -100,7 +129,13 @@ export interface CreateServerOptions {
  */
 export function createServer(router: Router, options: CreateServerOptions = {}): HttpServer {
   const gate = createGate();
-  const server = createNodeServer((req, res) => void handle(router, gate, req, res));
+  const limits: RequestLimits = {
+    maxBodySize: isUndefined(options.maxBodySize) ? undefined : parseBytes(options.maxBodySize),
+    handlerTimeout: isUndefined(options.handlerTimeout)
+      ? undefined
+      : parseDuration(options.handlerTimeout),
+  };
+  const server = createNodeServer((req, res) => void handle(router, gate, limits, req, res));
 
   if (!isUndefined(options.headersTimeout))
     server.headersTimeout = parseDuration(options.headersTimeout);
@@ -114,9 +149,15 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
   return { server, gate };
 }
 
+interface RequestLimits {
+  maxBodySize: number | undefined;
+  handlerTimeout: number | undefined;
+}
+
 async function handle(
   router: Router,
   gate: Gate,
+  limits: RequestLimits,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -129,18 +170,24 @@ async function handle(
   }
 
   try {
-    const request = toRequest(req);
+    const request = toRequest(req, limits.maxBodySize);
     const url = new URL(request.url);
     const match = router.match(request.method as HTTPMethod, url.pathname);
 
     if (match.type === 'matched') {
-      const { response, drain } = await dispatch(match.route, request, url, match.params);
+      const { response, drain } = await dispatch(match.route, request, url, match.params, {
+        handlerTimeout: limits.handlerTimeout,
+      });
       await sendResponse(res, response);
       await drain();
     } else {
       await sendResponse(res, errorResponse(match));
     }
   } catch (error) {
+    if (error instanceof HTTPError && !res.headersSent) {
+      await sendResponse(res, toResponse(error, { status: error.status, headers: new Headers() }));
+      return;
+    }
     usePrinter().error(`request failed: ${reason(error)}`);
     if (!res.headersSent) {
       res.statusCode = 500;

@@ -3,7 +3,7 @@ import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 import type { Handler, Route } from '../routes/route.ts';
 import type { Event } from './event.ts';
 
-import { isUndefined } from '../../utils/index.ts';
+import { isUndefined, withTimeout } from '../../utils/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
@@ -31,6 +31,18 @@ export interface Dispatched {
 }
 
 /**
+ * Per-dispatch limits applied around the handler run.
+ */
+export interface DispatchOptions {
+  /**
+   * Milliseconds to let middleware and the handler run before giving up with a `503`.
+   * Distinct from the socket-level `requestTimeout`: this bounds the work, not the connection.
+   * Omitted lets the handler run without a deadline.
+   */
+  handlerTimeout?: number;
+}
+
+/**
  * Runs a matched route to a response.
  *
  * Builds the request `Event` and binds it via `runWithEvent`.
@@ -39,6 +51,7 @@ export interface Dispatched {
  * A middleware that returns a value short-circuits, and the handler never runs.
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
+ * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
  * The returned `drain` defers background work past the response.
  *
  * @example
@@ -53,6 +66,7 @@ export async function dispatch(
   request: Request,
   url: URL,
   params: RouteParams,
+  options: DispatchOptions = {},
 ): Promise<Dispatched> {
   const background: Promise<unknown>[] = [];
 
@@ -68,7 +82,7 @@ export async function dispatch(
     },
   };
 
-  const response = await runWithEvent(event, async () => {
+  const run = runWithEvent(event, async () => {
     try {
       const registry = useMiddleware();
       for (const name of await resolveMiddleware(registry.keys(), event)) {
@@ -84,6 +98,15 @@ export async function dispatch(
       return toResponse(new HTTPError(500, 'Internal Server Error'), event.response);
     }
   });
+
+  const response = isUndefined(options.handlerTimeout)
+    ? await run
+    : await withTimeout(run, options.handlerTimeout, () =>
+        toResponse(new HTTPError(503, 'Service Unavailable'), {
+          status: 503,
+          headers: new Headers(),
+        }),
+      );
 
   return { response, drain: () => drain(background) };
 }

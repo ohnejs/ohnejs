@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
 
-import { sendResponse, toRequest } from '../../../src/ohne/index.ts';
+import { HTTPError, sendResponse, toRequest } from '../../../src/ohne/index.ts';
 
 async function withServer(
   handler: RequestListener,
@@ -64,6 +64,70 @@ describe('toRequest', () => {
       async (base) => {
         const res = await fetch(base, { method: 'POST', body: 'hello' });
         strictEqual(await res.text(), 'HELLO');
+      },
+    );
+  });
+
+  it('passes a body within maxBodySize', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, 64);
+        await sendResponse(res, new Response((await request.text()).toUpperCase()));
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'POST', body: 'hello' });
+        strictEqual(await res.text(), 'HELLO');
+      },
+    );
+  });
+
+  it('refuses an over-cap Content-Length with 413 before reading', async () => {
+    await withServer(
+      async (req, res) => {
+        try {
+          toRequest(req, 4);
+          await sendResponse(res, new Response(null, { status: 200 }));
+        } catch (error) {
+          await sendResponse(
+            res,
+            new Response(null, { status: error instanceof HTTPError ? error.status : 500 }),
+          );
+        }
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'POST', body: 'hello world' });
+        strictEqual(res.status, 413);
+      },
+    );
+  });
+
+  it('aborts a streamed body that overruns the cap with 413', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, 4);
+        try {
+          await request.text();
+          await sendResponse(res, new Response(null, { status: 200 }));
+        } catch (error) {
+          await sendResponse(
+            res,
+            new Response(null, { status: error instanceof HTTPError ? error.status : 500 }),
+          );
+        }
+      },
+      async (base) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('hello world'));
+            controller.close();
+          },
+        });
+        const res = await fetch(base, {
+          method: 'POST',
+          body: stream,
+          duplex: 'half',
+        } as RequestInit);
+        strictEqual(res.status, 413);
       },
     );
   });

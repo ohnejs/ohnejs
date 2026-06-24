@@ -233,6 +233,41 @@ export interface Config {
      * false
      */
     maxConnections?: number | false;
+
+    /**
+     * Largest request body to accept, as a `parseBytes` value (bytes as a number, or a string like `'1mb'`).
+     * An over-cap `Content-Length` is refused with `413` before any body is read.
+     * A body that overruns mid-stream aborts with the same `413`.
+     * `false` leaves the body size unbounded.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 1048576 // one mebibyte, as raw bytes
+     * '1mb'   // one mebibyte
+     * false   // unbounded
+     * ```
+     */
+    maxBodySize?: number | string | false;
+
+    /**
+     * How long middleware and the handler may run before the request is answered with `503`.
+     * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+     * `false` lets the handler run without a deadline.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 30000 // 30 seconds, as raw milliseconds
+     * '30s' // 30 seconds
+     * false // no deadline
+     * ```
+     */
+    handlerTimeout?: number | string | false;
   };
 
   /**
@@ -314,6 +349,8 @@ export const DEFAULTS = {
     requestTimeout: false,
     keepAliveTimeout: false,
     maxConnections: false,
+    maxBodySize: false,
+    handlerTimeout: false,
   },
 } satisfies Config;
 
