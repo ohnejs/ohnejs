@@ -7,7 +7,7 @@ const KEYS = ['SILENT', 'DEBUG', 'NO_COLOR', 'FORCE_COLOR', 'SKIP_CODEGEN'] as c
 
 describe('useEnv', () => {
   afterEach(() => {
-    for (const k of KEYS) {
+    for (const k of [...KEYS, 'PORT', 'HOST'] as const) {
       useEnv().unset(k);
       delete process.env[k];
     }
@@ -106,6 +106,20 @@ describe('useEnv', () => {
 
       process.env['SKIP_CODEGEN'] = '0';
       strictEqual(useEnv().get('SKIP_CODEGEN'), false);
+    });
+
+    it('PORT parses an integer string, `0` included; throws on invalid', () => {
+      process.env['PORT'] = '3000';
+      strictEqual(useEnv().get('PORT'), 3000);
+
+      process.env['PORT'] = '0';
+      strictEqual(useEnv().get('PORT'), 0);
+
+      process.env['PORT'] = 'abc';
+      throws(() => useEnv().get('PORT'), /Invalid PORT/);
+
+      process.env['PORT'] = '99999';
+      throws(() => useEnv().get('PORT'), /Invalid PORT/);
     });
   });
 

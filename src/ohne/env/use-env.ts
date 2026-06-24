@@ -2,11 +2,12 @@ import type { Env } from './env.ts';
 
 import {
   coerceToBoolean,
-  coerceToPositiveInteger,
+  coerceToInteger,
   createEnvRegistry,
   type EnvRegistry,
   isDebugEnabled,
-  isNumber,
+  isPort,
+  MAX_PORT,
   parseBoolean,
 } from '../../utils/index.ts';
 
@@ -23,8 +24,10 @@ registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
 registry.define('PORT', {
   default: undefined,
   parse: (raw) => {
-    const port = coerceToPositiveInteger(raw);
-    return isNumber(port) ? port : undefined;
+    const port = coerceToInteger(raw);
+    if (!isPort(port))
+      throw new Error(`Invalid PORT: ${raw}. Must be an integer between 0 and ${MAX_PORT}.`);
+    return port;
   },
 });
 registry.define('HOST', { default: undefined, parse: (raw) => raw });

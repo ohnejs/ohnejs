@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { strictEqual } from 'node:assert';
+import { rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -96,5 +96,14 @@ describe('serveAPI', () => {
     strictEqual(http.server.listening, true);
     const { port } = http.server.address() as AddressInfo;
     strictEqual(await get(port, '/missing'), 404);
+  });
+
+  it('rejects a port outside 0-65535', async () => {
+    const dir = makeApp('badport', 'badport:boot');
+    useEnv().set('PORT', 99999);
+
+    await rejects(() => serveAPI(dir), /Invalid server port/);
+
+    useEnv().set('PORT', 0);
   });
 });

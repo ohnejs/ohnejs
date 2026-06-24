@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
 import { exists } from '../../utils/fs/index.ts';
-import { isNull, joinPath } from '../../utils/index.ts';
+import { isNull, isPort, joinPath, MAX_PORT } from '../../utils/index.ts';
 import { bootLayers } from '../boot/boot-layers.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
@@ -65,6 +65,9 @@ export async function serveAPI(from: string = process.cwd()): Promise<HttpServer
   });
 
   const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_PORT;
+  if (!isPort(port)) {
+    throw new Error(`Invalid server port: ${port}. Must be an integer between 0 and ${MAX_PORT}.`);
+  }
   const host = useEnv().get('HOST') ?? config.host;
 
   onShutdown(() =>
