@@ -89,6 +89,7 @@ export * from './keys/key-stroke.ts';
 export * from './keys/platform.ts';
 export * from './keys/stroke-from-keyboard-event.ts';
 export * from './keys/stroke-from-readline-key.ts';
+export * from './media-type/parse-media-type.ts';
 export * from './merge/merge.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
