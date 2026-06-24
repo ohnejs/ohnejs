@@ -26,7 +26,23 @@ export interface ToRequestOptions {
 }
 
 /**
- * Bridges a Node `IncomingMessage` into a Web `Request`.
+ * The inbound bridge result.
+ * The `URL` is handed back beside the `Request` so the transport routes on it without re-parsing.
+ */
+export interface InboundRequest {
+  /**
+   * The bridged Web `Request`.
+   */
+  request: Request;
+
+  /**
+   * The request URL, parsed once from the target and the resolved `Host`.
+   */
+  url: URL;
+}
+
+/**
+ * Bridges a Node `IncomingMessage` into a Web `Request` and the `URL` it was built from.
  *
  * The URL is assembled from the request target and the `Host` header.
  * The scheme is `http`, since TLS terminates in the proxy (out of core).
@@ -44,7 +60,7 @@ export interface ToRequestOptions {
  *
  * This is the only inbound place Node internals are touched.
  */
-export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
+export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): InboundRequest {
   const method = req.method ?? 'GET';
   const forwarded = trusts(options.trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
   const host = forwarded?.host ?? req.headers.host ?? 'localhost';
@@ -72,7 +88,7 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
   let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
   if (!isNull(body) && !isUndefined(maxBodySize)) body = meterBody(body, maxBodySize);
 
-  return new Request(url, { method, headers, body, duplex: 'half' });
+  return { request: new Request(url, { method, headers, body, duplex: 'half' }), url };
 }
 
 /**

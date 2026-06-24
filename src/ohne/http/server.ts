@@ -196,8 +196,7 @@ async function handle(
 
   let drain: (() => Promise<void>) | undefined;
   try {
-    const request = toRequest(req, { maxBodySize: limits.maxBodySize, trustProxy });
-    const url = new URL(request.url);
+    const { request, url } = toRequest(req, { maxBodySize: limits.maxBodySize, trustProxy });
     const match = router.match(request.method as HTTPMethod, url.pathname);
 
     if (match.type === 'matched') {
