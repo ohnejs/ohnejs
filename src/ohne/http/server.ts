@@ -194,18 +194,19 @@ async function handle(
     return;
   }
 
+  let drain: (() => Promise<void>) | undefined;
   try {
     const request = toRequest(req, { maxBodySize: limits.maxBodySize, trustProxy });
     const url = new URL(request.url);
     const match = router.match(request.method as HTTPMethod, url.pathname);
 
     if (match.type === 'matched') {
-      const { response, drain } = await dispatch(match.route, request, url, match.params, {
+      const dispatched = await dispatch(match.route, request, url, match.params, {
         handlerTimeout: limits.handlerTimeout,
         ip: clientIP(req, trustProxy),
       });
-      await sendResponse(res, response);
-      await drain();
+      drain = dispatched.drain;
+      await sendResponse(res, dispatched.response);
     } else {
       await sendResponse(res, errorResponse(match));
     }
@@ -220,6 +221,7 @@ async function handle(
       res.end();
     }
   } finally {
+    if (drain) await drain();
     release();
   }
 }

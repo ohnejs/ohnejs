@@ -85,7 +85,13 @@ export async function dispatch(
     context: {},
     appliedMiddleware: [],
     waitUntil(promise) {
-      background.push(promise);
+      // Handle now, not at drain time.
+      // A rejection deferred to drain leaks an unhandledRejection before the response is sent.
+      background.push(
+        promise.catch((error: unknown) => {
+          usePrinter().error(`waitUntil rejected: ${reason(error)}`);
+        }),
+      );
     },
   };
 
@@ -125,14 +131,7 @@ async function resolveMiddleware(names: string[], event: Event): Promise<string[
 }
 
 async function drain(background: Promise<unknown>[]): Promise<void> {
-  while (background.length > 0) {
-    const batch = background.splice(0);
-    for (const result of await Promise.allSettled(batch)) {
-      if (result.status === 'rejected') {
-        usePrinter().error(`waitUntil rejected: ${reason(result.reason)}`);
-      }
-    }
-  }
+  while (background.length > 0) await Promise.all(background.splice(0));
 }
 
 function logUnhandled(route: Route, error: unknown): void {
