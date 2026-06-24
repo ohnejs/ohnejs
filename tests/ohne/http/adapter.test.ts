@@ -226,6 +226,21 @@ describe('sendResponse', () => {
     );
   });
 
+  it('sends the standard reason phrase for the status, independent of the body message', async () => {
+    await withServer(
+      async (_req, res) => {
+        const body = JSON.stringify({ statusCode: 404, message: 'User not found' });
+        await sendResponse(res, new Response(body, { status: 404 }));
+      },
+      async (base) => {
+        const res = await fetch(base);
+        strictEqual(res.status, 404);
+        strictEqual(res.statusText, 'Not Found');
+        strictEqual(JSON.parse(await res.text()).message, 'User not found');
+      },
+    );
+  });
+
   it('ends the socket with no body for a bodyless response', async () => {
     await withServer(
       async (_req, res) => {
