@@ -29,6 +29,8 @@ export * from './coerce/coerce-to-integer.ts';
 export * from './coerce/coerce-to-number.ts';
 export * from './coerce/coerce-to-positive-integer.ts';
 export * from './coerce/coerce-to-string.ts';
+export * from './cookie/parse-cookies.ts';
+export * from './cookie/serialize-cookie.ts';
 export * from './debug/is-debug-enabled.ts';
 export * from './defaults/with-defaults.ts';
 export * from './did-you-mean/did-you-mean.ts';
