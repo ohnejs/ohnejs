@@ -67,6 +67,7 @@ export * from './is/is-nullish.ts';
 export * from './is/is-number.ts';
 export * from './is/is-object.ts';
 export * from './is/is-plain-object.ts';
+export * from './is/is-port.ts';
 export * from './is/is-positive-integer.ts';
 export * from './is/is-real-number.ts';
 export * from './is/is-regexp.ts';
