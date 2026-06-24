@@ -64,7 +64,15 @@ export interface Shutdown {
   watch(options?: ShutdownRunOptions): void;
 
   /**
+   * Removes the funnel installed by `watch`, detaching every process listener it added.
+   * A later `watch` re-installs it, so the pair brackets a server that starts and stops in-process.
+   * No-op when not watching.
+   */
+  unwatch(): void;
+
+  /**
    * Drops every registered hook and resets the run state to `'idle'`.
+   * Leaves the signal funnel in place; call `unwatch` to detach it.
    */
   clear(): void;
 
@@ -78,7 +86,7 @@ const hooks = new Set<ShutdownHook>();
 
 let running: Promise<ShutdownOutcome> | undefined;
 let state: 'idle' | 'running' | 'done' = 'idle';
-let watching = false;
+let detach: (() => void) | undefined;
 
 const shutdown: Shutdown = {
   add(hook) {
@@ -93,15 +101,26 @@ const shutdown: Shutdown = {
     }));
   },
   watch(options) {
-    if (watching) return;
-    watching = true;
-    const trigger = () => void exit(options);
+    if (detach) return;
+    const trigger = (): void => void exit(options);
+    const onMessage = (message: unknown): void => {
+      if (message === 'shutdown') trigger();
+    };
+    const worker = cluster.isWorker ? cluster.worker : undefined;
     process.on('SIGTERM', trigger);
     process.on('SIGINT', trigger);
-    process.on('message', (message) => {
-      if (message === 'shutdown') trigger();
-    });
-    if (cluster.isWorker) cluster.worker?.on('disconnect', trigger);
+    process.on('message', onMessage);
+    worker?.on('disconnect', trigger);
+    detach = () => {
+      process.off('SIGTERM', trigger);
+      process.off('SIGINT', trigger);
+      process.off('message', onMessage);
+      worker?.off('disconnect', trigger);
+    };
+  },
+  unwatch() {
+    detach?.();
+    detach = undefined;
   },
   clear() {
     hooks.clear();

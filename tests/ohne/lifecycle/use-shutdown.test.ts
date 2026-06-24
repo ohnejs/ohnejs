@@ -75,4 +75,18 @@ describe('useShutdown', () => {
     await run;
     strictEqual(useShutdown().state, 'done');
   });
+
+  it('watch attaches the signal funnel once, unwatch detaches it', () => {
+    const sigterm = process.listenerCount('SIGTERM');
+    const sigint = process.listenerCount('SIGINT');
+
+    useShutdown().watch();
+    useShutdown().watch();
+    strictEqual(process.listenerCount('SIGTERM'), sigterm + 1);
+    strictEqual(process.listenerCount('SIGINT'), sigint + 1);
+
+    useShutdown().unwatch();
+    strictEqual(process.listenerCount('SIGTERM'), sigterm);
+    strictEqual(process.listenerCount('SIGINT'), sigint);
+  });
 });
