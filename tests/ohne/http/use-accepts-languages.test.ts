@@ -36,4 +36,11 @@ describe('useAcceptsLanguages', () => {
       strictEqual(useAcceptsLanguages(['en', 'de']), 'en');
     });
   });
+
+  it('appends Accept-Language to the response Vary header', () => {
+    const event = makeEvent('en');
+    event.response.headers.set('vary', 'Accept');
+    runWithEvent(event, () => useAcceptsLanguages(['en']));
+    strictEqual(event.response.headers.get('vary'), 'Accept, Accept-Language');
+  });
 });

@@ -1,5 +1,5 @@
-import { first, isNull, negotiateMediaType } from '../../utils/index.ts';
-import { useRequest } from './use-request.ts';
+import { first, isNull, negotiateMediaType, vary } from '../../utils/index.ts';
+import { useEvent } from './use-event.ts';
 
 /**
  * Picks the best response media type for the request's `Accept` header from what you can produce.
@@ -8,6 +8,7 @@ import { useRequest } from './use-request.ts';
  *
  * Valid only within a request.
  * Negotiation runs `negotiateMediaType` against the live header.
+ * `Accept` is appended to the response `Vary` header, since the choice depends on it.
  *
  * @example
  * ```ts
@@ -16,6 +17,9 @@ import { useRequest } from './use-request.ts';
  * ```
  */
 export function useAccepts(available: readonly string[]): string | undefined {
-  const header = useRequest().headers.get('accept');
+  const { request, response } = useEvent();
+  response.headers.set('vary', vary(response.headers.get('vary') ?? '', 'Accept'));
+
+  const header = request.headers.get('accept');
   return isNull(header) ? first(available) : negotiateMediaType(header, available);
 }

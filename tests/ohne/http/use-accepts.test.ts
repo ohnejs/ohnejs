@@ -36,4 +36,10 @@ describe('useAccepts', () => {
       strictEqual(useAccepts(['application/json', 'text/html']), 'application/json');
     });
   });
+
+  it('sets the response Vary header to Accept', () => {
+    const event = makeEvent('text/html');
+    runWithEvent(event, () => useAccepts(['text/html']));
+    strictEqual(event.response.headers.get('vary'), 'Accept');
+  });
 });
