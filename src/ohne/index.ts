@@ -17,6 +17,7 @@ export * from './http/event.ts';
 export * from './http/http-error.ts';
 export * from './http/match-path.ts';
 export * from './http/router.ts';
+export * from './http/send-redirect.ts';
 export * from './http/server.ts';
 export * from './http/set-cookie.ts';
 export * from './http/set-response-status.ts';
