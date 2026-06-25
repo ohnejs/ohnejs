@@ -236,6 +236,23 @@ export interface Config {
     maxConnections?: number | false;
 
     /**
+     * Largest total request header block to accept, as a `parseBytes` value.
+     * Caps the request line and all headers; the parser refuses anything larger before routing.
+     * `false` keeps Node's own default of 16 KiB.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 32768  // 32 KiB, as raw bytes
+     * '32kb' // 32 KiB
+     * false  // Node's 16 KiB default
+     * ```
+     */
+    maxHeaderSize?: number | string | false;
+
+    /**
      * Largest request body to accept, as a `parseBytes` value (bytes as a number, or a string like `'1mb'`).
      * An over-cap `Content-Length` is refused with `413` before any body is read.
      * A body that overruns mid-stream aborts with the same `413`.
@@ -402,6 +419,7 @@ export const DEFAULTS = {
     requestTimeout: false,
     keepAliveTimeout: false,
     maxConnections: false,
+    maxHeaderSize: false,
     maxBodySize: '1mb',
     handlerTimeout: '30s',
     waitUntilTimeout: false,

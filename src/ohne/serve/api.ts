@@ -62,6 +62,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     requestTimeout: offToUndefined(config.requestTimeout),
     keepAliveTimeout: offToUndefined(config.keepAliveTimeout),
     maxConnections: offToUndefined(config.maxConnections),
+    maxHeaderSize: offToUndefined(config.maxHeaderSize),
     maxBodySize: offToUndefined(config.maxBodySize),
     handlerTimeout: offToUndefined(config.handlerTimeout),
     waitUntilTimeout: offToUndefined(config.waitUntilTimeout),

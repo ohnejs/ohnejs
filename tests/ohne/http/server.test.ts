@@ -258,3 +258,29 @@ describe('allowed hosts', () => {
     });
   });
 });
+
+function statusWithHeaderOf(base: string, size: number): Promise<number> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const headers = { 'x-big': 'a'.repeat(size), connection: 'close' };
+    const req = request({ port, path: '/', headers }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+describe('header size limit', () => {
+  it('refuses an oversized request header block with 431', async () => {
+    await withServer(
+      [makeRoute('GET', '/', () => 'ok')],
+      async (base) => {
+        strictEqual(await statusWithHeaderOf(base, 100), 200);
+        strictEqual(await statusWithHeaderOf(base, 8000), 431);
+      },
+      { maxHeaderSize: 2048 },
+    );
+  });
+});

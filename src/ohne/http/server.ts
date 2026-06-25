@@ -1,4 +1,4 @@
-import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import type { IncomingMessage, Server, ServerOptions, ServerResponse } from 'node:http';
 
 import { createServer as createNodeServer } from 'node:http';
 
@@ -87,6 +87,19 @@ export interface CreateServerOptions {
    * Omitted keeps Node's default of no limit.
    */
   maxConnections?: number;
+
+  /**
+   * Largest total request header block to accept, as a `parseBytes` value.
+   * Caps the request line and all headers; the parser refuses anything larger before routing.
+   * Omitted keeps Node's default of 16 KiB.
+   *
+   * @example
+   * ```ts
+   * 32768  // 32 KiB, as raw bytes
+   * '32kb' // 32 KiB
+   * ```
+   */
+  maxHeaderSize?: number | string;
 
   /**
    * Largest request body to accept, as a `parseBytes` value.
@@ -193,7 +206,12 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
   const allowedHosts = options.allowedHosts?.length
     ? createHostMatcher(options.allowedHosts)
     : undefined;
+  const httpOptions: ServerOptions = {};
+  if (!isUndefined(options.maxHeaderSize)) {
+    httpOptions.maxHeaderSize = parseBytes(options.maxHeaderSize);
+  }
   const server = createNodeServer(
+    httpOptions,
     (req, res) => void handle(router, gate, limits, trustProxy, allowedHosts, req, res),
   );
 
