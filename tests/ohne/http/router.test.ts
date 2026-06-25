@@ -94,6 +94,29 @@ describe('createRouter', () => {
     deepStrictEqual(router.match('HEAD', '/x'), { type: 'method-not-allowed', allow: ['POST'] });
   });
 
+  it('answers OPTIONS to a path with no OPTIONS route as auto-OPTIONS', () => {
+    const router = createRouter([route('GET', '/x'), route('POST', '/x')]);
+    deepStrictEqual(router.match('OPTIONS', '/x'), {
+      type: 'options',
+      allow: ['GET', 'HEAD', 'OPTIONS', 'POST'],
+    });
+  });
+
+  it('prefers an explicit OPTIONS route over auto-OPTIONS', () => {
+    const router = createRouter([route('GET', '/x'), route('OPTIONS', '/x')]);
+    deepStrictEqual(router.match('OPTIONS', '/x').type, 'matched');
+  });
+
+  it('a method-agnostic route answers OPTIONS as matched, not auto-OPTIONS', () => {
+    const router = createRouter([route(null, '/any')]);
+    deepStrictEqual(router.match('OPTIONS', '/any').type, 'matched');
+  });
+
+  it('returns not-found for OPTIONS to an unmatched path', () => {
+    const router = createRouter([route('GET', '/x')]);
+    deepStrictEqual(router.match('OPTIONS', '/nope'), { type: 'not-found' });
+  });
+
   it('returns not-found when no pattern matches', () => {
     const router = createRouter([route('GET', '/users/[id]')]);
     deepStrictEqual(router.match('GET', '/nope'), { type: 'not-found' });

@@ -3,6 +3,7 @@ import type { IncomingMessage, Server, ServerOptions, ServerResponse } from 'nod
 import { createServer as createNodeServer } from 'node:http';
 
 import type { Gate, HTTPMethod } from '../../utils/index.ts';
+import type { Route } from '../routes/route.ts';
 import type { RouteMatch, Router } from './router.ts';
 
 import { createGate, isNull, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
@@ -13,6 +14,7 @@ import { dispatch } from './dispatch.ts';
 import { HTTPError } from './http-error.ts';
 import { routeLimits } from './route-limits.ts';
 import { toResponse } from './to-response.ts';
+import { useResponse } from './use-response.ts';
 
 /**
  * A built HTTP server: the Node transport and the drain gate it admits requests through.
@@ -264,8 +266,10 @@ async function handle(
       maxBodySize: limit(overrides?.maxBodySize, limits.maxBodySize),
     });
 
-    if (match.type === 'matched') {
-      const dispatched = await dispatch(match.route, request, url, match.params, {
+    if (match.type === 'matched' || match.type === 'options') {
+      const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
+      const params = match.type === 'matched' ? match.params : {};
+      const dispatched = await dispatch(route, request, url, params, {
         handlerTimeout: limit(overrides?.handlerTimeout, limits.handlerTimeout),
         waitUntilTimeout: limit(overrides?.waitUntilTimeout, limits.waitUntilTimeout),
         ip: clientIP(req, trustProxy),
@@ -291,13 +295,31 @@ async function handle(
   }
 }
 
-function errorResponse(match: Exclude<RouteMatch, { type: 'matched' }>): Response {
+function errorResponse(match: Exclude<RouteMatch, { type: 'matched' | 'options' }>): Response {
   const headers = new Headers();
   if (match.type === 'method-not-allowed') {
     headers.set('Allow', match.allow.join(', '));
     return toResponse(new HTTPError(405, 'Method Not Allowed'), { status: 405, headers });
   }
   return toResponse(new HTTPError(404, 'Not Found'), { status: 404, headers });
+}
+
+/**
+ * Builds the synthetic `OPTIONS` route the server dispatches for an auto-`OPTIONS` match.
+ * It runs the middleware chain like any route, so a `cors()` middleware can answer preflight first.
+ * If nothing short-circuits, the default response is `204` with the `Allow` header.
+ */
+function autoOptionsRoute(allow: HTTPMethod[]): Route {
+  return {
+    method: 'OPTIONS',
+    pattern: '*',
+    file: '',
+    layer: '',
+    handler: () => {
+      useResponse().headers.set('Allow', allow.join(', '));
+      return null;
+    },
+  };
 }
 
 function limit(

@@ -8,6 +8,7 @@ import { compileRoute, isNull, isUndefined, naturalCompare } from '../../utils/i
  *
  * - `matched` carries the resolved route and the params captured from its pattern.
  * - `method-not-allowed` means the path matched but no route serves it; `allow` lists those that do.
+ * - `options` means an `OPTIONS` matched a path with no `OPTIONS` route; `allow` adds `OPTIONS` to it.
  * - `not-found` means no route matched the path at all.
  */
 export type RouteMatch =
@@ -41,6 +42,17 @@ export type RouteMatch =
     }
   | {
       /**
+       * Discriminator for an `OPTIONS` request to a path with no explicit `OPTIONS` route.
+       */
+      type: 'options';
+
+      /**
+       * Methods the matched path serves, plus `OPTIONS`, for the `Allow` header.
+       */
+      allow: HTTPMethod[];
+    }
+  | {
+      /**
        * Discriminator for a path that matched no route.
        */
       type: 'not-found';
@@ -58,6 +70,8 @@ export interface Router {
    * Patterns are tried most-specific first: static segments beat named params, which beat catch-alls.
    * A method-agnostic route (no method suffix in its filename) answers any method.
    * A `HEAD` with no `HEAD` route is served by the path's `GET` route; the body is dropped on the wire.
+   * An `OPTIONS` with no `OPTIONS` route resolves to `options`, answered with `204` + `Allow`.
+   * Middleware runs first, so a `cors()` middleware can handle the preflight.
    * Captured params are URI-decoded before they reach the handler.
    */
   match(method: HTTPMethod, path: string): RouteMatch;
@@ -84,6 +98,9 @@ interface PatternEntry {
  *
  * router.match('DELETE', '/users/42')
  * // -> { type: 'method-not-allowed', allow: ['GET', 'HEAD'] }
+ *
+ * router.match('OPTIONS', '/users/42')
+ * // -> { type: 'options', allow: ['GET', 'HEAD', 'OPTIONS'] }
  *
  * router.match('GET', '/nope')
  * // -> { type: 'not-found' }
@@ -123,7 +140,13 @@ export function createRouter(routes: Iterable<Route>): Router {
     }
 
     if (allow.has('GET')) allow.add('HEAD');
-    if (allow.size > 0) return { type: 'method-not-allowed', allow: [...allow].sort() };
+    if (allow.size > 0) {
+      if (method === 'OPTIONS') {
+        allow.add('OPTIONS');
+        return { type: 'options', allow: [...allow].sort() };
+      }
+      return { type: 'method-not-allowed', allow: [...allow].sort() };
+    }
     return { type: 'not-found' };
   }
 
