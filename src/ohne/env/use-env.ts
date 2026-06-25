@@ -12,14 +12,6 @@ import {
 
 const registry: EnvRegistry<Env> = createEnvRegistry<Env>();
 
-registry.define('SILENT', { default: false, parse: parseBoolean });
-registry.define('DEBUG', { default: false, parse: (raw) => isDebugEnabled('ohne', raw) });
-registry.define('NO_COLOR', { default: false, parse: (raw) => raw !== '' });
-registry.define('FORCE_COLOR', {
-  default: undefined,
-  parse: (raw) => coerceToBoolean(raw) !== false,
-});
-registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
 registry.define('PORT', {
   default: undefined,
   parse: (raw) => {
@@ -30,6 +22,15 @@ registry.define('PORT', {
   },
 });
 registry.define('HOST', { default: undefined, parse: (raw) => raw });
+registry.define('COOKIE_SECRET', { default: undefined });
+registry.define('SILENT', { default: false, parse: parseBoolean });
+registry.define('DEBUG', { default: false, parse: (raw) => isDebugEnabled('ohne', raw) });
+registry.define('NO_COLOR', { default: false, parse: (raw) => raw !== '' });
+registry.define('FORCE_COLOR', {
+  default: undefined,
+  parse: (raw) => coerceToBoolean(raw) !== false,
+});
+registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
 
 /**
  * Returns the process-wide env registry for `Env`.

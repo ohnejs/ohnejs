@@ -5,6 +5,7 @@
  * Built-ins:
  * - `PORT` - overrides `Config.server.port` when set.
  * - `HOST` - overrides `Config.server.host` when set.
+ * - `COOKIE_SECRET` - signs cookies set with `setSignedCookie`; required to use signed cookies.
  * - `SILENT` - truthy disables every printer call.
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
  * - `NO_COLOR` - non-empty value disables ANSI colors per the `no-color.org` standard.
@@ -36,6 +37,15 @@ export interface Env {
    * undefined
    */
   HOST: string | undefined;
+
+  /**
+   * Secret that signs cookies set with `setSignedCookie` and verifies them on the way back in.
+   * Has no usable default; signed cookies throw until it is set to a long, random value.
+   *
+   * @default
+   * undefined
+   */
+  COOKIE_SECRET: string | undefined;
 
   /**
    * When `true`, every printer call is dropped.
