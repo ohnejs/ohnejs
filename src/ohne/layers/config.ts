@@ -241,7 +241,7 @@ export interface Config {
      * `false` leaves the body size unbounded.
      *
      * @default
-     * false
+     * '1mb'
      *
      * @example
      * ```ts
@@ -366,7 +366,7 @@ export const DEFAULTS = {
     requestTimeout: false,
     keepAliveTimeout: false,
     maxConnections: false,
-    maxBodySize: false,
+    maxBodySize: '1mb',
     handlerTimeout: false,
     trustProxy: [],
   },
