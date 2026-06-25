@@ -41,6 +41,10 @@
       "types": "./src/utils/codegen/index.ts",
       "default": "./src/utils/codegen/index.ts"
     },
+    "./utils/crypto": {
+      "types": "./src/utils/crypto/index.ts",
+      "default": "./src/utils/crypto/index.ts"
+    },
     "./utils/env": {
       "types": "./src/utils/env/index.ts",
       "default": "./src/utils/env/index.ts"
