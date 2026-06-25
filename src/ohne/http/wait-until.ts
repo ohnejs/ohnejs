@@ -7,6 +7,7 @@ import { useEvent } from './use-event.ts';
  * The response is sent immediately.
  * The promise runs after and holds the request's drain ticket until it settles, so shutdown waits for it.
  * A rejection is isolated and logged, never touching the sent response.
+ * Best for short side effects like logging or analytics; durable work belongs in a queue, not here.
  *
  * @example
  * ```ts
