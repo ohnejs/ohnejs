@@ -30,6 +30,7 @@ export * from './http/shutdown-server.ts';
 export * from './http/to-response.ts';
 export * from './http/use-accepts-languages.ts';
 export * from './http/use-accepts.ts';
+export * from './http/use-authorization.ts';
 export * from './http/use-cookies.ts';
 export * from './http/use-event.ts';
 export * from './http/use-request.ts';
