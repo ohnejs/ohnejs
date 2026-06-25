@@ -91,6 +91,22 @@ export function payloadTooLarge(message = 'Content Too Large', data?: unknown): 
 }
 
 /**
+ * Builds a `415 Unsupported Media Type` error.
+ * The status when a body reader does not accept the request's `Content-Type`.
+ *
+ * @example
+ * ```ts
+ * throw unsupportedMediaType()
+ * ```
+ */
+export function unsupportedMediaType(
+  message = 'Unsupported Media Type',
+  data?: unknown,
+): HTTPError {
+  return new HTTPError(415, message, data);
+}
+
+/**
  * Builds a `422 Unprocessable Content` error.
  * The status for a well-formed request that fails validation.
  *
