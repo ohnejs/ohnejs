@@ -1,18 +1,21 @@
+import type { IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { request } from 'node:http';
-import { before, describe, it } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 
 import type { AnyHandler, CreateServerOptions, Route } from '../../../src/ohne/index.ts';
 import type { Gate, HTTPMethod } from '../../../src/utils/index.ts';
 
 import {
+  cors,
   createRouter,
   createServer,
   defineHandler,
   useEvent,
+  useMiddleware,
   usePrinter,
   waitUntil,
 } from '../../../src/ohne/index.ts';
@@ -68,8 +71,31 @@ function statusWithHeaderOf(base: string, size: number): Promise<number> {
   });
 }
 
+function optionsRequest(
+  base: string,
+  path: string,
+  headers: Record<string, string>,
+): Promise<{ status: number; headers: IncomingHttpHeaders }> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { port, path, method: 'OPTIONS', headers: { ...headers, connection: 'close' } },
+      (res) => {
+        res.resume();
+        resolve({ status: res.statusCode ?? 0, headers: res.headers });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 before(() => {
   usePrinter().configure({ stream: { write() {} } });
+});
+
+afterEach(() => {
+  useMiddleware().clear();
 });
 
 describe('createServer', () => {
@@ -98,6 +124,28 @@ describe('createServer', () => {
       strictEqual(res.status, 405);
       strictEqual(res.headers.get('allow'), 'GET, HEAD');
       await res.body?.cancel();
+    });
+  });
+
+  it('answers OPTIONS to a route with no OPTIONS handler with 204 and Allow', async () => {
+    await withServer([makeRoute('GET', '/users', () => [])], async (base) => {
+      const { status, headers } = await optionsRequest(base, '/users', {});
+      strictEqual(status, 204);
+      strictEqual(headers['allow'], 'GET, HEAD, OPTIONS');
+    });
+  });
+
+  it('runs middleware for auto-OPTIONS so cors answers a preflight', async () => {
+    useMiddleware().register('cors', cors({ origin: 'https://app.example.com' }));
+    await withServer([makeRoute('GET', '/data', () => ({ ok: true }))], async (base) => {
+      const { status, headers } = await optionsRequest(base, '/data', {
+        origin: 'https://app.example.com',
+        'access-control-request-method': 'GET',
+      });
+      strictEqual(status, 204);
+      strictEqual(headers['access-control-allow-origin'], 'https://app.example.com');
+      strictEqual(headers['access-control-allow-methods'], 'GET, HEAD, PUT, PATCH, POST, DELETE');
+      strictEqual(headers['vary'], 'Origin');
     });
   });
 

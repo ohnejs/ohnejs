@@ -11,6 +11,7 @@ export * from './hooks/hook.ts';
 export * from './hooks/hooks.ts';
 export * from './hooks/use-hooks.ts';
 export * from './http/adapter.ts';
+export * from './http/cors.ts';
 export * from './http/delete-cookie.ts';
 export * from './http/dispatch.ts';
 export * from './http/event.ts';
