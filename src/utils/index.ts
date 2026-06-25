@@ -4,6 +4,7 @@ export * from './array/key-by.ts';
 export * from './array/last.ts';
 export * from './array/to-array.ts';
 export * from './array/unique-array.ts';
+export * from './authorization/parse-authorization.ts';
 export * from './bytes/format-bytes.ts';
 export * from './bytes/parse-bytes.ts';
 export * from './case/capitalize.ts';
