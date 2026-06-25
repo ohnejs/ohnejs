@@ -43,6 +43,31 @@ async function withServer(
   }
 }
 
+function statusWithHost(base: string, host: string): Promise<number> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const req = request({ port, path: '/', headers: { host, connection: 'close' } }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function statusWithHeaderOf(base: string, size: number): Promise<number> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const headers = { 'x-big': 'a'.repeat(size), connection: 'close' };
+    const req = request({ port, path: '/', headers }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 before(() => {
   usePrinter().configure({ stream: { write() {} } });
 });
@@ -226,18 +251,6 @@ describe('per-route limits', () => {
   });
 });
 
-function statusWithHost(base: string, host: string): Promise<number> {
-  const { port } = new URL(base);
-  return new Promise((resolve, reject) => {
-    const req = request({ port, path: '/', headers: { host, connection: 'close' } }, (res) => {
-      res.resume();
-      resolve(res.statusCode ?? 0);
-    });
-    req.on('error', reject);
-    req.end();
-  });
-}
-
 describe('allowed hosts', () => {
   it('refuses a Host outside the allowlist with 400, allowing the apex and subdomains', async () => {
     await withServer(
@@ -258,19 +271,6 @@ describe('allowed hosts', () => {
     });
   });
 });
-
-function statusWithHeaderOf(base: string, size: number): Promise<number> {
-  const { port } = new URL(base);
-  return new Promise((resolve, reject) => {
-    const headers = { 'x-big': 'a'.repeat(size), connection: 'close' };
-    const req = request({ port, path: '/', headers }, (res) => {
-      res.resume();
-      resolve(res.statusCode ?? 0);
-    });
-    req.on('error', reject);
-    req.end();
-  });
-}
 
 describe('header size limit', () => {
   it('refuses an oversized request header block with 431', async () => {
