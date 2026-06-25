@@ -42,6 +42,13 @@ export interface DispatchOptions {
   handlerTimeout?: number;
 
   /**
+   * Milliseconds to let a `waitUntil` promise run after the response before abandoning it.
+   * On overrun the promise is logged and the request's drain ticket is released.
+   * Omitted lets background work run without a deadline.
+   */
+  waitUntilTimeout?: number;
+
+  /**
    * The resolved client IP, exposed as `event.ip`.
    * Omitted leaves `event.ip` an empty string, meaning the transport could not resolve one.
    */
@@ -75,6 +82,7 @@ export async function dispatch(
   options: DispatchOptions = {},
 ): Promise<Dispatched> {
   const background: Promise<unknown>[] = [];
+  const { waitUntilTimeout } = options;
 
   const event: Event = {
     request,
@@ -87,8 +95,15 @@ export async function dispatch(
     waitUntil(promise) {
       // Handle now, not at drain time.
       // A rejection deferred to drain leaks an unhandledRejection before the response is sent.
+      const bounded = isUndefined(waitUntilTimeout)
+        ? promise
+        : withTimeout(promise, waitUntilTimeout, () => {
+            usePrinter().error(
+              `waitUntil timed out after ${waitUntilTimeout}ms in ${route.method ?? 'ANY'} ${route.pattern}`,
+            );
+          });
       background.push(
-        promise.catch((error: unknown) => {
+        bounded.catch((error: unknown) => {
           usePrinter().error(`waitUntil rejected: ${reason(error)}`);
         }),
       );

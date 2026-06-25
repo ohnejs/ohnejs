@@ -146,7 +146,8 @@ export interface Config {
 
     /**
      * How long to wait for in-flight requests and their background work to drain.
-     * Keep it below the orchestrator's kill window, or it `SIGKILL`s mid-drain.
+     * Keep it below the deploy target's kill window (or raise that window), or it `SIGKILL`s mid-drain.
+     * The window is the target's, so no default fits all: PM2 `kill_timeout` `1600ms`, k8s grace `30s`.
      * `false` waits indefinitely.
      *
      * @default
@@ -270,6 +271,24 @@ export interface Config {
     handlerTimeout?: number | string | false;
 
     /**
+     * How long a `waitUntil` promise may run after the response before it is abandoned.
+     * A `parseDuration` value; on overrun the promise is logged and the request's drain ticket released.
+     * Distinct from `shutdownTimeout`, which bounds background work only while shutting down.
+     * `false` lets background work run without a deadline.
+     *
+     * @default
+     * false
+     *
+     * @example
+     * ```ts
+     * 60000 // 60 seconds, as raw milliseconds
+     * '60s' // 60 seconds
+     * false // no deadline
+     * ```
+     */
+    waitUntilTimeout?: number | string | false;
+
+    /**
      * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
      * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
      * They override the socket's own scheme and host, so `event.url` reflects the original client request.
@@ -385,6 +404,7 @@ export const DEFAULTS = {
     maxConnections: false,
     maxBodySize: '1mb',
     handlerTimeout: '30s',
+    waitUntilTimeout: false,
     trustProxy: [],
     allowedHosts: [],
   },

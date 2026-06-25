@@ -165,6 +165,33 @@ describe('dispatch', () => {
     await drain();
   });
 
+  it('abandons a waitUntil promise that overruns waitUntilTimeout', async () => {
+    const route = makeRoute('/', () => {
+      waitUntil(new Promise<void>(() => {}));
+      return 'ok';
+    });
+    const { response, drain } = await dispatch(route, req(), url(), {}, { waitUntilTimeout: 10 });
+
+    strictEqual(await response.text(), 'ok');
+    await drain();
+  });
+
+  it('lets a waitUntil promise settle within waitUntilTimeout', async () => {
+    let done = false;
+    const route = makeRoute('/', () => {
+      waitUntil(
+        sleep(1).then(() => {
+          done = true;
+        }),
+      );
+      return 'ok';
+    });
+    const { drain } = await dispatch(route, req(), url(), {}, { waitUntilTimeout: 1000 });
+
+    await drain();
+    strictEqual(done, true);
+  });
+
   it('runs middleware before the handler, sharing the event', async () => {
     useMiddleware().register('tag', (event) => {
       event.response.headers.set('x-mw', 'on');

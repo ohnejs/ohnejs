@@ -6,6 +6,7 @@ import { getRouteOptions } from '../routes/route-options.ts';
 interface RouteLimits {
   maxBodySize: number | false | undefined;
   handlerTimeout: number | false | undefined;
+  waitUntilTimeout: number | false | undefined;
 }
 
 const cache = new WeakMap<AnyHandler, RouteLimits>();
@@ -28,6 +29,7 @@ function resolveMs(value: number | string | false | undefined): number | false |
 export function routeLimits(handler: AnyHandler): {
   maxBodySize: number | false | undefined;
   handlerTimeout: number | false | undefined;
+  waitUntilTimeout: number | false | undefined;
 } {
   const cached = cache.get(handler);
   if (!isUndefined(cached)) return cached;
@@ -36,6 +38,7 @@ export function routeLimits(handler: AnyHandler): {
   const limits: RouteLimits = {
     maxBodySize: resolveBytes(options?.maxBodySize),
     handlerTimeout: resolveMs(options?.handlerTimeout),
+    waitUntilTimeout: resolveMs(options?.waitUntilTimeout),
   };
   cache.set(handler, limits);
   return limits;

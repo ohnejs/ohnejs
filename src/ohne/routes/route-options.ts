@@ -17,6 +17,13 @@ export interface RouteOptions {
    * Overrides `server.handlerTimeout` for this route.
    */
   handlerTimeout?: number | string | false;
+
+  /**
+   * How long this route's `waitUntil` work may run after the response, as a `parseDuration` value.
+   * Set `false` for no deadline.
+   * Overrides `server.waitUntilTimeout` for this route.
+   */
+  waitUntilTimeout?: number | string | false;
 }
 
 const OPTIONS = Symbol('ohne.routeOptions');

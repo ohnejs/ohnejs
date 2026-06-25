@@ -64,6 +64,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     maxConnections: offToUndefined(config.maxConnections),
     maxBodySize: offToUndefined(config.maxBodySize),
     handlerTimeout: offToUndefined(config.handlerTimeout),
+    waitUntilTimeout: offToUndefined(config.waitUntilTimeout),
     trustProxy: config.trustProxy,
     allowedHosts: config.allowedHosts,
   });

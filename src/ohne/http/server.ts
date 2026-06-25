@@ -118,6 +118,20 @@ export interface CreateServerOptions {
   handlerTimeout?: number | string;
 
   /**
+   * How long a `waitUntil` promise may run after the response before it is abandoned.
+   * A `parseDuration` value; on overrun the promise is logged and the request's drain ticket released.
+   * Omitted lets background work run without a deadline.
+   *
+   * @example
+   * ```ts
+   * 60000 // 60 seconds, as raw milliseconds
+   * '60s' // 60 seconds
+   * '5m'  // five minutes
+   * ```
+   */
+  waitUntilTimeout?: number | string;
+
+  /**
    * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
    * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
    * They override the socket's own scheme and host.
@@ -171,6 +185,9 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
     handlerTimeout: isUndefined(options.handlerTimeout)
       ? undefined
       : parseDuration(options.handlerTimeout),
+    waitUntilTimeout: isUndefined(options.waitUntilTimeout)
+      ? undefined
+      : parseDuration(options.waitUntilTimeout),
   };
   const trustProxy = createCIDRMatcher(options.trustProxy ?? []);
   const allowedHosts = options.allowedHosts?.length
@@ -195,6 +212,7 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
 interface RequestLimits {
   maxBodySize: number | undefined;
   handlerTimeout: number | undefined;
+  waitUntilTimeout: number | undefined;
 }
 
 async function handle(
@@ -238,6 +256,7 @@ async function handle(
     if (match.type === 'matched') {
       const dispatched = await dispatch(match.route, request, url, match.params, {
         handlerTimeout: limit(overrides?.handlerTimeout, limits.handlerTimeout),
+        waitUntilTimeout: limit(overrides?.waitUntilTimeout, limits.waitUntilTimeout),
         ip: clientIP(req, trustProxy),
       });
       drain = dispatched.drain;
