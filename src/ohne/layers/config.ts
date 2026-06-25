@@ -285,6 +285,23 @@ export interface Config {
      * ```
      */
     trustProxy?: string[];
+
+    /**
+     * Hostnames this server answers to, matched against the request's `Host` (the port is ignored).
+     * A `Host` outside the list is refused with `400` before routing.
+     * Each entry is a `compileGlob` pattern, so `'*.example.com'` matches any subdomain.
+     * An empty list answers to any host.
+     *
+     * @default
+     * []
+     *
+     * @example
+     * ```ts
+     * ['example.com', '*.example.com'] // the apex and its subdomains
+     * ['localhost', '127.0.0.1']       // local development
+     * ```
+     */
+    allowedHosts?: string[];
   };
 
   /**
@@ -369,6 +386,7 @@ export const DEFAULTS = {
     maxBodySize: '1mb',
     handlerTimeout: '30s',
     trustProxy: [],
+    allowedHosts: [],
   },
 } satisfies Config;
 

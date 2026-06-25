@@ -225,3 +225,36 @@ describe('per-route limits', () => {
     );
   });
 });
+
+function statusWithHost(base: string, host: string): Promise<number> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const req = request({ port, path: '/', headers: { host, connection: 'close' } }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+describe('allowed hosts', () => {
+  it('refuses a Host outside the allowlist with 400, allowing the apex and subdomains', async () => {
+    await withServer(
+      [makeRoute('GET', '/', () => 'ok')],
+      async (base) => {
+        strictEqual(await statusWithHost(base, 'example.com'), 200);
+        strictEqual(await statusWithHost(base, 'api.example.com'), 200);
+        strictEqual(await statusWithHost(base, 'a.b.example.com'), 200);
+        strictEqual(await statusWithHost(base, 'evil.com'), 400);
+      },
+      { allowedHosts: ['example.com', '*.example.com'] },
+    );
+  });
+
+  it('answers any host when the allowlist is empty', async () => {
+    await withServer([makeRoute('GET', '/', () => 'ok')], async (base) => {
+      strictEqual(await statusWithHost(base, 'anything.test'), 200);
+    });
+  });
+});

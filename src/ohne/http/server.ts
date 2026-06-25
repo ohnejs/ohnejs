@@ -8,6 +8,7 @@ import type { RouteMatch, Router } from './router.ts';
 import {
   createCIDRMatcher,
   createGate,
+  createHostMatcher,
   isNull,
   isUndefined,
   parseBytes,
@@ -129,6 +130,20 @@ export interface CreateServerOptions {
    * ```
    */
   trustProxy?: string[];
+
+  /**
+   * Hostnames the server answers to, matched against the request's `Host` (the port is ignored).
+   * A `Host` outside the list is refused with `400` before routing.
+   * Each entry is a `compileGlob` pattern, so `'*.example.com'` matches any subdomain.
+   * An empty list (the default) answers to any host.
+   *
+   * @example
+   * ```ts
+   * ['example.com', '*.example.com'] // the apex and its subdomains
+   * ['localhost', '127.0.0.1']       // local development
+   * ```
+   */
+  allowedHosts?: string[];
 }
 
 /**
@@ -158,8 +173,11 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
       : parseDuration(options.handlerTimeout),
   };
   const trustProxy = createCIDRMatcher(options.trustProxy ?? []);
+  const allowedHosts = options.allowedHosts?.length
+    ? createHostMatcher(options.allowedHosts)
+    : undefined;
   const server = createNodeServer(
-    (req, res) => void handle(router, gate, limits, trustProxy, req, res),
+    (req, res) => void handle(router, gate, limits, trustProxy, allowedHosts, req, res),
   );
 
   if (!isUndefined(options.headersTimeout))
@@ -184,6 +202,7 @@ async function handle(
   gate: Gate,
   limits: RequestLimits,
   trustProxy: (ip: string) => boolean,
+  allowedHosts: ((hostname: string) => boolean) | undefined,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -198,6 +217,15 @@ async function handle(
   let drain: (() => Promise<void>) | undefined;
   try {
     const url = toURL(req, trustProxy);
+    if (allowedHosts && !allowedHosts(url.hostname)) {
+      const response = toResponse(new HTTPError(400, 'Bad Request'), {
+        status: 400,
+        headers: new Headers(),
+      });
+      await sendResponse(res, response);
+      return;
+    }
+
     const method = (req.method ?? 'GET').toUpperCase() as HTTPMethod;
     const match = router.match(method, url.pathname);
 

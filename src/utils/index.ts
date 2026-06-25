@@ -95,6 +95,7 @@ export * from './mime/mime-type-for.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
 export * from './net/create-cidr-matcher.ts';
+export * from './net/create-host-matcher.ts';
 export * from './net/unmap-ip.ts';
 export * from './number/clamp.ts';
 export * from './object/has-key.ts';
