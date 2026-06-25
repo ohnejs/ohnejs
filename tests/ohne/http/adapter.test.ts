@@ -164,6 +164,25 @@ describe('toRequest', () => {
     );
   });
 
+  it('honors the Forwarded header origin over X-Forwarded-* when the peer is trusted', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, { url: toURL(req, () => true) });
+        await sendResponse(res, new Response(request.url));
+      },
+      async (base) => {
+        const res = await fetch(`${base}/p`, {
+          headers: {
+            forwarded: 'host=example.com;proto=https',
+            'x-forwarded-host': 'evil.com',
+            'x-forwarded-proto': 'http',
+          },
+        });
+        strictEqual(await res.text(), 'https://example.com/p');
+      },
+    );
+  });
+
   it('appends every value of an array-valued header', async () => {
     await withServer(
       async (req, res) => {
@@ -206,6 +225,65 @@ describe('clientIP', () => {
         const res = await fetch(base, { headers: { 'x-forwarded-for': '203.0.113.9' } });
         const ip = await res.text();
         ok(ip === '127.0.0.1' || ip === '::1');
+      },
+    );
+  });
+
+  it('walks the Forwarded header for to the first untrusted address', async () => {
+    await withServer(
+      async (req, res) => {
+        const trusted = createCIDRMatcher(['10.0.0.0/8', '127.0.0.1', '::1']);
+        await sendResponse(res, new Response(clientIP(req, trusted)));
+      },
+      async (base) => {
+        const res = await fetch(base, { headers: { forwarded: 'for=203.0.113.9, for=10.0.0.1' } });
+        strictEqual(await res.text(), '203.0.113.9');
+      },
+    );
+  });
+
+  it('strips the port and brackets from a Forwarded IPv6 for', async () => {
+    await withServer(
+      async (req, res) => {
+        const trusted = createCIDRMatcher(['10.0.0.0/8', '127.0.0.1', '::1']);
+        await sendResponse(res, new Response(clientIP(req, trusted)));
+      },
+      async (base) => {
+        const res = await fetch(base, {
+          headers: { forwarded: 'for="[2001:db8::a]:4711", for=10.0.0.1' },
+        });
+        strictEqual(await res.text(), '2001:db8::a');
+      },
+    );
+  });
+
+  it('stops the walk at an obfuscated Forwarded for, never reading past it', async () => {
+    await withServer(
+      async (req, res) => {
+        const trusted = createCIDRMatcher(['10.0.0.0/8', '127.0.0.1', '::1']);
+        await sendResponse(res, new Response(clientIP(req, trusted)));
+      },
+      async (base) => {
+        const res = await fetch(base, {
+          headers: { forwarded: 'for=203.0.113.9, for=_hidden, for=10.0.0.1' },
+        });
+        const ip = await res.text();
+        ok(ip === '127.0.0.1' || ip === '::1');
+      },
+    );
+  });
+
+  it('prefers the Forwarded header over X-Forwarded-For', async () => {
+    await withServer(
+      async (req, res) => {
+        const trusted = createCIDRMatcher(['10.0.0.0/8', '127.0.0.1', '::1']);
+        await sendResponse(res, new Response(clientIP(req, trusted)));
+      },
+      async (base) => {
+        const res = await fetch(base, {
+          headers: { forwarded: 'for=203.0.113.9', 'x-forwarded-for': '198.51.100.7' },
+        });
+        strictEqual(await res.text(), '203.0.113.9');
       },
     );
   });
