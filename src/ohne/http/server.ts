@@ -14,9 +14,10 @@ import {
   parseDuration,
 } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { clientIP, sendResponse, toRequest } from './adapter.ts';
+import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
 import { dispatch } from './dispatch.ts';
 import { HTTPError } from './http-error.ts';
+import { routeLimits } from './route-limits.ts';
 import { toResponse } from './to-response.ts';
 
 /**
@@ -196,12 +197,19 @@ async function handle(
 
   let drain: (() => Promise<void>) | undefined;
   try {
-    const { request, url } = toRequest(req, { maxBodySize: limits.maxBodySize, trustProxy });
-    const match = router.match(request.method as HTTPMethod, url.pathname);
+    const url = toURL(req, trustProxy);
+    const method = (req.method ?? 'GET').toUpperCase() as HTTPMethod;
+    const match = router.match(method, url.pathname);
+
+    const overrides = match.type === 'matched' ? routeLimits(match.route.handler) : undefined;
+    const request = toRequest(req, {
+      url,
+      maxBodySize: limit(overrides?.maxBodySize, limits.maxBodySize),
+    });
 
     if (match.type === 'matched') {
       const dispatched = await dispatch(match.route, request, url, match.params, {
-        handlerTimeout: limits.handlerTimeout,
+        handlerTimeout: limit(overrides?.handlerTimeout, limits.handlerTimeout),
         ip: clientIP(req, trustProxy),
       });
       drain = dispatched.drain;
@@ -232,6 +240,14 @@ function errorResponse(match: Exclude<RouteMatch, { type: 'matched' }>): Respons
     return toResponse(new HTTPError(405, 'Method Not Allowed'), { status: 405, headers });
   }
   return toResponse(new HTTPError(404, 'Not Found'), { status: 404, headers });
+}
+
+function limit(
+  override: number | false | undefined,
+  fallback: number | undefined,
+): number | undefined {
+  if (override === false) return undefined;
+  return override ?? fallback;
 }
 
 function reason(error: unknown): string {

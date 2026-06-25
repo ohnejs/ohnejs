@@ -11,6 +11,7 @@ import type { Gate, HTTPMethod } from '../../../src/utils/index.ts';
 import {
   createRouter,
   createServer,
+  defineHandler,
   useEvent,
   usePrinter,
   waitUntil,
@@ -139,6 +140,88 @@ describe('createServer', () => {
         strictEqual(await res.text(), '203.0.113.9');
       },
       { trustProxy: ['10.0.0.0/8', '127.0.0.1', '::1'] },
+    );
+  });
+});
+
+describe('per-route limits', () => {
+  it('lets a route maxBodySize override loosen past the global cap', async () => {
+    await withServer(
+      [
+        makeRoute(
+          'POST',
+          '/tight',
+          defineHandler(() => 'ok'),
+        ),
+        makeRoute(
+          'POST',
+          '/loose',
+          defineHandler(() => 'ok', { maxBodySize: '1kb' }),
+        ),
+      ],
+      async (base) => {
+        const body = 'x'.repeat(64);
+
+        const tight = await fetch(`${base}/tight`, { method: 'POST', body });
+        strictEqual(tight.status, 413);
+        await tight.body?.cancel();
+
+        const loose = await fetch(`${base}/loose`, { method: 'POST', body });
+        strictEqual(await loose.text(), 'ok');
+      },
+      { maxBodySize: 8 },
+    );
+  });
+
+  it('lets a route maxBodySize override tighten below the default', async () => {
+    await withServer(
+      [
+        makeRoute(
+          'POST',
+          '/login',
+          defineHandler(() => 'ok', { maxBodySize: 8 }),
+        ),
+      ],
+      async (base) => {
+        const res = await fetch(`${base}/login`, { method: 'POST', body: 'x'.repeat(64) });
+        strictEqual(res.status, 413);
+        await res.body?.cancel();
+      },
+    );
+  });
+
+  it('lets a route handlerTimeout override opt out of the global deadline', async () => {
+    await withServer(
+      [
+        makeRoute(
+          'GET',
+          '/slow',
+          defineHandler(async () => {
+            await sleep(60);
+            return 'done';
+          }),
+        ),
+        makeRoute(
+          'GET',
+          '/patient',
+          defineHandler(
+            async () => {
+              await sleep(60);
+              return 'done';
+            },
+            { handlerTimeout: false },
+          ),
+        ),
+      ],
+      async (base) => {
+        const timed = await fetch(`${base}/slow`);
+        strictEqual(timed.status, 503);
+        await timed.body?.cancel();
+
+        const patient = await fetch(`${base}/patient`);
+        strictEqual(await patient.text(), 'done');
+      },
+      { handlerTimeout: 20 },
     );
   });
 });

@@ -11,48 +11,44 @@ import { payloadTooLarge } from './http-error.ts';
  */
 export interface ToRequestOptions {
   /**
+   * The request URL, already assembled.
+   * Omitted, it is built from the request via `toURL`, without proxy trust.
+   * The transport passes the URL it routed on; a standalone caller can let `toRequest` build one.
+   */
+  url?: URL;
+
+  /**
    * Largest request body to accept, in bytes.
    * An over-cap `Content-Length` throws `413` before any body is read; an overrun aborts mid-stream.
    * Omitted leaves the body size unbounded.
    */
   maxBodySize?: number;
-
-  /**
-   * Tells whether the socket's immediate peer is a trusted proxy.
-   * When it returns `true` for the peer, `X-Forwarded-Proto` and `X-Forwarded-Host` are honored.
-   * Omitted, or `false` for the peer, ignores those headers and trusts only the socket.
-   */
-  trustProxy?: (ip: string) => boolean;
 }
 
 /**
- * The inbound bridge result.
- * The `URL` is handed back beside the `Request` so the transport routes on it without re-parsing.
- */
-export interface InboundRequest {
-  /**
-   * The bridged Web `Request`.
-   */
-  request: Request;
-
-  /**
-   * The request URL, parsed once from the target and the resolved `Host`.
-   */
-  url: URL;
-}
-
-/**
- * Bridges a Node `IncomingMessage` into a Web `Request` and the `URL` it was built from.
+ * Assembles the request `URL` from the target and the resolved `Host`.
  *
- * The URL is assembled from the request target and the `Host` header.
  * The scheme is `http`, since TLS terminates in the proxy (out of core).
- * `GET` and `HEAD` are forced bodyless.
- * Every other method streams the body via `Readable.toWeb` with `duplex: 'half'`.
- * The body flows on demand with backpressure rather than buffering.
- *
  * When the peer is a trusted proxy (`trustProxy`), `X-Forwarded-Proto` and `X-Forwarded-Host` are honored.
  * They override the scheme and host, so the URL reflects the original client request.
  * An untrusted peer's forwarding headers are ignored, closing the cache-poisoning and open-redirect gap.
+ *
+ * The transport assembles the URL before routing, then hands it to `toRequest`, so the body is built once.
+ */
+export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean): URL {
+  const forwarded = trusts(trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
+  const host = forwarded?.host ?? req.headers.host ?? 'localhost';
+  const proto = forwarded?.proto ?? 'http';
+  return new URL(req.url ?? '/', `${proto}://${host}`);
+}
+
+/**
+ * Bridges a Node `IncomingMessage` into a Web `Request`.
+ * The URL comes from `options.url`, or is assembled from the request via `toURL` when omitted.
+ *
+ * `GET` and `HEAD` are forced bodyless.
+ * Every other method streams the body via `Readable.toWeb` with `duplex: 'half'`.
+ * The body flows on demand with backpressure rather than buffering.
  *
  * When `maxBodySize` is set, an over-cap `Content-Length` throws `413` before any body is read.
  * The streamed body is metered too, so a chunked or under-reported body aborts mid-flight with `413`.
@@ -60,12 +56,9 @@ export interface InboundRequest {
  *
  * This is the only inbound place Node internals are touched.
  */
-export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): InboundRequest {
-  const method = req.method ?? 'GET';
-  const forwarded = trusts(options.trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
-  const host = forwarded?.host ?? req.headers.host ?? 'localhost';
-  const proto = forwarded?.proto ?? 'http';
-  const url = new URL(req.url ?? '/', `${proto}://${host}`);
+export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
+  const url = options.url ?? toURL(req);
+  const method = (req.method ?? 'GET').toUpperCase();
 
   const headers = new Headers();
   for (const name in req.headers) {
@@ -88,7 +81,7 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
   let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
   if (!isNull(body) && !isUndefined(maxBodySize)) body = meterBody(body, maxBodySize);
 
-  return { request: new Request(url, { method, headers, body, duplex: 'half' }), url };
+  return new Request(url, { method, headers, body, duplex: 'half' });
 }
 
 /**
@@ -112,7 +105,7 @@ export function clientIP(req: IncomingMessage, trustProxy?: (ip: string) => bool
   return unmapIP(peer);
 }
 
-function trusts(trustProxy: ToRequestOptions['trustProxy'], req: IncomingMessage): boolean {
+function trusts(trustProxy: ((ip: string) => boolean) | undefined, req: IncomingMessage): boolean {
   return !isUndefined(trustProxy) && trustProxy(req.socket.remoteAddress ?? '');
 }
 

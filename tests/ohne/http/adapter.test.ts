@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
 
-import { clientIP, HTTPError, sendResponse, toRequest } from '../../../src/ohne/index.ts';
+import { clientIP, HTTPError, sendResponse, toRequest, toURL } from '../../../src/ohne/index.ts';
 import { createCIDRMatcher } from '../../../src/utils/index.ts';
 
 async function withServer(
@@ -28,7 +28,7 @@ describe('toRequest', () => {
   it('assembles the URL from target and Host, carries headers, GET is bodyless', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req);
+        const request = toRequest(req);
         await sendResponse(
           res,
           Response.json({
@@ -59,7 +59,7 @@ describe('toRequest', () => {
   it('streams a request body for non-bodyless methods', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req);
+        const request = toRequest(req);
         await sendResponse(res, new Response((await request.text()).toUpperCase()));
       },
       async (base) => {
@@ -72,7 +72,7 @@ describe('toRequest', () => {
   it('passes a body within maxBodySize', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req, { maxBodySize: 64 });
+        const request = toRequest(req, { maxBodySize: 64 });
         await sendResponse(res, new Response((await request.text()).toUpperCase()));
       },
       async (base) => {
@@ -105,7 +105,7 @@ describe('toRequest', () => {
   it('aborts a streamed body that overruns the cap with 413', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req, { maxBodySize: 4 });
+        const request = toRequest(req, { maxBodySize: 4 });
         try {
           await request.text();
           await sendResponse(res, new Response(null, { status: 200 }));
@@ -136,7 +136,7 @@ describe('toRequest', () => {
   it('honors X-Forwarded-Proto and Host when the peer is trusted', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req, { trustProxy: () => true });
+        const request = toRequest(req, { url: toURL(req, () => true) });
         await sendResponse(res, new Response(request.url));
       },
       async (base) => {
@@ -151,7 +151,7 @@ describe('toRequest', () => {
   it('ignores forwarding headers when the peer is not trusted', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req, { trustProxy: () => false });
+        const request = toRequest(req, { url: toURL(req, () => false) });
         const url = new URL(request.url);
         await sendResponse(res, new Response(`${url.protocol}//${url.host}`));
       },
@@ -167,7 +167,7 @@ describe('toRequest', () => {
   it('appends every value of an array-valued header', async () => {
     await withServer(
       async (req, res) => {
-        const { request } = toRequest(req);
+        const request = toRequest(req);
         await sendResponse(res, new Response(request.headers.get('set-cookie')));
       },
       async (base) => {
