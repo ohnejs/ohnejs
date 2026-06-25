@@ -49,6 +49,10 @@
       "types": "./src/utils/env/index.ts",
       "default": "./src/utils/env/index.ts"
     },
+    "./utils/etag": {
+      "types": "./src/utils/etag/index.ts",
+      "default": "./src/utils/etag/index.ts"
+    },
     "./utils/fs": {
       "types": "./src/utils/fs/index.ts",
       "default": "./src/utils/fs/index.ts"
