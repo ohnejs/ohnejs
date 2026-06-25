@@ -1,10 +1,9 @@
 import type { Env } from './env.ts';
 
+import { createEnvRegistry, type EnvRegistry } from '../../utils/env/index.ts';
 import {
   coerceToBoolean,
   coerceToInteger,
-  createEnvRegistry,
-  type EnvRegistry,
   isDebugEnabled,
   isPort,
   MAX_PORT,

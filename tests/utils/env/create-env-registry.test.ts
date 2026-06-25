@@ -1,9 +1,9 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
+import { createEnvRegistry } from '../../../src/utils/env/create-env-registry.ts';
 import { parseBoolean, parseInteger, parseNumber } from '../../../src/utils/index.ts';
 import { effect } from '../../../src/utils/reactive/effect.ts';
-import { createEnvRegistry } from '../../../src/utils/registry/create-env-registry.ts';
 
 interface SampleEnv {
   STR: string;

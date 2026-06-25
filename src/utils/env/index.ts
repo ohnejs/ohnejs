@@ -1,3 +1,4 @@
+export * from './create-env-registry.ts';
 export * from './load-env.ts';
 export * from './parse-env.ts';
 export * from './patch-env.ts';
