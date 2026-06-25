@@ -258,7 +258,7 @@ export interface Config {
      * `false` lets the handler run without a deadline.
      *
      * @default
-     * false
+     * '30s'
      *
      * @example
      * ```ts
@@ -367,7 +367,7 @@ export const DEFAULTS = {
     keepAliveTimeout: false,
     maxConnections: false,
     maxBodySize: '1mb',
-    handlerTimeout: false,
+    handlerTimeout: '30s',
     trustProxy: [],
   },
 } satisfies Config;
