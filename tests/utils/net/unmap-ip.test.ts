@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { unmapIP } from '../../../src/utils/index.ts';
+import { unmapIP } from '../../../src/utils/net/index.ts';
 
 describe('unmapIP', () => {
   it('normalizes an IPv4-mapped IPv6 address to its IPv4 form', () => {

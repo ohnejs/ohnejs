@@ -53,6 +53,10 @@
       "types": "./src/utils/fs/index.ts",
       "default": "./src/utils/fs/index.ts"
     },
+    "./utils/net": {
+      "types": "./src/utils/net/index.ts",
+      "default": "./src/utils/net/index.ts"
+    },
     "./utils/print": {
       "types": "./src/utils/print/index.ts",
       "default": "./src/utils/print/index.ts"

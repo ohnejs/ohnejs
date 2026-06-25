@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { createCIDRMatcher } from '../../../src/utils/index.ts';
+import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
 
 describe('createCIDRMatcher', () => {
   it('matches addresses inside a CIDR block and rejects those outside', () => {

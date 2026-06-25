@@ -6,7 +6,7 @@ import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
 
 import { clientIP, HTTPError, sendResponse, toRequest, toURL } from '../../../src/ohne/index.ts';
-import { createCIDRMatcher } from '../../../src/utils/index.ts';
+import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
 
 async function withServer(
   handler: RequestListener,

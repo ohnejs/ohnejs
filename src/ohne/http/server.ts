@@ -5,15 +5,8 @@ import { createServer as createNodeServer } from 'node:http';
 import type { Gate, HTTPMethod } from '../../utils/index.ts';
 import type { RouteMatch, Router } from './router.ts';
 
-import {
-  createCIDRMatcher,
-  createGate,
-  createHostMatcher,
-  isNull,
-  isUndefined,
-  parseBytes,
-  parseDuration,
-} from '../../utils/index.ts';
+import { createGate, isNull, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
+import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
 import { dispatch } from './dispatch.ts';

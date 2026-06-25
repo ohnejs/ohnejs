@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { createHostMatcher } from '../../../src/utils/index.ts';
+import { createHostMatcher } from '../../../src/utils/net/index.ts';
 
 describe('createHostMatcher', () => {
   it('matches an exact hostname', () => {

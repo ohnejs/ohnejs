@@ -3,7 +3,8 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { isArray, isNull, isUndefined, unmapIP } from '../../utils/index.ts';
+import { isArray, isNull, isUndefined } from '../../utils/index.ts';
+import { unmapIP } from '../../utils/net/index.ts';
 import { payloadTooLarge } from './http-error.ts';
 
 /**
