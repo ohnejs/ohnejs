@@ -82,13 +82,11 @@ export interface Gate {
  * ```ts
  * const gate = createGate()
  *
- * const release = gate.enter()  // -> release fn, gate.pending is now 1
- * release?.()                   //    work done, gate.pending back to 0
+ * const release = gate.enter() // -> release fn, gate.pending is now 1
+ * release?.()                  //    work done, gate.pending back to 0
  *
- * await gate.close()            // -> { drained: true, pending: 0 }
- * gate.enter()                  // -> null, the gate refuses new work
- *
- * await gate.close({ timeout: '5s' }) // bounds the wait at five seconds
+ * await gate.close()           // -> { drained: true, pending: 0 }
+ * gate.enter()                 // -> null, the gate refuses new work
  * ```
  */
 export function createGate(): Gate {
