@@ -45,7 +45,7 @@ export interface HTTPServer {
 export interface CreateServerOptions {
   /**
    * How long the server waits for the complete request headers, as a `parseDuration` value.
-   * Omitted keeps Node's default.
+   * Omitted keeps Node's default of 60 seconds.
    *
    * @example
    * ```ts
@@ -58,7 +58,7 @@ export interface CreateServerOptions {
 
   /**
    * How long the server allows for the entire request, headers and body, as a `parseDuration` value.
-   * Omitted keeps Node's default.
+   * Omitted keeps Node's default of 5 minutes.
    *
    * @example
    * ```ts
@@ -71,7 +71,7 @@ export interface CreateServerOptions {
 
   /**
    * How long an idle keep-alive socket is held open between requests, as a `parseDuration` value.
-   * Omitted keeps Node's default.
+   * Omitted keeps Node's default of 5 seconds.
    *
    * @example
    * ```ts

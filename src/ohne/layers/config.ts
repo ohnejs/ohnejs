@@ -180,7 +180,7 @@ export interface Config {
 
     /**
      * How long the server waits for the complete request headers.
-     * `false` keeps Node's own default.
+     * `false` keeps Node's own default of 60 seconds.
      *
      * @default
      * false
@@ -189,14 +189,14 @@ export interface Config {
      * ```ts
      * 10000 // 10 seconds, as raw milliseconds
      * '10s' // 10 seconds
-     * false // keep Node's default
+     * false // keep Node's default of 60s
      * ```
      */
     headersTimeout?: number | string | false;
 
     /**
      * How long the server allows for the entire request, headers and body.
-     * `false` keeps Node's own default.
+     * `false` keeps Node's own default of 5 minutes.
      *
      * @default
      * false
@@ -205,14 +205,14 @@ export interface Config {
      * ```ts
      * 30000 // 30 seconds, as raw milliseconds
      * '30s' // 30 seconds
-     * false // keep Node's default
+     * false // keep Node's default of 5m
      * ```
      */
     requestTimeout?: number | string | false;
 
     /**
      * How long an idle keep-alive socket is held open between requests.
-     * `false` keeps Node's own default.
+     * `false` keeps Node's own default of 5 seconds.
      *
      * @default
      * false
@@ -221,7 +221,7 @@ export interface Config {
      * ```ts
      * 5000  // 5 seconds, as raw milliseconds
      * '5s'  // 5 seconds
-     * false // keep Node's default
+     * false // keep Node's default of 5s
      * ```
      */
     keepAliveTimeout?: number | string | false;
