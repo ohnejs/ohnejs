@@ -10,7 +10,7 @@ import { HTTPError } from './http-error.ts';
  * `init` supplies status and headers, except for a verbatim `Response` and an `HTTPError`.
  * Those two carry their own status:
  *
- * - `Response` - returned as-is.
+ * - `Response` - its own status and body win; `init` headers are merged in, the Response winning per name.
  * - `HTTPError` - JSON `{ statusCode, message, data? }` at the error's status.
  * - `null` / `undefined` - empty body; `204` unless a status was set.
  * - `string` - `text/html`.
@@ -20,7 +20,7 @@ import { HTTPError } from './http-error.ts';
  * A `content-type` already on `init.headers` is left untouched, so a handler or middleware can override it.
  */
 export function toResponse(value: unknown, init: EventResponse): Response {
-  if (value instanceof Response) return value;
+  if (value instanceof Response) return mergeHeaders(value, init.headers);
 
   const { status, headers } = init;
 
@@ -48,6 +48,24 @@ export function toResponse(value: unknown, init: EventResponse): Response {
 
   if (!headers.has('content-type')) headers.set('content-type', 'application/json; charset=utf-8');
   return new Response(JSON.stringify(value), { status, headers });
+}
+
+/**
+ * Merges `extra` onto a verbatim `Response`, the Response winning per name, cookies accumulating.
+ * Rebuilds rather than mutating in place: a `Response.redirect()` carries immutable headers.
+ */
+function mergeHeaders(response: Response, extra: Headers): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of extra) {
+    if (name === 'set-cookie') continue;
+    if (!headers.has(name)) headers.set(name, value);
+  }
+  for (const cookie of extra.getSetCookie()) headers.append('set-cookie', cookie);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function isBinary(value: unknown): value is ReadableStream | Uint8Array | ArrayBuffer | Blob {

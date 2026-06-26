@@ -10,9 +10,45 @@ function init(status = 200): ResponseInit {
 }
 
 describe('toResponse', () => {
-  it('returns a Response verbatim', () => {
-    const response = new Response('body', { status: 201 });
-    strictEqual(toResponse(response, init()), response);
+  it('keeps a verbatim Response status and body', async () => {
+    const response = toResponse(new Response('body', { status: 201 }), init());
+    strictEqual(response.status, 201);
+    strictEqual(await response.text(), 'body');
+  });
+
+  it('merges init headers onto a verbatim Response, the Response winning', () => {
+    const headers = new Headers({
+      'access-control-allow-origin': 'https://app.example.com',
+      'content-type': 'text/plain',
+    });
+    const response = toResponse(new Response('body', { headers: { 'content-type': 'text/csv' } }), {
+      status: 200,
+      headers,
+    });
+    strictEqual(response.headers.get('access-control-allow-origin'), 'https://app.example.com');
+    strictEqual(response.headers.get('content-type'), 'text/csv');
+  });
+
+  it('accumulates set-cookie from init and a verbatim Response', () => {
+    const headers = new Headers();
+    headers.append('set-cookie', 'session=abc');
+    headers.append('set-cookie', 'csrf=xyz');
+    const response = toResponse(new Response('body', { headers: { 'set-cookie': 'handler=1' } }), {
+      status: 200,
+      headers,
+    });
+    deepStrictEqual(response.headers.getSetCookie(), ['handler=1', 'session=abc', 'csrf=xyz']);
+  });
+
+  it('merges init headers onto an immutable redirect Response', () => {
+    const headers = new Headers({ 'access-control-allow-origin': 'https://app.example.com' });
+    const response = toResponse(Response.redirect('https://app.example.com/login', 302), {
+      status: 200,
+      headers,
+    });
+    strictEqual(response.status, 302);
+    strictEqual(response.headers.get('location'), 'https://app.example.com/login');
+    strictEqual(response.headers.get('access-control-allow-origin'), 'https://app.example.com');
   });
 
   it('serializes an object as JSON', async () => {
