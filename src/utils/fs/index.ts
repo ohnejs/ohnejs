@@ -8,6 +8,7 @@ export * from './read-json.ts';
 export * from './remove-dir.ts';
 export * from './remove-file.ts';
 export * from './resolve-module-dir.ts';
+export * from './watch-tree.ts';
 export * from './write-file-if-changed.ts';
 export * from './write-file.ts';
 export * from './write-json.ts';
