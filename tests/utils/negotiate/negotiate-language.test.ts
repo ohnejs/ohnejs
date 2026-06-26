@@ -36,6 +36,14 @@ describe('negotiateLanguage', () => {
     strictEqual(negotiateLanguage('*', ['en', 'de']), 'en');
   });
 
+  it('does not let * resolve to a tag refused with q=0', () => {
+    strictEqual(negotiateLanguage('*, en;q=0', ['en', 'de']), 'de');
+  });
+
+  it('returns undefined when * would only resolve to a refused tag', () => {
+    strictEqual(negotiateLanguage('*, en;q=0', ['en']), undefined);
+  });
+
   it('returns undefined when nothing overlaps', () => {
     strictEqual(negotiateLanguage('fr-FR', ['en', 'de']), undefined);
   });
