@@ -209,6 +209,42 @@ describe('createLayerRegistry', () => {
     deepStrictEqual(r.resolve(), { a: 99 });
   });
 
+  it('clear drops every layer', () => {
+    const r = createLayerRegistry<{ a: number }>();
+    r.add({ path: '/a', input: { a: 1 } });
+    r.add({ path: '/b', input: { a: 2 } });
+    r.clear();
+    deepStrictEqual(r.layers(), []);
+    deepStrictEqual(r.resolve(), {});
+  });
+
+  it('clear invalidates the cache', () => {
+    const r = createLayerRegistry<{ a: number }>();
+    r.add({ path: '/p', input: { a: 1 } });
+    const first = r.layers();
+    r.clear();
+    const second = r.layers();
+    strictEqual(first === second, false);
+  });
+
+  it('clear on an empty registry keeps the cached identity', () => {
+    const r = createLayerRegistry<{ a: number }>();
+    r.add({ path: '/p', input: { a: 1 } });
+    r.clear();
+    const first = r.layers();
+    r.clear();
+    const second = r.layers();
+    strictEqual(first, second);
+  });
+
+  it('add accepts a previously registered path after clear', () => {
+    const r = createLayerRegistry<{ a: number }>();
+    r.add({ path: '/p', defaults: { a: 1 } });
+    r.clear();
+    r.add({ path: '/p', input: { a: 99 } });
+    deepStrictEqual(r.resolve(), { a: 99 });
+  });
+
   describe('reactivity', () => {
     it('`resolve` inside an effect re-runs on `add`', () => {
       const r = createLayerRegistry<{ a: number }>();
@@ -245,6 +281,18 @@ describe('createLayerRegistry', () => {
       deepStrictEqual(snapshot, ['b']);
       r.setStrategy('tags', 'concat-unique');
       deepStrictEqual(snapshot, ['b', 'a']);
+    });
+
+    it('`resolve` inside an effect re-runs on `clear`', () => {
+      const r = createLayerRegistry<{ a: number }>();
+      r.add({ path: '/p', defaults: { a: 1 } });
+      let seen: number | undefined;
+      effect(() => {
+        seen = r.resolve().a;
+      });
+      strictEqual(seen, 1);
+      r.clear();
+      strictEqual(seen, undefined);
     });
 
     it('`layers` and `strategies` reads also subscribe', () => {

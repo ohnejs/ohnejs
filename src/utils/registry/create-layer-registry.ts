@@ -86,7 +86,7 @@ export interface Layer<C extends object> {
  * Layers are registered in insertion order; closer = later.
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies are shared between per-layer and cross-layer merges.
- * Results are cached and invalidated on `add`, `remove`, or `setStrategy`.
+ * Results are cached and invalidated on `add`, `remove`, `clear`, or `setStrategy`.
  */
 export interface LayerRegistry<C extends object> {
   /**
@@ -101,6 +101,12 @@ export interface LayerRegistry<C extends object> {
    * Returns `true` if a layer was removed.
    */
   remove(path: string): boolean;
+
+  /**
+   * Removes every registered layer, returning the registry to empty.
+   * A subsequent `add` may reuse any previously registered path.
+   */
+  clear(): void;
 
   /**
    * Returns every registered layer in insertion order, with cumulative `resolved` filled in.
@@ -154,7 +160,7 @@ export interface LayerRegistry<C extends object> {
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies apply to per-layer and cross-layer merges alike.
  * Extend them at any time via `setStrategy`.
- * Results are cached and invalidated on `add`, `remove`, or `setStrategy`.
+ * Results are cached and invalidated on `add`, `remove`, `clear`, or `setStrategy`.
  *
  * @example
  * ```ts
@@ -215,6 +221,11 @@ export function createLayerRegistry<C extends object>(
       specs.splice(idx, 1);
       invalidate();
       return true;
+    },
+    clear() {
+      if (specs.length === 0) return;
+      specs.length = 0;
+      invalidate();
     },
     layers() {
       void version.value;
