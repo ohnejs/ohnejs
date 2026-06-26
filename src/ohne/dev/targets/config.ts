@@ -9,7 +9,9 @@ import { useLayers } from '../../layers/use-layers.ts';
  * The root invalidator.
  *
  * Its closure is every layer's `ohne.config.ts`.
- * On change it refreshes the registry: `clear`, then a fresh `loadLayers` reads past the module cache.
+ * On change it reloads the registry with a fresh `loadLayers`, reading past the module cache.
+ * A config that fails to import leaves the previous stack intact, so `affectedBy` keeps matching.
+ * A later good save then recovers.
  * It invalidates each dependent so the next cycle regenerates against the fresh registry.
  * The supervisor runs it first, as a barrier.
  */
@@ -23,7 +25,6 @@ export function createConfigTarget(from: string, dependents: readonly SetTarget[
         .some((layer) => path === joinPath(layer.path, 'ohne.config.ts'));
     },
     async regen() {
-      useLayers().clear();
       await loadLayers(from, { fresh: true });
       for (const dependent of dependents) dependent.invalidate();
     },

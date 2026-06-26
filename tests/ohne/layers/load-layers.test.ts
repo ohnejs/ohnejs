@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, rejects } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -57,5 +57,34 @@ describe('loadLayers', { skip: process.platform === 'win32' }, () => {
     );
     deepStrictEqual(useConfig().dirs, { codegen: 'gen' });
     deepStrictEqual(useConfig().printer, { silent: true });
+  });
+
+  it('reloads in place, replacing the previous stack', async () => {
+    const reload = join(root, 'reload');
+    mkdirSync(reload, { recursive: true });
+    writeManifest(reload, 'reload', [], { dirs: { codegen: 'gen' } });
+
+    await loadLayers(reload);
+    deepStrictEqual(useConfig().dirs, { codegen: 'gen' });
+
+    writeFileSync(join(reload, 'ohne.config.ts'), "export default { dirs: { codegen: 'out' } }\n");
+    const stack = await loadLayers(reload, { fresh: true });
+    deepStrictEqual(
+      stack.map((layer) => layer.name),
+      ['reload'],
+    );
+    deepStrictEqual(useConfig().dirs, { codegen: 'out' });
+  });
+
+  it('leaves the previous stack intact when a reload fails to import', async () => {
+    const broken = join(root, 'broken');
+    mkdirSync(broken, { recursive: true });
+    writeManifest(broken, 'broken', [], { dirs: { codegen: 'gen' } });
+
+    await loadLayers(broken);
+    writeFileSync(join(broken, 'ohne.config.ts'), 'export default {\n');
+
+    await rejects(loadLayers(broken, { fresh: true }));
+    deepStrictEqual(useConfig().dirs, { codegen: 'gen' });
   });
 });

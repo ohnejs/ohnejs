@@ -6,20 +6,21 @@ import { DEFAULTS } from './config.ts';
 import { useLayers } from './use-layers.ts';
 
 /**
- * Resolves the layer stack and registers every layer into `useLayers`.
+ * Resolves the layer stack and registers it into `useLayers`, replacing any prior stack.
  *
  * Each layer registers its own `input`, `defaults`, and `strategies`, furthest-first.
  * Closer layers override and the app wins.
  * The framework `DEFAULTS` merge into the furthest layer's own defaults, flooring the whole stack.
  * Any layer is still free to override them.
  *
- * Run this once before reading config, so `useConfig` resolves with every layer in place.
+ * The stack resolves before the registry is cleared, so a config that fails to import never wipes it.
+ * The previous stack stays intact, and a later call is a clean reload.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
- * Returns the registered stack, or `[]` when no `package.json` is found.
+ * Returns the registered stack, or `[]` when no `package.json` is found, leaving the registry as-is.
  *
  * Pass `fresh` to re-read every config past the module cache.
- * The dev supervisor uses it to pick up edits after a `clear`; a normal boot does not.
+ * The dev supervisor reloads with it to pick up edits; a normal boot does not.
  *
  * @example
  * ```ts
@@ -33,6 +34,7 @@ export async function loadLayers(
 ): Promise<ResolvedLayer[]> {
   const stack = await resolveLayerStack(from, options);
   const layers = useLayers();
+  if (stack.length > 0) layers.clear();
   stack.forEach((layer, i) => {
     for (const [path, strategy] of Object.entries(layer.strategies)) {
       layers.setStrategy(path, strategy);

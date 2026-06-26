@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,6 +76,23 @@ describe('config target', () => {
     const app = writeApp('content');
     await loadLayers(app);
     const config = createConfigTarget(app, []);
+
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      "export default { disable: { routes: ['GET /**'] } }\n",
+    );
+    await config.regen();
+    deepStrictEqual(useConfig().disable.routes, ['GET /**']);
+  });
+
+  it('recovers config detection after a failed reload', async () => {
+    const app = writeApp('recover');
+    await loadLayers(app);
+    const config = createConfigTarget(app, []);
+
+    writeFileSync(join(app, 'ohne.config.ts'), 'export default {\n');
+    await rejects(config.regen());
+    strictEqual(config.affectedBy(join(app, 'ohne.config.ts')), true);
 
     writeFileSync(
       join(app, 'ohne.config.ts'),
