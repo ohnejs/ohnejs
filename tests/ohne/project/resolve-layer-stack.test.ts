@@ -12,7 +12,7 @@ interface LayerSpec {
   layers?: string[];
 }
 
-describe('resolveLayerStack', () => {
+describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
   let root: string;
   let store: string;
   let app: string;

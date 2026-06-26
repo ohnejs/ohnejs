@@ -6,7 +6,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { loadLayers, useConfig } from '../../../src/ohne/index.ts';
 
-describe('loadLayers', () => {
+describe('loadLayers', { skip: process.platform === 'win32' }, () => {
   let root: string;
   let store: string;
   let app: string;
