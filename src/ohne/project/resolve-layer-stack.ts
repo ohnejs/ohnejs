@@ -3,7 +3,7 @@ import type { Config } from '../layers/config.ts';
 
 import { resolveModuleDir } from '../../utils/fs/index.ts';
 import { isNull, isUndefined, last } from '../../utils/index.ts';
-import { readLayerConfig } from './read-layer-config.ts';
+import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
 import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
 
 /**
@@ -43,6 +43,8 @@ export interface ResolvedLayer extends OhneLayer {
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Returns `[]` when no `package.json` is found.
  *
+ * Pass `fresh` to re-read every config past the module cache, so edits are seen again.
+ *
  * @example
  * ```ts
  * const stack = await resolveLayerStack()
@@ -51,7 +53,10 @@ export interface ResolvedLayer extends OhneLayer {
  * // -> ['ohne', '@acme/base', '@acme/auth', 'app']
  * ```
  */
-export async function resolveLayerStack(from: string = process.cwd()): Promise<ResolvedLayer[]> {
+export async function resolveLayerStack(
+  from: string = process.cwd(),
+  options: LayerLoadOptions = {},
+): Promise<ResolvedLayer[]> {
   const closure = await resolveOhneLayers(from);
   if (closure.length === 0) return [];
 
@@ -66,7 +71,7 @@ export async function resolveLayerStack(from: string = process.cwd()): Promise<R
     if (visited.has(layer.dir)) return;
     visited.add(layer.dir);
 
-    const config = (await readLayerConfig(layer.dir)) ?? {
+    const config = (await readLayerConfig(layer.dir, options)) ?? {
       input: {},
       defaults: {},
       strategies: {},

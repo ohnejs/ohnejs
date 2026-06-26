@@ -1,3 +1,5 @@
+import type { LayerLoadOptions } from '../project/read-layer-config.ts';
+
 import { merge } from '../../utils/index.ts';
 import { resolveLayerStack, type ResolvedLayer } from '../project/resolve-layer-stack.ts';
 import { DEFAULTS } from './config.ts';
@@ -16,14 +18,20 @@ import { useLayers } from './use-layers.ts';
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Returns the registered stack, or `[]` when no `package.json` is found.
  *
+ * Pass `fresh` to re-read every config past the module cache.
+ * The dev supervisor uses it to pick up edits after a `clear`; a normal boot does not.
+ *
  * @example
  * ```ts
  * await loadLayers()
  * useConfig() // -> the config merged from every layer
  * ```
  */
-export async function loadLayers(from: string = process.cwd()): Promise<ResolvedLayer[]> {
-  const stack = await resolveLayerStack(from);
+export async function loadLayers(
+  from: string = process.cwd(),
+  options: LayerLoadOptions = {},
+): Promise<ResolvedLayer[]> {
+  const stack = await resolveLayerStack(from, options);
   const layers = useLayers();
   stack.forEach((layer, i) => {
     for (const [path, strategy] of Object.entries(layer.strategies)) {

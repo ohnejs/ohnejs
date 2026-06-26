@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 import type { LayerStrategies } from '../../utils/index.ts';
@@ -28,8 +29,24 @@ export interface LayerConfig {
   strategies: LayerStrategies;
 }
 
-async function importDefault<T>(file: string): Promise<T | null> {
-  const module = await import(pathToFileURL(file).href);
+/**
+ * Options for reading and resolving layer config.
+ */
+export interface LayerLoadOptions {
+  /**
+   * Re-import each `ohne.config.ts` and `ohne.layer.ts` fresh, past the module cache.
+   * The dev supervisor sets this to pick up edits in its own long-lived process; a normal boot never does.
+   *
+   * @default
+   * false
+   */
+  fresh?: boolean;
+}
+
+async function importDefault<T>(file: string, fresh: boolean): Promise<T | null> {
+  const href = pathToFileURL(file).href;
+  const url = fresh ? `${href}?v=${(await stat(file)).mtimeMs}` : href;
+  const module = await import(url);
   return (module.default ?? null) as T | null;
 }
 
@@ -41,6 +58,8 @@ async function importDefault<T>(file: string): Promise<T | null> {
  * `ohne.layer.ts` is optional; its absence yields empty `defaults` and `strategies`.
  * A config that fails to import propagates, so a syntax error in it is not swallowed.
  *
+ * Pass `fresh` to re-import past the module cache, so an edited config is read again.
+ *
  * @example
  * ```ts
  * await readLayerConfig('/srv/app')
@@ -49,13 +68,19 @@ async function importDefault<T>(file: string): Promise<T | null> {
  * await readLayerConfig('/srv/not-a-layer') // -> null
  * ```
  */
-export async function readLayerConfig(dir: string): Promise<LayerConfig | null> {
+export async function readLayerConfig(
+  dir: string,
+  options: LayerLoadOptions = {},
+): Promise<LayerConfig | null> {
+  const { fresh = false } = options;
   const configFile = joinPath(dir, 'ohne.config.ts');
   if (!(await exists(configFile))) return null;
-  const input = (await importDefault<Config>(configFile)) ?? {};
+  const input = (await importDefault<Config>(configFile, fresh)) ?? {};
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');
-  const layer = (await exists(layerFile)) ? await importDefault<LayerDefinition>(layerFile) : null;
+  const layer = (await exists(layerFile))
+    ? await importDefault<LayerDefinition>(layerFile, fresh)
+    : null;
 
   return { input, defaults: layer?.defaults ?? {}, strategies: layer?.strategies ?? {} };
 }

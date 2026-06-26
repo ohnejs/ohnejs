@@ -50,4 +50,17 @@ describe('readLayerConfig', () => {
   it('returns null when the directory has no ohne.config.ts', async () => {
     strictEqual(await readLayerConfig(join(root, 'plain')), null);
   });
+
+  it('re-reads an edited config when fresh, past the module cache', async () => {
+    const dir = join(root, 'fresh');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, 'ohne.config.ts');
+
+    writeFileSync(file, "export default { dirs: { api: 'one' } }\n");
+    deepStrictEqual((await readLayerConfig(dir))?.input, { dirs: { api: 'one' } });
+
+    writeFileSync(file, "export default { dirs: { api: 'two' } }\n");
+    deepStrictEqual((await readLayerConfig(dir))?.input, { dirs: { api: 'one' } });
+    deepStrictEqual((await readLayerConfig(dir, { fresh: true }))?.input, { dirs: { api: 'two' } });
+  });
 });
