@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 import { pathToFileURL } from 'node:url';
 
@@ -83,20 +84,20 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     }),
   );
 
-  await listen(http.server, port, host);
+  const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
 
-  usePrinter().info(`Listening on "http://${host ?? 'localhost'}:${port}"`);
+  usePrinter().info(`Listening on "http://${host ?? 'localhost'}:${address.port}"`);
   return http;
 }
 
-function listen(server: Server, port: number, host?: string): Promise<void> {
+function listen(server: Server, port: number, host?: string): Promise<AddressInfo> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error): void => reject(error);
     server.once('error', onError);
     server.listen(port, host, () => {
       server.removeListener('error', onError);
-      resolve();
+      resolve(server.address() as AddressInfo);
     });
   });
 }
