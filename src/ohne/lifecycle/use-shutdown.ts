@@ -1,5 +1,3 @@
-import cluster from 'node:cluster';
-
 import { isUndefined, parseDuration } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 
@@ -54,7 +52,7 @@ export interface Shutdown {
 
   /**
    * Installs the signal funnel once, idempotently.
-   * `SIGTERM`, `SIGINT`, a `'shutdown'` process message, and a worker `disconnect` all run the hooks.
+   * `SIGTERM`, `SIGINT`, a `'shutdown'` process message, and a parent `disconnect` all run the hooks.
    * The process then exits `0` on a clean drain or `1` if the deadline won.
    * This is the only place process signals are handled.
    */
@@ -103,16 +101,15 @@ const shutdown: Shutdown = {
     const onMessage = (message: unknown): void => {
       if (message === 'shutdown') trigger();
     };
-    const worker = cluster.isWorker ? cluster.worker : undefined;
     process.on('SIGTERM', trigger);
     process.on('SIGINT', trigger);
     process.on('message', onMessage);
-    worker?.on('disconnect', trigger);
+    process.on('disconnect', trigger);
     detach = () => {
       process.off('SIGTERM', trigger);
       process.off('SIGINT', trigger);
       process.off('message', onMessage);
-      worker?.off('disconnect', trigger);
+      process.off('disconnect', trigger);
     };
   },
   unwatch() {
@@ -133,7 +130,7 @@ const shutdown: Shutdown = {
  * Returns the process-wide shutdown coordinator.
  *
  * Register teardown with `add` (or the `onShutdown` sugar), drive it with `watch`, run it with `run`.
- * Every arrival path funnels into one ordered run: signals, a process message, a worker disconnect.
+ * Every arrival path funnels into one ordered run: signals, a process message, a parent disconnect.
  * The job queue and the HTTP server then drain through the same coordinator, with no handler of their own.
  *
  * @example

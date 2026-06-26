@@ -33,6 +33,7 @@ import { useRoutes } from '../routes/use-routes.ts';
  * The generated `routes.ts` is then imported to populate `useRoutes` with live handlers.
  * The server is built from that table, started, and wired to graceful shutdown through `onShutdown`.
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.
+ * With an IPC parent, it signals `'ready'` after the funnel is watching, so a supervisor can drive reloads.
  *
  * Port and host come from `Config.server`, overridden by the `PORT` and `HOST` env vars when set.
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
@@ -87,6 +88,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
 
   const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
+  process.send?.('ready');
 
   usePrinter().info(`Listening on "http://${host ?? 'localhost'}:${address.port}"`);
   return http;
