@@ -77,6 +77,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   }
   const host = useEnv().get('HOST') ?? config.host;
 
+  onShutdown(() => usePrinter().info('Shutting down'));
   onShutdown(() =>
     shutdownServer(http.server, http.gate, {
       preStopDelay: offToUndefined(config.preStopDelay),
