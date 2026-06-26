@@ -95,22 +95,26 @@ describe('listDir', () => {
     deepStrictEqual(names, ['top.md', 'top.ts']);
   });
 
-  it('skips symlinks unless `followSymlinks: true`', async () => {
-    const linkRoot = mkdtempSync(join(tmpdir(), 'ohne-list-dir-link-'));
-    try {
-      const target = join(linkRoot, 'target.ts');
-      writeFileSync(target, '');
-      symlinkSync(target, join(linkRoot, 'link.ts'));
+  it(
+    'skips symlinks unless `followSymlinks: true`',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const linkRoot = mkdtempSync(join(tmpdir(), 'ohne-list-dir-link-'));
+      try {
+        const target = join(linkRoot, 'target.ts');
+        writeFileSync(target, '');
+        symlinkSync(target, join(linkRoot, 'link.ts'));
 
-      const skipped = await listDir(linkRoot);
-      deepStrictEqual(skipped!.map((entry) => entry.name).sort(), ['target.ts']);
+        const skipped = await listDir(linkRoot);
+        deepStrictEqual(skipped!.map((entry) => entry.name).sort(), ['target.ts']);
 
-      const followed = await listDir(linkRoot, { followSymlinks: true });
-      deepStrictEqual(followed!.map((entry) => entry.name).sort(), ['link.ts', 'target.ts']);
-    } finally {
-      rmSync(linkRoot, { recursive: true, force: true });
-    }
-  });
+        const followed = await listDir(linkRoot, { followSymlinks: true });
+        deepStrictEqual(followed!.map((entry) => entry.name).sort(), ['link.ts', 'target.ts']);
+      } finally {
+        rmSync(linkRoot, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('resolves a relative `path` against the current working directory', async () => {
     process.chdir(dir);

@@ -23,7 +23,9 @@ describe('resolveModuleDir', () => {
     mkdirSync(join(dir, 'app', 'src', 'deep'), { recursive: true });
     // A pnpm-style symlink: app/node_modules/linked -> store/linked.
     makePackage(join(dir, 'store', 'linked'), 'linked');
-    symlinkSync(join(dir, 'store', 'linked'), join(dir, 'app', 'node_modules', 'linked'));
+    if (process.platform !== 'win32') {
+      symlinkSync(join(dir, 'store', 'linked'), join(dir, 'app', 'node_modules', 'linked'));
+    }
   });
 
   after(() => {
@@ -45,10 +47,14 @@ describe('resolveModuleDir', () => {
     strictEqual(found?.endsWith('/app/node_modules/@scope/pkg'), true);
   });
 
-  it('collapses symlinks to the real store path', async () => {
-    const found = await resolveModuleDir('linked', join(dir, 'app'));
-    strictEqual(found, normalizePath(realpathSync(join(dir, 'store', 'linked'))));
-  });
+  it(
+    'collapses symlinks to the real store path',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const found = await resolveModuleDir('linked', join(dir, 'app'));
+      strictEqual(found, normalizePath(realpathSync(join(dir, 'store', 'linked'))));
+    },
+  );
 
   it('returns null for a package that is not installed', async () => {
     strictEqual(await resolveModuleDir('missing', join(dir, 'app')), null);

@@ -52,7 +52,7 @@ describe('loadEnv', () => {
   });
 
   it('propagates non-ENOENT read errors', async () => {
-    if (process.getuid?.() === 0) return; // root bypasses perms
+    if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const denied = join(dir, '.env.denied');
     writeFileSync(denied, 'A=1\n');
     chmodSync(denied, 0o000);

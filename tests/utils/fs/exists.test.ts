@@ -34,7 +34,7 @@ describe('exists', () => {
   });
 
   it('propagates permission errors', async () => {
-    if (process.getuid?.() === 0) return;
+    if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const locked = join(dir, 'locked');
     mkdirSync(locked);
     const inside = join(locked, 'file');

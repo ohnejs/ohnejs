@@ -28,7 +28,7 @@ describe('readFile', () => {
   });
 
   it('propagates non-ENOENT errors', async () => {
-    if (process.getuid?.() === 0) return;
+    if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const f = join(dir, 'denied');
     writeFileSync(f, 'x');
     chmodSync(f, 0o000);
