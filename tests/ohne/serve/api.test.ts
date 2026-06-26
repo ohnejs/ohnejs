@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 
 import { rejects, strictEqual } from 'node:assert';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,6 +31,22 @@ function get(port: number, path: string): Promise<number> {
   });
 }
 
+const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
+
+function header(port: number, path: string, name: string): Promise<string | undefined> {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: 'localhost', port, path, headers: { connection: 'close' } },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.headers[name] as string | undefined));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 describe('serveAPI', () => {
   let root: string;
   let http: HTTPServer | undefined;
@@ -43,6 +59,19 @@ describe('serveAPI', () => {
     writeFileSync(
       join(dir, 'boot', 'index.ts'),
       `globalThis.__ohneServeBoot.push(${JSON.stringify(mark)})\n`,
+    );
+    return dir;
+  }
+
+  // An app whose generated files can resolve the bare `ohne` import, with one route to dispatch.
+  function serveable(name: string): string {
+    const dir = makeApp(name, `${name}:boot`);
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohne'), 'dir');
+    mkdirSync(join(dir, 'api'));
+    writeFileSync(
+      join(dir, 'api', 'ping.get.ts'),
+      "import { defineHandler } from 'ohne';\nexport default defineHandler(() => 'pong');\n",
     );
     return dir;
   }
@@ -96,6 +125,24 @@ describe('serveAPI', () => {
     strictEqual(http.server.listening, true);
     const { port } = http.server.address() as AddressInfo;
     strictEqual(await get(port, '/missing'), 404);
+  });
+
+  it('imports the generated middleware table and runs it', async () => {
+    const dir = serveable('mw');
+    mkdirSync(join(dir, 'middleware'));
+    writeFileSync(
+      join(dir, 'middleware', 'mark.ts'),
+      "import { defineMiddleware } from 'ohne';\n" +
+        'export default defineMiddleware((event) => {\n' +
+        "  event.response.headers.set('x-mw', 'ran');\n" +
+        '});\n',
+    );
+
+    http = await serveAPI(dir);
+    const { port } = http.server.address() as AddressInfo;
+
+    strictEqual(await get(port, '/ping'), 200);
+    strictEqual(await header(port, '/ping', 'x-mw'), 'ran');
   });
 
   it('rejects a port outside 0-65535', async () => {

@@ -51,11 +51,13 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     ]);
   }
 
-  // Routes live in the generated file, never in memory: importing it runs the registrations.
+  // The route and middleware tables live in generated files: importing them runs the registrations.
   const dir = await codegenDir(from);
   if (!isNull(dir)) {
-    const routesFile = joinPath(dir, 'routes.ts');
-    if (await exists(routesFile)) await import(pathToFileURL(routesFile).href);
+    for (const name of ['middleware.ts', 'routes.ts']) {
+      const file = joinPath(dir, name);
+      if (await exists(file)) await import(pathToFileURL(file).href);
+    }
   }
 
   const config = useConfig().server;
