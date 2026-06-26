@@ -12,8 +12,8 @@ import { useLayers } from '../../layers/use-layers.ts';
  * On change it reloads the registry with a fresh `loadLayers`, reading past the module cache.
  * A config that fails to import leaves the previous stack intact, so `affectedBy` keeps matching.
  * A later good save then recovers.
- * It invalidates each dependent so the next cycle regenerates against the fresh registry.
- * The supervisor runs it first, as a barrier.
+ * It then forces a full regen of every dependent against the fresh registry.
+ * The supervisor runs it first, as a barrier, so a config-only edit still rewrites every table.
  */
 export function createConfigTarget(from: string, dependents: readonly SetTarget[]): Target {
   return {
@@ -27,6 +27,7 @@ export function createConfigTarget(from: string, dependents: readonly SetTarget[
     async regen() {
       await loadLayers(from, { fresh: true });
       for (const dependent of dependents) dependent.invalidate();
+      await Promise.all(dependents.map((dependent) => dependent.regen()));
     },
   };
 }

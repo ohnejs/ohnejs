@@ -47,7 +47,7 @@ describe('config target', () => {
     strictEqual(config.affectedBy(join(app, 'nested', 'ohne.config.ts')), false);
   });
 
-  it('refreshes the registry and invalidates dependents', async () => {
+  it('refreshes the registry and regenerates dependents', async () => {
     const app = writeApp('refresh');
     writeRoute(app, 'health.ts');
     await loadLayers(app);
@@ -57,8 +57,6 @@ describe('config target', () => {
 
     await routes.regen();
     rmSync(out);
-    await routes.regen();
-    strictEqual(existsSync(out), false);
 
     await config.regen();
     deepStrictEqual(
@@ -67,8 +65,6 @@ describe('config target', () => {
         .map((layer) => layer.path),
       [app],
     );
-
-    await routes.regen();
     strictEqual(existsSync(out), true);
   });
 
