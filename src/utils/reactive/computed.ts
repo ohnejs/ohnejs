@@ -1,4 +1,4 @@
-import { type Effect, runEffect, track, trigger } from './_runtime.ts';
+import { type Effect, runEffect, track } from './_runtime.ts';
 
 /**
  * Lazy, cached derivation.
@@ -43,8 +43,8 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
     },
     scheduler() {
       dirty = true;
-      trigger(subs);
     },
+    subs,
     deps: new Set(),
     active: true,
   };

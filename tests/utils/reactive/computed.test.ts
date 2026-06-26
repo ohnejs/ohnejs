@@ -102,4 +102,30 @@ describe('computed', () => {
     cond.value = false;
     strictEqual(lastValue, 42);
   });
+
+  it('never exposes a stale value to an effect that also reads the source', () => {
+    const a = ref(1);
+    const c = computed(() => a.value * 2);
+    const observed: [number, number][] = [];
+    effect(() => observed.push([a.value, c.value]));
+
+    a.value = 2;
+
+    for (const [av, cv] of observed) strictEqual(cv, av * 2);
+  });
+
+  it('keeps sibling computeds of one source consistent in an effect', () => {
+    const a = ref(1);
+    const c1 = computed(() => a.value * 2);
+    const c2 = computed(() => a.value * 10);
+    const observed: [number, number, number][] = [];
+    effect(() => observed.push([a.value, c1.value, c2.value]));
+
+    a.value = 2;
+
+    for (const [av, x, y] of observed) {
+      strictEqual(x, av * 2);
+      strictEqual(y, av * 10);
+    }
+  });
 });

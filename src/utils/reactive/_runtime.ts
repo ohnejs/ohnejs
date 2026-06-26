@@ -5,10 +5,13 @@ import { isNull } from '../is/is-null.ts';
  * A unit of reactive work.
  * `fn` is the user callback; `scheduler` (when set) replaces `fn` on trigger - used by `computed`.
  * `deps` is the set of subscriber sets this effect has been added to, used for stale-dep cleanup.
+ * `subs`, on a computed's runner, is that computed's own subscriber set.
+ * `trigger` reads it to propagate invalidation before running any reader.
  */
 export interface Effect {
   fn: () => void;
   scheduler?: () => void;
+  subs?: Set<Effect>;
   deps: Set<Set<Effect>>;
   active: boolean;
 }
@@ -86,20 +89,45 @@ export function track(subs: Set<Effect>): void {
 }
 
 /**
+ * Invalidates every computed reachable from `subs` and collects the plain effects to run.
+ * Walking the whole graph first ensures no effect reads a computed before it is invalidated.
+ */
+function invalidate(
+  subs: Set<Effect>,
+  current: Effect | null,
+  effects: Set<Effect>,
+  seen: Set<Effect>,
+): void {
+  for (const e of Array.from(subs)) {
+    if (e === current || seen.has(e)) continue;
+    seen.add(e);
+    if (e.scheduler) {
+      e.scheduler();
+      if (e.subs) invalidate(e.subs, current, effects, seen);
+    } else {
+      effects.add(e);
+    }
+  }
+}
+
+/**
  * Notifies every subscriber of `subs`.
  * Skips the currently active effect to avoid self-triggers.
  * Runs synchronously - no batching.
+ *
+ * Every reachable computed is invalidated before any effect runs.
+ * An effect that reads a diamond dependency therefore never observes a stale derived value.
  */
 export function trigger(subs: Set<Effect>): void {
   const current = activeEffect();
-  const snapshot = Array.from(subs);
+  const effects = new Set<Effect>();
+  invalidate(subs, current, effects, new Set());
+
   let firstError: unknown;
   let captured = false;
-  for (const e of snapshot) {
-    if (e === current) continue;
+  for (const e of effects) {
     try {
-      if (e.scheduler) e.scheduler();
-      else runEffect(e);
+      runEffect(e);
     } catch (err) {
       if (!captured) {
         firstError = err;
