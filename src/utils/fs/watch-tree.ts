@@ -1,4 +1,4 @@
-import type { FSWatcher } from 'node:fs';
+import type { Dirent, FSWatcher } from 'node:fs';
 
 import { watch } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
@@ -51,11 +51,14 @@ export function watchTree(
   const ignore = new Set(options.ignore);
   const watchers = new Map<string, FSWatcher>();
   let closed = false;
+  let ready = false;
 
   const pruned = (name: string): boolean =>
     name.startsWith('.') || name === ALWAYS_IGNORED || ignore.has(name);
 
-  void watchDir(resolvePath(dir));
+  void watchDir(resolvePath(dir), false).then(() => {
+    ready = true;
+  });
 
   return () => {
     closed = true;
@@ -63,7 +66,7 @@ export function watchTree(
     watchers.clear();
   };
 
-  async function watchDir(path: string): Promise<void> {
+  async function watchDir(path: string, emitExisting: boolean): Promise<void> {
     if (closed || watchers.has(path)) return;
 
     let watcher: FSWatcher;
@@ -82,18 +85,25 @@ export function watchTree(
     });
     watchers.set(path, watcher);
 
-    await Promise.all((await subdirs(path)).map((child) => watchDir(child)));
+    await walk(path, emitExisting);
   }
 
-  async function subdirs(path: string): Promise<string[]> {
+  async function walk(path: string, emitExisting: boolean): Promise<void> {
+    let entries: Dirent[];
     try {
-      const entries = await readdir(path, { withFileTypes: true });
-      return entries
-        .filter((entry) => entry.isDirectory() && !pruned(entry.name))
-        .map((entry) => joinPath(path, entry.name));
+      entries = await readdir(path, { withFileTypes: true });
     } catch {
-      return [];
+      return;
     }
+    await Promise.all(
+      entries.map((entry) => {
+        if (pruned(entry.name)) return undefined;
+        const child = joinPath(path, entry.name);
+        if (entry.isDirectory()) return watchDir(child, emitExisting);
+        if (emitExisting) onChange(child);
+        return undefined;
+      }),
+    );
   }
 
   function onEvent(watchedDir: string, filename: string | null): void {
@@ -112,7 +122,7 @@ export function watchTree(
   async function watchNewDir(path: string): Promise<void> {
     if (closed || watchers.has(path)) return;
     try {
-      if ((await stat(path)).isDirectory()) await watchDir(path);
+      if ((await stat(path)).isDirectory()) await watchDir(path, ready);
     } catch {
       // The entry vanished or is unreadable; nothing to watch.
     }

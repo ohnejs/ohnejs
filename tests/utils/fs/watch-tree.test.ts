@@ -67,6 +67,16 @@ describe('watchTree', () => {
     await waitFor(() => changed.some((path) => path.endsWith('/late/c.ts')));
   });
 
+  it('reports a file created together with its new directory', async () => {
+    stop = watchTree(dir, (path) => changed.push(path));
+    await delay(50);
+
+    mkdirSync(join(dir, 'fresh'));
+    writeFileSync(join(dir, 'fresh', 'g.ts'), 'one');
+
+    await waitFor(() => changed.some((path) => path.endsWith('/fresh/g.ts')));
+  });
+
   it('ignores node_modules', async () => {
     mkdirSync(join(dir, 'node_modules'));
     const file = join(dir, 'node_modules', 'd.ts');
