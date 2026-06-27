@@ -5,6 +5,7 @@ import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
 
 import {
   badRequest,
+  defineHandler,
   dispatch,
   hook,
   notFound,
@@ -192,8 +193,8 @@ describe('dispatch', () => {
     strictEqual(done, true);
   });
 
-  it('runs middleware before the handler, sharing the event', async () => {
-    useMiddleware().register('tag', (event) => {
+  it('runs global middleware before the handler, sharing the event', async () => {
+    useMiddleware().registerGlobal('global-tag', (event) => {
       event.response.headers.set('x-mw', 'on');
       (event.context as Record<string, unknown>).role = 'admin';
     });
@@ -203,9 +204,9 @@ describe('dispatch', () => {
     deepStrictEqual(await response.json(), { role: 'admin' });
   });
 
-  it('short-circuits when a middleware returns a value', async () => {
+  it('short-circuits when a global middleware returns a value', async () => {
     let handlerRan = false;
-    useMiddleware().register('guard', () => badRequest('blocked'));
+    useMiddleware().registerGlobal('global-guard', () => badRequest('blocked'));
     const route = makeRoute('/', () => {
       handlerRan = true;
       return 'ok';
@@ -215,10 +216,10 @@ describe('dispatch', () => {
     strictEqual(handlerRan, false);
   });
 
-  it('runs middleware in registration order, before the handler', async () => {
+  it('runs global middleware in registration order, before the handler', async () => {
     const order: string[] = [];
     for (const name of ['10', '2', 'auth']) {
-      useMiddleware().register(name, () => {
+      useMiddleware().registerGlobal(name, () => {
         order.push(name);
       });
     }
@@ -230,8 +231,97 @@ describe('dispatch', () => {
     deepStrictEqual(order, ['10', '2', 'auth', 'handler']);
   });
 
+  it('runs only the named middleware a route selects, after the globals', async () => {
+    const order: string[] = [];
+    useMiddleware().registerGlobal('global-tag', () => {
+      order.push('global-tag');
+    });
+    for (const name of ['audit', 'rate']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    const route = makeRoute(
+      '/',
+      defineHandler(() => useEvent().appliedMiddleware, { middleware: ['rate'] }),
+    );
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['global-tag', 'rate']);
+    deepStrictEqual(await response.json(), ['global-tag', 'rate']);
+  });
+
+  it('runs the route selection in the order given', async () => {
+    const order: string[] = [];
+    for (const name of ['n1', 'n2']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    const route = makeRoute(
+      '/',
+      defineHandler(() => 'ok', { middleware: ['n2', 'n1'] }),
+    );
+    await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['n2', 'n1']);
+  });
+
+  it('selects named middleware with a function form', async () => {
+    for (const name of ['a', 'b', 'c']) useMiddleware().register(name, () => undefined);
+    const route = makeRoute(
+      '/',
+      defineHandler(() => useEvent().appliedMiddleware, {
+        middleware: (available) => available.filter((name) => name !== 'b'),
+      }),
+    );
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(await response.json(), ['a', 'c']);
+  });
+
+  it('drops a selected name that is not a known middleware', async () => {
+    let handlerRan = false;
+    const route = makeRoute(
+      '/',
+      defineHandler(
+        () => {
+          handlerRan = true;
+          return useEvent().appliedMiddleware;
+        },
+        { middleware: ['ghost'] },
+      ),
+    );
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(handlerRan, true);
+    deepStrictEqual(await response.json(), []);
+  });
+
+  it('runs only globals when the route selects no middleware', async () => {
+    useMiddleware().register('named', () => undefined);
+    useMiddleware().registerGlobal('global-only', () => undefined);
+    const route = makeRoute('/', () => useEvent().appliedMiddleware);
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(await response.json(), ['global-only']);
+  });
+
+  it('de-duplicates a repeated middleware selection', async () => {
+    const order: string[] = [];
+    for (const name of ['a', 'b']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    const route = makeRoute(
+      '/',
+      defineHandler(() => useEvent().appliedMiddleware, {
+        middleware: (available) => [...available, 'a'],
+      }),
+    );
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['a', 'b']);
+    deepStrictEqual(await response.json(), ['a', 'b']);
+  });
+
   it('maps an unexpected throw from middleware to a generic 500', async () => {
-    useMiddleware().register('boom', () => {
+    useMiddleware().registerGlobal('boom', () => {
       throw new Error('mw exploded');
     });
     const { response } = await dispatch(
@@ -244,7 +334,7 @@ describe('dispatch', () => {
   });
 
   it('records the middleware that ran on event.appliedMiddleware', async () => {
-    for (const name of ['a', 'b']) useMiddleware().register(name, () => undefined);
+    for (const name of ['a', 'b']) useMiddleware().registerGlobal(name, () => undefined);
     const route = makeRoute('/', () => useEvent().appliedMiddleware);
     const { response } = await dispatch(route, req(), url(), {});
     deepStrictEqual(await response.json(), ['a', 'b']);
@@ -253,7 +343,7 @@ describe('dispatch', () => {
   it('lets the middleware:resolve hook filter and reorder', async () => {
     const order: string[] = [];
     for (const name of ['a', 'b', 'c']) {
-      useMiddleware().register(name, () => {
+      useMiddleware().registerGlobal(name, () => {
         order.push(name);
       });
     }
@@ -262,6 +352,26 @@ describe('dispatch', () => {
     const { response } = await dispatch(route, req(), url(), {});
     deepStrictEqual(order, ['c', 'a']);
     deepStrictEqual(await response.json(), ['c', 'a']);
+  });
+
+  it('runs the hook over the globals and route selection together', async () => {
+    const order: string[] = [];
+    useMiddleware().registerGlobal('g1', () => {
+      order.push('g1');
+    });
+    for (const name of ['n1', 'n2']) {
+      useMiddleware().register(name, () => {
+        order.push(name);
+      });
+    }
+    hook('middleware:resolve', (names) => names.filter((name) => name !== 'g1' && name !== 'n1'));
+    const route = makeRoute(
+      '/',
+      defineHandler(() => useEvent().appliedMiddleware, { middleware: ['n1', 'n2'] }),
+    );
+    const { response } = await dispatch(route, req(), url(), {});
+    deepStrictEqual(order, ['n2']);
+    deepStrictEqual(await response.json(), ['n2']);
   });
 
   it('drains a re-entrant waitUntil', async () => {

@@ -40,13 +40,14 @@ describe('generateMiddleware', () => {
     for (const layer of useLayers().layers()) useLayers().remove(layer.path);
   });
 
-  it('emits imports and registrations in run order', async () => {
+  it('emits imports and registrations, globals first', async () => {
     const app = join(root, 'app');
     writePackage(app, { name: 'app', ohne: true, dependencies: { a: '*' } });
     writePackage(join(app, 'node_modules', 'a'), { name: 'a', ohne: true });
 
     writeMiddleware(join(app, 'node_modules', 'a'), '10-auth.ts');
     writeMiddleware(app, '20-locale.ts');
+    writeMiddleware(app, 'global/secure.ts');
 
     await loadLayers(app);
     const path = await generateMiddleware(app);
@@ -54,19 +55,30 @@ describe('generateMiddleware', () => {
     const out = readFileSync(path!, 'utf8');
 
     strictEqual(out.includes("import { useMiddleware } from 'ohne';"), true);
-    strictEqual(out.includes("import m0 from '../node_modules/a/middleware/10-auth.ts';"), true);
-    strictEqual(out.includes("import m1 from '../middleware/20-locale.ts';"), true);
+    strictEqual(out.includes("import m0 from '../middleware/global/secure.ts';"), true);
+    strictEqual(out.includes("import m1 from '../node_modules/a/middleware/10-auth.ts';"), true);
+    strictEqual(out.includes("import m2 from '../middleware/20-locale.ts';"), true);
 
     strictEqual(out.includes('interface KnownMiddleware {'), true);
-    strictEqual(out.includes("'10-auth': typeof m0;"), true);
-    strictEqual(out.includes("'20-locale': typeof m1;"), true);
+    strictEqual(out.includes("'global-secure': typeof m0;"), true);
+    strictEqual(out.includes("'10-auth': typeof m1;"), true);
+    strictEqual(out.includes("'20-locale': typeof m2;"), true);
+
+    const namedBlock = out.slice(
+      out.indexOf('interface KnownNamedMiddleware {'),
+      out.indexOf('}', out.indexOf('interface KnownNamedMiddleware {')),
+    );
+    strictEqual(namedBlock.includes("'10-auth': typeof m1;"), true);
+    strictEqual(namedBlock.includes("'20-locale': typeof m2;"), true);
+    strictEqual(namedBlock.includes('global-secure'), false);
 
     strictEqual(out.includes('const middleware = useMiddleware();'), true);
-    strictEqual(out.includes("middleware.register('10-auth', m0);"), true);
-    strictEqual(out.includes("middleware.register('20-locale', m1);"), true);
+    strictEqual(out.includes("middleware.registerGlobal('global-secure', m0);"), true);
+    strictEqual(out.includes("middleware.register('10-auth', m1);"), true);
+    strictEqual(out.includes("middleware.register('20-locale', m2);"), true);
   });
 
-  it('emits an empty interface when there is no middleware', async () => {
+  it('emits empty interfaces when there is no middleware', async () => {
     const app = join(root, 'empty');
     writePackage(app, { name: 'empty', ohne: true });
 
@@ -79,6 +91,7 @@ describe('generateMiddleware', () => {
         '\n' +
         "declare module 'ohne' {\n" +
         '  interface KnownMiddleware {}\n' +
+        '  interface KnownNamedMiddleware {}\n' +
         '}\n',
     );
   });

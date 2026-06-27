@@ -129,9 +129,9 @@ describe('serveAPI', () => {
 
   it('imports the generated middleware table and runs it', async () => {
     const dir = serveable('mw');
-    mkdirSync(join(dir, 'middleware'));
+    mkdirSync(join(dir, 'middleware', 'global'), { recursive: true });
     writeFileSync(
-      join(dir, 'middleware', 'mark.ts'),
+      join(dir, 'middleware', 'global', 'mark.ts'),
       "import { defineMiddleware } from 'ohne';\n" +
         'export default defineMiddleware((event) => {\n' +
         "  event.response.headers.set('x-mw', 'ran');\n" +

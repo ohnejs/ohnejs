@@ -135,8 +135,8 @@ describe('createServer', () => {
     });
   });
 
-  it('runs middleware for auto-OPTIONS so cors answers a preflight', async () => {
-    useMiddleware().register('cors', cors({ origin: 'https://app.example.com' }));
+  it('runs global middleware for auto-OPTIONS so cors answers a preflight', async () => {
+    useMiddleware().registerGlobal('global-cors', cors({ origin: 'https://app.example.com' }));
     await withServer([makeRoute('GET', '/data', () => ({ ok: true }))], async (base) => {
       const { status, headers } = await optionsRequest(base, '/data', {
         origin: 'https://app.example.com',

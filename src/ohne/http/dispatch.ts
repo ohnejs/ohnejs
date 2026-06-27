@@ -9,6 +9,7 @@ import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { HTTPError } from './http-error.ts';
+import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
 import { runWithEvent } from './use-event.ts';
 
@@ -59,8 +60,9 @@ export interface DispatchOptions {
  * Runs a matched route to a response.
  *
  * Builds the request `Event` and binds it via `runWithEvent`.
- * The `middleware:resolve` hook may filter or reorder the middleware first.
- * Runs the resolved middleware in order, recording each on `event.appliedMiddleware`, then the handler.
+ * Runs the global middleware, then the route's selected named middleware.
+ * The `middleware:resolve` hook may filter or reorder that combined list first.
+ * Records each on `event.appliedMiddleware` as it runs, then runs the handler.
  * A middleware that returns a value short-circuits, and the handler never runs.
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
@@ -113,7 +115,9 @@ export async function dispatch(
   const run = runWithEvent(event, async () => {
     try {
       const registry = useMiddleware();
-      for (const name of await resolveMiddleware(registry.keys(), event)) {
+      const selected = routeMiddleware(route.handler, registry.namedKeys());
+      const base = [...registry.globalKeys(), ...selected];
+      for (const name of await resolveMiddleware(base, event)) {
         event.appliedMiddleware.push(name as MiddlewareKey);
         const result = await registry.get(name)!(event);
         if (!isUndefined(result)) return toResponse(result, event.response);
