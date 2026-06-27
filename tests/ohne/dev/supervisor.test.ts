@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { dev, type DevServer } from '../../../src/ohne/dev/supervisor.ts';
-import { useLayers, usePrinter, useShutdown } from '../../../src/ohne/index.ts';
+import { useEnv, useLayers, usePrinter, useShutdown } from '../../../src/ohne/index.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
@@ -103,6 +103,7 @@ describe('dev', () => {
     useShutdown().unwatch();
     useShutdown().clear();
     useLayers().clear();
+    useEnv().unset('SILENT');
   });
 
   it('serves routes and reloads when a route file is added', TIMEOUT, async () => {
@@ -125,11 +126,12 @@ describe('dev', () => {
 
   it('settles on a "Waiting for changes" notice after a successful start', TIMEOUT, async () => {
     const port = await freePort();
-    const app = writeProject('park', port, false);
+    const app = writeProject('park', port);
     writeRoute(app, 'health.ts');
 
     // Capture the in-process supervisor's printer; the child serves in a separate process.
     const out: string[] = [];
+    useEnv().set('SILENT', false);
     usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN });

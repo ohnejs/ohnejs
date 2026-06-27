@@ -53,7 +53,7 @@ describe('serveAPI', () => {
 
   function makeApp(name: string, mark: string): string {
     const dir = mkdtempSync(join(root, `${name}-`));
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name }));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(join(dir, 'ohne.config.ts'), '');
     mkdirSync(join(dir, 'boot'));
     writeFileSync(

@@ -70,10 +70,11 @@ describe('spawnAPIChild', () => {
   });
 
   it('rejects ready when the child exits before signalling ready', TIMEOUT, async () => {
-    const notApp = join(root, 'not-ohne');
-    mkdirSync(notApp, { recursive: true });
+    const app = writeProject('boot-fail');
+    mkdirSync(join(app, 'boot'), { recursive: true });
+    writeFileSync(join(app, 'boot', 'crash.ts'), 'process.exit(1)\n');
 
-    const child = spawnAPIChild(notApp, { entry: BIN });
+    const child = spawnAPIChild(app, { entry: BIN });
     children.push(child);
     await rejects(child.ready);
   });
