@@ -58,6 +58,20 @@ describe('reportError', () => {
     ok(text().includes('/abs/foo.ts:3:7'));
   });
 
+  it('pulls a column-less location from a TypeScript syntax-error preamble', () => {
+    const { printer, text } = capture();
+    const error = new SyntaxError('Parenthesized expression cannot be empty');
+    error.stack =
+      'file:///abs/oops.get.ts:2\n' +
+      'export default defineHandler(() => ( );\n' +
+      '                                   ^^^\n\n' +
+      'SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Parenthesized expression cannot be empty\n' +
+      '    at parseTypeScript (node:internal/modules/typescript:63:36)';
+    reportError(error, printer);
+
+    ok(text().includes('/abs/oops.get.ts:2'));
+  });
+
   it('shows the stack only under debug', () => {
     const error = new Error('boom');
     error.stack = 'Error: boom\n    at fn (file:///abs/foo.ts:3:7)';

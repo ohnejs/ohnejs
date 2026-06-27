@@ -11,7 +11,8 @@ import { isOhneError } from './ohne-error.ts';
  *
  * An `ohneError` with a title or path becomes an error block; a bare-message one becomes a line.
  * Any other throw becomes a block titled by its error name, with the message as the body.
- * A `file:line:col` is pulled from the stack into the corner when one is present.
+ * A source location is pulled from the stack into the corner when present.
+ * The column is included when the stack carries one.
  * The stack itself shows only under `DEBUG`.
  */
 export function reportError(error: unknown, printer: Printer = usePrinter()): void {
@@ -42,6 +43,8 @@ function relativize(path: string | undefined): string | undefined {
 
 function errorLocation(error: unknown): string | undefined {
   if (!(error instanceof Error) || isUndefined(error.stack)) return undefined;
-  const match = error.stack.match(/(file:\/\/\/\S*?):(\d+):(\d+)/);
-  return isNull(match) ? undefined : `${fileURLToPath(match[1]!)}:${match[2]}:${match[3]}`;
+  const match = error.stack.match(/(file:\/\/\/\S*?):(\d+)(?::(\d+))?/);
+  if (isNull(match)) return undefined;
+  const location = `${fileURLToPath(match[1]!)}:${match[2]}`;
+  return isUndefined(match[3]) ? location : `${location}:${match[3]}`;
 }
