@@ -82,10 +82,9 @@ export async function dev(
   if (codegenOK) {
     try {
       await respawn();
-    } catch {
-      park();
-    }
+    } catch {}
   }
+  park();
 
   // Watch only after the initial build, so no change can race the first spawn.
   const schedule = debounce(() => void tick(), DEBOUNCE);
@@ -123,15 +122,15 @@ export async function dev(
       await regen(batch);
     } catch (error) {
       reportError(error);
+      park();
       return;
     }
     if (![...batch].some(isSource)) return;
-    printer.info('reloading');
+    printer.info('__Reloading...__');
     try {
       await respawn();
-    } catch {
-      park();
-    }
+    } catch {}
+    park();
   }
 
   async function regen(batch: Set<string> | null): Promise<void> {

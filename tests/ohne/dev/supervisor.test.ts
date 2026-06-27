@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer, type AddressInfo } from 'node:net';
@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { dev, type DevServer } from '../../../src/ohne/dev/supervisor.ts';
-import { useLayers, useShutdown } from '../../../src/ohne/index.ts';
+import { useLayers, usePrinter, useShutdown } from '../../../src/ohne/index.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
@@ -52,7 +52,7 @@ describe('dev', () => {
   let root: string;
   let servers: DevServer[];
 
-  function writeProject(name: string, port: number): string {
+  function writeProject(name: string, port: number, silent = true): string {
     const app = join(root, name);
     mkdirSync(join(app, 'api'), { recursive: true });
     mkdirSync(join(app, 'node_modules'), { recursive: true });
@@ -60,7 +60,7 @@ describe('dev', () => {
     writeFileSync(join(app, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(
       join(app, 'ohne.config.ts'),
-      `export default { server: { port: ${port} }, printer: { silent: true } }\n`,
+      `export default { server: { port: ${port} }, printer: { silent: ${silent} } }\n`,
     );
     return app;
   }
@@ -104,5 +104,23 @@ describe('dev', () => {
 
     await server.close();
     await waitFor(async () => (await get(port, '/health')) === -1);
+  });
+
+  it('settles on a "Waiting for changes" notice after a successful start', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('park', port, false);
+    writeRoute(app, 'health.ts');
+
+    // Capture the in-process supervisor's printer; the child serves in a separate process.
+    const out: string[] = [];
+    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    try {
+      const server = await dev(app, { entry: BIN });
+      servers.push(server);
+      await waitFor(async () => (await get(port, '/health')) === 200);
+      ok(out.join('').includes('Waiting for changes'));
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
   });
 });
