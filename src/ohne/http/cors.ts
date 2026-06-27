@@ -54,7 +54,8 @@ export interface CORSOptions {
 /**
  * Builds a CORS middleware from an origin policy.
  *
- * Mount it by default-exporting the result from a `middleware/` file: `export default cors({ origin })`.
+ * Mount it as a global by default-exporting the result from a `middleware/global/` file.
+ * It then runs on every request, including the auto-`OPTIONS` preflight: `export default cors({ origin })`.
  * On an allowed cross-origin request it sets `Access-Control-Allow-Origin`.
  * A non-`*` policy always appends `Vary: Origin`, even on a denied origin, so shared caches key per origin.
  * A preflight `OPTIONS` is answered with `204` and the allow headers.
@@ -62,12 +63,13 @@ export interface CORSOptions {
  *
  * Safe by construction: there is no origin-reflection mode.
  * A wildcard `origin: '*'` with `credentials` throws, since the browser forbids it.
- * Order it before auth middleware so preflight short-circuits first.
+ * Globals run in resolved-name order, so an auth middleware that rejects preflights must sort after cors.
+ * Name the cors file to control that order.
  * CORS governs browser read-access only; it is never a substitute for authorization.
  *
  * @example
  * ```ts
- * // middleware/cors.ts
+ * // middleware/global/cors.ts
  * export default cors({ origin: ['https://app.example.com'], credentials: true })
  * ```
  */

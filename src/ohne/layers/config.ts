@@ -69,7 +69,8 @@ export interface Config {
 
     /**
      * Directory each layer's middleware is read from.
-     * Each `.ts` file is one middleware, named by its path (`foo/bar.ts` -> `foo-bar`); all run globally.
+     * Each `.ts` file is one middleware, named by its path (`foo/bar.ts` -> `foo-bar`).
+     * Files under `global/` run on every request; the rest are opt-in per route via `defineHandler`.
      * Resolved against each layer's root.
      *
      * @default

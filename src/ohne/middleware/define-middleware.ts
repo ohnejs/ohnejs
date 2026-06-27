@@ -3,18 +3,24 @@ import type { Middleware } from './middleware.ts';
 /**
  * Defines a request middleware.
  *
- * Middleware runs before the route handler, once per request, in name order.
+ * Middleware runs before the route handler, once per request.
  * It receives the request `event` (the same one `useEvent` returns) to read or mutate.
  * Return nothing to continue to the next middleware and then the handler.
  * Return a value to short-circuit: it becomes the response and the handler never runs.
  *
  * Default-export the result from a file in a layer's `middleware/` directory to register it.
- * Scope it to part of the app with `matchPath`, and share data with the handler through `event.context`.
- * To change which middleware run, or their order, per request, use the `middleware:resolve` hook.
+ * Where the file sits decides when it runs:
+ * - under `middleware/global/`, it runs on every request, in name order;
+ * - anywhere else, it is opt-in - a route runs it through `defineHandler`'s `middleware` option.
+ *
+ * A route runs every global middleware, plus the named ones it opts into, and nothing else.
+ * Scope a middleware to part of the app with `matchPath`, and share data through `event.context`.
+ * `matchPath` and the route's `middleware` option are the primary controls over what runs.
+ * The `middleware:resolve` hook is a last resort, for dynamic per-request decisions.
  *
  * @example
  * ```ts
- * // middleware/auth.ts
+ * // middleware/global/auth.ts - runs on every request
  * import { defineMiddleware, matchPath, unauthorized } from 'ohne'
  *
  * export default defineMiddleware((event) => {
@@ -27,11 +33,26 @@ import type { Middleware } from './middleware.ts';
  *
  * @example
  * ```ts
- * // boot/middleware.ts
+ * // middleware/rate-limit.ts - opt-in, named `rate-limit`
+ * import { defineMiddleware, tooManyRequests } from 'ohne'
+ *
+ * export default defineMiddleware((event) => {
+ *   if (overLimit(event.ip)) return tooManyRequests()
+ * })
+ *
+ * // api/search.get.ts - runs the global middleware, plus rate-limit
+ * import { defineHandler } from 'ohne'
+ *
+ * export default defineHandler(() => search(), { middleware: ['rate-limit'] })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // boot/middleware.ts - dynamic, per-request filtering (escape hatch)
  * import { hook } from 'ohne'
  *
  * hook('middleware:resolve', (names, event) =>
- *   isPublic(event) ? names.filter((name) => name !== 'auth') : names,
+ *   isPublic(event) ? names.filter((name) => name !== 'global-auth') : names,
  * )
  * ```
  */
