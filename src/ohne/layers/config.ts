@@ -77,6 +77,17 @@ export interface Config {
      * 'middleware'
      */
     middleware?: string;
+
+    /**
+     * Directory each layer's messages are read from.
+     * Each `.json` file is named after a BCP-47 language tag (`en.json`, `de-AT.json`).
+     * A subdirectory prefixes its keys, so `dashboard/en.json` contributes `dashboard.*` keys.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'messages'
+     */
+    messages?: string;
   };
 
   /**
@@ -104,6 +115,21 @@ export interface Config {
      * ```
      */
     routes?: string[];
+  };
+
+  /**
+   * Message catalog settings.
+   */
+  messages?: {
+    /**
+     * Language to fall back to when a request's language, and its parents, have no entry.
+     * A BCP-47 tag like `en` or `de-AT`, canonicalized before use.
+     * Inherited across layers, so an upper layer can set it once for everything above.
+     *
+     * @default
+     * 'en'
+     */
+    defaultLanguage?: string;
   };
 
   /**
@@ -412,6 +438,7 @@ export interface ConfigExtensions {}
 export const DEFAULTS = {
   layers: [],
   disable: { routes: [] },
+  messages: { defaultLanguage: 'en' },
   server: {
     preStopDelay: false,
     shutdownTimeout: false,
@@ -438,6 +465,7 @@ export const DIR_DEFAULTS = {
   api: 'api',
   boot: 'boot',
   middleware: 'middleware',
+  messages: 'messages',
 } satisfies NonNullable<Config['dirs']>;
 
 /**
