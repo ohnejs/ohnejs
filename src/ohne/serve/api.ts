@@ -8,6 +8,7 @@ import { isNull, isPort, joinPath, MAX_PORT } from '../../utils/index.ts';
 import { bootLayers } from '../boot/boot-layers.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
+import { generateMessages } from '../codegen/generate-messages.ts';
 import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
@@ -49,13 +50,14 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
       generateResolvedConfig(from),
       generateRoutes(from),
       generateMiddleware(from),
+      generateMessages(from),
     ]);
   }
 
-  // The route and middleware tables live in generated files: importing them runs the registrations.
+  // The component tables live in generated files: importing runs the registrations.
   const dir = await codegenDir(from);
   if (!isNull(dir)) {
-    for (const name of ['routes.ts', 'middleware.ts']) {
+    for (const name of ['routes.ts', 'middleware.ts', 'messages.ts']) {
       const file = joinPath(dir, name);
       if (await exists(file)) await import(pathToFileURL(file).href);
     }

@@ -1,6 +1,7 @@
 export * from './boot/boot-layers.ts';
 export * from './boot/scan-layer-boot.ts';
 export * from './codegen/generate-layer-name.ts';
+export * from './codegen/generate-messages.ts';
 export * from './codegen/generate-middleware.ts';
 export * from './codegen/generate-resolved-config.ts';
 export * from './codegen/generate-routes.ts';

@@ -8,6 +8,7 @@ import {
   resolvePath,
 } from '../../../utils/index.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
+import { generateMessages } from '../../codegen/generate-messages.ts';
 import { generateMiddleware } from '../../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../../codegen/generate-routes.ts';
@@ -51,6 +52,7 @@ export const prepareCommand = defineCommand({
           generateResolvedConfig(cwd),
           generateRoutes(cwd),
           generateMiddleware(cwd),
+          generateMessages(cwd),
         ])
       ).filter(isString);
     });
