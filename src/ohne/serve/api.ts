@@ -47,15 +47,15 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     await Promise.all([
       generateLayerName(from),
       generateResolvedConfig(from),
-      generateMiddleware(from),
       generateRoutes(from),
+      generateMiddleware(from),
     ]);
   }
 
   // The route and middleware tables live in generated files: importing them runs the registrations.
   const dir = await codegenDir(from);
   if (!isNull(dir)) {
-    for (const name of ['middleware.ts', 'routes.ts']) {
+    for (const name of ['routes.ts', 'middleware.ts']) {
       const file = joinPath(dir, name);
       if (await exists(file)) await import(pathToFileURL(file).href);
     }

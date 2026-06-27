@@ -49,8 +49,8 @@ export const prepareCommand = defineCommand({
         await Promise.all([
           generateLayerName(cwd),
           generateResolvedConfig(cwd),
-          generateMiddleware(cwd),
           generateRoutes(cwd),
+          generateMiddleware(cwd),
         ])
       ).filter(isString);
     });
