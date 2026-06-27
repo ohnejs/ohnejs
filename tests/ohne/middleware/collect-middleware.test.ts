@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,7 +23,9 @@ describe('collectMiddleware', () => {
     app = { name: 'app', dir: join(root, 'app') };
     writeMiddleware(dep.dir, '10-auth.ts');
     writeMiddleware(dep.dir, '20-locale.ts');
+    writeMiddleware(dep.dir, 'global/audit.ts');
     writeMiddleware(app.dir, '20-locale.ts');
+    writeMiddleware(app.dir, 'global/track.ts');
   });
 
   after(() => {
@@ -36,11 +38,27 @@ describe('collectMiddleware', () => {
     strictEqual(overridden?.layer, 'app');
   });
 
-  it('combines the middleware of every layer, ordered by name', async () => {
+  it('orders global middleware first, then named, flagging each', async () => {
     const middleware = await collectMiddleware([dep, app]);
     deepStrictEqual(
-      middleware.map((entry) => entry.name),
-      ['10-auth', '20-locale'],
+      middleware.map((entry) => ({ name: entry.name, isGlobal: entry.isGlobal })),
+      [
+        { name: 'global-audit', isGlobal: true },
+        { name: 'global-track', isGlobal: true },
+        { name: '10-auth', isGlobal: false },
+        { name: '20-locale', isGlobal: false },
+      ],
+    );
+  });
+
+  it('throws when a name is global in one layer and named in another', async () => {
+    const base: OhneLayer = { name: 'base', dir: join(root, 'base') };
+    const over: OhneLayer = { name: 'over', dir: join(root, 'over') };
+    writeMiddleware(base.dir, 'global/secure.ts');
+    writeMiddleware(over.dir, 'global-secure.ts');
+    await rejects(
+      collectMiddleware([base, over]),
+      /`global-secure` is global in one layer, named in another/,
     );
   });
 });

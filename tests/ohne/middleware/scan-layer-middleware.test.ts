@@ -30,12 +30,27 @@ describe('scanLayerMiddleware', () => {
   it('maps each file in a layer to a named middleware', async () => {
     const middleware = await scanLayerMiddleware(dep, 'middleware');
     deepStrictEqual(
-      middleware.map((entry) => ({ name: entry.name, layer: entry.layer })),
+      middleware.map((entry) => ({
+        name: entry.name,
+        isGlobal: entry.isGlobal,
+        layer: entry.layer,
+      })),
       [
-        { name: '10-auth', layer: 'dep' },
-        { name: 'admin-guard', layer: 'dep' },
+        { name: '10-auth', isGlobal: false, layer: 'dep' },
+        { name: 'admin-guard', isGlobal: false, layer: 'dep' },
       ],
     );
+  });
+
+  it('flags files under global/ as global, leaving a literal global.ts named', async () => {
+    const layer: OhneLayer = { name: 'g', dir: join(root, 'g') };
+    writeMiddleware(layer.dir, 'global/session.ts');
+    writeMiddleware(layer.dir, 'global.ts');
+    const byName = new Map(
+      (await scanLayerMiddleware(layer, 'middleware')).map((entry) => [entry.name, entry.isGlobal]),
+    );
+    deepStrictEqual(byName.get('global-session'), true);
+    deepStrictEqual(byName.get('global'), false);
   });
 
   it('returns an empty list when a layer has no middleware directory', async () => {
@@ -50,5 +65,15 @@ describe('scanLayerMiddleware', () => {
     writeMiddleware(clashing.dir, 'foo-bar.ts');
     writeMiddleware(clashing.dir, 'foo/bar.ts');
     await rejects(scanLayerMiddleware(clashing, 'middleware'), /Duplicate middleware `foo-bar`/);
+  });
+
+  it('throws when a global file and a named file resolve to the same name', async () => {
+    const clashing: OhneLayer = { name: 'gclash', dir: join(root, 'gclash') };
+    writeMiddleware(clashing.dir, 'global/auth.ts');
+    writeMiddleware(clashing.dir, 'global-auth.ts');
+    await rejects(
+      scanLayerMiddleware(clashing, 'middleware'),
+      /Duplicate middleware `global-auth`/,
+    );
   });
 });

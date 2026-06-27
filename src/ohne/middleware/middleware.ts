@@ -6,6 +6,9 @@ import type { MiddlewareKey } from './known-middleware.ts';
  * Runs before the route handler, inside the request's `AsyncLocalStorage`, with the `Event` passed in.
  * Read or mutate `event.context`, set `event.response` headers and status, or short-circuit.
  *
+ * A middleware under the `global/` directory runs on every request.
+ * Any other runs only when a route opts into it through `defineHandler`'s `middleware` option.
+ *
  * Returning `undefined` continues to the next middleware, then the handler.
  * Returning any other value short-circuits: that value becomes the response and the handler never runs.
  * A thrown or returned `HTTPError` maps to its status, exactly as from a handler.
@@ -24,6 +27,13 @@ export interface MiddlewareMeta {
   name: string;
 
   /**
+   * Whether the middleware is global.
+   * Global middleware live under the `global/` directory and run on every request, before named ones.
+   * A named middleware runs only when a route selects it.
+   */
+  isGlobal: boolean;
+
+  /**
    * Absolute path of the file the middleware was discovered in.
    */
   file: string;
@@ -37,9 +47,10 @@ export interface MiddlewareMeta {
 declare module 'ohne' {
   interface Hooks {
     /**
-     * Resolves which middleware run for a request, and in what order, before any of them runs.
-     * Receives the run-order names plus the request event, and returns the names to run.
-     * Return a new array to filter or reorder.
+     * Filters or reorders the middleware for a request, after globals and the route's selection resolve.
+     * Receives the run-order names - globals first, then the route's selection - plus the request event.
+     * Returns the names to run, as a filtered or reordered list.
+     * A secondary escape hatch for dynamic, per-request control; routine selection belongs on the route.
      * The argument is a per-request copy, so leaving it untouched is safe.
      */
     'middleware:resolve': (names: MiddlewareKey[], event: Event) => MiddlewareKey[];

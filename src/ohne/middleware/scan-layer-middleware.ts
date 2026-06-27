@@ -12,10 +12,14 @@ import {
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
+const GLOBAL_DIR = 'global';
+
 /**
  * Reads every middleware file in one layer's middleware directory.
  *
  * Each `.ts` file under `<layer.dir>/<middleware>` maps to a middleware, named via `pathToKebabName`.
+ * A file inside the `global/` directory is flagged `isGlobal`, read from the raw path.
+ * So a literal `global.ts` file stays named, while `global/auth.ts` is global.
  * Results are sorted by file path so the output is deterministic.
  * Returns `[]` when the layer has no middleware directory.
  * Throws when two files in the layer resolve to the same name, since one would silently shadow the other.
@@ -23,7 +27,7 @@ import { ohneError } from '../error/ohne-error.ts';
  * @example
  * ```ts
  * await scanLayerMiddleware({ name: 'app', dir: '/app' }, 'middleware')
- * // -> [{ name: 'auth', file: '/app/middleware/auth.ts', layer: 'app' }]
+ * // -> [{ name: 'auth', isGlobal: false, file: '/app/middleware/auth.ts', layer: 'app' }]
  * ```
  */
 export async function scanLayerMiddleware(
@@ -51,6 +55,7 @@ export async function scanLayerMiddleware(
         });
       }
       seen.set(name, entry.path);
-      return { name, file: entry.path, layer: layer.name };
+      const isGlobal = entry.relativePath.startsWith(`${GLOBAL_DIR}/`);
+      return { name, isGlobal, file: entry.path, layer: layer.name };
     });
 }
