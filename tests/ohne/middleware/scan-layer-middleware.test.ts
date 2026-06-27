@@ -49,9 +49,6 @@ describe('scanLayerMiddleware', () => {
     const clashing: OhneLayer = { name: 'clash', dir: join(root, 'clash') };
     writeMiddleware(clashing.dir, 'foo-bar.ts');
     writeMiddleware(clashing.dir, 'foo/bar.ts');
-    await rejects(
-      scanLayerMiddleware(clashing, 'middleware'),
-      /Duplicate middleware name "foo-bar" in layer "clash"/,
-    );
+    await rejects(scanLayerMiddleware(clashing, 'middleware'), /Duplicate middleware `foo-bar`/);
   });
 });

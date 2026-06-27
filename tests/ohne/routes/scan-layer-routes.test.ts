@@ -46,9 +46,6 @@ describe('scanLayerRoutes', () => {
     const clashing: OhneLayer = { name: 'clash', dir: join(root, 'clash') };
     writeRoute(clashing.dir, 'users.get.ts');
     writeRoute(clashing.dir, 'users/index.get.ts');
-    await rejects(
-      scanLayerRoutes(clashing, 'api'),
-      /Duplicate route "GET \/users" in layer "clash"/,
-    );
+    await rejects(scanLayerRoutes(clashing, 'api'), /Duplicate route `GET \/users`/);
   });
 });

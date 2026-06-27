@@ -2,6 +2,7 @@ import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
 import { listDir } from '../../utils/fs/index.ts';
 import { isNull, isUndefined, joinPath, naturalCompare, pathToRoute } from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
 import { routeId, type RouteMeta } from './route.ts';
 
 /**
@@ -30,9 +31,15 @@ export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<Ro
       const id = routeId(method, pattern);
       const clash = seen.get(id);
       if (!isUndefined(clash)) {
-        throw new Error(
-          `Duplicate route "${id}" in layer "${layer.name}": "${clash}" and "${entry.path}" resolve to the same route.`,
-        );
+        throw ohneError({
+          title: `Duplicate route \`${id}\``,
+          body: [
+            `Two files in layer \`${layer.name}\` resolve to the same route.`,
+            '',
+            `- \`${clash}\``,
+            `- \`${entry.path}\``,
+          ],
+        });
       }
       seen.set(id, entry.path);
       return { method, pattern, file: entry.path, layer: layer.name };

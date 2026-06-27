@@ -9,6 +9,7 @@ import {
   naturalCompare,
   pathToKebabName,
 } from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
 
 /**
  * Reads every middleware file in one layer's middleware directory.
@@ -38,9 +39,15 @@ export async function scanLayerMiddleware(
       const name = pathToKebabName(entry.relativePath);
       const clash = seen.get(name);
       if (!isUndefined(clash)) {
-        throw new Error(
-          `Duplicate middleware name "${name}" in layer "${layer.name}": "${clash}" and "${entry.path}" resolve to the same name.`,
-        );
+        throw ohneError({
+          title: `Duplicate middleware \`${name}\``,
+          body: [
+            `Two files in layer \`${layer.name}\` resolve to the same name.`,
+            '',
+            `- \`${clash}\``,
+            `- \`${entry.path}\``,
+          ],
+        });
       }
       seen.set(name, entry.path);
       return { name, file: entry.path, layer: layer.name };

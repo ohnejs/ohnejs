@@ -3,6 +3,7 @@ import type { Config } from '../layers/config.ts';
 
 import { resolveModuleDir } from '../../utils/fs/index.ts';
 import { isNull, isUndefined, last } from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
 import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
 
@@ -80,10 +81,13 @@ export async function resolveLayerStack(
       const dir = dirByName.get(name);
       if (isUndefined(dir)) {
         const resolved = await resolveModuleDir(name, layer.dir);
-        const reason = isNull(resolved)
-          ? 'it is not installed'
-          : `it has no "ohne.config.ts" (resolved to "${resolved}")`;
-        throw new Error(`Layer "${name}" listed by "${layer.name}" cannot be used: ${reason}.`);
+        const detail = isNull(resolved)
+          ? `\`${name}\` is not installed.`
+          : `\`${name}\` has no \`ohne.config.ts\` (resolved to \`${resolved}\`).`;
+        throw ohneError({
+          title: `Layer \`${name}\` cannot be used`,
+          body: [detail, `It is listed by \`${layer.name}\`.`],
+        });
       }
       await walk({ name, dir });
     }

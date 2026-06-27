@@ -12,6 +12,7 @@ import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { useEnv } from '../env/use-env.ts';
+import { ohneError } from '../error/ohne-error.ts';
 import { createRouter } from '../http/router.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
@@ -76,7 +77,10 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
 
   const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_PORT;
   if (!isPort(port)) {
-    throw new Error(`Invalid server port: ${port}. Must be an integer between 0 and ${MAX_PORT}.`);
+    throw ohneError({
+      title: 'Invalid server port',
+      body: [`Port must be an integer between \`0\` and \`${MAX_PORT}\`.`, `You set \`${port}\`.`],
+    });
   }
   const host = useEnv().get('HOST') ?? config.host;
 

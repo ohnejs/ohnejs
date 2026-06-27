@@ -93,10 +93,7 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     writeFileSync(join(store, 'plain', 'package.json'), JSON.stringify({ name: 'plain' }));
     link(broken, 'plain');
 
-    await rejects(
-      () => resolveLayerStack(broken),
-      /Layer "plain" listed by "broken" cannot be used/,
-    );
+    await rejects(() => resolveLayerStack(broken), /Layer `plain` cannot be used/);
   });
 
   it('returns an empty list when no package.json is found', async () => {
