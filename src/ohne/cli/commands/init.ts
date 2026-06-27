@@ -99,7 +99,7 @@ export const initCommand = defineCommand({
           print.errorBlock({
             title: 'Directory not empty',
             body: 'Re-run with `--force` to overwrite its contents.',
-            path: target,
+            path: relativePath(process.cwd(), target),
           });
           process.exitCode = 1;
           return;
@@ -176,7 +176,8 @@ export const initCommand = defineCommand({
     const body = steps.map((step) => `\`${step}\``).join('\n');
     print.success(`Created \`${name}\``);
     if (interactive) prompt.note(body, 'Next steps', true);
-    else print.successBlock({ title: 'Next steps:', body, path: target });
+    else
+      print.successBlock({ title: 'Next steps:', body, path: relativePath(process.cwd(), target) });
   },
 });
 

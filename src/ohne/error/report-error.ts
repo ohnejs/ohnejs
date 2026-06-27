@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Printer } from '../../utils/print/index.ts';
 
-import { errorMessage, isArray, isNull, isUndefined } from '../../utils/index.ts';
+import { errorMessage, isArray, isNull, isUndefined, relativePath } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isOhneError } from './ohne-error.ts';
 
@@ -22,18 +22,22 @@ export function reportError(error: unknown, printer: Printer = usePrinter()): vo
       printer.errorBlock({
         title: error.title ?? error.message,
         body: isArray(error.body) ? error.body.join('\n') : (error.body ?? ''),
-        path: error.path,
+        path: relativize(error.path),
       });
     }
   } else {
     printer.errorBlock({
       title: error instanceof Error ? error.name : 'Error',
       body: errorMessage(error),
-      path: errorLocation(error),
+      path: relativize(errorLocation(error)),
     });
   }
 
   if (error instanceof Error && !isUndefined(error.stack)) printer.debug(error.stack);
+}
+
+function relativize(path: string | undefined): string | undefined {
+  return isUndefined(path) ? undefined : relativePath(process.cwd(), path);
 }
 
 function errorLocation(error: unknown): string | undefined {

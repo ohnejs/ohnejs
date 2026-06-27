@@ -1,5 +1,5 @@
 import { defineCommand } from '../../../utils/cli/index.ts';
-import { resolvePath } from '../../../utils/index.ts';
+import { relativePath, resolvePath } from '../../../utils/index.ts';
 import { dev } from '../../dev/supervisor.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
@@ -26,7 +26,7 @@ export const devCommand = defineCommand({
       print.errorBlock({
         title: 'Not an ohne project',
         body: 'No `ohne.config.ts` at the project root.',
-        path: cwd,
+        path: relativePath(process.cwd(), cwd),
       });
       process.exitCode = 1;
       return;

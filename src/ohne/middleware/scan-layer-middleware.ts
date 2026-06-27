@@ -8,6 +8,7 @@ import {
   joinPath,
   naturalCompare,
   pathToKebabName,
+  relativePath,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
@@ -44,8 +45,8 @@ export async function scanLayerMiddleware(
           body: [
             `Two files in layer \`${layer.name}\` resolve to the same name.`,
             '',
-            `- \`${clash}\``,
-            `- \`${entry.path}\``,
+            `- \`${relativePath(process.cwd(), clash)}\``,
+            `- \`${relativePath(process.cwd(), entry.path)}\``,
           ],
         });
       }

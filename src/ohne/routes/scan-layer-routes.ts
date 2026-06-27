@@ -1,7 +1,14 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
 import { listDir } from '../../utils/fs/index.ts';
-import { isNull, isUndefined, joinPath, naturalCompare, pathToRoute } from '../../utils/index.ts';
+import {
+  isNull,
+  isUndefined,
+  joinPath,
+  naturalCompare,
+  pathToRoute,
+  relativePath,
+} from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { routeId, type RouteMeta } from './route.ts';
 
@@ -36,8 +43,8 @@ export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<Ro
           body: [
             `Two files in layer \`${layer.name}\` resolve to the same route.`,
             '',
-            `- \`${clash}\``,
-            `- \`${entry.path}\``,
+            `- \`${relativePath(process.cwd(), clash)}\``,
+            `- \`${relativePath(process.cwd(), entry.path)}\``,
           ],
         });
       }

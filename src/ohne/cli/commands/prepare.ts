@@ -37,7 +37,7 @@ export const prepareCommand = defineCommand({
       print.errorBlock({
         title: 'Not an ohne project',
         body: 'No `ohne.config.ts` at the project root.',
-        path: cwd,
+        path: relativePath(process.cwd(), cwd),
       });
       process.exitCode = 1;
       return;
@@ -62,7 +62,7 @@ export const prepareCommand = defineCommand({
         .sort(naturalCompare)
         .map((path) => `__${path}__`)
         .join('\n'),
-      path: cwd,
+      path: relativePath(process.cwd(), cwd),
     });
   },
 });
