@@ -2,13 +2,14 @@ import { createServer } from 'node:net';
 
 import { debounce, extname, isNull } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
+import { reportError } from '../error/report-error.ts';
 import { DEFAULT_PORT } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { type APIChild, type ChildExit, spawnAPIChild } from './child-server.ts';
+import { type APIChild, spawnAPIChild } from './child-server.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRoutesTarget } from './targets/routes.ts';
@@ -71,12 +72,19 @@ export async function dev(
   let cycling = false;
   let rerun = false;
 
+  let codegenOK = false;
   try {
     await regen(null);
-    await respawn();
+    codegenOK = true;
   } catch (error) {
-    printer.error(`dev: initial build failed: ${reason(error)}`);
-    child = null;
+    reportError(error);
+  }
+  if (codegenOK) {
+    try {
+      await respawn();
+    } catch {
+      park();
+    }
   }
 
   // Watch only after the initial build, so no change can race the first spawn.
@@ -114,16 +122,15 @@ export async function dev(
     try {
       await regen(batch);
     } catch (error) {
-      printer.error(`dev: codegen failed: ${reason(error)}`);
+      reportError(error);
       return;
     }
     if (![...batch].some(isSource)) return;
+    printer.info('reloading');
     try {
-      printer.info('dev: reloading');
       await respawn();
-    } catch (error) {
-      printer.error(`dev: server failed to start: ${reason(error)}`);
-      child = null;
+    } catch {
+      park();
     }
   }
 
@@ -154,9 +161,13 @@ export async function dev(
     child = next;
   }
 
-  function onCrash(exit: ChildExit): void {
+  function onCrash(): void {
     child = null;
-    printer.error(`dev: server exited (code ${exit.code ?? '-'}, signal ${exit.signal ?? '-'})`);
+    park();
+  }
+
+  function park(): void {
+    printer.info('__Waiting for changes...__');
   }
 
   async function resolvePort(): Promise<number> {
@@ -192,8 +203,4 @@ function freePort(): Promise<number> {
       probe.close(() => resolve(port));
     });
   });
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
