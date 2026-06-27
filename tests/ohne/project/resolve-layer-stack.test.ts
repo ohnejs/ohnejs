@@ -99,4 +99,42 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
   it('returns an empty list when no package.json is found', async () => {
     deepStrictEqual(await resolveLayerStack(join(root, 'nowhere')), []);
   });
+
+  it('resolves a layer named by an exported package subpath', async () => {
+    const consumer = join(root, 'subpath-app');
+    mkdirSync(consumer, { recursive: true });
+    writeManifest(consumer, { name: 'subpath-app', deps: ['kit'], layers: ['kit/auth'] });
+
+    const kit = join(store, 'kit');
+    mkdirSync(join(kit, 'auth'), { recursive: true });
+    writeFileSync(
+      join(kit, 'package.json'),
+      JSON.stringify({
+        name: 'kit',
+        type: 'module',
+        exports: { './auth': './auth/ohne.config.ts' },
+      }),
+    );
+    writeFileSync(join(kit, 'auth', 'ohne.config.ts'), 'export default {}\n');
+    link(consumer, 'kit');
+
+    const stack = await resolveLayerStack(consumer);
+    deepStrictEqual(
+      stack.map((layer) => layer.name),
+      ['kit/auth', 'subpath-app'],
+    );
+  });
+
+  it('throws when a listed subpath is not exported', async () => {
+    const consumer = join(root, 'bad-subpath');
+    mkdirSync(consumer, { recursive: true });
+    writeManifest(consumer, { name: 'bad-subpath', deps: ['kit2'], layers: ['kit2/ghost'] });
+
+    const kit = join(store, 'kit2');
+    mkdirSync(kit, { recursive: true });
+    writeFileSync(join(kit, 'package.json'), JSON.stringify({ name: 'kit2', exports: {} }));
+    link(consumer, 'kit2');
+
+    await rejects(() => resolveLayerStack(consumer), /Layer `kit2\/ghost` cannot be used/);
+  });
 });

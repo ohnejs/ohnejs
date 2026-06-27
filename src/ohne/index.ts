@@ -62,6 +62,7 @@ export * from './printer/use-printer.ts';
 export * from './project/is-ohne-project.ts';
 export * from './project/read-layer-config.ts';
 export * from './project/resolve-dependency-layer-names.ts';
+export * from './project/resolve-layer-dir.ts';
 export * from './project/resolve-layer-stack.ts';
 export * from './project/resolve-ohne-layers.ts';
 export * from './routes/collect-routes.ts';

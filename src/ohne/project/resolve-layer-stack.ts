@@ -1,10 +1,11 @@
 import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
 
-import { resolveModuleDir } from '../../utils/fs/index.ts';
 import { isNull, isUndefined, last, relativePath } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { isOhneProject } from './is-ohne-project.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
+import { resolveLayerDir } from './resolve-layer-dir.ts';
 import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
 
 /**
@@ -33,13 +34,15 @@ export interface ResolvedLayer extends OhneLayer {
  * The app's `layers` name the layers it extends; each of those names its own, and so on.
  * Only the layers reached this way are stacked - an installed layer no one lists is left out.
  * Names resolve to directories through `resolveOhneLayers`, the app's ohne dependency closure.
+ * A name carrying a subpath (`@acme/kit/auth`) resolves through the package's `exports`.
  *
  * The graph is walked depth-first in post-order, so a layer is emitted before the layers that list it.
  * A layer shared by several entries is emitted once, ahead of them all.
  * Within one layer's `layers`, declaration order holds, with the later entry winning.
  * The app itself is the root and comes last; later overrides earlier everywhere.
  *
- * Throws when a listed layer cannot be used: not installed, or installed without an `ohne.config.ts`.
+ * Throws when a listed layer cannot be used.
+ * The name is not installed, its subpath is not exported, or the directory has no `ohne.config.ts`.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Returns `[]` when no `package.json` is found.
@@ -78,15 +81,24 @@ export async function resolveLayerStack(
       strategies: {},
     };
     for (const name of config.input.layers ?? []) {
-      const dir = dirByName.get(name);
-      if (isUndefined(dir)) {
-        const resolved = await resolveModuleDir(name, layer.dir);
-        const detail = isNull(resolved)
-          ? `\`${name}\` is not installed.`
-          : `\`${name}\` has no \`ohne.config.ts\` (resolved to \`${relativePath(process.cwd(), resolved)}\`).`;
+      const known = dirByName.get(name);
+      const dir = known ?? (await resolveLayerDir(name, layer.dir));
+      if (isNull(dir)) {
         throw ohneError({
           title: `Layer \`${name}\` cannot be used`,
-          body: [detail, `It is listed by \`${layer.name}\`.`],
+          body: [
+            `\`${name}\` is not installed, or its package does not export it as a layer.`,
+            `It is listed by \`${layer.name}\`.`,
+          ],
+        });
+      }
+      if (isUndefined(known) && !(await isOhneProject(dir))) {
+        throw ohneError({
+          title: `Layer \`${name}\` cannot be used`,
+          body: [
+            `\`${name}\` resolved to \`${relativePath(process.cwd(), dir)}\`, which has no \`ohne.config.ts\`.`,
+            `It is listed by \`${layer.name}\`.`,
+          ],
         });
       }
       await walk({ name, dir });
