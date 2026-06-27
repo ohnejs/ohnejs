@@ -42,9 +42,9 @@ registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
  *
  * @example
  * ```ts
- * useEnv().get('SILENT')      // -> boolean
+ * useEnv().get('SILENT')       // -> boolean
  * useEnv().set('SILENT', true)
- * useEnv().get('SILENT')      // -> true
+ * useEnv().get('SILENT')       // -> true
  * useEnv().unset('SILENT')
  * ```
  */
