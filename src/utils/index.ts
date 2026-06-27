@@ -47,6 +47,7 @@ export * from './dot-notation/parse-dot-notation.ts';
 export * from './duration/format-duration.ts';
 export * from './duration/measure.ts';
 export * from './duration/parse-duration.ts';
+export * from './error/error-message.ts';
 export * from './forwarded/parse-forwarded.ts';
 export * from './fuzzy/fuzzy.ts';
 export * from './gate/create-gate.ts';
