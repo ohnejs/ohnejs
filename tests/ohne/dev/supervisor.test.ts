@@ -40,6 +40,23 @@ function get(port: number, path: string): Promise<number> {
   });
 }
 
+function getBody(port: number, path: string): Promise<string> {
+  return new Promise((resolve) => {
+    const req = request(
+      { host: '127.0.0.1', port, path, headers: { connection: 'close' } },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => resolve(body));
+      },
+    );
+    req.on('error', () => resolve(''));
+    req.end();
+  });
+}
+
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 15_000): Promise<void> {
   const start = Date.now();
   while (!(await predicate())) {
@@ -122,5 +139,24 @@ describe('dev', () => {
     } finally {
       usePrinter().configure({ stream: process.stderr });
     }
+  });
+
+  it('regenerates and reloads when a message catalog changes', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('messages', port);
+    writeFileSync(
+      join(app, 'api', 'lang.get.ts'),
+      "import { useMessages } from 'ohne'\nexport default () => useMessages().get('en')?.greeting ?? 'missing'\n",
+    );
+    mkdirSync(join(app, 'messages'), { recursive: true });
+    writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hi' }));
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+
+    await waitFor(async () => (await getBody(port, '/lang')) === 'Hi');
+
+    writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hello' }));
+    await waitFor(async () => (await getBody(port, '/lang')) === 'Hello');
   });
 });

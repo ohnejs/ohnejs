@@ -11,6 +11,7 @@ import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { type APIChild, spawnAPIChild } from './child-server.ts';
 import { createConfigTarget } from './targets/config.ts';
+import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRoutesTarget } from './targets/routes.ts';
 import { watchLayers } from './watch-layers.ts';
@@ -63,8 +64,9 @@ export async function dev(
 
   const routes = createRoutesTarget(from);
   const middleware = createMiddlewareTarget(from);
-  const config = createConfigTarget(from, [routes, middleware]);
-  const targets = [routes, middleware];
+  const messages = createMessagesTarget(from);
+  const config = createConfigTarget(from, [routes, middleware, messages]);
+  const targets = [routes, middleware, messages];
   const port = await resolvePort();
 
   let child: APIChild | null = null;
@@ -125,7 +127,8 @@ export async function dev(
       park();
       return;
     }
-    if (![...batch].some(isSource)) return;
+    const paths = [...batch];
+    if (!paths.some(isSource) && !paths.some((path) => messages.affectedBy(path))) return;
     printer.info('__Reloading...__');
     try {
       await respawn();
