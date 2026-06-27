@@ -27,8 +27,8 @@ describe('collectMessages', () => {
     return { name, dir };
   }
 
-  async function byKey(layers: OhneLayer[]): Promise<Map<string, MessageMeta>> {
-    return new Map((await collectMessages(layers)).map((m) => [m.key, m]));
+  async function byKey(layers: OhneLayer[], disable?: string[]): Promise<Map<string, MessageMeta>> {
+    return new Map((await collectMessages(layers, { disable })).map((m) => [m.key, m]));
   }
 
   it('lets a closer layer override a key', async () => {
@@ -81,5 +81,35 @@ describe('collectMessages', () => {
       (await collectMessages([base])).map((m) => `${m.language}/${m.key}`),
       ['de/z', 'en/a', 'en/b'],
     );
+  });
+
+  it('drops a whole group with a `**` glob, keeping other groups', async () => {
+    const base = layer('disable1', {
+      'en.json': { 'dashboard.title': 'T', 'dashboard.row.id': 'R', 'field.name': 'N' },
+    });
+    const keys = await byKey([base], ['dashboard.**']);
+    strictEqual(keys.has('dashboard.title'), false);
+    strictEqual(keys.has('dashboard.row.id'), false);
+    strictEqual(keys.get('field.name')?.template, 'N');
+  });
+
+  it('scopes `*` to one segment and `**` across segments', async () => {
+    const base = layer('disable2', {
+      'en.json': { 'field.email': 'E', 'field.email.hint': 'H', 'field.name': 'N' },
+    });
+    const star = await byKey([base], ['field.*']);
+    strictEqual(star.has('field.email'), false);
+    strictEqual(star.has('field.name'), false);
+    strictEqual(star.get('field.email.hint')?.template, 'H');
+    strictEqual((await byKey([base], ['field.**'])).size, 0);
+  });
+
+  it('drops a key contributed by a further layer', async () => {
+    const base = layer('disable3', { 'en.json': { 'secret.token': 'S', visible: 'V' } });
+    const app = layer('disable3-app', { 'en.json': { extra: 'E' } });
+    const keys = await byKey([base, app], ['secret.**']);
+    strictEqual(keys.has('secret.token'), false);
+    strictEqual(keys.get('visible')?.template, 'V');
+    strictEqual(keys.get('extra')?.template, 'E');
   });
 });

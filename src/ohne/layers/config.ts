@@ -115,6 +115,27 @@ export interface Config {
      * ```
      */
     routes?: string[];
+
+    /**
+     * Message keys to drop, as globs over the dot-separated key.
+     * `*` matches within one segment and `**` across them, so `dashboard.**` drops the whole group.
+     * A dropped key vanishes from the catalog endpoint, `useT`, and the generated `KnownMessages` type.
+     *
+     * @default
+     * []
+     *
+     * @example
+     * ```ts
+     * disable: {
+     *   messages: [
+     *     'dashboard.**',  // every key in the dashboard group
+     *     'field.email.*', // the direct keys under field.email
+     *     'legal.cookies', // a single key
+     *   ],
+     * }
+     * ```
+     */
+    messages?: string[];
   };
 
   /**
@@ -437,7 +458,7 @@ export interface ConfigExtensions {}
  */
 export const DEFAULTS = {
   layers: [],
-  disable: { routes: [] },
+  disable: { routes: [], messages: [] },
   messages: { defaultLanguage: 'en' },
   server: {
     preStopDelay: false,
@@ -479,12 +500,14 @@ export const DEFAULT_PORT = 9001;
  *
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
+ * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `server.port` and `server.host` stay each layer's own: both are private to the layer that sets them.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
   'disable.routes': 'concat-unique',
+  'disable.messages': 'concat-unique',
   printer: 'own',
   'server.port': 'own',
   'server.host': 'own',

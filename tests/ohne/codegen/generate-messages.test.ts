@@ -68,6 +68,26 @@ describe('generateMessages', () => {
     strictEqual(out.includes("'field.required': 'This field is required',"), true);
   });
 
+  it('drops disabled keys from the catalog and its types', async () => {
+    const app = join(root, 'disabled');
+    writePackage(app, { name: 'disabled', ohne: true });
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      "export default { disable: { messages: ['secret.**'] } }\n",
+    );
+    writeMessages(app, 'en.json', {
+      'field.required': 'This field is required',
+      'secret.token': 'do not ship',
+    });
+
+    await loadLayers(app);
+    const out = readFileSync((await generateMessages(app))!, 'utf8');
+
+    strictEqual(out.includes("'field.required'"), true);
+    strictEqual(out.includes('secret.token'), false);
+    strictEqual(out.includes('do not ship'), false);
+  });
+
   it('types a select parameter as a union of its keywords', async () => {
     const app = join(root, 'select');
     writePackage(app, { name: 'select', ohne: true });
