@@ -10,7 +10,7 @@ import {
   relativePath,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { routeId, type RouteMeta } from './route.ts';
+import { routeID, type RouteMeta } from './route.ts';
 
 /**
  * Reads every route file in one layer's API directory.
@@ -35,7 +35,7 @@ export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<Ro
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
       const { method, pattern } = pathToRoute(entry.relativePath);
-      const id = routeId(method, pattern);
+      const id = routeID(method, pattern);
       const clash = seen.get(id);
       if (!isUndefined(clash)) {
         throw ohneError({

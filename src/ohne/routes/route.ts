@@ -78,10 +78,10 @@ export interface Route extends RouteMeta {
  *
  * @example
  * ```ts
- * routeId('GET', '/users/[id]') // -> 'GET /users/[id]'
- * routeId(null, '/users/[id]')  // -> '/users/[id]'
+ * routeID('GET', '/users/[id]') // -> 'GET /users/[id]'
+ * routeID(null, '/users/[id]')  // -> '/users/[id]'
  * ```
  */
-export function routeId(method: HTTPMethod | null, pattern: string): string {
+export function routeID(method: HTTPMethod | null, pattern: string): string {
   return isNull(method) ? pattern : `${method} ${pattern}`;
 }

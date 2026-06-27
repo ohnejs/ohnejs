@@ -3,7 +3,7 @@ import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import { compileGlob, type HTTPMethod, isNull, naturalCompare } from '../../utils/index.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
 import { useLayers } from '../layers/use-layers.ts';
-import { routeId, type RouteMeta } from './route.ts';
+import { routeID, type RouteMeta } from './route.ts';
 import { scanLayerRoutes } from './scan-layer-routes.ts';
 
 /**
@@ -55,14 +55,14 @@ export async function collectRoutes(
   for (const layer of layers) {
     const dir = configByPath.get(layer.dir)?.dirs?.api ?? DIR_DEFAULTS.api;
     for (const route of await scanLayerRoutes(layer, dir)) {
-      table.set(routeId(route.method, route.pattern), route);
+      table.set(routeID(route.method, route.pattern), route);
     }
   }
 
   const drop = disabled(disable);
   return [...table.values()]
     .filter((route) => !drop(route))
-    .sort((a, b) => naturalCompare(routeId(a.method, a.pattern), routeId(b.method, b.pattern)));
+    .sort((a, b) => naturalCompare(routeID(a.method, a.pattern), routeID(b.method, b.pattern)));
 }
 
 function disabled(globs: string[]): (route: RouteMeta) => boolean {
