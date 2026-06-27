@@ -84,7 +84,6 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   }
   const host = useEnv().get('HOST') ?? config.host;
 
-  onShutdown(() => usePrinter().info('Shutting down'));
   onShutdown(() =>
     shutdownServer(http.server, http.gate, {
       preStopDelay: offToUndefined(config.preStopDelay),
@@ -94,9 +93,9 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
 
   const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
-  process.send?.('ready');
 
-  usePrinter().info(`Listening on "http://${host ?? 'localhost'}:${address.port}"`);
+  usePrinter().success(`Listening on \`http://${host ?? 'localhost'}:${address.port}\``);
+  process.send?.('ready');
   return http;
 }
 
