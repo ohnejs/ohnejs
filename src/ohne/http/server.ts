@@ -6,7 +6,14 @@ import type { Gate, HTTPMethod } from '../../utils/index.ts';
 import type { Route } from '../routes/route.ts';
 import type { RouteMatch, Router } from './router.ts';
 
-import { createGate, isNull, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
+import {
+  createGate,
+  errorMessage,
+  isNull,
+  isUndefined,
+  parseBytes,
+  parseDuration,
+} from '../../utils/index.ts';
 import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
@@ -284,7 +291,7 @@ async function handle(
       await sendResponse(res, toResponse(error, { status: error.status, headers: new Headers() }));
       return;
     }
-    usePrinter().error(`request failed: ${reason(error)}`);
+    usePrinter().error(`request failed: ${errorMessage(error)}`);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.end();
@@ -328,8 +335,4 @@ function limit(
 ): number | undefined {
   if (override === false) return undefined;
   return override ?? fallback;
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

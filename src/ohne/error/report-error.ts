@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Printer } from '../../utils/print/index.ts';
 
-import { isArray, isNull, isUndefined } from '../../utils/index.ts';
+import { errorMessage, isArray, isNull, isUndefined } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isOhneError } from './ohne-error.ts';
 
@@ -28,7 +28,7 @@ export function reportError(error: unknown, printer: Printer = usePrinter()): vo
   } else {
     printer.errorBlock({
       title: error instanceof Error ? error.name : 'Error',
-      body: error instanceof Error ? error.message : String(error),
+      body: errorMessage(error),
       path: errorLocation(error),
     });
   }

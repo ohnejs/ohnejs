@@ -1,4 +1,4 @@
-import { isUndefined, parseDuration } from '../../utils/index.ts';
+import { errorMessage, isUndefined, parseDuration } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 
 /**
@@ -149,7 +149,7 @@ async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
       try {
         await hook();
       } catch (error) {
-        usePrinter().error(`shutdown hook failed: ${reason(error)}`);
+        usePrinter().error(`shutdown hook failed: ${errorMessage(error)}`);
       }
     }
   })();
@@ -172,8 +172,4 @@ async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
 async function exit(options?: ShutdownRunOptions): Promise<void> {
   const { completed } = await shutdown.run(options);
   process.exit(completed ? 0 : 1);
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

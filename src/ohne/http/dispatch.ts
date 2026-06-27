@@ -3,7 +3,7 @@ import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 import type { Handler, Route } from '../routes/route.ts';
 import type { Event } from './event.ts';
 
-import { isUndefined, withTimeout } from '../../utils/index.ts';
+import { errorMessage, isUndefined, withTimeout } from '../../utils/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
@@ -104,7 +104,7 @@ export async function dispatch(
           });
       background.push(
         bounded.catch((error: unknown) => {
-          usePrinter().error(`waitUntil rejected: ${reason(error)}`);
+          usePrinter().error(`waitUntil rejected: ${errorMessage(error)}`);
         }),
       );
     },
@@ -152,10 +152,6 @@ async function drain(background: Promise<unknown>[]): Promise<void> {
 function logUnhandled(route: Route, error: unknown): void {
   usePrinter().errorBlock({
     title: `Unhandled error in ${route.method ?? 'ANY'} ${route.pattern}`,
-    body: error instanceof Error ? (error.stack ?? error.message) : reason(error),
+    body: error instanceof Error ? (error.stack ?? error.message) : errorMessage(error),
   });
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
