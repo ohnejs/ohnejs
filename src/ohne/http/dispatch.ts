@@ -102,12 +102,12 @@ export async function dispatch(
         ? promise
         : withTimeout(promise, waitUntilTimeout, () => {
             usePrinter().error(
-              `waitUntil timed out after ${waitUntilTimeout}ms in ${route.method ?? 'ANY'} ${route.pattern}`,
+              `\`waitUntil\` timed out after ${waitUntilTimeout}ms in \`${route.method ?? 'ANY'} ${route.pattern}\``,
             );
           });
       background.push(
         bounded.catch((error: unknown) => {
-          usePrinter().error(`waitUntil rejected: ${errorMessage(error)}`);
+          usePrinter().error(`\`waitUntil\` rejected: ${errorMessage(error)}`);
         }),
       );
     },
@@ -159,7 +159,7 @@ async function drain(background: Promise<unknown>[]): Promise<void> {
 
 function logUnhandled(route: Route, error: unknown): void {
   usePrinter().errorBlock({
-    title: `Unhandled error in ${route.method ?? 'ANY'} ${route.pattern}`,
+    title: `Unhandled error in \`${route.method ?? 'ANY'} ${route.pattern}\``,
     body: error instanceof Error ? (error.stack ?? error.message) : errorMessage(error),
   });
 }

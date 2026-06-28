@@ -17,7 +17,9 @@ registry.define('PORT', {
   parse: (raw) => {
     const port = coerceToInteger(raw);
     if (!isPort(port))
-      throw new Error(`Invalid PORT: ${raw}. Must be an integer between 0 and ${MAX_PORT}.`);
+      throw new Error(
+        `\`PORT\` must be an integer between \`0\` and \`${MAX_PORT}\`, got \`${raw}\`.`,
+      );
     return port;
   },
 });

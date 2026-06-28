@@ -50,6 +50,6 @@ export function tryUseEvent(): Event | undefined {
  */
 export function useEvent(): Event {
   const event = tryUseEvent();
-  if (isUndefined(event)) throw new Error('useEvent() called outside of a request.');
+  if (isUndefined(event)) throw new Error('`useEvent()` called outside of a request.');
   return event;
 }

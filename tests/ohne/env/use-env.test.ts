@@ -116,10 +116,10 @@ describe('useEnv', () => {
       strictEqual(useEnv().get('PORT'), 0);
 
       process.env['PORT'] = 'abc';
-      throws(() => useEnv().get('PORT'), /Invalid PORT/);
+      throws(() => useEnv().get('PORT'), /`PORT` must be an integer/);
 
       process.env['PORT'] = '99999';
-      throws(() => useEnv().get('PORT'), /Invalid PORT/);
+      throws(() => useEnv().get('PORT'), /`PORT` must be an integer/);
     });
   });
 

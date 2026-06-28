@@ -75,7 +75,9 @@ export interface CORSOptions {
  */
 export function cors(options: CORSOptions): Middleware {
   if (options.origin === '*' && options.credentials)
-    throw new Error("cors: origin '*' cannot be combined with credentials; list explicit origins.");
+    throw new Error(
+      "cors: `origin: '*'` cannot be combined with `credentials`; list explicit origins.",
+    );
 
   const wildcard = options.origin === '*';
   const origins = wildcard ? [] : toArray(options.origin);

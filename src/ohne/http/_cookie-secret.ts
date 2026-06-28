@@ -9,6 +9,6 @@ import { useEnv } from '../env/use-env.ts';
 export function cookieSecrets(): string[] {
   const secret = useEnv().get('COOKIE_SECRET');
   if (isUndefined(secret) || isEmpty(secret))
-    throw new Error('Signed cookies need the "COOKIE_SECRET" env var (a long random value).');
+    throw new Error('Signed cookies need the `COOKIE_SECRET` env var (a long random value).');
   return [secret];
 }
