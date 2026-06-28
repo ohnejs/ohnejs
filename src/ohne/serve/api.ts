@@ -65,6 +65,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
 
   const config = useConfig().server;
   const http = createServer(createRouter(Object.values(useRoutes().all())), {
+    basePath: config.basePath,
     headersTimeout: offToUndefined(config.headersTimeout),
     requestTimeout: offToUndefined(config.requestTimeout),
     keepAliveTimeout: offToUndefined(config.keepAliveTimeout),

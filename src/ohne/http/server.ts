@@ -11,8 +11,10 @@ import {
   errorMessage,
   isNull,
   isUndefined,
+  normalizeBasePath,
   parseBytes,
   parseDuration,
+  stripBasePath,
 } from '../../utils/index.ts';
 import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
@@ -173,6 +175,20 @@ export interface CreateServerOptions {
    * ```
    */
   allowedHosts?: string[];
+
+  /**
+   * Base path every route is mounted under.
+   * A request outside the prefix is answered `404`; inside it, the prefix is stripped before routing.
+   * The stripped path is what the router, handlers, and `matchPath` see, so routes stay prefix-free.
+   * Omitted, or empty, mounts at the root with no prefix.
+   *
+   * @example
+   * ```ts
+   * '/api'    // a GET /users route answers at /api/users
+   * '/api/v1' // nests deeper, GET /users answers at /api/v1/users
+   * ```
+   */
+  basePath?: string;
 }
 
 /**
@@ -208,13 +224,14 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
   const allowedHosts = options.allowedHosts?.length
     ? createHostMatcher(options.allowedHosts)
     : undefined;
+  const basePath = normalizeBasePath(options.basePath ?? '');
   const httpOptions: ServerOptions = {};
   if (!isUndefined(options.maxHeaderSize)) {
     httpOptions.maxHeaderSize = parseBytes(options.maxHeaderSize);
   }
   const server = createNodeServer(
     httpOptions,
-    (req, res) => void handle(router, gate, limits, trustProxy, allowedHosts, req, res),
+    (req, res) => void handle(router, gate, limits, trustProxy, allowedHosts, basePath, req, res),
   );
 
   if (!isUndefined(options.headersTimeout))
@@ -241,6 +258,7 @@ async function handle(
   limits: RequestLimits,
   trustProxy: (ip: string) => boolean,
   allowedHosts: ((hostname: string) => boolean) | undefined,
+  basePath: string,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -262,6 +280,15 @@ async function handle(
       });
       await sendResponse(res, response);
       return;
+    }
+
+    if (basePath !== '') {
+      const routePath = stripBasePath(url.pathname, basePath);
+      if (isNull(routePath)) {
+        await sendResponse(res, errorResponse({ type: 'not-found' }));
+        return;
+      }
+      url.pathname = routePath;
     }
 
     const method = (req.method ?? 'GET').toUpperCase() as HTTPMethod;

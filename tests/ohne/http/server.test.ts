@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { request } from 'node:http';
 import { afterEach, before, describe, it } from 'node:test';
@@ -329,6 +329,57 @@ describe('header size limit', () => {
         strictEqual(await statusWithHeaderOf(base, 8000), 431);
       },
       { maxHeaderSize: 2048 },
+    );
+  });
+});
+
+describe('base path', () => {
+  it('mounts routes under the prefix and strips it before the handler', async () => {
+    await withServer(
+      [
+        makeRoute('GET', '/users/[id]', () => ({
+          id: useEvent().params.id,
+          seen: useEvent().url.pathname,
+        })),
+      ],
+      async (base) => {
+        const res = await fetch(`${base}/api/users/42`);
+        strictEqual(res.status, 200);
+        deepStrictEqual(await res.json(), { id: '42', seen: '/users/42' });
+      },
+      { basePath: '/api' },
+    );
+  });
+
+  it('answers a request outside the prefix with 404', async () => {
+    await withServer(
+      [makeRoute('GET', '/users', () => 'ok')],
+      async (base) => {
+        const res = await fetch(`${base}/users`);
+        strictEqual(res.status, 404);
+        await res.body?.cancel();
+      },
+      { basePath: '/api' },
+    );
+  });
+
+  it('serves the mount root at the bare prefix', async () => {
+    await withServer(
+      [makeRoute('GET', '/', () => 'home')],
+      async (base) => {
+        strictEqual(await (await fetch(`${base}/api`)).text(), 'home');
+      },
+      { basePath: '/api' },
+    );
+  });
+
+  it('accepts any slash variant of the configured prefix', async () => {
+    await withServer(
+      [makeRoute('GET', '/ping', () => 'pong')],
+      async (base) => {
+        strictEqual(await (await fetch(`${base}/api/ping`)).text(), 'pong');
+      },
+      { basePath: 'api/' },
     );
   });
 });

@@ -176,6 +176,19 @@ export interface Config {
     host?: string;
 
     /**
+     * Base path every API route is mounted under.
+     * A request outside the prefix is a `404`; inside it, the prefix is stripped before routing.
+     * So `'/api'` serves a `/users` route at `/api/users`, and the handler still sees `/users`.
+     * Slashes are forgiving: `'/api'`, `'api/'`, and `'/api/'` all mean the same mount.
+     * Empty mounts at the root, with no prefix.
+     * Inherited across layers, so a base layer can mount a whole stack under one prefix.
+     *
+     * @default
+     * ''
+     */
+    basePath?: string;
+
+    /**
      * How long to keep serving after a shutdown signal before refusing connections.
      * Buys a load balancer time to deregister this instance first.
      * `false` refuses connections at once.
@@ -461,6 +474,7 @@ export const DEFAULTS = {
   disable: { routes: [], messages: [] },
   messages: { defaultLanguage: 'en' },
   server: {
+    basePath: '',
     preStopDelay: false,
     shutdownTimeout: false,
     deadline: false,
