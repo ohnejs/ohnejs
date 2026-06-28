@@ -24,6 +24,19 @@ export function runWithEvent<R>(event: Event, fn: () => R): R {
 }
 
 /**
+ * Returns the current request's `Event`, or `undefined` outside a request.
+ * The non-throwing counterpart to `useEvent`, for code that runs with or without a bound event.
+ *
+ * @example
+ * ```ts
+ * tryUseEvent()?.request.url // -> the inbound URL, or undefined outside a request
+ * ```
+ */
+export function tryUseEvent(): Event | undefined {
+  return store.getStore();
+}
+
+/**
  * Returns the current request's `Event`.
  * Reaches the event bound by `runWithEvent` at any call depth, the basis for every composable.
  *
@@ -36,7 +49,7 @@ export function runWithEvent<R>(event: Event, fn: () => R): R {
  * ```
  */
 export function useEvent(): Event {
-  const event = store.getStore();
+  const event = tryUseEvent();
   if (isUndefined(event)) throw new Error('useEvent() called outside of a request.');
   return event;
 }
