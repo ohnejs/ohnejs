@@ -1,6 +1,6 @@
 import type { ResponseInit as EventResponse } from './event.ts';
 
-import { isNullish, isString, isUndefined } from '../../utils/index.ts';
+import { isNullish, isString, isUndefined, vary } from '../../utils/index.ts';
 import { HTTPError } from './http-error.ts';
 
 /**
@@ -51,15 +51,18 @@ export function toResponse(value: unknown, init: EventResponse): Response {
 }
 
 /**
- * Merges `extra` onto a verbatim `Response`, the Response winning per name, cookies accumulating.
+ * Merges `extra` onto a verbatim `Response`, the Response winning per name.
+ * `vary` is unioned and `set-cookie` accumulates, so a verbatim Response cannot drop a negotiated `Vary`.
  * Rebuilds rather than mutating in place: a `Response.redirect()` carries immutable headers.
  */
 function mergeHeaders(response: Response, extra: Headers): Response {
   const headers = new Headers(response.headers);
   for (const [name, value] of extra) {
-    if (name === 'set-cookie') continue;
+    if (name === 'set-cookie' || name === 'vary') continue;
     if (!headers.has(name)) headers.set(name, value);
   }
+  const merged = vary(headers.get('vary') ?? '', extra.get('vary') ?? '');
+  if (merged !== '') headers.set('vary', merged);
   for (const cookie of extra.getSetCookie()) headers.append('set-cookie', cookie);
   return new Response(response.body, {
     status: response.status,

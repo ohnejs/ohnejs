@@ -40,6 +40,19 @@ describe('toResponse', () => {
     deepStrictEqual(response.headers.getSetCookie(), ['handler=1', 'session=abc', 'csrf=xyz']);
   });
 
+  it('unions vary from init and a verbatim Response, keeping the cors Vary: Origin', () => {
+    const headers = new Headers({
+      'access-control-allow-origin': 'https://a.example',
+      vary: 'Origin',
+    });
+    const response = toResponse(new Response('body', { headers: { vary: 'Accept-Encoding' } }), {
+      status: 200,
+      headers,
+    });
+    strictEqual(response.headers.get('access-control-allow-origin'), 'https://a.example');
+    strictEqual(response.headers.get('vary'), 'Accept-Encoding, Origin');
+  });
+
   it('merges init headers onto an immutable redirect Response', () => {
     const headers = new Headers({ 'access-control-allow-origin': 'https://app.example.com' });
     const response = toResponse(Response.redirect('https://app.example.com/login', 302), {
