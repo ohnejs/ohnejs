@@ -18,7 +18,7 @@ describe('generateMessages', () => {
   function writePackage(at: string, spec: PackageSpec): void {
     mkdirSync(at, { recursive: true });
     const { ohne, ...manifest } = spec;
-    writeFileSync(join(at, 'package.json'), JSON.stringify(manifest));
+    writeFileSync(join(at, 'package.json'), JSON.stringify({ ...manifest, type: 'module' }));
     if (ohne) writeFileSync(join(at, 'ohne.config.ts'), '');
   }
 
