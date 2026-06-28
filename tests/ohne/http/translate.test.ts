@@ -73,6 +73,16 @@ describe('translate', () => {
     });
   });
 
+  it('resolves the default inside a request with no `Accept-Language`, not catalog order', async () => {
+    await setup({
+      de: { 'api.http.notFound': 'Nicht gefunden' },
+      en: { 'api.http.notFound': 'Not Found' },
+    });
+    runWithEvent(makeEvent(), () => {
+      strictEqual(translate('api.http.notFound'), 'Not Found');
+    });
+  });
+
   it('formats a backticked parameter', async () => {
     await setup({ en: { 'api.messages.unknownGroup': 'Unknown message group `{group}`' } });
     strictEqual(

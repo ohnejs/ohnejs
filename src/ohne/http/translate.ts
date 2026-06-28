@@ -62,6 +62,7 @@ export function translateIn(key: string, language: string, params?: MessageParam
 /**
  * Resolves the request's active language, falling back to the default language outside a request.
  * Inside a request it is `context.locale` when set, otherwise the best `Accept-Language` match.
+ * A request with no `Accept-Language` resolves to the default, not whatever the catalog lists first.
  */
 export function activeLanguage(): string {
   const fallback = defaultLanguage();
@@ -69,7 +70,9 @@ export function activeLanguage(): string {
   if (isUndefined(event)) return fallback;
   if (!isUndefined(event.context.locale))
     return canonicalizeLanguage(event.context.locale) ?? fallback;
-  return useAcceptsLanguages(Object.keys(useMessages().all())) ?? fallback;
+  // Offer the default first, so no `Accept-Language` (or a bare `*`) resolves to it, not catalog order.
+  const offered = uniqueArray([fallback, ...Object.keys(useMessages().all())]);
+  return useAcceptsLanguages(offered) ?? fallback;
 }
 
 function lookup(key: string, language: string): { template: string; language: string } | undefined {
