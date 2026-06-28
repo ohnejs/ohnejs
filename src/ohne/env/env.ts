@@ -3,8 +3,8 @@
  * Add fields by augmenting it from a layer with `declare module 'ohne'`.
  *
  * Built-ins:
- * - `PORT` - overrides `Config.server.port` when set.
- * - `HOST` - overrides `Config.server.host` when set.
+ * - `PORT` - overrides `Config.api.port` when set.
+ * - `HOST` - overrides `Config.api.host` when set.
  * - `COOKIE_SECRET` - signs cookies set with `setSignedCookie`; required to use signed cookies.
  * - `SILENT` - truthy disables every printer call.
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
@@ -23,7 +23,7 @@
  */
 export interface Env {
   /**
-   * Port override for the HTTP server, taking precedence over `Config.server.port`.
+   * Port override for the HTTP server, taking precedence over `Config.api.port`.
    *
    * @default
    * undefined
@@ -31,7 +31,7 @@ export interface Env {
   PORT: number | undefined;
 
   /**
-   * Host override for the HTTP server, taking precedence over `Config.server.host`.
+   * Host override for the HTTP server, taking precedence over `Config.api.host`.
    *
    * @default
    * undefined

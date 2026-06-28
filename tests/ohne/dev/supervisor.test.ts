@@ -77,7 +77,7 @@ describe('dev', () => {
     writeFileSync(join(app, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(
       join(app, 'ohne.config.ts'),
-      `export default { server: { port: ${port} }, printer: { silent: ${silent} } }\n`,
+      `export default { api: { port: ${port} }, printer: { silent: ${silent} } }\n`,
     );
     return app;
   }

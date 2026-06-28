@@ -37,7 +37,7 @@ import { useRoutes } from '../routes/use-routes.ts';
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.
  * With an IPC parent, it signals `'ready'` after the funnel is watching, so a supervisor can drive reloads.
  *
- * Port and host come from `Config.server`, overridden by the `PORT` and `HOST` env vars when set.
+ * Port and host come from `Config.api`, overridden by the `PORT` and `HOST` env vars when set.
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
 export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer> {
@@ -63,7 +63,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     }
   }
 
-  const config = useConfig().server;
+  const config = useConfig().api;
   const http = createServer(createRouter(Object.values(useRoutes().all())), {
     basePath: config.basePath,
     headersTimeout: offToUndefined(config.headersTimeout),

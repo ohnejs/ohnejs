@@ -154,11 +154,11 @@ export interface Config {
   };
 
   /**
-   * HTTP server settings consumed by `serveAPI`.
+   * Settings for the API's HTTP server, consumed by `serveAPI`.
    * Every timeout accepts a `parseDuration` value: milliseconds as a number, or a string like `'10s'`.
    * `false` disables the corresponding limit.
    */
-  server?: {
+  api?: {
     /**
      * Port the server listens on.
      * The `PORT` env var overrides it when set.
@@ -462,7 +462,7 @@ export interface ConfigExtensions {}
  *
  * ---
  *
- * `server.port` and `server.host` are absent for the same reason: both are `'own'` (layer-private).
+ * `api.port` and `api.host` are absent for the same reason: both are `'own'` (layer-private).
  * A merged default never applies to an `'own'` key.
  *
  * ---
@@ -473,7 +473,7 @@ export const DEFAULTS = {
   layers: [],
   disable: { routes: [], messages: [] },
   messages: { defaultLanguage: 'en' },
-  server: {
+  api: {
     basePath: '',
     preStopDelay: false,
     shutdownTimeout: false,
@@ -504,8 +504,8 @@ export const DIR_DEFAULTS = {
 } satisfies NonNullable<Config['dirs']>;
 
 /**
- * Default port `serveAPI` listens on when no layer sets `server.port` and `PORT` is unset.
- * Read at point of use, like `DIR_DEFAULTS`, because `server.port` is `'own'` (layer-private).
+ * Default port `serveAPI` listens on when no layer sets `api.port` and `PORT` is unset.
+ * Read at point of use, like `DIR_DEFAULTS`, because `api.port` is `'own'` (layer-private).
  */
 export const DEFAULT_PORT = 9001;
 
@@ -516,15 +516,15 @@ export const DEFAULT_PORT = 9001;
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
  * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
- * - `server.port` and `server.host` stay each layer's own: both are private to the layer that sets them.
+ * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
   'disable.routes': 'concat-unique',
   'disable.messages': 'concat-unique',
   printer: 'own',
-  'server.port': 'own',
-  'server.host': 'own',
+  'api.port': 'own',
+  'api.host': 'own',
 };
 
 /**

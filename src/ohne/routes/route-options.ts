@@ -3,7 +3,7 @@ import type { AnyHandler } from './route.ts';
 
 /**
  * Per-route configuration, declared on a handler through `defineHandler`.
- * Each limit field overrides the server-wide `Config.server` default for this one route.
+ * Each limit field overrides the server-wide `Config.api` default for this one route.
  * A limit set to `false` opts the route out entirely, so the route owns its own bounding.
  * The `middleware` field selects which named middleware run for the route, after the global ones.
  */

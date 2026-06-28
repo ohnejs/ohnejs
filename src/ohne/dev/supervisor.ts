@@ -173,7 +173,7 @@ export async function dev(
   }
 
   async function resolvePort(): Promise<number> {
-    const configured = useEnv().get('PORT') ?? useConfig().server.port ?? DEFAULT_PORT;
+    const configured = useEnv().get('PORT') ?? useConfig().api.port ?? DEFAULT_PORT;
     return configured === 0 ? freePort() : configured;
   }
 
