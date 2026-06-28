@@ -10,7 +10,7 @@
  * ```ts
  * declare module 'ohne' {
  *   interface Hooks {
- *     'render:html:before': (html: string) => string
+ *     'request:id': (id: string) => string
  *     'server:ready': () => void | Promise<void>
  *   }
  * }

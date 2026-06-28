@@ -24,13 +24,13 @@ import { useHooks } from './use-hooks.ts';
  * ```ts
  * declare module 'ohne' {
  *   interface Hooks {
- *     'render:html:before': (html: string) => string
+ *     'request:id': (id: string) => string
  *     'server:ready': () => void
  *   }
  * }
  *
- * const html = await applyHook('render:html:before', '<h1>hi</h1>') // filter
- * await applyHook('server:ready')                                   // action
+ * const id = await applyHook('request:id', 'req_8f2a') // filter
+ * await applyHook('server:ready')                      // action
  * ```
  */
 export async function applyHook<K extends HookName>(

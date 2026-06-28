@@ -13,7 +13,7 @@ import { useHooks } from './use-hooks.ts';
  *
  * @example
  * ```ts
- * hook('render:html:before', (html) => html.trim())
+ * hook('request:id', (id) => id.toUpperCase())
  * hook('server:ready', async () => { await warmCache() })
  * ```
  */
