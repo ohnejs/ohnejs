@@ -71,7 +71,12 @@ describe('GET /messages/:group/:language', () => {
   });
 
   it('responds 404 for a group with no keys', async () => {
-    await setup({ en: { 'field.required': 'Required' } });
+    await setup({
+      en: {
+        'field.required': 'Required',
+        'api.messages.unknownGroup': 'Unknown message group `{group}`',
+      },
+    });
     throws(
       () => handler({ params: { group: 'dashboard', language: 'en' } }),
       /Unknown message group `dashboard`/,
@@ -79,7 +84,12 @@ describe('GET /messages/:group/:language', () => {
   });
 
   it('responds 400 for a malformed language tag', async () => {
-    await setup({ en: { 'field.required': 'Required' } });
+    await setup({
+      en: {
+        'field.required': 'Required',
+        'api.messages.invalidLanguage': 'Invalid language `{language}`',
+      },
+    });
     throws(
       () => handler({ params: { group: 'field', language: 'en_US' } }),
       /Invalid language `en_US`/,

@@ -8,6 +8,8 @@ import {
   uniqueArray,
 } from 'ohne/utils';
 
+import { translate } from '../../../../ohne/http/translate.ts';
+
 /**
  * `GET /messages/:group/:language`
  *
@@ -18,7 +20,8 @@ import {
  */
 export default defineHandler(({ params }): Record<string, string> => {
   const language = canonicalizeLanguage(params.language);
-  if (isNull(language)) throw badRequest(`Invalid language \`${params.language}\``);
+  if (isNull(language))
+    throw badRequest(translate('api.messages.invalidLanguage', { language: params.language }));
 
   const configured = useConfig().messages.defaultLanguage;
   const fallback = canonicalizeLanguage(configured) ?? configured;
@@ -34,7 +37,7 @@ export default defineHandler(({ params }): Record<string, string> => {
     }
   }
 
-  if (isEmpty(result)) throw notFound(`Unknown message group \`${group}\``);
+  if (isEmpty(result)) throw notFound(translate('api.messages.unknownGroup', { group }));
   return result;
 });
 
