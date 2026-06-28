@@ -20,6 +20,8 @@ declare module 'ohne' {
      * Active language for the request, as a BCP-47 tag.
      * `useT` reads it first, before negotiating `Accept-Language`.
      * Set it from a middleware to force the language: from a cookie, a route segment, or a user setting.
+     *
+     * Setting it skips `Accept-Language` negotiation, so no `Vary` is added.
      */
     locale?: string;
   }
