@@ -1,0 +1,25 @@
+{
+  "body": {
+    "empty": "Anfragekörper ist leer",
+    "invalidForm": "Anfragekörper sind keine gültigen Formulardaten",
+    "invalidJSON": "Anfragekörper ist kein gültiges JSON",
+    "invalidUTF8": "Anfragekörper ist kein gültiges UTF-8"
+  },
+  "http": {
+    "badRequest": "Ungültige Anfrage",
+    "contentTooLarge": "Inhalt zu groß",
+    "forbidden": "Verboten",
+    "internalServerError": "Interner Serverfehler",
+    "methodNotAllowed": "Methode nicht erlaubt",
+    "notFound": "Nicht gefunden",
+    "serviceUnavailable": "Dienst nicht verfügbar",
+    "tooManyRequests": "Zu viele Anfragen",
+    "unauthorized": "Nicht autorisiert",
+    "unprocessableContent": "Nicht verarbeitbarer Inhalt",
+    "unsupportedMediaType": "Nicht unterstützter Medientyp"
+  },
+  "messages": {
+    "invalidLanguage": "Ungültige Sprache `{language}`",
+    "unknownGroup": "Unbekannte Nachrichtengruppe `{group}`"
+  }
+}

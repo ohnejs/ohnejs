@@ -1,0 +1,25 @@
+{
+  "body": {
+    "empty": "Tijelo zahtjeva je prazno",
+    "invalidForm": "Tijelo zahtjeva nisu važeći podaci forme",
+    "invalidJSON": "Tijelo zahtjeva nije važeći JSON",
+    "invalidUTF8": "Tijelo zahtjeva nije važeći UTF-8"
+  },
+  "http": {
+    "badRequest": "Neispravan zahtjev",
+    "contentTooLarge": "Sadržaj prevelik",
+    "forbidden": "Zabranjeno",
+    "internalServerError": "Interna greška servera",
+    "methodNotAllowed": "Metoda nije dozvoljena",
+    "notFound": "Nije pronađeno",
+    "serviceUnavailable": "Usluga nedostupna",
+    "tooManyRequests": "Previše zahtjeva",
+    "unauthorized": "Niste autorizovani",
+    "unprocessableContent": "Neobradiv sadržaj",
+    "unsupportedMediaType": "Nepodržan tip medija"
+  },
+  "messages": {
+    "invalidLanguage": "Neispravan jezik `{language}`",
+    "unknownGroup": "Nepoznata grupa poruka `{group}`"
+  }
+}

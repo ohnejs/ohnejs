@@ -1,0 +1,25 @@
+{
+  "body": {
+    "empty": "Request body is empty",
+    "invalidForm": "Request body is not valid form data",
+    "invalidJSON": "Request body is not valid JSON",
+    "invalidUTF8": "Request body is not valid UTF-8"
+  },
+  "http": {
+    "badRequest": "Bad Request",
+    "contentTooLarge": "Content Too Large",
+    "forbidden": "Forbidden",
+    "internalServerError": "Internal Server Error",
+    "methodNotAllowed": "Method Not Allowed",
+    "notFound": "Not Found",
+    "serviceUnavailable": "Service Unavailable",
+    "tooManyRequests": "Too Many Requests",
+    "unauthorized": "Unauthorized",
+    "unprocessableContent": "Unprocessable Content",
+    "unsupportedMediaType": "Unsupported Media Type"
+  },
+  "messages": {
+    "invalidLanguage": "Invalid language `{language}`",
+    "unknownGroup": "Unknown message group `{group}`"
+  }
+}
