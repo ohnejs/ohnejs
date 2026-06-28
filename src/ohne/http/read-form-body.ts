@@ -1,6 +1,7 @@
 import { isUndefined, parseMediaType } from '../../utils/index.ts';
 import { badRequest, unsupportedMediaType } from './http-error.ts';
 import { readRawBody } from './read-raw-body.ts';
+import { translate } from './translate.ts';
 import { useRequest } from './use-request.ts';
 
 /**
@@ -32,6 +33,6 @@ export async function readFormBody(): Promise<FormData> {
   try {
     return await new Response(bytes, { headers: { 'content-type': contentType } }).formData();
   } catch {
-    throw badRequest('Request body is not valid form data');
+    throw badRequest(translate('api.body.invalidForm'));
   }
 }

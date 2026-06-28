@@ -112,7 +112,7 @@ describe('dispatch', () => {
     strictEqual(response.status, 503);
     deepStrictEqual(await response.json(), {
       statusCode: 503,
-      message: 'Service Unavailable',
+      message: 'api.http.serviceUnavailable',
     });
   });
 
@@ -130,7 +130,7 @@ describe('dispatch', () => {
     const { response } = await dispatch(route, req(), url(), {});
     strictEqual(response.status, 500);
     const body = await response.json();
-    deepStrictEqual(body, { statusCode: 500, message: 'Internal Server Error' });
+    deepStrictEqual(body, { statusCode: 500, message: 'api.http.internalServerError' });
     ok(!JSON.stringify(body).includes('db exploded'));
   });
 

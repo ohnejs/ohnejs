@@ -27,14 +27,14 @@ describe('HTTPError', () => {
 });
 
 describe('HTTPError constructors', () => {
-  it('map to their status with a default message', () => {
+  it('map to their status, the message defaulting to the catalog key', () => {
     strictEqual(badRequest().status, 400);
-    strictEqual(badRequest().message, 'Bad Request');
+    strictEqual(badRequest().message, 'api.http.badRequest');
     strictEqual(unauthorized().status, 401);
     strictEqual(forbidden().status, 403);
     strictEqual(notFound().status, 404);
     strictEqual(unprocessable().status, 422);
-    strictEqual(unprocessable().message, 'Unprocessable Content');
+    strictEqual(unprocessable().message, 'api.http.unprocessableContent');
     strictEqual(tooManyRequests().status, 429);
   });
 

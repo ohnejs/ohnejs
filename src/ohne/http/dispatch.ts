@@ -11,6 +11,7 @@ import { usePrinter } from '../printer/use-printer.ts';
 import { HTTPError } from './http-error.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
+import { translate } from './translate.ts';
 import { runWithEvent } from './use-event.ts';
 
 /**
@@ -127,14 +128,17 @@ export async function dispatch(
     } catch (error) {
       if (error instanceof HTTPError) return toResponse(error, event.response);
       logUnhandled(route, error);
-      return toResponse(new HTTPError(500, 'Internal Server Error'), event.response);
+      return toResponse(
+        new HTTPError(500, translate('api.http.internalServerError')),
+        event.response,
+      );
     }
   });
 
   const response = isUndefined(options.handlerTimeout)
     ? await run
     : await withTimeout(run, options.handlerTimeout, () =>
-        toResponse(new HTTPError(503, 'Service Unavailable'), {
+        toResponse(new HTTPError(503, translate('api.http.serviceUnavailable')), {
           status: 503,
           headers: new Headers(),
         }),

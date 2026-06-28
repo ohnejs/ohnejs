@@ -23,6 +23,7 @@ import { dispatch } from './dispatch.ts';
 import { HTTPError } from './http-error.ts';
 import { routeLimits } from './route-limits.ts';
 import { toResponse } from './to-response.ts';
+import { translate } from './translate.ts';
 import { useResponse } from './use-response.ts';
 
 /**
@@ -274,7 +275,7 @@ async function handle(
   try {
     const url = toURL(req, trustProxy);
     if (allowedHosts && !allowedHosts(url.hostname)) {
-      const response = toResponse(new HTTPError(400, 'Bad Request'), {
+      const response = toResponse(new HTTPError(400, translate('api.http.badRequest')), {
         status: 400,
         headers: new Headers(),
       });
@@ -333,9 +334,12 @@ function errorResponse(match: Exclude<RouteMatch, { type: 'matched' | 'options' 
   const headers = new Headers();
   if (match.type === 'method-not-allowed') {
     headers.set('Allow', match.allow.join(', '));
-    return toResponse(new HTTPError(405, 'Method Not Allowed'), { status: 405, headers });
+    return toResponse(new HTTPError(405, translate('api.http.methodNotAllowed')), {
+      status: 405,
+      headers,
+    });
   }
-  return toResponse(new HTTPError(404, 'Not Found'), { status: 404, headers });
+  return toResponse(new HTTPError(404, translate('api.http.notFound')), { status: 404, headers });
 }
 
 /**

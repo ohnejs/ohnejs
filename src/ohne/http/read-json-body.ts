@@ -1,6 +1,7 @@
 import { parseMediaType } from '../../utils/index.ts';
 import { badRequest, unsupportedMediaType } from './http-error.ts';
 import { readTextBody } from './read-text-body.ts';
+import { translate } from './translate.ts';
 import { useRequest } from './use-request.ts';
 
 /**
@@ -21,11 +22,11 @@ export async function readJSONBody<T = unknown>(): Promise<T> {
   if (type !== 'application/json' && !type.endsWith('+json')) throw unsupportedMediaType();
 
   const text = await readTextBody();
-  if (text === '') throw badRequest('Request body is empty');
+  if (text === '') throw badRequest(translate('api.body.empty'));
 
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw badRequest('Request body is not valid JSON');
+    throw badRequest(translate('api.body.invalidJSON'));
   }
 }

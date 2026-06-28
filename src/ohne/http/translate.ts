@@ -8,6 +8,7 @@ import {
   parseMessage,
   uniqueArray,
 } from '../../utils/index.ts';
+import { DEFAULTS } from '../layers/config.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { useMessages } from '../messages/use-messages.ts';
 import { useAcceptsLanguages } from './use-accepts-languages.ts';
@@ -79,7 +80,7 @@ function lookup(key: string, language: string): { template: string; language: st
 }
 
 function defaultLanguage(): string {
-  const configured = useConfig().messages.defaultLanguage;
+  const configured = useConfig().messages?.defaultLanguage ?? DEFAULTS.messages.defaultLanguage;
   return canonicalizeLanguage(configured) ?? configured;
 }
 

@@ -1,6 +1,7 @@
 import { decodeText, isUndefined } from '../../utils/index.ts';
 import { badRequest } from './http-error.ts';
 import { readRawBody } from './read-raw-body.ts';
+import { translate } from './translate.ts';
 
 /**
  * Reads the request body as a UTF-8 string, or `''` when there is none.
@@ -19,6 +20,6 @@ export async function readTextBody(): Promise<string> {
   try {
     return decodeText(bytes);
   } catch {
-    throw badRequest('Request body is not valid UTF-8');
+    throw badRequest(translate('api.body.invalidUTF8'));
   }
 }

@@ -1,3 +1,5 @@
+import { translate } from './translate.ts';
+
 /**
  * An error that carries an HTTP status.
  *
@@ -37,7 +39,7 @@ export class HTTPError extends Error {
  * throw badRequest('Missing `email`')
  * ```
  */
-export function badRequest(message = 'Bad Request', data?: unknown): HTTPError {
+export function badRequest(message = translate('api.http.badRequest'), data?: unknown): HTTPError {
   return new HTTPError(400, message, data);
 }
 
@@ -49,7 +51,10 @@ export function badRequest(message = 'Bad Request', data?: unknown): HTTPError {
  * throw unauthorized()
  * ```
  */
-export function unauthorized(message = 'Unauthorized', data?: unknown): HTTPError {
+export function unauthorized(
+  message = translate('api.http.unauthorized'),
+  data?: unknown,
+): HTTPError {
   return new HTTPError(401, message, data);
 }
 
@@ -61,7 +66,7 @@ export function unauthorized(message = 'Unauthorized', data?: unknown): HTTPErro
  * throw forbidden('Admins only')
  * ```
  */
-export function forbidden(message = 'Forbidden', data?: unknown): HTTPError {
+export function forbidden(message = translate('api.http.forbidden'), data?: unknown): HTTPError {
   return new HTTPError(403, message, data);
 }
 
@@ -73,7 +78,7 @@ export function forbidden(message = 'Forbidden', data?: unknown): HTTPError {
  * throw notFound('No such user')
  * ```
  */
-export function notFound(message = 'Not Found', data?: unknown): HTTPError {
+export function notFound(message = translate('api.http.notFound'), data?: unknown): HTTPError {
   return new HTTPError(404, message, data);
 }
 
@@ -86,7 +91,10 @@ export function notFound(message = 'Not Found', data?: unknown): HTTPError {
  * throw payloadTooLarge()
  * ```
  */
-export function payloadTooLarge(message = 'Content Too Large', data?: unknown): HTTPError {
+export function payloadTooLarge(
+  message = translate('api.http.contentTooLarge'),
+  data?: unknown,
+): HTTPError {
   return new HTTPError(413, message, data);
 }
 
@@ -100,7 +108,7 @@ export function payloadTooLarge(message = 'Content Too Large', data?: unknown): 
  * ```
  */
 export function unsupportedMediaType(
-  message = 'Unsupported Media Type',
+  message = translate('api.http.unsupportedMediaType'),
   data?: unknown,
 ): HTTPError {
   return new HTTPError(415, message, data);
@@ -115,7 +123,10 @@ export function unsupportedMediaType(
  * throw unprocessable('Password too short', { field: 'password' })
  * ```
  */
-export function unprocessable(message = 'Unprocessable Content', data?: unknown): HTTPError {
+export function unprocessable(
+  message = translate('api.http.unprocessableContent'),
+  data?: unknown,
+): HTTPError {
   return new HTTPError(422, message, data);
 }
 
@@ -127,6 +138,9 @@ export function unprocessable(message = 'Unprocessable Content', data?: unknown)
  * throw tooManyRequests()
  * ```
  */
-export function tooManyRequests(message = 'Too Many Requests', data?: unknown): HTTPError {
+export function tooManyRequests(
+  message = translate('api.http.tooManyRequests'),
+  data?: unknown,
+): HTTPError {
   return new HTTPError(429, message, data);
 }
