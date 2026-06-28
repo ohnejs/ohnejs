@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { importClosure, normalizePath } from '../../../src/utils/index.ts';
+import { importClosure } from '../../../src/utils/imports/index.ts';
+import { normalizePath } from '../../../src/utils/index.ts';
 
 describe('importClosure', () => {
   let dir: string;

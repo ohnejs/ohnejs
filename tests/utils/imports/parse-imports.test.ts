@@ -1,7 +1,7 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { parseImports } from '../../../src/utils/index.ts';
+import { parseImports } from '../../../src/utils/imports/index.ts';
 
 describe('parseImports', () => {
   it('captures static named, default, and namespace imports', () => {
