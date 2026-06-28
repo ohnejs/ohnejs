@@ -6,14 +6,14 @@ import { isOhneProject } from '../../project/is-ohne-project.ts';
 
 /**
  * The `ohne dev` command.
- * Watches the project at `--cwd` and reloads the API server on every change.
+ * Watches the project at `--cwd`, reloads the API server on every change, and serves the dashboard.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
  */
 export const devCommand = defineCommand({
   meta: {
     name: 'dev',
-    description: 'Watch the project and reload the API server on change.',
+    description: 'Watch the project, reload the API on change, and serve the dashboard.',
   },
   args: {
     cwd: { type: 'string', description: 'Project root to watch.' },

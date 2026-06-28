@@ -7,9 +7,9 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  type APIChild,
   type ChildExit,
-  spawnAPIChild,
+  type ServeChild,
+  spawnServeChild,
 } from '../../../src/ohne/dev/child-server.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
@@ -26,9 +26,9 @@ function freePort(): Promise<number> {
   });
 }
 
-describe('spawnAPIChild', () => {
+describe('spawnServeChild', () => {
   let root: string;
-  let children: APIChild[];
+  let children: ServeChild[];
 
   function writeProject(name: string): string {
     const app = join(root, name);
@@ -58,12 +58,12 @@ describe('spawnAPIChild', () => {
     const app = writeProject('serves');
     const port = await freePort();
 
-    const first = spawnAPIChild(app, { port, entry: BIN });
+    const first = spawnServeChild(app, 'api', { port, entry: BIN });
     children.push(first);
     await first.ready;
     await first.stop();
 
-    const second = spawnAPIChild(app, { port, entry: BIN });
+    const second = spawnServeChild(app, 'api', { port, entry: BIN });
     children.push(second);
     await second.ready;
     await second.stop();
@@ -74,7 +74,7 @@ describe('spawnAPIChild', () => {
     mkdirSync(join(app, 'boot'), { recursive: true });
     writeFileSync(join(app, 'boot', 'crash.ts'), 'process.exit(1)\n');
 
-    const child = spawnAPIChild(app, { entry: BIN });
+    const child = spawnServeChild(app, 'api', { entry: BIN });
     children.push(child);
     await rejects(child.ready);
   });
@@ -89,7 +89,11 @@ describe('spawnAPIChild', () => {
     const exited = new Promise<ChildExit>((resolve) => {
       resolveExit = resolve;
     });
-    const child = spawnAPIChild(app, { port, entry: BIN, onExit: (exit) => resolveExit(exit) });
+    const child = spawnServeChild(app, 'api', {
+      port,
+      entry: BIN,
+      onExit: (exit) => resolveExit(exit),
+    });
     children.push(child);
 
     await child.ready;

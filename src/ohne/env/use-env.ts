@@ -24,6 +24,7 @@ registry.define('PORT', {
   },
 });
 registry.define('HOST', { default: undefined, parse: (raw) => raw });
+registry.define('API_URL', { default: undefined, parse: (raw) => raw });
 registry.define('COOKIE_SECRET', { default: undefined });
 registry.define('SILENT', { default: false, parse: parseBoolean });
 registry.define('DEBUG', { default: false, parse: (raw) => isDebugEnabled('ohne', raw) });

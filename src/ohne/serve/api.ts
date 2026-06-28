@@ -17,7 +17,7 @@ import { ohneError } from '../error/ohne-error.ts';
 import { createRouter } from '../http/router.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
-import { DEFAULT_PORT, offToUndefined } from '../layers/config.ts';
+import { DEFAULT_API_PORT, offToUndefined } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
@@ -78,7 +78,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     allowedHosts: config.allowedHosts,
   });
 
-  const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_PORT;
+  const port = useEnv().get('PORT') ?? config.port ?? DEFAULT_API_PORT;
   if (!isPort(port)) {
     throw ohneError({
       title: 'Invalid server port',
@@ -97,7 +97,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
 
-  usePrinter().success(`Listening on \`http://${host ?? 'localhost'}:${address.port}\``);
+  usePrinter().success(`API ready at \`http://${host ?? 'localhost'}:${address.port}\``);
   process.send?.('ready');
   return http;
 }

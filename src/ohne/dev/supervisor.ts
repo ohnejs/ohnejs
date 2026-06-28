@@ -1,15 +1,15 @@
 import { createServer } from 'node:net';
 
-import { debounce, extname, isNull } from '../../utils/index.ts';
+import { debounce, extname, isNull, normalizeBasePath } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { reportError } from '../error/report-error.ts';
-import { DEFAULT_PORT } from '../layers/config.ts';
+import { DEFAULT_API_PORT, DEFAULT_DASHBOARD_PORT } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { type APIChild, spawnAPIChild } from './child-server.ts';
+import { type ServeChild, spawnServeChild } from './child-server.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
@@ -24,7 +24,7 @@ const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.
  */
 export interface DevServer {
   /**
-   * Stops watching and drains the current child, resolving once it has exited.
+   * Stops watching and drains the running children, resolving once they have exited.
    * Idempotent.
    */
   close(): Promise<void>;
@@ -35,12 +35,20 @@ export interface DevServer {
  */
 export interface DevOptions {
   /**
-   * CLI entry to spawn the server child with, as `node <entry> serve api`.
+   * CLI entry to spawn the server children with, as `node <entry> serve <backend>`.
    *
    * @default
    * process.argv[1]
    */
   entry?: string;
+
+  /**
+   * Whether to also serve the dashboard alongside the API.
+   *
+   * @default
+   * true
+   */
+  dashboard?: boolean;
 }
 
 /**
@@ -52,6 +60,9 @@ export interface DevOptions {
  *
  * Codegen failures and child crashes never tear the supervisor down.
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
+ *
+ * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
+ * The dashboard reads its modules from disk per request, so it never reloads; it only stops on teardown.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
@@ -69,10 +80,13 @@ export async function dev(
   const targets = [routes, middleware, messages];
   const port = await resolvePort();
 
-  let child: APIChild | null = null;
+  let api: ServeChild | null = null;
+  let dashboard: ServeChild | null = null;
   const pending = new Set<string>();
   let cycling = false;
   let rerun = false;
+
+  if (options.dashboard ?? true) await startDashboard();
 
   let codegenOK = false;
   try {
@@ -129,7 +143,7 @@ export async function dev(
     }
     const paths = [...batch];
     if (!paths.some(isSource) && !paths.some((path) => messages.affectedBy(path))) return;
-    printer.info('__Reloading...__');
+    printer.info('__Reloading API...__');
     try {
       await respawn();
     } catch {}
@@ -153,19 +167,42 @@ export async function dev(
   }
 
   async function respawn(): Promise<void> {
-    if (child) {
-      const previous = child;
-      child = null;
+    if (api) {
+      const previous = api;
+      api = null;
       await previous.stop();
     }
-    const next = spawnAPIChild(from, { port, entry: options.entry, onExit: onCrash });
+    const next = spawnServeChild(from, 'api', { port, entry: options.entry, onExit: onCrash });
     await next.ready;
-    child = next;
+    api = next;
+  }
+
+  async function startDashboard(): Promise<void> {
+    const api = useConfig().api;
+    try {
+      dashboard = spawnServeChild(from, 'dashboard', {
+        port: useConfig().dashboard?.port ?? DEFAULT_DASHBOARD_PORT,
+        entry: options.entry,
+        onExit: onDashboardExit,
+        env: {
+          API_URL: `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`,
+        },
+      });
+      await dashboard.ready;
+    } catch (error) {
+      dashboard = null;
+      reportError(error);
+    }
   }
 
   function onCrash(): void {
-    child = null;
+    api = null;
     park();
+  }
+
+  function onDashboardExit(): void {
+    dashboard = null;
+    printer.warn('Dashboard server exited.');
   }
 
   function park(): void {
@@ -173,7 +210,7 @@ export async function dev(
   }
 
   async function resolvePort(): Promise<number> {
-    const configured = useEnv().get('PORT') ?? useConfig().api.port ?? DEFAULT_PORT;
+    const configured = useEnv().get('PORT') ?? useConfig().api.port ?? DEFAULT_API_PORT;
     return configured === 0 ? freePort() : configured;
   }
 
@@ -184,11 +221,12 @@ export async function dev(
   async function teardown(): Promise<void> {
     schedule.cancel();
     watch.close();
-    if (child) {
-      const previous = child;
-      child = null;
-      await previous.stop();
-    }
+    const running: ServeChild[] = [];
+    if (api) running.push(api);
+    if (dashboard) running.push(dashboard);
+    api = null;
+    dashboard = null;
+    await Promise.all(running.map((c) => c.stop()));
   }
 }
 

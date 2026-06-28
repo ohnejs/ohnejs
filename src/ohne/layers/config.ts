@@ -155,8 +155,6 @@ export interface Config {
 
   /**
    * Settings for the API's HTTP server, consumed by `serveAPI`.
-   * Every timeout accepts a `parseDuration` value: milliseconds as a number, or a string like `'10s'`.
-   * `false` disables the corresponding limit.
    */
   api?: {
     /**
@@ -402,6 +400,35 @@ export interface Config {
   };
 
   /**
+   * Settings for the dashboard's HTTP server, consumed by `serveDashboard`.
+   */
+  dashboard?: {
+    /**
+     * Port the dashboard server listens on.
+     * The `PORT` env var overrides it when set.
+     *
+     * @default
+     * 9000
+     */
+    port?: number;
+
+    /**
+     * Host the dashboard server binds to.
+     * The `HOST` env var overrides it when set.
+     * Absent binds every interface.
+     */
+    host?: string;
+
+    /**
+     * Absolute base URL of the API the browser reaches, including any `api.basePath`.
+     * Injected into the dashboard shell so the client knows where to send requests.
+     * The `API_URL` env var overrides it; omitted, it is derived from `Config.api`.
+     * Set it when the API is reached at a different origin, such as behind a reverse proxy.
+     */
+    apiURL?: string;
+  };
+
+  /**
    * Printer settings consumed by `usePrinter`.
    * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value.
    * These fields only apply when the matching env var is unset.
@@ -463,11 +490,12 @@ export interface ConfigExtensions {}
  * ---
  *
  * `api.port` and `api.host` are absent for the same reason: both are `'own'` (layer-private).
+ * `dashboard.port` and `dashboard.host` are absent for the same reason.
  * A merged default never applies to an `'own'` key.
  *
  * ---
  *
- * `port` falls back to `DEFAULT_PORT`, read at point of use.
+ * `port` falls back to `DEFAULT_API_PORT`, read at point of use; `dashboard.port` to `DEFAULT_DASHBOARD_PORT`.
  */
 export const DEFAULTS = {
   layers: [],
@@ -507,7 +535,13 @@ export const DIR_DEFAULTS = {
  * Default port `serveAPI` listens on when no layer sets `api.port` and `PORT` is unset.
  * Read at point of use, like `DIR_DEFAULTS`, because `api.port` is `'own'` (layer-private).
  */
-export const DEFAULT_PORT = 9001;
+export const DEFAULT_API_PORT = 9001;
+
+/**
+ * Default port `serveDashboard` listens on when no layer sets `dashboard.port`.
+ * Read at point of use, like `DEFAULT_API_PORT`, because `dashboard.port` is `'own'` (layer-private).
+ */
+export const DEFAULT_DASHBOARD_PORT = 9000;
 
 /**
  * Framework merge strategies, seeded into the layer registry.
@@ -517,6 +551,7 @@ export const DEFAULT_PORT = 9001;
  * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
+ * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
@@ -525,6 +560,9 @@ export const BASE_STRATEGIES: LayerStrategies = {
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',
+  'dashboard.port': 'own',
+  'dashboard.host': 'own',
+  'dashboard.apiURL': 'own',
 };
 
 /**

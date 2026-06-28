@@ -3,8 +3,9 @@
  * Add fields by augmenting it from a layer with `declare module 'ohne'`.
  *
  * Built-ins:
- * - `PORT` - overrides `Config.api.port` when set.
- * - `HOST` - overrides `Config.api.host` when set.
+ * - `PORT` - overrides `Config.api.port` and `Config.dashboard.port` when set.
+ * - `HOST` - overrides `Config.api.host` and `Config.dashboard.host` when set.
+ * - `API_URL` - the dashboard's API base URL; overrides `Config.dashboard.apiURL` and the derived default.
  * - `COOKIE_SECRET` - signs cookies set with `setSignedCookie`; required to use signed cookies.
  * - `SILENT` - truthy disables every printer call.
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
@@ -23,7 +24,7 @@
  */
 export interface Env {
   /**
-   * Port override for the HTTP server, taking precedence over `Config.api.port`.
+   * Port override for the HTTP servers, taking precedence over `Config.api.port` and `Config.dashboard.port`.
    *
    * @default
    * undefined
@@ -31,12 +32,21 @@ export interface Env {
   PORT: number | undefined;
 
   /**
-   * Host override for the HTTP server, taking precedence over `Config.api.host`.
+   * Host override for the HTTP servers, taking precedence over `Config.api.host` and `Config.dashboard.host`.
    *
    * @default
    * undefined
    */
   HOST: string | undefined;
+
+  /**
+   * Base URL of the API the dashboard's browser client calls, including any base path.
+   * Takes precedence over `Config.dashboard.apiURL` and the URL derived from `Config.api`.
+   *
+   * @default
+   * undefined
+   */
+  API_URL: string | undefined;
 
   /**
    * Secret that signs cookies set with `setSignedCookie` and verifies them on the way back in.

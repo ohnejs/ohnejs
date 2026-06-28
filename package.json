@@ -24,6 +24,10 @@
       "types": "./src/ohne/index.ts",
       "default": "./src/ohne/index.ts"
     },
+    "./dashboard": {
+      "types": "./src/dashboard/index.ts",
+      "default": "./src/dashboard/index.ts"
+    },
     "./register": "./src/ohne/runtime/register.js",
     "./utils": {
       "types": "./src/utils/index.ts",
@@ -57,6 +61,10 @@
       "types": "./src/utils/fs/index.ts",
       "default": "./src/utils/fs/index.ts"
     },
+    "./utils/imports": {
+      "types": "./src/utils/imports/index.ts",
+      "default": "./src/utils/imports/index.ts"
+    },
     "./utils/net": {
       "types": "./src/utils/net/index.ts",
       "default": "./src/utils/net/index.ts"
@@ -68,10 +76,13 @@
     "./tsconfig.base.json": "./tsconfig.base.json"
   },
   "scripts": {
+    "dev": "node src/ohne/cli/bin.js dev",
     "format": "oxfmt",
     "lint": "oxlint",
+    "serve:api": "node src/ohne/cli/bin.js serve api",
+    "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
     "test": "node --test \"tests/**/*.test.ts\"",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p tsconfig.browser.json"
   },
   "devDependencies": {
     "@types/node": "26.0.0",

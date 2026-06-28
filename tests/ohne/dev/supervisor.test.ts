@@ -111,7 +111,7 @@ describe('dev', () => {
     const app = writeProject('reload', port);
     writeRoute(app, 'health.ts');
 
-    const server = await dev(app, { entry: BIN });
+    const server = await dev(app, { entry: BIN, dashboard: false });
     servers.push(server);
 
     await waitFor(async () => (await get(port, '/health')) === 200);
@@ -134,7 +134,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
     try {
-      const server = await dev(app, { entry: BIN });
+      const server = await dev(app, { entry: BIN, dashboard: false });
       servers.push(server);
       await waitFor(async () => (await get(port, '/health')) === 200);
       ok(out.join('').includes('Waiting for changes'));
@@ -153,12 +153,35 @@ describe('dev', () => {
     mkdirSync(join(app, 'messages'), { recursive: true });
     writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hi' }));
 
-    const server = await dev(app, { entry: BIN });
+    const server = await dev(app, { entry: BIN, dashboard: false });
     servers.push(server);
 
     await waitFor(async () => (await getBody(port, '/lang')) === 'Hi');
 
     writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hello' }));
     await waitFor(async () => (await getBody(port, '/lang')) === 'Hello');
+  });
+
+  it('serves the dashboard alongside the API and injects the bound API URL', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('with-dashboard', 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+    );
+    writeRoute(app, 'health.ts');
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+
+    const apiURL = (await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)?.[1] ?? '';
+    ok(/^http:\/\/localhost:\d+$/.test(apiURL) && !apiURL.endsWith(':0'));
+    const apiPort = Number(new URL(apiURL).port);
+    await waitFor(async () => (await get(apiPort, '/health')) === 200);
+
+    await server.close();
+    await waitFor(async () => (await get(dashPort, '/')) === -1);
   });
 });

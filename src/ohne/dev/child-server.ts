@@ -3,12 +3,17 @@ import { spawn } from 'node:child_process';
 import { isUndefined } from '../../utils/index.ts';
 
 /**
- * A spawned `ohne serve api` child the dev supervisor controls.
- *
- * The child is the real production server, only with `SKIP_CODEGEN` set and an IPC channel.
- * The supervisor awaits `ready`, then `stop`s it to reload.
+ * Which backend a serve child runs, as the `ohne serve <backend>` subcommand.
  */
-export interface APIChild {
+export type ServeBackend = 'api' | 'dashboard';
+
+/**
+ * A spawned `ohne serve <backend>` child the dev supervisor controls.
+ *
+ * The child is the real production server with an IPC channel; the `api` backend also gets `SKIP_CODEGEN`.
+ * The supervisor awaits `ready`, then `stop`s it to reload or shut it down.
+ */
+export interface ServeChild {
   /**
    * Resolves when the child signals `'ready'` after it is listening.
    * Rejects if the child exits before ever signalling ready, which is a boot failure.
@@ -40,9 +45,9 @@ export interface ChildExit {
 }
 
 /**
- * Options for `spawnAPIChild`.
+ * Options for `spawnServeChild`.
  */
-export interface SpawnAPIChildOptions {
+export interface SpawnServeChildOptions {
   /**
    * Port the child binds, set as `PORT` so every respawn reuses the same one.
    * Omitted lets the child resolve its own port from config or `PORT`.
@@ -64,33 +69,43 @@ export interface SpawnAPIChildOptions {
   killTimeout?: number;
 
   /**
-   * CLI entry to run, as `node <entry> serve api`.
+   * CLI entry to run, as `node <entry> serve <backend>`.
    *
    * @default
    * process.argv[1]
    */
   entry?: string;
+
+  /**
+   * Extra environment variables for the child, merged over the inherited `process.env`.
+   */
+  env?: Record<string, string>;
 }
 
 const KILL_TIMEOUT = 10_000;
 
 /**
- * Spawns `ohne serve api` as a supervised child and returns handles to its lifecycle.
+ * Spawns `ohne serve <backend>` as a supervised child and returns handles to its lifecycle.
  *
- * The child runs the real CLI entry with `SKIP_CODEGEN=1` and an IPC channel.
+ * The child runs the real CLI entry with an IPC channel; the `api` backend also gets `SKIP_CODEGEN=1`.
  * The supervisor owns codegen; the child only serves.
  * `ready` settles the boot outcome; `stop` drains or kills it.
  * `process.execArgv` is forwarded so node flags carry over, minus `--inspect*` to avoid a port clash.
  */
-export function spawnAPIChild(cwd: string, options: SpawnAPIChildOptions = {}): APIChild {
+export function spawnServeChild(
+  cwd: string,
+  backend: ServeBackend,
+  options: SpawnServeChildOptions = {},
+): ServeChild {
   const { port, onExit, killTimeout = KILL_TIMEOUT, entry = process.argv[1] } = options;
 
   const env = {
     ...process.env,
-    SKIP_CODEGEN: '1',
+    ...(backend === 'api' ? { SKIP_CODEGEN: '1' } : {}),
     ...(isUndefined(port) ? {} : { PORT: String(port) }),
+    ...options.env,
   };
-  const args = [...nodeFlags(), entry, 'serve', 'api', '--cwd', cwd];
+  const args = [...nodeFlags(), entry, 'serve', backend, '--cwd', cwd];
   const child = spawn(process.execPath, args, {
     env,
     stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
@@ -126,7 +141,8 @@ export function spawnAPIChild(cwd: string, options: SpawnAPIChildOptions = {}): 
     markGone();
     if (commanded) return;
     if (readied) onExit?.({ code, signal });
-    else failBoot(new Error(`API child exited before ready (code ${code}, signal ${signal})`));
+    else
+      failBoot(new Error(`${backend} child exited before ready (code ${code}, signal ${signal})`));
   });
 
   let stopping: Promise<void> | undefined;

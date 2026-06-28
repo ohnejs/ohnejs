@@ -198,6 +198,7 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
     scripts: {
       dev: 'ohne dev',
       'serve:api': 'ohne serve api',
+      'serve:dashboard': 'ohne serve dashboard',
       prepare: 'ohne prepare',
       typecheck: 'tsc',
     },
