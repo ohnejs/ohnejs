@@ -140,6 +140,7 @@ export * from './path/with-trailing-slash.ts';
 export * from './path/without-leading-slash.ts';
 export * from './path/without-trailing-slash.ts';
 export * from './range/parse-range.ts';
+export * from './reactive/batched-effect.ts';
 export * from './reactive/computed.ts';
 export * from './reactive/effect-scope.ts';
 export * from './reactive/effect.ts';
