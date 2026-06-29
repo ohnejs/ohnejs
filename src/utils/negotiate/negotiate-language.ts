@@ -12,7 +12,8 @@ import { type AcceptEntry, parseAccept } from './parse-accept.ts';
  * - `*` matches any tag not matched by another range; an offer it covers takes the `*` weight.
  * - The highest-weighted offer wins; ties go to the more specific offer, then to `available` order.
  *
- * Matching is case-insensitive. Applying a default locale is the caller's job.
+ * Matching is case-insensitive.
+ * Applying a default locale is the caller's job.
  *
  * @example
  * ```ts

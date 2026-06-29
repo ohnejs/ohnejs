@@ -59,7 +59,8 @@ export class MessageSyntaxError extends Error {
  * try { formatMessage('{n, number, currency}', { n: 5 }, 'en'); }
  * catch (e) {
  *   e instanceof MessageFormatError // -> true
- *   e.message                       // -> "bare `currency` style requires a code; use `::currency/XXX` skeleton instead"
+ *   e.message
+ *   // -> "bare `currency` style requires a code; use `::currency/XXX` skeleton instead"
  * }
  * ```
  */
