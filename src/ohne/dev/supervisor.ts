@@ -1,5 +1,3 @@
-import { createServer } from 'node:net';
-
 import { debounce, extname, isNull, normalizeBasePath } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { reportError } from '../error/report-error.ts';
@@ -10,6 +8,7 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { type ServeChild, spawnServeChild } from './child-server.ts';
+import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
@@ -78,7 +77,17 @@ export async function dev(
   const messages = createMessagesTarget(from);
   const config = createConfigTarget(from, [routes, middleware, messages]);
   const targets = [routes, middleware, messages];
-  const port = await resolvePort();
+
+  const wantDashboard = options.dashboard ?? true;
+  const { dashboard: dashboardPort, api: port } = await resolveDevPorts(
+    {
+      base: useEnv().get('PORT'),
+      dashboard: useConfig().dashboard?.port ?? DEFAULT_DASHBOARD_PORT,
+      api: useConfig().api.port ?? DEFAULT_API_PORT,
+      serveDashboard: wantDashboard,
+    },
+    (busy) => printer.warn(`Port \`${busy}\` is already in use.`),
+  );
 
   let api: ServeChild | null = null;
   let dashboard: ServeChild | null = null;
@@ -86,7 +95,7 @@ export async function dev(
   let cycling = false;
   let rerun = false;
 
-  if (options.dashboard ?? true) await startDashboard();
+  if (wantDashboard) await startDashboard();
 
   let codegenOK = false;
   try {
@@ -181,7 +190,7 @@ export async function dev(
     const api = useConfig().api;
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
-        port: useConfig().dashboard?.port ?? DEFAULT_DASHBOARD_PORT,
+        port: dashboardPort,
         entry: options.entry,
         onExit: onDashboardExit,
         env: {
@@ -209,11 +218,6 @@ export async function dev(
     printer.info('__Waiting for changes...__');
   }
 
-  async function resolvePort(): Promise<number> {
-    const configured = useEnv().get('PORT') ?? useConfig().api.port ?? DEFAULT_API_PORT;
-    return configured === 0 ? freePort() : configured;
-  }
-
   function close(): Promise<void> {
     return (closing ??= teardown());
   }
@@ -232,15 +236,4 @@ export async function dev(
 
 function isSource(path: string): boolean {
   return SOURCE.has(extname(path));
-}
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, () => {
-      const { port } = probe.address() as { port: number };
-      probe.close(() => resolve(port));
-    });
-  });
 }
