@@ -1,7 +1,13 @@
 import type { HTTPMethod, RouteMatcher, RouteParams } from '../../utils/index.ts';
 import type { Route } from '../routes/route.ts';
 
-import { compileRoute, isNull, isUndefined, naturalCompare } from '../../utils/index.ts';
+import {
+  compareSpecificity,
+  compileRoute,
+  decodeRouteParams,
+  isNull,
+  isUndefined,
+} from '../../utils/index.ts';
 
 /**
  * The outcome of matching a request against the route table.
@@ -134,7 +140,7 @@ export function createRouter(routes: Iterable<Route>): Router {
         entry.routes.get(method) ??
         entry.routes.get(null) ??
         (method === 'HEAD' ? entry.routes.get('GET') : undefined);
-      if (!isUndefined(route)) return { type: 'matched', route, params: decodeParams(params) };
+      if (!isUndefined(route)) return { type: 'matched', route, params: decodeRouteParams(params) };
 
       for (const m of entry.routes.keys()) if (!isNull(m)) allow.add(m);
     }
@@ -151,44 +157,4 @@ export function createRouter(routes: Iterable<Route>): Router {
   }
 
   return { match };
-}
-
-function decodeParams(params: RouteParams): RouteParams {
-  const out: RouteParams = {};
-  for (const key in params) {
-    const value = params[key];
-    out[key] = value.includes('%') ? safeDecode(value) : value;
-  }
-  return out;
-}
-
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function specificity(pattern: string): number[] {
-  return pattern
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => {
-      if (segment.startsWith('[...')) return 0;
-      if (segment.startsWith('[') || segment.startsWith(':')) return 1;
-      return 2;
-    });
-}
-
-function compareSpecificity(a: string, b: string): number {
-  const sa = specificity(a);
-  const sb = specificity(b);
-
-  const shared = Math.min(sa.length, sb.length);
-  for (let i = 0; i < shared; i++) {
-    if (sa[i] !== sb[i]) return sb[i] - sa[i];
-  }
-  if (sa.length !== sb.length) return sb.length - sa.length;
-  return naturalCompare(a, b);
 }
