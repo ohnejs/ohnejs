@@ -1,3 +1,4 @@
 export { h } from './h.ts';
-export type { Child, Props } from './h.ts';
+export type { Props } from './h.ts';
+export type { Child } from './insert.ts';
 export { mount } from './mount.ts';
