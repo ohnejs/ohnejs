@@ -7,7 +7,26 @@ import type { ForwardedElement } from '../../utils/index.ts';
 
 import { isArray, isNull, isUndefined, parseForwarded } from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
+import { applyHook } from '../hooks/apply-hook.ts';
+import { useHooks } from '../hooks/use-hooks.ts';
 import { payloadTooLarge } from './http-error.ts';
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters a response's outgoing headers, the last seam before they are written to the socket.
+     * Unlike `response:send`, it also covers responses that never enter dispatch.
+     * A router `404`/`405`, a rejected-host `400`, and a base-path miss all pass through here.
+     * Receives the headers and the read-only `Response` for status context.
+     * Stamp or strip a header in place and return nothing, or return a replacement `Headers`.
+     * Returning `undefined` leaves them unchanged.
+     */
+    'response:headers': (
+      headers: Headers,
+      response: Response,
+    ) => void | Headers | Promise<void | Headers>;
+  }
+}
 
 /**
  * Options for `toRequest`.
@@ -189,6 +208,7 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  * Writes a Web `Response` back onto a Node `ServerResponse`.
  *
  * Status and headers are copied over, then the body is piped from `Readable.fromWeb`.
+ * The `response:headers` hook filters the headers before they are written.
  * The pipe carries backpressure and destroys both ends on error.
  * A bodyless response (e.g. `204`) just ends the socket.
  *
@@ -196,7 +216,7 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
-  res.setHeaders(response.headers);
+  res.setHeaders(await resolveHeaders(response));
 
   if (isNull(response.body)) {
     res.end();
@@ -204,4 +224,10 @@ export async function sendResponse(res: ServerResponse, response: Response): Pro
   }
 
   await pipeline(Readable.fromWeb(response.body), res);
+}
+
+async function resolveHeaders(response: Response): Promise<Headers> {
+  const callbacks = useHooks().get('response:headers');
+  if (isUndefined(callbacks) || callbacks.length === 0) return response.headers;
+  return applyHook('response:headers', response.headers, response);
 }

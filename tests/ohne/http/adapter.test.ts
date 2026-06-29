@@ -5,7 +5,15 @@ import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
 
-import { clientIP, HTTPError, sendResponse, toRequest, toURL } from '../../../src/ohne/index.ts';
+import {
+  clientIP,
+  hook,
+  HTTPError,
+  sendResponse,
+  toRequest,
+  toURL,
+  useHooks,
+} from '../../../src/ohne/index.ts';
 import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
 
 async function withServer(
@@ -349,5 +357,24 @@ describe('sendResponse', () => {
         strictEqual(await res.text(), 'ab');
       },
     );
+  });
+
+  it('runs the response:headers hook before writing the headers', async () => {
+    hook('response:headers', (headers, response) => {
+      headers.set('x-hooked', String(response.status));
+    });
+    try {
+      await withServer(
+        async (_req, res) => {
+          await sendResponse(res, new Response('x', { status: 201 }));
+        },
+        async (base) => {
+          const res = await fetch(base);
+          strictEqual(res.headers.get('x-hooked'), '201');
+        },
+      );
+    } finally {
+      useHooks().clear();
+    }
   });
 });
