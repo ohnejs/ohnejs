@@ -1,4 +1,4 @@
-import { cleanup, type Effect, runEffect } from './_runtime.ts';
+import { type Effect, register, runEffect, stopEffect } from './_runtime.ts';
 
 /**
  * Runs `fn` immediately and again whenever a tracked dependency changes.
@@ -23,11 +23,8 @@ export function effect(fn: () => void): () => void {
     deps: new Set(),
     active: true,
   };
-  const stop = () => {
-    if (!e.active) return;
-    e.active = false;
-    cleanup(e);
-  };
+  register(e);
+  const stop = () => stopEffect(e);
   try {
     runEffect(e);
   } catch (err) {

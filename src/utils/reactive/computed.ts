@@ -1,4 +1,4 @@
-import { type Effect, runEffect, track } from './_runtime.ts';
+import { type Effect, register, runEffect, track } from './_runtime.ts';
 
 /**
  * Lazy, cached derivation.
@@ -48,6 +48,7 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
     deps: new Set(),
     active: true,
   };
+  register(runner);
 
   return {
     get value() {
