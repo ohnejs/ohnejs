@@ -12,10 +12,14 @@ import {
   serveAPI,
   shutdownServer,
   useEnv,
+  useHooks,
   useShutdown,
 } from '../../../src/ohne/index.ts';
 
-const scope = globalThis as typeof globalThis & { __ohneServeBoot: string[] };
+const scope = globalThis as typeof globalThis & {
+  __ohneServeBoot: string[];
+  __ohneServeReady?: { host: string; port: number };
+};
 
 function get(port: number, path: string): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -88,6 +92,7 @@ describe('serveAPI', () => {
     http = undefined;
     useShutdown().clear();
     useShutdown().unwatch();
+    useHooks().clear();
     useEnv().unset('SKIP_CODEGEN');
   });
 
@@ -143,6 +148,23 @@ describe('serveAPI', () => {
 
     strictEqual(await get(port, '/ping'), 200);
     strictEqual(await header(port, '/ping', 'x-mw'), 'ran');
+  });
+
+  it('runs the server:ready hook once listening, with the bound host and port', async () => {
+    const dir = serveable('ready');
+    writeFileSync(
+      join(dir, 'boot', 'index.ts'),
+      "import { hook } from 'ohne';\n" +
+        "hook('server:ready', (info) => {\n" +
+        '  globalThis.__ohneServeReady = info;\n' +
+        '});\n',
+    );
+
+    http = await serveAPI(dir);
+    const { port } = http.server.address() as AddressInfo;
+
+    strictEqual(scope.__ohneServeReady?.host, 'localhost');
+    strictEqual(scope.__ohneServeReady?.port, port);
   });
 
   it('rejects a port outside 0-65535', async () => {

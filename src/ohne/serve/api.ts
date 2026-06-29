@@ -14,6 +14,7 @@ import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { applyHook } from '../hooks/apply-hook.ts';
 import { createRouter } from '../http/router.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
@@ -25,15 +26,29 @@ import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { useRoutes } from '../routes/use-routes.ts';
 
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Runs once the API server is listening, after the socket accepts and before readiness is announced.
+     * Receives the bound `host` and `port`; read `port` to learn the real port when `api.port` is `0`.
+     * Register it from a boot file to warm a cache, open a pool, or announce the address to discovery.
+     * An action: its return is ignored, and a throw aborts startup through the error funnel.
+     * For teardown, use `onShutdown` instead.
+     */
+    'server:ready': (info: { host: string; port: number }) => void | Promise<void>;
+  }
+}
+
 /**
  * Boots the API backend for the project rooted at `from` and starts serving it.
  *
  * Resolves and registers the layer stack, runs every layer's boot files, then regenerates types.
- * Boot runs before codegen so the hooks codegen consults are already registered.
+ * Boot registers each layer's hooks and startup side effects before the server is built.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  *
  * The generated `routes.ts` is then imported to populate `useRoutes` with live handlers.
  * The server is built from that table, started, and wired to graceful shutdown through `onShutdown`.
+ * Once it is listening, the `server:ready` hook runs before readiness is announced.
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.
  * With an IPC parent, it signals `'ready'` after the funnel is watching, so a supervisor can drive reloads.
  *
@@ -96,6 +111,8 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
 
   const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
+
+  await applyHook('server:ready', { host: host ?? 'localhost', port: address.port });
 
   usePrinter().success(`API ready at \`http://${host ?? 'localhost'}:${address.port}\``);
   process.send?.('ready');
