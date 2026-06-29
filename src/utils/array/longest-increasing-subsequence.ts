@@ -1,4 +1,5 @@
 import { isUndefined } from '../is/is-undefined.ts';
+import { last } from './last.ts';
 
 /**
  * Returns the indices of a longest strictly-increasing subsequence of `items`.
@@ -33,7 +34,7 @@ export function longestIncreasingSubsequence(items: readonly number[]): number[]
   }
 
   const result: number[] = [];
-  let index = tails[tails.length - 1];
+  let index = last(tails);
   while (!isUndefined(index)) {
     result.push(index);
     index = predecessors[index];

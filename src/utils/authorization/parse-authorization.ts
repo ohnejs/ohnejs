@@ -1,3 +1,4 @@
+import { isNull } from '../is/is-null.ts';
 import { decodeText } from '../text/decode-text.ts';
 
 /**
@@ -62,7 +63,7 @@ function decodeBasic(token: string): Pick<Authorization, 'username' | 'password'
  */
 export function parseAuthorization(header: string): Authorization | null {
   const match = /^(\S+)\s+(\S.*)$/.exec(header.trim());
-  if (match === null) return null;
+  if (isNull(match)) return null;
 
   const scheme = match[1].toLowerCase();
   const token = match[2];
@@ -70,7 +71,7 @@ export function parseAuthorization(header: string): Authorization | null {
 
   if (scheme === 'basic') {
     const credentials = decodeBasic(token);
-    if (credentials !== null) Object.assign(auth, credentials);
+    if (!isNull(credentials)) Object.assign(auth, credentials);
   }
 
   return auth;

@@ -1,3 +1,4 @@
+import { last } from '../array/last.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 
 /**
@@ -50,7 +51,7 @@ export function normalizePath(path: string): string {
   for (const segment of body.split('/')) {
     if (segment === '' || segment === '.') continue;
     if (segment === '..') {
-      const top = resolved[resolved.length - 1];
+      const top = last(resolved);
       if (!isUndefined(top) && top !== '..') {
         resolved.pop();
       } else if (!absolute) {
