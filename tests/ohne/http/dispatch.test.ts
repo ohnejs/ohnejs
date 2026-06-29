@@ -374,6 +374,62 @@ describe('dispatch', () => {
     deepStrictEqual(await response.json(), ['n2']);
   });
 
+  it('lets the response:send hook filter the final response', async () => {
+    hook('response:send', (response) => {
+      response.headers.set('x-sent', 'yes');
+    });
+    const { response } = await dispatch(
+      makeRoute('/', () => ({ ok: true })),
+      req(),
+      url(),
+      {},
+    );
+    strictEqual(response.headers.get('x-sent'), 'yes');
+  });
+
+  it('passes the event to response:send and can replace the response', async () => {
+    hook('response:send', (_response, event) => new Response(event.url.pathname, { status: 202 }));
+    const { response } = await dispatch(
+      makeRoute('/x', () => 'orig'),
+      req('http://localhost/x'),
+      url('http://localhost/x'),
+      {},
+    );
+    strictEqual(response.status, 202);
+    strictEqual(await response.text(), '/x');
+  });
+
+  it('runs error:response on a thrown error, then response:send', async () => {
+    const order: string[] = [];
+    hook('error:response', (response, error) => {
+      order.push(`error:${(error as Error).message}`);
+      return response;
+    });
+    hook('response:send', (response) => {
+      order.push(`send:${response.status}`);
+      return response;
+    });
+    const route = makeRoute('/', () => {
+      throw notFound('gone');
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.status, 404);
+    deepStrictEqual(order, ['error:gone', 'send:404']);
+  });
+
+  it('lets error:response replace an unhandled error response', async () => {
+    hook(
+      'error:response',
+      (_response, error) => new Response((error as Error).message, { status: 500 }),
+    );
+    const route = makeRoute('/', () => {
+      throw new Error('boom');
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.status, 500);
+    strictEqual(await response.text(), 'boom');
+  });
+
   it('drains a re-entrant waitUntil', async () => {
     let releaseFirst!: () => void;
     const first = new Promise<void>((r) => (releaseFirst = r));

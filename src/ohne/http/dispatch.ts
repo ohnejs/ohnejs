@@ -14,6 +14,39 @@ import { toResponse } from './to-response.ts';
 import { translate } from './translate.ts';
 import { runWithEvent } from './use-event.ts';
 
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters the finished response of a dispatched request, just before it returns to the transport.
+     * Fires for every outcome: a handler result, a middleware short-circuit, or a mapped `HTTPError`.
+     * The generic `500` and the timed-out `503` run through it too.
+     * Return a replacement `Response`, or mutate `response.headers` in place and return nothing.
+     * Returning `undefined` leaves the response unchanged.
+     * It runs outside the request `AsyncLocalStorage`, so read the passed `event`, not the composables.
+     * Router misses (`404`/`405`) skip dispatch; reach for `response:headers` to cover those too.
+     */
+    'response:send': (
+      response: Response,
+      event: Event,
+    ) => void | Response | Promise<void | Response>;
+
+    /**
+     * Filters the response built when a request throws, inside the request context.
+     * Fires for a mapped `HTTPError` and for an unhandled error's generic `500`.
+     * A non-throwing timeout `503` is not an error outcome, so it does not fire.
+     * Receives the error response, the thrown `error`, and the `Event`.
+     * Return a replacement `Response`: a branded error page, or a body with the detail redacted.
+     * Otherwise report the error and return nothing to leave it unchanged.
+     * It runs before `response:send`, which then sees whatever this returns.
+     */
+    'error:response': (
+      response: Response,
+      error: unknown,
+      event: Event,
+    ) => void | Response | Promise<void | Response>;
+  }
+}
+
 /**
  * The outcome of running a matched route.
  * The response is ready to send; `drain` settles the request's background work.
@@ -68,6 +101,8 @@ export interface DispatchOptions {
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
  * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
+ * An error outcome runs the `error:response` hook first.
+ * `response:send` then filters the final response of every outcome, the timeout `503` included.
  * The returned `drain` defers background work past the response.
  *
  * @example
@@ -126,12 +161,15 @@ export async function dispatch(
       const result = await (route.handler as Handler)({ params });
       return toResponse(result, event.response);
     } catch (error) {
-      if (error instanceof HTTPError) return toResponse(error, event.response);
+      if (error instanceof HTTPError) {
+        return resolveErrorResponse(toResponse(error, event.response), error, event);
+      }
       logUnhandled(route, error);
-      return toResponse(
+      const response = toResponse(
         new HTTPError(500, translate('api.http.internalServerError')),
         event.response,
       );
+      return resolveErrorResponse(response, error, event);
     }
   });
 
@@ -144,13 +182,29 @@ export async function dispatch(
         }),
       );
 
-  return { response, drain: () => drain(background) };
+  return { response: await resolveResponse(response, event), drain: () => drain(background) };
 }
 
 async function resolveMiddleware(names: string[], event: Event): Promise<string[]> {
   const callbacks = useHooks().get('middleware:resolve');
   if (isUndefined(callbacks) || callbacks.length === 0) return names;
   return applyHook('middleware:resolve', names as MiddlewareKey[], event);
+}
+
+async function resolveResponse(response: Response, event: Event): Promise<Response> {
+  const callbacks = useHooks().get('response:send');
+  if (isUndefined(callbacks) || callbacks.length === 0) return response;
+  return applyHook('response:send', response, event);
+}
+
+async function resolveErrorResponse(
+  response: Response,
+  error: unknown,
+  event: Event,
+): Promise<Response> {
+  const callbacks = useHooks().get('error:response');
+  if (isUndefined(callbacks) || callbacks.length === 0) return response;
+  return applyHook('error:response', response, error, event);
 }
 
 async function drain(background: Promise<unknown>[]): Promise<void> {
