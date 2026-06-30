@@ -32,12 +32,18 @@ describe('sendEvents', () => {
     });
   });
 
+  it('opens the stream with a comment so the response headers flush on connect', async () => {
+    const stream = runWithEvent(makeEvent(), () => sendEvents());
+    stream.close();
+    strictEqual(await read(stream.body), ': open\n\n');
+  });
+
   it('streams each sent message as an SSE frame, then closes', async () => {
     const stream = runWithEvent(makeEvent(), () => sendEvents());
     stream.send('reload');
     stream.send('hi', { event: 'greet' });
     stream.close();
-    strictEqual(await read(stream.body), 'data: reload\n\nevent: greet\ndata: hi\n\n');
+    strictEqual(await read(stream.body), ': open\n\ndata: reload\n\nevent: greet\ndata: hi\n\n');
   });
 
   it('ignores sends after close and runs onClose once', () => {

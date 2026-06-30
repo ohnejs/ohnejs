@@ -1,6 +1,8 @@
 import { formatSSE, type FormatSSEOptions } from '../../utils/sse/format-sse.ts';
 import { useResponse } from './use-response.ts';
 
+const OPEN = ': open\n\n';
+
 /**
  * An open Server-Sent Events stream: the response body plus the controls to push and end it.
  */
@@ -71,7 +73,10 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
   };
 
   const body = new ReadableStream<Uint8Array>({
-    start: (c) => void (controller = c),
+    start: (c) => {
+      controller = c;
+      c.enqueue(encoder.encode(OPEN));
+    },
     cancel: finish,
   });
 
