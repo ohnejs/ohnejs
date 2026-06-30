@@ -49,8 +49,8 @@ export async function startRouter(
   pages = compilePages(manifest);
   window.addEventListener('popstate', () => void render());
   document.addEventListener('click', interceptLink);
-  mount(() => view(), container);
   await render();
+  mount(() => view(), container);
 }
 
 /**
