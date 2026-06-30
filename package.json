@@ -81,7 +81,7 @@
     "lint": "oxlint",
     "serve:api": "node src/ohne/cli/bin.js serve api",
     "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
-    "test": "node --test \"tests/**/*.test.ts\"",
+    "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc && tsc -p tsconfig.browser.json"
   },
   "devDependencies": {
