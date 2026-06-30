@@ -62,7 +62,8 @@ export interface DevOptions {
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
  *
  * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
- * The dashboard reads its modules from disk per request, so it never reloads; it only stops on teardown.
+ * The dashboard child reads its modules from disk per request, so it never respawns.
+ * A change in a dashboard directory tells its browsers to reload over the dev live-reload stream.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
@@ -152,6 +153,7 @@ export async function dev(
       return;
     }
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
+    if (reloadable.length < batch.size) dashboard?.reload();
     if (!reloadable.some(isSource) && !reloadable.some((path) => messages.affectedBy(path))) return;
     printer.info('__Reloading API...__');
     try {
@@ -193,13 +195,15 @@ export async function dev(
 
   async function startDashboard(): Promise<void> {
     const api = useConfig().api;
+    const apiURL = `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`;
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
         port: dashboardPort,
         entry: options.entry,
         onExit: onDashboardExit,
         env: {
-          API_URL: `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`,
+          API_URL: process.env['API_URL'] ?? apiURL,
+          DASHBOARD_RELOAD: process.env['DASHBOARD_RELOAD'] ?? '1',
         },
       });
       await dashboard.ready;

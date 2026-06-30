@@ -103,7 +103,8 @@ export interface Env {
 
   /**
    * When `true`, the dashboard serves its dev live-reload stream and injects the browser reload client.
-   * Set by `ohne dev` on the dashboard child, and unset for a standalone `ohne serve dashboard`.
+   * `ohne dev` enables it by default, overridable with `DASHBOARD_RELOAD=0`.
+   * A standalone `ohne serve dashboard` leaves it off.
    *
    * @default
    * false

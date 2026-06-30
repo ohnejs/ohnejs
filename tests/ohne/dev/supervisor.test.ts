@@ -65,6 +65,31 @@ async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 15_000): P
   }
 }
 
+function sseReload(
+  port: number,
+  path: string,
+): { connected: Promise<void>; reloaded: Promise<void>; close: () => void } {
+  let onConnect!: () => void;
+  let onReload!: () => void;
+  let onError!: (error: Error) => void;
+  const connected = new Promise<void>((resolve) => (onConnect = resolve));
+  const reloaded = new Promise<void>((resolve, reject) => {
+    onReload = resolve;
+    onError = reject;
+  });
+  const req = request({ host: '127.0.0.1', port, path }, (res) => {
+    onConnect();
+    let buffer = '';
+    res.on('data', (chunk) => {
+      buffer += chunk;
+      if (buffer.includes('data: reload')) onReload();
+    });
+  });
+  req.on('error', (error) => onError(error));
+  req.end();
+  return { connected, reloaded, close: () => req.destroy() };
+}
+
 describe('dev', () => {
   let root: string;
   let servers: DevServer[];
@@ -212,5 +237,27 @@ describe('dev', () => {
     } finally {
       usePrinter().configure({ stream: process.stderr });
     }
+  });
+
+  it('reloads the browser on a dashboard file change', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('dash-reload', 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+    );
+    writeRoute(app, 'health.ts');
+    mkdirSync(join(app, 'dashboard', 'pages'), { recursive: true });
+    writeFileSync(join(app, 'dashboard', 'pages', 'index.ts'), 'export default () => null\n');
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+
+    const client = sseReload(dashPort, '/m/dashboard/reload');
+    await client.connected;
+    writeFileSync(join(app, 'dashboard', 'pages', 'about.ts'), 'export default () => null\n');
+    await client.reloaded;
+    client.close();
   });
 });

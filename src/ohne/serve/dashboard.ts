@@ -24,6 +24,7 @@ import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { notFound } from '../http/http-error.ts';
 import { createRouter } from '../http/router.ts';
+import { type EventStream, sendEvents } from '../http/send-events.ts';
 import { sendFile } from '../http/send-file.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
@@ -35,9 +36,20 @@ import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
 
+/**
+ * URL prefix under which the framework's browser modules are served.
+ */
 const MODULE_BASE = '/m';
 
+/**
+ * URL prefix under which each layer's dashboard modules are served, merged closer-layer-first.
+ */
 const APP_MODULE_BASE = `${MODULE_BASE}/app`;
+
+/**
+ * Path of the dev live-reload event stream the browser subscribes to, gated by `DASHBOARD_RELOAD`.
+ */
+const RELOAD_PATH = `${MODULE_BASE}/dashboard/reload`;
 
 /**
  * Maps the bare specifiers a page may import to their served URLs, injected as the shell's importmap.
@@ -83,11 +95,13 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const layers = await resolveOhneLayers(from);
   const appRoots = dashboardRoots(layers);
   const apiURL = resolveAPIURL();
+  const reload = useEnv().get('DASHBOARD_RELOAD');
 
   const renderShell = async (): Promise<string> =>
     shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
+      reload,
     );
 
   const routes: Route[] = [
@@ -98,6 +112,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     ),
     synthetic(`${MODULE_BASE}/[...path]`, serveModule),
   ];
+  if (reload) liveReload(routes);
   const http = createServer(createRouter(routes));
 
   const port = useEnv().get('PORT') ?? config?.port ?? DEFAULT_DASHBOARD_PORT;
@@ -131,6 +146,32 @@ function serveModule({ params }: HandlerContext): Promise<string | undefined> {
   return sendFile([SRC_ROOT], params.path, { notFound: 'Not Found' });
 }
 
+/**
+ * Wires the dev live-reload channel onto `routes`.
+ *
+ * Adds the event-stream route the browser subscribes to and tracks every open stream.
+ * A `'reload'` IPC message from the dev supervisor, sent on a dashboard-file change, broadcasts to them.
+ * On shutdown the streams close first, so an idle one never holds the server's drain open.
+ */
+function liveReload(routes: Route[]): void {
+  const clients = new Set<EventStream>();
+  routes.push(
+    synthetic(RELOAD_PATH, () => {
+      const stream = sendEvents({ onClose: () => clients.delete(stream) });
+      clients.add(stream);
+      return stream.body;
+    }),
+  );
+  const onMessage = (message: unknown): void => {
+    if (message === 'reload') for (const client of clients) client.send('reload');
+  };
+  process.on('message', onMessage);
+  onShutdown(() => {
+    process.off('message', onMessage);
+    for (const client of clients) client.close();
+  });
+}
+
 function resolveAPIURL(): string {
   const api = useConfig().api;
   return (
@@ -140,8 +181,11 @@ function resolveAPIURL(): string {
   );
 }
 
-function shellDocument(apiURL: string, pages: PageRoute[]): string {
+function shellDocument(apiURL: string, pages: PageRoute[], reload: boolean): string {
   const config = jsonForScript({ apiURL, pages });
+  const reloadClient = reload
+    ? `\n    <script type="module" src="${MODULE_BASE}/dashboard/runtime/reload-client.ts"></script>`
+    : '';
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -153,7 +197,7 @@ function shellDocument(apiURL: string, pages: PageRoute[]): string {
   <body>
     <div id="app"></div>
     <script type="application/json" id="ohne-config">${config}</script>
-    <script type="module" src="${MODULE_BASE}/dashboard/boot.ts"></script>
+    <script type="module" src="${MODULE_BASE}/dashboard/boot.ts"></script>${reloadClient}
   </body>
 </html>
 `;

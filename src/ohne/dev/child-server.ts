@@ -27,6 +27,12 @@ export interface ServeChild {
    * Idempotent: later calls await the same exit.
    */
   stop(): Promise<void>;
+
+  /**
+   * Sends the child a `'reload'` message, telling the dashboard to reload its connected browsers.
+   * A no-op once the IPC channel has closed.
+   */
+  reload(): void;
 }
 
 /**
@@ -149,6 +155,7 @@ export function spawnServeChild(
   return {
     ready,
     stop: () => (stopping ??= drain()),
+    reload: () => send('reload'),
   };
 
   async function drain(): Promise<void> {

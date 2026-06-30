@@ -63,6 +63,7 @@ describe('serveDashboard', () => {
     http = undefined;
     useShutdown().clear();
     useShutdown().unwatch();
+    useEnv().unset('DASHBOARD_RELOAD');
   });
 
   after(() => {
@@ -186,6 +187,23 @@ describe('serveDashboard', () => {
     const port = await serve('boot');
     strictEqual(
       (await req(port, '/')).body.includes('<script type="module" src="/m/dashboard/boot.ts">'),
+      true,
+    );
+  });
+
+  it('omits the reload client and its stream route by default', async () => {
+    const port = await serve('no-reload');
+    strictEqual((await req(port, '/')).body.includes('reload-client.ts'), false);
+    strictEqual((await req(port, '/m/dashboard/reload')).status, 404);
+  });
+
+  it('injects the reload client when `DASHBOARD_RELOAD` is set', async () => {
+    useEnv().set('DASHBOARD_RELOAD', true);
+    const port = await serve('reload');
+    strictEqual(
+      (await req(port, '/')).body.includes(
+        '<script type="module" src="/m/dashboard/runtime/reload-client.ts">',
+      ),
       true,
     );
   });
