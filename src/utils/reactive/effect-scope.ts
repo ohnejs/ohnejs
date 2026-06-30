@@ -74,8 +74,8 @@ export function onCleanup(fn: () => void): void {
 function disposeScope(scope: Scope): void {
   if (!scope.active) return;
   scope.active = false;
-  for (const fn of scope.cleanups) fn();
   for (const e of scope.effects) stopEffect(e);
+  for (const fn of scope.cleanups) fn();
   for (const child of scope.scopes) disposeScope(child);
   scope.cleanups.length = 0;
   scope.effects.length = 0;

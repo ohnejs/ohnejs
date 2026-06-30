@@ -22,6 +22,24 @@ describe('effectScope', () => {
     strictEqual(runs, 2);
   });
 
+  it('does not re-run an owned effect when a cleanup writes its dependency', () => {
+    const scope = effectScope();
+    const open = ref(true);
+    let runs = 0;
+    scope.run(() => {
+      effect(() => {
+        void open.value;
+        runs++;
+      });
+      onCleanup(() => {
+        open.value = false;
+      });
+    });
+    strictEqual(runs, 1);
+    scope.dispose();
+    strictEqual(runs, 1);
+  });
+
   it('runs cleanups in registration order, exactly once', () => {
     const scope = effectScope();
     const order: number[] = [];
