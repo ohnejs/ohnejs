@@ -34,7 +34,8 @@ export function append(parent: Node, child: Child): void {
  *
  * Each run rebuilds the region inside a fresh `effectScope`.
  * Effects from the previous content are disposed before the new content is built.
- * A region holding a single text node is patched in place; otherwise it is cleared and rebuilt.
+ * A region holding a single text node is patched in place when the new value is a string or number.
+ * Otherwise the region is cleared and rebuilt.
  */
 export function insert(parent: Node, getter: () => Child): void {
   const start = parent.appendChild(document.createComment(''));
