@@ -319,7 +319,7 @@ async function handle(
       await sendResponse(res, toResponse(error, { status: error.status, headers: new Headers() }));
       return;
     }
-    usePrinter().error(`request failed: ${errorMessage(error)}`);
+    usePrinter().error(`Request failed: ${errorMessage(error)}`);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.end();

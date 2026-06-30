@@ -149,7 +149,7 @@ async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
       try {
         await hook();
       } catch (error) {
-        usePrinter().error(`shutdown hook failed: ${errorMessage(error)}`);
+        usePrinter().error(`Shutdown hook failed: ${errorMessage(error)}`);
       }
     }
   })();
