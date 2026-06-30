@@ -10,7 +10,7 @@ import {
   relativePath,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { DASHBOARD_PAGES_DIR, type DashboardPage } from './dashboard-page.ts';
+import { DASHBOARD_PAGES_DIR, type DiscoveredDashboardPage } from './dashboard-page.ts';
 
 /**
  * Reads every page file in one layer's dashboard pages directory.
@@ -29,7 +29,7 @@ import { DASHBOARD_PAGES_DIR, type DashboardPage } from './dashboard-page.ts';
 export async function scanDashboardPages(
   layer: OhneLayer,
   dashboard: string,
-): Promise<DashboardPage[]> {
+): Promise<DiscoveredDashboardPage[]> {
   const entries = await listDir(joinPath(layer.dir, dashboard, DASHBOARD_PAGES_DIR), {
     ext: 'ts',
     files: true,

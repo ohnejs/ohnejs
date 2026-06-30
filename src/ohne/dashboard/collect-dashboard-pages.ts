@@ -1,5 +1,5 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
-import type { DashboardPage } from './dashboard-page.ts';
+import type { DiscoveredDashboardPage } from './dashboard-page.ts';
 
 import { naturalCompare } from '../../utils/index.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
@@ -25,14 +25,14 @@ import { scanDashboardPages } from './scan-dashboard-pages.ts';
  */
 export async function collectDashboardPages(
   layers: readonly OhneLayer[],
-): Promise<DashboardPage[]> {
+): Promise<DiscoveredDashboardPage[]> {
   const configByPath = new Map(
     useLayers()
       .layers()
       .map((layer) => [layer.path, layer.input]),
   );
 
-  const table = new Map<string, DashboardPage>();
+  const table = new Map<string, DiscoveredDashboardPage>();
   for (const layer of layers) {
     const dir = configByPath.get(layer.dir)?.dirs?.dashboard ?? DIR_DEFAULTS.dashboard;
     for (const page of await scanDashboardPages(layer, dir)) {

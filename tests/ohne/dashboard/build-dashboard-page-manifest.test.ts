@@ -1,9 +1,12 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { buildDashboardPageManifest, type DashboardPage } from '../../../src/ohne/index.ts';
+import {
+  buildDashboardPageManifest,
+  type DiscoveredDashboardPage,
+} from '../../../src/ohne/index.ts';
 
-const page = (pattern: string, module: string): DashboardPage => ({
+const page = (pattern: string, module: string): DiscoveredDashboardPage => ({
   pattern,
   module,
   file: '',

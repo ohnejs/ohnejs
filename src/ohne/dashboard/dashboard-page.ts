@@ -1,8 +1,8 @@
 /**
  * Static metadata for a dashboard page, independent of its module.
- * This is what page discovery produces.
+ * This is what dashboard page discovery produces.
  */
-export interface DashboardPage {
+export interface DiscoveredDashboardPage {
   /**
    * URL route pattern, always starting with `/`.
    */

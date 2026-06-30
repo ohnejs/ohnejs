@@ -1,4 +1,4 @@
-import type { DashboardPage } from './dashboard-page.ts';
+import type { DiscoveredDashboardPage } from './dashboard-page.ts';
 
 import { compareSpecificity, type PageRoute } from '../../utils/index.ts';
 
@@ -18,7 +18,7 @@ import { compareSpecificity, type PageRoute } from '../../utils/index.ts';
  * ```
  */
 export function buildDashboardPageManifest(
-  pages: readonly DashboardPage[],
+  pages: readonly DiscoveredDashboardPage[],
   base: string,
 ): PageRoute[] {
   return pages
