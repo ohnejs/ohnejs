@@ -209,6 +209,7 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  *
  * Status and headers are copied over, then the body is piped from `Readable.fromWeb`.
  * The `response:headers` hook filters the headers before they are written.
+ * The open CORS default is then applied, unless a policy already set or denied an origin.
  * The pipe carries backpressure and destroys both ends on error.
  * A bodyless response (e.g. `204`) just ends the socket.
  *
@@ -216,7 +217,7 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
-  res.setHeaders(await resolveHeaders(response));
+  res.setHeaders(await resolveHeaders(response, res.req.method));
 
   if (isNull(response.body)) {
     res.end();
@@ -226,8 +227,38 @@ export async function sendResponse(res: ServerResponse, response: Response): Pro
   await pipeline(Readable.fromWeb(response.body), res);
 }
 
-async function resolveHeaders(response: Response): Promise<Headers> {
+async function resolveHeaders(response: Response, method?: string): Promise<Headers> {
   const callbacks = useHooks().get('response:headers');
-  if (isUndefined(callbacks) || callbacks.length === 0) return response.headers;
-  return applyHook('response:headers', response.headers, response);
+  const headers =
+    isUndefined(callbacks) || callbacks.length === 0
+      ? response.headers
+      : await applyHook('response:headers', response.headers, response);
+  applyDefaultCORS(headers, method);
+  return headers;
+}
+
+/**
+ * Applies the open CORS default to a finished response, last of all.
+ * A response that already allows an origin is left alone, so a configured `cors` always wins.
+ * So is one carrying `Vary: Origin`: a `cors` varied on the origin and chose to deny it.
+ * Otherwise the API allows any origin, and any method and header on a preflight.
+ */
+function applyDefaultCORS(headers: Headers, method?: string): void {
+  if (headers.has('access-control-allow-origin') || variesOnOrigin(headers)) return;
+  headers.set('access-control-allow-origin', '*');
+  if (method === 'OPTIONS') {
+    headers.set('access-control-allow-methods', '*');
+    headers.set('access-control-allow-headers', '*');
+  }
+}
+
+function variesOnOrigin(headers: Headers): boolean {
+  const vary = headers.get('vary');
+  return (
+    !isNull(vary) &&
+    vary
+      .toLowerCase()
+      .split(',')
+      .some((token) => token.trim() === 'origin')
+  );
 }

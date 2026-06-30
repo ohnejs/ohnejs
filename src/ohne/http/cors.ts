@@ -56,6 +56,8 @@ export interface CORSOptions {
  *
  * Mount it as a global by default-exporting the result from a `middleware/global/` file.
  * It then runs on every request, including the auto-`OPTIONS` preflight: `export default cors({ origin })`.
+ * Mounting one replaces the API's open default: with no cors anywhere, the API allows any origin.
+ * That default is applied last, only when nothing else set or denied an origin, so this always wins.
  * On an allowed cross-origin request it sets `Access-Control-Allow-Origin`.
  * A non-`*` policy always appends `Vary: Origin`, even on a denied origin, so shared caches key per origin.
  * A preflight `OPTIONS` is answered with `204` and the allow headers.
