@@ -1,5 +1,4 @@
 import { stripTypeScriptTypes } from 'node:module';
-import { pathToFileURL } from 'node:url';
 
 import { etag } from '../../utils/etag/etag.ts';
 import { readFile } from '../../utils/fs/read-file.ts';
@@ -82,9 +81,7 @@ export async function sendFile(
 
 function serve(file: string, source: string, options: SendFileOptions): string | undefined {
   const typescript = TYPESCRIPT.test(file);
-  const body = typescript
-    ? stripTypeScriptTypes(source, { sourceUrl: pathToFileURL(file).href })
-    : source;
+  const body = typescript ? stripTypeScriptTypes(source) : source;
 
   const response = useResponse();
   response.headers.set(
