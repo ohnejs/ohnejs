@@ -12,6 +12,7 @@
  * - `NO_COLOR` - non-empty value disables ANSI colors per the `no-color.org` standard.
  * - `FORCE_COLOR` - forces ANSI on (or off) regardless of TTY detection.
  * - `SKIP_CODEGEN` - truthy skips codegen on startup, for when a parent process already ran it.
+ * - `DASHBOARD_RELOAD` - truthy makes the dashboard serve its dev reload stream and inject the client.
  *
  * @example
  * ```ts
@@ -99,4 +100,13 @@ export interface Env {
    * false
    */
   SKIP_CODEGEN: boolean;
+
+  /**
+   * When `true`, the dashboard serves its dev live-reload stream and injects the browser reload client.
+   * Set by `ohne dev` on the dashboard child, and unset for a standalone `ohne serve dashboard`.
+   *
+   * @default
+   * false
+   */
+  DASHBOARD_RELOAD: boolean;
 }

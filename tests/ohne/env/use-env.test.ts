@@ -3,7 +3,14 @@ import { afterEach, describe, it } from 'node:test';
 import { useEnv } from 'ohne';
 import { effect } from 'ohne/utils';
 
-const KEYS = ['SILENT', 'DEBUG', 'NO_COLOR', 'FORCE_COLOR', 'SKIP_CODEGEN'] as const;
+const KEYS = [
+  'SILENT',
+  'DEBUG',
+  'NO_COLOR',
+  'FORCE_COLOR',
+  'SKIP_CODEGEN',
+  'DASHBOARD_RELOAD',
+] as const;
 
 describe('useEnv', () => {
   afterEach(() => {
@@ -36,6 +43,10 @@ describe('useEnv', () => {
 
     it('SKIP_CODEGEN defaults to `false`', () => {
       strictEqual(useEnv().get('SKIP_CODEGEN'), false);
+    });
+
+    it('DASHBOARD_RELOAD defaults to `false`', () => {
+      strictEqual(useEnv().get('DASHBOARD_RELOAD'), false);
     });
   });
 
@@ -108,6 +119,17 @@ describe('useEnv', () => {
       strictEqual(useEnv().get('SKIP_CODEGEN'), false);
     });
 
+    it('DASHBOARD_RELOAD parses `1`/`0`/`true`/`false` (case-insensitive)', () => {
+      process.env['DASHBOARD_RELOAD'] = '1';
+      strictEqual(useEnv().get('DASHBOARD_RELOAD'), true);
+
+      process.env['DASHBOARD_RELOAD'] = 'TRUE';
+      strictEqual(useEnv().get('DASHBOARD_RELOAD'), true);
+
+      process.env['DASHBOARD_RELOAD'] = '0';
+      strictEqual(useEnv().get('DASHBOARD_RELOAD'), false);
+    });
+
     it('PORT parses an integer string, `0` included; throws on invalid', () => {
       process.env['PORT'] = '3000';
       strictEqual(useEnv().get('PORT'), 3000);
@@ -139,7 +161,7 @@ describe('useEnv', () => {
   });
 
   describe('names', () => {
-    it('reports the five built-ins', () => {
+    it('reports the six built-ins', () => {
       const names = [...useEnv().names()];
       deepStrictEqual(
         names.filter((n) => (KEYS as readonly string[]).includes(n)).sort(),
