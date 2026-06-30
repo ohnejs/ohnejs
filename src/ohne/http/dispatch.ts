@@ -85,7 +85,10 @@ export interface DispatchOptions {
 
   /**
    * The resolved client IP, exposed as `event.ip`.
-   * Omitted leaves `event.ip` an empty string, meaning the transport could not resolve one.
+   * Omitted means the transport could not resolve one.
+   *
+   * @default
+   * ''
    */
   ip?: string;
 }
