@@ -61,8 +61,8 @@ node_modules/
  * Writes `ohne.config.ts`, `package.json`, `tsconfig.json`, `tsconfig.browser.json`, and `.gitignore`.
  *
  * `tsconfig.json` type-checks the Node code and excludes `dashboard/`.
- * `tsconfig.browser.json` type-checks that browser code with the DOM lib, ready for when pages land.
- * `typecheck` runs the Node pass alone; add `tsc -p tsconfig.browser.json` once you author a page.
+ * `tsconfig.browser.json` type-checks that browser code with the DOM lib.
+ * `typecheck` runs the Node pass alone; add `tsc -p tsconfig.browser.json` once you author a dashboard page.
  *
  * The target directory comes from the first positional.
  * When it is omitted, a TTY prompts for the location and a non-TTY defaults to the current directory.

@@ -91,7 +91,7 @@ export interface Config {
 
     /**
      * Directory each layer's dashboard pages and components are read from and served from.
-     * Pages live under `pages/` within it (`pages/users/[id].ts` -> the `/users/[id]` page).
+     * Dashboard pages live under `pages/` within it (`pages/users/[id].ts` -> the `/users/[id]` page).
      * Resolved against each layer's root.
      *
      * @default

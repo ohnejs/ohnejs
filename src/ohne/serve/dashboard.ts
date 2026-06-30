@@ -52,8 +52,10 @@ const APP_MODULE_BASE = `${MODULE_BASE}/app`;
 const RELOAD_PATH = `${MODULE_BASE}/dashboard/reload`;
 
 /**
- * Maps the bare specifiers a page may import to their served URLs, injected as the shell's importmap.
- * `ohne/utils` serves the full utils barrel, so a page or layer can import any isomorphic util by name.
+ * Maps the bare specifiers a dashboard page may import to their served URLs.
+ * The result is injected as the shell's importmap.
+ * `ohne/utils` serves the full utils barrel.
+ * A dashboard page or layer can import any isomorphic util by name.
  */
 const IMPORTMAP = jsonForScript({
   imports: {
@@ -79,7 +81,8 @@ const MODULE_ROOTS = ['dashboard', 'utils'].map((dir) => resolvePath(dir, SRC_RO
  * Boots the dashboard server for the project rooted at `from` and starts serving it.
  *
  * Resolves the layer stack, then serves a single-page shell on every navigation.
- * The shell injects the page manifest, scanned per request, plus an importmap, and boots the client kernel.
+ * The shell injects the dashboard page manifest, scanned per request, plus an importmap.
+ * It then boots the client kernel.
  * The framework kernel is served under `/m/`, each layer's dashboard modules under `/m/app/`.
  * Both are type-stripped to JavaScript: the dashboard is a pure SPA with no build step.
  *
