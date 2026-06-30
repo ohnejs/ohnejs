@@ -1,7 +1,10 @@
+import type { Stats } from 'node:fs';
+
 import { stripTypeScriptTypes } from 'node:module';
 
 import { etag } from '../../utils/etag/etag.ts';
 import { readFile } from '../../utils/fs/read-file.ts';
+import { stat } from '../../utils/fs/stat.ts';
 import { silenceFirstStripWarning } from '../../utils/imports/silence-strip-warning.js';
 import {
   cacheControl,
@@ -49,7 +52,8 @@ export interface SendFileOptions {
  * This is the stripping Node uses to run `.ts`, pointed at the browser.
  * Any other file is served with the content type for its extension.
  *
- * The body is tagged with a strong `ETag`, so a fresh request is answered `304`.
+ * The response carries a weak `ETag` from the file's size and modification time, so a fresh request is `304`.
+ * A fresh request short-circuits on the stat alone: the file is neither read nor stripped.
  * Call it inside a request and return its result as the handler body.
  *
  * @example
@@ -66,34 +70,33 @@ export async function sendFile(
   for (const root of roots) {
     const resolved = safeResolve(root, path);
     if (isNull(resolved)) continue;
-    let source: string | null;
-    try {
-      source = await readFile(resolved);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EISDIR') throw error;
-      continue;
-    }
-    if (isNull(source)) continue;
-    return serve(resolved, source, options);
+    const stats = await stat(resolved);
+    if (isNull(stats) || !stats.isFile()) continue;
+    return serve(resolved, stats, options);
   }
   throw notFound(options.notFound);
 }
 
-function serve(file: string, source: string, options: SendFileOptions): string | undefined {
+async function serve(
+  file: string,
+  stats: Stats,
+  options: SendFileOptions,
+): Promise<string | undefined> {
   const typescript = TYPESCRIPT.test(file);
-  const body = typescript ? stripTypeScriptTypes(source) : source;
 
   const response = useResponse();
   response.headers.set(
     'content-type',
     typescript ? JAVASCRIPT : (mimeTypeFor(file) ?? 'text/plain; charset=utf-8'),
   );
-  response.headers.set('etag', etag(body));
+  response.headers.set('etag', etag(stats));
   response.headers.set('cache-control', cacheControl(options.cache ?? { noCache: true }));
 
   if (isFresh()) {
     sendNotModified();
     return undefined;
   }
-  return body;
+
+  const source = (await readFile(file)) ?? '';
+  return typescript ? stripTypeScriptTypes(source) : source;
 }
