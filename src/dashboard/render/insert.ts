@@ -1,11 +1,11 @@
-import { isArray } from '../utils/is/is-array.ts';
-import { isBoolean } from '../utils/is/is-boolean.ts';
-import { isFunction } from '../utils/is/is-function.ts';
-import { isNullish } from '../utils/is/is-nullish.ts';
-import { isNumber } from '../utils/is/is-number.ts';
-import { isString } from '../utils/is/is-string.ts';
-import { batchedEffect } from '../utils/reactive/batched-effect.ts';
-import { effectScope, type EffectScope } from '../utils/reactive/effect-scope.ts';
+import { isArray } from '../../utils/is/is-array.ts';
+import { isBoolean } from '../../utils/is/is-boolean.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
+import { isNullish } from '../../utils/is/is-nullish.ts';
+import { isNumber } from '../../utils/is/is-number.ts';
+import { isString } from '../../utils/is/is-string.ts';
+import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
+import { effectScope, type EffectScope } from '../../utils/reactive/effect-scope.ts';
 
 /**
  * A renderable dashboard child.

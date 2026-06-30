@@ -1,7 +1,7 @@
 import type { Child } from './insert.ts';
 
-import { effect } from '../utils/reactive/effect.ts';
-import { ref } from '../utils/reactive/ref.ts';
+import { effect } from '../../utils/reactive/effect.ts';
+import { ref } from '../../utils/reactive/ref.ts';
 
 /**
  * A reactive conditional child.

@@ -1,6 +1,6 @@
-import { isFunction } from '../utils/is/is-function.ts';
-import { isNullish } from '../utils/is/is-nullish.ts';
-import { batchedEffect } from '../utils/reactive/batched-effect.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
+import { isNullish } from '../../utils/is/is-nullish.ts';
+import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { append, type Child } from './insert.ts';
 
 /**
