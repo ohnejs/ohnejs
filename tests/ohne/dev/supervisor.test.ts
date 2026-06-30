@@ -184,4 +184,33 @@ describe('dev', () => {
     await server.close();
     await waitFor(async () => (await get(dashPort, '/')) === -1);
   });
+
+  it('does not reload the API on a dashboard file change', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('dash-noreload', port);
+    writeRoute(app, 'health.ts');
+
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    try {
+      const server = await dev(app, { entry: BIN, dashboard: false });
+      servers.push(server);
+      await waitFor(async () => (await get(port, '/health')) === 200);
+      await waitFor(async () => out.join('').includes('Waiting for changes'));
+      out.length = 0;
+
+      mkdirSync(join(app, 'dashboard', 'pages'), { recursive: true });
+      writeFileSync(join(app, 'dashboard', 'pages', 'index.ts'), 'export default () => null\n');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      strictEqual(out.join('').includes('Reloading API'), false);
+      strictEqual(await get(port, '/health'), 200);
+
+      writeRoute(app, 'users.get.ts');
+      await waitFor(async () => (await get(port, '/users')) === 200);
+      ok(out.join('').includes('Reloading API'));
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
+  });
 });

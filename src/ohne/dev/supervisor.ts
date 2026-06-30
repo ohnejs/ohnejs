@@ -8,6 +8,7 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { type ServeChild, spawnServeChild } from './child-server.ts';
+import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createMessagesTarget } from './targets/messages.ts';
@@ -150,8 +151,8 @@ export async function dev(
       park();
       return;
     }
-    const paths = [...batch];
-    if (!paths.some(isSource) && !paths.some((path) => messages.affectedBy(path))) return;
+    const reloadable = [...batch].filter((path) => !isDashboardPath(path));
+    if (!reloadable.some(isSource) && !reloadable.some((path) => messages.affectedBy(path))) return;
     printer.info('__Reloading API...__');
     try {
       await respawn();
@@ -181,7 +182,11 @@ export async function dev(
       api = null;
       await previous.stop();
     }
-    const next = spawnServeChild(from, 'api', { port, entry: options.entry, onExit: onCrash });
+    const next = spawnServeChild(from, 'api', {
+      port,
+      entry: options.entry,
+      onExit: onCrash,
+    });
     await next.ready;
     api = next;
   }
