@@ -88,6 +88,16 @@ export interface Config {
      * 'messages'
      */
     messages?: string;
+
+    /**
+     * Directory each layer's dashboard pages and components are read from and served from.
+     * Pages live under `pages/` within it (`pages/users/[id].ts` -> the `/users/[id]` page).
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'dashboard'
+     */
+    dashboard?: string;
   };
 
   /**
@@ -529,6 +539,7 @@ export const DIR_DEFAULTS = {
   boot: 'boot',
   middleware: 'middleware',
   messages: 'messages',
+  dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
 
 /**
