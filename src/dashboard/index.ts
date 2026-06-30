@@ -4,6 +4,7 @@ export type { Props } from './render/h.ts';
 export type { Child } from './render/insert.ts';
 export { mount } from './render/mount.ts';
 export { when } from './render/when.ts';
+export { defineDashboardPage } from './router/define-dashboard-page.ts';
 export { navigate } from './router/router.ts';
 export type { DashboardPage, RouteContext } from './router/router.ts';
 export { api } from './runtime/api.ts';
