@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,7 +27,7 @@ describe('ohne init', () => {
     process.exitCode = 0;
   });
 
-  it('scaffolds the four project files into a new directory', async () => {
+  it('scaffolds the project files into a new directory', async () => {
     const dir = join(freshDir('app'), 'my-app');
 
     const code = await runCommand(ohne, ['init', dir, '--yes']);
@@ -36,6 +36,7 @@ describe('ohne init', () => {
     strictEqual(existsSync(join(dir, 'ohne.config.ts')), true);
     strictEqual(existsSync(join(dir, 'package.json')), true);
     strictEqual(existsSync(join(dir, 'tsconfig.json')), true);
+    strictEqual(existsSync(join(dir, 'tsconfig.browser.json')), true);
     strictEqual(existsSync(join(dir, '.gitignore')), true);
   });
 
@@ -80,6 +81,18 @@ describe('ohne init', () => {
     await runCommand(ohne, ['init', dir, '--yes']);
     const tsconfig = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
     strictEqual(tsconfig.extends, 'ohne/tsconfig.base.json');
+    deepStrictEqual(tsconfig.exclude, ['dashboard']);
+  });
+
+  it('writes a browser tsconfig for the dashboard code', async () => {
+    const dir = join(freshDir('app'), 'browser');
+
+    await runCommand(ohne, ['init', dir, '--yes']);
+    const tsconfig = JSON.parse(readFileSync(join(dir, 'tsconfig.browser.json'), 'utf8'));
+    strictEqual(tsconfig.extends, 'ohne/tsconfig.base.json');
+    deepStrictEqual(tsconfig.include, ['dashboard/**/*.ts']);
+    deepStrictEqual(tsconfig.compilerOptions.lib, ['esnext', 'dom', 'dom.iterable']);
+    deepStrictEqual(tsconfig.compilerOptions.types, []);
   });
 
   it('refuses a non-empty directory without --force and exits 1', async () => {
