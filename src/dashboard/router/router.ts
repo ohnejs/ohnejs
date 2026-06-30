@@ -26,10 +26,10 @@ export interface RouteContext {
 /**
  * A dashboard page component, rendered for its route with the route context.
  */
-export type Page = (route: RouteContext) => Child;
+export type DashboardPage = (route: RouteContext) => Child;
 
 interface Active extends MatchedRoute {
-  component: Page;
+  component: DashboardPage;
 }
 
 let pages: CompiledPage[] = [];
@@ -78,7 +78,7 @@ async function render(): Promise<void> {
     return;
   }
   const mine = ++token;
-  const module = (await import(match.url)) as { default: Page };
+  const module = (await import(match.url)) as { default: DashboardPage };
   if (mine !== token) return;
   active.value = { ...match, component: module.default };
 }

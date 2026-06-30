@@ -5,7 +5,7 @@ export type { Child } from './render/insert.ts';
 export { mount } from './render/mount.ts';
 export { when } from './render/when.ts';
 export { navigate } from './router/router.ts';
-export type { Page, RouteContext } from './router/router.ts';
+export type { DashboardPage, RouteContext } from './router/router.ts';
 export { api } from './runtime/api.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
