@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 import { etag } from '../../utils/etag/etag.ts';
 import { readFile } from '../../utils/fs/read-file.ts';
+import { silenceFirstStripWarning } from '../../utils/imports/silence-strip-warning.js';
 import {
   cacheControl,
   type CacheControlOptions,
@@ -17,6 +18,8 @@ import { useResponse } from './use-response.ts';
 
 const TYPESCRIPT = /\.m?ts$/;
 const JAVASCRIPT = 'text/javascript; charset=utf-8';
+
+silenceFirstStripWarning();
 
 /**
  * Options for `sendFile`.
