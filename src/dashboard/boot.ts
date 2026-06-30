@@ -1,4 +1,4 @@
-import { dashboardConfig } from './config.ts';
-import { startRouter } from './router.ts';
+import { startRouter } from './router/router.ts';
+import { dashboardConfig } from './runtime/config.ts';
 
 void startRouter(dashboardConfig().pages, document.getElementById('app') as Element);

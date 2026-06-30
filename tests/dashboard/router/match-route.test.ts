@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { compilePages, matchPages } from '../../src/dashboard/match-route.ts';
+import { compilePages, matchPages } from '../../../src/dashboard/router/match-route.ts';
 
 const manifest = [
   { pattern: '/users/new', url: '/m/app/pages/users/new.ts' },

@@ -1,12 +1,12 @@
-import type { RouteParams } from '../utils/route/compile-route.ts';
-import type { PageRoute } from '../utils/route/page-route.ts';
-import type { Child } from './render/insert.ts';
+import type { RouteParams } from '../../utils/route/compile-route.ts';
+import type { PageRoute } from '../../utils/route/page-route.ts';
+import type { Child } from '../render/insert.ts';
 
-import { isNull } from '../utils/is/is-null.ts';
-import { ref } from '../utils/reactive/ref.ts';
+import { isNull } from '../../utils/is/is-null.ts';
+import { ref } from '../../utils/reactive/ref.ts';
+import { h } from '../render/h.ts';
+import { mount } from '../render/mount.ts';
 import { compilePages, type CompiledPage, type MatchedRoute, matchPages } from './match-route.ts';
-import { h } from './render/h.ts';
-import { mount } from './render/mount.ts';
 
 /**
  * The context a page component receives: its decoded route params and the matched path.

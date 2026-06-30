@@ -1,6 +1,6 @@
-import type { PageRoute } from '../utils/route/page-route.ts';
+import type { PageRoute } from '../../utils/route/page-route.ts';
 
-import { isUndefined } from '../utils/is/is-undefined.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 
 /**
  * The configuration the dashboard server injects into the shell.
