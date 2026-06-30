@@ -29,6 +29,7 @@ export * from './http/read-json-body.ts';
 export * from './http/read-raw-body.ts';
 export * from './http/read-text-body.ts';
 export * from './http/router.ts';
+export * from './http/send-events.ts';
 export * from './http/send-file.ts';
 export * from './http/send-not-modified.ts';
 export * from './http/send-redirect.ts';
