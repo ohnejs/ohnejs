@@ -178,7 +178,7 @@ describe('serveDashboard', () => {
     const body = (await req(port, '/')).body;
     strictEqual(body.includes('<script type="importmap">'), true);
     strictEqual(body.includes('"ohne/dashboard":"/m/dashboard/index.ts"'), true);
-    strictEqual(body.includes('"ohne/utils":"/m/utils/reactive/index.ts"'), true);
+    strictEqual(body.includes('"ohne/utils":"/m/utils/index.ts"'), true);
     strictEqual(body.includes('"app/":"/m/app/"'), true);
   });
 

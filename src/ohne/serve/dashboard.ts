@@ -41,12 +41,12 @@ const APP_MODULE_BASE = `${MODULE_BASE}/app`;
 
 /**
  * Maps the bare specifiers a page may import to their served URLs, injected as the shell's importmap.
- * `ohne/utils` points at the curated reactive barrel, not the universal one, to keep the browser graph small.
+ * `ohne/utils` serves the full utils barrel, so a page or layer can import any isomorphic util by name.
  */
 const IMPORTMAP = jsonForScript({
   imports: {
     'ohne/dashboard': `${MODULE_BASE}/dashboard/index.ts`,
-    'ohne/utils': `${MODULE_BASE}/utils/reactive/index.ts`,
+    'ohne/utils': `${MODULE_BASE}/utils/index.ts`,
     'app/': `${APP_MODULE_BASE}/`,
   },
 });
