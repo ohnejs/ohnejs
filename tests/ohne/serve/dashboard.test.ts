@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 
 import { rejects, strictEqual } from 'node:assert';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -171,5 +171,42 @@ describe('serveDashboard', () => {
     } finally {
       useEnv().unset('API_URL');
     }
+  });
+
+  it('injects an importmap mapping the bare specifiers to served URLs', async () => {
+    const port = await serve('importmap');
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<script type="importmap">'), true);
+    strictEqual(body.includes('"ohne/dashboard":"/m/dashboard/index.ts"'), true);
+    strictEqual(body.includes('"ohne/utils":"/m/utils/reactive/index.ts"'), true);
+    strictEqual(body.includes('"app/":"/m/app/"'), true);
+  });
+
+  it('references the boot module entry from the shell', async () => {
+    const port = await serve('boot');
+    strictEqual(
+      (await req(port, '/')).body.includes('<script type="module" src="/m/dashboard/boot.ts">'),
+      true,
+    );
+  });
+
+  it('lists a page in the manifest and serves its module under /m/app', async () => {
+    const dir = makeApp('app-pages');
+    const file = join(dir, 'dashboard', 'pages', 'users', '[id].ts');
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, 'export default () => null\n');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+
+    strictEqual((await req(port, '/')).body.includes('"url":"/m/app/pages/users/[id].ts"'), true);
+
+    const mod = await req(port, '/m/app/pages/users/[id].ts');
+    strictEqual(mod.status, 200);
+    strictEqual(mod.headers['content-type'], 'text/javascript; charset=utf-8');
+  });
+
+  it('blocks path traversal out of the app module root', async () => {
+    const port = await serve('app-traversal');
+    strictEqual((await req(port, '/m/app/%2Fetc%2Fpasswd')).status, 404);
   });
 });

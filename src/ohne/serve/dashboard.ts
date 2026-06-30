@@ -10,11 +10,15 @@ import {
   isNull,
   isPathInside,
   isPort,
+  jsonForScript,
   MAX_PORT,
   normalizeBasePath,
+  type PageRoute,
   resolvePath,
   safeResolve,
 } from '../../utils/index.ts';
+import { buildDashboardManifest } from '../dashboard/pages/build-page-manifest.ts';
+import { collectDashboardPages } from '../dashboard/pages/collect-pages.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { notFound } from '../http/http-error.ts';
@@ -28,8 +32,24 @@ import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
+import { dashboardRoots } from './dashboard-roots.ts';
 
 const MODULE_BASE = '/m';
+
+const APP_MODULE_BASE = `${MODULE_BASE}/app`;
+
+/**
+ * Maps the bare specifiers a page may import to their served URLs, injected as the shell's importmap.
+ * `ohne/utils` points at the curated reactive barrel, not the universal one, to keep the browser graph small.
+ */
+const IMPORTMAP = jsonForScript({
+  imports: {
+    'ohne/dashboard': `${MODULE_BASE}/dashboard/index.ts`,
+    'ohne/utils': `${MODULE_BASE}/utils/reactive/index.ts`,
+    'app/': `${APP_MODULE_BASE}/`,
+  },
+});
 
 /**
  * The framework `src` directory, the root the client modules are served from.
@@ -46,9 +66,10 @@ const MODULE_ROOTS = ['dashboard', 'utils'].map((dir) => resolvePath(dir, SRC_RO
 /**
  * Boots the dashboard server for the project rooted at `from` and starts serving it.
  *
- * Resolves the layer stack for config, then serves a single-page shell on every navigation.
- * The client modules under `/m/` are served type-stripped to JavaScript.
- * The dashboard is a pure SPA: the browser fetches each module and renders with the reactive client kernel.
+ * Resolves the layer stack, then serves a single-page shell on every navigation.
+ * The shell injects the page manifest, scanned per request, plus an importmap, and boots the client kernel.
+ * The framework kernel is served under `/m/`, each layer's dashboard modules under `/m/app/`.
+ * Both are type-stripped to JavaScript: the dashboard is a pure SPA with no build step.
  *
  * Port and host come from `Config.dashboard`, overridden by the `PORT` and `HOST` env vars when set.
  * The injected API base URL comes from the `API_URL` env, then `Config.dashboard.apiURL`, then `Config.api`.
@@ -59,10 +80,22 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   await loadLayers(from);
   const config = useConfig().dashboard;
 
-  const shell = shellDocument(resolveAPIURL());
+  const layers = await resolveOhneLayers(from);
+  const appRoots = dashboardRoots(layers);
+  const apiURL = resolveAPIURL();
+
+  const renderShell = async (): Promise<string> =>
+    shellDocument(
+      apiURL,
+      buildDashboardManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
+    );
+
   const routes: Route[] = [
-    synthetic('/', () => shell),
-    synthetic('/[...path]', () => shell),
+    synthetic('/', renderShell),
+    synthetic('/[...path]', renderShell),
+    synthetic(`${APP_MODULE_BASE}/[...path]`, ({ params }: HandlerContext) =>
+      sendFile(appRoots, params.path, { notFound: 'Not Found' }),
+    ),
     synthetic(`${MODULE_BASE}/[...path]`, serveModule),
   ];
   const http = createServer(createRouter(routes));
@@ -107,18 +140,20 @@ function resolveAPIURL(): string {
   );
 }
 
-function shellDocument(apiURL: string): string {
-  const config = JSON.stringify({ apiURL }).replace(/</g, '\\u003c');
+function shellDocument(apiURL: string, pages: PageRoute[]): string {
+  const config = jsonForScript({ apiURL, pages });
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ohne</title>
+    <script type="importmap">${IMPORTMAP}</script>
   </head>
   <body>
-    <div id="app"><h1>ohne</h1></div>
+    <div id="app"></div>
     <script type="application/json" id="ohne-config">${config}</script>
+    <script type="module" src="${MODULE_BASE}/dashboard/boot.ts"></script>
   </body>
 </html>
 `;
