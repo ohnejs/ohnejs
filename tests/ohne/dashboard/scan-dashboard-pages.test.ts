@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { type OhneLayer, scanLayerDashboardPages } from '../../../../src/ohne/index.ts';
+import { type OhneLayer, scanDashboardPages } from '../../../src/ohne/index.ts';
 
-describe('scanLayerDashboardPages', () => {
+describe('scanDashboardPages', () => {
   let root: string;
   let app: OhneLayer;
 
@@ -17,7 +17,7 @@ describe('scanLayerDashboardPages', () => {
   }
 
   before(() => {
-    root = mkdtempSync(join(tmpdir(), 'ohne-scan-layer-dashboard-pages-'));
+    root = mkdtempSync(join(tmpdir(), 'ohne-scan-dashboard-pages-'));
     app = { name: 'app', dir: join(root, 'app') };
     writePage(app.dir, 'index.ts');
     writePage(app.dir, 'users/[id].ts');
@@ -29,7 +29,7 @@ describe('scanLayerDashboardPages', () => {
   });
 
   it('maps each file to a pattern and module', async () => {
-    const pages = await scanLayerDashboardPages(app, 'dashboard');
+    const pages = await scanDashboardPages(app, 'dashboard');
     deepStrictEqual(
       pages.map((page) => ({ pattern: page.pattern, module: page.module, layer: page.layer })),
       [
@@ -42,7 +42,7 @@ describe('scanLayerDashboardPages', () => {
 
   it('returns an empty list when a layer has no pages directory', async () => {
     deepStrictEqual(
-      await scanLayerDashboardPages({ name: 'bare', dir: join(root, 'bare') }, 'dashboard'),
+      await scanDashboardPages({ name: 'bare', dir: join(root, 'bare') }, 'dashboard'),
       [],
     );
   });
@@ -51,6 +51,6 @@ describe('scanLayerDashboardPages', () => {
     const clash: OhneLayer = { name: 'clash', dir: join(root, 'clash') };
     writePage(clash.dir, 'users.ts');
     writePage(clash.dir, 'users/index.ts');
-    await rejects(scanLayerDashboardPages(clash, 'dashboard'), /Duplicate page/);
+    await rejects(scanDashboardPages(clash, 'dashboard'), /Duplicate page/);
   });
 });

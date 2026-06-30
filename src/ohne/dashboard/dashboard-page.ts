@@ -27,4 +27,4 @@ export interface DashboardPage {
 /**
  * Subdirectory within a layer's dashboard directory that holds page files.
  */
-export const PAGES_DIR = 'pages';
+export const DASHBOARD_PAGES_DIR = 'pages';

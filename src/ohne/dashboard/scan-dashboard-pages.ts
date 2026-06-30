@@ -1,6 +1,6 @@
-import type { OhneLayer } from '../../project/resolve-ohne-layers.ts';
+import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
-import { listDir } from '../../../utils/fs/index.ts';
+import { listDir } from '../../utils/fs/index.ts';
 import {
   isNull,
   isUndefined,
@@ -8,9 +8,9 @@ import {
   naturalCompare,
   pathToRoutePattern,
   relativePath,
-} from '../../../utils/index.ts';
-import { ohneError } from '../../error/ohne-error.ts';
-import { type DashboardPage, PAGES_DIR } from './page.ts';
+} from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
+import { DASHBOARD_PAGES_DIR, type DashboardPage } from './dashboard-page.ts';
 
 /**
  * Reads every page file in one layer's dashboard pages directory.
@@ -22,15 +22,15 @@ import { type DashboardPage, PAGES_DIR } from './page.ts';
  *
  * @example
  * ```ts
- * await scanLayerDashboardPages({ name: 'app', dir: '/app' }, 'dashboard')
+ * await scanDashboardPages({ name: 'app', dir: '/app' }, 'dashboard')
  * // -> [{ pattern: '/users/[id]', module: 'pages/users/[id].ts', file: '...', layer: 'app' }]
  * ```
  */
-export async function scanLayerDashboardPages(
+export async function scanDashboardPages(
   layer: OhneLayer,
   dashboard: string,
 ): Promise<DashboardPage[]> {
-  const entries = await listDir(joinPath(layer.dir, dashboard, PAGES_DIR), {
+  const entries = await listDir(joinPath(layer.dir, dashboard, DASHBOARD_PAGES_DIR), {
     ext: 'ts',
     files: true,
   });
@@ -46,7 +46,7 @@ export async function scanLayerDashboardPages(
         throw ohneError({
           title: `Duplicate page \`${pattern}\``,
           body: [
-            `Two files in layer \`${layer.name}\` resolve to the same page.`,
+            `Two files in layer \`${layer.name}\` resolve to the same dashboard page.`,
             '',
             `- \`${relativePath(process.cwd(), clash)}\``,
             `- \`${relativePath(process.cwd(), entry.path)}\``,
@@ -56,7 +56,7 @@ export async function scanLayerDashboardPages(
       seen.set(pattern, entry.path);
       return {
         pattern,
-        module: joinPath(PAGES_DIR, entry.relativePath),
+        module: joinPath(DASHBOARD_PAGES_DIR, entry.relativePath),
         file: entry.path,
         layer: layer.name,
       };

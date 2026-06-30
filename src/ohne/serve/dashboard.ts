@@ -17,8 +17,9 @@ import {
   resolvePath,
   safeResolve,
 } from '../../utils/index.ts';
-import { buildDashboardManifest } from '../dashboard/pages/build-page-manifest.ts';
-import { collectDashboardPages } from '../dashboard/pages/collect-pages.ts';
+import { buildDashboardPageManifest } from '../dashboard/build-dashboard-page-manifest.ts';
+import { collectDashboardPages } from '../dashboard/collect-dashboard-pages.ts';
+import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { notFound } from '../http/http-error.ts';
@@ -33,7 +34,6 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
-import { dashboardRoots } from './dashboard-roots.ts';
 
 const MODULE_BASE = '/m';
 
@@ -87,7 +87,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const renderShell = async (): Promise<string> =>
     shellDocument(
       apiURL,
-      buildDashboardManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
+      buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
     );
 
   const routes: Route[] = [

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { collectDashboardPages, type OhneLayer } from '../../../../src/ohne/index.ts';
+import { collectDashboardPages, type OhneLayer } from '../../../src/ohne/index.ts';
 
 describe('collectDashboardPages', () => {
   let root: string;
