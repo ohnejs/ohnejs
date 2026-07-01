@@ -215,8 +215,10 @@ async function drain(background: Promise<unknown>[]): Promise<void> {
 }
 
 function logUnhandled(route: Route, error: unknown): void {
-  usePrinter().errorBlock({
+  const printer = usePrinter();
+  printer.errorBlock({
     title: `Unhandled error in \`${route.method ?? 'ANY'} ${route.pattern}\``,
-    body: error instanceof Error ? (error.stack ?? error.message) : errorMessage(error),
+    body: errorMessage(error),
   });
+  if (error instanceof Error && !isUndefined(error.stack)) printer.debug(error.stack);
 }

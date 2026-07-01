@@ -134,6 +134,28 @@ describe('dispatch', () => {
     ok(!JSON.stringify(body).includes('db exploded'));
   });
 
+  it('logs an unhandled error as a message, with the stack only under DEBUG', async () => {
+    const route = makeRoute('/', () => {
+      throw new Error('db exploded');
+    });
+
+    const quiet: string[] = [];
+    usePrinter().configure({ debug: false, stream: { write: (s) => quiet.push(s) } });
+    await dispatch(route, req(), url(), {});
+    const off = quiet.join('');
+
+    const loud: string[] = [];
+    usePrinter().configure({ debug: true, stream: { write: (s) => loud.push(s) } });
+    await dispatch(route, req(), url(), {});
+    const on = loud.join('');
+
+    usePrinter().configure({ debug: false, stream: { write() {} } });
+
+    ok(off.includes('db exploded'));
+    ok(!off.includes('    at '));
+    ok(on.includes('    at '));
+  });
+
   it('holds background work until drain settles', async () => {
     let resolve!: () => void;
     const work = new Promise<void>((r) => (resolve = r));
