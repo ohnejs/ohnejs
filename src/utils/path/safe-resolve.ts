@@ -1,5 +1,5 @@
+import { isPathInside } from './is-path-inside.ts';
 import { resolvePath } from './resolve-path.ts';
-import { withTrailingSlash } from './with-trailing-slash.ts';
 
 /**
  * Resolves an untrusted `path` against `base`, refusing anything that escapes `base`.
@@ -9,7 +9,7 @@ import { withTrailingSlash } from './with-trailing-slash.ts';
  * Use it before mapping a request param onto the filesystem.
  * `base` itself (an empty or `.` path) resolves to `base` and is allowed.
  *
- * The check is lexical: it normalizes and compares prefixes, it does not touch the disk or follow symlinks.
+ * The check is lexical: it normalizes and checks containment, it does not touch the disk or follow symlinks.
  *
  * @example
  * ```ts
@@ -22,6 +22,5 @@ import { withTrailingSlash } from './with-trailing-slash.ts';
 export function safeResolve(base: string, path: string): string | null {
   const root = resolvePath(base);
   const resolved = resolvePath(path, root);
-  if (resolved === root) return resolved;
-  return resolved.startsWith(withTrailingSlash(root)) ? resolved : null;
+  return isPathInside(resolved, root) ? resolved : null;
 }

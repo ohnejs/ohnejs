@@ -29,4 +29,9 @@ describe('safeResolve', () => {
   it('refuses a sibling that shares the base prefix', () => {
     strictEqual(safeResolve('/srv/files', '../files-secret/x'), null);
   });
+
+  it('resolves and refuses under a UNC base', () => {
+    strictEqual(safeResolve('//srv/sh', 'a/b.txt'), '//srv/sh/a/b.txt');
+    strictEqual(safeResolve('//srv/sh', '/etc/passwd'), null);
+  });
 });
