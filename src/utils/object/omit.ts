@@ -1,6 +1,7 @@
 /**
  * Returns a new object with all own keys of `obj` except the listed ones.
  * Symbol keys are not copied.
+ * `__proto__`, `constructor`, and `prototype` are dropped to prevent prototype pollution.
  *
  * @example
  * ```ts
