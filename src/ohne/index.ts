@@ -58,6 +58,7 @@ export * from './layers/layer-name.ts';
 export * from './layers/load-layers.ts';
 export * from './layers/use-config.ts';
 export * from './layers/use-layers.ts';
+export * from './layers/validate-config-dirs.ts';
 export * from './lifecycle/on-shutdown.ts';
 export * from './lifecycle/use-shutdown.ts';
 export * from './messages/collect-messages.ts';

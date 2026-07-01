@@ -7,6 +7,7 @@ import type { LayerDefinition } from '../layers/define-layer.ts';
 
 import { exists } from '../../utils/fs/index.ts';
 import { joinPath } from '../../utils/index.ts';
+import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
 
 /**
  * A directory's config, split by ownership.
@@ -76,6 +77,7 @@ export async function readLayerConfig(
   const configFile = joinPath(dir, 'ohne.config.ts');
   if (!(await exists(configFile))) return null;
   const input = (await importDefault<Config>(configFile, fresh)) ?? {};
+  if (input.dirs) validateConfigDirs(input.dirs, configFile);
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');
   const layer = (await exists(layerFile))
