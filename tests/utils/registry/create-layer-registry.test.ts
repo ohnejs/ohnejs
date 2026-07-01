@@ -245,6 +245,14 @@ describe('createLayerRegistry', () => {
     deepStrictEqual(r.resolve(), { a: 99 });
   });
 
+  it('clear restores strategies to the construction seed', () => {
+    const r = createLayerRegistry<{ tags: string[] }>({ strategies: { tags: 'concat-unique' } });
+    r.add({ path: '/a', input: { tags: ['x'] } });
+    r.setStrategy('extra', 'concat');
+    r.clear();
+    deepStrictEqual(r.strategies(), { tags: 'concat-unique' });
+  });
+
   describe('reactivity', () => {
     it('`resolve` inside an effect re-runs on `add`', () => {
       const r = createLayerRegistry<{ a: number }>();

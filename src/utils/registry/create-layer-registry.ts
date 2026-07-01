@@ -103,7 +103,7 @@ export interface LayerRegistry<C extends object> {
   remove(path: string): boolean;
 
   /**
-   * Removes every registered layer, returning the registry to empty.
+   * Removes every registered layer and restores strategies to the ones seeded at construction.
    * A subsequent `add` may reuse any previously registered path.
    */
   clear(): void;
@@ -183,7 +183,8 @@ export function createLayerRegistry<C extends object>(
   options?: LayerRegistryOptions,
 ): LayerRegistry<C> {
   const specs: LayerSpec<C>[] = [];
-  const strategies: LayerStrategies = { ...options?.strategies };
+  const seed: LayerStrategies = { ...options?.strategies };
+  let strategies: LayerStrategies = { ...seed };
   let cached: Layer<C>[] | null = null;
   const version = ref(0);
 
@@ -225,6 +226,7 @@ export function createLayerRegistry<C extends object>(
     clear() {
       if (specs.length === 0) return;
       specs.length = 0;
+      strategies = { ...seed };
       invalidate();
     },
     layers() {
