@@ -72,12 +72,12 @@ function notFound(): Child {
 }
 
 async function render(): Promise<void> {
+  const mine = ++token;
   const match = matchPages(pages, location.pathname);
   if (isNull(match)) {
     active.value = null;
     return;
   }
-  const mine = ++token;
   const module = (await import(match.url)) as { default: DashboardPage };
   if (mine !== token) return;
   active.value = { ...match, component: module.default };
