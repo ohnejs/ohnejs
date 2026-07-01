@@ -12,8 +12,9 @@ function readParameters(input: string, out: Record<string, string>): void {
     const nameStart = i;
     while (i < input.length && input[i] !== '=' && input[i] !== ';') i++;
     const name = input.slice(nameStart, i).trim().toLowerCase();
-    if (input[i] !== '=' || name === '') continue;
+    if (input[i] !== '=') continue;
     i++;
+    if (name === '') continue;
 
     let value: string;
     if (input[i] === '"') {

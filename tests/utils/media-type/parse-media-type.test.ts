@@ -64,6 +64,15 @@ describe('parseMediaType', () => {
     deepStrictEqual(parseMediaType(''), { type: '', parameters: {} });
   });
 
+  it('skips a parameter whose name is empty before the `=` without hanging', () => {
+    deepStrictEqual(parseMediaType('text/plain;=x'), { type: 'text/plain', parameters: {} });
+    deepStrictEqual(parseMediaType('text/html; =utf-8'), { type: 'text/html', parameters: {} });
+    deepStrictEqual(parseMediaType('text/plain;=x; charset=utf-8'), {
+      type: 'text/plain',
+      parameters: { charset: 'utf-8' },
+    });
+  });
+
   it('lands a __proto__ parameter as an own property without polluting', () => {
     const { parameters } = parseMediaType('text/plain; __proto__=evil');
     deepStrictEqual(parameters.__proto__, 'evil');
