@@ -149,6 +149,38 @@ describe('dev', () => {
     await waitFor(async () => (await get(port, '/health')) === -1);
   });
 
+  it('drains a child mid-respawn when close is called before it is ready', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('close-race', port);
+    writeRoute(app, 'health.ts');
+
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    try {
+      const server = await dev(app, { entry: BIN, dashboard: false });
+      servers.push(server);
+      await waitFor(async () => (await get(port, '/health')) === 200);
+
+      // Trigger a reload, then close the instant the respawn begins - before the new child is ready.
+      out.length = 0;
+      writeRoute(app, 'users.get.ts');
+      await waitFor(async () => out.join('').includes('Reloading API'));
+      await server.close();
+
+      // The respawning child must have been drained: nothing binds the port, even after it would boot.
+      let bound = false;
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline && !bound) {
+        if ((await get(port, '/health')) === 200) bound = true;
+        else await delay(100);
+      }
+      strictEqual(bound, false);
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
+  });
+
   it('settles on a "Waiting for changes" notice after a successful start', TIMEOUT, async () => {
     const port = await freePort();
     const app = writeProject('park', port);

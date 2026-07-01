@@ -93,6 +93,7 @@ export async function dev(
 
   let api: ServeChild | null = null;
   let dashboard: ServeChild | null = null;
+  let respawning: Promise<void> | undefined;
   const pending = new Set<string>();
   let cycling = false;
   let rerun = false;
@@ -178,19 +179,22 @@ export async function dev(
     }
   }
 
-  async function respawn(): Promise<void> {
-    if (api) {
-      const previous = api;
-      api = null;
-      await previous.stop();
-    }
-    const next = spawnServeChild(from, 'api', {
-      port,
-      entry: options.entry,
-      onExit: onCrash,
-    });
-    await next.ready;
-    api = next;
+  function respawn(): Promise<void> {
+    respawning = (async () => {
+      if (api) {
+        const previous = api;
+        api = null;
+        await previous.stop();
+      }
+      const next = spawnServeChild(from, 'api', {
+        port,
+        entry: options.entry,
+        onExit: onCrash,
+      });
+      await next.ready;
+      api = next;
+    })();
+    return respawning;
   }
 
   async function startDashboard(): Promise<void> {
@@ -234,6 +238,7 @@ export async function dev(
   async function teardown(): Promise<void> {
     schedule.cancel();
     watch.close();
+    await respawning?.catch(() => {});
     const running: ServeChild[] = [];
     if (api) running.push(api);
     if (dashboard) running.push(dashboard);
