@@ -70,4 +70,12 @@ describe('stringifySearchParams', () => {
     };
     deepStrictEqual(parseSearchParams(stringifySearchParams(value)), value);
   });
+
+  it('round-trips an integer above the safe range as a number', () => {
+    for (const n of [1e20, 2 ** 53, 9007199254740994]) {
+      const back = parseSearchParams(stringifySearchParams({ n })).n;
+      strictEqual(back, n);
+      strictEqual(typeof back, 'number');
+    }
+  });
 });

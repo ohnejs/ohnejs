@@ -28,7 +28,11 @@ function needsMarker(value: string): boolean {
 function encodeValue(value: SearchParamValue): string {
   if (isNull(value)) return 'null';
   if (isBoolean(value)) return value ? 'true' : 'false';
-  if (typeof value === 'number') return isRealNumber(value) ? String(value) : 'null';
+  if (typeof value === 'number') {
+    if (!isRealNumber(value)) return 'null';
+    const token = String(value);
+    return coerceToken(token) === value ? token : value.toExponential().replace('e+', 'e');
+  }
   if (isString(value)) return (needsMarker(value) ? '`' : '') + encode(value, false);
   if (isArray<SearchParamValue[]>(value)) {
     const items = value.map((v) => {
