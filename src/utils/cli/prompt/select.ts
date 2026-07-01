@@ -75,13 +75,14 @@ export function selectDefinition<T>(options: SelectOptions<T>): PromptDefinition
       const body =
         state.status === 'active'
           ? `${rail}\n${optionListBody(count, cursor, max, colors, (i) => row(items[i], i === cursor, colors))}\n${rail}`
-          : `${rail}  ${colors.dim(optionLabel(items[cursor]))}`;
+          : `${rail}  ${colors.dim(items[cursor] ? optionLabel(items[cursor]) : '')}`;
       const block = `${titleLine(options.message, state.status, undefined, colors)}\n${body}`;
       return leadIn(block, lead, colors);
     },
 
     onKey(key, str, state) {
       current = state;
+      if (count === 0) return;
       keymap(strokeFromReadlineKey(str, key));
     },
   };

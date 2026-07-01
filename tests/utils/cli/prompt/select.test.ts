@@ -82,6 +82,14 @@ describe('createPrompt().select', () => {
     strictEqual(isCancel(result), true);
   });
 
+  it('ignores navigation and submit on an empty list instead of crashing', async () => {
+    const { result } = await runSelect(['\x1b[B', '\x1b[A', '\x1b[F', '\x1b[H', '\r', '\x03'], {
+      message: 'Empty?',
+      options: [],
+    });
+    strictEqual(isCancel(result), true);
+  });
+
   it('marks the cursor row with a cyan bullet and plain text while dimming the rest', async () => {
     const input = new PassThrough();
     const out: string[] = [];
