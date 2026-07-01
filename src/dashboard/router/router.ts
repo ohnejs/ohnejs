@@ -6,7 +6,7 @@ import { isNull } from '../../utils/is/is-null.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
-import { compilePages, type CompiledPage, type MatchedRoute, matchPages } from './match-route.ts';
+import { compilePages, matchPages, type CompiledPage, type MatchedRoute } from './match-route.ts';
 
 /**
  * The context a page component receives: its decoded route params and the matched path.
@@ -57,7 +57,7 @@ export async function startRouter(
  * Navigates to `path` through the History API and re-renders; a no-op when already there.
  */
 export function navigate(path: string): void {
-  if (path === location.pathname) return;
+  if (path === location.pathname + location.search + location.hash) return;
   history.pushState(null, '', path);
   void render();
 }
@@ -100,6 +100,9 @@ function interceptLink(event: MouseEvent): void {
   if (isNull(anchor) || anchor.target !== '' || anchor.hasAttribute('download')) return;
   const url = new URL(anchor.href);
   if (url.origin !== location.origin) return;
+  if (url.pathname === location.pathname && url.search === location.search && url.hash !== '') {
+    return;
+  }
   event.preventDefault();
-  navigate(url.pathname);
+  navigate(url.pathname + url.search + url.hash);
 }
