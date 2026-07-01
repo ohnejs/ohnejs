@@ -62,7 +62,7 @@ interface NumberArg extends CommonArg {
   type: 'number';
 
   /**
-   * Reject values that are not whole numbers.
+   * Truncate the value toward zero to a whole number.
    *
    * @default
    * false
