@@ -1,6 +1,6 @@
 import type { Env } from './env.ts';
 
-import { createEnvRegistry, type EnvRegistry } from '../../utils/env/index.ts';
+import { createEnvRegistry, type EnvRegistry, nodeEnv } from '../../utils/env/index.ts';
 import {
   coerceToBoolean,
   coerceToInteger,
@@ -12,6 +12,7 @@ import {
 
 const registry: EnvRegistry<Env> = createEnvRegistry<Env>();
 
+registry.define('NODE_ENV', { default: 'development', parse: nodeEnv });
 registry.define('PORT', {
   default: undefined,
   parse: (raw) => {

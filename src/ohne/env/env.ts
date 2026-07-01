@@ -1,8 +1,11 @@
+import type { NodeEnv } from '../../utils/env/index.ts';
+
 /**
  * Typed ohne env vars.
  * Add fields by augmenting it from a layer with `declare module 'ohne'`.
  *
  * Built-ins:
+ * - `NODE_ENV` - runtime environment; `production` or `test`, else `development`.
  * - `PORT` - overrides `Config.api.port` and `Config.dashboard.port` when set.
  * - `HOST` - overrides `Config.api.host` and `Config.dashboard.host` when set.
  * - `API_URL` - the dashboard's API base URL; overrides `Config.dashboard.apiURL` and the derived default.
@@ -24,6 +27,15 @@
  * ```
  */
 export interface Env {
+  /**
+   * The runtime environment, read from `NODE_ENV`.
+   * `production` and `test` match exactly; every other value, and unset, is `development`.
+   *
+   * @default
+   * 'development'
+   */
+  NODE_ENV: NodeEnv;
+
   /**
    * Port override for the HTTP servers, taking precedence over `Config.api.port` and `Config.dashboard.port`.
    *
