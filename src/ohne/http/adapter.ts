@@ -224,7 +224,13 @@ export async function sendResponse(res: ServerResponse, response: Response): Pro
     return;
   }
 
-  await pipeline(Readable.fromWeb(response.body), res);
+  try {
+    await pipeline(Readable.fromWeb(response.body), res);
+  } catch (error) {
+    const clientLeft =
+      (error as NodeJS.ErrnoException).code === 'ERR_STREAM_PREMATURE_CLOSE' && res.req.destroyed;
+    if (!clientLeft) throw error;
+  }
 }
 
 async function resolveHeaders(response: Response, method?: string): Promise<Headers> {
