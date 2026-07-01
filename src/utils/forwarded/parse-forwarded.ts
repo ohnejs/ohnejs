@@ -87,8 +87,9 @@ export function parseForwarded(header: string): ForwardedElement[] {
     const nameStart = i;
     while (i < header.length && header[i] !== '=' && header[i] !== ';' && header[i] !== ',') i++;
     const name = header.slice(nameStart, i).trim().toLowerCase();
-    if (header[i] !== '=' || name === '') continue;
+    if (header[i] !== '=') continue;
     i++;
+    if (name === '') continue;
 
     let value: string;
     if (header[i] === '"') {

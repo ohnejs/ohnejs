@@ -49,6 +49,13 @@ describe('parseForwarded', () => {
     deepStrictEqual(parseForwarded(''), []);
   });
 
+  it('skips a parameter whose name is empty before the `=` without hanging', () => {
+    deepStrictEqual(parseForwarded('='), []);
+    deepStrictEqual(parseForwarded(';='), []);
+    deepStrictEqual(parseForwarded('for=a,=b'), [{ for: 'a' }]);
+    deepStrictEqual(parseForwarded('for=a,=b;proto=https'), [{ for: 'a' }, { proto: 'https' }]);
+  });
+
   it('lands a __proto__ parameter as an own property without polluting', () => {
     const [element] = parseForwarded('__proto__=evil;for=a');
     strictEqual(element.__proto__, 'evil');
