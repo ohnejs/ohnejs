@@ -71,6 +71,17 @@ describe('createCodeGenerator', () => {
     deepStrictEqual(await gen.prune(), ['stale.ts']);
   });
 
+  it('leaves a hidden file in place', async () => {
+    const dir = join(root, 'prune-hidden');
+    const gen = createCodeGenerator({ dir });
+    await gen.write('mine.ts', '1');
+    writeFileSync(join(dir, '.keep'), '');
+    writeFileSync(join(dir, 'stale.ts'), 'old');
+
+    deepStrictEqual(await gen.prune(), ['stale.ts']);
+    strictEqual(existsSync(join(dir, '.keep')), true);
+  });
+
   it('prunes nothing when the directory does not exist', async () => {
     const gen = createCodeGenerator({ dir: join(root, 'absent') });
     deepStrictEqual(await gen.prune(), []);

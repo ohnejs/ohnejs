@@ -56,8 +56,8 @@ export interface CodeGenerator {
   written(): string[];
 
   /**
-   * Deletes every file under the output directory that was not written this run.
-   * Leaves directories in place.
+   * Deletes every non-hidden file under the output directory that was not written this run.
+   * Leaves hidden entries and directories in place.
    * Returns the relative paths that were removed.
    */
   prune(): Promise<string[]>;
