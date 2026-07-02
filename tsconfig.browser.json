@@ -1,8 +1,7 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.node.json",
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable"],
     "types": []
-  },
-  "include": ["src/dashboard/**/*.ts"]
+  }
 }

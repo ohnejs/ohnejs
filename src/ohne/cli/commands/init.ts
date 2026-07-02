@@ -26,19 +26,15 @@ export default defineConfig({
 `;
 
 const TSCONFIG_FILE = `{
-  "extends": "ohne/tsconfig.base.json",
-  "include": ["**/*.ts", ".ohne/**/*.ts"],
+  "extends": "ohne/tsconfig.node.json",
+  "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
   "exclude": ["dashboard"]
 }
 `;
 
-const TSCONFIG_BROWSER_FILE = `{
-  "extends": "ohne/tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "types": []
-  },
-  "include": ["dashboard/**/*.ts"]
+const TSCONFIG_DASHBOARD_FILE = `{
+  "extends": "ohne/tsconfig.browser.json",
+  "include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]
 }
 `;
 
@@ -58,11 +54,13 @@ node_modules/
 /**
  * The `ohne init` command.
  * Scaffolds a new ohne project.
- * Writes `ohne.config.ts`, `package.json`, `tsconfig.json`, `tsconfig.browser.json`, and `.gitignore`.
+ * Writes `ohne.config.ts`, `package.json`, `tsconfig.json`, `dashboard/tsconfig.json`, and `.gitignore`.
  *
  * `tsconfig.json` type-checks the Node code and excludes `dashboard/`.
- * `tsconfig.browser.json` type-checks that browser code with the DOM lib.
- * `typecheck` runs the Node pass alone; add `tsc -p tsconfig.browser.json` once you author a dashboard page.
+ * `dashboard/tsconfig.json` type-checks that browser code with the DOM lib.
+ * It sits inside `dashboard/` so an editor discovers it and narrows `useT` there.
+ * `typecheck` runs the Node pass alone.
+ * Add `tsc -p dashboard/tsconfig.json` once you author a dashboard page.
  *
  * The target directory comes from the first positional.
  * When it is omitted, a TTY prompts for the location and a non-TTY defaults to the current directory.
@@ -223,7 +221,7 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
     engines: { node: '>=26.0.0' },
   });
   await writeFile(joinPath(target, 'tsconfig.json'), TSCONFIG_FILE);
-  await writeFile(joinPath(target, 'tsconfig.browser.json'), TSCONFIG_BROWSER_FILE);
+  await writeFile(joinPath(target, 'dashboard', 'tsconfig.json'), TSCONFIG_DASHBOARD_FILE);
   await writeFile(joinPath(target, '.gitignore'), GITIGNORE_FILE);
 }
 

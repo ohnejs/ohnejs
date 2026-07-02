@@ -15,7 +15,8 @@
   "files": [
     "src",
     "ohne.config.ts",
-    "tsconfig.base.json"
+    "tsconfig.browser.json",
+    "tsconfig.node.json"
   ],
   "type": "module",
   "sideEffects": false,
@@ -73,7 +74,8 @@
       "types": "./src/utils/print/index.ts",
       "default": "./src/utils/print/index.ts"
     },
-    "./tsconfig.base.json": "./tsconfig.base.json"
+    "./tsconfig.browser.json": "./tsconfig.browser.json",
+    "./tsconfig.node.json": "./tsconfig.node.json"
   },
   "scripts": {
     "dev": "node src/ohne/cli/bin.js dev",
@@ -82,7 +84,7 @@
     "serve:api": "node src/ohne/cli/bin.js serve api",
     "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
     "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test \"tests/**/*.test.ts\"",
-    "typecheck": "tsc && tsc -p tsconfig.browser.json"
+    "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "26.0.0",
