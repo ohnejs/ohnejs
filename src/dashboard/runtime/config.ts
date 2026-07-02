@@ -1,4 +1,5 @@
 import type { PageRoute } from '../../utils/route/page-route.ts';
+import type { DashboardLanguage } from './use-dashboard-language.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 
@@ -15,6 +16,13 @@ export interface DashboardConfig {
    * The page route manifest, ordered most-specific-first.
    */
   pages: PageRoute[];
+
+  /**
+   * Default message language, a canonical BCP-47 tag.
+   * `useDashboardLanguage` starts here, and the messages endpoint falls back to it.
+   * Narrows to the generated language union once codegen has run.
+   */
+  defaultLanguage: DashboardLanguage;
 }
 
 let cached: DashboardConfig | undefined;
