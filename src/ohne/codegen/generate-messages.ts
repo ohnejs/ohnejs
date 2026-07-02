@@ -85,7 +85,7 @@ async function writeShared(
 }
 
 /**
- * Writes `node/messages.ts`: augments `ohne`'s `KnownMessages` and registers each language's catalog.
+ * Writes `node/messages.ts`: augments `ohne`'s `KnownMessages` and `KnownLanguages`, registers each catalog.
  */
 async function writeNode(dir: string, messages: readonly MessageMeta[]): Promise<string> {
   const code = createCodeBuilder();
@@ -93,10 +93,13 @@ async function writeNode(dir: string, messages: readonly MessageMeta[]): Promise
     code.line("import { useMessages } from 'ohne';");
     code.line();
   }
-  code.line("import type { GeneratedMessages } from '../shared/messages.ts';");
+  code.line("import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';");
   code.line();
   code.line("declare module 'ohne' {");
-  code.indent(() => code.line('interface KnownMessages extends GeneratedMessages {}'));
+  code.indent(() => {
+    code.line('interface KnownMessages extends GeneratedMessages {}');
+    code.line('interface KnownLanguages extends GeneratedLanguages {}');
+  });
   code.line('}');
 
   if (messages.length > 0) {

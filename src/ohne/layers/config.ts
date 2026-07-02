@@ -4,6 +4,7 @@ import type {
   LayerStrategies,
   RequireByShape,
 } from '../../utils/index.ts';
+import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { LayerName } from './layer-name.ts';
 
 /**
@@ -155,12 +156,13 @@ export interface Config {
     /**
      * Language to fall back to when a request's language, and its parents, have no entry.
      * A BCP-47 tag like `en` or `de-AT`, canonicalized before use.
+     * Once codegen has run it must be one of the catalog languages, typed by `KnownLanguages`.
      * Inherited across layers, so an upper layer can set it once for everything above.
      *
      * @default
      * 'en'
      */
-    defaultLanguage?: string;
+    defaultLanguage?: KnownLanguage;
   };
 
   /**

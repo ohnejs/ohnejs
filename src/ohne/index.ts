@@ -63,6 +63,7 @@ export * from './layers/validate-config-dirs.ts';
 export * from './lifecycle/on-shutdown.ts';
 export * from './lifecycle/use-shutdown.ts';
 export * from './messages/collect-messages.ts';
+export * from './messages/known-languages.ts';
 export * from './messages/known-messages.ts';
 export * from './messages/messages.ts';
 export * from './messages/scan-layer-messages.ts';
