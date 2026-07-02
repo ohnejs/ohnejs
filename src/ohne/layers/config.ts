@@ -25,6 +25,7 @@ export interface Config {
    * Layers this project extends, by name.
    * Each name must be an ohne layer in the dependency closure; that closure types `LayerName`.
    * Add a layer to your `package.json` dependencies to make it referenceable, then list it here to stack it.
+   * A name outside `LayerName` is accepted too, so a fresh layer can be listed before codegen sees it.
    *
    * Listed furthest-first: a later entry overrides an earlier one, and this project overrides all.
    * Resolution cascades - each listed layer's own `layers` load before it.
@@ -33,7 +34,7 @@ export interface Config {
    * @default
    * []
    */
-  layers?: LayerName[];
+  layers?: (LayerName | (string & {}))[];
 
   /**
    * Configurable directories.
