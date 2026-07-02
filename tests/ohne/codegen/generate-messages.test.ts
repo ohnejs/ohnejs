@@ -1,4 +1,4 @@
-import { rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,6 +28,12 @@ describe('generateMessages', () => {
     writeFileSync(file, JSON.stringify(data));
   }
 
+  function bucket(paths: string[], name: 'shared' | 'node' | 'browser'): string {
+    const path = paths.find((p) => p.endsWith(`/.ohne/${name}/messages.ts`));
+    if (path === undefined) throw new Error(`no ${name} bucket in ${paths.join(', ')}`);
+    return readFileSync(path, 'utf8');
+  }
+
   before(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'ohne-gen-messages-')));
   });
@@ -40,7 +46,7 @@ describe('generateMessages', () => {
     for (const layer of useLayers().layers()) useLayers().remove(layer.path);
   });
 
-  it('types each key and registers each language catalog', async () => {
+  it('types keys and languages in shared, registers catalogs in node, augments browser', async () => {
     const app = join(root, 'app');
     writePackage(app, { name: 'app', ohne: true });
     writeMessages(app, 'en.json', {
@@ -53,22 +59,37 @@ describe('generateMessages', () => {
     });
 
     await loadLayers(app);
-    const path = await generateMessages(app);
-    strictEqual(path?.endsWith('/.ohne/messages.ts'), true);
-    const out = readFileSync(path!, 'utf8');
+    const paths = await generateMessages(app);
 
-    strictEqual(out.includes("import { useMessages } from 'ohne';"), true);
-    strictEqual(out.includes('interface KnownMessages {'), true);
-    strictEqual(out.includes("'field.required': {};"), true);
-    strictEqual(out.includes("'field.minLength': { min: number };"), true);
+    const shared = bucket(paths, 'shared');
+    strictEqual(shared.includes('export interface GeneratedMessages {'), true);
+    strictEqual(shared.includes("'field.required': {};"), true);
+    strictEqual(shared.includes("'field.minLength': { min: number };"), true);
+    strictEqual(shared.includes('export interface GeneratedLanguages {'), true);
+    strictEqual(shared.includes('de: true;'), true);
+    strictEqual(shared.includes('en: true;'), true);
 
-    strictEqual(out.includes('const messages = useMessages();'), true);
-    strictEqual(out.includes("messages.register('en', {"), true);
-    strictEqual(out.includes("messages.register('de', {"), true);
-    strictEqual(out.includes("'field.required': 'This field is required',"), true);
+    const node = bucket(paths, 'node');
+    strictEqual(node.includes("import { useMessages } from 'ohne';"), true);
+    strictEqual(node.includes('interface KnownMessages extends GeneratedMessages {}'), true);
+    strictEqual(node.includes('const messages = useMessages();'), true);
+    strictEqual(node.includes("messages.register('en', {"), true);
+    strictEqual(node.includes("messages.register('de', {"), true);
+    strictEqual(node.includes("'field.required': 'This field is required',"), true);
+    // The key body lives in shared, not duplicated into node.
+    strictEqual(node.includes("'field.minLength': { min: number };"), false);
+
+    const browser = bucket(paths, 'browser');
+    strictEqual(browser.includes("declare module 'ohne/dashboard' {"), true);
+    strictEqual(browser.includes('interface KnownMessages extends GeneratedMessages {}'), true);
+    strictEqual(
+      browser.includes('interface DashboardLanguages extends GeneratedLanguages {}'),
+      true,
+    );
+    strictEqual(browser.includes('This field is required'), false);
   });
 
-  it('drops disabled keys from the catalog and its types', async () => {
+  it('drops disabled keys from the shared types and the node catalog', async () => {
     const app = join(root, 'disabled');
     writePackage(app, { name: 'disabled', ohne: true });
     writeFileSync(
@@ -81,11 +102,11 @@ describe('generateMessages', () => {
     });
 
     await loadLayers(app);
-    const out = readFileSync((await generateMessages(app))!, 'utf8');
+    const paths = await generateMessages(app);
 
-    strictEqual(out.includes("'field.required'"), true);
-    strictEqual(out.includes('secret.token'), false);
-    strictEqual(out.includes('do not ship'), false);
+    strictEqual(bucket(paths, 'shared').includes("'field.required'"), true);
+    strictEqual(bucket(paths, 'shared').includes('secret.token'), false);
+    strictEqual(bucket(paths, 'node').includes('do not ship'), false);
   });
 
   it('types a select parameter as a union of its keywords', async () => {
@@ -96,8 +117,8 @@ describe('generateMessages', () => {
     });
 
     await loadLayers(app);
-    const out = readFileSync((await generateMessages(app))!, 'utf8');
-    strictEqual(out.includes("status: { state: 'active' | 'paused' };"), true);
+    const shared = bucket(await generateMessages(app), 'shared');
+    strictEqual(shared.includes("status: { state: 'active' | 'paused' };"), true);
   });
 
   it('throws when a key has different parameters across languages', async () => {
@@ -122,24 +143,42 @@ describe('generateMessages', () => {
     await rejects(generateMessages(app), /Invalid message `broken` for `en`/);
   });
 
-  it('emits an empty interface when there are no messages', async () => {
+  it('emits empty interfaces and a value-free node file when there are no messages', async () => {
     const app = join(root, 'empty');
     writePackage(app, { name: 'empty', ohne: true });
 
     await loadLayers(app);
-    const path = await generateMessages(app);
+    const paths = await generateMessages(app);
+
     strictEqual(
-      readFileSync(path!, 'utf8'),
+      bucket(paths, 'shared'),
       '// Generated by ohne. Do not edit.\n' +
-        "import type {} from 'ohne';\n" +
+        'export interface GeneratedMessages {}\n' +
+        '\n' +
+        'export interface GeneratedLanguages {}\n',
+    );
+    strictEqual(
+      bucket(paths, 'node'),
+      '// Generated by ohne. Do not edit.\n' +
+        "import type { GeneratedMessages } from '../shared/messages.ts';\n" +
         '\n' +
         "declare module 'ohne' {\n" +
-        '  interface KnownMessages {}\n' +
+        '  interface KnownMessages extends GeneratedMessages {}\n' +
+        '}\n',
+    );
+    strictEqual(
+      bucket(paths, 'browser'),
+      '// Generated by ohne. Do not edit.\n' +
+        "import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';\n" +
+        '\n' +
+        "declare module 'ohne/dashboard' {\n" +
+        '  interface KnownMessages extends GeneratedMessages {}\n' +
+        '  interface DashboardLanguages extends GeneratedLanguages {}\n' +
         '}\n',
     );
   });
 
-  it('returns null when no package.json is found', async () => {
-    strictEqual(await generateMessages(join(root, 'nowhere')), null);
+  it('returns no paths when no package.json is found', async () => {
+    deepStrictEqual(await generateMessages(join(root, 'nowhere')), []);
   });
 });

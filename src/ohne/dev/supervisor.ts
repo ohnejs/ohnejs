@@ -1,4 +1,5 @@
 import { debounce, extname, isNull, normalizeBasePath } from '../../utils/index.ts';
+import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { useEnv } from '../env/use-env.ts';
 import { reportError } from '../error/report-error.ts';
 import { DEFAULT_API_PORT, DEFAULT_DASHBOARD_PORT } from '../layers/config.ts';
@@ -13,6 +14,7 @@ import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
+import { createRegistryTarget } from './targets/registry.ts';
 import { createRoutesTarget } from './targets/routes.ts';
 import { watchLayers } from './watch-layers.ts';
 
@@ -55,6 +57,7 @@ export interface DevOptions {
  * Watches the project and reloads `ohne serve api` on every change.
  *
  * Owns codegen, then spawns the server as a child with `SKIP_CODEGEN` so the child only serves.
+ * The initial build writes the full set and prunes stale files from the codegen dir.
  * A change re-runs the affected codegen, then drains the child and respawns it.
  * An `ohne.config.ts` change refreshes the registry first, as a barrier, so every table is rebuilt.
  *
@@ -74,11 +77,12 @@ export async function dev(
   const printer = usePrinter();
   await loadLayers(from);
 
+  const registry = createRegistryTarget(from);
   const routes = createRoutesTarget(from);
   const middleware = createMiddlewareTarget(from);
   const messages = createMessagesTarget(from);
-  const config = createConfigTarget(from, [routes, middleware, messages]);
-  const targets = [routes, middleware, messages];
+  const config = createConfigTarget(from, [registry, routes, middleware, messages]);
+  const targets = [registry, routes, middleware, messages];
 
   const wantDashboard = options.dashboard ?? true;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(
@@ -165,7 +169,8 @@ export async function dev(
 
   async function regen(batch: Set<string> | null): Promise<void> {
     if (isNull(batch)) {
-      await Promise.all(targets.map((target) => target.regen()));
+      const written = (await Promise.all(targets.map((target) => target.regen()))).flat();
+      await pruneCodegen(from, written);
       return;
     }
     const paths = [...batch];

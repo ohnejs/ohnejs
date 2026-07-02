@@ -51,13 +51,13 @@ describe('generateMiddleware', () => {
 
     await loadLayers(app);
     const path = await generateMiddleware(app);
-    strictEqual(path?.endsWith('/.ohne/middleware.ts'), true);
+    strictEqual(path?.endsWith('/.ohne/node/middleware.ts'), true);
     const out = readFileSync(path!, 'utf8');
 
     strictEqual(out.includes("import { useMiddleware } from 'ohne';"), true);
-    strictEqual(out.includes("import m0 from '../middleware/global/secure.ts';"), true);
-    strictEqual(out.includes("import m1 from '../node_modules/a/middleware/10-auth.ts';"), true);
-    strictEqual(out.includes("import m2 from '../middleware/20-locale.ts';"), true);
+    strictEqual(out.includes("import m0 from '../../middleware/global/secure.ts';"), true);
+    strictEqual(out.includes("import m1 from '../../node_modules/a/middleware/10-auth.ts';"), true);
+    strictEqual(out.includes("import m2 from '../../middleware/20-locale.ts';"), true);
 
     strictEqual(out.includes('interface KnownMiddleware {'), true);
     strictEqual(out.includes("'global-secure': typeof m0;"), true);

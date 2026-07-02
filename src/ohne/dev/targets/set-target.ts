@@ -30,7 +30,7 @@ export function createSetTarget(
   from: string,
   dir: 'api' | 'middleware',
   files: (from: string) => Promise<Set<string>>,
-  generate: (from: string) => Promise<unknown>,
+  generate: (from: string) => Promise<string | null>,
 ): SetTarget {
   let snapshot: Set<string> | null = null;
 
@@ -48,9 +48,10 @@ export function createSetTarget(
     },
     async regen() {
       const current = await files(from);
-      if (!isNull(snapshot) && sameSet(snapshot, current)) return;
+      if (!isNull(snapshot) && sameSet(snapshot, current)) return [];
       snapshot = current;
-      await generate(from);
+      const written = await generate(from);
+      return isNull(written) ? [] : [written];
     },
     invalidate() {
       snapshot = null;

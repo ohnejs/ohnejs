@@ -51,7 +51,7 @@ describe('generateRoutes', () => {
 
     await loadLayers(app);
     const path = await generateRoutes(app);
-    strictEqual(path?.endsWith('/.ohne/routes.ts'), true);
+    strictEqual(path?.endsWith('/.ohne/node/routes.ts'), true);
     const out = readFileSync(path!, 'utf8');
 
     strictEqual(out.includes("import { useRoutes } from 'ohne';"), true);
@@ -68,8 +68,8 @@ describe('generateRoutes', () => {
     strictEqual(out.includes("layer: 'app',"), true);
     strictEqual(out.includes('handler: h2,'), true);
 
-    strictEqual(out.includes("import h0 from '../api/health.ts';"), true);
-    strictEqual(out.includes("import h1 from '../node_modules/a/api/index.get.ts';"), true);
+    strictEqual(out.includes("import h0 from '../../api/health.ts';"), true);
+    strictEqual(out.includes("import h1 from '../../node_modules/a/api/index.get.ts';"), true);
   });
 
   it('emits an empty interface when there are no routes', async () => {

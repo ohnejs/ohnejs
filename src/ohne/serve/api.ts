@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
 
 import { exists } from '../../utils/fs/index.ts';
-import { isNull, isPort, joinPath, MAX_PORT } from '../../utils/index.ts';
+import { isNull, isPort, isString, joinPath, MAX_PORT } from '../../utils/index.ts';
 import { bootLayers } from '../boot/boot-layers.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
@@ -12,6 +12,7 @@ import { generateMessages } from '../codegen/generate-messages.ts';
 import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
+import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
@@ -44,6 +45,7 @@ declare module 'ohne' {
  *
  * Resolves and registers the layer stack, runs every layer's boot files, then regenerates types.
  * Boot registers each layer's hooks and startup side effects before the server is built.
+ * Files an earlier run left in the codegen dir are pruned, so it holds exactly the current output.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  *
  * The generated `routes.ts` is then imported to populate `useRoutes` with live handlers.
@@ -60,19 +62,24 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   await bootLayers();
 
   if (!useEnv().get('SKIP_CODEGEN')) {
-    await Promise.all([
-      generateLayerName(from),
-      generateResolvedConfig(from),
-      generateRoutes(from),
-      generateMiddleware(from),
-      generateMessages(from),
-    ]);
+    const written = (
+      await Promise.all([
+        generateLayerName(from),
+        generateResolvedConfig(from),
+        generateRoutes(from),
+        generateMiddleware(from),
+        generateMessages(from),
+      ])
+    )
+      .flat()
+      .filter(isString);
+    await pruneCodegen(from, written);
   }
 
-  // The component tables live in generated files: importing runs the registrations.
+  // The component tables live in the node bucket: importing runs the registrations.
   const dir = await codegenDir(from);
   if (!isNull(dir)) {
-    for (const name of ['routes.ts', 'middleware.ts', 'messages.ts']) {
+    for (const name of ['node/routes.ts', 'node/middleware.ts', 'node/messages.ts']) {
       const file = joinPath(dir, name);
       if (await exists(file)) await import(pathToFileURL(file).href);
     }

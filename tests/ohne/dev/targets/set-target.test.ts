@@ -1,11 +1,11 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
 import { createSetTarget } from '../../../../src/ohne/dev/targets/set-target.ts';
 import { useLayers } from '../../../../src/ohne/index.ts';
 
 const noFiles = async (): Promise<Set<string>> => new Set();
-const noop = async (): Promise<void> => {};
+const noop = async (): Promise<string | null> => null;
 
 describe('createSetTarget', () => {
   afterEach(() => useLayers().clear());
@@ -37,13 +37,14 @@ describe('createSetTarget', () => {
       async () => new Set(files),
       async () => {
         writes++;
+        return `/out/${writes}.ts`;
       },
     );
 
-    await target.regen();
+    deepStrictEqual(await target.regen(), ['/out/1.ts']);
     strictEqual(writes, 1);
 
-    await target.regen();
+    deepStrictEqual(await target.regen(), []);
     strictEqual(writes, 1);
 
     files = new Set(['a', 'b']);

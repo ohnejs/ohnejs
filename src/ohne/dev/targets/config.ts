@@ -27,7 +27,7 @@ export function createConfigTarget(from: string, dependents: readonly SetTarget[
     async regen() {
       await loadLayers(from, { fresh: true });
       for (const dependent of dependents) dependent.invalidate();
-      await Promise.all(dependents.map((dependent) => dependent.regen()));
+      return (await Promise.all(dependents.map((dependent) => dependent.regen()))).flat();
     },
   };
 }

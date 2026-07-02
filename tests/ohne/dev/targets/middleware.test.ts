@@ -41,7 +41,7 @@ describe('middleware target', () => {
     writeMiddleware(app, 'auth.ts');
     await loadLayers(app);
     const target = createMiddlewareTarget(app);
-    const out = join(app, '.ohne', 'middleware.ts');
+    const out = join(app, '.ohne', 'node', 'middleware.ts');
 
     strictEqual(target.affectedBy(join(app, 'middleware', 'auth.ts')), true);
     strictEqual(target.affectedBy(join(app, 'api', 'health.ts')), false);

@@ -1,7 +1,7 @@
 /**
  * A codegen unit the dev supervisor can invalidate and regenerate on change.
  *
- * Every generated output - routes, middleware, and later collections - implements this one interface.
+ * Every generated output implements this one interface.
  * The supervisor drives them all the same way.
  *
  * `affectedBy` is a dependency-closure containment test, not a file-set membership test.
@@ -23,8 +23,9 @@ export interface Target {
 
   /**
    * Regenerates the target's output.
+   * Returns the absolute paths its generator produced, empty when the write was skipped.
    *
    * A set-based target skips the write when its file set is unchanged since the last `regen`.
    */
-  regen(): Promise<void>;
+  regen(): Promise<string[]>;
 }

@@ -41,7 +41,7 @@ describe('messages target', () => {
     writeMessages(app, 'en.json', { greeting: 'Hi' });
     await loadLayers(app);
     const target = createMessagesTarget(app);
-    const out = join(app, '.ohne', 'messages.ts');
+    const out = join(app, '.ohne', 'node', 'messages.ts');
 
     strictEqual(target.affectedBy(join(app, 'messages', 'en.json')), true);
     strictEqual(target.affectedBy(join(app, 'api', 'health.ts')), false);
@@ -55,7 +55,7 @@ describe('messages target', () => {
     writeMessages(app, 'en.json', { greeting: 'Hi' });
     await loadLayers(app);
     const target = createMessagesTarget(app);
-    const out = join(app, '.ohne', 'messages.ts');
+    const out = join(app, '.ohne', 'node', 'messages.ts');
 
     await target.regen();
     strictEqual(readFileSync(out, 'utf8').includes("greeting: 'Hi'"), true);

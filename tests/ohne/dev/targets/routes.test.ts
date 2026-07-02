@@ -61,7 +61,7 @@ describe('routes target', () => {
     writeRoute(app, 'health.ts');
     await loadLayers(app);
     const target = createRoutesTarget(app);
-    const out = join(app, '.ohne', 'routes.ts');
+    const out = join(app, '.ohne', 'node', 'routes.ts');
 
     await target.regen();
     strictEqual(readFileSync(out, 'utf8').includes("'/health'"), true);

@@ -53,7 +53,7 @@ describe('config target', () => {
     await loadLayers(app);
     const routes = createRoutesTarget(app);
     const config = createConfigTarget(app, [routes]);
-    const out = join(app, '.ohne', 'routes.ts');
+    const out = join(app, '.ohne', 'node', 'routes.ts');
 
     await routes.regen();
     rmSync(out);

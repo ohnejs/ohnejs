@@ -10,7 +10,8 @@ import { useLayers } from '../../layers/use-layers.ts';
  *
  * Its closure is every layer's `dirs.messages`; `affectedBy` is containment against those directories.
  * The catalog depends on file contents, not just the set of files.
- * `regen` runs unconditionally and lets `generateMessages` write only when the output changes.
+ * `regen` runs unconditionally and lets `generateMessages` write only when its output changes.
+ * One scan emits the shared, node, and browser buckets together.
  * `invalidate` is a no-op for the same reason: there is no file-set snapshot to drop.
  */
 export function createMessagesTarget(from: string): SetTarget {
@@ -27,7 +28,7 @@ export function createMessagesTarget(from: string): SetTarget {
         );
     },
     async regen() {
-      await generateMessages(from);
+      return generateMessages(from);
     },
     invalidate() {},
   };

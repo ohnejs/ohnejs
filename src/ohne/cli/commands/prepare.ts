@@ -12,6 +12,7 @@ import { generateMessages } from '../../codegen/generate-messages.ts';
 import { generateMiddleware } from '../../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../../codegen/generate-routes.ts';
+import { pruneCodegen } from '../../codegen/prune-codegen.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
@@ -19,6 +20,7 @@ import { isOhneProject } from '../../project/is-ohne-project.ts';
 /**
  * The `ohne prepare` command.
  * Runs every codegen for the project at `--cwd`, writing the generated types into its codegen dir.
+ * Files an earlier run left behind are pruned, so the dir holds exactly the current output.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
  */
@@ -46,7 +48,7 @@ export const prepareCommand = defineCommand({
 
     const { result: written, ms } = await measure(async () => {
       await loadLayers(cwd);
-      return (
+      const files = (
         await Promise.all([
           generateLayerName(cwd),
           generateResolvedConfig(cwd),
@@ -54,7 +56,11 @@ export const prepareCommand = defineCommand({
           generateMiddleware(cwd),
           generateMessages(cwd),
         ])
-      ).filter(isString);
+      )
+        .flat()
+        .filter(isString);
+      await pruneCodegen(cwd, files);
+      return files;
     });
 
     print.successBlock({
