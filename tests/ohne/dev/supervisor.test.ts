@@ -170,7 +170,7 @@ describe('dev', () => {
 
       // The respawning child must have been drained: nothing binds the port, even after it would boot.
       let bound = false;
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + 1500;
       while (Date.now() < deadline && !bound) {
         if ((await get(port, '/health')) === 200) bound = true;
         else await delay(100);
