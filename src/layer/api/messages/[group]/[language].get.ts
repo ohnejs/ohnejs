@@ -5,6 +5,7 @@ import {
   isNull,
   isUndefined,
   languageFallbacks,
+  messageGroup,
   uniqueArray,
 } from 'ohne/utils';
 
@@ -33,15 +34,10 @@ export default defineHandler(({ params }): Record<string, string> => {
     const catalog = catalogs[lang];
     if (isUndefined(catalog)) continue;
     for (const [key, template] of Object.entries(catalog)) {
-      if (groupOf(key) === group) result[key] = template;
+      if (messageGroup(key) === group) result[key] = template;
     }
   }
 
   if (isEmpty(result)) throw notFound(translate('api.messages.unknownGroup', { group }));
   return result;
 });
-
-function groupOf(key: string): string {
-  const dot = key.indexOf('.');
-  return dot === -1 ? key : key.slice(0, dot);
-}
