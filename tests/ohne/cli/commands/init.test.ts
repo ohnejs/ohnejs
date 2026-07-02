@@ -36,7 +36,6 @@ describe('ohne init', () => {
     strictEqual(existsSync(join(dir, 'ohne.config.ts')), true);
     strictEqual(existsSync(join(dir, 'package.json')), true);
     strictEqual(existsSync(join(dir, 'tsconfig.json')), true);
-    strictEqual(existsSync(join(dir, 'dashboard', 'tsconfig.json')), true);
     strictEqual(existsSync(join(dir, '.gitignore')), true);
   });
 
@@ -85,18 +84,11 @@ describe('ohne init', () => {
     deepStrictEqual(tsconfig.exclude, ['dashboard']);
   });
 
-  it('writes a nested browser tsconfig the editor can discover for dashboard code', async () => {
+  it('does not scaffold a dashboard folder', async () => {
     const dir = join(freshDir('app'), 'browser');
 
     await runCommand(ohne, ['init', dir, '--yes']);
-    const tsconfig = JSON.parse(readFileSync(join(dir, 'dashboard', 'tsconfig.json'), 'utf8'));
-    strictEqual(tsconfig.extends, 'ohne/tsconfig.browser.json');
-    deepStrictEqual(tsconfig.include, [
-      '**/*.ts',
-      '../.ohne/shared/**/*.ts',
-      '../.ohne/browser/**/*.ts',
-    ]);
-    deepStrictEqual(tsconfig.compilerOptions, undefined);
+    strictEqual(existsSync(join(dir, 'dashboard')), false);
   });
 
   it('refuses a non-empty directory without --force and exits 1', async () => {
