@@ -62,6 +62,7 @@ export * from './i18n/format-message.ts';
 export * from './i18n/language-fallbacks.ts';
 export * from './i18n/message-ast.ts';
 export * from './i18n/message-errors.ts';
+export * from './i18n/message-group.ts';
 export * from './i18n/message-param-types.ts';
 export * from './i18n/number-options-from-skeleton.ts';
 export * from './i18n/parse-message.ts';
