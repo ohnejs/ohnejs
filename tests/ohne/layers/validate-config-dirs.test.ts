@@ -2,14 +2,13 @@ import { doesNotThrow, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { validateConfigDirs } from '../../../src/ohne/index.ts';
-import { isArray } from '../../../src/utils/index.ts';
 
 const file = '/app/ohne.config.ts';
 
 function bodyMatches(pattern: RegExp) {
   return (error: unknown) => {
     const body = (error as { body?: string | string[] }).body;
-    const text = isArray(body) ? body.join('\n') : (body ?? '');
+    const text = Array.isArray(body) ? body.join('\n') : (body ?? '');
     return pattern.test(text);
   };
 }

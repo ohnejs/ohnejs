@@ -15,7 +15,6 @@ import {
   useMiddleware,
   useShutdown,
 } from '../../../src/ohne/index.ts';
-import { isString } from '../../../src/utils/index.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 const ORIGIN = 'http://dash.example';
@@ -112,7 +111,7 @@ describe('serveAPI CORS', () => {
       'access-control-request-method': 'GET',
     });
     strictEqual(res.status, 204);
-    ok(isString(res.headers['access-control-allow-methods']));
+    ok(typeof res.headers['access-control-allow-methods'] === 'string');
   });
 
   it('lets a mounted cors policy replace the default', async () => {
