@@ -12,6 +12,7 @@ import {
   serveDashboard,
   shutdownServer,
   useEnv,
+  usePrinter,
   useShutdown,
 } from '../../../src/ohne/index.ts';
 
@@ -52,6 +53,14 @@ describe('serveDashboard', () => {
     return (http.server.address() as AddressInfo).port;
   }
 
+  function captureWarnings(): string[] {
+    const buf: string[] = [];
+    useEnv().set('NO_COLOR', true);
+    usePrinter().configure({ stream: { write: (s: string) => buf.push(s) }, color: false });
+    useEnv().unset('SILENT');
+    return buf;
+  }
+
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-dashboard-'));
     useEnv().set('SILENT', true);
@@ -64,6 +73,9 @@ describe('serveDashboard', () => {
     useShutdown().clear();
     useShutdown().unwatch();
     useEnv().unset('DASHBOARD_RELOAD');
+    useEnv().unset('NO_COLOR');
+    useEnv().set('SILENT', true);
+    usePrinter().configure({ stream: process.stderr });
   });
 
   after(() => {
@@ -226,6 +238,48 @@ describe('serveDashboard', () => {
       ),
       true,
     );
+  });
+
+  it('warns when the dashboard folder has no tsconfig.json', async () => {
+    const dir = makeApp('tsconfig-warn');
+    mkdirSync(join(dir, 'dashboard'));
+    const buf = captureWarnings();
+    http = await serveDashboard(dir);
+
+    const out = buf.join('');
+    strictEqual(out.includes('Dashboard has no tsconfig.json'), true);
+    strictEqual(out.includes('"extends": "ohne/tsconfig.browser.json"'), true);
+    strictEqual(
+      out.includes('"include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]'),
+      true,
+    );
+  });
+
+  it('derives the suggested tsconfig from the configured dirs', async () => {
+    const dir = makeApp('tsconfig-dirs');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dirs: { dashboard: 'ui', codegen: 'generated' } }\n",
+    );
+    mkdirSync(join(dir, 'ui'));
+    const buf = captureWarnings();
+    http = await serveDashboard(dir);
+
+    strictEqual(buf.join('').includes('"../generated/shared/**/*.ts"'), true);
+  });
+
+  it('does not warn when the dashboard tsconfig exists or the folder is absent', async () => {
+    const buf = captureWarnings();
+    http = await serveDashboard(makeApp('tsconfig-absent'));
+    await shutdownServer(http.server, http.gate);
+    http = undefined;
+
+    const present = makeApp('tsconfig-present');
+    mkdirSync(join(present, 'dashboard'));
+    writeFileSync(join(present, 'dashboard', 'tsconfig.json'), '{}');
+    http = await serveDashboard(present);
+
+    strictEqual(buf.join('').includes('Dashboard has no'), false);
   });
 
   it('lists a page in the manifest and serves its module under /m/app', async () => {

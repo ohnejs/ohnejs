@@ -5,19 +5,23 @@ import { fileURLToPath } from 'node:url';
 
 import type { HandlerContext, Route } from '../routes/route.ts';
 
+import { exists } from '../../utils/fs/index.ts';
 import {
   canonicalizeLanguage,
   dirname,
   isNull,
   isPathInside,
   isPort,
+  joinPath,
   jsonForScript,
   MAX_PORT,
   normalizeBasePath,
   type PageRoute,
+  relativePath,
   resolvePath,
   safeResolve,
 } from '../../utils/index.ts';
+import { codegenDir } from '../codegen/codegen-dir.ts';
 import { buildDashboardPageManifest } from '../dashboard/build-dashboard-page-manifest.ts';
 import { collectDashboardPages } from '../dashboard/collect-dashboard-pages.ts';
 import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
@@ -98,6 +102,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
 
   const layers = await resolveOhneLayers(from);
   const appRoots = dashboardRoots(layers);
+  await warnMissingTSConfig(appRoots[0], from);
   const apiURL = resolveAPIURL();
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
@@ -185,6 +190,25 @@ function resolveAPIURL(): string {
     useConfig().dashboard?.apiURL ??
     `http://${api.host ?? 'localhost'}:${api.port ?? DEFAULT_API_PORT}${normalizeBasePath(api.basePath)}`
   );
+}
+
+async function warnMissingTSConfig(dashboardDir: string, from: string): Promise<void> {
+  if (!(await exists(dashboardDir))) return;
+  if (await exists(joinPath(dashboardDir, 'tsconfig.json'))) return;
+
+  const codegen = await codegenDir(from);
+  if (isNull(codegen)) return;
+
+  const buckets = relativePath(dashboardDir, codegen);
+  usePrinter().warnBlock({
+    title: 'Dashboard has no `tsconfig.json`',
+    body: [
+      'Without it the editor lacks DOM types and the generated types for dashboard code.',
+      'Create a `tsconfig.json` inside it with:',
+      `{\n  "extends": "ohne/tsconfig.browser.json",\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
+    ],
+    path: relativePath(process.cwd(), dashboardDir),
+  });
 }
 
 function resolveDefaultLanguage(): string {
