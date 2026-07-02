@@ -174,6 +174,26 @@ describe('serveDashboard', () => {
     }
   });
 
+  it('injects the canonicalized `messages.defaultLanguage`', async () => {
+    const dir = makeApp('language');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { messages: { defaultLanguage: 'de-at' } }\n",
+    );
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    strictEqual((await req(port, '/')).body.includes('"defaultLanguage":"de-AT"'), true);
+  });
+
+  it('rejects an invalid `messages.defaultLanguage`', async () => {
+    const dir = makeApp('badlanguage');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { messages: { defaultLanguage: 'en_US' } }\n",
+    );
+    await rejects(() => serveDashboard(dir), /Invalid default language/);
+  });
+
   it('injects an importmap mapping the bare specifiers to served URLs', async () => {
     const port = await serve('importmap');
     const body = (await req(port, '/')).body;

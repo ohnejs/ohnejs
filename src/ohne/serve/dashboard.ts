@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { HandlerContext, Route } from '../routes/route.ts';
 
 import {
+  canonicalizeLanguage,
   dirname,
   isNull,
   isPathInside,
@@ -98,12 +99,14 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const layers = await resolveOhneLayers(from);
   const appRoots = dashboardRoots(layers);
   const apiURL = resolveAPIURL();
+  const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
 
   const renderShell = async (): Promise<string> =>
     shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
+      defaultLanguage,
       reload,
     );
 
@@ -184,8 +187,25 @@ function resolveAPIURL(): string {
   );
 }
 
-function shellDocument(apiURL: string, pages: PageRoute[], reload: boolean): string {
-  const config = jsonForScript({ apiURL, pages });
+function resolveDefaultLanguage(): string {
+  const configured = useConfig().messages.defaultLanguage;
+  const canonical = canonicalizeLanguage(configured);
+  if (isNull(canonical)) {
+    throw ohneError({
+      title: `Invalid default language \`${configured}\``,
+      body: ['Set `messages.defaultLanguage` to a valid BCP-47 tag, like `en` or `de-AT`.'],
+    });
+  }
+  return canonical;
+}
+
+function shellDocument(
+  apiURL: string,
+  pages: PageRoute[],
+  defaultLanguage: string,
+  reload: boolean,
+): string {
+  const config = jsonForScript({ apiURL, pages, defaultLanguage });
   const reloadClient = reload
     ? `\n    <script type="module" src="${MODULE_BASE}/dashboard/runtime/reload-client.ts"></script>`
     : '';
