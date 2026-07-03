@@ -78,7 +78,15 @@ async function render(): Promise<void> {
     active.value = null;
     return;
   }
-  const module = (await import(match.url)) as { default: DashboardPage };
+  let module: { default: DashboardPage };
+  try {
+    module = (await import(match.url)) as { default: DashboardPage };
+  } catch (error) {
+    if (mine !== token) return;
+    console.error(error);
+    active.value = null;
+    return;
+  }
   if (mine !== token) return;
   active.value = { ...match, component: module.default };
 }
