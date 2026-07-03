@@ -19,9 +19,9 @@ import {
   uniqueArray,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
-import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
 
 /**
@@ -34,6 +34,7 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
  * Both augmentations only `extends` the shared types, so the key body is written once, never per target.
  *
  * Messages are read from each layer's `Config.dirs.messages` directory and merged per key.
+ * Layers come from the registered stack, so `loadLayers` must have run first.
  * Keys matched by `Config.disable.messages` are dropped before the catalog and its types are emitted.
  * A key's parameters must match across every language that defines it, or generation throws.
  *
@@ -47,7 +48,7 @@ export async function generateMessages(from: string = process.cwd()): Promise<st
   const dir = await codegenDir(from);
   if (isNull(dir)) return [];
 
-  const messages = await collectMessages(await resolveOhneLayers(from), {
+  const messages = await collectMessages(stackedLayers(), {
     disable: useConfig().disable.messages,
   });
   const keyTypes = unifyKeyTypes(messages);

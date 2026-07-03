@@ -35,11 +35,11 @@ import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
 import { DEFAULT_API_PORT, DEFAULT_DASHBOARD_PORT } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
+import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
 
 /**
  * URL prefix under which the framework's browser modules are served.
@@ -100,7 +100,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   await loadLayers(from);
   const config = useConfig().dashboard;
 
-  const layers = await resolveOhneLayers(from);
+  const layers = stackedLayers();
   const appRoots = dashboardRoots(layers);
   await warnMissingTSConfig(appRoots[0], from);
   const apiURL = resolveAPIURL();

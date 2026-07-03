@@ -6,8 +6,8 @@ import {
   propertyKey,
 } from '../../utils/codegen/index.ts';
 import { isNull } from '../../utils/index.ts';
+import { stackedLayers } from '../layers/stacked-layers.ts';
 import { collectMiddleware } from '../middleware/collect-middleware.ts';
-import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
 
 /**
@@ -19,6 +19,7 @@ import { BANNER, codegenBucket } from './codegen-dir.ts';
  * Each middleware is statically imported from its source file by relative path.
  *
  * Middleware is read from each layer's `Config.dirs.middleware` directory and combined.
+ * Layers come from the registered stack, so `loadLayers` must have run first.
  * A closer layer overrides an earlier middleware with the same resolved name.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
@@ -31,7 +32,7 @@ export async function generateMiddleware(from: string = process.cwd()): Promise<
   const dir = await codegenBucket(from, 'node');
   if (isNull(dir)) return null;
 
-  const middleware = await collectMiddleware(await resolveOhneLayers(from));
+  const middleware = await collectMiddleware(stackedLayers());
   const indexed = middleware.map((entry, index) => ({ ...entry, index }));
   const named = indexed.filter((entry) => !entry.isGlobal);
 

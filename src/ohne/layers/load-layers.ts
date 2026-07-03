@@ -41,6 +41,7 @@ export async function loadLayers(
     }
     layers.add({
       path: layer.dir,
+      name: layer.name,
       input: layer.input,
       defaults: i === 0 ? merge(DEFAULTS, layer.defaults) : layer.defaults,
     });

@@ -57,6 +57,7 @@ export * from './layers/define-config.ts';
 export * from './layers/define-layer.ts';
 export * from './layers/layer-name.ts';
 export * from './layers/load-layers.ts';
+export * from './layers/stacked-layers.ts';
 export * from './layers/use-config.ts';
 export * from './layers/use-layers.ts';
 export * from './layers/validate-config-dirs.ts';

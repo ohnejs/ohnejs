@@ -6,8 +6,8 @@ import {
   propertyKey,
 } from '../../utils/codegen/index.ts';
 import { isNull } from '../../utils/index.ts';
+import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
-import { resolveOhneLayers } from '../project/resolve-ohne-layers.ts';
 import { collectRoutes } from '../routes/collect-routes.ts';
 import { routeID } from '../routes/route.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
@@ -18,6 +18,7 @@ import { BANNER, codegenBucket } from './codegen-dir.ts';
  * Each handler is statically imported from its source file by relative path.
  *
  * Routes are read from each layer's `Config.dirs.api` directory and combined.
+ * Layers come from the registered stack, so `loadLayers` must have run first.
  * A closer layer overrides an earlier route with the same id.
  * Routes matched by `Config.disable.routes` are then dropped.
  *
@@ -31,7 +32,7 @@ export async function generateRoutes(from: string = process.cwd()): Promise<stri
   const dir = await codegenBucket(from, 'node');
   if (isNull(dir)) return null;
 
-  const routes = await collectRoutes(await resolveOhneLayers(from), {
+  const routes = await collectRoutes(stackedLayers(), {
     disable: useConfig().disable.routes,
   });
 

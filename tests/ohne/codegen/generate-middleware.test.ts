@@ -1,5 +1,13 @@
 import { strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -9,6 +17,7 @@ import { generateMiddleware, loadLayers, useLayers } from '../../../src/ohne/ind
 interface PackageSpec {
   name: string;
   ohne?: boolean;
+  layers?: string[];
   dependencies?: Record<string, string>;
 }
 
@@ -17,9 +26,18 @@ describe('generateMiddleware', () => {
 
   function writePackage(at: string, spec: PackageSpec): void {
     mkdirSync(at, { recursive: true });
-    const { ohne, ...manifest } = spec;
+    const { ohne, layers, ...manifest } = spec;
     writeFileSync(join(at, 'package.json'), JSON.stringify(manifest));
-    if (ohne) writeFileSync(join(at, 'ohne.config.ts'), '');
+    const config = layers ? `export default { layers: ${JSON.stringify(layers)} };\n` : '';
+    if (ohne) writeFileSync(join(at, 'ohne.config.ts'), config);
+  }
+
+  function writeDep(app: string, name: string, spec: PackageSpec): string {
+    const dir = join(app, 'packages', name);
+    writePackage(dir, spec);
+    mkdirSync(join(app, 'node_modules'), { recursive: true });
+    symlinkSync(dir, join(app, 'node_modules', name), 'dir');
+    return dir;
   }
 
   function writeMiddleware(layerDir: string, relative: string): void {
@@ -42,10 +60,10 @@ describe('generateMiddleware', () => {
 
   it('emits imports and registrations, globals first', async () => {
     const app = join(root, 'app');
-    writePackage(app, { name: 'app', ohne: true, dependencies: { a: '*' } });
-    writePackage(join(app, 'node_modules', 'a'), { name: 'a', ohne: true });
+    writePackage(app, { name: 'app', ohne: true, layers: ['a'], dependencies: { a: '*' } });
+    const dep = writeDep(app, 'a', { name: 'a', ohne: true });
 
-    writeMiddleware(join(app, 'node_modules', 'a'), '10-auth.ts');
+    writeMiddleware(dep, '10-auth.ts');
     writeMiddleware(app, '20-locale.ts');
     writeMiddleware(app, 'global/secure.ts');
 
@@ -56,7 +74,7 @@ describe('generateMiddleware', () => {
 
     strictEqual(out.includes("import { useMiddleware } from 'ohne';"), true);
     strictEqual(out.includes("import m0 from '../../middleware/global/secure.ts';"), true);
-    strictEqual(out.includes("import m1 from '../../node_modules/a/middleware/10-auth.ts';"), true);
+    strictEqual(out.includes("import m1 from '../../packages/a/middleware/10-auth.ts';"), true);
     strictEqual(out.includes("import m2 from '../../middleware/20-locale.ts';"), true);
 
     strictEqual(out.includes('interface KnownMiddleware {'), true);
@@ -76,6 +94,21 @@ describe('generateMiddleware', () => {
     strictEqual(out.includes("middleware.registerGlobal('global-secure', m0);"), true);
     strictEqual(out.includes("middleware.register('10-auth', m1);"), true);
     strictEqual(out.includes("middleware.register('20-locale', m2);"), true);
+  });
+
+  it('leaves out an installed layer no config lists', async () => {
+    const app = join(root, 'unlisted');
+    writePackage(app, { name: 'unlisted', ohne: true, dependencies: { a: '*' } });
+    const dep = writeDep(app, 'a', { name: 'a', ohne: true });
+
+    writeMiddleware(dep, 'global/audit.ts');
+    writeMiddleware(app, '10-locale.ts');
+
+    await loadLayers(app);
+    const out = readFileSync((await generateMiddleware(app))!, 'utf8');
+
+    strictEqual(out.includes("'10-locale'"), true);
+    strictEqual(out.includes('audit'), false);
   });
 
   it('emits empty interfaces when there is no middleware', async () => {
