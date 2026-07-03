@@ -5,6 +5,8 @@ import { pathRoot } from './path-root.ts';
 /**
  * Returns the relative path from `from` to `to`.
  * Both inputs are normalized first.
+ * A relative `from` must not keep leading `..` segments after normalization.
+ * Such segments are not lexically invertible; the result treats them as ordinary names.
  *
  * If one path is absolute and the other relative, the normalized `to` is returned unchanged.
  * The same holds if both are absolute but on different roots (different drive letters or UNC shares).
