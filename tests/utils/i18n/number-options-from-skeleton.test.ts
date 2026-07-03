@@ -41,16 +41,25 @@ describe('numberOptionsFromSkeleton - unit and style', () => {
     deepStrictEqual(opts('currency/EUR'), { style: 'currency', currency: 'EUR' });
   });
 
-  it('unit/length-meter strips the ICU prefix', () => {
-    deepStrictEqual(opts('unit/length-meter'), { style: 'unit', unit: 'meter' });
+  it('unit/ takes the core unit identifier verbatim', () => {
+    deepStrictEqual(opts('unit/fluid-ounce'), { style: 'unit', unit: 'fluid-ounce' });
   });
 
-  it('measure-unit/mass-kilogram is treated like unit/', () => {
+  it('unit/ compound identifiers feed Intl.NumberFormat', () => {
+    const out = new Intl.NumberFormat('en-US', opts('unit/kilometer-per-hour')).format(5);
+    strictEqual(out.includes('km/h'), true);
+  });
+
+  it('measure-unit/ strips the ICU type prefix', () => {
     deepStrictEqual(opts('measure-unit/mass-kilogram'), { style: 'unit', unit: 'kilogram' });
+    deepStrictEqual(opts('measure-unit/volume-fluid-ounce'), {
+      style: 'unit',
+      unit: 'fluid-ounce',
+    });
   });
 
-  it('concise-unit/digital-megabyte is treated like unit/', () => {
-    deepStrictEqual(opts('concise-unit/digital-megabyte'), { style: 'unit', unit: 'megabyte' });
+  it('concise-unit/ is treated like unit/', () => {
+    deepStrictEqual(opts('concise-unit/megabyte'), { style: 'unit', unit: 'megabyte' });
   });
 });
 
@@ -191,7 +200,11 @@ describe('numberOptionsFromSkeleton - integer width', () => {
     deepStrictEqual(opts('integer-width/00'), { minimumIntegerDigits: 2 });
   });
 
-  it('integer-width/+00 strips the leading `+`', () => {
+  it('integer-width/*000 accepts the canonical `*` form', () => {
+    deepStrictEqual(opts('integer-width/*000'), { minimumIntegerDigits: 3 });
+  });
+
+  it('integer-width/+00 accepts the deprecated `+` form', () => {
     deepStrictEqual(opts('integer-width/+00'), { minimumIntegerDigits: 2 });
   });
 

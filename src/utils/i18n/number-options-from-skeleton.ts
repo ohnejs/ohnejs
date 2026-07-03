@@ -208,8 +208,13 @@ function applyParametricStem(
       return;
 
     case 'unit':
-    case 'measure-unit':
     case 'concise-unit': {
+      options.style = 'unit';
+      options.unit = arg;
+      return;
+    }
+
+    case 'measure-unit': {
       options.style = 'unit';
       options.unit = stripUnitPrefix(arg);
       return;
@@ -293,7 +298,7 @@ function applySignificantShortcut(token: string, options: Intl.NumberFormatOptio
 }
 
 function parseIntegerWidth(arg: string): number {
-  const body = arg.startsWith('+') ? arg.slice(1) : arg;
+  const body = arg.startsWith('*') || arg.startsWith('+') ? arg.slice(1) : arg;
   if (!/^0+$/.test(body)) {
     throw new MessageFormatError(`malformed integer-width pattern \`${arg}\``);
   }
