@@ -112,6 +112,29 @@ describe('watchLayers', () => {
     ok(!changed.some((path) => path.endsWith('/b.ts')));
   });
 
+  it('resync re-ignores a renamed codegen dir on surviving watches', async () => {
+    const app = join(root, 'regen-rename');
+    manifest(app, 'regen-rename', [], { dirs: { codegen: 'gen' } });
+    await loadLayers(app);
+    changed = [];
+    watch = watchLayers((path) => changed.push(path));
+    await delay(50);
+
+    writeFileSync(join(app, 'ohne.config.ts'), "export default { dirs: { codegen: 'gen2' } }\n");
+    await loadLayers(app, { fresh: true });
+    watch.resync();
+    await delay(50);
+
+    changed.length = 0;
+    mkdirSync(join(app, 'gen2'), { recursive: true });
+    writeFileSync(join(app, 'gen2', 'routes.ts'), '// generated\n');
+    await delay(150);
+    ok(!changed.some((path) => path.endsWith('/routes.ts')));
+
+    writeRoute(app, 'health.ts');
+    await waitFor(() => changed.some((path) => path.endsWith('/api/health.ts')));
+  });
+
   it(
     'resync watches a newly stacked layer and unwatches a removed one',
     skipOnWindows,

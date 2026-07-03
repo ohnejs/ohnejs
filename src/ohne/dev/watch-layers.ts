@@ -17,6 +17,7 @@ export interface LayerWatch {
    * The supervisor calls this after the config barrier reloads the registry.
    * Newly stacked layers start being watched and removed ones are torn down.
    * A layer that stays keeps its existing watch.
+   * When the codegen dir name changes, every watch is rebuilt so the new name is pruned.
    */
   resync(): void;
 
@@ -48,10 +49,16 @@ export interface LayerWatch {
  */
 export function watchLayers(onChange: (path: string) => void): LayerWatch {
   const watchers = new Map<string, () => void>();
+  let ignoreName: string | null = null;
   resync();
   return { resync, close };
 
   function resync(): void {
+    const ignore = codegenName();
+    if (ignore !== ignoreName) {
+      ignoreName = ignore;
+      close();
+    }
     const desired = new Set(watchedDirs());
     for (const [dir, stop] of watchers) {
       if (!desired.has(dir)) {
@@ -59,9 +66,8 @@ export function watchLayers(onChange: (path: string) => void): LayerWatch {
         watchers.delete(dir);
       }
     }
-    const ignore = [codegenName()];
     for (const dir of desired) {
-      if (!watchers.has(dir)) watchers.set(dir, watchTree(dir, onChange, { ignore }));
+      if (!watchers.has(dir)) watchers.set(dir, watchTree(dir, onChange, { ignore: [ignore] }));
     }
   }
 
