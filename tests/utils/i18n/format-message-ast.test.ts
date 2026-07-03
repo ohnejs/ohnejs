@@ -119,9 +119,8 @@ describe('formatMessageAST - date and time', () => {
   const epoch = new Date(Date.UTC(2026, 5, 7, 14, 30, 0));
 
   it('formats `{d, date}` with default (medium) style', () => {
-    const out = render('{d, date}', { d: epoch }, 'en-US');
-    strictEqual(out.length > 0, true);
-    strictEqual(typeof out, 'string');
+    const expected = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(epoch);
+    strictEqual(render('{d, date}', { d: epoch }, 'en-US'), expected);
   });
 
   it('formats `{d, date, short}` in en-US shape', () => {
@@ -130,13 +129,15 @@ describe('formatMessageAST - date and time', () => {
   });
 
   it('accepts an ISO date string and formats it', () => {
-    const out = render('{d, date, short}', { d: '2026-06-07' }, 'en-US');
-    strictEqual(out.length > 0, true);
+    const expected = new Intl.DateTimeFormat('en-US', { dateStyle: 'short' }).format(
+      new Date('2026-06-07'),
+    );
+    strictEqual(render('{d, date, short}', { d: '2026-06-07' }, 'en-US'), expected);
   });
 
   it('accepts a unix timestamp number', () => {
-    const out = render('{d, date, short}', { d: epoch.getTime() }, 'en-US');
-    strictEqual(out.length > 0, true);
+    const expected = new Intl.DateTimeFormat('en-US', { dateStyle: 'short' }).format(epoch);
+    strictEqual(render('{d, date, short}', { d: epoch.getTime() }, 'en-US'), expected);
   });
 
   it('renders placeholder when the value cannot be coerced to a Date', () => {
@@ -159,7 +160,6 @@ describe('formatMessageAST - date and time', () => {
   it('formats `::yMMMd` date skeleton', () => {
     const out = render('{d, date, ::yMMMd}', { d: epoch }, 'en-US');
     strictEqual(out.includes('2026'), true);
-    strictEqual(out.length > 0, true);
   });
 });
 

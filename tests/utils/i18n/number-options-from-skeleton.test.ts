@@ -396,8 +396,7 @@ describe('numberOptionsFromSkeleton - end-to-end rendering', () => {
 
   it('compact-short renders compact notation', () => {
     const o = opts('compact-short');
-    const out = new Intl.NumberFormat('en-US', o).format(12345);
-    strictEqual(out.length < 10, true);
+    strictEqual(new Intl.NumberFormat('en-US', o).format(12345), '12K');
   });
 
   it('scientific produces scientific output', () => {
