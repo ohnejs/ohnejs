@@ -8,6 +8,7 @@ import type {
 } from './message-ast.ts';
 
 import { last } from '../array/last.ts';
+import { isNull } from '../is/is-null.ts';
 import { MessageSyntaxError } from './message-errors.ts';
 
 type Cursor = {
@@ -295,17 +296,34 @@ function readOffset(c: Cursor): number {
   if (!c.src.startsWith('offset:', c.pos)) return 0;
 
   c.pos += 'offset:'.length;
+  skipWhitespace(c);
   const start = c.pos;
 
-  if (c.src[c.pos] === '-') c.pos++;
-  while (c.pos < c.src.length && isDigit(c.src.charCodeAt(c.pos))) c.pos++;
-
-  const raw = c.src.slice(start, c.pos);
-  if (!raw || raw === '-') {
-    throw new MessageSyntaxError('expected integer after `offset:`', c.src, start);
+  const raw = readNumber(c);
+  if (isNull(raw)) {
+    throw new MessageSyntaxError('expected number after `offset:`', c.src, start);
   }
 
   return Number(raw);
+}
+
+function readNumber(c: Cursor): string | null {
+  const start = c.pos;
+  if (c.src[c.pos] === '-') c.pos++;
+
+  const digitsStart = c.pos;
+  while (c.pos < c.src.length && isDigit(c.src.charCodeAt(c.pos))) c.pos++;
+  if (c.pos === digitsStart) {
+    c.pos = start;
+    return null;
+  }
+
+  if (c.src[c.pos] === '.') {
+    c.pos++;
+    while (c.pos < c.src.length && isDigit(c.src.charCodeAt(c.pos))) c.pos++;
+  }
+
+  return c.src.slice(start, c.pos);
 }
 
 function readPluralCase(c: Cursor): MessagePluralCase {
@@ -316,12 +334,9 @@ function readPluralCase(c: Cursor): MessagePluralCase {
     c.pos++;
     const start = c.pos;
 
-    if (c.src[c.pos] === '-') c.pos++;
-    while (c.pos < c.src.length && isDigit(c.src.charCodeAt(c.pos))) c.pos++;
-
-    const raw = c.src.slice(start, c.pos);
-    if (!raw || raw === '-') {
-      throw new MessageSyntaxError("expected integer after '='", c.src, start);
+    const raw = readNumber(c);
+    if (isNull(raw)) {
+      throw new MessageSyntaxError("expected number after '='", c.src, start);
     }
 
     exact = Number(raw);

@@ -223,7 +223,24 @@ describe('parseMessage - plural', () => {
     strictEqual((ast[0] as MessagePluralNode).offset, -2);
   });
 
-  it('throws when `offset:` is not followed by an integer', () => {
+  it('allows whitespace between `offset:` and its value', () => {
+    const ast = parseMessage('{n, plural, offset: 1 one {x} other {y}}');
+    strictEqual((ast[0] as MessagePluralNode).offset, 1);
+  });
+
+  it('parses a decimal `offset:N`', () => {
+    const ast = parseMessage('{n, plural, offset:1.5 other {x}}');
+    strictEqual((ast[0] as MessagePluralNode).offset, 1.5);
+  });
+
+  it('parses a decimal `=N` exact selector', () => {
+    const ast = parseMessage('{n, plural, =1.5 {x} other {y}}');
+    const node = ast[0] as MessagePluralNode;
+    strictEqual(node.cases[0]!.keyword, '=1.5');
+    strictEqual(node.cases[0]!.exact, 1.5);
+  });
+
+  it('throws when `offset:` is not followed by a number', () => {
     throws(() => parseMessage('{n, plural, offset: one {x} other {y}}'), MessageSyntaxError);
     throws(() => parseMessage('{n, plural, offset:- other {y}}'), MessageSyntaxError);
   });
