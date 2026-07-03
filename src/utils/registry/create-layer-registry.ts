@@ -235,7 +235,6 @@ export function createLayerRegistry<C extends object>(
       return true;
     },
     clear() {
-      if (specs.length === 0) return;
       specs.length = 0;
       strategies = { ...seed };
       invalidate();

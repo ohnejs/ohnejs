@@ -237,14 +237,11 @@ describe('createLayerRegistry', () => {
     strictEqual(first === second, false);
   });
 
-  it('clear on an empty registry keeps the cached identity', () => {
-    const r = createLayerRegistry<{ a: number }>();
-    r.add({ path: '/p', input: { a: 1 } });
+  it('clear on an empty registry still resets strategies', () => {
+    const r = createLayerRegistry<{ tags: string[] }>();
+    r.setStrategy('tags', 'concat');
     r.clear();
-    const first = r.layers();
-    r.clear();
-    const second = r.layers();
-    strictEqual(first, second);
+    deepStrictEqual(r.strategies(), {});
   });
 
   it('add accepts a previously registered path after clear', () => {
