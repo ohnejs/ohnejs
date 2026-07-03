@@ -129,6 +129,16 @@ describe('createLayerRegistry', () => {
     deepStrictEqual(layer!.resolved, {});
   });
 
+  it('carries the name through to the layer', () => {
+    const r = createLayerRegistry<{ a: number }>();
+    r.add({ path: '/named', name: 'auth' });
+    r.add({ path: '/nameless' });
+    deepStrictEqual(
+      r.layers().map((l) => l.name),
+      ['auth', undefined],
+    );
+  });
+
   it('strategies() returns a fresh shallow copy', () => {
     const r = createLayerRegistry<{ a: number }>({ strategies: { a: 'replace' } });
     const first = r.strategies();

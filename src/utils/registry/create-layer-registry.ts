@@ -36,6 +36,12 @@ export interface LayerSpec<C extends object> {
   path: string;
 
   /**
+   * Display name of the layer.
+   * Carried through to `Layer` untouched; the registry never reads it.
+   */
+  name?: string;
+
+  /**
    * Default config the layer ships with.
    *
    * @default
@@ -63,6 +69,11 @@ export interface Layer<C extends object> {
    * Absolute path of the layer, as given to `add`.
    */
   path: string;
+
+  /**
+   * Display name of the layer, as given to `add`.
+   */
+  name?: string;
 
   /**
    * Default config the layer was registered with, normalised to `{}` if omitted.
@@ -153,7 +164,7 @@ export interface LayerRegistry<C extends object> {
 /**
  * Creates a typed layer registry.
  *
- * Each layer is stored as `{ path, defaults, input, resolved }`.
+ * Each layer is stored as `{ path, name, defaults, input, resolved }`.
  * `resolved` folds the layer via `withDefaults` using the registry's strategies.
  * Closer layers win; base layers fill.
  *
@@ -202,7 +213,7 @@ export function createLayerRegistry<C extends object>(
       const input: Partial<C> = spec.input ?? {};
       const own = withDefaults(input, defaults, { strategies });
       cumulative = isUndefined(cumulative) ? own : withDefaults(own, cumulative, { strategies });
-      result.push({ path: spec.path, defaults, input, resolved: cumulative });
+      result.push({ path: spec.path, name: spec.name, defaults, input, resolved: cumulative });
     }
     cached = result;
     return result;
