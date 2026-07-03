@@ -27,7 +27,7 @@ describe('generateMiddleware', () => {
   function writePackage(at: string, spec: PackageSpec): void {
     mkdirSync(at, { recursive: true });
     const { ohne, layers, ...manifest } = spec;
-    writeFileSync(join(at, 'package.json'), JSON.stringify(manifest));
+    writeFileSync(join(at, 'package.json'), JSON.stringify({ ...manifest, type: 'module' }));
     const config = layers ? `export default { layers: ${JSON.stringify(layers)} };\n` : '';
     if (ohne) writeFileSync(join(at, 'ohne.config.ts'), config);
   }
