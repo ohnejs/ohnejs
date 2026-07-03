@@ -1,11 +1,9 @@
-import { isArray } from '../is/is-array.ts';
-import { isPlainObject } from '../is/is-plain-object.ts';
 import { hasKey } from '../object/has-key.ts';
-import { parseDotNotation } from './parse-dot-notation.ts';
+import { parseDotNotation, segmentAddresses } from './parse-dot-notation.ts';
 
 /**
  * Checks whether `path` resolves to an own property of `value`.
- * Descends only plain objects and arrays.
+ * A `.key` segment descends only a plain object; a `[n]` segment only an array.
  * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf; returns `false`.
  *
  * Returns `true` even if the resolved value is `undefined`, as long as the key is set.
@@ -26,7 +24,7 @@ export function dotHas(value: unknown, path: string): boolean {
   const segments = parseDotNotation(path);
   let current: unknown = value;
   for (const segment of segments) {
-    if (!isPlainObject(current) && !isArray(current)) return false;
+    if (!segmentAddresses(segment, current)) return false;
     if (!hasKey(current, segment.value)) return false;
     current = (current as Record<PropertyKey, unknown>)[segment.value];
   }

@@ -36,6 +36,16 @@ describe('dotGet', () => {
     strictEqual(dotGet({ a: 1 }, 'a.b'), undefined);
   });
 
+  it('does not resolve a .key segment on an array', () => {
+    const arr: number[] & { tag?: string } = [1, 2];
+    arr.tag = 'x';
+    strictEqual(dotGet({ a: arr }, 'a.tag'), undefined);
+  });
+
+  it('does not resolve an [n] segment on a plain object', () => {
+    strictEqual(dotGet({ a: { 0: 'x' } }, 'a[0]'), undefined);
+  });
+
   it('returns undefined for an out-of-bounds index', () => {
     strictEqual(dotGet({ a: [1, 2] }, 'a[5]'), undefined);
   });

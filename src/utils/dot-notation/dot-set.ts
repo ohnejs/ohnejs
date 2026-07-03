@@ -13,6 +13,7 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  * Type mismatches along the path are replaced wholesale to match the path expression's intent.
  * A key segment on a non-plain-object replaces with `{}`.
  * An index segment on a non-array replaces with `[]`.
+ * Arrays hold elements only: cloning through one drops named properties on it.
  *
  * Paths through `__proto__`, `constructor`, or `prototype` are no-ops (prototype pollution guard).
  *

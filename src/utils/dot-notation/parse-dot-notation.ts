@@ -1,4 +1,6 @@
+import { isArray } from '../is/is-array.ts';
 import { isInteger } from '../is/is-integer.ts';
+import { isPlainObject } from '../is/is-plain-object.ts';
 
 /**
  * A single segment of a parsed dot-notation path.
@@ -112,4 +114,23 @@ export function parseDotNotation(path: string): DotNotationSegment[] {
   }
 
   return segments;
+}
+
+/**
+ * Whether `value` is the container kind `segment` addresses.
+ * A `key` segment addresses a plain object; an `index` segment addresses an array.
+ * This is the shared resolution rule of `dotGet`, `dotHas`, and `dotUnset`.
+ *
+ * @example
+ * ```ts
+ * segmentAddresses({ kind: 'key', value: 'a' }, { a: 1 }) // -> true
+ * segmentAddresses({ kind: 'key', value: 'a' }, [1, 2])   // -> false
+ * segmentAddresses({ kind: 'index', value: 0 }, [1, 2])   // -> true
+ * ```
+ */
+export function segmentAddresses(
+  segment: DotNotationSegment,
+  value: unknown,
+): value is Record<string, unknown> | readonly unknown[] {
+  return segment.kind === 'index' ? isArray(value) : isPlainObject(value);
 }

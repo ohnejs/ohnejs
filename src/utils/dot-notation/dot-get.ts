@@ -1,12 +1,10 @@
-import { isArray } from '../is/is-array.ts';
-import { isPlainObject } from '../is/is-plain-object.ts';
-import { parseDotNotation } from './parse-dot-notation.ts';
+import { parseDotNotation, segmentAddresses } from './parse-dot-notation.ts';
 
 /**
  * Reads the value at `path` inside `value`.
- * Descends only plain objects and arrays.
+ * A `.key` segment descends only a plain object; a `[n]` segment only an array.
  * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf.
- * Returns `undefined` in that case.
+ * A segment that does not resolve yields `undefined`.
  *
  * Inside a plain object, inherited properties are returned (uses bracket access, not own-property check).
  * To distinguish "missing" from "present and undefined", use `dotHas`.
@@ -25,7 +23,7 @@ export function dotGet<T = unknown>(value: unknown, path: string): T | undefined
   const segments = parseDotNotation(path);
   let current: unknown = value;
   for (const segment of segments) {
-    if (!isPlainObject(current) && !isArray(current)) return undefined;
+    if (!segmentAddresses(segment, current)) return undefined;
     current = (current as Record<PropertyKey, unknown>)[segment.value];
   }
   return current as T | undefined;

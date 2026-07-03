@@ -12,6 +12,14 @@ describe('dotSet', () => {
     deepStrictEqual(dotSet({ a: { b: 1 } }, 'a.b', 2), { a: { b: 2 } });
   });
 
+  it('clones arrays as element lists when writing through them', () => {
+    const arr: { b: number }[] & { meta?: string } = [{ b: 1 }];
+    arr.meta = 'x';
+    const out = dotSet({ a: arr }, 'a[0].b', 2);
+    deepStrictEqual(out, { a: [{ b: 2 }] });
+    strictEqual(Object.hasOwn(out.a, 'meta'), false);
+  });
+
   it('sets an array element via [n]', () => {
     deepStrictEqual(dotSet({ a: [1, 2, 3] }, 'a[1]', 9), { a: [1, 9, 3] });
   });

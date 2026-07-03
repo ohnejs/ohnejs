@@ -25,6 +25,16 @@ describe('dotHas', () => {
     strictEqual(dotHas({ a: 1 }, 'b'), false);
   });
 
+  it('returns false for a .key segment on an array', () => {
+    const arr: number[] & { tag?: string } = [1, 2];
+    arr.tag = 'x';
+    strictEqual(dotHas({ a: arr }, 'a.tag'), false);
+  });
+
+  it('returns false for an [n] segment on a plain object', () => {
+    strictEqual(dotHas({ a: { 0: 'x' } }, 'a[0]'), false);
+  });
+
   it('returns false for an out-of-bounds array index', () => {
     strictEqual(dotHas({ a: [1, 2] }, 'a[5]'), false);
   });

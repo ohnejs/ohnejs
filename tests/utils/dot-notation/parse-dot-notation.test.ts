@@ -1,7 +1,7 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { parseDotNotation } from '../../../src/utils/index.ts';
+import { parseDotNotation, segmentAddresses } from '../../../src/utils/index.ts';
 
 describe('parseDotNotation', () => {
   it('parses a single key', () => {
@@ -108,5 +108,18 @@ describe('parseDotNotation', () => {
 
   it('throws when a key follows an index without a separator', () => {
     throws(() => parseDotNotation('foo[0]bar'), /expected "\." or "\["/);
+  });
+});
+
+describe('segmentAddresses', () => {
+  it('key segments address plain objects only', () => {
+    strictEqual(segmentAddresses({ kind: 'key', value: 'a' }, { a: 1 }), true);
+    strictEqual(segmentAddresses({ kind: 'key', value: 'a' }, [1, 2]), false);
+    strictEqual(segmentAddresses({ kind: 'key', value: 'a' }, new Map()), false);
+  });
+
+  it('index segments address arrays only', () => {
+    strictEqual(segmentAddresses({ kind: 'index', value: 0 }, [1, 2]), true);
+    strictEqual(segmentAddresses({ kind: 'index', value: 0 }, { 0: 'x' }), false);
   });
 });

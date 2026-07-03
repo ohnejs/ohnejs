@@ -16,13 +16,24 @@ describe('dotUnset', () => {
     deepStrictEqual(dotUnset({ a: [1, 2, 3] }, 'a[1]'), { a: [1, 3] });
   });
 
-  it('deletes a named property on an array without splicing', () => {
+  it('returns the input unchanged for a .key segment on an array', () => {
     const arr: number[] & { tag?: string } = [1, 2, 3];
     arr.tag = 'x';
-    const out = dotUnset({ a: arr }, 'a.tag') as { a: number[] & { tag?: string } };
-    deepStrictEqual(out.a, [1, 2, 3]);
-    strictEqual(out.a.tag, undefined);
-    strictEqual(Object.hasOwn(out.a, 'tag'), false);
+    const input = { a: arr };
+    strictEqual(dotUnset(input, 'a.tag'), input);
+  });
+
+  it('returns the input unchanged for an [n] segment on a plain object', () => {
+    const input = { a: { 0: 'x' } };
+    strictEqual(dotUnset(input, 'a[0]'), input);
+  });
+
+  it('clones arrays as element lists when descending', () => {
+    const arr: { b?: number }[] & { meta?: string } = [{ b: 1 }];
+    arr.meta = 'x';
+    const out = dotUnset({ a: arr }, 'a[0].b') as { a: typeof arr };
+    deepStrictEqual(out.a, [{}]);
+    strictEqual(Object.hasOwn(out.a, 'meta'), false);
   });
 
   it('returns the input unchanged when the path is missing', () => {
@@ -89,9 +100,8 @@ describe('dotUnset', () => {
     strictEqual(dotUnset(input, 'constructor.prototype.x'), input);
   });
 
-  it('does not throw when the trailing key targets a non-configurable own property', () => {
+  it('returns the input unchanged when the trailing key targets an array', () => {
     const input = { a: [1, 2, 3] };
-    const out = dotUnset(input, 'a.length') as { a: number[] };
-    deepStrictEqual(out.a, [1, 2, 3]);
+    strictEqual(dotUnset(input, 'a.length'), input);
   });
 });
