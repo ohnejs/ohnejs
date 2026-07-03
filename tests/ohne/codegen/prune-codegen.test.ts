@@ -53,7 +53,7 @@ describe('pruneCodegen', () => {
   it('leaves hidden entries in place', async () => {
     const app = makeApp('hidden');
     const ignore = join(app, '.ohne', '.gitignore');
-    writeFileSync(ignore, '*\n');
+    writeFileSync(ignore, BANNER);
 
     deepStrictEqual(await pruneCodegen(app, []), []);
     strictEqual(existsSync(ignore), true);
