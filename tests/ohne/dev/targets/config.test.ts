@@ -37,14 +37,16 @@ describe('config target', () => {
     useLayers().clear();
   });
 
-  it('is affected only by an ohne.config.ts in the stack', async () => {
+  it('is affected only by an ohne.config.ts or ohne.layer.ts in the stack', async () => {
     const app = writeApp('affected');
     await loadLayers(app);
     const config = createConfigTarget(app, []);
 
     strictEqual(config.affectedBy(join(app, 'ohne.config.ts')), true);
+    strictEqual(config.affectedBy(join(app, 'ohne.layer.ts')), true);
     strictEqual(config.affectedBy(join(app, 'api', 'health.ts')), false);
     strictEqual(config.affectedBy(join(app, 'nested', 'ohne.config.ts')), false);
+    strictEqual(config.affectedBy(join(app, 'nested', 'ohne.layer.ts')), false);
   });
 
   it('refreshes the registry and regenerates dependents', async () => {
@@ -79,6 +81,24 @@ describe('config target', () => {
     );
     await config.regen();
     deepStrictEqual(useConfig().disable.routes, ['GET /**']);
+  });
+
+  it('re-resolves edited layer defaults', async () => {
+    const app = writeApp('defaults');
+    writeFileSync(
+      join(app, 'ohne.layer.ts'),
+      "export default { defaults: { disable: { routes: ['GET /a'] } } }\n",
+    );
+    await loadLayers(app);
+    const config = createConfigTarget(app, []);
+    deepStrictEqual(useConfig().disable.routes, ['GET /a']);
+
+    writeFileSync(
+      join(app, 'ohne.layer.ts'),
+      "export default { defaults: { disable: { routes: ['GET /b'] } } }\n",
+    );
+    await config.regen();
+    deepStrictEqual(useConfig().disable.routes, ['GET /b']);
   });
 
   it('recovers config detection after a failed reload', async () => {
