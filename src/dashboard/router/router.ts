@@ -97,9 +97,10 @@ function interceptLink(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const anchor = target.closest('a');
-  if (isNull(anchor) || anchor.target !== '' || anchor.hasAttribute('download')) return;
-  const url = new URL(anchor.href);
-  if (url.origin !== location.origin) return;
+  if (isNull(anchor) || !anchor.hasAttribute('href')) return;
+  if (anchor.target !== '' || anchor.hasAttribute('download')) return;
+  const url = URL.parse(anchor.href);
+  if (isNull(url) || url.origin !== location.origin) return;
   if (url.pathname === location.pathname && url.search === location.search && url.hash !== '') {
     return;
   }
