@@ -59,6 +59,8 @@ export type ResolveArgsResult<S extends ArgsSchema> =
  * Parses `argv` against a schema and resolves typed option values.
  * Applies aliases, coercion, defaults, and required checks, and reports unknown flags with a hint.
  * A long flag matches its schema key in camelCase or kebab-case, so `--full-flag` resolves `fullFlag`.
+ * A boolean key whose kebab form starts with `no-` wins over negation, so `--no-cache` sets `noCache`.
+ * A `no`-prefixed key of any other type must be passed as `--no-foo=value`; the bare form negates `foo`.
  * A scalar flag repeated under one name takes its last value.
  * When a flag is given under both its canonical name and an alias, the canonical name wins.
  *

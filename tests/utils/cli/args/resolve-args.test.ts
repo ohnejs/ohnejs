@@ -46,6 +46,20 @@ describe('resolveArgs', () => {
     });
   });
 
+  it('resolves a `no`-prefixed boolean key through its kebab flag', () => {
+    const schema = { noCache: { type: 'boolean' } } as const;
+    deepStrictEqual(resolveArgs(schema, ['--no-cache']), {
+      ok: true,
+      values: { noCache: true },
+      positionals: [],
+    });
+    deepStrictEqual(resolveArgs(schema, []), {
+      ok: true,
+      values: { noCache: false },
+      positionals: [],
+    });
+  });
+
   it('accepts a valid enum value', () => {
     const schema = { mode: { type: 'enum', options: ['dev', 'prod'] } } as const;
     deepStrictEqual(resolveArgs(schema, ['--mode', 'prod']), {

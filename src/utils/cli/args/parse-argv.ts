@@ -52,6 +52,7 @@ export interface ParsedArgv {
  *
  * A bare flag consumes the following token as its value.
  * It does not consume when the flag is listed in `booleans` or the next token is itself a flag.
+ * A `--no-*` flag whose full name is listed in `booleans` is taken verbatim instead of negating.
  *
  * @example
  * ```ts
@@ -96,7 +97,7 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
       const eq = body.indexOf('=');
       if (eq !== -1) {
         assign(body.slice(0, eq), body.slice(eq + 1));
-      } else if (body.startsWith('no-')) {
+      } else if (body.startsWith('no-') && !booleans.has(body)) {
         assign(body.slice(3), false);
       } else if (consumesNext(body, argv[i + 1], booleans)) {
         assign(body, argv[++i]!);

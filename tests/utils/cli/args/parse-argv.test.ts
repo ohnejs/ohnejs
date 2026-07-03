@@ -39,6 +39,13 @@ describe('parseArgv', () => {
     deepStrictEqual(parseArgv(['--no-cache']), { positionals: [], flags: flags({ cache: false }) });
   });
 
+  it('takes a --no- flag verbatim when its full name is a declared boolean', () => {
+    deepStrictEqual(parseArgv(['--no-cache'], { booleans: ['no-cache'] }), {
+      positionals: [],
+      flags: flags({ 'no-cache': true }),
+    });
+  });
+
   it('does not consume the next token for a declared boolean', () => {
     deepStrictEqual(parseArgv(['--force', 'build'], { booleans: ['force'] }), {
       positionals: ['build'],
