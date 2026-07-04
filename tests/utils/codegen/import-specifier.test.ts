@@ -12,14 +12,18 @@ describe('importSpecifier', () => {
     strictEqual(importSpecifier('/app/.gen', '/app/.gen/code.ts'), './code.ts');
   });
 
-  it('percent-encodes URL-special characters in a segment', () => {
+  it('percent-encodes only the URL-breaking characters', () => {
     strictEqual(importSpecifier('/app/.gen', '/app/api/50%off.ts'), '../api/50%25off.ts');
-    strictEqual(importSpecifier('/app/.gen', '/app/api/a b.ts'), '../api/a%20b.ts');
     strictEqual(importSpecifier('/app/.gen', '/app/api/c#.ts'), '../api/c%23.ts');
     strictEqual(importSpecifier('/app/.gen', '/app/api/what?.ts'), '../api/what%3F.ts');
   });
 
-  it('encodes a non-ASCII segment', () => {
-    strictEqual(importSpecifier('/app/.gen', '/app/api/über.ts'), '../api/%C3%BCber.ts');
+  it('leaves a dynamic-route bracket raw so TypeScript can resolve it', () => {
+    strictEqual(importSpecifier('/app/.gen', '/app/api/[id].get.ts'), '../api/[id].get.ts');
+  });
+
+  it('leaves spaces and non-ASCII raw, which Node resolves as-is', () => {
+    strictEqual(importSpecifier('/app/.gen', '/app/api/a b.ts'), '../api/a b.ts');
+    strictEqual(importSpecifier('/app/.gen', '/app/api/über.ts'), '../api/über.ts');
   });
 });
