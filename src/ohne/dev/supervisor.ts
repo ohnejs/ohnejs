@@ -203,15 +203,16 @@ export async function dev(
   }
 
   async function startDashboard(): Promise<void> {
-    const api = useConfig().api;
-    const apiURL = `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`;
+    const config = useConfig();
+    const api = config.api;
+    const derivedURL = `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`;
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
         port: dashboardPort,
         entry: options.entry,
         onExit: onDashboardExit,
         env: {
-          API_URL: process.env['API_URL'] ?? apiURL,
+          API_URL: process.env['API_URL'] ?? config.dashboard?.apiURL ?? derivedURL,
           DASHBOARD_RELOAD: process.env['DASHBOARD_RELOAD'] ?? '1',
         },
       });

@@ -242,6 +242,26 @@ describe('dev', () => {
     await waitFor(async () => (await get(dashPort, '/')) === -1);
   });
 
+  it('honors a configured `dashboard.apiURL` over the derived URL', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('dashboard-apiurl', 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort}, apiURL: 'https://proxy.example/api' }, printer: { silent: true } }\n`,
+    );
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+
+    const apiURL = (await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)?.[1] ?? '';
+    strictEqual(apiURL, 'https://proxy.example/api');
+
+    await server.close();
+    await waitFor(async () => (await get(dashPort, '/')) === -1);
+  });
+
   it('does not reload the API on a dashboard file change', TIMEOUT, async () => {
     const port = await freePort();
     const app = writeProject('dash-noreload', port);
