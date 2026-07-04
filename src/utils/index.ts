@@ -169,6 +169,7 @@ export * from './timeout/with-timeout.ts';
 export * from './types/deep-prettify.ts';
 export * from './types/defaults-marker.ts';
 export * from './types/defined.ts';
+export * from './types/literal-union.ts';
 export * from './types/require-by-shape.ts';
 export * from './unique-name/unique-name.ts';
 export * from './vary/vary.ts';
