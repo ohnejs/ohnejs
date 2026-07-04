@@ -135,6 +135,9 @@ function applySymbol(symbol: string, count: number, options: Intl.DateTimeFormat
       return;
 
     case 'a':
+      options.hourCycle ??= 'h12';
+      return;
+
     case 'b':
     case 'B':
       options.dayPeriod = count === 4 ? 'long' : count === 5 ? 'narrow' : 'short';

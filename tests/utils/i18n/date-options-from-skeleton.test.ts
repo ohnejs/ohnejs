@@ -2,6 +2,7 @@ import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { dateOptionsFromSkeleton } from '../../../src/utils/i18n/date-options-from-skeleton.ts';
+import { formatMessage } from '../../../src/utils/i18n/format-message.ts';
 import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
 
 const opts = dateOptionsFromSkeleton;
@@ -157,18 +158,33 @@ describe('dateOptionsFromSkeleton - minute and second', () => {
   });
 });
 
+describe('dateOptionsFromSkeleton - AM/PM marker', () => {
+  it('a asks for a 12-hour cycle, not a day period', () => {
+    deepStrictEqual(opts('a'), { hourCycle: 'h12' });
+    deepStrictEqual(opts('aaaa'), { hourCycle: 'h12' });
+  });
+
+  it('a does not clobber an explicit 12-hour cycle from the hour field', () => {
+    deepStrictEqual(opts('Kmm a'), { hour: 'numeric', minute: '2-digit', hourCycle: 'h11' });
+  });
+
+  it('`h a` renders the marker, not a day-period phrase', () => {
+    const d = new Date(Date.UTC(2026, 5, 7, 14, 30, 0));
+    const expected = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h12' }).format(
+      d,
+    );
+    const out = formatMessage('{d, time, ::h a}', { d }, 'en-US');
+    strictEqual(out, expected);
+    strictEqual(/AM|PM/.test(out), true);
+    strictEqual(/morning|afternoon|noon|night/.test(out), false);
+  });
+});
+
 describe('dateOptionsFromSkeleton - day period', () => {
-  it('a / aa / aaa -> short', () => {
-    deepStrictEqual(opts('a'), { dayPeriod: 'short' });
-    deepStrictEqual(opts('aaa'), { dayPeriod: 'short' });
-  });
-
-  it('aaaa -> long', () => {
-    deepStrictEqual(opts('aaaa'), { dayPeriod: 'long' });
-  });
-
-  it('aaaaa -> narrow', () => {
-    deepStrictEqual(opts('aaaaa'), { dayPeriod: 'narrow' });
+  it('b / B -> descriptive day period', () => {
+    deepStrictEqual(opts('B'), { dayPeriod: 'short' });
+    deepStrictEqual(opts('BBBB'), { dayPeriod: 'long' });
+    deepStrictEqual(opts('bbbbb'), { dayPeriod: 'narrow' });
   });
 });
 
