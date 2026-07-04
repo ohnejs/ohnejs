@@ -50,6 +50,7 @@ export function watchTree(
 ): () => void {
   const ignore = new Set(options.ignore);
   const watchers = new Map<string, FSWatcher>();
+  const reconciles = new Map<string, Promise<void>>();
   let closed = false;
   let ready = false;
 
@@ -116,15 +117,42 @@ export function watchTree(
 
     const changed = joinPath(watchedDir, filename);
     onChange(changed);
-    void watchNewDir(changed);
+    reconcile(changed);
   }
 
-  async function watchNewDir(path: string): Promise<void> {
-    if (closed || watchers.has(path)) return;
+  /**
+   * Reconciles the watch of `changed` against the disk, serialized per path.
+   * Chaining per path keeps a delete event and its recreate from racing to a stale end state.
+   */
+  function reconcile(changed: string): void {
+    const prev = reconciles.get(changed) ?? Promise.resolve();
+    const next = prev.then(() => syncWatch(changed));
+    reconciles.set(changed, next);
+    void next.finally(() => {
+      if (reconciles.get(changed) === next) reconciles.delete(changed);
+    });
+  }
+
+  async function syncWatch(path: string): Promise<void> {
+    if (closed) return;
+    let isDir = false;
     try {
-      if ((await stat(path)).isDirectory()) await watchDir(path, ready);
+      isDir = (await stat(path)).isDirectory();
     } catch {
-      // The entry vanished or is unreadable; nothing to watch.
+      // The entry is gone; fall through to drop any stale watchers under it.
+    }
+    if (closed) return;
+    evictSubtree(path);
+    if (isDir) await watchDir(path, ready);
+  }
+
+  function evictSubtree(path: string): void {
+    const prefix = `${path}/`;
+    for (const [key, watcher] of watchers) {
+      if (key === path || key.startsWith(prefix)) {
+        watcher.close();
+        watchers.delete(key);
+      }
     }
   }
 }

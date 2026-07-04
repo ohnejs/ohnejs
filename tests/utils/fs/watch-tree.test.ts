@@ -101,6 +101,27 @@ describe('watchTree', () => {
     ok(!changed.some((path) => path.endsWith('/e.ts')));
   });
 
+  it('rewatches a directory that is deleted and recreated', async () => {
+    const sub = join(dir, 'sub');
+    const inner = join(sub, 'inner');
+    mkdirSync(inner, { recursive: true });
+    stop = watchTree(dir, (path) => changed.push(path));
+    await delay(50);
+
+    rmSync(sub, { recursive: true, force: true });
+    await delay(150);
+    mkdirSync(inner, { recursive: true });
+    await delay(150);
+
+    changed.length = 0;
+    writeFileSync(join(sub, 'b.ts'), 'b');
+    await waitFor(() => changed.some((path) => path.endsWith('/sub/b.ts')));
+
+    changed.length = 0;
+    writeFileSync(join(inner, 'c.ts'), 'c');
+    await waitFor(() => changed.some((path) => path.endsWith('/sub/inner/c.ts')));
+  });
+
   it('stops reporting after the closer runs', async () => {
     const file = join(dir, 'f.ts');
     writeFileSync(file, 'one');
