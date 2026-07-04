@@ -188,10 +188,13 @@ describe('createSpinner', () => {
 describe('createPrompt().spinner', () => {
   it('binds to the prompt stream and connects to the rail after a prompt', async () => {
     const out: string[] = [];
-    const prompt = createPrompt({ output: { write: (s) => out.push(s) } });
+    const prompt = createPrompt({ output: { write: (s) => out.push(s) }, color: false });
+    prompt.intro('Start');
+    out.length = 0;
     const spin = prompt.spinner({ frames: ['A'] });
     spin.start('Working');
     spin.stop('Done');
     strictEqual(out.join('').includes('Done'), true);
+    strictEqual(out.join('').includes('│'), true);
   });
 });

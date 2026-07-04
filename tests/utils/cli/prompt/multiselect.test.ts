@@ -128,6 +128,7 @@ describe('createPrompt().multiselect', () => {
     const { out } = await runMultiselect([' ', '\r'], { message: 'Fruit?', options: FRUITS });
     const submit = out.find((s) => s.includes('◇'))!;
     strictEqual(submit.includes('Apple'), true);
+    strictEqual(submit.includes('Pear'), false);
   });
 
   it('summarizes an empty submit as none', async () => {

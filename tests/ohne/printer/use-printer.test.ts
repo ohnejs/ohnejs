@@ -106,7 +106,10 @@ describe('usePrinter', () => {
 
   it('respects `useEnv().set("NO_COLOR", true)` over a manual `color: true`', () => {
     const ESC = '\x1b';
-    usePrinter().configure({ color: true });
+    usePrinter().configure({
+      stream: { write: (s: string) => buf.push(s), isTTY: true },
+      color: true,
+    });
 
     useEnv().set('NO_COLOR', true);
 

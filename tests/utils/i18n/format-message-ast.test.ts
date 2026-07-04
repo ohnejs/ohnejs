@@ -149,17 +149,23 @@ describe('formatMessageAST - date and time', () => {
   });
 
   it('formats `{d, time, short}`', () => {
-    const out = render('{d, time, short}', { d: epoch }, 'en-US');
-    strictEqual(/\d/.test(out), true);
+    const expected = new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(epoch);
+    strictEqual(render('{d, time, short}', { d: epoch }, 'en-US'), expected);
   });
 
   it('throws on an unknown date style', () => {
     throws(() => render('{d, date, mystery}', { d: epoch }), MessageFormatError);
   });
 
-  it('formats `::yMMMd` date skeleton', () => {
-    const out = render('{d, date, ::yMMMd}', { d: epoch }, 'en-US');
-    strictEqual(out.includes('2026'), true);
+  it('formats a `::yMMMMd` date skeleton distinctly from the medium fallback', () => {
+    const expected = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(epoch);
+    const medium = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(epoch);
+    strictEqual(render('{d, date, ::yMMMMd}', { d: epoch }, 'en-US'), expected);
+    strictEqual(expected !== medium, true);
   });
 });
 
