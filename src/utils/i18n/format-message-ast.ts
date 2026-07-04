@@ -35,7 +35,7 @@ type Context = {
 export interface FormatMessageOptions {
   /**
    * Hook invoked on every soft format failure.
-   * Soft failures: a missing parameter, an uncoercible value, a plural with no keyword match.
+   * Soft failures: a missing parameter, or a value that cannot be coerced to the argument's type.
    * The default is a no-op; `formatMessageAST` emits the fallback render and keeps going.
    * Throw from `onError` to opt into strict mode.
    */
