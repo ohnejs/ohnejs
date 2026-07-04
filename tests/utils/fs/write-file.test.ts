@@ -1,5 +1,13 @@
 import { strictEqual } from 'node:assert';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -43,6 +51,19 @@ describe('writeFile', () => {
       (name) => name.startsWith('clean.') && name.endsWith('.tmp'),
     );
     strictEqual(stragglers.length, 0);
+  });
+
+  it('replaces the file via a fresh inode, not by truncating in place', async () => {
+    const f = join(dir, 'inode');
+    await writeFile(f, 'old');
+    const fd = openSync(f, 'r');
+    try {
+      await writeFile(f, 'brand-new-content');
+      // An atomic rename leaves the held fd on the original inode; a truncating write would mutate it.
+      strictEqual(readFileSync(fd, 'utf8'), 'old');
+    } finally {
+      closeSync(fd);
+    }
   });
 
   it('survives concurrent writes (last one wins, no half-written file)', async () => {
