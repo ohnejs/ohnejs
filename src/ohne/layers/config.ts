@@ -2,6 +2,7 @@ import type {
   DeepPrettify,
   DefaultsMarker,
   LayerStrategies,
+  LiteralUnion,
   RequireByShape,
 } from '../../utils/index.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
@@ -34,7 +35,7 @@ export interface Config {
    * @default
    * []
    */
-  layers?: (LayerName | (string & {}))[];
+  layers?: LiteralUnion<LayerName>[];
 
   /**
    * Configurable directories.
