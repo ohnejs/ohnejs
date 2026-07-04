@@ -10,6 +10,7 @@ export type { DashboardPage, RouteContext } from './router/router.ts';
 export { api } from './runtime/api.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
+export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
 export type { KnownMessages, MessageKey } from './runtime/known-messages.ts';
 export type { MessageCatalog, MessageEntry } from './runtime/messages.ts';
 export type { DashboardLanguage, DashboardLanguages } from './runtime/use-dashboard-language.ts';
