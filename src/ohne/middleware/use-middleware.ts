@@ -1,3 +1,4 @@
+import type { MiddlewareKey, NamedMiddlewareKey } from './known-middleware.ts';
 import type { Middleware } from './middleware.ts';
 
 import { createRegistry, type Registry } from '../../utils/index.ts';
@@ -32,12 +33,12 @@ export interface MiddlewareRegistry {
   /**
    * Returns the global middleware names, in run order.
    */
-  globalKeys(): string[];
+  globalKeys(): MiddlewareKey[];
 
   /**
    * Returns the named, opt-in middleware names, in registration order.
    */
-  namedKeys(): string[];
+  namedKeys(): NamedMiddlewareKey[];
 
   /**
    * Removes every entry, global and named.
@@ -62,10 +63,10 @@ const registry: MiddlewareRegistry = {
     return store.get(key);
   },
   globalKeys() {
-    return [...globals];
+    return [...globals] as MiddlewareKey[];
   },
   namedKeys() {
-    return [...named];
+    return [...named] as NamedMiddlewareKey[];
   },
   clear() {
     store.clear();
