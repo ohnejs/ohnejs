@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { collectMiddleware, type OhneLayer } from '../../../src/ohne/index.ts';
+import { collectMiddleware, type OhneLayer, useLayers } from '../../../src/ohne/index.ts';
 
 describe('collectMiddleware', () => {
   let root: string;
@@ -49,6 +49,20 @@ describe('collectMiddleware', () => {
         { name: '20-locale', isGlobal: false },
       ],
     );
+  });
+
+  it('scans each layer in its own configured middleware directory', async () => {
+    const layers = useLayers();
+    layers.add({ path: app.dir, input: { dirs: { middleware: 'mw' } } });
+    try {
+      mkdirSync(join(app.dir, 'mw'), { recursive: true });
+      writeFileSync(join(app.dir, 'mw', 'ping.ts'), 'export default () => undefined\n');
+      const names = (await collectMiddleware([app])).map((entry) => entry.name);
+      strictEqual(names.includes('ping'), true);
+      strictEqual(names.includes('20-locale'), false);
+    } finally {
+      layers.remove(app.dir);
+    }
   });
 
   it('throws when a name is global in one layer and named in another', async () => {

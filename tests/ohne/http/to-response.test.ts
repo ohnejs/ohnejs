@@ -40,6 +40,14 @@ describe('toResponse', () => {
     deepStrictEqual(response.headers.getSetCookie(), ['handler=1', 'session=abc', 'csrf=xyz']);
   });
 
+  it('carries init set-cookie once when the Response sets none', () => {
+    const headers = new Headers();
+    headers.append('set-cookie', 'session=abc');
+    headers.append('set-cookie', 'csrf=xyz');
+    const response = toResponse(new Response('body'), { status: 200, headers });
+    deepStrictEqual(response.headers.getSetCookie(), ['session=abc', 'csrf=xyz']);
+  });
+
   it('unions vary from init and a verbatim Response, keeping the cors Vary: Origin', () => {
     const headers = new Headers({
       'access-control-allow-origin': 'https://a.example',

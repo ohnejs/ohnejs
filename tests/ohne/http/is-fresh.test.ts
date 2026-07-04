@@ -37,8 +37,9 @@ describe('isFresh', () => {
     strictEqual(fresh({ 'if-none-match': '"a", "b", "c"' }, { etag: '"b"' }), true);
   });
 
-  it('compares weakly, ignoring the W/ prefix', () => {
+  it('compares weakly, ignoring the W/ prefix in either position', () => {
     strictEqual(fresh({ 'if-none-match': 'W/"a"' }, { etag: '"a"' }), true);
+    strictEqual(fresh({ 'if-none-match': '"a"' }, { etag: 'W/"a"' }), true);
   });
 
   it('treats * as matching any current representation', () => {

@@ -44,6 +44,17 @@ describe('useSignedCookies', () => {
     );
   });
 
+  it('drops a value swapped under a reused tag', () => {
+    useEnv().set('COOKIE_SECRET', 'k');
+    const signed = signValue('u42', 'k', 'sid');
+    const tag = signed.slice(signed.indexOf('.') + 1);
+    const event = makeEvent(`sid=evil.${tag}`);
+    deepStrictEqual(
+      runWithEvent(event, () => useSignedCookies()),
+      {},
+    );
+  });
+
   it('drops a value replayed under a different name', () => {
     useEnv().set('COOKIE_SECRET', 'k');
     const event = makeEvent(`other=${signValue('u42', 'k', 'sid')}`);

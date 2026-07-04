@@ -112,6 +112,30 @@ describe('watchLayers', () => {
     ok(!changed.some((path) => path.endsWith('/b.ts')));
   });
 
+  it(
+    'reads the codegen dir from the app layer, not the base of the stack',
+    skipOnWindows,
+    async () => {
+      const base = join(root, 'k-base');
+      manifest(base, 'k-base', [], {});
+      const app = join(root, 'k-app');
+      manifest(app, 'k-app', ['k-base'], { layers: ['k-base'], dirs: { codegen: 'gen' } });
+      link(app, 'k-base', base);
+      await loadLayers(app);
+      changed = [];
+      watch = watchLayers((path) => changed.push(path));
+      await delay(50);
+
+      mkdirSync(join(app, 'gen'), { recursive: true });
+      writeFileSync(join(app, 'gen', 'routes.ts'), '// generated\n');
+      await delay(150);
+      ok(!changed.some((path) => path.endsWith('/routes.ts')));
+
+      writeRoute(app, 'health.ts');
+      await waitFor(() => changed.some((path) => path.endsWith('/api/health.ts')));
+    },
+  );
+
   it('resync re-ignores a renamed codegen dir on surviving watches', async () => {
     const app = join(root, 'regen-rename');
     manifest(app, 'regen-rename', [], { dirs: { codegen: 'gen' } });

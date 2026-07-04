@@ -312,4 +312,32 @@ describe('dev', () => {
     await client.reloaded;
     client.close();
   });
+
+  it('does not reload the browser on an API-only change', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('api-only-reload', 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+    );
+    writeRoute(app, 'health.ts');
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+    const apiPort = Number(
+      new URL((await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)![1]).port,
+    );
+
+    const client = sseReload(dashPort, '/m/dashboard/reload');
+    await client.connected;
+    let reloaded = false;
+    void client.reloaded.then(() => (reloaded = true));
+
+    writeRoute(app, 'users.get.ts');
+    await waitFor(async () => (await get(apiPort, '/users')) === 200);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    client.close();
+    strictEqual(reloaded, false);
+  });
 });

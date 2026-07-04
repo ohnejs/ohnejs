@@ -104,12 +104,15 @@ describe('useT', () => {
     });
   });
 
-  it('formats plurals with the found language rules', async () => {
-    await setup({ en: { items: '{n, plural, one {# item} other {# items}}' } });
-    runWithEvent(makeEvent('en'), () => {
-      const t = useT();
-      strictEqual(t('items', { n: 1 }), '1 item');
-      strictEqual(t('items', { n: 5 }), '5 items');
+  it('formats a fallback message with its origin plural rules, not the active language', async () => {
+    await setup({
+      ru: { plain: 'Privet' },
+      en: { items: '{n, plural, one {# item} other {# items}}' },
+    });
+    runWithEvent(makeEvent('ru'), () => {
+      // `items` exists only in `en`, so English plural rules apply: 21 -> `other`.
+      // Russian rules would pick `one` for 21, which would be wrong for the English text.
+      strictEqual(useT()('items', { n: 21 }), '21 items');
     });
   });
 });

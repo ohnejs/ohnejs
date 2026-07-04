@@ -90,6 +90,20 @@ describe('toRequest', () => {
     );
   });
 
+  it('passes a body of exactly maxBodySize', async () => {
+    await withServer(
+      async (req, res) => {
+        const request = toRequest(req, { maxBodySize: 5 });
+        await sendResponse(res, new Response((await request.text()).toUpperCase()));
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'POST', body: 'hello' });
+        strictEqual(res.status, 200);
+        strictEqual(await res.text(), 'HELLO');
+      },
+    );
+  });
+
   it('refuses an over-cap Content-Length with 413 before reading', async () => {
     await withServer(
       async (req, res) => {
@@ -218,7 +232,9 @@ describe('clientIP', () => {
         await sendResponse(res, new Response(clientIP(req, trusted)));
       },
       async (base) => {
-        const res = await fetch(base, { headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' } });
+        const res = await fetch(base, {
+          headers: { 'x-forwarded-for': '6.6.6.6, 203.0.113.9, 10.0.0.1' },
+        });
         strictEqual(await res.text(), '203.0.113.9');
       },
     );

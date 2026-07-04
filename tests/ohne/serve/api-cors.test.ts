@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { ok, strictEqual } from 'node:assert';
+import { strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -111,7 +111,8 @@ describe('serveAPI CORS', () => {
       'access-control-request-method': 'GET',
     });
     strictEqual(res.status, 204);
-    ok(typeof res.headers['access-control-allow-methods'] === 'string');
+    strictEqual(res.headers['access-control-allow-methods'], '*');
+    strictEqual(res.headers['access-control-allow-headers'], '*');
   });
 
   it('lets a mounted cors policy replace the default', async () => {
