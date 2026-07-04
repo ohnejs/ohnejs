@@ -43,19 +43,19 @@ describe('GET /messages/:group/:language', () => {
       },
     });
     deepStrictEqual(handler({ params: { group: 'field', language: 'en' } }), {
-      'field.required': 'Required',
-      'field.minLength': 'Too short',
+      'field.required': { template: 'Required', language: 'en' },
+      'field.minLength': { template: 'Too short', language: 'en' },
     });
   });
 
-  it('fills a missing key from the upper language', async () => {
+  it('fills a missing key from the upper language, tagged with its origin', async () => {
     await setup({
       en: { 'field.required': 'Required', 'field.minLength': 'Too short' },
       de: { 'field.required': 'Pflichtfeld' },
     });
     deepStrictEqual(handler({ params: { group: 'field', language: 'de' } }), {
-      'field.required': 'Pflichtfeld',
-      'field.minLength': 'Too short',
+      'field.required': { template: 'Pflichtfeld', language: 'de' },
+      'field.minLength': { template: 'Too short', language: 'en' },
     });
   });
 
@@ -66,7 +66,7 @@ describe('GET /messages/:group/:language', () => {
       'de-AT': { 'field.required': 'Pflichtfeld (AT)' },
     });
     deepStrictEqual(handler({ params: { group: 'field', language: 'de-AT' } }), {
-      'field.required': 'Pflichtfeld (AT)',
+      'field.required': { template: 'Pflichtfeld (AT)', language: 'de-AT' },
     });
   });
 

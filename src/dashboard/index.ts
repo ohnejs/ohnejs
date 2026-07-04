@@ -11,7 +11,7 @@ export { api } from './runtime/api.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
 export type { KnownMessages, MessageKey } from './runtime/known-messages.ts';
-export type { MessageCatalog } from './runtime/messages.ts';
+export type { MessageCatalog, MessageEntry } from './runtime/messages.ts';
 export type { DashboardLanguage, DashboardLanguages } from './runtime/use-dashboard-language.ts';
 export { useDashboardLanguage } from './runtime/use-dashboard-language.ts';
 export type { MessageParams, Translate } from './runtime/use-t.ts';

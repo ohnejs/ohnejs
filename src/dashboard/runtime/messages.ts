@@ -3,10 +3,26 @@ import { type Ref, ref } from '../../utils/reactive/ref.ts';
 import { api } from './api.ts';
 
 /**
- * One language's messages for a single group: a flat map of message key to ICU template.
+ * One resolved message: its ICU template and the language that template is written in.
+ * The language is the fallback lookup's origin, so the client formats it with matching plural rules.
+ */
+export interface MessageEntry {
+  /**
+   * The ICU MessageFormat template.
+   */
+  template: string;
+
+  /**
+   * The BCP-47 language the template is written in, for plural and number formatting.
+   */
+  language: string;
+}
+
+/**
+ * One group's resolved messages for a language: a flat map of message key to its entry.
  * This is exactly the shape the `GET /messages/:group/:language` endpoint returns.
  */
-export type MessageCatalog = Record<string, string>;
+export type MessageCatalog = Record<string, MessageEntry>;
 
 const cells = new Map<string, Ref<MessageCatalog | undefined>>();
 
@@ -23,7 +39,8 @@ const cells = new Map<string, Ref<MessageCatalog | undefined>>();
  *
  * @example
  * ```ts
- * messageCatalog('en', 'nav') // -> undefined, then { 'nav.home': 'Home' } once loaded
+ * messageCatalog('en', 'nav')
+ * // -> { 'nav.home': { template: 'Home', language: 'en' } } once loaded
  * ```
  */
 export function messageCatalog(language: string, group: string): MessageCatalog | undefined {

@@ -36,7 +36,8 @@ const cache = new Map<string, MessageAST>();
  * The catalog is fetched from the API on demand, once per group.
  *
  * A key whose catalog has not loaded yet, or that no language defines, renders as the key itself.
- * Templates are parsed once and cached, and formatted in the active language for its plural rules.
+ * Templates are parsed once and cached, and formatted in the language they are written in.
+ * A fallback-filled message keeps its origin language, so its plural and number rules match the text.
  *
  * @example
  * ```ts
@@ -53,9 +54,9 @@ export function useT(): Translate {
 function translate(key: string, params: MessageParams | undefined): string {
   const language = useDashboardLanguage().value;
   const catalog = messageCatalog(language, messageGroup(key));
-  const template = catalog?.[key];
-  if (isUndefined(template)) return key;
-  return formatMessageAST(astOf(template), params, language);
+  const entry = catalog?.[key];
+  if (isUndefined(entry)) return key;
+  return formatMessageAST(astOf(entry.template), params, entry.language);
 }
 
 function astOf(template: string): MessageAST {
