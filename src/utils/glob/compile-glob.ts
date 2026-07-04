@@ -49,11 +49,11 @@ const META_RE = /[.+^${}()|[\]\\]/;
  *
  * @example
  * ```ts
- * compileGlob('*.ts')('index.ts')        // -> true
- * compileGlob('*.ts')('nested/index.ts') // -> false
- * compileGlob('**\/*.ts')('nested/a.ts') // -> true
- * compileGlob('/users/?')('/users/1')    // -> true
- * compileGlob('/admin/**')('/admin/x/y') // -> true
+ * compileGlob('*.ts')('index.ts')         // -> true
+ * compileGlob('*.ts')('nested/index.ts')  // -> false
+ * compileGlob('**\/*.ts')('nested/a.ts')  // -> true
+ * compileGlob('/authors/?')('/authors/1') // -> true
+ * compileGlob('/admin/**')('/admin/x/y')  // -> true
  * ```
  */
 export function compileGlob(glob: string): GlobMatcher {

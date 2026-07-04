@@ -24,9 +24,9 @@ export interface ParsedRouteID {
  *
  * @example
  * ```ts
- * parseRouteID('GET /users/[id]') // -> { method: 'GET', path: '/users/[id]' }
- * parseRouteID('/health')         // -> { path: '/health' }
- * parseRouteID('search')          // -> { path: 'search' }
+ * parseRouteID('GET /authors/[id]') // -> { method: 'GET', path: '/authors/[id]' }
+ * parseRouteID('/health')           // -> { path: '/health' }
+ * parseRouteID('search')            // -> { path: 'search' }
  * ```
  */
 export function parseRouteID(id: string): ParsedRouteID {

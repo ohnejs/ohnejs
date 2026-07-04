@@ -6,12 +6,12 @@
  *
  * @example
  * ```ts
- * const page: PageRoute = { pattern: '/users/[id]', url: '/m/app/pages/users/[id].ts' }
+ * const page: PageRoute = { pattern: '/authors/[id]', url: '/m/app/pages/authors/[id].ts' }
  * ```
  */
 export interface PageRoute {
   /**
-   * The route pattern, in the same syntax as the API route files (`/`, `/about`, `/users/[id]`).
+   * The route pattern, in the same syntax as the API route files (`/`, `/about`, `/authors/[id]`).
    */
   pattern: string;
 

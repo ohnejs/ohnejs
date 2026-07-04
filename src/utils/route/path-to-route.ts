@@ -43,8 +43,8 @@ const METHOD_SUFFIX_RE = /^(.*)\.(get|post|put|patch|delete|head|options)$/i;
  * pathToRoute('./foo/[bar]/index.post.ts')
  * // -> { method: 'POST', pattern: '/foo/[bar]' }
  *
- * pathToRoute('./users/[id].get.ts')
- * // -> { method: 'GET', pattern: '/users/[id]' }
+ * pathToRoute('./authors/[id].get.ts')
+ * // -> { method: 'GET', pattern: '/authors/[id]' }
  *
  * pathToRoute('./files/[...path].ts')
  * // -> { method: null, pattern: '/files/[...path]' }

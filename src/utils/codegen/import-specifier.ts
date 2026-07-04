@@ -12,10 +12,10 @@ import { relativePath } from '../path/relative-path.ts';
  *
  * @example
  * ```ts
- * importSpecifier('/app/.gen', '/app/api/users.ts')  // -> '../api/users.ts'
- * importSpecifier('/app/.gen', '/app/.gen/code.ts')  // -> './code.ts'
- * importSpecifier('/app/.gen', '/app/api/[id].ts')   // -> '../api/[id].ts'
- * importSpecifier('/app/.gen', '/app/api/50%off.ts') // -> '../api/50%25off.ts'
+ * importSpecifier('/app/.gen', '/app/api/authors.ts') // -> '../api/authors.ts'
+ * importSpecifier('/app/.gen', '/app/.gen/code.ts')   // -> './code.ts'
+ * importSpecifier('/app/.gen', '/app/api/[id].ts')    // -> '../api/[id].ts'
+ * importSpecifier('/app/.gen', '/app/api/50%off.ts')  // -> '../api/50%25off.ts'
  * ```
  */
 export function importSpecifier(fromDir: string, file: string): string {

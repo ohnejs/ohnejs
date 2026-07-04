@@ -11,12 +11,12 @@
  *
  * @example
  * ```ts
- * stripBasePath('/api/users', '/api') // -> '/users'
- * stripBasePath('/api', '/api')       // -> '/'
- * stripBasePath('/api/', '/api')      // -> '/'
- * stripBasePath('/users', '')         // -> '/users'
- * stripBasePath('/users', '/api')     // -> null
- * stripBasePath('/apiece', '/api')    // -> null
+ * stripBasePath('/api/authors', '/api') // -> '/authors'
+ * stripBasePath('/api', '/api')         // -> '/'
+ * stripBasePath('/api/', '/api')        // -> '/'
+ * stripBasePath('/authors', '')         // -> '/authors'
+ * stripBasePath('/authors', '/api')     // -> null
+ * stripBasePath('/apiece', '/api')      // -> null
  * ```
  */
 export function stripBasePath(pathname: string, basePath: string): string | null {

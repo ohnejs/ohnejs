@@ -18,7 +18,7 @@ import { pathNameSegments } from '../path/path-name-segments.ts';
  * pathToRoutePattern('./foo/bar.tsx')        // -> '/foo/bar'
  * pathToRoutePattern('./[id]/posts.ts')      // -> '/[id]/posts'
  * pathToRoutePattern('./files/[...path].ts') // -> '/files/[...path]'
- * pathToRoutePattern('./users/:id.ts')       // -> '/users/:id'
+ * pathToRoutePattern('./authors/:id.ts')     // -> '/authors/:id'
  * pathToRoutePattern('./index.ts')           // -> '/'
  * ```
  */

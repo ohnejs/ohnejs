@@ -5,9 +5,9 @@ import { naturalCompare } from '../sort/natural-compare.ts';
  *
  * @example
  * ```ts
- * specificity('/users/new')  // -> [2, 2]
- * specificity('/users/[id]') // -> [2, 1]
- * specificity('/[...path]')  // -> [0]
+ * specificity('/authors/new')  // -> [2, 2]
+ * specificity('/authors/[id]') // -> [2, 1]
+ * specificity('/[...path]')    // -> [0]
  * ```
  */
 export function specificity(pattern: string): number[] {
@@ -28,8 +28,8 @@ export function specificity(pattern: string): number[] {
  *
  * @example
  * ```ts
- * ['/[...all]', '/users/[id]', '/users/new'].sort(compareSpecificity)
- * // -> ['/users/new', '/users/[id]', '/[...all]']
+ * ['/[...all]', '/authors/[id]', '/authors/new'].sort(compareSpecificity)
+ * // -> ['/authors/new', '/authors/[id]', '/[...all]']
  * ```
  */
 export function compareSpecificity(a: string, b: string): number {

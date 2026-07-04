@@ -14,14 +14,14 @@ export type RouteParams = Record<string, string>;
  *
  * @example
  * ```ts
- * const matcher = compileRoute('/users/[id]')
+ * const matcher = compileRoute('/authors/[id]')
  *
- * matcher('/users/42')   // -> { id: '42' }
- * matcher('/users/42/')  // -> { id: '42' }
- * matcher('/posts/1')    // -> null
+ * matcher('/authors/42')   // -> { id: '42' }
+ * matcher('/authors/42/')  // -> { id: '42' }
+ * matcher('/posts/1')      // -> null
  *
- * matcher.pattern        // -> '/users/[id]'
- * matcher.params         // -> ['id']
+ * matcher.pattern          // -> '/authors/[id]'
+ * matcher.params           // -> ['id']
  * ```
  */
 export interface RouteMatcher {
@@ -67,12 +67,12 @@ const META_RE = /[.*+?^${}()|[\]\\]/g;
  *
  * @example
  * ```ts
- * compileRoute('/users/[id]')('/users/42')          // -> { id: '42' }
- * compileRoute('/users/:id')('/users/42')           // -> { id: '42' }
- * compileRoute('/files/[...path]')('/files/a/b/c')  // -> { path: 'a/b/c' }
+ * compileRoute('/authors/[id]')('/authors/42')     // -> { id: '42' }
+ * compileRoute('/authors/:id')('/authors/42')      // -> { id: '42' }
+ * compileRoute('/files/[...path]')('/files/a/b/c') // -> { path: 'a/b/c' }
  *
- * compileRoute('/users/[id]')('/posts/1')           // -> null
- * compileRoute('/users/[id]')('/users/')            // -> null
+ * compileRoute('/authors/[id]')('/posts/1')        // -> null
+ * compileRoute('/authors/[id]')('/authors/')       // -> null
  * ```
  */
 export function compileRoute(pattern: string): RouteMatcher {
