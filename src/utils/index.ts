@@ -154,6 +154,7 @@ export * from './route/compile-route.ts';
 export * from './route/decode-route-params.ts';
 export * from './route/normalize-base-path.ts';
 export * from './route/page-route.ts';
+export * from './route/parse-route-id.ts';
 export * from './route/path-to-route-pattern.ts';
 export * from './route/path-to-route.ts';
 export * from './route/specificity.ts';
