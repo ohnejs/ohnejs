@@ -1,6 +1,6 @@
 import type { Target } from './target.ts';
 
-import { isNull, isPathInside, joinPath } from '../../../utils/index.ts';
+import { isArray, isNull, isPathInside, joinPath } from '../../../utils/index.ts';
 import { DIR_DEFAULTS } from '../../layers/config.ts';
 import { useLayers } from '../../layers/use-layers.ts';
 
@@ -30,7 +30,7 @@ export function createSetTarget(
   from: string,
   dir: 'api' | 'middleware',
   files: (from: string) => Promise<Set<string>>,
-  generate: (from: string) => Promise<string | null>,
+  generate: (from: string) => Promise<string | string[] | null>,
 ): SetTarget {
   let snapshot: Set<string> | null = null;
 
@@ -51,7 +51,7 @@ export function createSetTarget(
       if (!isNull(snapshot) && sameSet(snapshot, current)) return [];
       snapshot = current;
       const written = await generate(from);
-      return isNull(written) ? [] : [written];
+      return isNull(written) ? [] : isArray(written) ? written : [written];
     },
     invalidate() {
       snapshot = null;
