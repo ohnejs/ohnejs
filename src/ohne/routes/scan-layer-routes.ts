@@ -9,6 +9,7 @@ import {
   pathToRoute,
   relativePath,
 } from '../../utils/index.ts';
+import { assertImportablePath } from '../codegen/assert-importable-path.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { routeID, type RouteMeta } from './route.ts';
 
@@ -34,6 +35,7 @@ export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<Ro
   return entries
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
+      assertImportablePath('route', entry.relativePath, entry.path);
       const { method, pattern } = pathToRoute(entry.relativePath);
       const id = routeID(method, pattern);
       const clash = seen.get(id);

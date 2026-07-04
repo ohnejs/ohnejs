@@ -76,4 +76,13 @@ describe('scanLayerMiddleware', () => {
       /Duplicate middleware `global-auth`/,
     );
   });
+
+  it('throws when a filename holds a character its generated import cannot resolve', async () => {
+    const layer: OhneLayer = { name: 'bad', dir: join(root, 'bad') };
+    writeMiddleware(layer.dir, 'a#b.ts');
+    await rejects(
+      scanLayerMiddleware(layer, 'middleware'),
+      /Unsupported character `#` in a middleware path/,
+    );
+  });
 });

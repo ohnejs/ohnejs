@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { rejects, strictEqual } from 'node:assert';
 import {
   mkdirSync,
   mkdtempSync,
@@ -91,16 +91,13 @@ describe('generateRoutes', () => {
     strictEqual(out.includes("import h1 from '../../packages/a/api/index.get.ts';"), true);
   });
 
-  it('percent-encodes a URL-special character in a route filename import', async () => {
+  it('rejects a route filename whose character breaks its generated import', async () => {
     const app = join(root, 'special-name');
     writePackage(app, { name: 'special-name', ohne: true });
     writeRoute(app, '50%off.get.ts');
 
     await loadLayers(app);
-    const out = readFileSync((await generateRoutes(app))!, 'utf8');
-
-    strictEqual(out.includes("import h0 from '../../api/50%25off.get.ts';"), true);
-    strictEqual(out.includes("from '../../api/50%off.get.ts'"), false);
+    await rejects(generateRoutes(app), /Unsupported character `%` in a route path/);
   });
 
   it('leaves out an installed layer no config lists', async () => {

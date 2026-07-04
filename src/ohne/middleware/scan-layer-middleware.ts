@@ -10,6 +10,7 @@ import {
   pathToKebabName,
   relativePath,
 } from '../../utils/index.ts';
+import { assertImportablePath } from '../codegen/assert-importable-path.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
 const GLOBAL_DIR = 'global';
@@ -41,6 +42,7 @@ export async function scanLayerMiddleware(
   return entries
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
+      assertImportablePath('middleware', entry.relativePath, entry.path);
       const name = pathToKebabName(entry.relativePath);
       const clash = seen.get(name);
       if (!isUndefined(clash)) {
