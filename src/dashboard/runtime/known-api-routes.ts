@@ -12,7 +12,7 @@ import type { LiteralUnion } from '../../utils/types/literal-union.ts';
  * ```ts
  * declare module 'ohne/dashboard' {
  *   interface KnownAPIRoutes {
- *     'GET /users/[id]': true
+ *     'GET /authors/[id]': true
  *   }
  * }
  * ```

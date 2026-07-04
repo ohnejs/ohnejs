@@ -5,7 +5,7 @@ import { dashboardConfig } from './config.ts';
 
 /**
  * Fetches a route from the API the dashboard is configured for.
- * The `route` is a root-relative path, optionally prefixed with a method (`GET /users/[id]`).
+ * The `route` is a root-relative path, optionally prefixed with a method (`GET /authors/[id]`).
  * A leading method overrides `init.method`; the rest is the path appended to the base URL.
  * Returns the raw `Response`; the caller decides how to read it.
  */
