@@ -9,6 +9,7 @@ import {
   pathToRoutePattern,
   relativePath,
 } from '../../utils/index.ts';
+import { assertImportablePath } from '../codegen/assert-importable-path.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { DASHBOARD_PAGES_DIR, type DiscoveredDashboardPage } from './dashboard-page.ts';
 
@@ -40,6 +41,7 @@ export async function scanDashboardPages(
   return entries
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
+      assertImportablePath('page', entry.relativePath, entry.path);
       const pattern = pathToRoutePattern(entry.relativePath);
       const clash = seen.get(pattern);
       if (!isUndefined(clash)) {

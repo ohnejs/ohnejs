@@ -53,4 +53,10 @@ describe('scanDashboardPages', () => {
     writePage(clash.dir, 'users/index.ts');
     await rejects(scanDashboardPages(clash, 'dashboard'), /Duplicate page/);
   });
+
+  it('throws when a filename holds a character its browser import cannot resolve', async () => {
+    const bad: OhneLayer = { name: 'bad', dir: join(root, 'bad') };
+    writePage(bad.dir, 'a#b.ts');
+    await rejects(scanDashboardPages(bad, 'dashboard'), /Unsupported character `#` in a page path/);
+  });
 });
