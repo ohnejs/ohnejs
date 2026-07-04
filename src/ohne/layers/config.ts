@@ -94,7 +94,7 @@ export interface Config {
 
     /**
      * Directory each layer's dashboard pages and components are read from and served from.
-     * Dashboard pages live under `pages/` within it (`pages/users/[id].ts` -> the `/users/[id]` page).
+     * Dashboard pages live under `pages/` within it (`pages/authors/[id].ts` -> the `/authors/[id]` page).
      * Resolved against each layer's root.
      *
      * @default
@@ -120,9 +120,9 @@ export interface Config {
      * ```ts
      * disable: {
      *   routes: [
-     *     '/internal/**',     // every route nested under /internal/
-     *     'GET /admin/**',    // only GET, nested under /admin/
-     *     'POST /users/[id]', // a single method on one route
+     *     '/internal/**',       // every route nested under /internal/
+     *     'GET /admin/**',      // only GET, nested under /admin/
+     *     'POST /authors/[id]', // a single method on one route
      *   ],
      * }
      * ```
@@ -190,7 +190,7 @@ export interface Config {
     /**
      * Base path every API route is mounted under.
      * A request outside the prefix is a `404`; inside it, the prefix is stripped before routing.
-     * So `'/api'` serves a `/users` route at `/api/users`, and the handler still sees `/users`.
+     * So `'/api'` serves a `/authors` route at `/api/authors`, and the handler still sees `/authors`.
      * Slashes are forgiving: `'/api'`, `'api/'`, and `'/api/'` all mean the same mount.
      * Empty mounts at the root, with no prefix.
      * Inherited across layers, so a base layer can mount a whole stack under one prefix.

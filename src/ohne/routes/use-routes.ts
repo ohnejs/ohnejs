@@ -14,15 +14,15 @@ const registry: Registry<Route> = createRegistry<Route>();
  *
  * @example
  * ```ts
- * useRoutes().register('GET /users/[id]', {
+ * useRoutes().register('GET /authors/[id]', {
  *   method: 'GET',
- *   pattern: '/users/[id]',
- *   file: '/app/api/users/[id].get.ts',
+ *   pattern: '/authors/[id]',
+ *   file: '/app/api/authors/[id].get.ts',
  *   layer: 'my-app',
  *   handler,
  * })
  *
- * useRoutes().get('GET /users/[id]')?.pattern // -> '/users/[id]'
+ * useRoutes().get('GET /authors/[id]')?.pattern // -> '/authors/[id]'
  * ```
  */
 export function useRoutes(): Registry<Route> {

@@ -99,13 +99,13 @@ interface PatternEntry {
  * ```ts
  * const router = createRouter(Object.values(useRoutes().all()))
  *
- * router.match('GET', '/users/42')
+ * router.match('GET', '/authors/42')
  * // -> { type: 'matched', route, params: { id: '42' } }
  *
- * router.match('DELETE', '/users/42')
+ * router.match('DELETE', '/authors/42')
  * // -> { type: 'method-not-allowed', allow: ['GET', 'HEAD'] }
  *
- * router.match('OPTIONS', '/users/42')
+ * router.match('OPTIONS', '/authors/42')
  * // -> { type: 'options', allow: ['GET', 'HEAD', 'OPTIONS'] }
  *
  * router.match('GET', '/nope')

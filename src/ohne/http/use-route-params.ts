@@ -11,7 +11,7 @@ import { useEvent } from './use-event.ts';
  *
  * @example
  * ```ts
- * // api/users/[id].get.ts, matched against /users/42
+ * // api/authors/[id].get.ts, matched against /authors/42
  * useRouteParams().id // -> '42'
  * ```
  */

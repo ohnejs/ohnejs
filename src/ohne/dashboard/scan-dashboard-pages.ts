@@ -24,7 +24,7 @@ import { DASHBOARD_PAGES_DIR, type DiscoveredDashboardPage } from './dashboard-p
  * @example
  * ```ts
  * await scanDashboardPages({ name: 'app', dir: '/app' }, 'dashboard')
- * // -> [{ pattern: '/users/[id]', module: 'pages/users/[id].ts', file: '...', layer: 'app' }]
+ * // -> [{ pattern: '/authors/[id]', module: 'pages/authors/[id].ts', file: '...', layer: 'app' }]
  * ```
  */
 export async function scanDashboardPages(

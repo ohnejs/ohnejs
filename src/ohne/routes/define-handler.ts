@@ -17,7 +17,7 @@ export type { RouteOptions } from './route-options.ts';
  *
  * @example
  * ```ts
- * // api/users/[id].get.ts
+ * // api/authors/[id].get.ts
  * import { defineHandler } from 'ohne'
  *
  * export default defineHandler(({ params }) => ({ id: params.id }))

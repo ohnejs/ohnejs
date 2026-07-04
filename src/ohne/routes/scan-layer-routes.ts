@@ -24,7 +24,7 @@ import { routeID, type RouteMeta } from './route.ts';
  * @example
  * ```ts
  * await scanLayerRoutes({ name: 'app', dir: '/app' }, 'api')
- * // -> [{ method: 'GET', pattern: '/users/[id]', file: '...', layer: 'app' }]
+ * // -> [{ method: 'GET', pattern: '/authors/[id]', file: '...', layer: 'app' }]
  * ```
  */
 export async function scanLayerRoutes(layer: OhneLayer, api: string): Promise<RouteMeta[]> {

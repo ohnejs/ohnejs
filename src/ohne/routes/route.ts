@@ -12,7 +12,7 @@ export interface HandlerContext {
    *
    * @example
    * ```ts
-   * // api/users/[id].get.ts, matched against /users/42
+   * // api/authors/[id].get.ts, matched against /authors/42
    * export default defineHandler(({ params }) => params.id) // -> '42'
    * ```
    */
@@ -78,8 +78,8 @@ export interface Route extends RouteMeta {
  *
  * @example
  * ```ts
- * routeID('GET', '/users/[id]') // -> 'GET /users/[id]'
- * routeID(null, '/users/[id]')  // -> '/users/[id]'
+ * routeID('GET', '/authors/[id]') // -> 'GET /authors/[id]'
+ * routeID(null, '/authors/[id]')  // -> '/authors/[id]'
  * ```
  */
 export function routeID(method: HTTPMethod | null, pattern: string): string {

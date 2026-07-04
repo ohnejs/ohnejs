@@ -34,8 +34,8 @@ export type API = [keyof KnownRoutes] extends [never]
  * ```ts
  * const api = useAPI()
  *
- * api['GET /users/[id]'].pattern // -> '/users/[id]'
- * api['GET /users/[id]'].handler // -> the typed handler ref
+ * api['GET /authors/[id]'].pattern // -> '/authors/[id]'
+ * api['GET /authors/[id]'].handler // -> the typed handler ref
  * ```
  */
 export function useAPI(): API {

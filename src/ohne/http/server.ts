@@ -187,8 +187,8 @@ export interface CreateServerOptions {
    *
    * @example
    * ```ts
-   * '/api'    // a GET /users route answers at /api/users
-   * '/api/v1' // nests deeper, GET /users answers at /api/v1/users
+   * '/api'    // a GET /authors route answers at /api/authors
+   * '/api/v1' // nests deeper, GET /authors answers at /api/v1/authors
    * ```
    */
   basePath?: string;

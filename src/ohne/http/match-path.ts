@@ -21,7 +21,7 @@ function matcher(pattern: string): (path: string) => boolean {
  * Tests a path against one or more patterns, reusing a process-wide compiled-matcher cache.
  * Returns `true` when `path` matches any candidate.
  *
- * A pattern is a route pattern when it contains a `[param]`, matched like a route (`/users/[id]`).
+ * A pattern is a route pattern when it contains a `[param]`, matched like a route (`/authors/[id]`).
  * Otherwise it is a glob with the same syntax as `disable.routes`: `*` per segment, `**` across segments.
  *
  * Use this when you have a path in hand; `matchPath` is the shorthand for the current request.

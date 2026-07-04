@@ -19,7 +19,7 @@ import { scanDashboardPages } from './scan-dashboard-pages.ts';
  * await collectDashboardPages([{ name: 'auth', dir: '/dep' }, { name: 'app', dir: '/app' }])
  * // -> [
  * //      { pattern: '/', module: 'pages/index.ts', file: '...', layer: 'auth' },
- * //      { pattern: '/users/[id]', module: 'pages/users/[id].ts', file: '...', layer: 'app' },
+ * //      { pattern: '/authors/[id]', module: 'pages/authors/[id].ts', file: '...', layer: 'app' },
  * //    ]
  * ```
  */

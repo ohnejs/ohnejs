@@ -9,7 +9,7 @@
  * ```ts
  * declare module 'ohne' {
  *   interface KnownRoutes {
- *     'GET /users/[id]': typeof import('../api/users/[id].get.ts').default
+ *     'GET /authors/[id]': typeof import('../api/authors/[id].get.ts').default
  *   }
  * }
  * ```

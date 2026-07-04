@@ -11,10 +11,10 @@ import { compareSpecificity, type PageRoute } from '../../utils/index.ts';
  * @example
  * ```ts
  * buildDashboardPageManifest(
- *   [{ pattern: '/users/[id]', module: 'pages/users/[id].ts', file: '...', layer: 'app' }],
+ *   [{ pattern: '/authors/[id]', module: 'pages/authors/[id].ts', file: '...', layer: 'app' }],
  *   '/m/app',
  * )
- * // -> [{ pattern: '/users/[id]', url: '/m/app/pages/users/[id].ts' }]
+ * // -> [{ pattern: '/authors/[id]', url: '/m/app/pages/authors/[id].ts' }]
  * ```
  */
 export function buildDashboardPageManifest(
