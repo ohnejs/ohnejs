@@ -3,9 +3,7 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import type { ForwardedElement } from '../../utils/index.ts';
-
-import { isArray, isNull, isUndefined, parseForwarded } from '../../utils/index.ts';
+import { isArray, isNull, isUndefined } from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
@@ -53,7 +51,7 @@ export interface ToRequestOptions {
  * The scheme is `http`, since TLS terminates in the proxy (out of core).
  * When the peer is a trusted proxy (`trustProxy`), the forwarding headers override the scheme and host.
  * The URL then reflects the original client request, not the proxy hop.
- * The RFC 7239 `Forwarded` header wins when present; otherwise `X-Forwarded-Proto` / `X-Forwarded-Host`.
+ * Only `X-Forwarded-Proto` and `X-Forwarded-Host` are read; the `Forwarded` header is not consulted.
  * An untrusted peer's forwarding headers are ignored, closing the cache-poisoning and open-redirect gap.
  *
  * The transport assembles the URL before routing, then hands it to `toRequest`, so the body is built once.
@@ -110,14 +108,13 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
 /**
  * Resolves the client IP behind any trusted proxies.
  *
- * When the socket's peer is a trusted proxy (`trustProxy`), the real client comes from the forwarding chain.
- * The RFC 7239 `Forwarded` header wins when present; otherwise `X-Forwarded-For`.
+ * When the socket's peer is a trusted proxy (`trustProxy`), the real client comes from `X-Forwarded-For`.
  * Walking it right-to-left, the first address that is not itself a trusted proxy is the client.
- * A `Forwarded` `for` is reduced to its IP, dropping any port and brackets.
- * An obfuscated or `unknown` hop stops the walk, so a hidden upstream address is never read as the client.
- * Otherwise, or when every forwarded entry is trusted, the socket's own peer address is the client.
+ * When every forwarded entry is trusted, or the peer is untrusted, the socket's own peer address is used.
  * The result is normalized, so an IPv4-mapped IPv6 peer reads as plain IPv4.
  *
+ * The RFC 7239 `Forwarded` header is not consulted.
+ * A proxy that forwards a client-supplied one could otherwise be spoofed.
  * This reads the Node socket, so it lives in the adapter with the other inbound bridging.
  */
 export function clientIP(req: IncomingMessage, trustProxy?: (ip: string) => boolean): string {
@@ -136,9 +133,6 @@ function trusts(trustProxy: ((ip: string) => boolean) | undefined, req: Incoming
 }
 
 function forwardedFor(headers: IncomingHttpHeaders): string[] {
-  const elements = parseForwarded(joinHeader(headers['forwarded']));
-  if (elements.length > 0) return forwardedForIPs(elements);
-
   const value = headers['x-forwarded-for'];
   if (isUndefined(value)) return [];
   const raw = isArray(value) ? value.join(',') : value;
@@ -148,40 +142,11 @@ function forwardedFor(headers: IncomingHttpHeaders): string[] {
     .filter((part) => part.length > 0);
 }
 
-function forwardedForIPs(elements: ForwardedElement[]): string[] {
-  const ips: string[] = [];
-  for (const element of elements) {
-    const ip = nodeIP(element.for ?? '');
-    if (isNull(ip)) ips.length = 0;
-    else ips.push(ip);
-  }
-  return ips;
-}
-
-function nodeIP(node: string): string | null {
-  if (node === '' || node === 'unknown' || node.startsWith('_')) return null;
-  if (node.startsWith('[')) {
-    const close = node.indexOf(']');
-    return close === -1 ? null : node.slice(1, close);
-  }
-  const colon = node.indexOf(':');
-  if (colon !== -1 && node.indexOf(':', colon + 1) === -1) return node.slice(0, colon);
-  return node;
-}
-
 function forwardedOrigin(headers: IncomingHttpHeaders): { proto?: string; host?: string } {
-  const elements = parseForwarded(joinHeader(headers['forwarded']));
-  if (elements.length > 0) return { proto: elements[0].proto, host: elements[0].host };
-
   return {
     proto: firstToken(headers['x-forwarded-proto']),
     host: firstToken(headers['x-forwarded-host']),
   };
-}
-
-function joinHeader(value: string | string[] | undefined): string {
-  if (isUndefined(value)) return '';
-  return isArray(value) ? value.join(',') : value;
 }
 
 function firstToken(value: string | string[] | undefined): string | undefined {

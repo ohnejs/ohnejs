@@ -154,6 +154,8 @@ export interface CreateServerOptions {
    * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
    * They override the socket's own scheme and host.
    * An empty list (the default) trusts no proxy.
+   * Only `X-Forwarded-*` is read; the RFC 7239 `Forwarded` header is ignored.
+   * A proxy often forwards a client-supplied `Forwarded` header unchanged, so trusting it is unsafe.
    *
    * @example
    * ```ts
