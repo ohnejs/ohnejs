@@ -1,7 +1,7 @@
 import type { RouteParams } from '../../utils/index.ts';
 import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 import type { Handler, Route } from '../routes/route.ts';
-import type { Event } from './event.ts';
+import type { Event, EventContext } from './event.ts';
 
 import { errorMessage, isUndefined, withTimeout } from '../../utils/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
@@ -131,7 +131,7 @@ export async function dispatch(
     params,
     ip: options.ip ?? '',
     response: { status: 200, headers: new Headers() },
-    context: {},
+    context: {} as EventContext,
     appliedMiddleware: [],
     waitUntil(promise) {
       // Handle now, not at drain time.
