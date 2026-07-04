@@ -24,6 +24,11 @@ describe('toJSIdentifier', () => {
     strictEqual(toJSIdentifier('await'), '_await');
   });
 
+  it('prefixes `eval` and `arguments`, illegal as strict-mode bindings', () => {
+    strictEqual(toJSIdentifier('eval'), '_eval');
+    strictEqual(toJSIdentifier('arguments'), '_arguments');
+  });
+
   it('prefixes an empty result', () => {
     strictEqual(toJSIdentifier(''), '_');
     strictEqual(toJSIdentifier('!!!'), '_');

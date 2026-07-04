@@ -1,4 +1,5 @@
 const RESERVED = new Set([
+  'arguments',
   'await',
   'break',
   'case',
@@ -12,6 +13,7 @@ const RESERVED = new Set([
   'do',
   'else',
   'enum',
+  'eval',
   'export',
   'extends',
   'false',
@@ -51,7 +53,7 @@ const RESERVED = new Set([
  * Coerces any string into a valid, non-reserved JavaScript identifier.
  *
  * Runs of characters that are not `A-Z`, `a-z`, `0-9`, `_` or `$` collapse into a single `_`.
- * A leading digit, an empty result, or a reserved word is prefixed with `_`.
+ * A leading digit, an empty result, or a reserved or strict-mode-restricted word is prefixed with `_`.
  *
  * This is the safety net for names built from arbitrary input.
  * When you want a readable name from a file path, reach for `pathToCamelName` first.
@@ -61,6 +63,7 @@ const RESERVED = new Set([
  * toJSIdentifier('foo-bar')      // -> 'foo_bar'
  * toJSIdentifier('2cool')        // -> '_2cool'
  * toJSIdentifier('class')        // -> '_class'
+ * toJSIdentifier('eval')         // -> '_eval'
  * toJSIdentifier('user.profile') // -> 'user_profile'
  * ```
  */
