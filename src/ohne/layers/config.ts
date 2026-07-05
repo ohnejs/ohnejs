@@ -5,6 +5,7 @@ import type {
   LiteralUnion,
   RequireByShape,
 } from '../../utils/index.ts';
+import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { LayerName } from './layer-name.ts';
 
@@ -443,6 +444,61 @@ export interface Config {
   };
 
   /**
+   * Database connection and schema-sync settings.
+   */
+  database?: {
+    /**
+     * Which database dialect to use, by name.
+     * ohne ships `sqlite`; other dialects are added by layers.
+     *
+     * @default
+     * 'sqlite'
+     */
+    dialect?: DialectName;
+
+    /**
+     * Where the main database lives, as a URL the dialect understands.
+     * For SQLite this is a file path, created on demand, or `:memory:` for an ephemeral database.
+     * The `DATABASE` or `DB` env var overrides it when set.
+     *
+     * @default
+     * '.data/ohne.db'
+     */
+    url?: string;
+
+    /**
+     * Additional databases keyed by name, each a URL the dialect understands.
+     * Reach one with `useDatabase('name')`; a helper holds no schema, only what you read and write.
+     * Any layer can contribute a helper; if two layers name the same one, the closer layer wins.
+     *
+     * @default
+     * {}
+     *
+     * @example
+     * ```ts
+     * database: {
+     *   helpers: { rateLimit: ':memory:' },
+     * }
+     * ```
+     */
+    helpers?: Record<string, string>;
+
+    /**
+     * Schema-sync settings.
+     */
+    sync?: {
+      /**
+       * Authorize a destructive sync, carrying out the data loss it would otherwise refuse.
+       * The `FORCE_SYNC` env var overrides this for a single boot.
+       *
+       * @default
+       * false
+       */
+      force?: boolean;
+    };
+  };
+
+  /**
    * Printer settings consumed by `usePrinter`.
    * The `SILENT` and `DEBUG` env vars take precedence when set, regardless of value.
    * These fields only apply when the matching env var is unset.
@@ -559,6 +615,19 @@ export const DEFAULT_API_PORT = 9001;
 export const DEFAULT_DASHBOARD_PORT = 9000;
 
 /**
+ * Default dialect selected when no layer sets `database.dialect`.
+ * Read at point of use in `connect`, like `DEFAULT_API_PORT`, because `database.dialect` is `'own'`.
+ */
+export const DEFAULT_DIALECT = 'sqlite';
+
+/**
+ * Default main-database URL when no layer sets `database.url` and neither `DATABASE` nor `DB` is set.
+ * Read at point of use in `connect`, like `DEFAULT_API_PORT`, because `database.url` is `'own'`.
+ * A relative SQLite file path, created on demand.
+ */
+export const DEFAULT_DATABASE_URL = '.data/ohne.db';
+
+/**
  * Framework merge strategies, seeded into the layer registry.
  *
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
@@ -567,6 +636,9 @@ export const DEFAULT_DASHBOARD_PORT = 9000;
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
+ * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
+ * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
+ * - `database.helpers` is unlisted on purpose: the default per-key merge already lets any layer add one.
  */
 export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
@@ -578,6 +650,9 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.port': 'own',
   'dashboard.host': 'own',
   'dashboard.apiURL': 'own',
+  'database.dialect': 'own',
+  'database.url': 'own',
+  'database.sync.force': 'own',
 };
 
 /**

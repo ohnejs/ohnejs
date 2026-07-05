@@ -194,4 +194,37 @@ describe('useEnv', () => {
       strictEqual(runs, before + 1);
     });
   });
+
+  describe('database env vars', () => {
+    afterEach(() => {
+      for (const k of ['DATABASE', 'DB', 'FORCE_SYNC'] as const) {
+        useEnv().unset(k);
+        delete process.env[k];
+      }
+    });
+
+    it('DATABASE and DB pass through as strings, defaulting to undefined', () => {
+      strictEqual(useEnv().get('DATABASE'), undefined);
+      strictEqual(useEnv().get('DB'), undefined);
+      process.env['DATABASE'] = '.data/app.db';
+      strictEqual(useEnv().get('DATABASE'), '.data/app.db');
+      process.env['DB'] = ':memory:';
+      strictEqual(useEnv().get('DB'), ':memory:');
+    });
+
+    it('FORCE_SYNC parses booleans, defaulting to false', () => {
+      strictEqual(useEnv().get('FORCE_SYNC'), false);
+      process.env['FORCE_SYNC'] = '1';
+      strictEqual(useEnv().get('FORCE_SYNC'), true);
+      process.env['FORCE_SYNC'] = '0';
+      strictEqual(useEnv().get('FORCE_SYNC'), false);
+    });
+
+    it('has() detects DATABASE and DB, for the both-set conflict check', () => {
+      strictEqual(useEnv().has('DATABASE'), false);
+      process.env['DATABASE'] = ':memory:';
+      process.env['DB'] = ':memory:';
+      strictEqual(useEnv().has('DATABASE') && useEnv().has('DB'), true);
+    });
+  });
 });

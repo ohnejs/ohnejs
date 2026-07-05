@@ -16,6 +16,9 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  * - `FORCE_COLOR` - forces ANSI on (or off) regardless of TTY detection.
  * - `SKIP_CODEGEN` - truthy skips codegen on startup, for when a parent process already ran it.
  * - `DASHBOARD_RELOAD` - truthy makes the dashboard serve its dev reload stream and inject the client.
+ * - `DATABASE` - overrides `Config.database.url`, the main database connection URL.
+ * - `DB` - alias of `DATABASE`; setting both throws.
+ * - `FORCE_SYNC` - truthy authorizes and performs a destructive schema sync for one boot.
  *
  * @example
  * ```ts
@@ -122,4 +125,31 @@ export interface Env {
    * false
    */
   DASHBOARD_RELOAD: boolean;
+
+  /**
+   * Connection URL for the main database, taking precedence over `Config.database.url`.
+   * `DB` is an alias; setting both throws, since ohne cannot tell which you meant.
+   *
+   * @default
+   * undefined
+   */
+  DATABASE: string | undefined;
+
+  /**
+   * Alias of `DATABASE`, taking precedence over `Config.database.url`.
+   * Setting both `DATABASE` and `DB` throws, since ohne cannot tell which you meant.
+   *
+   * @default
+   * undefined
+   */
+  DB: string | undefined;
+
+  /**
+   * When `true`, the schema sync authorizes and performs the destructive changes it would otherwise refuse.
+   * Overrides `Config.database.sync.force` for a single boot.
+   *
+   * @default
+   * false
+   */
+  FORCE_SYNC: boolean;
 }
