@@ -1,0 +1,214 @@
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it } from 'node:test';
+
+import type { DatabaseAdapter } from '../../../../../src/ohne/database/adapter.ts';
+
+import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+
+const dialect = new SQLiteDialect();
+
+const nullObj = <T extends object>(o: T): T => Object.assign(Object.create(null), o);
+
+function open(): Promise<DatabaseAdapter> {
+  return dialect.connect(':memory:');
+}
+
+async function errorOf(promise: Promise<unknown>): Promise<unknown> {
+  return promise.then(
+    () => undefined,
+    (error) => error,
+  );
+}
+
+describe('SQLiteDialect', () => {
+  it('registers under the name `sqlite`', () => {
+    strictEqual(dialect.name, 'sqlite');
+  });
+
+  it('creates the parent directory for a file path', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ohne-sqlite-'));
+    const path = join(root, 'nested', 'app.db');
+    const db = await dialect.connect(path);
+    await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+    await db.close();
+    ok(existsSync(path));
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  describe('quote', () => {
+    it('wraps in double quotes', () => {
+      strictEqual(dialect.quote('Posts'), '"Posts"');
+    });
+
+    it('doubles an embedded quote', () => {
+      strictEqual(dialect.quote('we"ird'), '"we""ird"');
+    });
+  });
+
+  describe('columnType', () => {
+    it('maps each logical type to a SQLite type', () => {
+      strictEqual(dialect.columnType('text'), 'TEXT');
+      strictEqual(dialect.columnType('json'), 'TEXT');
+      strictEqual(dialect.columnType('integer'), 'INTEGER');
+      strictEqual(dialect.columnType('boolean'), 'INTEGER');
+    });
+  });
+
+  describe('codec', () => {
+    it('round-trips a boolean through 1/0', () => {
+      strictEqual(dialect.serialize('boolean', true), 1);
+      strictEqual(dialect.serialize('boolean', false), 0);
+      strictEqual(dialect.deserialize('boolean', 1), true);
+      strictEqual(dialect.deserialize('boolean', 0), false);
+    });
+
+    it('round-trips JSON through text', () => {
+      const value = { a: 1, b: ['x', 'y'] };
+      const stored = dialect.serialize('json', value);
+      strictEqual(stored, '{"a":1,"b":["x","y"]}');
+      deepStrictEqual(dialect.deserialize('json', stored as string), value);
+    });
+
+    it('passes text and integer through unchanged', () => {
+      strictEqual(dialect.serialize('text', 'hi'), 'hi');
+      strictEqual(dialect.serialize('integer', 42), 42);
+      strictEqual(dialect.deserialize('text', 'hi'), 'hi');
+      strictEqual(dialect.deserialize('integer', 42), 42);
+    });
+
+    it('codes null and undefined to NULL, and NULL back to null', () => {
+      strictEqual(dialect.serialize('text', null), null);
+      strictEqual(dialect.serialize('json', undefined), null);
+      strictEqual(dialect.serialize('boolean', null), null);
+      strictEqual(dialect.deserialize('boolean', null), null);
+      strictEqual(dialect.deserialize('json', null), null);
+    });
+  });
+
+  describe('adapter', () => {
+    it('runs statements and reads rows back', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY, n INTEGER)');
+      const { changes } = await db.run('INSERT INTO t (id, n) VALUES (?, ?)', ['a', 1]);
+      strictEqual(changes, 1);
+      deepStrictEqual(await db.query('SELECT id, n FROM t'), [nullObj({ id: 'a', n: 1 })]);
+      deepStrictEqual(
+        await db.queryOne('SELECT id, n FROM t WHERE id = ?', ['a']),
+        nullObj({ id: 'a', n: 1 }),
+      );
+      strictEqual(await db.queryOne('SELECT id FROM t WHERE id = ?', ['missing']), undefined);
+      await db.close();
+    });
+
+    it('reports the number of rows a write changed', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      await db.run('INSERT INTO t (id) VALUES (?)', ['a']);
+      await db.run('INSERT INTO t (id) VALUES (?)', ['b']);
+      strictEqual((await db.run('DELETE FROM t')).changes, 2);
+      await db.close();
+    });
+
+    it('enforces foreign keys, since the pragma is applied', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE parent (id TEXT PRIMARY KEY)');
+      await db.exec('CREATE TABLE child (id TEXT PRIMARY KEY, pid TEXT REFERENCES parent(id))');
+      await rejects(() => db.run('INSERT INTO child (id, pid) VALUES (?, ?)', ['c', 'missing']));
+      await db.close();
+    });
+  });
+
+  describe('transaction', () => {
+    it('commits when fn returns', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      const result = await db.transaction(async (tx) => {
+        await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+        return 'done';
+      });
+      strictEqual(result, 'done');
+      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+
+    it('rolls back when fn throws, then rethrows', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      await db.run('INSERT INTO t (id) VALUES (?)', ['a']);
+      await rejects(
+        db.transaction(async (tx) => {
+          await tx.run('INSERT INTO t (id) VALUES (?)', ['b']);
+          throw new Error('boom');
+        }),
+        /boom/,
+      );
+      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+  });
+
+  describe('error classification', () => {
+    it('recognizes a unique violation, over both a unique index and a primary key', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY, email TEXT UNIQUE)');
+      await db.run('INSERT INTO t (id, email) VALUES (?, ?)', ['a', 'x@y.z']);
+      const uniqueError = await errorOf(
+        db.run('INSERT INTO t (id, email) VALUES (?, ?)', ['b', 'x@y.z']),
+      );
+      const pkError = await errorOf(
+        db.run('INSERT INTO t (id, email) VALUES (?, ?)', ['a', 'w@y.z']),
+      );
+      ok(dialect.isUniqueViolation(uniqueError));
+      ok(dialect.isUniqueViolation(pkError));
+      strictEqual(dialect.isForeignKeyViolation(uniqueError), false);
+      await db.close();
+    });
+
+    it('recognizes a foreign-key violation', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE parent (id TEXT PRIMARY KEY)');
+      await db.exec('CREATE TABLE child (id TEXT PRIMARY KEY, pid TEXT REFERENCES parent(id))');
+      const fkError = await errorOf(
+        db.run('INSERT INTO child (id, pid) VALUES (?, ?)', ['c', 'missing']),
+      );
+      ok(dialect.isForeignKeyViolation(fkError));
+      strictEqual(dialect.isUniqueViolation(fkError), false);
+      await db.close();
+    });
+
+    it('classifies a non-database error as neither', () => {
+      strictEqual(dialect.isUniqueViolation(new Error('x')), false);
+      strictEqual(dialect.isForeignKeyViolation(undefined), false);
+    });
+  });
+
+  describe('cluster lock', () => {
+    it('grants the lock to one caller and refuses the next', async () => {
+      const db = await open();
+      const first = await dialect.acquireLock(db, 'sync');
+      ok(first);
+      strictEqual(await dialect.acquireLock(db, 'sync'), null);
+      await db.close();
+    });
+
+    it('frees the lock on release, so it can be re-acquired', async () => {
+      const db = await open();
+      const handle = await dialect.acquireLock(db, 'sync');
+      ok(handle);
+      await dialect.releaseLock(db, handle);
+      ok(await dialect.acquireLock(db, 'sync'));
+      await db.close();
+    });
+
+    it('ignores a release with a mismatched nonce', async () => {
+      const db = await open();
+      ok(await dialect.acquireLock(db, 'sync'));
+      await dialect.releaseLock(db, { key: 'sync', nonce: 'wrong' });
+      strictEqual(await dialect.acquireLock(db, 'sync'), null);
+      await db.close();
+    });
+  });
+});

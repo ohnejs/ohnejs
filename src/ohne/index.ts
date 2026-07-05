@@ -15,6 +15,7 @@ export * from './dashboard/scan-dashboard-pages.ts';
 export * from './database/adapter.ts';
 export * from './database/dialect.ts';
 export * from './database/known-dialects.ts';
+export * from './database/use-dialects.ts';
 export * from './env/env.ts';
 export * from './env/use-env.ts';
 export * from './hooks/apply-hook.ts';
