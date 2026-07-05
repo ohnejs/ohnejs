@@ -109,6 +109,7 @@ export * from './mime/mime-type-for.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
 export * from './number/clamp.ts';
+export * from './object/deep-equal.ts';
 export * from './object/has-key.ts';
 export * from './object/has-keys.ts';
 export * from './object/map-keys.ts';
