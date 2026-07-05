@@ -6,6 +6,11 @@ import { physicalName } from './_physical.ts';
 export const OHNE_LOCKS = 'ohne_locks';
 
 /**
+ * Prefix of the aside name a table rebuild renames the old table to while it swaps shapes.
+ */
+export const OHNE_REBUILD_PREFIX = 'ohne_rebuild_';
+
+/**
  * The table of a collection: the collection name verbatim, capped at the physical boundary.
  *
  * @example

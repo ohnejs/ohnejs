@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
-import type { TableSchema } from './schema/table-schema.ts';
+import type { TableDiff, TableSchema } from './schema/table-schema.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
 import { OHNE_LOCKS } from './naming/table-names.ts';
@@ -121,6 +121,18 @@ export abstract class Dialect {
    * ```
    */
   abstract describeTable(db: Transaction, table: string): Promise<TableSchema>;
+
+  /**
+   * Realizes one table's whole diff - create, drop, or alter - in however many statements it takes.
+   * N column changes on one table cost one pass; on SQLite that one pass may be a full table rebuild.
+   * Runs inside the caller's `schemaTransaction` and never opens its own.
+   *
+   * @example
+   * ```ts
+   * await dialect.applyTableDiff(tx, { kind: 'drop', table: legacy })
+   * ```
+   */
+  abstract applyTableDiff(db: Transaction, diff: TableDiff): Promise<void>;
 
   /**
    * Runs `fn` inside a transaction that is all-or-nothing, DDL included.

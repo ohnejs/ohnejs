@@ -1,13 +1,14 @@
 import { DatabaseSync } from 'node:sqlite';
 
 import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
-import type { TableSchema } from '../../schema/table-schema.ts';
+import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-schema.ts';
 
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import { dirname, isNull, isNullish, isNumber, isObject } from '../../../../utils/index.ts';
 import { Dialect, type LogicalType } from '../../dialect.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
+import { createIndex, createIndexes, createTable, rebuildTable } from './rebuild.ts';
 
 // SQLite extended result codes for the constraint violations the engine classifies.
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
@@ -102,6 +103,43 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
+   * Realizes a per-table diff, deciding internally when SQLite forces a rebuild.
+   * Nullable column adds, column drops, and index changes apply in place, drops before adds.
+   * Anything `ALTER TABLE` cannot express - retypes, key or foreign-key changes - rebuilds once.
+   */
+  async applyTableDiff(db: Transaction, diff: TableDiff): Promise<void> {
+    if (diff.kind === 'create') {
+      await createTable(db, this, diff.table);
+      await createIndexes(db, this, diff.table);
+      return;
+    }
+    if (diff.kind === 'drop') {
+      await db.exec(`DROP TABLE ${this.quote(diff.table.name)}`);
+      return;
+    }
+    if (needsRebuild(diff)) {
+      await rebuildTable(db, this, diff);
+      return;
+    }
+    const table = this.quote(diff.desired.name);
+    for (const index of [...diff.dropUniques, ...diff.dropIndexes]) {
+      await db.exec(`DROP INDEX ${this.quote(index.name)}`);
+    }
+    for (const column of diff.dropColumns) {
+      await db.exec(`ALTER TABLE ${table} DROP COLUMN ${this.quote(column.name)}`);
+    }
+    for (const column of diff.addColumns) {
+      await db.exec(
+        `ALTER TABLE ${table} ADD COLUMN ${this.quote(column.name)} ${this.columnType(column.type)}`,
+      );
+    }
+    for (const unique of diff.addUniques)
+      await createIndex(db, this, diff.desired.name, unique, true);
+    for (const index of diff.addIndexes)
+      await createIndex(db, this, diff.desired.name, index, false);
+  }
+
+  /**
    * Runs its own `BEGIN`/`COMMIT`/`ROLLBACK` with `foreign_keys = OFF` hoisted outside the transaction.
    * The pragma no-ops inside one, which is why this never delegates to the adapter's `transaction`.
    * `foreign_keys = ON` is restored on both the commit and the rollback path.
@@ -137,6 +175,23 @@ export class SQLiteDialect extends Dialect {
   isForeignKeyViolation(error: unknown): boolean {
     return errcodeOf(error) === SQLITE_CONSTRAINT_FOREIGNKEY;
   }
+}
+
+/**
+ * Whether an alter holds anything SQLite's `ALTER TABLE` cannot express in place.
+ * A dropped `sqlite_autoindex_` unique is an inline constraint, droppable only by rebuilding.
+ */
+function needsRebuild(diff: TableAlter): boolean {
+  return (
+    diff.changeColumns.length > 0 ||
+    diff.changePrimaryKey ||
+    diff.addForeignKeys.length > 0 ||
+    diff.dropForeignKeys.length > 0 ||
+    diff.addColumns.some((column) => column.notNull) ||
+    [...diff.dropUniques, ...diff.dropIndexes].some((index) =>
+      index.name.startsWith('sqlite_autoindex_'),
+    )
+  );
 }
 
 /**
