@@ -38,6 +38,9 @@ node_modules/
 # Generated
 .ohne/
 
+# Data
+.data/
+
 # Environment / secrets
 .env
 
