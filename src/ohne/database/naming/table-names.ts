@@ -11,6 +11,11 @@ export const OHNE_LOCKS = 'ohne_locks';
 export const OHNE_REBUILD_PREFIX = 'ohne_rebuild_';
 
 /**
+ * The one-row table holding the schema snapshot.
+ */
+export const OHNE_SCHEMA = 'ohne_schema';
+
+/**
  * The table of a collection: the collection name verbatim, capped at the physical boundary.
  *
  * @example
