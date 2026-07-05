@@ -2,8 +2,7 @@ import type { DatabaseAdapter } from '../adapter.ts';
 import type { Dialect, LockHandle } from '../dialect.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
-import { ohneError } from '../../error/ohne-error.ts';
-import { ensureSchemaTable, readSnapshot } from './snapshot.ts';
+import { ensureSchemaTable, readSnapshot, refuseIfSuperseded } from './snapshot.ts';
 
 /**
  * Timing and identity of one instance's bid for the sync lock.
@@ -59,14 +58,6 @@ export async function acquireSyncLock(
     const snapshot = await readSnapshot(db, dialect);
     if (isUndefined(snapshot)) continue;
     if (snapshot.hash === options.desiredHash) return undefined;
-    if (snapshot.history.some((generation) => generation.hash === options.desiredHash)) {
-      throw ohneError({
-        title: 'The database schema is newer than this build',
-        body: [
-          `Another instance synced the schema past this build; the database is at generation \`${snapshot.generation}\`.`,
-          'Deploy the newer build to this instance, or stop the fleet and start it on one version.',
-        ],
-      });
-    }
+    refuseIfSuperseded(snapshot, options.desiredHash);
   }
 }

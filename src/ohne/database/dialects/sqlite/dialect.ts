@@ -8,7 +8,7 @@ import { dirname, isNull, isNullish, isNumber, isObject } from '../../../../util
 import { Dialect, type LogicalType } from '../../dialect.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
-import { createIndex, createIndexes, createTable, rebuildTable } from './rebuild.ts';
+import { createIndex, createIndexes, createTable, rebuildTable, sweepRebuilds } from './rebuild.ts';
 
 // SQLite extended result codes for the constraint violations the engine classifies.
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
@@ -137,6 +137,13 @@ export class SQLiteDialect extends Dialect {
       await createIndex(db, this, diff.desired.name, unique, true);
     for (const index of diff.addIndexes)
       await createIndex(db, this, diff.desired.name, index, false);
+  }
+
+  /**
+   * Drops leftover `ohne_rebuild_` aside tables a crashed rebuild left behind.
+   */
+  sweepRebuilds(db: Transaction): Promise<void> {
+    return sweepRebuilds(db, this);
   }
 
   /**

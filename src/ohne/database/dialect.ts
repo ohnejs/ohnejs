@@ -151,6 +151,15 @@ export abstract class Dialect {
   abstract applyTableDiff(db: Transaction, diff: TableDiff): Promise<void>;
 
   /**
+   * Drops whatever a crashed schema change left behind, called before a sync introspects.
+   * The base implementation has nothing to sweep.
+   * A dialect that rebuilds tables through aside names overrides this to drop abandoned ones.
+   */
+  async sweepRebuilds(db: Transaction): Promise<void> {
+    void db;
+  }
+
+  /**
    * Runs `fn` inside a transaction that is all-or-nothing, DDL included.
    * A failure rolls back every statement, schema changes among them, and re-throws.
    * A dialect over a database with non-transactional DDL must journal its own undo to honor this.

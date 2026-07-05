@@ -5,6 +5,7 @@ import type { Dialect, LogicalType } from '../dialect.ts';
 import type { TableSchema } from './table-schema.ts';
 
 import { isUndefined, jsonSerialize } from '../../../utils/index.ts';
+import { ohneError } from '../../error/ohne-error.ts';
 import { OHNE_SCHEMA } from '../naming/table-names.ts';
 
 /**
@@ -121,6 +122,22 @@ export function advanceSnapshot(
         -HISTORY_LIMIT,
       );
   return { generation: (previous?.generation ?? 0) + 1, hash, history, classification };
+}
+
+/**
+ * Throws the version-skew refusal when `hash` was already superseded in the snapshot's history.
+ * A build whose desired hash sits in the history is old code; syncing would revert the schema.
+ */
+export function refuseIfSuperseded(snapshot: SchemaSnapshot | undefined, hash: string): void {
+  if (isUndefined(snapshot)) return;
+  if (!snapshot.history.some((generation) => generation.hash === hash)) return;
+  throw ohneError({
+    title: 'The database schema is newer than this build',
+    body: [
+      `Another instance synced the schema past this build; the database is at generation \`${snapshot.generation}\`.`,
+      'Deploy the newer build to this instance, or stop the fleet and start it on one version.',
+    ],
+  });
 }
 
 /**
