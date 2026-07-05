@@ -1,20 +1,23 @@
-import { isUndefined } from '../../utils/index.ts';
+import type { Dialect } from './dialect.ts';
+
+import { isAbsolutePath, isUndefined, joinPath, last } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { DEFAULT_DATABASE_URL, DEFAULT_DIALECT } from '../layers/config.ts';
 import { useConfig } from '../layers/use-config.ts';
-import { onShutdown } from '../lifecycle/on-shutdown.ts';
+import { useLayers } from '../layers/use-layers.ts';
 import { clearDatabases, registerDatabase } from './use-database.ts';
 import { useDialects } from './use-dialects.ts';
 
 /**
  * Resolves database config and env, opens the main connection and every helper, and registers them.
  *
- * Runs in `serveAPI` before `listen`.
+ * Runs in `serveAPI` before `listen`; returns the selected dialect for the sync that follows.
  * The main URL comes from `DATABASE` or `DB` environment variables, then `database.url`, then the default.
- * Each open connection is closed on shutdown, in registration order.
+ * A plain relative path resolves against the app root rather than the process working directory.
+ * `closeDatabases` closes everything this opened; the caller sequences it after the server drain.
  */
-export async function connect(): Promise<void> {
+export async function connect(): Promise<Dialect> {
   const config = useConfig().database;
   const dialectName = config?.dialect ?? DEFAULT_DIALECT;
   const dialect = useDialects().get(dialectName);
@@ -31,16 +34,24 @@ export async function connect(): Promise<void> {
   const url = resolveMainURL(config?.url);
 
   clearDatabases();
-
-  const main = await dialect.connect(url);
-  registerDatabase(main);
-  onShutdown(() => main.close());
-
+  registerDatabase(await dialect.connect(rootRelative(url)));
   for (const [name, helperURL] of Object.entries(config?.helpers ?? {})) {
-    const helper = await dialect.connect(helperURL);
-    registerDatabase(helper, name);
-    onShutdown(() => helper.close());
+    registerDatabase(await dialect.connect(rootRelative(helperURL)), name);
   }
+  return dialect;
+}
+
+/**
+ * Resolves a plain relative path against the app root, the closest layer of the stack.
+ * `:memory:`, `file:` URLs, driver URLs carrying a scheme, and absolute paths pass through untouched.
+ * Without a loaded stack the path stays as given, resolving against the process working directory.
+ */
+function rootRelative(url: string): string {
+  if (url === ':memory:' || url.startsWith('file:') || url.includes('://') || isAbsolutePath(url)) {
+    return url;
+  }
+  const root = last(useLayers().layers())?.path;
+  return isUndefined(root) ? url : joinPath(root, url);
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { rejects, strictEqual } from 'node:assert';
+import { ok, rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -8,9 +8,11 @@ import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import {
+  closeDatabases,
   type HTTPServer,
   serveAPI,
   shutdownServer,
+  useDatabase,
   useEnv,
   useHooks,
   useShutdown,
@@ -84,12 +86,14 @@ describe('serveAPI', () => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-api-'));
     scope.__ohneServeBoot = [];
     useEnv().set('SILENT', true);
+    useEnv().set('DATABASE', ':memory:');
     useEnv().set('PORT', 0);
   });
 
   afterEach(async () => {
     if (http) await shutdownServer(http.server, http.gate);
     http = undefined;
+    await closeDatabases();
     useShutdown().clear();
     useShutdown().unwatch();
     useHooks().clear();
@@ -98,6 +102,7 @@ describe('serveAPI', () => {
 
   after(() => {
     useEnv().unset('SILENT');
+    useEnv().unset('DATABASE');
     useEnv().unset('PORT');
     rmSync(root, { recursive: true, force: true });
   });
@@ -123,6 +128,38 @@ describe('serveAPI', () => {
 
     strictEqual(scope.__ohneServeBoot.includes('skip:boot'), true);
     strictEqual(existsSync(join(dir, '.ohne')), false);
+  });
+
+  it('connects and syncs the database before serving', async () => {
+    const dir = makeApp('db', 'db:boot');
+
+    http = await serveAPI(dir);
+
+    const row = await useDatabase().queryOne<{ data: string }>(
+      'SELECT "data" FROM "ohne_schema" WHERE "key" = ?',
+      ['schema'],
+    );
+    ok(row);
+    strictEqual((JSON.parse(row.data) as { generation: number }).generation, 1);
+  });
+
+  it('re-syncs a file database as a no-op on a second boot', async () => {
+    const dir = makeApp('dbfile', 'dbfile:boot');
+    useEnv().set('DATABASE', join(dir, 'data.db'));
+
+    http = await serveAPI(dir);
+    await shutdownServer(http.server, http.gate);
+    http = undefined;
+    await closeDatabases();
+    http = await serveAPI(dir);
+
+    const row = await useDatabase().queryOne<{ data: string }>(
+      'SELECT "data" FROM "ohne_schema" WHERE "key" = ?',
+      ['schema'],
+    );
+    ok(row);
+    strictEqual((JSON.parse(row.data) as { generation: number }).generation, 1);
+    useEnv().set('DATABASE', ':memory:');
   });
 
   it('listens and answers an unmatched request with 404', async () => {

@@ -58,12 +58,14 @@ describe('serveDashboard', () => {
     useEnv().set('NO_COLOR', true);
     usePrinter().configure({ stream: { write: (s: string) => buf.push(s) }, color: false });
     useEnv().unset('SILENT');
+    useEnv().unset('DATABASE');
     return buf;
   }
 
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-dashboard-'));
     useEnv().set('SILENT', true);
+    useEnv().set('DATABASE', ':memory:');
     useEnv().set('PORT', 0);
   });
 
@@ -75,11 +77,13 @@ describe('serveDashboard', () => {
     useEnv().unset('DASHBOARD_RELOAD');
     useEnv().unset('NO_COLOR');
     useEnv().set('SILENT', true);
+    useEnv().set('DATABASE', ':memory:');
     usePrinter().configure({ stream: process.stderr });
   });
 
   after(() => {
     useEnv().unset('SILENT');
+    useEnv().unset('DATABASE');
     useEnv().unset('PORT');
     rmSync(root, { recursive: true, force: true });
   });

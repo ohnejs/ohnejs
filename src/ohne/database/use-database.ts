@@ -26,6 +26,18 @@ export function clearDatabases(): void {
 }
 
 /**
+ * Closes the main connection and every helper, then forgets them.
+ * The caller sequences it after the server drain, so in-flight requests never see a closed database.
+ */
+export async function closeDatabases(): Promise<void> {
+  const open = [mainConnection, ...Object.values(helperConnections.all())];
+  clearDatabases();
+  for (const connection of open) {
+    if (!isUndefined(connection)) await connection.close();
+  }
+}
+
+/**
  * Returns the main database connection, or a named helper.
  *
  * `useDatabase()` is the main connection; `useDatabase('rateLimit')` a helper declared in `database.helpers`.

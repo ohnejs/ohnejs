@@ -76,6 +76,7 @@ describe('serveAPI CORS', () => {
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-cors-'));
     useEnv().set('SILENT', true);
+    useEnv().set('DATABASE', ':memory:');
     useEnv().set('PORT', 0);
   });
 
@@ -89,6 +90,7 @@ describe('serveAPI CORS', () => {
 
   after(() => {
     useEnv().unset('SILENT');
+    useEnv().unset('DATABASE');
     useEnv().unset('PORT');
     rmSync(root, { recursive: true, force: true });
   });

@@ -13,6 +13,9 @@ import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
+import { connect } from '../database/connect.ts';
+import { syncDatabase } from '../database/schema/sync.ts';
+import { closeDatabases, useDatabase } from '../database/use-database.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
@@ -49,6 +52,7 @@ declare module 'ohne' {
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  *
  * The generated `routes.ts` is then imported to populate `useRoutes` with live handlers.
+ * The database connects and its schema syncs before the server is built, so a failed sync never serves.
  * The server is built from that table, started, and wired to graceful shutdown through `onShutdown`.
  * Once it is listening, the `server:ready` hook runs before readiness is announced.
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.
@@ -85,6 +89,22 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     }
   }
 
+  const dialect = await connect();
+  const database = useConfig().database;
+  const force = useEnv().has('FORCE_SYNC')
+    ? useEnv().get('FORCE_SYNC')
+    : (database?.sync?.force ?? false);
+  const report = await syncDatabase(useDatabase(), dialect, { desired: [], force });
+  if (report.deletions.length > 0) {
+    usePrinter().warnBlock({ title: 'Sync removed data under `force`', body: report.deletions });
+  }
+  if (report.warnings.length > 0) {
+    usePrinter().warnBlock({
+      title: 'Pre-existing orphan rows',
+      body: [...report.warnings, '', 'Set `FORCE_SYNC` or `database.sync.force` to purge them.'],
+    });
+  }
+
   const config = useConfig().api;
   const http = createServer(createRouter(Object.values(useRoutes().all())), {
     basePath: config.basePath,
@@ -115,6 +135,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
       shutdownTimeout: offToUndefined(config.shutdownTimeout),
     }),
   );
+  onShutdown(() => closeDatabases());
 
   const address = await listen(http.server, port, host);
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });

@@ -1,15 +1,18 @@
-import { rejects, strictEqual, throws } from 'node:assert';
+import { ok, rejects, strictEqual, throws } from 'node:assert';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { useEnv, useLayers } from 'ohne';
 
 import { connect } from '../../../src/ohne/database/connect.ts';
-import { clearDatabases, useDatabase } from '../../../src/ohne/database/use-database.ts';
+import { closeDatabases, useDatabase } from '../../../src/ohne/database/use-database.ts';
 
 describe('connect', () => {
   const layerPaths = ['/db-connect-helper', '/db-connect-dialect'];
 
-  afterEach(() => {
-    clearDatabases();
+  afterEach(async () => {
+    await closeDatabases();
     useEnv().unset('DATABASE');
     useEnv().unset('DB');
     for (const path of layerPaths) useLayers().remove(path);
@@ -31,6 +34,17 @@ describe('connect', () => {
     await connect();
     await useDatabase('cache').exec('CREATE TABLE c (k TEXT PRIMARY KEY)');
     strictEqual((await useDatabase('cache').run('INSERT INTO c (k) VALUES (?)', ['x'])).changes, 1);
+  });
+
+  it('resolves a relative database path against the app root', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ohne-connect-root-'));
+    useLayers().add({ path: root, input: { database: { url: 'nested/app.db' } } });
+    await connect();
+    await useDatabase().exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+    ok(existsSync(join(root, 'nested', 'app.db')));
+    await closeDatabases();
+    useLayers().remove(root);
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('throws when both DATABASE and DB are set', async () => {
