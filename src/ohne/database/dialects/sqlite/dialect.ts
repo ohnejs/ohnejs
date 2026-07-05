@@ -1,10 +1,12 @@
 import { DatabaseSync } from 'node:sqlite';
 
-import type { DatabaseAdapter, SQLValue } from '../../adapter.ts';
+import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
+import type { TableSchema } from '../../schema/table-schema.ts';
 
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import { dirname, isNull, isNullish, isNumber, isObject } from '../../../../utils/index.ts';
 import { Dialect, type LogicalType } from '../../dialect.ts';
+import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
 
 // SQLite extended result codes for the constraint violations the engine classifies.
@@ -83,6 +85,20 @@ export class SQLiteDialect extends Dialect {
       default:
         return value;
     }
+  }
+
+  /**
+   * Lists tables from `sqlite_master`, excluding SQLite's own internals.
+   */
+  listTables(db: Transaction): Promise<string[]> {
+    return listTables(db);
+  }
+
+  /**
+   * Describes a table through SQLite's pragmas.
+   */
+  describeTable(db: Transaction, table: string): Promise<TableSchema> {
+    return describeTable(db, table, this);
   }
 
   /**

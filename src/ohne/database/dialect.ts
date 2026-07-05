@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
+import type { TableSchema } from './schema/table-schema.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
 import { OHNE_LOCKS } from './naming/table-names.ts';
@@ -98,6 +99,28 @@ export abstract class Dialect {
    * ```
    */
   abstract deserialize(type: LogicalType, value: SQLValue): unknown;
+
+  /**
+   * Lists every table in the database, framework and app alike.
+   * Driver internals, like SQLite's `sqlite_*` tables, are excluded.
+   *
+   * @example
+   * ```ts
+   * await dialect.listTables(db) // -> ['Posts', 'ohne_locks']
+   * ```
+   */
+  abstract listTables(db: Transaction): Promise<string[]>;
+
+  /**
+   * Describes one live table as a normalized `TableSchema`.
+   * Structure only: column types map to their storage primitive, so `boolean` reads back as `integer`.
+   *
+   * @example
+   * ```ts
+   * (await dialect.describeTable(db, 'Posts')).primaryKey // -> ['UUID']
+   * ```
+   */
+  abstract describeTable(db: Transaction, table: string): Promise<TableSchema>;
 
   /**
    * Whether `error` thrown by the driver is a unique-constraint violation.
