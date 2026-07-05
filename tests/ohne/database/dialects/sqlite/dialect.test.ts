@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import type { DatabaseAdapter } from '../../../../../src/ohne/database/adapter.ts';
 
 import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { sleep } from '../../../../../src/utils/index.ts';
 
 const dialect = new SQLiteDialect();
 
@@ -260,6 +261,30 @@ describe('SQLiteDialect', () => {
       ok(await dialect.acquireLock(db, 'sync'));
       await dialect.releaseLock(db, { key: 'sync', nonce: 'wrong' });
       strictEqual(await dialect.acquireLock(db, 'sync'), null);
+      await db.close();
+    });
+
+    it('waitForLock resolves once the holder releases', async () => {
+      const db = await open();
+      const handle = await dialect.acquireLock(db, 'sync');
+      ok(handle);
+      const waited = dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 10_000 });
+      await sleep(15);
+      await dialect.releaseLock(db, handle);
+      await waited;
+      ok(await dialect.acquireLock(db, 'sync'));
+      await db.close();
+    });
+
+    it('waitForLock steals an abandoned lock', async () => {
+      const db = await open();
+      ok(await dialect.acquireLock(db, 'sync'));
+      await db.run('UPDATE "ohne_locks" SET "acquiredAt" = ? WHERE "key" = ?', [
+        Date.now() - 10_000,
+        'sync',
+      ]);
+      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
+      ok(await dialect.acquireLock(db, 'sync'));
       await db.close();
     });
   });

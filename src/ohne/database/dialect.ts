@@ -2,6 +2,7 @@ import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
 import type { TableDiff, TableSchema } from './schema/table-schema.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
+import { isUndefined, sleep } from '../../utils/index.ts';
 import { OHNE_LOCKS } from './naming/table-names.ts';
 
 /**
@@ -28,6 +29,21 @@ export interface LockHandle {
    * The random nonce identifying this holder, matched on release so only the winner can free the lock.
    */
   nonce: string;
+}
+
+/**
+ * Resolved timing for waiting on a held cluster lock.
+ */
+export interface LockTiming {
+  /**
+   * Milliseconds between checks of a held lock.
+   */
+  pollInterval: number;
+
+  /**
+   * Milliseconds after which a held lock counts as abandoned and may be taken over.
+   */
+  staleAfter: number;
 }
 
 /**
@@ -198,6 +214,38 @@ export abstract class Dialect {
       [key, nonce, Date.now()],
     );
     return changes === 1 ? { key, nonce } : null;
+  }
+
+  /**
+   * Waits while another holder keeps `key`, resolving when a new acquisition attempt is worthwhile.
+   * The base implementation polls the `ohne_locks` row and steals it once older than `staleAfter`.
+   * The steal deletes by key, nonce, and timestamp, so two stealers cannot both remove one row.
+   * A rotated nonce or timestamp is a new holder and the poll continues against it.
+   * A dialect with a natively blocking lock overrides this together with `acquireLock` and `releaseLock`.
+   *
+   * @example
+   * ```ts
+   * await dialect.waitForLock(db, 'sync', { pollInterval: 250, staleAfter: 60_000 })
+   * ```
+   */
+  async waitForLock(db: DatabaseAdapter, key: string, timing: LockTiming): Promise<void> {
+    while (true) {
+      const row = await db.queryOne<{ nonce: string; acquiredAt: number }>(
+        `SELECT ${this.quote('nonce')}, ${this.quote('acquiredAt')} ` +
+          `FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ?`,
+        [key],
+      );
+      if (isUndefined(row)) return;
+      if (Date.now() - row.acquiredAt > timing.staleAfter) {
+        await db.run(
+          `DELETE FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ? ` +
+            `AND ${this.quote('nonce')} = ? AND ${this.quote('acquiredAt')} = ?`,
+          [key, row.nonce, row.acquiredAt],
+        );
+        return;
+      }
+      await sleep(timing.pollInterval);
+    }
   }
 
   /**
