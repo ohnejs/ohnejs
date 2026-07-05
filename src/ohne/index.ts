@@ -6,6 +6,7 @@ export * from './codegen/generate-middleware.ts';
 export * from './codegen/generate-resolved-config.ts';
 export * from './codegen/generate-routes.ts';
 export * from './codegen/prune-codegen.ts';
+export * from './codegen/scan-layer-augmentations.ts';
 export * from './dashboard/build-dashboard-page-manifest.ts';
 export * from './dashboard/collect-dashboard-pages.ts';
 export * from './dashboard/dashboard-page.ts';
