@@ -102,6 +102,28 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
+   * Runs its own `BEGIN`/`COMMIT`/`ROLLBACK` with `foreign_keys = OFF` hoisted outside the transaction.
+   * The pragma no-ops inside one, which is why this never delegates to the adapter's `transaction`.
+   * `foreign_keys = ON` is restored on both the commit and the rollback path.
+   */
+  async schemaTransaction<T>(db: DatabaseAdapter, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+    await db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      await db.exec('BEGIN');
+      try {
+        const result = await fn(db);
+        await db.exec('COMMIT');
+        return result;
+      } catch (error) {
+        await db.exec('ROLLBACK');
+        throw error;
+      }
+    } finally {
+      await db.exec('PRAGMA foreign_keys = ON');
+    }
+  }
+
+  /**
    * Classifies a duplicate-key failure, covering both a unique index and a primary key.
    */
   isUniqueViolation(error: unknown): boolean {

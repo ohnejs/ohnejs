@@ -123,6 +123,21 @@ export abstract class Dialect {
   abstract describeTable(db: Transaction, table: string): Promise<TableSchema>;
 
   /**
+   * Runs `fn` inside a transaction that is all-or-nothing, DDL included.
+   * A failure rolls back every statement, schema changes among them, and re-throws.
+   * A dialect over a database with non-transactional DDL must journal its own undo to honor this.
+   *
+   * @example
+   * ```ts
+   * await dialect.schemaTransaction(db, (tx) => tx.exec('DROP TABLE "legacy"'))
+   * ```
+   */
+  abstract schemaTransaction<T>(
+    db: DatabaseAdapter,
+    fn: (tx: Transaction) => Promise<T>,
+  ): Promise<T>;
+
+  /**
    * Whether `error` thrown by the driver is a unique-constraint violation.
    *
    * @example

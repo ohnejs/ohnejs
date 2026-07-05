@@ -150,6 +150,58 @@ describe('SQLiteDialect', () => {
     });
   });
 
+  describe('schemaTransaction', () => {
+    it('commits DDL and DML together and returns the result', async () => {
+      const db = await open();
+      const result = await dialect.schemaTransaction(db, async (tx) => {
+        await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+        await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+        return 'done';
+      });
+      strictEqual(result, 'done');
+      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+
+    it('rolls back DDL atomically when fn throws, then rethrows', async () => {
+      const db = await open();
+      await rejects(
+        dialect.schemaTransaction(db, async (tx) => {
+          await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+          throw new Error('boom');
+        }),
+        /boom/,
+      );
+      deepStrictEqual(await dialect.listTables(db), []);
+      await db.close();
+    });
+
+    it('turns foreign-key enforcement off inside and back on after commit', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE parent (id TEXT PRIMARY KEY)');
+      await db.exec('CREATE TABLE child (id TEXT PRIMARY KEY, pid TEXT REFERENCES parent(id))');
+      await dialect.schemaTransaction(db, async (tx) => {
+        await tx.run('INSERT INTO child (id, pid) VALUES (?, ?)', ['c', 'missing']);
+        await tx.run('DELETE FROM child');
+      });
+      deepStrictEqual(await db.query('PRAGMA foreign_keys'), [nullObj({ foreign_keys: 1 })]);
+      await rejects(db.run('INSERT INTO child (id, pid) VALUES (?, ?)', ['c', 'missing']));
+      await db.close();
+    });
+
+    it('restores foreign-key enforcement after a rollback', async () => {
+      const db = await open();
+      await rejects(
+        dialect.schemaTransaction(db, async () => {
+          throw new Error('boom');
+        }),
+        /boom/,
+      );
+      deepStrictEqual(await db.query('PRAGMA foreign_keys'), [nullObj({ foreign_keys: 1 })]);
+      await db.close();
+    });
+  });
+
   describe('error classification', () => {
     it('recognizes a unique violation, over both a unique index and a primary key', async () => {
       const db = await open();
