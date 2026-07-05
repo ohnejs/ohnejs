@@ -1,6 +1,7 @@
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
+import { OHNE_LOCKS } from './naming/table-names.ts';
 
 /**
  * The storage-primitive column types the schema model reconciles.
@@ -133,7 +134,7 @@ export abstract class Dialect {
    * ```
    */
   async acquireLock(db: DatabaseAdapter, key: string): Promise<LockHandle | null> {
-    const table = this.quote('ohne_locks');
+    const table = this.quote(OHNE_LOCKS);
     await db.exec(
       `CREATE TABLE IF NOT EXISTS ${table} (` +
         `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
@@ -161,7 +162,7 @@ export abstract class Dialect {
    */
   async releaseLock(tx: Transaction, handle: LockHandle): Promise<void> {
     await tx.run(
-      `DELETE FROM ${this.quote('ohne_locks')} ` +
+      `DELETE FROM ${this.quote(OHNE_LOCKS)} ` +
         `WHERE ${this.quote('key')} = ? AND ${this.quote('nonce')} = ?`,
       [handle.key, handle.nonce],
     );
