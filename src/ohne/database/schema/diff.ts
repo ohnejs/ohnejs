@@ -38,6 +38,9 @@ export function diffSchemas(
   return diffs;
 }
 
+/**
+ * Diffs one table present on both sides, or `undefined` when nothing differs.
+ */
 function diffTable(
   live: TableSchema,
   desired: TableSchema,
@@ -90,6 +93,9 @@ function diffTable(
   };
 }
 
+/**
+ * Whether two columns agree on native column type and nullability.
+ */
 function sameColumn(live: ColumnSchema, desired: ColumnSchema, dialect: Dialect): boolean {
   return (
     dialect.columnType(live.type) === dialect.columnType(desired.type) &&
