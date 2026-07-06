@@ -6,6 +6,11 @@ import { physicalName } from './_physical.ts';
 export const OHNE_LOCKS = 'ohne_locks';
 
 /**
+ * The migration-state table: one row per migration, stamped `applied` or `skipped`.
+ */
+export const OHNE_MIGRATIONS = 'ohne_migrations';
+
+/**
  * Prefix of the aside name a table rebuild renames the old table to while it swaps shapes.
  */
 export const OHNE_REBUILD_PREFIX = 'ohne_rebuild_';
