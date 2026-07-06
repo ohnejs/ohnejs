@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
  * The hash covers the entire untruncated name, so names differing only past the cut stay distinct.
  *
  * The default cap of 63 is the tightest common identifier limit across SQL databases.
+ * A cap below 9 cannot fit the marker; the result is then the bare 9-char `$`-hash.
  *
  * @example
  * ```ts
@@ -21,5 +22,5 @@ export function truncateWithHash(name: string, max = 63): string {
     return name;
   }
   const hash = createHash('sha256').update(name).digest('hex').slice(0, 8);
-  return `${name.slice(0, max - 9)}$${hash}`;
+  return `${name.slice(0, Math.max(0, max - 9))}$${hash}`;
 }

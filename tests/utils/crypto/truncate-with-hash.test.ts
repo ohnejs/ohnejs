@@ -37,4 +37,9 @@ describe('truncateWithHash', () => {
     strictEqual(truncateWithHash('d'.repeat(40), 30).length, 30);
     match(truncateWithHash('d'.repeat(40), 30), /^d{21}\$[0-9a-f]{8}$/);
   });
+
+  it('keeps the head from the start when the cap cannot fit the marker', () => {
+    match(truncateWithHash('e'.repeat(40), 4), /^\$[0-9a-f]{8}$/);
+    strictEqual(truncateWithHash('e'.repeat(40), 4), truncateWithHash('e'.repeat(40), 4));
+  });
 });
