@@ -38,6 +38,7 @@ const DEFAULT_STALE_AFTER = 60_000;
 /**
  * Races the cluster for the right to sync, waiting through the dialect while another instance holds it.
  * The winner gets the `LockHandle` its sync must release as the final in-transaction statement.
+ * A busy database during the race reads as a held lock: the instance waits and re-races.
  * A loser waits; once the lock clears it compares the written snapshot against `desiredHash`.
  * A match returns `undefined` - the schema is already realized and the caller boots without syncing.
  * A hash found in the snapshot's history means this build was superseded: it refuses loudly.
@@ -52,7 +53,12 @@ export async function acquireSyncLock(
   const staleAfter = options.staleAfter ?? DEFAULT_STALE_AFTER;
   await ensureSchemaTable(db, dialect);
   while (true) {
-    const handle = await dialect.acquireLock(db, LOCK_KEY);
+    let handle = null;
+    try {
+      handle = await dialect.acquireLock(db, LOCK_KEY);
+    } catch (error) {
+      if (!dialect.isBusy(error)) throw error;
+    }
     if (!isNull(handle)) return handle;
     await dialect.waitForLock(db, LOCK_KEY, { pollInterval, staleAfter });
     const snapshot = await readSnapshot(db, dialect);

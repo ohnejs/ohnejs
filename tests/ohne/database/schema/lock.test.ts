@@ -117,6 +117,27 @@ describe('acquireSyncLock', () => {
     await b.close();
   });
 
+  it('treats a busy database during the race as a held lock', async () => {
+    const [a, b] = await openPair();
+    class BusyOnce extends SQLiteDialect {
+      private raced = false;
+      override async acquireLock(
+        db: DatabaseAdapter,
+        key: string,
+      ): ReturnType<SQLiteDialect['acquireLock']> {
+        if (!this.raced) {
+          this.raced = true;
+          throw Object.assign(new Error('database is locked'), { errcode: 5 });
+        }
+        return super.acquireLock(db, key);
+      }
+    }
+    const handle = await acquireSyncLock(a, new BusyOnce(), { desiredHash: 'H', pollInterval: 5 });
+    ok(handle);
+    await a.close();
+    await b.close();
+  });
+
   it('lets exactly one of two concurrent stealers win', async () => {
     const [a, b] = await openPair();
     const bootstrap = await dialect.acquireLock(a, 'sync');

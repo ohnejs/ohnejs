@@ -1,4 +1,5 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -36,6 +37,26 @@ describe('SQLiteDialect', () => {
     await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
     await db.close();
     ok(existsSync(path));
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('connects while another process holds the write lock', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ohne-sqlite-busy-'));
+    const path = join(root, 'contended.db');
+    const holder = spawn(process.execPath, [
+      '-e',
+      `const { DatabaseSync } = require('node:sqlite');
+       const db = new DatabaseSync(${JSON.stringify(path)});
+       db.exec('BEGIN EXCLUSIVE');
+       console.log('holding');
+       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 900);
+       db.exec('COMMIT');`,
+    ]);
+    await new Promise<void>((resolve) => holder.stdout.once('data', () => resolve()));
+    const db = await dialect.connect(path);
+    deepStrictEqual(await db.query('PRAGMA journal_mode'), [nullObj({ journal_mode: 'wal' })]);
+    await db.close();
+    await new Promise((resolve) => holder.once('exit', resolve));
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -235,6 +256,14 @@ describe('SQLiteDialect', () => {
     it('classifies a non-database error as neither', () => {
       strictEqual(dialect.isUniqueViolation(new Error('x')), false);
       strictEqual(dialect.isForeignKeyViolation(undefined), false);
+    });
+
+    it('recognizes busy and locked, extended codes folded to primary', () => {
+      strictEqual(dialect.isBusy(Object.assign(new Error('locked'), { errcode: 5 })), true);
+      strictEqual(dialect.isBusy(Object.assign(new Error('locked'), { errcode: 6 })), true);
+      strictEqual(dialect.isBusy(Object.assign(new Error('locked'), { errcode: 517 })), true);
+      strictEqual(dialect.isBusy(Object.assign(new Error('fk'), { errcode: 787 })), false);
+      strictEqual(dialect.isBusy(new Error('x')), false);
     });
   });
 

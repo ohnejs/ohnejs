@@ -4,7 +4,14 @@ import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
 import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-schema.ts';
 
 import { ensureDir } from '../../../../utils/fs/index.ts';
-import { dirname, isNull, isNullish, isNumber, isObject } from '../../../../utils/index.ts';
+import {
+  dirname,
+  isNull,
+  isNullish,
+  isNumber,
+  isObject,
+  isUndefined,
+} from '../../../../utils/index.ts';
 import { Dialect, type LogicalType } from '../../dialect.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
@@ -14,6 +21,10 @@ import { createIndex, createIndexes, createTable, rebuildTable, sweepRebuilds } 
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 const SQLITE_CONSTRAINT_FOREIGNKEY = 787;
+
+// Primary result codes for a database held by another connection.
+const SQLITE_BUSY = 5;
+const SQLITE_LOCKED = 6;
 
 /**
  * The SQLite dialect, over Node's built-in `node:sqlite`.
@@ -181,6 +192,16 @@ export class SQLiteDialect extends Dialect {
    */
   isForeignKeyViolation(error: unknown): boolean {
     return errcodeOf(error) === SQLITE_CONSTRAINT_FOREIGNKEY;
+  }
+
+  /**
+   * Classifies a busy or locked database, extended codes folded to their primary result code.
+   */
+  isBusy(error: unknown): boolean {
+    const code = errcodeOf(error);
+    if (isUndefined(code)) return false;
+    const primary = code & 0xff;
+    return primary === SQLITE_BUSY || primary === SQLITE_LOCKED;
   }
 }
 

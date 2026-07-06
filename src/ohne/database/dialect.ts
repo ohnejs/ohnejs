@@ -197,6 +197,17 @@ export abstract class Dialect {
   abstract isForeignKeyViolation(error: unknown): boolean;
 
   /**
+   * Whether `error` is the driver reporting the database temporarily locked by another connection.
+   *
+   * @example
+   * ```ts
+   * dialect.isBusy(caught)
+   * // -> true when the write lock stayed held past the busy budget
+   * ```
+   */
+  abstract isBusy(error: unknown): boolean;
+
+  /**
    * Races for the cluster lock `key` by inserting a nonce row into `ohne_locks`.
    * Ensures the table first, then inserts with `ON CONFLICT DO NOTHING`.
    * The winner's insert changes one row and yields a handle; a contender that changed nothing gets `null`.
@@ -210,12 +221,7 @@ export abstract class Dialect {
    */
   async acquireLock(db: DatabaseAdapter, key: string): Promise<LockHandle | null> {
     const table = this.quote(OHNE_LOCKS);
-    await db.exec(
-      `CREATE TABLE IF NOT EXISTS ${table} (` +
-        `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
-        `${this.quote('nonce')} ${this.columnType('text')} NOT NULL, ` +
-        `${this.quote('acquiredAt')} ${this.columnType('integer')} NOT NULL)`,
-    );
+    await this.ensureLockTable(db);
     const nonce = randomToken();
     const { changes } = await db.run(
       `INSERT INTO ${table} (${this.quote('key')}, ${this.quote('nonce')}, ${this.quote('acquiredAt')}) ` +
@@ -238,6 +244,7 @@ export abstract class Dialect {
    * ```
    */
   async waitForLock(db: DatabaseAdapter, key: string, timing: LockTiming): Promise<void> {
+    await this.ensureLockTable(db);
     while (true) {
       const row = await db.queryOne<{ nonce: string; acquiredAt: number }>(
         `SELECT ${this.quote('nonce')}, ${this.quote('acquiredAt')} ` +
@@ -255,6 +262,19 @@ export abstract class Dialect {
       }
       await sleep(timing.pollInterval);
     }
+  }
+
+  /**
+   * Ensures the `ohne_locks` table exists, tolerating a concurrent create.
+   * Both the race and the wait ensure it, since a busy-classified lost race can poll first.
+   */
+  protected async ensureLockTable(db: DatabaseAdapter): Promise<void> {
+    await db.exec(
+      `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_LOCKS)} (` +
+        `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
+        `${this.quote('nonce')} ${this.columnType('text')} NOT NULL, ` +
+        `${this.quote('acquiredAt')} ${this.columnType('integer')} NOT NULL)`,
+    );
   }
 
   /**
