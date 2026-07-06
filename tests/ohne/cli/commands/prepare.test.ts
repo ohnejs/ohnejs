@@ -38,6 +38,7 @@ describe('ohne prepare', () => {
     strictEqual(process.exitCode, 0);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'layer-name.ts')), true);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'resolved-config.ts')), true);
+    strictEqual(existsSync(join(dir, '.ohne', 'node', 'database.ts')), true);
   });
 
   it('prunes files an earlier run left in the codegen dir', async () => {

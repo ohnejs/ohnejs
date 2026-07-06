@@ -7,6 +7,7 @@ import { exists } from '../../utils/fs/index.ts';
 import { isNull, isPort, isString, joinPath, MAX_PORT } from '../../utils/index.ts';
 import { bootLayers } from '../boot/boot-layers.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
+import { generateDatabase } from '../codegen/generate-database.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
 import { generateMessages } from '../codegen/generate-messages.ts';
 import { generateMiddleware } from '../codegen/generate-middleware.ts';
@@ -14,6 +15,7 @@ import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { connect } from '../database/connect.ts';
+import { useMigrations } from '../database/migrations/use-migrations.ts';
 import { syncDatabase } from '../database/schema/sync.ts';
 import { closeDatabases, useDatabase } from '../database/use-database.ts';
 import { useEnv } from '../env/use-env.ts';
@@ -73,6 +75,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
         generateRoutes(from),
         generateMiddleware(from),
         generateMessages(from),
+        generateDatabase(from),
       ])
     )
       .flat()
@@ -83,7 +86,12 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   // The component tables live in the node bucket: importing runs the registrations.
   const dir = await codegenDir(from);
   if (!isNull(dir)) {
-    for (const name of ['node/routes.ts', 'node/middleware.ts', 'node/messages.ts']) {
+    for (const name of [
+      'node/routes.ts',
+      'node/middleware.ts',
+      'node/messages.ts',
+      'node/database.ts',
+    ]) {
       const file = joinPath(dir, name);
       if (await exists(file)) await import(pathToFileURL(file).href);
     }
@@ -94,7 +102,11 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   const force = useEnv().has('FORCE_SYNC')
     ? useEnv().get('FORCE_SYNC')
     : (database?.sync?.force ?? false);
-  const report = await syncDatabase(useDatabase(), dialect, { desired: [], force });
+  const report = await syncDatabase(useDatabase(), dialect, {
+    desired: [],
+    migrations: Object.values(useMigrations().all()),
+    force,
+  });
   if (report.deletions.length > 0) {
     usePrinter().warnBlock({ title: 'Sync removed data under `force`', body: report.deletions });
   }

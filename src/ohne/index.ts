@@ -1,5 +1,6 @@
 export * from './boot/boot-layers.ts';
 export * from './boot/scan-layer-boot.ts';
+export * from './codegen/generate-database.ts';
 export * from './codegen/generate-layer-name.ts';
 export * from './codegen/generate-messages.ts';
 export * from './codegen/generate-middleware.ts';
@@ -17,7 +18,9 @@ export * from './database/connect.ts';
 export * from './database/dialect.ts';
 export * from './database/known-databases.ts';
 export * from './database/known-dialects.ts';
+export * from './database/migrations/collect-migrations.ts';
 export * from './database/migrations/define-migration.ts';
+export * from './database/migrations/scan-layer-migrations.ts';
 export * from './database/migrations/use-migrations.ts';
 export * from './database/use-database.ts';
 export * from './database/use-dialects.ts';

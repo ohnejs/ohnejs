@@ -7,6 +7,7 @@ import {
   relativePath,
   resolvePath,
 } from '../../../utils/index.ts';
+import { generateDatabase } from '../../codegen/generate-database.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateMessages } from '../../codegen/generate-messages.ts';
 import { generateMiddleware } from '../../codegen/generate-middleware.ts';
@@ -55,6 +56,7 @@ export const prepareCommand = defineCommand({
           generateRoutes(cwd),
           generateMiddleware(cwd),
           generateMessages(cwd),
+          generateDatabase(cwd),
         ])
       )
         .flat()

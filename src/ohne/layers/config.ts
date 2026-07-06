@@ -94,6 +94,16 @@ export interface Config {
     messages?: string;
 
     /**
+     * Directory each layer's database migrations are read from.
+     * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'migrations'
+     */
+    migrations?: string;
+
+    /**
      * Directory each layer's dashboard pages and components are read from and served from.
      * Dashboard pages live under `pages/` within it (`pages/authors/[id].ts` -> the `/authors/[id]` page).
      * Resolved against each layer's root.
@@ -599,6 +609,7 @@ export const DIR_DEFAULTS = {
   boot: 'boot',
   middleware: 'middleware',
   messages: 'messages',
+  migrations: 'migrations',
   dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
 

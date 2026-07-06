@@ -12,6 +12,7 @@ import { type ServeChild, spawnServeChild } from './child-server.ts';
 import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
+import { createDatabaseTarget } from './targets/database.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRegistryTarget } from './targets/registry.ts';
@@ -81,8 +82,9 @@ export async function dev(
   const routes = createRoutesTarget(from);
   const middleware = createMiddlewareTarget(from);
   const messages = createMessagesTarget(from);
-  const config = createConfigTarget(from, [registry, routes, middleware, messages]);
-  const targets = [registry, routes, middleware, messages];
+  const database = createDatabaseTarget(from);
+  const config = createConfigTarget(from, [registry, routes, middleware, messages, database]);
+  const targets = [registry, routes, middleware, messages, database];
 
   const wantDashboard = options.dashboard ?? true;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(
