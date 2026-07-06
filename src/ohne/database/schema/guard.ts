@@ -111,7 +111,15 @@ async function guardAlter(
   }
   for (const change of alter.changeColumns) {
     const name = change.desired.name;
-    if (dialect.columnType(change.live.type) !== dialect.columnType(change.desired.type)) {
+    const retyped =
+      dialect.columnType(change.live.type) !== dialect.columnType(change.desired.type);
+    if (retyped && change.desired.notNull && rows > 0) {
+      findings.blockers.push(
+        `- column \`${table}.${name}\` retypes under NOT NULL, leaving \`${rows}\` rows without a value`,
+      );
+      continue;
+    }
+    if (retyped) {
       const values = await countWhere(db, dialect, table, `${dialect.quote(name)} IS NOT NULL`);
       if (values > 0) {
         findings.losses.push(

@@ -113,6 +113,23 @@ describe('guardDiffs', () => {
     await db.close();
   });
 
+  it('blocks a retype under NOT NULL on a populated table even under force', async () => {
+    const db = await open();
+    const live = table('Posts', {
+      columns: [UUID, { name: 'views', type: 'text', notNull: true }],
+    });
+    const desired = table('Posts', {
+      columns: [UUID, { name: 'views', type: 'integer', notNull: true }],
+    });
+    await materialize(db, [live]);
+    deepStrictEqual(await guard(db, [live], [desired], true), { deletions: [], warnings: [] });
+    await db.run('INSERT INTO "Posts" ("UUID", "views") VALUES (?, ?)', ['a', '9']);
+    const error = await refusalOf(guard(db, [live], [desired], true));
+    match(bodyOf(error), /`Posts.views` retypes under NOT NULL, leaving `1` rows/);
+    match(bodyOf(error), /cannot resolve them/);
+    await db.close();
+  });
+
   it('blocks NOT NULL over NULL rows even under force', async () => {
     const db = await open();
     const live = table('Posts', {
