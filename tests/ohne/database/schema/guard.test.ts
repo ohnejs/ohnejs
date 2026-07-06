@@ -249,6 +249,59 @@ describe('guardDiffs', () => {
     await db.close();
   });
 
+  it('skips probes over columns arriving in the same sync', async () => {
+    const db = await open();
+    const live = table('Users');
+    await materialize(db, [live]);
+    await db.run('INSERT INTO "Users" ("UUID") VALUES (?)', ['u1']);
+    const desired = table('Users', {
+      columns: [UUID, { name: 'email', type: 'text', notNull: false }],
+      primaryKey: ['UUID', 'email'],
+      uniques: [{ name: 'UX__Users__email', columns: ['email'] }],
+      foreignKeys: [
+        {
+          column: 'email',
+          targetTable: 'Users',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    });
+    deepStrictEqual(await guard(db, [live], [desired]), { deletions: [], warnings: [] });
+    await db.close();
+  });
+
+  it('counts every value as dangling when the target arrives in the same sync', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'category', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "category") VALUES (?, ?)', ['p1', 'news']);
+    await db.run('INSERT INTO "Posts" ("UUID", "category") VALUES (?, ?)', ['p2', 'tech']);
+    await db.run('INSERT INTO "Posts" ("UUID", "category") VALUES (?, ?)', ['p3', null]);
+    const categories = table('Categories');
+    const desired = {
+      ...posts,
+      foreignKeys: [
+        {
+          column: 'category',
+          targetTable: 'Categories',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    };
+    const error = await refusalOf(guard(db, [posts], [categories, desired]));
+    match(bodyOf(error), /`2` rows of `Posts` dangle/);
+    const report = await guard(db, [posts], [categories, desired], true);
+    strictEqual(report.deletions.length, 1);
+    deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts"'), [
+      Object.assign(Object.create(null), { UUID: 'p3' }),
+    ]);
+    await db.close();
+  });
+
   it('collects every finding into one refusal', async () => {
     const db = await open();
     const posts = table('Posts', {

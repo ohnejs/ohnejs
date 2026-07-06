@@ -52,6 +52,9 @@ export async function guardDiffs(
   options: GuardOptions,
 ): Promise<GuardReport> {
   const findings: Findings = { losses: [], purgeable: [], blockers: [], orphans: [] };
+  const creating = new Set(
+    diffs.flatMap((diff) => (diff.kind === 'create' ? [diff.table.name] : [])),
+  );
   for (const diff of diffs) {
     if (diff.kind === 'create') continue;
     if (diff.kind === 'drop') {
@@ -59,7 +62,7 @@ export async function guardDiffs(
       if (rows > 0) findings.losses.push(`- table \`${diff.table.name}\` (\`${rows}\` rows)`);
       continue;
     }
-    await guardAlter(db, dialect, diff, findings);
+    await guardAlter(db, dialect, diff, creating, findings);
   }
   const destructive = [...findings.losses, ...findings.purgeable.map((item) => item.line)];
   if (findings.blockers.length > 0 || (destructive.length > 0 && !options.force)) {
@@ -82,14 +85,19 @@ export async function guardDiffs(
 
 /**
  * Probes one alter's columns, uniques, primary key, and foreign keys, pushing findings by grade.
+ * Structure arriving in this sync is never probed against the live table.
+ * A just-added column holds no values, so nothing over it can collide or dangle.
+ * A foreign key to a table created this sync makes every non-NULL value dangle by definition.
  */
 async function guardAlter(
   db: Transaction,
   dialect: Dialect,
   alter: TableAlter,
+  creating: ReadonlySet<string>,
   findings: Findings,
 ): Promise<void> {
   const table = alter.desired.name;
+  const added = new Set(alter.addColumns.map((column) => column.name));
   const rows = await countRows(db, dialect, table);
   for (const column of alter.dropColumns) {
     const values = await countWhere(
@@ -129,12 +137,18 @@ async function guardAlter(
     }
   }
   for (const unique of alter.addUniques) {
+    if (unique.columns.some((column) => added.has(column))) continue;
     const groups = await countDuplicateGroups(db, dialect, table, unique.columns);
     if (groups > 0) {
       findings.blockers.push(`- unique \`${unique.name}\` covers \`${groups}\` duplicate groups`);
     }
   }
-  if (alter.changePrimaryKey && alter.desired.primaryKey.length > 0 && rows > 0) {
+  if (
+    alter.changePrimaryKey &&
+    alter.desired.primaryKey.length > 0 &&
+    rows > 0 &&
+    !alter.desired.primaryKey.some((column) => added.has(column))
+  ) {
     const groups = await countDuplicateGroups(db, dialect, table, alter.desired.primaryKey);
     if (groups > 0) {
       const key = alter.desired.primaryKey.map((column) => `\`${column}\``).join(', ');
@@ -142,11 +156,17 @@ async function guardAlter(
     }
   }
   for (const foreignKey of alter.addForeignKeys) {
-    const dangling = await countDangling(db, dialect, table, foreignKey);
+    if (added.has(foreignKey.column)) continue;
+    const targetCreated = creating.has(foreignKey.targetTable);
+    const dangling = targetCreated
+      ? await countWhere(db, dialect, table, `${dialect.quote(foreignKey.column)} IS NOT NULL`)
+      : await countDangling(db, dialect, table, foreignKey);
     if (dangling === 0) continue;
     findings.purgeable.push({
       line: danglingLine(table, foreignKey, dangling),
-      purge: purgeSQL(dialect, table, foreignKey),
+      purge: targetCreated
+        ? purgeAllSQL(dialect, table, foreignKey.column)
+        : purgeSQL(dialect, table, foreignKey),
     });
   }
   const surviving = alter.live.foreignKeys.filter(
@@ -253,6 +273,14 @@ async function countDangling(
       `${dialect.quote('row')}.${dialect.quote(foreignKey.column)})`,
   );
   return row?.count ?? 0;
+}
+
+/**
+ * Builds the `DELETE` for every row carrying a value, used when the target table arrives this sync.
+ * A just-created target is empty, so every non-NULL referencing value dangles by definition.
+ */
+function purgeAllSQL(dialect: Dialect, table: string, column: string): string {
+  return `DELETE FROM ${dialect.quote(table)} WHERE ${dialect.quote(column)} IS NOT NULL`;
 }
 
 /**
