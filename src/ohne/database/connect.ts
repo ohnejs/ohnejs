@@ -6,7 +6,7 @@ import { ohneError } from '../error/ohne-error.ts';
 import { DEFAULT_DATABASE_URL, DEFAULT_DIALECT } from '../layers/config.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { useLayers } from '../layers/use-layers.ts';
-import { clearDatabases, registerDatabase } from './use-database.ts';
+import { clearDatabases, registerDatabase, registerDialect } from './use-database.ts';
 import { useDialects } from './use-dialects.ts';
 
 /**
@@ -34,6 +34,7 @@ export async function connect(): Promise<Dialect> {
   const url = resolveMainURL(config?.url);
 
   clearDatabases();
+  registerDialect(dialect);
   registerDatabase(await dialect.connect(rootRelative(url)));
   for (const [name, helperURL] of Object.entries(config?.helpers ?? {})) {
     registerDatabase(await dialect.connect(rootRelative(helperURL)), name);

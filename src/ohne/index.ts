@@ -19,6 +19,7 @@ export * from './database/known-databases.ts';
 export * from './database/known-dialects.ts';
 export * from './database/use-database.ts';
 export * from './database/use-dialects.ts';
+export * from './database/with-lock.ts';
 export * from './env/env.ts';
 export * from './env/use-env.ts';
 export * from './hooks/apply-hook.ts';
