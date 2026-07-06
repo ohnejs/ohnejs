@@ -110,7 +110,9 @@ export async function syncDatabase(
     const classified = applyClassification(live, claimed, dialect);
     const diffs = diffSchemas(classified, desired, dialect);
     return await dialect.schemaTransaction(db, async (tx) => {
-      const report = await guardDiffs(tx, dialect, diffs, { force: options.force ?? false });
+      const report = await guardDiffs(tx, dialect, diffs, classified, {
+        force: options.force ?? false,
+      });
       for (const diff of diffs) {
         await dialect.applyTableDiff(tx, diff);
       }

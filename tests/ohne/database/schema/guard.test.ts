@@ -47,7 +47,7 @@ async function guard(
   desired: TableSchema[],
   force = false,
 ): Promise<ReturnType<typeof guardDiffs>> {
-  return guardDiffs(db, dialect, diffSchemas(live, desired, dialect), { force });
+  return guardDiffs(db, dialect, diffSchemas(live, desired, dialect), live, { force });
 }
 
 async function refusalOf(promise: Promise<unknown>): Promise<OhneError> {
@@ -315,6 +315,82 @@ describe('guardDiffs', () => {
     strictEqual(report.deletions.length, 1);
     deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts"'), [
       Object.assign(Object.create(null), { UUID: 'p3' }),
+    ]);
+    await db.close();
+  });
+
+  it('cascades a force purge through a self-referencing chain', async () => {
+    const db = await open();
+    const nodes = table('Nodes', {
+      columns: [UUID, { name: 'parent', type: 'text', notNull: false }],
+    });
+    await materialize(db, [nodes]);
+    await db.run('INSERT INTO "Nodes" ("UUID", "parent") VALUES (?, ?)', ['A', 'missing']);
+    await db.run('INSERT INTO "Nodes" ("UUID", "parent") VALUES (?, ?)', ['B', 'A']);
+    await db.run('INSERT INTO "Nodes" ("UUID", "parent") VALUES (?, ?)', ['C', 'B']);
+    const desired = {
+      ...nodes,
+      foreignKeys: [
+        {
+          column: 'parent',
+          targetTable: 'Nodes',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    };
+    const report = await guard(db, [nodes], [desired], true);
+    strictEqual(report.deletions.length, 3);
+    deepStrictEqual(await db.query('SELECT * FROM "Nodes"'), []);
+    await db.close();
+  });
+
+  it('purges rows of an untouched table orphaned by the purge itself', async () => {
+    const db = await open();
+    const bosses = table('Bosses');
+    const parents = table('Parents', {
+      columns: [UUID, { name: 'boss', type: 'text', notNull: false }],
+    });
+    const children = table('Children', {
+      columns: [UUID, { name: 'parent', type: 'text', notNull: false }],
+      foreignKeys: [
+        {
+          column: 'parent',
+          targetTable: 'Parents',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    });
+    await materialize(db, [bosses, parents, children]);
+    await db.run('INSERT INTO "Parents" ("UUID", "boss") VALUES (?, ?)', ['P1', 'ghost']);
+    await db.run('INSERT INTO "Parents" ("UUID", "boss") VALUES (?, ?)', ['P2', null]);
+    await db.run('INSERT INTO "Children" ("UUID", "parent") VALUES (?, ?)', ['C1', 'P1']);
+    await db.run('INSERT INTO "Children" ("UUID", "parent") VALUES (?, ?)', ['C2', 'P2']);
+    const desiredParents = {
+      ...parents,
+      foreignKeys: [
+        {
+          column: 'boss',
+          targetTable: 'Bosses',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    };
+    const live = [bosses, parents, children];
+    const desired = [bosses, desiredParents, children];
+    const report = await dialect.schemaTransaction(db, (tx) =>
+      guardDiffs(tx, dialect, diffSchemas(live, desired, dialect), live, { force: true }),
+    );
+    strictEqual(report.deletions.length, 2);
+    match(report.deletions.join('\n'), /rows of `Parents` dangle/);
+    match(report.deletions.join('\n'), /rows of `Children` dangle/);
+    deepStrictEqual(await db.query('SELECT "UUID" FROM "Parents"'), [
+      Object.assign(Object.create(null), { UUID: 'P2' }),
+    ]);
+    deepStrictEqual(await db.query('SELECT "UUID" FROM "Children"'), [
+      Object.assign(Object.create(null), { UUID: 'C2' }),
     ]);
     await db.close();
   });

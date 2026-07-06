@@ -1,6 +1,6 @@
 import type { Transaction } from '../adapter.ts';
 import type { Dialect } from '../dialect.ts';
-import type { ForeignKeySchema, TableAlter, TableDiff } from './table-schema.ts';
+import type { ForeignKeySchema, TableAlter, TableDiff, TableSchema } from './table-schema.ts';
 
 import { ohneError } from '../../error/ohne-error.ts';
 
@@ -30,11 +30,18 @@ export interface GuardReport {
   warnings: string[];
 }
 
+interface DanglingFinding {
+  table: string;
+  foreignKey: ForeignKeySchema;
+  count: number;
+  targetCreated: boolean;
+}
+
 interface Findings {
   losses: string[];
-  purgeable: { line: string; purge: string }[];
+  purgeable: DanglingFinding[];
   blockers: string[];
-  orphans: { line: string; purge: string }[];
+  orphans: DanglingFinding[];
 }
 
 /**
@@ -43,12 +50,14 @@ interface Findings {
  * A new unique over duplicates or `NOT NULL` over NULLs refuses regardless - force cannot pick winners.
  * Rows dangling under a foreign key being added refuse too; under force they are deleted here.
  * Pre-existing orphans under a surviving foreign key only warn; under force they are purged as well.
+ * Purges run to a fixed point: rows orphaned by a purge are purged and reported too, `live`-wide.
  * Every finding lands in one error block; probes run before any mutation, so a re-add cannot explode.
  */
 export async function guardDiffs(
   db: Transaction,
   dialect: Dialect,
   diffs: readonly TableDiff[],
+  live: readonly TableSchema[],
   options: GuardOptions,
 ): Promise<GuardReport> {
   const findings: Findings = { losses: [], purgeable: [], blockers: [], orphans: [] };
@@ -64,7 +73,10 @@ export async function guardDiffs(
     }
     await guardAlter(db, dialect, diff, creating, findings);
   }
-  const destructive = [...findings.losses, ...findings.purgeable.map((item) => item.line)];
+  const destructive = [
+    ...findings.losses,
+    ...findings.purgeable.map((item) => danglingLine(item.table, item.foreignKey, item.count)),
+  ];
   if (findings.blockers.length > 0 || (destructive.length > 0 && !options.force)) {
     throw ohneError({
       title: 'Destructive sync refused',
@@ -72,15 +84,21 @@ export async function guardDiffs(
     });
   }
   if (!options.force) {
-    return { deletions: [], warnings: findings.orphans.map((orphan) => orphan.line) };
+    return {
+      deletions: [],
+      warnings: findings.orphans.map((orphan) =>
+        danglingLine(orphan.table, orphan.foreignKey, orphan.count),
+      ),
+    };
   }
-  for (const item of [...findings.purgeable, ...findings.orphans]) {
-    await db.run(item.purge);
-  }
-  return {
-    deletions: [...destructive, ...findings.orphans.map((orphan) => orphan.line)],
-    warnings: [],
-  };
+  const purged = await purgeDangling(
+    db,
+    dialect,
+    [...findings.purgeable, ...findings.orphans],
+    diffs,
+    live,
+  );
+  return { deletions: [...findings.losses, ...purged], warnings: [] };
 }
 
 /**
@@ -170,12 +188,7 @@ async function guardAlter(
       ? await countWhere(db, dialect, table, `${dialect.quote(foreignKey.column)} IS NOT NULL`)
       : await countDangling(db, dialect, table, foreignKey);
     if (dangling === 0) continue;
-    findings.purgeable.push({
-      line: danglingLine(table, foreignKey, dangling),
-      purge: targetCreated
-        ? purgeAllSQL(dialect, table, foreignKey.column)
-        : purgeSQL(dialect, table, foreignKey),
-    });
+    findings.purgeable.push({ table, foreignKey, count: dangling, targetCreated });
   }
   const surviving = alter.live.foreignKeys.filter(
     (foreignKey) => !alter.dropForeignKeys.some((dropped) => dropped.column === foreignKey.column),
@@ -183,11 +196,81 @@ async function guardAlter(
   for (const foreignKey of surviving) {
     const dangling = await countDangling(db, dialect, table, foreignKey);
     if (dangling === 0) continue;
-    findings.orphans.push({
-      line: danglingLine(table, foreignKey, dangling),
-      purge: purgeSQL(dialect, table, foreignKey),
-    });
+    findings.orphans.push({ table, foreignKey, count: dangling, targetCreated: false });
   }
+}
+
+/**
+ * Executes the dangling purges to a fixed point, following foreign keys onto rows they orphan.
+ * A deleted row can strand rows referencing it, on tables this sync never touched.
+ * Every foreign key aiming at a purged table is re-probed until a pass deletes nothing.
+ * Returns one report line per executed purge, counting the rows it actually deleted.
+ */
+async function purgeDangling(
+  db: Transaction,
+  dialect: Dialect,
+  initial: readonly DanglingFinding[],
+  diffs: readonly TableDiff[],
+  live: readonly TableSchema[],
+): Promise<string[]> {
+  const lines: string[] = [];
+  const universe = probeUniverse(diffs, live);
+  let queue = [...initial];
+  while (queue.length > 0) {
+    const affected = new Set<string>();
+    for (const item of queue) {
+      const purge = item.targetCreated
+        ? purgeAllSQL(dialect, item.table, item.foreignKey.column)
+        : purgeSQL(dialect, item.table, item.foreignKey);
+      const { changes } = await db.run(purge);
+      if (changes === 0) continue;
+      lines.push(danglingLine(item.table, item.foreignKey, changes));
+      affected.add(item.table);
+    }
+    queue = [];
+    for (const probe of universe) {
+      if (!affected.has(probe.foreignKey.targetTable)) continue;
+      const count = await countDangling(db, dialect, probe.table, probe.foreignKey);
+      if (count > 0) queue.push({ ...probe, count, targetCreated: false });
+    }
+  }
+  return lines;
+}
+
+/**
+ * Collects every foreign key that could newly dangle when a purge deletes its target's rows.
+ * Surviving live foreign keys count, and added ones whose column already exists live.
+ * A foreign key to a table created this sync is exempt: its initial purge removes every value.
+ */
+function probeUniverse(
+  diffs: readonly TableDiff[],
+  live: readonly TableSchema[],
+): { table: string; foreignKey: ForeignKeySchema }[] {
+  const creating = new Set(
+    diffs.flatMap((diff) => (diff.kind === 'create' ? [diff.table.name] : [])),
+  );
+  const dropping = new Set(
+    diffs.flatMap((diff) => (diff.kind === 'drop' ? [diff.table.name] : [])),
+  );
+  const alters = new Map(
+    diffs.flatMap((diff) => (diff.kind === 'alter' ? [[diff.desired.name, diff] as const] : [])),
+  );
+  const universe: { table: string; foreignKey: ForeignKeySchema }[] = [];
+  for (const table of live) {
+    if (dropping.has(table.name)) continue;
+    const alter = alters.get(table.name);
+    for (const foreignKey of table.foreignKeys) {
+      const dropped =
+        alter?.dropForeignKeys.some((item) => item.column === foreignKey.column) ?? false;
+      if (!dropped) universe.push({ table: table.name, foreignKey });
+    }
+    for (const foreignKey of alter?.addForeignKeys ?? []) {
+      if (creating.has(foreignKey.targetTable)) continue;
+      if (!table.columns.some((column) => column.name === foreignKey.column)) continue;
+      universe.push({ table: table.name, foreignKey });
+    }
+  }
+  return universe;
 }
 
 /**
