@@ -224,6 +224,40 @@ describe('SQLiteDialect', () => {
     });
   });
 
+  describe('renameTable', () => {
+    it('renames a table, keeping its rows', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE "Posts" (id TEXT PRIMARY KEY)');
+      await db.run('INSERT INTO "Posts" (id) VALUES (?)', ['a']);
+      await dialect.renameTable(db, 'Posts', 'Articles');
+      deepStrictEqual(await dialect.listTables(db), ['Articles']);
+      deepStrictEqual(await db.query('SELECT id FROM "Articles"'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+
+    it('rewrites other tables` foreign keys to follow the new name', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE "Posts" (id TEXT PRIMARY KEY)');
+      await db.exec(
+        'CREATE TABLE "Comments" (id TEXT PRIMARY KEY, post TEXT REFERENCES "Posts"(id))',
+      );
+      await dialect.renameTable(db, 'Posts', 'Articles');
+      const schema = await dialect.describeTable(db, 'Comments');
+      strictEqual(schema.foreignKeys[0]?.targetTable, 'Articles');
+      await db.close();
+    });
+
+    it('hops through an aside name on a case-only rename', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE "Posts" (id TEXT PRIMARY KEY)');
+      await db.run('INSERT INTO "Posts" (id) VALUES (?)', ['a']);
+      await dialect.renameTable(db, 'Posts', 'posts');
+      deepStrictEqual(await dialect.listTables(db), ['posts']);
+      deepStrictEqual(await db.query('SELECT id FROM "posts"'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+  });
+
   describe('error classification', () => {
     it('recognizes a unique violation, over both a unique index and a primary key', async () => {
       const db = await open();

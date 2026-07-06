@@ -151,6 +151,18 @@ export abstract class Dialect {
   abstract applyTableDiff(db: Transaction, diff: TableDiff): Promise<void>;
 
   /**
+   * Renames a live table, keeping its rows, columns, and foreign keys.
+   * Other tables' foreign keys follow the new name; index names stay as they are.
+   * Constraint names derive from the table name, so the sync's diff recreates them afterwards.
+   *
+   * @example
+   * ```ts
+   * await dialect.renameTable(tx, 'Posts', 'Articles')
+   * ```
+   */
+  abstract renameTable(db: Transaction, from: string, to: string): Promise<void>;
+
+  /**
    * Drops whatever a crashed schema change left behind, called before a sync introspects.
    * The base implementation has nothing to sweep.
    * A dialect that rebuilds tables through aside names overrides this to drop abandoned ones.

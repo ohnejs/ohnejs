@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
 import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-schema.ts';
 
+import { truncateWithHash } from '../../../../utils/crypto/index.ts';
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import {
   dirname,
@@ -13,6 +14,7 @@ import {
   isUndefined,
 } from '../../../../utils/index.ts';
 import { Dialect, type LogicalType } from '../../dialect.ts';
+import { OHNE_REBUILD_PREFIX } from '../../naming/table-names.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
 import { createIndex, createIndexes, createTable, rebuildTable, sweepRebuilds } from './rebuild.ts';
@@ -148,6 +150,22 @@ export class SQLiteDialect extends Dialect {
       await createIndex(db, this, diff.desired.name, unique, true);
     for (const index of diff.addIndexes)
       await createIndex(db, this, diff.desired.name, index, false);
+  }
+
+  /**
+   * Renames a table in place.
+   * SQLite rewrites other tables' `REFERENCES` clauses to follow, even with `foreign_keys = OFF`.
+   * A case-only rename hops through an aside name, since SQLite matches table names case-insensitively.
+   * The hop runs inside the sync transaction, so a failure between the two steps rolls back whole.
+   */
+  async renameTable(db: Transaction, from: string, to: string): Promise<void> {
+    if (from !== to && from.toLowerCase() === to.toLowerCase()) {
+      const aside = truncateWithHash(`${OHNE_REBUILD_PREFIX}${from}`);
+      await db.exec(`ALTER TABLE ${this.quote(from)} RENAME TO ${this.quote(aside)}`);
+      await db.exec(`ALTER TABLE ${this.quote(aside)} RENAME TO ${this.quote(to)}`);
+      return;
+    }
+    await db.exec(`ALTER TABLE ${this.quote(from)} RENAME TO ${this.quote(to)}`);
   }
 
   /**
