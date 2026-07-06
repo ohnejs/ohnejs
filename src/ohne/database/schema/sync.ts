@@ -61,6 +61,7 @@ const INTERNAL_TABLES = new Set<string>([OHNE_LOCKS, OHNE_SCHEMA]);
  * The winner of the sync lock sweeps rebuild leftovers, reads the snapshot, and introspects.
  * Live structure is authoritative; the snapshot supplies classification and the claim record.
  * Unclaimed tables are foreign: never dropped, and a name collision with the desired set refuses.
+ * Collisions match case-insensitively - the weakest dialect's rule, so schemas stay portable.
  * A build whose hash sits in the snapshot history refuses instead of reverting the schema.
  * Diff, guard, apply, snapshot write, and lock release run in one transaction; COMMIT frees the cluster.
  * On failure everything rolls back, the lock frees best-effort, and the boot dies with the thrown error.
@@ -85,11 +86,11 @@ export async function syncDatabase(
     refuseIfSuperseded(snapshot, desiredHash);
     const names = await dialect.listTables(db);
     const claimed = snapshot?.classification ?? {};
-    const desiredNames = new Set(desired.map((table) => table.name));
+    const desiredNames = new Set(desired.map((table) => table.name.toLowerCase()));
     const external = names.filter(
       (name) => !INTERNAL_TABLES.has(name) && isUndefined(claimed[name]),
     );
-    const collisions = external.filter((name) => desiredNames.has(name));
+    const collisions = external.filter((name) => desiredNames.has(name.toLowerCase()));
     if (collisions.length > 0) {
       throw ohneError({
         title: 'Existing tables collide with the desired schema',

@@ -110,6 +110,15 @@ describe('syncDatabase', () => {
     await db.close();
   });
 
+  it('refuses a collision differing only in case', async () => {
+    const db = await open();
+    await db.exec('CREATE TABLE "posts" ("a" TEXT)');
+    await rejects(syncDatabase(db, dialect, { desired: [table('Posts')] }), /collide/);
+    strictEqual((await db.query('SELECT * FROM "posts"')).length, 0);
+    await lockIsFree(db);
+    await db.close();
+  });
+
   it('refuses to sync a superseded build', async () => {
     const db = await open();
     const posts = table('Posts');
