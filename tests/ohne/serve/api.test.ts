@@ -3,10 +3,17 @@ import type { AddressInfo } from 'node:net';
 import { ok, rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import {
+  ensureSchemaTable,
+  schemaHash,
+  writeSnapshot,
+} from '../../../src/ohne/database/schema/snapshot.ts';
 import {
   closeDatabases,
   type HTTPServer,
@@ -38,6 +45,19 @@ function get(port: number, path: string): Promise<number> {
 }
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
+
+const dialect = new SQLiteDialect();
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, () => {
+      const { port } = server.address() as AddressInfo;
+      server.close(() => resolve(port));
+    });
+  });
+}
 
 function header(port: number, path: string, name: string): Promise<string | undefined> {
   return new Promise((resolve, reject) => {
@@ -141,6 +161,29 @@ describe('serveAPI', () => {
     );
     ok(row);
     strictEqual((JSON.parse(row.data) as { generation: number }).generation, 1);
+  });
+
+  it('never serves when the sync refuses', async () => {
+    const dir = makeApp('dbfail', 'dbfail:boot');
+    const path = join(dir, 'data.db');
+    useEnv().set('DATABASE', path);
+    const seed = await dialect.connect(path);
+    await ensureSchemaTable(seed, dialect);
+    await writeSnapshot(seed, dialect, {
+      generation: 2,
+      hash: 'future',
+      history: [{ generation: 1, hash: schemaHash([]) }],
+      classification: {},
+    });
+    await seed.close();
+    const port = await freePort();
+    useEnv().set('PORT', port);
+
+    await rejects(serveAPI(dir), /newer than this build/);
+
+    await rejects(get(port, '/'));
+    useEnv().set('PORT', 0);
+    useEnv().set('DATABASE', ':memory:');
   });
 
   it('re-syncs a file database as a no-op on a second boot', async () => {
