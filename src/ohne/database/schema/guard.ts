@@ -286,11 +286,16 @@ function refusalBody(destructive: string[], blockers: string[]): string[] {
     body.push('These cannot apply even under force:', '', ...blockers);
   }
   body.push('');
-  body.push(
-    blockers.length > 0
-      ? 'Fix the data behind these rows first; `force` cannot resolve them.'
-      : 'Set `FORCE_SYNC` or `database.sync.force` to authorize this destruction for one boot.',
-  );
+  if (blockers.length > 0) {
+    body.push(
+      'Fix the data behind these rows first, or rewrite it with a move migration; `force` cannot resolve them.',
+    );
+  } else {
+    body.push('Cover these with a discard or move migration.');
+    body.push(
+      'Or set `FORCE_SYNC` or `database.sync.force` to authorize this destruction for one boot.',
+    );
+  }
   return body;
 }
 
