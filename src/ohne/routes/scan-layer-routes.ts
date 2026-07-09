@@ -17,6 +17,7 @@ import { routeID, type RouteMeta } from './route.ts';
  * Reads every route file in one layer's API directory.
  *
  * Each `.ts` file under `<layer.dir>/<api>` maps to a route via `pathToRoute`.
+ * A `_`-prefixed file is not a helper here: a route path can legitimately hold an underscore segment.
  * Results are sorted by file path so the output is deterministic.
  * Returns `[]` when the layer has no API directory.
  * Throws when two files in the layer resolve to the same route, since one would silently shadow the other.

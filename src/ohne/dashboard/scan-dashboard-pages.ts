@@ -17,6 +17,7 @@ import { DASHBOARD_PAGES_DIR, type DiscoveredDashboardPage } from './dashboard-p
  * Reads every page file in one layer's dashboard pages directory.
  *
  * Each `.ts` file under `<layer.dir>/<dashboard>/pages` maps to a route via `pathToRoutePattern`.
+ * A `_`-prefixed file is not a helper here: a page path can legitimately hold an underscore segment.
  * Results are sorted by file path so the output is deterministic.
  * Returns `[]` when the layer has no pages directory.
  * Throws when two files in the layer resolve to the same pattern, since one would silently shadow the other.
