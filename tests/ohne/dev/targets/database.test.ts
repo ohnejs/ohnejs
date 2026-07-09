@@ -1,11 +1,11 @@
 import { ok, strictEqual } from 'node:assert';
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,10 +26,14 @@ describe('database target', () => {
     return app;
   }
 
-  function writeMigration(app: string, relative: string): void {
-    const file = join(app, 'migrations', relative);
+  function writeCollection(app: string, fieldName: string): string {
+    const file = join(app, 'collections', 'Posts.ts');
     mkdirSync(join(file, '..'), { recursive: true });
-    writeFileSync(file, 'export default { from: { table: "Posts" }, to: null };\n');
+    writeFileSync(
+      file,
+      `export default { fields: { ${fieldName}: { type: 'text', options: {} } } };\n`,
+    );
+    return file;
   }
 
   before(() => {
@@ -44,34 +48,31 @@ describe('database target', () => {
     useLayers().clear();
   });
 
-  it('is affected by paths inside the migrations dir, including brand-new files', async () => {
+  it('is affected by paths inside any of the three schema dirs', async () => {
     const app = writeApp('affected');
-    writeMigration(app, '001-posts.ts');
     await loadLayers(app);
     const target = createDatabaseTarget(app);
 
+    strictEqual(target.affectedBy(join(app, 'collections', 'Posts.ts')), true);
+    strictEqual(target.affectedBy(join(app, 'fields', 'slug.ts')), true);
     strictEqual(target.affectedBy(join(app, 'migrations', '001-posts.ts')), true);
-    strictEqual(target.affectedBy(join(app, 'migrations', '002-new.ts')), true);
     strictEqual(target.affectedBy(join(app, 'api', 'health.ts')), false);
     strictEqual(target.affectedBy(join(app, 'README.md')), false);
   });
 
-  it('writes, skips an unchanged set, regenerates a changed one', async () => {
-    const app = writeApp('regen');
-    writeMigration(app, '001-posts.ts');
+  it('re-imports an edited definition fresh on regen', async () => {
+    const app = writeApp('fresh');
+    const file = writeCollection(app, 'title');
     await loadLayers(app);
     const target = createDatabaseTarget(app);
-    const out = join(app, '.ohne', 'node', 'database.ts');
+    const shared = join(app, '.ohne', 'shared', 'database.ts');
 
     await target.regen();
-    ok(readFileSync(out, 'utf8').includes('001-posts'));
+    ok(readFileSync(shared, 'utf8').includes('title: string;'));
 
-    rmSync(out);
+    writeCollection(app, 'slug');
+    utimesSync(file, new Date(), new Date(Date.now() + 1000));
     await target.regen();
-    strictEqual(existsSync(out), false);
-
-    writeMigration(app, '002-drafts.ts');
-    await target.regen();
-    ok(readFileSync(out, 'utf8').includes('002-drafts'));
+    ok(readFileSync(shared, 'utf8').includes('slug: string;'));
   });
 });
