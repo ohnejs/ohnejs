@@ -19,6 +19,7 @@ import { ohneError } from '../error/ohne-error.ts';
  * Reads every message file in one layer's messages directory.
  *
  * Each `.json` file is named after a BCP-47 language tag; its stem is the canonical language.
+ * A `_`-prefixed file or directory is skipped, so a draft catalog can sit beside the live ones.
  * Nested objects and literal dotted keys both flatten to dot-notation keys.
  * A subdirectory prefixes its keys, so `dashboard/en.json`'s `save` becomes `dashboard.save`.
  * Results are sorted by file path so the output is deterministic.
@@ -48,8 +49,11 @@ export async function scanLayerMessages(
 
   const seen = new Map<string, string>();
   const result: MessageMeta[] = [];
+  const catalogs = entries
+    .filter((entry) => !entry.relativePath.split('/').some((segment) => segment.startsWith('_')))
+    .sort((a, b) => naturalCompare(a.relativePath, b.relativePath));
 
-  for (const entry of entries.sort((a, b) => naturalCompare(a.relativePath, b.relativePath))) {
+  for (const entry of catalogs) {
     const language = canonicalizeLanguage(entry.stem);
     if (isNull(language)) {
       throw ohneError({

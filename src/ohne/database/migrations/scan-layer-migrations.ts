@@ -23,6 +23,7 @@ export interface ScannedMigration {
  * Reads every migration file in one layer's migrations directory.
  *
  * Each `.ts` file under `<layer.dir>/<migrations>` is one migration named `<layer>/<stem>`.
+ * A `_`-prefixed file or directory is a helper and is skipped, so shared transforms can live beside them.
  * Results sort by file name, the order they run in within the layer.
  * Returns `[]` when the layer has no migrations directory.
  *
@@ -39,6 +40,7 @@ export async function scanLayerMigrations(
   const entries = await listDir(joinPath(layer.dir, migrations), { ext: 'ts', files: true });
   if (isNull(entries)) return [];
   return entries
+    .filter((entry) => !entry.relativePath.split('/').some((segment) => segment.startsWith('_')))
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
       assertImportablePath('migration', entry.relativePath, entry.path);

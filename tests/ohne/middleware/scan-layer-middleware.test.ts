@@ -42,6 +42,18 @@ describe('scanLayerMiddleware', () => {
     );
   });
 
+  it('skips underscore-prefixed helper files and directories', async () => {
+    const helper: OhneLayer = { name: 'helper', dir: join(root, 'helper') };
+    writeMiddleware(helper.dir, 'auth.ts');
+    writeMiddleware(helper.dir, '_shared.ts');
+    writeMiddleware(helper.dir, '_lib/util.ts');
+    const middleware = await scanLayerMiddleware(helper, 'middleware');
+    deepStrictEqual(
+      middleware.map((entry) => entry.name),
+      ['auth'],
+    );
+  });
+
   it('flags files under global/ as global, leaving a literal global.ts named', async () => {
     const layer: OhneLayer = { name: 'g', dir: join(root, 'g') };
     writeMiddleware(layer.dir, 'global/session.ts');

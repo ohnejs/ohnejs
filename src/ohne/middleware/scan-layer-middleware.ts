@@ -19,6 +19,7 @@ const GLOBAL_DIR = 'global';
  * Reads every middleware file in one layer's middleware directory.
  *
  * Each `.ts` file under `<layer.dir>/<middleware>` maps to a middleware, named via `pathToKebabName`.
+ * A `_`-prefixed file or directory is a helper and is skipped.
  * A file inside the `global/` directory is flagged `isGlobal`, read from the raw path.
  * So a literal `global.ts` file stays named, while `global/auth.ts` is global.
  * Results are sorted by file path so the output is deterministic.
@@ -40,6 +41,7 @@ export async function scanLayerMiddleware(
 
   const seen = new Map<string, string>();
   return entries
+    .filter((entry) => !entry.relativePath.split('/').some((segment) => segment.startsWith('_')))
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
       assertImportablePath('middleware', entry.relativePath, entry.path);

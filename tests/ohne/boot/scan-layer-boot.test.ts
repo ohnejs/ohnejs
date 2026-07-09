@@ -34,6 +34,16 @@ describe('scanLayerBoot', () => {
     );
   });
 
+  it('skips underscore-prefixed helper files', async () => {
+    write('helpers/boot/10-run.ts');
+    write('helpers/boot/_env.ts');
+    const files = await scanLayerBoot(join(root, 'helpers'), 'boot');
+    deepStrictEqual(
+      files.map((file) => basename(file)),
+      ['10-run.ts'],
+    );
+  });
+
   it('returns only index.ts when one is present', async () => {
     write('indexed/boot/index.ts');
     write('indexed/boot/a.ts');

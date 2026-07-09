@@ -5,6 +5,7 @@ import { isNull, isUndefined, joinPath, naturalCompare } from '../../utils/index
  * Lists the boot files to run for one layer, in execution order.
  *
  * Reads the top level of `<dir>/<boot>` only - nested files are ignored.
+ * A `_`-prefixed file is a helper and is skipped.
  * If an `index.ts` sits at the top, it is the only file returned.
  * A layer can then order its own boot logic by importing from there.
  * Otherwise every top-level `.ts` file is returned, name-sorted.
@@ -23,8 +24,9 @@ export async function scanLayerBoot(dir: string, boot: string): Promise<string[]
   const entries = await listDir(joinPath(dir, boot), { ext: 'ts', files: true, depth: 0 });
   if (isNull(entries)) return [];
 
-  const index = entries.find((entry) => entry.name === 'index.ts');
+  const files = entries.filter((entry) => !entry.name.startsWith('_'));
+  const index = files.find((entry) => entry.name === 'index.ts');
   if (!isUndefined(index)) return [index.path];
 
-  return entries.sort((a, b) => naturalCompare(a.name, b.name)).map((entry) => entry.path);
+  return files.sort((a, b) => naturalCompare(a.name, b.name)).map((entry) => entry.path);
 }

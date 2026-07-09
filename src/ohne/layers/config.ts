@@ -64,6 +64,7 @@ export interface Config {
     /**
      * Directory each layer's boot files are read from.
      * Top-level `.ts` files run once at start in name order; an `index.ts` runs alone.
+     * A `_`-prefixed file is a helper and is skipped.
      * Resolved against each layer's root.
      *
      * @default
@@ -75,6 +76,7 @@ export interface Config {
      * Directory each layer's middleware is read from.
      * Each `.ts` file is one middleware, named by its path (`foo/bar.ts` -> `foo-bar`).
      * Files under `global/` run on every request; the rest are opt-in per route via `defineHandler`.
+     * A `_`-prefixed file or directory is a helper and is skipped.
      * Resolved against each layer's root.
      *
      * @default
@@ -86,6 +88,7 @@ export interface Config {
      * Directory each layer's messages are read from.
      * Each `.json` file is named after a BCP-47 language tag (`en.json`, `de-AT.json`).
      * A subdirectory prefixes its keys, so `dashboard/en.json` contributes `dashboard.*` keys.
+     * A `_`-prefixed file or directory is skipped, so a draft catalog can sit beside the live ones.
      * Resolved against each layer's root.
      *
      * @default
@@ -118,6 +121,7 @@ export interface Config {
     /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
+     * A `_`-prefixed file or directory is a helper and is skipped.
      * Resolved against each layer's root.
      *
      * @default

@@ -46,6 +46,19 @@ describe('scanLayerMessages', () => {
     );
   });
 
+  it('skips underscore-prefixed helper files and directories', async () => {
+    deepStrictEqual(
+      await read(
+        layer('helpers', {
+          'en.json': { save: 'Save' },
+          '_de.json': { save: 'Entwurf' },
+          '_drafts/en.json': { discard: 'Discard' },
+        }),
+      ),
+      [{ key: 'save', language: 'en', template: 'Save' }],
+    );
+  });
+
   it('flattens nested objects to dot keys', async () => {
     deepStrictEqual(
       await read(layer('nested', { 'en.json': { field: { required: 'r', minLength: 'm' } } })),

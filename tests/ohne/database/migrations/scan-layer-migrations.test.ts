@@ -36,6 +36,18 @@ describe('scanLayerMigrations', () => {
     deepStrictEqual(scanned[0]?.file, join(dir, 'migrations', '002-first.ts'));
   });
 
+  it('skips underscore-prefixed helper files and directories', async () => {
+    const dir = join(root, 'helpers');
+    writeMigration(dir, '001-posts.ts');
+    writeMigration(dir, '_transforms.ts');
+    writeMigration(dir, '_lib/shared.ts');
+    const scanned = await scanLayerMigrations({ name: 'app', dir }, 'migrations');
+    deepStrictEqual(
+      scanned.map((migration) => migration.name),
+      ['app/001-posts'],
+    );
+  });
+
   it('returns an empty list without a migrations directory', async () => {
     deepStrictEqual(
       await scanLayerMigrations({ name: 'app', dir: join(root, 'none') }, 'migrations'),
