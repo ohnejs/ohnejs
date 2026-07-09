@@ -2,6 +2,7 @@ import type { Transaction } from '../adapter.ts';
 import type { Dialect } from '../dialect.ts';
 import type { ForeignKeySchema, TableAlter, TableDiff, TableSchema } from './table-schema.ts';
 
+import { isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 
 /**
@@ -48,9 +49,11 @@ interface Findings {
  * The destructive guard: probes every diff and refuses what would silently lose data.
  * A populated table or column drop and a populated retype refuse unless `force` authorizes them.
  * A new unique over duplicates or `NOT NULL` over NULLs refuses regardless - force cannot pick winners.
- * Rows dangling under a foreign key being added refuse too; under force they are deleted here.
+ * Rows dangling under a foreign key being added refuse too; under force they are purged here.
  * Pre-existing orphans under a surviving foreign key only warn; under force they are purged as well.
- * Purges run to a fixed point: rows orphaned by a purge are purged and reported too, `live`-wide.
+ * A purge clears the dangling values where the column permits `NULL` both live and desired.
+ * Everywhere else it deletes the rows: a `record` reference clears, a junction row vanishes.
+ * Purges run to a fixed point: rows orphaned by a deletion are purged and reported too, `live`-wide.
  * Every finding lands in one error block; probes run before any mutation, so a re-add cannot explode.
  */
 export async function guardDiffs(
@@ -202,9 +205,13 @@ async function guardAlter(
 
 /**
  * Executes the dangling purges to a fixed point, following foreign keys onto rows they orphan.
+ * A dangling value is cleared to `NULL` where the column permits it both live and desired.
+ * Live governs because purges run before any structural apply; desired governs the end state.
+ * Everywhere else the rows are deleted.
  * A deleted row can strand rows referencing it, on tables this sync never touched.
- * Every foreign key aiming at a purged table is re-probed until a pass deletes nothing.
- * Returns one report line per executed purge, counting the rows it actually deleted.
+ * Every foreign key aiming at a purged table is therefore re-probed until a pass deletes nothing.
+ * Clearing values orphans nothing, so only deletions feed the re-probe.
+ * Returns one report line per executed purge, counting what it actually cleared or deleted.
  */
 async function purgeDangling(
   db: Transaction,
@@ -215,17 +222,19 @@ async function purgeDangling(
 ): Promise<string[]> {
   const lines: string[] = [];
   const universe = probeUniverse(diffs, live);
+  const nullable = nullableColumns(diffs, live);
   let queue = [...initial];
   while (queue.length > 0) {
     const affected = new Set<string>();
     for (const item of queue) {
-      const purge = item.targetCreated
-        ? purgeAllSQL(dialect, item.table, item.foreignKey.column)
-        : purgeSQL(dialect, item.table, item.foreignKey);
+      const clears = nullable.has(`${item.table}.${item.foreignKey.column}`);
+      const purge = clears
+        ? clearSQL(dialect, item.table, item.foreignKey, item.targetCreated)
+        : deleteSQL(dialect, item.table, item.foreignKey, item.targetCreated);
       const { changes } = await db.run(purge);
       if (changes === 0) continue;
-      lines.push(danglingLine(item.table, item.foreignKey, changes));
-      affected.add(item.table);
+      lines.push(purgedLine(item.table, item.foreignKey, changes, clears));
+      if (!clears) affected.add(item.table);
     }
     queue = [];
     for (const probe of universe) {
@@ -235,6 +244,29 @@ async function purgeDangling(
     }
   }
   return lines;
+}
+
+/**
+ * Collects the `table.column` keys safe to clear: nullable live and nullable (or absent) desired.
+ * A table without a diff keeps its live shape, so live alone decides there.
+ */
+function nullableColumns(diffs: readonly TableDiff[], live: readonly TableSchema[]): Set<string> {
+  const desired = new Map(
+    diffs.flatMap((diff) =>
+      diff.kind === 'alter' ? [[diff.desired.name, diff.desired] as const] : [],
+    ),
+  );
+  const safe = new Set<string>();
+  for (const table of live) {
+    const desiredColumns = desired.get(table.name)?.columns;
+    for (const column of table.columns) {
+      if (column.notNull) continue;
+      const target = desiredColumns?.find((candidate) => candidate.name === column.name);
+      if (!isUndefined(target) && target.notNull) continue;
+      safe.add(`${table.name}.${column.name}`);
+    }
+  }
+  return safe;
 }
 
 /**
@@ -307,6 +339,20 @@ function danglingLine(table: string, foreignKey: ForeignKeySchema, count: number
 }
 
 /**
+ * One report line for an executed purge: values cleared to `NULL`, or rows deleted.
+ */
+function purgedLine(
+  table: string,
+  foreignKey: ForeignKeySchema,
+  count: number,
+  cleared: boolean,
+): string {
+  return cleared
+    ? `- \`${count}\` values of \`${table}.${foreignKey.column}\` cleared, dangling to missing \`${foreignKey.targetTable}\` rows`
+    : `- \`${count}\` rows of \`${table}\` deleted, dangling from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
+}
+
+/**
  * Counts a table's rows.
  */
 async function countRows(db: Transaction, dialect: Dialect, table: string): Promise<number> {
@@ -362,32 +408,64 @@ async function countDangling(
   foreignKey: ForeignKeySchema,
 ): Promise<number> {
   const row = await db.queryOne<{ count: number }>(
-    `SELECT COUNT(*) AS ${dialect.quote('count')} FROM ${dialect.quote(table)} AS ${dialect.quote('row')} ` +
-      `WHERE ${dialect.quote('row')}.${dialect.quote(foreignKey.column)} IS NOT NULL AND NOT EXISTS (` +
-      `SELECT 1 FROM ${dialect.quote(foreignKey.targetTable)} AS ${dialect.quote('target')} ` +
-      `WHERE ${dialect.quote('target')}.${dialect.quote(foreignKey.targetColumn)} = ` +
-      `${dialect.quote('row')}.${dialect.quote(foreignKey.column)})`,
+    `SELECT COUNT(*) AS ${dialect.quote('count')} FROM ${dialect.quote(table)} AS ${dialect.quote('_row')} ` +
+      `WHERE ${dialect.quote('_row')}.${dialect.quote(foreignKey.column)} IS NOT NULL AND NOT EXISTS (` +
+      `SELECT 1 FROM ${dialect.quote(foreignKey.targetTable)} AS ${dialect.quote('_target')} ` +
+      `WHERE ${dialect.quote('_target')}.${dialect.quote(foreignKey.targetColumn)} = ` +
+      `${dialect.quote('_row')}.${dialect.quote(foreignKey.column)})`,
   );
   return row?.count ?? 0;
 }
 
 /**
- * Builds the `DELETE` for every row carrying a value, used when the target table arrives this sync.
- * A just-created target is empty, so every non-NULL referencing value dangles by definition.
+ * Builds the condition matching rows whose foreign-key value dangles.
+ * When the target table arrives this sync it is empty, so every non-NULL value dangles by definition.
+ *
+ * The purge target cannot wear an alias inside `UPDATE`/`DELETE`, so the outer column is table-qualified.
+ * The subquery alias is therefore `_`-prefixed: user identifiers never start with `_`.
+ * No table name can capture the outer qualifier the way a table named `Target` would capture `target`.
  */
-function purgeAllSQL(dialect: Dialect, table: string, column: string): string {
-  return `DELETE FROM ${dialect.quote(table)} WHERE ${dialect.quote(column)} IS NOT NULL`;
+function danglingCondition(
+  dialect: Dialect,
+  table: string,
+  foreignKey: ForeignKeySchema,
+  targetCreated: boolean,
+): string {
+  const column = `${dialect.quote(table)}.${dialect.quote(foreignKey.column)}`;
+  if (targetCreated) return `${column} IS NOT NULL`;
+  return (
+    `${column} IS NOT NULL AND NOT EXISTS (` +
+    `SELECT 1 FROM ${dialect.quote(foreignKey.targetTable)} AS ${dialect.quote('_target')} ` +
+    `WHERE ${dialect.quote('_target')}.${dialect.quote(foreignKey.targetColumn)} = ${column})`
+  );
+}
+
+/**
+ * Builds the `UPDATE` that clears dangling foreign-key values to `NULL`.
+ */
+function clearSQL(
+  dialect: Dialect,
+  table: string,
+  foreignKey: ForeignKeySchema,
+  targetCreated: boolean,
+): string {
+  return (
+    `UPDATE ${dialect.quote(table)} SET ${dialect.quote(foreignKey.column)} = NULL ` +
+    `WHERE ${danglingCondition(dialect, table, foreignKey, targetCreated)}`
+  );
 }
 
 /**
  * Builds the `DELETE` that removes rows dangling from `foreignKey`.
  */
-function purgeSQL(dialect: Dialect, table: string, foreignKey: ForeignKeySchema): string {
+function deleteSQL(
+  dialect: Dialect,
+  table: string,
+  foreignKey: ForeignKeySchema,
+  targetCreated: boolean,
+): string {
   return (
     `DELETE FROM ${dialect.quote(table)} ` +
-    `WHERE ${dialect.quote(foreignKey.column)} IS NOT NULL AND NOT EXISTS (` +
-    `SELECT 1 FROM ${dialect.quote(foreignKey.targetTable)} AS ${dialect.quote('target')} ` +
-    `WHERE ${dialect.quote('target')}.${dialect.quote(foreignKey.targetColumn)} = ` +
-    `${dialect.quote(table)}.${dialect.quote(foreignKey.column)})`
+    `WHERE ${danglingCondition(dialect, table, foreignKey, targetCreated)}`
   );
 }

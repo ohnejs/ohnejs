@@ -203,7 +203,7 @@ describe('guardDiffs', () => {
     await db.close();
   });
 
-  it('refuses dangling rows under a foreign key being added, purges them under force', async () => {
+  it('refuses dangling rows under a foreign key being added, clears them under force', async () => {
     const db = await open();
     const users = table('Users');
     const live = table('Posts', {
@@ -228,9 +228,63 @@ describe('guardDiffs', () => {
     match(bodyOf(error), /`1` rows of `Posts` dangle from `Posts.author` to missing `Users` rows/);
     const report = await guard(db, [users, live], [users, desired], true);
     strictEqual(report.deletions.length, 1);
-    deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts" ORDER BY "UUID"'), [
-      Object.assign(Object.create(null), { UUID: 'p1' }),
+    match(report.deletions[0] ?? '', /`1` values of `Posts.author` cleared/);
+    deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts" ORDER BY "UUID"'), [
+      Object.assign(Object.create(null), { UUID: 'p1', author: 'u1' }),
+      Object.assign(Object.create(null), { UUID: 'p2', author: null }),
     ]);
+    await db.close();
+  });
+
+  it('deletes dangling rows when the column is NOT NULL on either side', async () => {
+    const db = await open();
+    const users = table('Users');
+    const tightened = table('Posts', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+    });
+    const tightenedDesired = table('Posts', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: true }],
+      foreignKeys: [
+        {
+          column: 'author',
+          targetTable: 'Users',
+          targetColumn: 'UUID',
+          onDelete: 'cascade' as const,
+        },
+      ],
+    });
+    await materialize(db, [users, tightened]);
+    await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'ghost']);
+    const report = await guard(db, [users, tightened], [users, tightenedDesired], true);
+    strictEqual(report.deletions.length, 1);
+    match(report.deletions[0] ?? '', /`1` rows of `Posts` deleted/);
+    deepStrictEqual(await db.query('SELECT * FROM "Posts"'), []);
+    await db.close();
+  });
+
+  it('deletes dangling rows when the column relaxes to nullable this sync', async () => {
+    const db = await open();
+    const users = table('Users');
+    const live = table('Posts', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: true }],
+    });
+    const desired = table('Posts', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+      foreignKeys: [
+        {
+          column: 'author',
+          targetTable: 'Users',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    });
+    await materialize(db, [users, live]);
+    await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'ghost']);
+    const report = await guard(db, [users, live], [users, desired], true);
+    strictEqual(report.deletions.length, 1);
+    match(report.deletions[0] ?? '', /`1` rows of `Posts` deleted/);
+    deepStrictEqual(await db.query('SELECT * FROM "Posts"'), []);
     await db.close();
   });
 
@@ -262,7 +316,10 @@ describe('guardDiffs', () => {
     deepStrictEqual(report.deletions, []);
     const forced = await guard(db, [users, posts], [users, touched], true);
     strictEqual(forced.deletions.length, 1);
-    deepStrictEqual(await db.query('SELECT * FROM "Posts"'), []);
+    match(forced.deletions[0] ?? '', /`1` values of `Posts.author` cleared/);
+    deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts"'), [
+      Object.assign(Object.create(null), { UUID: 'p1', author: null }),
+    ]);
     await db.close();
   });
 
@@ -313,16 +370,22 @@ describe('guardDiffs', () => {
     match(bodyOf(error), /`2` rows of `Posts` dangle/);
     const report = await guard(db, [posts], [categories, desired], true);
     strictEqual(report.deletions.length, 1);
-    deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts"'), [
-      Object.assign(Object.create(null), { UUID: 'p3' }),
-    ]);
+    match(report.deletions[0] ?? '', /`2` values of `Posts.category` cleared/);
+    deepStrictEqual(
+      await db.query('SELECT "UUID" FROM "Posts" WHERE "category" IS NULL ORDER BY "UUID"'),
+      [
+        Object.assign(Object.create(null), { UUID: 'p1' }),
+        Object.assign(Object.create(null), { UUID: 'p2' }),
+        Object.assign(Object.create(null), { UUID: 'p3' }),
+      ],
+    );
     await db.close();
   });
 
   it('cascades a force purge through a self-referencing chain', async () => {
     const db = await open();
     const nodes = table('Nodes', {
-      columns: [UUID, { name: 'parent', type: 'text', notNull: false }],
+      columns: [UUID, { name: 'parent', type: 'text', notNull: true }],
     });
     await materialize(db, [nodes]);
     await db.run('INSERT INTO "Nodes" ("UUID", "parent") VALUES (?, ?)', ['A', 'missing']);
@@ -335,7 +398,7 @@ describe('guardDiffs', () => {
           column: 'parent',
           targetTable: 'Nodes',
           targetColumn: 'UUID',
-          onDelete: 'setNull' as const,
+          onDelete: 'cascade' as const,
         },
       ],
     };
@@ -349,24 +412,26 @@ describe('guardDiffs', () => {
     const db = await open();
     const bosses = table('Bosses');
     const parents = table('Parents', {
-      columns: [UUID, { name: 'boss', type: 'text', notNull: false }],
+      columns: [UUID, { name: 'boss', type: 'text', notNull: true }],
     });
     const children = table('Children', {
-      columns: [UUID, { name: 'parent', type: 'text', notNull: false }],
+      columns: [UUID, { name: 'parent', type: 'text', notNull: true }],
       foreignKeys: [
         {
           column: 'parent',
           targetTable: 'Parents',
           targetColumn: 'UUID',
-          onDelete: 'setNull' as const,
+          onDelete: 'cascade' as const,
         },
       ],
     });
     await materialize(db, [bosses, parents, children]);
     await db.run('INSERT INTO "Parents" ("UUID", "boss") VALUES (?, ?)', ['P1', 'ghost']);
-    await db.run('INSERT INTO "Parents" ("UUID", "boss") VALUES (?, ?)', ['P2', null]);
+    await db.run('INSERT INTO "Parents" ("UUID", "boss") VALUES (?, ?)', ['P2', 'ghost2']);
     await db.run('INSERT INTO "Children" ("UUID", "parent") VALUES (?, ?)', ['C1', 'P1']);
     await db.run('INSERT INTO "Children" ("UUID", "parent") VALUES (?, ?)', ['C2', 'P2']);
+    await db.run('INSERT INTO "Bosses" ("UUID") VALUES (?)', ['B1']);
+    await db.run('UPDATE "Parents" SET "boss" = ? WHERE "UUID" = ?', ['B1', 'P2']);
     const desiredParents = {
       ...parents,
       foreignKeys: [
@@ -374,7 +439,7 @@ describe('guardDiffs', () => {
           column: 'boss',
           targetTable: 'Bosses',
           targetColumn: 'UUID',
-          onDelete: 'setNull' as const,
+          onDelete: 'cascade' as const,
         },
       ],
     };
@@ -384,13 +449,46 @@ describe('guardDiffs', () => {
       guardDiffs(tx, dialect, diffSchemas(live, desired, dialect), live, { force: true }),
     );
     strictEqual(report.deletions.length, 2);
-    match(report.deletions.join('\n'), /rows of `Parents` dangle/);
-    match(report.deletions.join('\n'), /rows of `Children` dangle/);
+    match(report.deletions.join('\n'), /rows of `Parents` deleted/);
+    match(report.deletions.join('\n'), /rows of `Children` deleted/);
     deepStrictEqual(await db.query('SELECT "UUID" FROM "Parents"'), [
       Object.assign(Object.create(null), { UUID: 'P2' }),
     ]);
     deepStrictEqual(await db.query('SELECT "UUID" FROM "Children"'), [
       Object.assign(Object.create(null), { UUID: 'C2' }),
+    ]);
+    await db.close();
+  });
+
+  it('purges precisely on a table whose name matches the subquery alias', async () => {
+    const db = await open();
+    const users = table('Users', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+    });
+    const live = table('Target', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+    });
+    const desired = {
+      ...live,
+      foreignKeys: [
+        {
+          column: 'author',
+          targetTable: 'Users',
+          targetColumn: 'UUID',
+          onDelete: 'setNull' as const,
+        },
+      ],
+    };
+    await materialize(db, [users, live]);
+    await db.run('INSERT INTO "Users" ("UUID", "author") VALUES (?, ?)', ['u1', null]);
+    await db.run('INSERT INTO "Target" ("UUID", "author") VALUES (?, ?)', ['t1', 'u1']);
+    await db.run('INSERT INTO "Target" ("UUID", "author") VALUES (?, ?)', ['t2', 'ghost']);
+    const report = await guard(db, [users, live], [users, desired], true);
+    strictEqual(report.deletions.length, 1);
+    match(report.deletions[0] ?? '', /`1` values of `Target.author` cleared/);
+    deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Target" ORDER BY "UUID"'), [
+      Object.assign(Object.create(null), { UUID: 't1', author: 'u1' }),
+      Object.assign(Object.create(null), { UUID: 't2', author: null }),
     ]);
     await db.close();
   });
