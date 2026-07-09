@@ -1,11 +1,8 @@
-import { stat } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
-
 import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
 import type { LayerDefinition } from '../layers/define-layer.ts';
 
-import { exists } from '../../utils/fs/index.ts';
+import { exists, importDefault } from '../../utils/fs/index.ts';
 import { joinPath } from '../../utils/index.ts';
 import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
 
@@ -44,13 +41,6 @@ export interface LayerLoadOptions {
   fresh?: boolean;
 }
 
-async function importDefault<T>(file: string, fresh: boolean): Promise<T | null> {
-  const href = pathToFileURL(file).href;
-  const url = fresh ? `${href}?v=${(await stat(file)).mtimeMs}` : href;
-  const module = await import(url);
-  return (module.default ?? null) as T | null;
-}
-
 /**
  * Reads a directory's config, normalized to its input plus the defaults and strategies it owns.
  *
@@ -76,12 +66,12 @@ export async function readLayerConfig(
   const { fresh = false } = options;
   const configFile = joinPath(dir, 'ohne.config.ts');
   if (!(await exists(configFile))) return null;
-  const input = (await importDefault<Config>(configFile, fresh)) ?? {};
+  const input = (await importDefault<Config>(configFile, { fresh })) ?? {};
   if (input.dirs) validateConfigDirs(input.dirs, configFile);
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');
   const layer = (await exists(layerFile))
-    ? await importDefault<LayerDefinition>(layerFile, fresh)
+    ? await importDefault<LayerDefinition>(layerFile, { fresh })
     : null;
 
   return { input, defaults: layer?.defaults ?? {}, strategies: layer?.strategies ?? {} };
