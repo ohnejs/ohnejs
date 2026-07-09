@@ -6,3 +6,4 @@ export * from './literal-string.ts';
 export * from './literal-union.ts';
 export * from './property-key.ts';
 export * from './to-js-identifier.ts';
+export * from './type-imports.ts';
