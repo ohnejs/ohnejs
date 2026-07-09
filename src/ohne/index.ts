@@ -25,6 +25,7 @@ export * from './database/migrations/collect-migrations.ts';
 export * from './database/migrations/define-migration.ts';
 export * from './database/migrations/scan-layer-migrations.ts';
 export * from './database/migrations/use-migrations.ts';
+export * from './database/schema/desired.ts';
 export * from './database/use-database.ts';
 export * from './database/use-dialects.ts';
 export * from './database/with-lock.ts';
