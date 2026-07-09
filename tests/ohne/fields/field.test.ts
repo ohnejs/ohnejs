@@ -1,4 +1,4 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
@@ -12,10 +12,6 @@ describe('field', () => {
       type: 'integer',
       options: { index: true },
     });
-  });
-
-  it('rejects unique and index together', () => {
-    throws(() => field('text', { unique: true, index: true }), /`unique` conflicts with `index`/);
   });
 });
 

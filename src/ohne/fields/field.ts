@@ -1,9 +1,9 @@
 import type { FieldType } from './define-field.ts';
+import type { KnownFieldOptions } from './known-field-options.ts';
 import type { FieldTypeName, KnownFields } from './known-fields.ts';
-import type { AnyOptionDef, HasRequiredOption, ResolveOptions, ResolvedOptions } from './option.ts';
+import type { AnyOptionDef, ResolveOptions, ResolvedOptions } from './option.ts';
 
 import { isUndefined } from '../../utils/index.ts';
-import { validateFieldInstance } from './validate-field-instance.ts';
 
 /**
  * The storage options every field accepts.
@@ -12,14 +12,14 @@ export interface FieldOptions {
   /**
    * Whether the column permits `NULL`.
    *
-   * Omitted, it resolves to `false`.
-   * A force-nullable field type resolves it to `true` instead, and rejects an explicit `false`.
+   * @default
+   * false
    */
   nullable?: boolean;
 
   /**
-   * Emits a unique constraint over the field's column.
-   * Mutually exclusive with `index`.
+   * Emits a unique index over the field's column.
+   * Set together with `index`, the unique index alone is emitted: it serves plain lookups too.
    *
    * @default
    * false
@@ -28,7 +28,7 @@ export interface FieldOptions {
 
   /**
    * Emits a non-unique index over the field's column.
-   * Mutually exclusive with `unique`.
+   * Set together with `unique`, it yields to the unique index.
    *
    * @default
    * false
@@ -50,9 +50,33 @@ type DeclaredOptions<K extends FieldTypeName> =
   KnownFields[K] extends FieldType<infer O> ? O : Record<string, never>;
 
 /**
- * The full options object `field('K', ...)` accepts: the type's own options plus the common ones.
+ * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
+ * A column-less type stores through its hint alone, so it takes no common option.
+ * With declared options the excess-property check already rejects them, so nothing joins.
+ * Without any, `Record<string, never>` rejects every key through its index signature.
+ * Both leave the suggestion list empty; a bare `{}` would instead let anything through.
+ * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
+ * `unique` survives a forced index, upgrading it to a unique one.
  */
-type InstanceOptions<K extends FieldTypeName> = ResolveOptions<DeclaredOptions<K>> & FieldOptions;
+type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] extends false
+  ? [keyof DeclaredOptions<K>] extends [never]
+    ? Record<string, never>
+    : {}
+  : Omit<
+      FieldOptions,
+      | (NonNullable<KnownFields[K]['forceNullable']> extends true ? 'nullable' : never)
+      | (NonNullable<KnownFields[K]['forceIndex']> extends true ? 'index' : never)
+    >;
+
+/**
+ * The full options object `field('K', ...)` accepts.
+ * A `KnownFieldOptions` member is the complete shape.
+ * Otherwise the type's declared options resolve homomorphically.
+ * The common options then join per the column gate.
+ */
+type InstanceOptions<K extends FieldTypeName> = K extends keyof KnownFieldOptions
+  ? KnownFieldOptions[K]
+  : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>;
 
 /**
  * One field instance: the field-type name and options from a `field(...)` call.
@@ -93,14 +117,11 @@ const FIELD_OPTION_DEFAULTS = {
  */
 export function field<K extends FieldTypeName>(
   type: K,
-  ...args: HasRequiredOption<DeclaredOptions<K>> extends true
-    ? [options: InstanceOptions<K>]
-    : [options?: InstanceOptions<K>]
+  ...args: [{}] extends [InstanceOptions<K>]
+    ? [options?: InstanceOptions<K>]
+    : [options: InstanceOptions<K>]
 ): FieldInstance<K> {
-  const options = (args[0] ?? {}) as InstanceOptions<K>;
-  const instance: FieldInstance<K> = { type, options };
-  validateFieldInstance(instance);
-  return instance;
+  return { type, options: (args[0] ?? {}) as InstanceOptions<K> };
 }
 
 /**

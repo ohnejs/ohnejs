@@ -57,7 +57,9 @@ const FALLBACK: Record<LogicalType, string> = {
  * A nullable field (instance `nullable` or type `forceNullable`) is wrapped with `| null`.
  * This is the value type only; the caller assembles the surrounding property and indents each line.
  *
- * Column-less field types (`columnType: false`) are unsupported and throw.
+ * A column-less field derives its type from its storage hint.
+ * A junction holds the linked rows' `UUID` values in order, so it emits `string[]`.
+ * A column-less type without a hint throws.
  *
  * @example
  * ```ts
@@ -72,18 +74,20 @@ export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
   args: FieldValueTypeArgs<TOptions>,
 ): string {
   const { fieldType, name, options, fieldDir, imports } = args;
+  const resolved = resolveFieldOptions(fieldType, options);
 
   if (fieldType.columnType === false) {
+    const hint = fieldType.schema?.({ name, options: resolved });
+    if (hint?.kind === 'junction') return 'string[]';
     throw ohneError({
       title: 'Cannot emit a type for a column-less field',
       body: [
         'A column-less field type (`columnType: false`) owns no column, so it has no value type to emit.',
-        'Only column-bearing field types are supported.',
+        'Only column-bearing and junction field types are supported.',
       ],
     });
   }
 
-  const resolved = resolveFieldOptions(fieldType, options);
   const ctx: EmitTypeContext<TOptions> = {
     name,
     options: resolved,

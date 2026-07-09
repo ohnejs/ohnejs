@@ -1,6 +1,7 @@
 import type { LogicalType } from '../database/dialect.ts';
-import type { EmitTypeContext } from './context.ts';
+import type { EmitTypeContext, FieldContext } from './context.ts';
 import type { AnyOptionDef } from './option.ts';
+import type { StorageHint } from './storage-hint.ts';
 
 import { validateFieldType } from './validate-field.ts';
 
@@ -10,33 +11,39 @@ import { validateFieldType } from './validate-field.ts';
  * These members define how the field's value is stored.
  * The built-ins ship in core and register at module load; layers add their own under `dirs.fields`.
  * `TOptions` captures the options this type declares, so `field('<name>', ...)` narrows to them.
+ * `TColumn` keeps the `columnType` literal, so column-less types stay distinguishable at the type level.
+ * `TForceNullable` and `TForceIndex` keep the forced flags, so `field(...)` hides the options they lock.
  */
 export interface FieldType<
   TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+  TColumn extends LogicalType | false = LogicalType | false,
+  TForceNullable extends boolean = boolean,
+  TForceIndex extends boolean = boolean,
 > {
   /**
    * The storage primitive of the field's own column, or `false` when the field owns no column.
    */
-  columnType: LogicalType | false;
+  columnType: TColumn;
 
   /**
-   * Locks the column NULL-permitting regardless of the instance `nullable`.
+   * Locks the column NULL-permitting; a field of this type takes no `nullable` at all.
    * Column-bearing types only.
    * A `record` sets it: its target can be deleted out from under the column.
    *
    * @default
    * false
    */
-  forceNullable?: boolean;
+  forceNullable?: TForceNullable;
 
   /**
-   * Forces a non-unique index on the field's column regardless of the instance `index`.
+   * Locks a non-unique index onto the field's column.
    * Column-bearing types only.
+   * A field of this type takes no `index`; `unique: true` upgrades the forced index to a unique one.
    *
    * @default
    * false
    */
-  index?: boolean;
+  forceIndex?: TForceIndex;
 
   /**
    * The options this field type accepts, each declared with `option()`.
@@ -51,6 +58,18 @@ export interface FieldType<
    * ```
    */
   options?: TOptions;
+
+  /**
+   * Returns the storage layout of a field that needs more than a plain column.
+   *
+   * - A `record` pairs `columnType: 'text'` with a `foreignKey` hint.
+   * - A `records` pairs `columnType: false` with a `junction` hint.
+   *
+   * Runs when the desired schema builds and at codegen time, never inside a request.
+   * `ctx` carries the field's name and its resolved options.
+   * Mutually exclusive with `emitType`: the framework derives the value type from the hint.
+   */
+  schema?(ctx: FieldContext<TOptions>): StorageHint;
 
   /**
    * Emits the field's TypeScript value type as source, run at codegen time.
@@ -92,9 +111,14 @@ export interface FieldType<
  * export default defineField({ columnType: 'text' })
  * ```
  */
-export function defineField<TOptions extends Record<string, AnyOptionDef> = {}>(
-  type: FieldType<TOptions>,
-): FieldType<TOptions> {
+export function defineField<
+  TOptions extends Record<string, AnyOptionDef> = {},
+  TColumn extends LogicalType | false = LogicalType | false,
+  TForceNullable extends boolean = boolean,
+  TForceIndex extends boolean = boolean,
+>(
+  type: FieldType<TOptions, TColumn, TForceNullable, TForceIndex>,
+): FieldType<TOptions, TColumn, TForceNullable, TForceIndex> {
   validateFieldType(type);
   return type;
 }

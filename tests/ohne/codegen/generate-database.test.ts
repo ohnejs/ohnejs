@@ -262,16 +262,123 @@ describe('generateDatabase', () => {
     );
   });
 
+  it('types relation fields and maps owning records fields into GeneratedRelations', async () => {
+    const app = join(root, 'relations');
+    writePackage(app, 'relations');
+    write(
+      app,
+      'collections/Users.ts',
+      'export default { fields: {\n' +
+        "  posts: { type: 'records', options: { collection: 'Posts', inverse: 'reviewers' } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'collections/Posts.ts',
+      'export default { fields: {\n' +
+        "  author: { type: 'record', options: { collection: 'Users' } },\n" +
+        "  reviewers: { type: 'records', options: { collection: 'Users' } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    ok(shared.includes('author: string | null;'));
+    ok(shared.includes('reviewers: string[];'));
+    ok(shared.includes('posts: string[];'));
+    ok(shared.includes('export interface GeneratedRelations {'));
+    ok(shared.includes("reviewers: 'Users';"));
+    ok(shared.includes('Users: {};'));
+    ok(!shared.includes("posts: 'Posts';"));
+    ok(node.includes('interface KnownRelations extends GeneratedRelations {}'));
+  });
+
+  it('narrows relation options in a consumer app, rejecting the illegal shapes', async () => {
+    const app = join(root, 'relation-typing');
+    writePackage(app, 'relation-typing');
+    mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(
+      join(FRAMEWORK, 'node_modules', '@types', 'node'),
+      join(app, 'node_modules', '@types', 'node'),
+      'dir',
+    );
+    writeFileSync(
+      join(app, 'tsconfig.json'),
+      JSON.stringify({
+        extends: 'ohne/tsconfig.node.json',
+        include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
+      }),
+    );
+    write(
+      app,
+      'collections/Users.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        "export default defineCollection({ fields: { name: field('text') } });\n",
+    );
+    write(
+      app,
+      'collections/Posts.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        'export default defineCollection({\n' +
+        '  fields: {\n' +
+        "    author: field('record', { collection: 'Users' }),\n" +
+        "    tags: field('records', { collection: 'Tags' }),\n" +
+        '  },\n' +
+        '});\n',
+    );
+    write(
+      app,
+      'collections/Tags.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        'export default defineCollection({\n' +
+        "  fields: { posts: field('records', { collection: 'Posts', inverse: 'tags' }) },\n" +
+        '});\n',
+    );
+    write(
+      app,
+      'typing.ts',
+      "import { field } from 'ohne';\n" +
+        '\n' +
+        "field('record', { collection: 'Users', onDelete: 'cascade' });\n" +
+        "field('records', { collection: 'Posts', inverse: 'tags' });\n" +
+        '// @ts-expect-error an unknown collection is not a legal target\n' +
+        "field('record', { collection: 'Ghost' });\n" +
+        '// @ts-expect-error a records field has no column to constrain\n' +
+        "field('records', { collection: 'Users', unique: true });\n" +
+        '// @ts-expect-error a junction field is empty, never NULL\n' +
+        "field('records', { collection: 'Users', nullable: true });\n" +
+        '// @ts-expect-error `author` owns no junction on Posts\n' +
+        "field('records', { collection: 'Posts', inverse: 'author' });\n" +
+        '// @ts-expect-error a record field requires its options\n' +
+        "field('record');\n" +
+        '// @ts-expect-error a record column is force-nullable, so the option is hidden\n' +
+        "field('record', { collection: 'Users', nullable: true });\n",
+    );
+
+    await loadLayers(app);
+    await generateDatabase(app);
+
+    execFileSync(
+      process.execPath,
+      [join(FRAMEWORK, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', app],
+      { encoding: 'utf8' },
+    );
+  });
+
   it('rejects a collection referencing an unknown field type, naming the file', async () => {
     const app = join(root, 'unknown');
     writePackage(app, 'unknown');
     write(
       app,
       'collections/Posts.ts',
-      "export default { fields: { rel: { type: 'records', options: {} } } };\n",
+      "export default { fields: { rel: { type: 'gallery', options: {} } } };\n",
     );
 
     await loadLayers(app);
-    await rejects(generateDatabase(app), /Unknown field type `records`/);
+    await rejects(generateDatabase(app), /Unknown field type `gallery`/);
   });
 });

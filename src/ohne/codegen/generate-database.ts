@@ -21,6 +21,7 @@ import { collectCollections } from '../collections/collect-collections.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
+import { resolveFieldOptions } from '../fields/field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { fieldValueType } from '../fields/value-type.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
@@ -97,7 +98,8 @@ export async function generateDatabase(
 }
 
 /**
- * Writes `shared/database.ts`: the pure `GeneratedCollections` and `GeneratedDatabases` types.
+ * Writes `shared/database.ts`, the pure type bucket.
+ * It carries `GeneratedCollections`, `GeneratedRelations`, and `GeneratedDatabases`.
  * The collection traversal runs before emission, so `importType` records its `import type` lines first.
  */
 async function writeShared(
@@ -115,6 +117,7 @@ async function writeShared(
       name,
       type: valueTypeOf(collection, name, instance, types, imports),
     })),
+    relations: owningRelationsOf(collection, types),
   }));
 
   const code = createCodeBuilder();
@@ -137,6 +140,28 @@ async function writeShared(
         code.indent(() => {
           for (const field of member.fields) {
             code.line(`${propertyKey(field.name)}: ${field.type};`);
+          }
+        });
+        code.line('};');
+      }
+    });
+    code.line('}');
+  }
+  code.line();
+  if (members.length === 0) {
+    code.line('export interface GeneratedRelations {}');
+  } else {
+    code.line('export interface GeneratedRelations {');
+    code.indent(() => {
+      for (const member of members) {
+        if (member.relations.length === 0) {
+          code.line(`${propertyKey(member.name)}: {};`);
+          continue;
+        }
+        code.line(`${propertyKey(member.name)}: {`);
+        code.indent(() => {
+          for (const relation of member.relations) {
+            code.line(`${propertyKey(relation.name)}: ${literalString(relation.target)};`);
           }
         });
         code.line('};');
@@ -193,12 +218,13 @@ async function writeNode(
   if (collections.length + fields.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedCollections, GeneratedDatabases } from '../shared/database.ts';",
+    "import type { GeneratedCollections, GeneratedDatabases, GeneratedRelations } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
   code.indent(() => {
     code.line('interface KnownCollections extends GeneratedCollections {}');
+    code.line('interface KnownRelations extends GeneratedRelations {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     if (augmented.length === 0) {
       code.line('interface KnownFields {}');
@@ -297,9 +323,29 @@ function valueTypeOf(
   return fieldValueType({
     fieldType: registered.fieldType,
     name,
-    // The spread restores the index signature `InstanceOptions` lacks.
     options: { ...instance.options },
     fieldDir: registered.dir,
     imports,
   });
+}
+
+/**
+ * Collects one collection's owning relation fields: junction hints without `inverse`.
+ * These become the collection's `GeneratedRelations` member, each mapped to its target's name.
+ * Top-level collection fields only, by contract - the map never descends into subfields.
+ */
+function owningRelationsOf(
+  collection: CollectedCollection,
+  types: Map<string, EmittableFieldType>,
+): { name: string; target: string }[] {
+  const relations: { name: string; target: string }[] = [];
+  for (const [name, instance] of Object.entries(collection.collection.fields)) {
+    const fieldType = types.get(instance.type)?.fieldType;
+    if (isUndefined(fieldType?.schema)) continue;
+    const options = resolveFieldOptions(fieldType, { ...instance.options });
+    const hint = fieldType.schema({ name, options });
+    if (hint.kind !== 'junction' || !isUndefined(hint.inverse)) continue;
+    relations.push({ name, target: hint.collection });
+  }
+  return relations;
 }

@@ -6,9 +6,9 @@ import { option } from '../../../src/ohne/fields/option.ts';
 
 describe('defineField', () => {
   it('returns a column-bearing definition unchanged', () => {
-    deepStrictEqual(defineField({ columnType: 'text', index: true }), {
+    deepStrictEqual(defineField({ columnType: 'text', forceIndex: true }), {
       columnType: 'text',
-      index: true,
+      forceIndex: true,
     });
   });
 
@@ -20,8 +20,8 @@ describe('defineField', () => {
     throws(() => defineField({ columnType: false, forceNullable: true }), /column-less/);
   });
 
-  it('rejects `index` on a column-less type', () => {
-    throws(() => defineField({ columnType: false, index: true }), /column-less/);
+  it('rejects `forceIndex` on a column-less type', () => {
+    throws(() => defineField({ columnType: false, forceIndex: true }), /column-less/);
   });
 
   it('accepts camelCase, non-reserved option names', () => {
@@ -51,6 +51,18 @@ describe('defineField', () => {
   it('keeps an emitType callback on the definition', () => {
     const emitType = () => 'string';
     strictEqual(defineField({ columnType: 'text', emitType }).emitType, emitType);
+  });
+
+  it('rejects declaring both `schema` and `emitType`', () => {
+    throws(
+      () =>
+        defineField({
+          columnType: 'text',
+          schema: () => ({ kind: 'foreignKey', collection: 'Users' }),
+          emitType: () => 'string',
+        }),
+      /cannot declare both `schema` and `emitType`/,
+    );
   });
 
   it('types emitType ctx with fully resolved options - defaults required, no-default keys optional', () => {

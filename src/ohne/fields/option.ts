@@ -88,11 +88,6 @@ export type ResolveOptions<O> = {
 };
 
 /**
- * Whether a declared-options record has at least one required option.
- */
-export type HasRequiredOption<O> = [RequiredOptionKeys<O>] extends [never] ? false : true;
-
-/**
  * The keys of `O` present after resolution: required options, and optional options carrying a default.
  * An optional option declared without a default stays absent when omitted, so it is not here.
  */

@@ -42,7 +42,8 @@ fields: {
 }
 ```
 
-`unique` and `index` are mutually exclusive - a unique constraint already indexes the column.
+`unique` covers `index` - a unique index serves plain lookups too, so setting both emits the
+unique index alone.
 
 Constraints over several columns live on the collection, one entry per constraint:
 

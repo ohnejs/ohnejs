@@ -1,0 +1,44 @@
+import type { CollectionName } from '../../collections/known-collections.ts';
+
+import { defineField } from '../define-field.ts';
+import { option } from '../option.ts';
+
+/**
+ * The built-in `records` field type: an ordered many-to-many relation to another collection.
+ *
+ * Owns no column; its links live in a junction table joining the owner and the target by `UUID`.
+ * Each side of the junction keeps its own order, and a (parent, target) pair can exist only once.
+ * With `inverse`, this field is the other side of an owning `records` field and creates no table.
+ */
+export const records = defineField({
+  columnType: false,
+  options: {
+    /**
+     * The collection this field relates to, by name.
+     */
+    collection: option<CollectionName>({ required: true }),
+
+    /**
+     * The owning `records` field on the target collection this field is the inverse of.
+     * Both sides then share the owner's junction table, each keeping its own order.
+     * Omitted, this field owns the junction itself.
+     */
+    inverse: option<string>(),
+
+    /**
+     * What happens to a link when its target row is deleted.
+     * `cascade` removes the link, `restrict` blocks the delete while links exist.
+     * Only the owning side configures this; an `inverse` field cannot.
+     *
+     * @default
+     * 'cascade'
+     */
+    onDelete: option<'cascade' | 'restrict'>(),
+  },
+  schema: (ctx) => ({
+    kind: 'junction',
+    collection: ctx.options.collection,
+    inverse: ctx.options.inverse,
+    onDelete: ctx.options.onDelete,
+  }),
+});

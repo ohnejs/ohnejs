@@ -93,7 +93,24 @@ describe('fieldValueType', () => {
     deepStrictEqual(imports.statements(), ["import type { LatLng } from '../fields/geo.ts';"]);
   });
 
-  it('throws for a column-less field type', () => {
+  it('throws for a column-less field type without a storage hint', () => {
     throws(() => emit(defineField({ columnType: false })), /column-less/);
+  });
+
+  it('emits an ordered UUID array for a junction field', () => {
+    const junction = defineField({
+      columnType: false,
+      schema: () => ({ kind: 'junction', collection: 'Users' }),
+    });
+    strictEqual(emit(junction).type, 'string[]');
+  });
+
+  it('wraps a force-nullable foreign-key field with null', () => {
+    const reference = defineField({
+      columnType: 'text',
+      forceNullable: true,
+      schema: () => ({ kind: 'foreignKey', collection: 'Users' }),
+    });
+    strictEqual(emit(reference).type, 'string | null');
   });
 });

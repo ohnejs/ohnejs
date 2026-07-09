@@ -1,5 +1,7 @@
 import type { boolean } from './builtin/boolean.ts';
 import type { integer } from './builtin/integer.ts';
+import type { record } from './builtin/record.ts';
+import type { records } from './builtin/records.ts';
 import type { text } from './builtin/text.ts';
 
 /**
@@ -33,6 +35,16 @@ export interface KnownFields {
    * A true or false value.
    */
   boolean: typeof boolean;
+
+  /**
+   * A reference to one row of another collection.
+   */
+  record: typeof record;
+
+  /**
+   * An ordered many-to-many relation to another collection.
+   */
+  records: typeof records;
 }
 
 /**
