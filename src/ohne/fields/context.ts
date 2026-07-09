@@ -38,13 +38,14 @@ export interface EmitTypeContext<
    * Always use that returned name; it is aliased when another module already exported the same name.
    *
    * Write `path` as you would import it from your own field file.
-   * A relative path (`'./geo.ts'`) resolves against that file; a package name (`'zod'`) is used as is.
+   * A relative path (`'./_geo.ts'`) resolves against that file; a package name (`'zod'`) is used as is.
+   * A `_`-prefixed sibling is the place for such shared types: the field scanner skips it.
    *
    * @example
    * ```ts
    * // emit `LatLng[]`, importing `LatLng` from a sibling module
    * emitType: (ctx) => {
-   *   const LatLng = ctx.importType('./geo.ts', 'LatLng')
+   *   const LatLng = ctx.importType('./_geo.ts', 'LatLng')
    *   return `${LatLng}[]`
    * }
    * ```

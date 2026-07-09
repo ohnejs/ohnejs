@@ -7,6 +7,24 @@ import { ohneError } from '../error/ohne-error.ts';
 const RESERVED_OPTIONS = new Set(['nullable', 'unique', 'index']);
 
 /**
+ * Rejects a field-type name that is not camelCase.
+ * The name comes from the file under `dirs.fields`, so the fix is renaming the file.
+ * Pass `path` when the name comes from a file, so the error lands on it.
+ */
+export function validateFieldTypeName(name: string, path?: string): void {
+  if (!isCamelCase(name)) {
+    throw ohneError({
+      title: `Field-type name \`${name}\` is not camelCase`,
+      body: [
+        'Field-type names are camelCase: a lowercase letter, then letters and digits.',
+        'Rename the file to match.',
+      ],
+      path,
+    });
+  }
+}
+
+/**
  * Validates a field type's storage members and declared option names.
  *
  * - A column-less type (`columnType: false`) owns no column, so it cannot set `forceNullable` or `index`.

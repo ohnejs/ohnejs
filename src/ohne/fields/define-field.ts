@@ -66,14 +66,16 @@ export interface FieldType<
    * - `boolean` -> `boolean`
    * - `json` -> `unknown`.
    *
+   * Declared as a method, so a concrete field type stays assignable to the registry's wide `FieldType`.
+   *
    * @example
    * ```ts
    * emitType: () => 'string'
    * emitType: (ctx) => ctx.options.choices.map((c) => `'${c}'`).join(' | ')
-   * emitType: (ctx) => ctx.importType('./geo.ts', 'LatLng')
+   * emitType: (ctx) => ctx.importType('./_geo.ts', 'LatLng')
    * ```
    */
-  emitType?: (ctx: EmitTypeContext<TOptions>) => string | string[];
+  emitType?(ctx: EmitTypeContext<TOptions>): string | string[];
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { CollectionDefinition } from './define-collection.ts';
+import type { AnyCollectionDefinition } from './define-collection.ts';
 import type { CollectionName } from './known-collections.ts';
 
 import { createRegistry, type Registry } from '../../utils/index.ts';
@@ -13,9 +13,9 @@ export interface CollectionMeta {
   name: CollectionName;
 
   /**
-   * The collection definition.
+   * The collection definition, widened so any concrete `defineCollection` result fits.
    */
-  collection: CollectionDefinition;
+  collection: AnyCollectionDefinition;
 }
 
 const registry: Registry<CollectionMeta> = createRegistry<CollectionMeta>();

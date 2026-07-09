@@ -8,8 +8,9 @@ const RESERVED_COLLECTIONS = new Set(['ohne', 'block']);
  * PascalCase is an uppercase letter, then letters and digits: no underscores, spaces, or symbols.
  * Underscores are barred because a single `_` builds derived names and `__` marks framework names.
  * `Ohne` and `Block` are reserved case-insensitively.
+ * Pass `path` when the name comes from a file, so the error lands on it.
  */
-export function validateCollectionName(name: string): void {
+export function validateCollectionName(name: string, path?: string): void {
   if (isEmpty(name, { trim: true })) {
     throw ohneError('A collection name cannot be empty');
   }
@@ -20,6 +21,7 @@ export function validateCollectionName(name: string): void {
         'Collection names are PascalCase: an uppercase letter, then letters and digits, no underscores.',
         'A single `_` builds derived names and `__` marks framework names, so a name holds neither.',
       ],
+      path,
     });
   }
   if (RESERVED_COLLECTIONS.has(name.toLowerCase())) {
@@ -29,6 +31,7 @@ export function validateCollectionName(name: string): void {
         '`Ohne` and `Block` are reserved framework names, matched case-insensitively.',
         'Rename it.',
       ],
+      path,
     });
   }
 }

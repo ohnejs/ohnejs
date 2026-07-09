@@ -94,6 +94,28 @@ export interface Config {
     messages?: string;
 
     /**
+     * Directory each layer's collections are read from.
+     * Each `.ts` file default-exports one `defineCollection` result; the file names the collection.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'collections'
+     */
+    collections?: string;
+
+    /**
+     * Directory each layer's field types are read from.
+     * Each `.ts` file default-exports one `defineField` result; the file names the field type.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'fields'
+     */
+    fields?: string;
+
+    /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
      * Resolved against each layer's root.
@@ -160,6 +182,24 @@ export interface Config {
      * ```
      */
     messages?: string[];
+
+    /**
+     * Collection names to drop, matched exactly.
+     * A dropped collection vanishes from registration, the desired schema, and the generated types.
+     *
+     * @default
+     * []
+     */
+    collections?: string[];
+
+    /**
+     * Field-type names to drop, matched exactly.
+     * Built-ins can be dropped too; a field still referencing a dropped type fails at codegen.
+     *
+     * @default
+     * []
+     */
+    fields?: string[];
   };
 
   /**
@@ -579,7 +619,7 @@ export interface ConfigExtensions {}
  */
 export const DEFAULTS = {
   layers: [],
-  disable: { routes: [], messages: [] },
+  disable: { routes: [], messages: [], collections: [], fields: [] },
   messages: { defaultLanguage: 'en' },
   api: {
     basePath: '',
@@ -609,6 +649,8 @@ export const DIR_DEFAULTS = {
   boot: 'boot',
   middleware: 'middleware',
   messages: 'messages',
+  collections: 'collections',
+  fields: 'fields',
   migrations: 'migrations',
   dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
@@ -644,6 +686,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
  * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
+ * - `disable.collections` and `disable.fields` accumulate and dedupe, like `disable.routes`.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
@@ -655,6 +698,8 @@ export const BASE_STRATEGIES: LayerStrategies = {
   dirs: 'own',
   'disable.routes': 'concat-unique',
   'disable.messages': 'concat-unique',
+  'disable.collections': 'concat-unique',
+  'disable.fields': 'concat-unique',
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',

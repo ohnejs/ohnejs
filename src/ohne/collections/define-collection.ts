@@ -58,6 +58,28 @@ export interface CollectionDefinition<
 }
 
 /**
+ * Any collection definition, whatever fields it declares.
+ *
+ * `CollectionDefinition` is invariant in `TFields`, since `compositeIndexes` references `keyof TFields`.
+ * A concrete definition therefore never assigns to the default-generic form.
+ * Registries and codegen hold this widened view instead.
+ */
+export interface AnyCollectionDefinition {
+  /**
+   * The fields, keyed by their camelCase name.
+   */
+  fields: Record<string, FieldInstance>;
+
+  /**
+   * Collection-level composite constraints, one entry per constraint.
+   *
+   * @default
+   * []
+   */
+  compositeIndexes?: readonly CompositeIndex[];
+}
+
+/**
  * Defines a collection.
  *
  * Default-export the result from a file under a layer's `dirs.collections`.
