@@ -1,15 +1,14 @@
 /**
  * Codegen extension point for every known collection name.
  * Empty until codegen runs; the `database.ts` it emits augments this with one member per collection.
+ * Each member maps the collection name to its generated record shape.
  *
  * `type` aliases cannot be augmented, so the collection names live on this interface instead.
  *
  * @example
  * ```ts
  * declare module 'ohne' {
- *   interface KnownCollections {
- *     Posts: true
- *   }
+ *   interface KnownCollections extends GeneratedCollections {}
  * }
  * ```
  */
