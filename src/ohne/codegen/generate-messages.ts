@@ -126,6 +126,7 @@ async function writeNode(dir: string, messages: readonly MessageMeta[]): Promise
  */
 async function writeBrowser(dir: string): Promise<string> {
   const code = createCodeBuilder();
+  code.line("import type {} from 'ohne/dashboard';");
   code.line("import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';");
   code.line();
   code.line("declare module 'ohne/dashboard' {");

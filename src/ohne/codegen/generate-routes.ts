@@ -112,6 +112,7 @@ async function writeNode(dir: string, routes: readonly RouteMeta[]): Promise<str
  */
 async function writeBrowser(dir: string): Promise<string> {
   const code = createCodeBuilder();
+  code.line("import type {} from 'ohne/dashboard';");
   code.line("import type { GeneratedAPIRoutes } from '../shared/routes.ts';");
   code.line();
   code.line("declare module 'ohne/dashboard' {");
