@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { ok, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer } from 'node:net';
@@ -19,6 +19,7 @@ import {
   type HTTPServer,
   serveAPI,
   shutdownServer,
+  useCollections,
   useDatabase,
   useEnv,
   useHooks,
@@ -117,6 +118,7 @@ describe('serveAPI', () => {
     useShutdown().clear();
     useShutdown().unwatch();
     useHooks().clear();
+    useCollections().clear();
     useEnv().unset('SKIP_CODEGEN');
   });
 
@@ -203,6 +205,50 @@ describe('serveAPI', () => {
     ok(row);
     strictEqual((JSON.parse(row.data) as { generation: number }).generation, 1);
     useEnv().set('DATABASE', ':memory:');
+  });
+
+  it('builds the desired schema from the registered collections and syncs it', async () => {
+    const dir = serveable('schema');
+    mkdirSync(join(dir, 'collections'));
+    writeFileSync(
+      join(dir, 'collections', 'Posts.ts'),
+      "import { defineCollection, field } from 'ohne';\n" +
+        'export default defineCollection({\n' +
+        '  fields: {\n' +
+        "    title: field('text', { unique: true }),\n" +
+        "    views: field('integer', { nullable: true, index: true }),\n" +
+        "    email: field('text'),\n" +
+        "    tenant: field('text'),\n" +
+        '  },\n' +
+        "  compositeIndexes: [{ fields: ['email', 'tenant'], unique: true }],\n" +
+        '});\n',
+    );
+
+    http = await serveAPI(dir);
+
+    const table = await dialect.describeTable(useDatabase(), 'Posts');
+    strictEqual(table.name, 'Posts');
+    deepStrictEqual(table.primaryKey, ['UUID']);
+    deepStrictEqual(table.columns, [
+      { name: 'UUID', type: 'text', notNull: true },
+      { name: '_updatedAt', type: 'integer', notNull: true },
+      { name: 'title', type: 'text', notNull: true },
+      { name: 'views', type: 'integer', notNull: false },
+      { name: 'email', type: 'text', notNull: true },
+      { name: 'tenant', type: 'text', notNull: true },
+    ]);
+    deepStrictEqual(table.uniques.map((unique) => unique.name).sort(), [
+      'UX__Posts__email_tenant',
+      'UX__Posts__title',
+    ]);
+    deepStrictEqual(
+      table.uniques.find((unique) => unique.name === 'UX__Posts__email_tenant')?.columns,
+      ['email', 'tenant'],
+    );
+    deepStrictEqual(
+      table.indexes.map((index) => index.name),
+      ['IX__Posts__views'],
+    );
   });
 
   it('listens and answers an unmatched request with 404', async () => {
