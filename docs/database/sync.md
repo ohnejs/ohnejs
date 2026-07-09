@@ -1,0 +1,98 @@
+# Schema sync
+
+You declare what the database should look like; ohne makes it so. At every boot the schema sync
+compares the live database against your collections and applies the difference: new tables are
+created, new columns added, removed ones dropped. For everyday changes there is nothing else to do -
+no migration files, no SQL.
+
+## Declaring a collection
+
+A collection is one file under `collections/`, named after it:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohne';
+
+export default defineCollection({
+  fields: {
+    title: field('text'),
+    views: field('integer', { nullable: true }),
+  },
+});
+```
+
+The file name is the collection name: `collections/Posts.ts` becomes the `Posts` table. Collection
+names are PascalCase; field names are camelCase.
+
+Every collection gets two columns you never declare: `UUID`, the text primary key, and
+`_updatedAt`, an internal timestamp. Your fields become the other columns. A field is `NOT NULL`
+unless you pass `nullable: true`.
+
+A `_`-prefixed file or directory inside `collections/` is a helper and is ignored, so shared
+snippets can live beside your collections.
+
+## Uniques and indexes
+
+Field options cover the single-column cases:
+
+```ts
+fields: {
+  email: field('text', { unique: true }),
+  author: field('text', { index: true }),
+}
+```
+
+`unique` and `index` are mutually exclusive - a unique constraint already indexes the column.
+
+Constraints over several columns live on the collection, one entry per constraint:
+
+```ts
+export default defineCollection({
+  fields: {
+    email: field('text'),
+    tenant: field('text'),
+  },
+  compositeIndexes: [{ fields: ['email', 'tenant'], unique: true }],
+});
+```
+
+`fields` lists your field names in order. With `unique: true` the entry is a unique constraint,
+without it a plain index.
+
+## What happens at boot
+
+The sync runs inside the server boot, after your collections are registered and before the port
+opens. A failed sync means the app does not serve - the database is never half-migrated behind a
+live socket.
+
+The engine introspects the live database, diffs it against your collections, and applies the
+difference inside one transaction. When several instances of the app boot at once, a cluster lock
+elects one to sync; the others wait and then boot against the finished schema.
+
+## The destructive guard
+
+The sync never destroys data silently. It refuses to boot when a change would lose something:
+
+- dropping a table or column that still holds rows,
+- changing the type of a populated column,
+- adding a unique constraint over duplicate values,
+- adding `NOT NULL` where rows hold `NULL`.
+
+The refusal names exactly what would be lost. Empty tables and all-`NULL` columns are dropped
+freely - there is nothing to lose.
+
+An intentional change is expressed as a migration: a file under `migrations/` built with
+`defineMigration`, moving, renaming, or discarding data. Migrations run inside the same sync
+transaction, before the diff, so a covered change passes the guard.
+
+## Force
+
+`FORCE_SYNC` (or `database.sync.force` in config) authorizes the guard's deletions for one boot:
+
+```sh
+FORCE_SYNC=1 pnpm serve:api
+```
+
+Force does not skip the checks - it performs the deletions they warned about, and reports
+everything it deleted in one block. Reach for a migration first; force is for the cases where the
+data is truly disposable.
