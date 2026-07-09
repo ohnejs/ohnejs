@@ -7,6 +7,7 @@ import { truncateWithHash } from '../../../../utils/crypto/index.ts';
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import {
   dirname,
+  errorMessage,
   isNull,
   isNullish,
   isNumber,
@@ -23,6 +24,7 @@ import { createIndex, createIndexes, createTable, rebuildTable, sweepRebuilds } 
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 const SQLITE_CONSTRAINT_FOREIGNKEY = 787;
+const SQLITE_CONSTRAINT_TRIGGER = 1811;
 
 // Primary result codes for a database held by another connection.
 const SQLITE_BUSY = 5;
@@ -72,7 +74,8 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
-   * Codes a JS value for storage: booleans become `1`/`0`, JSON is stringified, `null`/`undefined` are `NULL`.
+   * Codes a JS value for storage.
+   * Booleans become `1`/`0`, JSON is stringified, `null`/`undefined` are `NULL`.
    */
   serialize(type: LogicalType, value: unknown): SQLValue {
     if (isNullish(value)) return null;
@@ -207,9 +210,13 @@ export class SQLiteDialect extends Dialect {
 
   /**
    * Classifies a foreign-key failure.
+   * SQLite reports an `ON DELETE RESTRICT` violation through its internal trigger machinery.
+   * The trigger code therefore counts too when the message names the foreign key.
    */
   isForeignKeyViolation(error: unknown): boolean {
-    return errcodeOf(error) === SQLITE_CONSTRAINT_FOREIGNKEY;
+    const code = errcodeOf(error);
+    if (code === SQLITE_CONSTRAINT_FOREIGNKEY) return true;
+    return code === SQLITE_CONSTRAINT_TRIGGER && errorMessage(error).includes('FOREIGN KEY');
   }
 
   /**
