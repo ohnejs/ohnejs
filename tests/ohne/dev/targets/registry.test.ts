@@ -46,6 +46,7 @@ describe('registry target', () => {
 
     const written = (await registry.regen()).sort();
     deepStrictEqual(written, [
+      join(app, '.ohne', 'browser', 'tsconfig.json'),
       join(app, '.ohne', 'node', 'layer-name.ts'),
       join(app, '.ohne', 'node', 'resolved-config.ts'),
     ]);

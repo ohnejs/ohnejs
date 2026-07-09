@@ -139,6 +139,7 @@ describe('serveAPI', () => {
     strictEqual(scope.__ohneServeBoot.includes('app:boot'), true);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'layer-name.ts')), true);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'resolved-config.ts')), true);
+    strictEqual(existsSync(join(dir, '.ohne', 'browser', 'tsconfig.json')), true);
     strictEqual(existsSync(join(dir, '.ohne', 'stale.ts')), false);
   });
 

@@ -7,6 +7,7 @@ import { exists } from '../../utils/fs/index.ts';
 import { isNull, isPort, isString, joinPath, MAX_PORT } from '../../utils/index.ts';
 import { bootLayers } from '../boot/boot-layers.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
+import { generateBrowserTSConfig } from '../codegen/generate-browser-tsconfig.ts';
 import { generateDatabase } from '../codegen/generate-database.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
 import { generateMessages } from '../codegen/generate-messages.ts';
@@ -75,6 +76,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
       await Promise.all([
         generateLayerName(from),
         generateResolvedConfig(from),
+        generateBrowserTSConfig(from),
         generateRoutes(from),
         generateMiddleware(from),
         generateMessages(from),

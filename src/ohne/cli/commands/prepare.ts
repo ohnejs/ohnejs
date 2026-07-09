@@ -7,6 +7,7 @@ import {
   relativePath,
   resolvePath,
 } from '../../../utils/index.ts';
+import { generateBrowserTSConfig } from '../../codegen/generate-browser-tsconfig.ts';
 import { generateDatabase } from '../../codegen/generate-database.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateMessages } from '../../codegen/generate-messages.ts';
@@ -53,6 +54,7 @@ export const prepareCommand = defineCommand({
         await Promise.all([
           generateLayerName(cwd),
           generateResolvedConfig(cwd),
+          generateBrowserTSConfig(cwd),
           generateRoutes(cwd),
           generateMiddleware(cwd),
           generateMessages(cwd),
