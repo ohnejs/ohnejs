@@ -4,6 +4,7 @@ import { devCommand } from './commands/dev.ts';
 import { initCommand } from './commands/init.ts';
 import { prepareCommand } from './commands/prepare.ts';
 import { serveCommand } from './commands/serve.ts';
+import { syncCommand } from './commands/sync.ts';
 
 /**
  * The root `ohne` command.
@@ -20,5 +21,6 @@ export const ohne = defineCommand({
     init: initCommand,
     prepare: prepareCommand,
     serve: serveCommand,
+    sync: syncCommand,
   },
 });

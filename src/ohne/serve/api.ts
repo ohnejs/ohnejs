@@ -15,15 +15,10 @@ import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
-import { useCollections } from '../collections/use-collections.ts';
-import { connect } from '../database/connect.ts';
-import { useMigrations } from '../database/migrations/use-migrations.ts';
-import { buildDesiredSchema } from '../database/schema/desired.ts';
-import { syncDatabase } from '../database/schema/sync.ts';
-import { closeDatabases, useDatabase } from '../database/use-database.ts';
+import { syncProjectDatabase } from '../database/sync-project.ts';
+import { closeDatabases } from '../database/use-database.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { useFields } from '../fields/use-fields.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { createRouter } from '../http/router.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
@@ -102,25 +97,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     }
   }
 
-  const dialect = await connect();
-  const database = useConfig().database;
-  const force = useEnv().has('FORCE_SYNC')
-    ? useEnv().get('FORCE_SYNC')
-    : (database?.sync?.force ?? false);
-  const report = await syncDatabase(useDatabase(), dialect, {
-    desired: buildDesiredSchema(useCollections(), useFields()),
-    migrations: Object.values(useMigrations().all()),
-    force,
-  });
-  if (report.deletions.length > 0) {
-    usePrinter().warnBlock({ title: 'Sync removed data under `force`', body: report.deletions });
-  }
-  if (report.warnings.length > 0) {
-    usePrinter().warnBlock({
-      title: 'Pre-existing orphan rows',
-      body: [...report.warnings, '', 'Set `FORCE_SYNC` or `database.sync.force` to purge them.'],
-    });
-  }
+  await syncProjectDatabase();
 
   const config = useConfig().api;
   const http = createServer(createRouter(Object.values(useRoutes().all())), {
