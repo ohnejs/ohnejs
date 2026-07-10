@@ -1,9 +1,10 @@
-import { deepStrictEqual, rejects } from 'node:assert';
+import { deepStrictEqual, match, ok, rejects } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { scanLayerCollections } from '../../../src/ohne/index.ts';
 
 describe('scanLayerCollections', () => {
@@ -23,15 +24,17 @@ describe('scanLayerCollections', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('names each file by its stem, a subdirectory only organizing', async () => {
+  it('names each file by its relative path, segments PascalCased and joined', async () => {
     const dir = join(root, 'ordered');
     writeCollection(dir, 'Posts.ts');
     writeCollection(dir, 'Authors.ts');
     writeCollection(dir, 'blog/Tags.ts');
+    writeCollection(dir, 'draft ideas.ts');
+    writeCollection(dir, 'shop/index.ts');
     const scanned = await scanLayerCollections({ name: 'app', dir }, 'collections');
     deepStrictEqual(
       scanned.map((collection) => collection.name),
-      ['Authors', 'Tags', 'Posts'],
+      ['Authors', 'BlogTags', 'DraftIdeas', 'Posts', 'Shop'],
     );
     deepStrictEqual(scanned[1]?.file, join(dir, 'collections', 'blog/Tags.ts'));
   });
@@ -55,19 +58,24 @@ describe('scanLayerCollections', () => {
     );
   });
 
-  it('rejects two files sharing a stem, naming both', async () => {
+  it('rejects two files resolving to the same name, naming both', async () => {
     const dir = join(root, 'duplicate');
+    writeCollection(dir, 'BlogPosts.ts');
     writeCollection(dir, 'blog/Posts.ts');
-    writeCollection(dir, 'shop/Posts.ts');
-    await rejects(
-      scanLayerCollections({ name: 'app', dir }, 'collections'),
-      /Duplicate collection `Posts`/,
-    );
+    await rejects(scanLayerCollections({ name: 'app', dir }, 'collections'), (error: unknown) => {
+      ok(isOhneError(error));
+      match(error.message, /Duplicate collection `BlogPosts`/);
+      const body = Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? '');
+      match(body, /Two files in layer `app` resolve to the same name\./);
+      match(body, /BlogPosts\.ts/);
+      match(body, /blog\/Posts\.ts/);
+      return true;
+    });
   });
 
-  it('rejects a non-PascalCase file name', async () => {
+  it('rejects a file name that resolves to no PascalCase identifier', async () => {
     const dir = join(root, 'casing');
-    writeCollection(dir, 'posts.ts');
+    writeCollection(dir, '404.ts');
     await rejects(scanLayerCollections({ name: 'app', dir }, 'collections'), /PascalCase/);
   });
 

@@ -6,20 +6,23 @@ const RESERVED_COLLECTIONS = new Set(['ohne', 'block']);
 /**
  * Rejects a collection name that is not PascalCase or is reserved.
  * PascalCase is an uppercase letter, then letters and digits: no underscores, spaces, or symbols.
- * Underscores are barred because a single `_` builds derived names and `__` marks framework names.
  * `Ohne` and `Block` are reserved case-insensitively.
  * Pass `path` when the name comes from a file, so the error lands on it.
  */
 export function validateCollectionName(name: string, path?: string): void {
   if (isEmpty(name, { trim: true })) {
-    throw ohneError('A collection name cannot be empty');
+    throw ohneError({
+      title: 'A collection name cannot be empty',
+      body: ['The name holds no letters or digits to build an identifier from.', 'Rename it.'],
+      path,
+    });
   }
   if (!isPascalCase(name)) {
     throw ohneError({
       title: `Collection name \`${name}\` is not PascalCase`,
       body: [
-        'Collection names are PascalCase: an uppercase letter, then letters and digits, no underscores.',
-        'A single `_` builds derived names and `__` marks framework names, so a name holds neither.',
+        'Collection names are PascalCase: an uppercase letter, then letters and digits.',
+        'Rename it.',
       ],
       path,
     });
@@ -39,10 +42,11 @@ export function validateCollectionName(name: string, path?: string): void {
 /**
  * Rejects a field name that is not camelCase or collides with the `UUID` primary key.
  * A camelCase name is a lowercase letter, then letters and digits: no underscores, no leading uppercase.
- * A known collection name sharpens the message; omit it before the name is known.
+ * A known scope - the collection, or a dotted composite path like `Posts.sections` - sharpens the message.
+ * Omit it before the name is known.
  */
-export function validateFieldName(name: string, collection?: string): void {
-  const where = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+export function validateFieldName(name: string, scope?: string): void {
+  const where = isUndefined(scope) ? '' : ` in \`${scope}\``;
   if (isEmpty(name, { trim: true })) {
     throw ohneError(`A field name${where} cannot be empty`);
   }
@@ -67,27 +71,28 @@ export function validateFieldName(name: string, collection?: string): void {
 }
 
 /**
- * Rejects a case-insensitive duplicate within a set of collection names or a collection's field names.
+ * Rejects a case-insensitive duplicate within a set of collection names or one scope's field names.
+ * The scope is a collection, or a dotted composite path like `Posts.sections`.
  * SQLite matches identifiers case-insensitively even when quoted, so `title` and `Title` cannot coexist.
  */
 export function validateUniqueNames(
   names: readonly string[],
   kind: 'collection' | 'field',
-  collection?: string,
+  scope?: string,
 ): void {
   const seen = new Map<string, string>();
   for (const name of names) {
     const key = name.toLowerCase();
     const first = seen.get(key);
     if (!isUndefined(first)) {
-      const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+      const where = isUndefined(scope) ? '' : ` in \`${scope}\``;
       throw ohneError({
         title:
           kind === 'collection'
             ? `Collection names \`${first}\` and \`${name}\` collide`
             : `Field names \`${first}\` and \`${name}\` collide`,
         body: [
-          `Identifiers match case-insensitively, so these cannot coexist${scope}.`,
+          `Identifiers match case-insensitively, so these cannot coexist${where}.`,
           'Rename one of them.',
         ],
       });

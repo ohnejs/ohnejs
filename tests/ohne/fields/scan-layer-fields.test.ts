@@ -1,9 +1,10 @@
-import { deepStrictEqual, rejects } from 'node:assert';
+import { deepStrictEqual, match, ok, rejects } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { scanLayerFields } from '../../../src/ohne/index.ts';
 
 describe('scanLayerFields', () => {
@@ -23,17 +24,19 @@ describe('scanLayerFields', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('names each file by its stem, a subdirectory only organizing', async () => {
+  it('names each file by its relative path, segments camelCased and joined', async () => {
     const dir = join(root, 'ordered');
     writeFieldType(dir, 'slug.ts');
     writeFieldType(dir, 'money.ts');
     writeFieldType(dir, 'geo/latLng.ts');
+    writeFieldType(dir, 'my rating.ts');
+    writeFieldType(dir, 'color/index.ts');
     const scanned = await scanLayerFields({ name: 'app', dir }, 'fields');
     deepStrictEqual(
       scanned.map((fieldType) => fieldType.name),
-      ['latLng', 'money', 'slug'],
+      ['color', 'geoLatLng', 'money', 'myRating', 'slug'],
     );
-    deepStrictEqual(scanned[0]?.file, join(dir, 'fields', 'geo/latLng.ts'));
+    deepStrictEqual(scanned[1]?.file, join(dir, 'fields', 'geo/latLng.ts'));
   });
 
   it('returns an empty list without a fields directory', async () => {
@@ -52,16 +55,24 @@ describe('scanLayerFields', () => {
     );
   });
 
-  it('rejects two files sharing a stem, naming both', async () => {
+  it('rejects two files resolving to the same name, naming both', async () => {
     const dir = join(root, 'duplicate');
+    writeFieldType(dir, 'geoPoint.ts');
     writeFieldType(dir, 'geo/point.ts');
-    writeFieldType(dir, 'map/point.ts');
-    await rejects(scanLayerFields({ name: 'app', dir }, 'fields'), /Duplicate field type `point`/);
+    await rejects(scanLayerFields({ name: 'app', dir }, 'fields'), (error: unknown) => {
+      ok(isOhneError(error));
+      match(error.message, /Duplicate field type `geoPoint`/);
+      const body = Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? '');
+      match(body, /Two files in layer `app` resolve to the same name\./);
+      match(body, /geoPoint\.ts/);
+      match(body, /geo\/point\.ts/);
+      return true;
+    });
   });
 
-  it('rejects a non-camelCase file name', async () => {
+  it('rejects a file name that resolves to no camelCase identifier', async () => {
     const dir = join(root, 'casing');
-    writeFieldType(dir, 'Slug.ts');
+    writeFieldType(dir, '404.ts');
     await rejects(scanLayerFields({ name: 'app', dir }, 'fields'), /camelCase/);
   });
 

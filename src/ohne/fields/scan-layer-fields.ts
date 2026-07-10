@@ -1,7 +1,14 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 
 import { listDir } from '../../utils/fs/index.ts';
-import { isNull, isUndefined, joinPath, naturalCompare, relativePath } from '../../utils/index.ts';
+import {
+  isNull,
+  isUndefined,
+  joinPath,
+  naturalCompare,
+  pathToCamelName,
+  relativePath,
+} from '../../utils/index.ts';
 import { assertImportablePath } from '../codegen/assert-importable-path.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { validateFieldTypeName } from './validate-field.ts';
@@ -11,7 +18,7 @@ import { validateFieldTypeName } from './validate-field.ts';
  */
 export interface ScannedFieldType {
   /**
-   * The field-type name: the file's stem, camelCase.
+   * The field-type name, derived from the file's relative path: segments camelCased and joined.
    */
   name: string;
 
@@ -24,11 +31,13 @@ export interface ScannedFieldType {
 /**
  * Reads every field-type file in one layer's fields directory.
  *
- * Each `.ts` file under `<layer.dir>/<fields>` is one field type named by its stem.
- * A subdirectory only organizes files; it never contributes to the name.
- * Two files sharing a stem therefore collide and throw, naming both.
+ * Each `.ts` file under `<layer.dir>/<fields>` is one field type named by its relative path.
+ * The path's segments convert to camelCase and join: `geo/point.ts` names `geoPoint`.
+ * So does `geo point.ts` - a loose stem normalizes into the name instead of erroring.
+ * A trailing `index` segment collapses into its parent: `slug/index.ts` names `slug`.
+ * Two files resolving to the same name collide and throw, naming both.
  * A `_`-prefixed file or directory is a helper and is skipped, so shared types can live beside a type.
- * Names are validated as they are read, so a bad file name fails here, naming the file.
+ * Names are validated as they are read, so an unnameable file fails here, naming the file.
  * Results sort by file name; returns `[]` when the layer has no fields directory.
  *
  * @example
@@ -50,11 +59,12 @@ export async function scanLayerFields(
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
       assertImportablePath('field type', entry.relativePath, entry.path);
-      validateFieldTypeName(entry.stem, entry.path);
-      const clash = seen.get(entry.stem);
+      const name = pathToCamelName(entry.relativePath);
+      validateFieldTypeName(name, entry.path);
+      const clash = seen.get(name);
       if (!isUndefined(clash)) {
         throw ohneError({
-          title: `Duplicate field type \`${entry.stem}\``,
+          title: `Duplicate field type \`${name}\``,
           body: [
             `Two files in layer \`${layer.name}\` resolve to the same name.`,
             '',
@@ -63,7 +73,7 @@ export async function scanLayerFields(
           ],
         });
       }
-      seen.set(entry.stem, entry.path);
-      return { name: entry.stem, file: entry.path };
+      seen.set(name, entry.path);
+      return { name, file: entry.path };
     });
 }
