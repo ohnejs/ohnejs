@@ -2,32 +2,31 @@ import { createHash } from 'node:crypto';
 
 import type { Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
-import type { TableSchema } from './table-schema.ts';
+import type { DerivedOrigin, TableSchema } from './table-schema.ts';
 
-import { isUndefined, jsonSerialize } from '../../../utils/index.ts';
-import { ohneError } from '../../error/ohne-error.ts';
+import { isUndefined, jsonSerialize, mapValues } from '../../../utils/index.ts';
 import { OHNE_SCHEMA } from '../naming/table-names.ts';
 
 /**
- * Logical column types per table, keyed table name then column name.
- * Doubles as the claim record: its keys are the tables ohne owns.
+ * What the snapshot knows about one claimed table beyond what introspection can see.
  */
-export type SchemaClassification = Record<string, Record<string, LogicalType>>;
+export interface TableClaim {
+  /**
+   * The logical column types, keyed by column name.
+   */
+  columns: Record<string, LogicalType>;
+
+  /**
+   * The derivation origin of a junction or child table; absent on collection main tables.
+   */
+  derived?: DerivedOrigin;
+}
 
 /**
- * One past schema generation, kept so a rolling deploy's old code is recognizable.
+ * One claim per table ohne owns, keyed by physical table name.
+ * The keys double as the claim record; an unclaimed live table is foreign.
  */
-export interface SchemaGeneration {
-  /**
-   * The generation number the hash belonged to.
-   */
-  generation: number;
-
-  /**
-   * The desired-schema hash of that generation.
-   */
-  hash: string;
-}
+export type SchemaClassification = Record<string, TableClaim>;
 
 /**
  * The persisted schema state: one row in `ohne_schema`, versioned JSON.
@@ -45,19 +44,11 @@ export interface SchemaSnapshot {
   hash: string;
 
   /**
-   * Past generations, oldest first, capped at 20.
-   * The current generation is not listed; finding a hash here means older code wrote it.
-   */
-  history: readonly SchemaGeneration[];
-
-  /**
    * The classification of every claimed table's columns.
    * Restores `boolean` and `json` over the storage primitives introspection reports.
    */
   classification: SchemaClassification;
 }
-
-const HISTORY_LIMIT = 20;
 
 /**
  * Ensures the `ohne_schema` table exists, tolerating a concurrent create.
@@ -72,6 +63,7 @@ export async function ensureSchemaTable(db: Transaction, dialect: Dialect): Prom
 
 /**
  * Reads the snapshot, or `undefined` when no sync has written one.
+ * A version-1 snapshot stored each claim as a bare column map; reading lifts it into a `TableClaim`.
  */
 export async function readSnapshot(
   db: Transaction,
@@ -82,8 +74,16 @@ export async function readSnapshot(
     ['schema'],
   );
   if (isUndefined(row)) return undefined;
-  const { generation, hash, history, classification } = JSON.parse(row.data) as SchemaSnapshot;
-  return { generation, hash, history, classification };
+  const parsed = JSON.parse(row.data) as SchemaSnapshot & { version: number };
+  const { generation, hash } = parsed;
+  const classification =
+    parsed.version === 1
+      ? mapValues(
+          parsed.classification as unknown as Record<string, Record<string, LogicalType>>,
+          (_, columns): TableClaim => ({ columns }),
+        )
+      : parsed.classification;
+  return { generation, hash, classification };
 }
 
 /**
@@ -94,7 +94,7 @@ export async function writeSnapshot(
   dialect: Dialect,
   snapshot: SchemaSnapshot,
 ): Promise<void> {
-  const data = JSON.stringify({ version: 1, ...snapshot });
+  const data = JSON.stringify({ version: 2, ...snapshot });
   await db.run(
     `INSERT INTO ${dialect.quote(OHNE_SCHEMA)} (${dialect.quote('key')}, ${dialect.quote('data')}) ` +
       `VALUES (?, ?) ON CONFLICT (${dialect.quote('key')}) ` +
@@ -105,8 +105,8 @@ export async function writeSnapshot(
 
 /**
  * Builds the snapshot a sync should persist after realizing `hash`.
- * An unchanged hash keeps the generation and history, refreshing only the classification.
- * A changed hash bumps the generation and appends the previous one to the bounded history.
+ * An unchanged hash keeps the generation, refreshing only the classification.
+ * A changed hash bumps the generation.
  */
 export function advanceSnapshot(
   previous: SchemaSnapshot | undefined,
@@ -116,28 +116,7 @@ export function advanceSnapshot(
   if (!isUndefined(previous) && previous.hash === hash) {
     return { ...previous, classification };
   }
-  const history = isUndefined(previous)
-    ? []
-    : [...previous.history, { generation: previous.generation, hash: previous.hash }].slice(
-        -HISTORY_LIMIT,
-      );
-  return { generation: (previous?.generation ?? 0) + 1, hash, history, classification };
-}
-
-/**
- * Throws the version-skew refusal when `hash` was already superseded in the snapshot's history.
- * A build whose desired hash sits in the history is old code; syncing would revert the schema.
- */
-export function refuseIfSuperseded(snapshot: SchemaSnapshot | undefined, hash: string): void {
-  if (isUndefined(snapshot)) return;
-  if (!snapshot.history.some((generation) => generation.hash === hash)) return;
-  throw ohneError({
-    title: 'The database schema is newer than this build',
-    body: [
-      `Another instance synced the schema past this build; the database is at generation \`${snapshot.generation}\`.`,
-      'Deploy the newer build to this instance, or stop the fleet and start it on one version.',
-    ],
-  });
+  return { generation: (previous?.generation ?? 0) + 1, hash, classification };
 }
 
 /**
@@ -149,14 +128,17 @@ export function schemaHash(tables: readonly TableSchema[]): string {
 }
 
 /**
- * Derives the classification of a desired schema: every table's logical column types.
+ * Derives the classification of a desired schema: each table's logical column types and origin.
  */
 export function classifySchema(desired: readonly TableSchema[]): SchemaClassification {
   return Object.fromEntries(
-    desired.map((table) => [
-      table.name,
-      Object.fromEntries(table.columns.map((column) => [column.name, column.type])),
-    ]),
+    desired.map((table) => {
+      const columns = Object.fromEntries(table.columns.map((column) => [column.name, column.type]));
+      return [
+        table.name,
+        isUndefined(table.derived) ? { columns } : { columns, derived: table.derived },
+      ];
+    }),
   );
 }
 
@@ -171,12 +153,12 @@ export function applyClassification(
   dialect: Dialect,
 ): TableSchema[] {
   return live.map((table) => {
-    const columns = classification[table.name];
-    if (isUndefined(columns)) return table;
+    const claim = classification[table.name];
+    if (isUndefined(claim)) return table;
     return {
       ...table,
       columns: table.columns.map((column) => {
-        const stored = columns[column.name];
+        const stored = claim.columns[column.name];
         if (isUndefined(stored)) return column;
         if (dialect.columnType(stored) !== dialect.columnType(column.type)) return column;
         return { ...column, type: stored };

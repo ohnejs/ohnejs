@@ -4,8 +4,10 @@ import type { FieldTypeName } from './known-fields.ts';
 import { createRegistry, type Registry } from '../../utils/index.ts';
 import { boolean } from './builtin/boolean.ts';
 import { integer } from './builtin/integer.ts';
+import { object } from './builtin/object.ts';
 import { record } from './builtin/record.ts';
 import { records } from './builtin/records.ts';
+import { repeater } from './builtin/repeater.ts';
 import { text } from './builtin/text.ts';
 
 /**
@@ -31,6 +33,8 @@ for (const [name, fieldType] of [
   ['boolean', boolean],
   ['record', record],
   ['records', records],
+  ['object', object],
+  ['repeater', repeater],
 ] as const) {
   registry.register(name, { name, fieldType });
 }

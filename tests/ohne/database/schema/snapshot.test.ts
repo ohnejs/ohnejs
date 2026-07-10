@@ -27,8 +27,7 @@ function snapshot(overrides: Partial<SchemaSnapshot> = {}): SchemaSnapshot {
   return {
     generation: 1,
     hash: 'h1',
-    history: [],
-    classification: { Posts: { UUID: 'text' } },
+    classification: { Posts: { columns: { UUID: 'text' } } },
     ...overrides,
   };
 }
@@ -66,7 +65,7 @@ describe('readSnapshot and writeSnapshot', () => {
   it('round-trips a snapshot', async () => {
     const db = await open();
     await ensureSchemaTable(db, dialect);
-    const written = snapshot({ history: [{ generation: 1, hash: 'h0' }], generation: 2 });
+    const written = snapshot({ generation: 2 });
     await writeSnapshot(db, dialect, written);
     deepStrictEqual(await readSnapshot(db, dialect), written);
     await db.close();
@@ -82,43 +81,53 @@ describe('readSnapshot and writeSnapshot', () => {
     strictEqual(rows.length, 1);
     await db.close();
   });
+
+  it('lifts the bare column maps of a version-1 snapshot into claims', async () => {
+    const db = await open();
+    await ensureSchemaTable(db, dialect);
+    const v1 = {
+      version: 1,
+      generation: 2,
+      hash: 'h2',
+      history: [{ generation: 1, hash: 'h1' }],
+      classification: { Posts: { UUID: 'text', meta: 'json' } },
+    };
+    await db.run('INSERT INTO "ohne_schema" ("key", "data") VALUES (?, ?)', [
+      'schema',
+      JSON.stringify(v1),
+    ]);
+    deepStrictEqual(await readSnapshot(db, dialect), {
+      generation: 2,
+      hash: 'h2',
+      classification: { Posts: { columns: { UUID: 'text', meta: 'json' } } },
+    });
+    await db.close();
+  });
 });
 
 describe('advanceSnapshot', () => {
-  it('starts a fresh database at generation 1 with no history', () => {
+  it('starts a fresh database at generation 1', () => {
     deepStrictEqual(advanceSnapshot(undefined, 'h1', {}), {
       generation: 1,
       hash: 'h1',
-      history: [],
       classification: {},
     });
   });
 
-  it('keeps the generation and history when the hash is unchanged', () => {
-    const previous = snapshot({ generation: 3, history: [{ generation: 2, hash: 'h0' }] });
-    const next = advanceSnapshot(previous, 'h1', { Posts: { UUID: 'text', meta: 'json' } });
+  it('keeps the generation when the hash is unchanged, refreshing the classification', () => {
+    const previous = snapshot({ generation: 3 });
+    const next = advanceSnapshot(previous, 'h1', {
+      Posts: { columns: { UUID: 'text', meta: 'json' } },
+    });
     strictEqual(next.generation, 3);
-    deepStrictEqual(next.history, previous.history);
-    deepStrictEqual(next.classification, { Posts: { UUID: 'text', meta: 'json' } });
+    deepStrictEqual(next.classification, { Posts: { columns: { UUID: 'text', meta: 'json' } } });
   });
 
-  it('bumps the generation and appends the previous one on a hash change', () => {
+  it('bumps the generation on a hash change', () => {
     const previous = snapshot({ generation: 3, hash: 'h3' });
     const next = advanceSnapshot(previous, 'h4', {});
     strictEqual(next.generation, 4);
     strictEqual(next.hash, 'h4');
-    deepStrictEqual(next.history, [{ generation: 3, hash: 'h3' }]);
-  });
-
-  it('bounds the history at 20 entries, dropping the oldest', () => {
-    let current = advanceSnapshot(undefined, 'h1', {});
-    for (let i = 2; i <= 25; i++) {
-      current = advanceSnapshot(current, `h${i}`, {});
-    }
-    strictEqual(current.history.length, 20);
-    strictEqual(current.history[0]?.hash, 'h5');
-    strictEqual(current.history[19]?.hash, 'h24');
-    strictEqual(current.generation, 25);
   });
 });
 
@@ -149,7 +158,21 @@ describe('classifySchema', () => {
         { name: 'meta', type: 'json', notNull: false },
       ],
     });
-    deepStrictEqual(classifySchema([posts]), { Posts: { UUID: 'text', meta: 'json' } });
+    deepStrictEqual(classifySchema([posts]), {
+      Posts: { columns: { UUID: 'text', meta: 'json' } },
+    });
+  });
+
+  it('carries a derived origin into the claim', () => {
+    const junction = table('Posts_authors', {
+      derived: { collection: 'Posts', path: ['authors'], kind: 'junction' },
+    });
+    deepStrictEqual(classifySchema([junction]), {
+      Posts_authors: {
+        columns: { UUID: 'text' },
+        derived: { collection: 'Posts', path: ['authors'], kind: 'junction' },
+      },
+    });
   });
 });
 
@@ -177,13 +200,17 @@ describe('applyClassification', () => {
 
   it('keeps the live type for a column drifted since the snapshot', () => {
     const live = table('T', { columns: [{ name: 'meta', type: 'integer', notNull: false }] });
-    const restored = applyClassification([live], { T: { meta: 'json' } }, dialect);
+    const restored = applyClassification([live], { T: { columns: { meta: 'json' } } }, dialect);
     strictEqual(restored[0]?.columns[0]?.type, 'integer');
   });
 
   it('leaves unclassified tables and columns untouched', () => {
     const foreign = table('Foreign');
-    const [untouched] = applyClassification([foreign], { Other: { UUID: 'text' } }, dialect);
+    const [untouched] = applyClassification(
+      [foreign],
+      { Other: { columns: { UUID: 'text' } } },
+      dialect,
+    );
     deepStrictEqual(untouched, foreign);
     ok(untouched);
   });

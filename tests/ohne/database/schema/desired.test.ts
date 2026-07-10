@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, match, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { CollectionMeta } from '../../../../src/ohne/collections/use-collections.ts';
@@ -6,6 +6,7 @@ import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts'
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
+import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field, type FieldInstance } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
@@ -22,6 +23,14 @@ function fieldsWith(name: string, fieldType: FieldTypeMeta['fieldType']): Regist
   const registry = createRegistry<FieldTypeMeta>();
   registry.register(name, { name: name as FieldTypeName, fieldType });
   return registry;
+}
+
+function bodyMatching(pattern: RegExp): (error: unknown) => boolean {
+  return (error: unknown) => {
+    ok(isOhneError(error));
+    match(Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? ''), pattern);
+    return true;
+  };
 }
 
 describe('buildDesiredSchema', () => {
@@ -713,6 +722,391 @@ describe('buildDesiredSchema', () => {
       {
         name: truncateWithHash(`UX__${long}_related___parentUUID__targetUUID`),
         columns: ['_parentUUID', '_targetUUID'],
+      },
+    ]);
+  });
+
+  it('emits a child table for an object field, nothing on the main table', () => {
+    const [posts, child] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: {
+            address: field('object', {
+              fields: { street: field('text'), city: field('text', { nullable: true }) },
+            }),
+          },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(posts!.columns.slice(2), []);
+    strictEqual(child!.name, 'Posts_address');
+    deepStrictEqual(child!.primaryKey, ['UUID']);
+    deepStrictEqual(child!.columns, [
+      { name: 'UUID', type: 'text', notNull: true },
+      { name: '_parentUUID', type: 'text', notNull: true },
+      { name: 'street', type: 'text', notNull: true },
+      { name: 'city', type: 'text', notNull: false },
+    ]);
+    deepStrictEqual(child!.uniques, [
+      { name: 'UX__Posts_address___parentUUID', columns: ['_parentUUID'] },
+    ]);
+    deepStrictEqual(child!.indexes, []);
+    deepStrictEqual(child!.foreignKeys, [
+      { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+    ]);
+    deepStrictEqual(child!.derived, {
+      collection: 'Posts',
+      path: ['address'],
+      kind: 'childOne',
+    });
+  });
+
+  it('emits an ordered child table for a repeater field', () => {
+    const [, child] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: { sections: field('repeater', { fields: { title: field('text') } }) },
+        },
+      }),
+      useFields(),
+    );
+    strictEqual(child!.name, 'Posts_sections');
+    deepStrictEqual(child!.primaryKey, ['UUID']);
+    deepStrictEqual(child!.columns, [
+      { name: 'UUID', type: 'text', notNull: true },
+      { name: '_parentUUID', type: 'text', notNull: true },
+      { name: '_parentPosition', type: 'integer', notNull: true },
+      { name: 'title', type: 'text', notNull: true },
+    ]);
+    deepStrictEqual(child!.uniques, []);
+    deepStrictEqual(child!.indexes, [
+      { name: 'IX__Posts_sections___parentUUID', columns: ['_parentUUID'] },
+    ]);
+    deepStrictEqual(child!.derived, {
+      collection: 'Posts',
+      path: ['sections'],
+      kind: 'childMany',
+    });
+  });
+
+  it('nests composites, each level deriving its own child table depth-first', () => {
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: {
+            sections: field('repeater', {
+              fields: {
+                title: field('text'),
+                items: field('repeater', { fields: { label: field('text') } }),
+              },
+            }),
+          },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_sections', 'Posts_sections_items'],
+    );
+    const items = tables[2]!;
+    deepStrictEqual(items.foreignKeys, [
+      {
+        column: '_parentUUID',
+        targetTable: 'Posts_sections',
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+    ]);
+    deepStrictEqual(items.indexes, [
+      { name: 'IX__Posts_sections_items___parentUUID', columns: ['_parentUUID'] },
+    ]);
+    deepStrictEqual(items.derived, {
+      collection: 'Posts',
+      path: ['sections', 'items'],
+      kind: 'childMany',
+    });
+  });
+
+  it('attaches subfield constraints and record foreign keys to the child table', () => {
+    const [, , child] = buildDesiredSchema(
+      collections(
+        { name: 'Users', collection: { fields: {} } },
+        {
+          name: 'Posts',
+          collection: {
+            fields: {
+              meta: field('object', {
+                fields: {
+                  email: field('text', { unique: true }),
+                  author: field('record', { collection: 'Users' }),
+                },
+              }),
+            },
+          },
+        },
+      ),
+      useFields(),
+    );
+    strictEqual(child!.name, 'Posts_meta');
+    deepStrictEqual(child!.columns.slice(2), [
+      { name: 'email', type: 'text', notNull: true },
+      { name: 'author', type: 'text', notNull: false },
+    ]);
+    deepStrictEqual(child!.uniques, [
+      { name: 'UX__Posts_meta___parentUUID', columns: ['_parentUUID'] },
+      { name: 'UX__Posts_meta__email', columns: ['email'] },
+    ]);
+    deepStrictEqual(child!.indexes, [{ name: 'IX__Posts_meta__author', columns: ['author'] }]);
+    deepStrictEqual(child!.foreignKeys, [
+      { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+      { column: 'author', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'setNull' },
+    ]);
+  });
+
+  it('derives a junction from a nested records field, hung off the child table', () => {
+    const tables = buildDesiredSchema(
+      collections(
+        { name: 'Users', collection: { fields: {} } },
+        {
+          name: 'Posts',
+          collection: {
+            fields: {
+              sections: field('repeater', {
+                fields: {
+                  title: field('text'),
+                  tags: field('records', { collection: 'Users' }),
+                },
+              }),
+            },
+          },
+        },
+      ),
+      useFields(),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Users', 'Posts', 'Posts_sections', 'Posts_sections_tags'],
+    );
+    const junction = tables[3]!;
+    deepStrictEqual(junction.foreignKeys, [
+      {
+        column: '_parentUUID',
+        targetTable: 'Posts_sections',
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+      { column: '_targetUUID', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'cascade' },
+    ]);
+    deepStrictEqual(junction.derived, {
+      collection: 'Posts',
+      path: ['sections', 'tags'],
+      kind: 'junction',
+    });
+  });
+
+  it('rejects an inverse on a nested records field', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections(
+            { name: 'Users', collection: { fields: {} } },
+            {
+              name: 'Posts',
+              collection: {
+                fields: {
+                  sections: field('repeater', {
+                    fields: { tags: field('records', { collection: 'Users', inverse: 'posts' }) },
+                  }),
+                },
+              },
+            },
+          ),
+          useFields(),
+        ),
+      /Field `sections\.tags` cannot declare `inverse`/,
+    );
+  });
+
+  it('rejects a composite declaring no fields', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { meta: field('object', { fields: {} }) } },
+          }),
+          useFields(),
+        ),
+      /Composite field `meta` declares no fields/,
+    );
+  });
+
+  it('rejects nullable on a composite, the message following the cardinality', () => {
+    const cases = [
+      { type: 'object', pattern: /absent row already reads as `null`/ },
+      { type: 'repeater', pattern: /empty, never `NULL`/ },
+    ];
+    for (const { type, pattern } of cases) {
+      throws(
+        () =>
+          buildDesiredSchema(
+            collections({
+              name: 'Posts',
+              collection: {
+                fields: {
+                  meta: {
+                    type,
+                    options: { fields: { x: field('text') }, nullable: true },
+                  } as unknown as FieldInstance,
+                },
+              },
+            }),
+            useFields(),
+          ),
+        bodyMatching(pattern),
+      );
+    }
+  });
+
+  it('rejects unique and index on a composite field', () => {
+    for (const key of ['unique', 'index']) {
+      throws(
+        () =>
+          buildDesiredSchema(
+            collections({
+              name: 'Posts',
+              collection: {
+                fields: {
+                  meta: {
+                    type: 'object',
+                    options: { fields: { x: field('text') }, [key]: true },
+                  } as unknown as FieldInstance,
+                },
+              },
+            }),
+            useFields(),
+          ),
+        /no column to constrain/,
+      );
+    }
+  });
+
+  it('rejects a child hint on a column-bearing type', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { meta: { type: 'broken', options: {} } as unknown as FieldInstance },
+            },
+          }),
+          fieldsWith(
+            'broken',
+            defineField({
+              columnType: 'text',
+              schema: () => ({
+                kind: 'child',
+                cardinality: 'one',
+                subfields: { x: field('text') },
+              }),
+            }),
+          ),
+        ),
+      /pairs a child table with a column/,
+    );
+  });
+
+  it('rejects a subfield name that is not camelCase, naming the composite scope', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { address: field('object', { fields: { Street: field('text') } }) },
+            },
+          }),
+          useFields(),
+        ),
+      bodyMatching(/Rename `Street` in `Posts\.address`/),
+    );
+  });
+
+  it('rejects case-insensitively colliding subfield names', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                address: field('object', {
+                  fields: { itemId: field('text'), itemID: field('text') },
+                }),
+              },
+            },
+          }),
+          useFields(),
+        ),
+      /Field names `itemId` and `itemID` collide/,
+    );
+  });
+
+  it('rejects a reserved subfield name', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { address: field('object', { fields: { uuid: field('text') } }) },
+            },
+          }),
+          useFields(),
+        ),
+      /reserved/,
+    );
+  });
+
+  it('rejects a composite index covering an object field', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { address: field('object', { fields: { street: field('text') } }) },
+              compositeIndexes: [{ fields: ['address'] }],
+            },
+          }),
+          useFields(),
+        ),
+      /Composite index covers column-less field `address`/,
+    );
+  });
+
+  it('truncates a long child name once, constraints composing from the logical name', () => {
+    const long = `A${'b'.repeat(70)}`;
+    const [, child] = buildDesiredSchema(
+      collections({
+        name: long,
+        collection: {
+          fields: { address: field('object', { fields: { street: field('text') } }) },
+        },
+      }),
+      useFields(),
+    );
+    strictEqual(child!.name, truncateWithHash(`${long}_address`));
+    deepStrictEqual(child!.uniques, [
+      {
+        name: truncateWithHash(`UX__${long}_address___parentUUID`),
+        columns: ['_parentUUID'],
       },
     ]);
   });

@@ -59,7 +59,8 @@ const FALLBACK: Record<LogicalType, string> = {
  *
  * A column-less field derives its type from its storage hint.
  * A junction holds the linked rows' `UUID` values in order, so it emits `string[]`.
- * A column-less type without a hint throws.
+ * A child hint is assembled from its subfields at codegen, where the registered types are at hand.
+ * It therefore throws here, as does a column-less type without a hint.
  *
  * @example
  * ```ts
@@ -83,7 +84,7 @@ export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
       title: 'Cannot emit a type for a column-less field',
       body: [
         'A column-less field type (`columnType: false`) owns no column, so it has no value type to emit.',
-        'Only column-bearing and junction field types are supported.',
+        "A junction emits `string[]`; a composite's shape is assembled from its subfields at codegen.",
       ],
     });
   }

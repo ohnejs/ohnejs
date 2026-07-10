@@ -3,7 +3,7 @@ import type { FieldInstance } from './field.ts';
 import type { AnyOptionDef } from './option.ts';
 import type { StorageHint } from './storage-hint.ts';
 
-import { isCamelCase, isUndefined } from '../../utils/index.ts';
+import { isCamelCase, isEmpty, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
 const RESERVED_OPTIONS = new Set(['nullable', 'unique', 'index']);
@@ -45,8 +45,10 @@ export interface ValidateFieldArgs {
  * - A column-less type must declare `schema`; without a hint the field can store nothing.
  * - A `foreignKey` hint requires `columnType: 'text'`: it stores the target's text `UUID`.
  * - A `junction` hint requires `columnType: false`: its links live in the junction table alone.
+ * - A `child` hint requires `columnType: false` too, and must declare at least one subfield.
  * - `unique` and `index` need a column, so a column-less field takes neither.
  * - A junction field with no links is empty, never `NULL`, so it takes no `nullable` either.
+ * - A child field takes no `nullable`: an absent one-row already reads as `null`, a list is never `NULL`.
  * - A force-nullable type locks `nullable` on, so a field of it takes no `nullable` at all.
  * - A force-index type locks its index on the same terms: the field takes no `index`.
  */
@@ -80,6 +82,24 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
+  if (hint?.kind === 'child' && fieldType.columnType !== false) {
+    throw ohneError({
+      title: `Field type \`${instance.type}\` pairs a child table with a column`,
+      body: [
+        'A `child` hint stores its rows in the child table alone.',
+        'Set `columnType: false` on the field type.',
+      ],
+    });
+  }
+  if (hint?.kind === 'child' && isEmpty(hint.subfields)) {
+    throw ohneError({
+      title: `Composite field \`${name}\` declares no fields`,
+      body: [
+        `${where} is \`${instance.type}\`, whose storage declares no subfields, so its child table would hold nothing.`,
+        'Declare at least one field.',
+      ],
+    });
+  }
   const options: Record<string, unknown> = { ...instance.options };
   if (fieldType.columnType === false) {
     for (const key of ['unique', 'index'] as const) {
@@ -98,6 +118,17 @@ export function validateField(args: ValidateFieldArgs): void {
       title: `Field \`${name}\` cannot be nullable`,
       body: [
         `${where} is a junction: with no links it is empty, never \`NULL\`.`,
+        'Drop `nullable`.',
+      ],
+    });
+  }
+  if (hint?.kind === 'child' && !isUndefined(options.nullable)) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be nullable`,
+      body: [
+        hint.cardinality === 'one'
+          ? `${where} holds at most one child row, and an absent row already reads as \`null\`.`
+          : `${where} is an ordered list: with no items it is empty, never \`NULL\`.`,
         'Drop `nullable`.',
       ],
     });
@@ -123,11 +154,18 @@ export function validateField(args: ValidateFieldArgs): void {
 }
 
 /**
- * Rejects a field-type name that is not camelCase.
+ * Rejects a field-type name that is empty or not camelCase.
  * The name comes from the file under `dirs.fields`, so the fix is renaming the file.
  * Pass `path` when the name comes from a file, so the error lands on it.
  */
 export function validateFieldTypeName(name: string, path?: string): void {
+  if (isEmpty(name, { trim: true })) {
+    throw ohneError({
+      title: 'A field-type name cannot be empty',
+      body: ['The name holds no letters or digits to build an identifier from.', 'Rename it.'],
+      path,
+    });
+  }
   if (!isCamelCase(name)) {
     throw ohneError({
       title: `Field-type name \`${name}\` is not camelCase`,

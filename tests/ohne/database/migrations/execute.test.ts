@@ -13,6 +13,7 @@ import {
 } from '../../../../src/ohne/database/dialects/sqlite/rebuild.ts';
 import { executeMigrations } from '../../../../src/ohne/database/migrations/execute.ts';
 import { classifySchema } from '../../../../src/ohne/database/schema/snapshot.ts';
+import { truncateWithHash } from '../../../../src/utils/crypto/index.ts';
 
 const dialect = new SQLiteDialect();
 
@@ -87,7 +88,7 @@ describe('executeMigrations', () => {
         ['b', 0],
       ],
     );
-    deepStrictEqual(outcome.claimed['Posts'], { UUID: 'text', draft: 'boolean' });
+    deepStrictEqual(outcome.claimed['Posts'], { columns: { UUID: 'text', draft: 'boolean' } });
     await db.close();
   });
 
@@ -125,7 +126,7 @@ describe('executeMigrations', () => {
       live.columns.find((column) => column.name === 'flag'),
       { name: 'flag', type: 'integer', notNull: false },
     );
-    strictEqual(outcome.claimed['Posts']?.['flag'], 'boolean');
+    strictEqual(outcome.claimed['Posts']?.columns['flag'], 'boolean');
     await db.close();
   });
 
@@ -224,7 +225,7 @@ describe('executeMigrations', () => {
     deepStrictEqual(outcome.stamps, [{ name: 'app/001-archive', status: 'applied' }]);
     const live = await dialect.describeTable(db, 'Archive');
     deepStrictEqual(live.uniques, []);
-    deepStrictEqual(outcome.claimed['Archive'], { UUID: 'text', title: 'text' });
+    deepStrictEqual(outcome.claimed['Archive'], { columns: { UUID: 'text', title: 'text' } });
     await db.close();
   });
 
@@ -348,6 +349,82 @@ describe('executeMigrations', () => {
     await db.close();
   });
 
+  it('cascades a rename over the derived tables the claims own', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const junction = table('Posts_authors', {
+      primaryKey: [],
+      derived: { collection: 'Posts', path: ['authors'], kind: 'junction' },
+    });
+    const items = table('Posts_sections_items', {
+      derived: { collection: 'Posts', path: ['sections', 'items'], kind: 'childMany' },
+    });
+    const foreign = table('Users_pets', {
+      derived: { collection: 'Users', path: ['pets'], kind: 'junction' },
+    });
+    await materialize(db, [posts, junction, items, foreign]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', { from: { table: 'Posts' }, to: { table: 'Articles' } }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, junction, items, foreign]),
+      force: false,
+    });
+    deepStrictEqual(await dialect.listTables(db), [
+      'Articles',
+      'Articles_authors',
+      'Articles_sections_items',
+      'Users_pets',
+    ]);
+    deepStrictEqual(outcome.claimed['Articles_authors']?.derived, {
+      collection: 'Articles',
+      path: ['authors'],
+      kind: 'junction',
+    });
+    deepStrictEqual(outcome.claimed['Articles_sections_items']?.derived, {
+      collection: 'Articles',
+      path: ['sections', 'items'],
+      kind: 'childMany',
+    });
+    deepStrictEqual(outcome.claimed['Users_pets']?.derived, {
+      collection: 'Users',
+      path: ['pets'],
+      kind: 'junction',
+    });
+    await db.close();
+  });
+
+  it('refuses a cascade onto a truncated name, and allows one without derived tables', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const junction = table('Posts_authors', {
+      primaryKey: [],
+      derived: { collection: 'Posts', path: ['authors'], kind: 'junction' },
+    });
+    const users = table('Users');
+    await materialize(db, [posts, junction, users]);
+    const long = truncateWithHash(`A${'b'.repeat(70)}`);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [meta('app/001-long', { from: { table: 'Posts' }, to: { table: long } })],
+        desired: [],
+        claimed: classifySchema([posts, junction, users]),
+        force: false,
+      }),
+      /cannot cascade onto a truncated name/,
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [meta('app/002-long', { from: { table: 'Users' }, to: { table: long } })],
+      desired: [],
+      claimed: classifySchema([posts, junction, users]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/002-long', status: 'applied' }]);
+    ok((await dialect.listTables(db)).includes(long));
+    await db.close();
+  });
+
   it('allows a case-only rename and refuses renaming onto an occupied name', async () => {
     const db = await open();
     const posts = table('Posts');
@@ -396,7 +473,7 @@ describe('executeMigrations', () => {
     deepStrictEqual(outcome.stamps, [{ name: 'app/001-drop', status: 'applied' }]);
     deepStrictEqual(await columnNames(db, 'Posts'), ['UUID']);
     deepStrictEqual((await dialect.describeTable(db, 'Posts')).indexes, []);
-    deepStrictEqual(outcome.claimed['Posts'], { UUID: 'text' });
+    deepStrictEqual(outcome.claimed['Posts'], { columns: { UUID: 'text' } });
     await db.close();
   });
 

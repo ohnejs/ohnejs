@@ -170,6 +170,40 @@ describe('generateDatabase', () => {
     ok(shared.includes('    title: string | null;'));
   });
 
+  it('assembles composite record shapes from subfields, nesting and wrapping by cardinality', async () => {
+    const app = join(root, 'composites');
+    writePackage(app, 'composites');
+    write(
+      app,
+      'collections/Posts.ts',
+      'export default { fields: {\n' +
+        "  address: { type: 'object', options: { fields: {\n" +
+        "    street: { type: 'text', options: {} },\n" +
+        "    city: { type: 'text', options: { nullable: true } },\n" +
+        '  } } },\n' +
+        "  sections: { type: 'repeater', options: { fields: {\n" +
+        "    title: { type: 'text', options: {} },\n" +
+        "    items: { type: 'repeater', options: { fields: { label: { type: 'text', options: {} } } } },\n" +
+        '  } } },\n' +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(
+      shared.includes(
+        '    address: {\n      street: string;\n      city: string | null;\n    } | null;',
+      ),
+    );
+    ok(
+      shared.includes(
+        '    sections: {\n      title: string;\n      items: {\n        label: string;\n      }[];\n    }[];',
+      ),
+    );
+  });
+
   it('drops disabled collections and field types, deleting a disabled built-in', async () => {
     const app = join(root, 'disabled');
     writePackage(
@@ -247,9 +281,27 @@ describe('generateDatabase', () => {
       'collections/Todos.ts',
       "import { defineCollection, field } from 'ohne';\n" +
         'export default defineCollection({\n' +
-        "  fields: { title: field('text', { unique: true }), status: field('status', { choices: ['open', 'done'] }) },\n" +
+        '  fields: {\n' +
+        "    title: field('text', { unique: true }),\n" +
+        "    status: field('status', { choices: ['open', 'done'] }),\n" +
+        "    meta: field('object', { fields: { color: field('text', { nullable: true }) } }),\n" +
+        "    checklist: field('repeater', { fields: { label: field('text'), done: field('boolean') } }),\n" +
+        '  },\n' +
         "  compositeIndexes: [{ fields: ['title', 'status'] }],\n" +
         '});\n',
+    );
+    write(
+      app,
+      'typing.ts',
+      "import type { KnownCollections } from 'ohne';\n" +
+        '\n' +
+        "export function shape(todo: KnownCollections['Todos']): string {\n" +
+        '  const labels = todo.checklist.map((item) => (item.done ? item.label : item.label.toUpperCase()));\n' +
+        "  const color = todo.meta === null ? 'none' : (todo.meta.color ?? 'unset');\n" +
+        "  return [todo.status, color, ...labels].join(' ');\n" +
+        '}\n' +
+        '// @ts-expect-error a repeater list is never null\n' +
+        "export const bad: KnownCollections['Todos']['checklist'] = null;\n",
     );
 
     await loadLayers(app);

@@ -1,7 +1,7 @@
 import type { SQLParams, SQLValue, Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
 import type { SchemaClassification } from '../schema/snapshot.ts';
-import type { ColumnSchema, TableSchema } from '../schema/table-schema.ts';
+import type { ColumnSchema, DerivedOrigin, TableSchema } from '../schema/table-schema.ts';
 import type {
   ColumnAddress,
   MigrationContext,
@@ -15,6 +15,7 @@ import type { MigrationMeta } from './use-migrations.ts';
 
 import { deepEqual, isNull, isUndefined, jsonClone } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { collectionTableName, derivedTableName } from '../naming/table-names.ts';
 import { applyClassification } from '../schema/snapshot.ts';
 
 /**
@@ -80,6 +81,14 @@ type MigrationForm =
   | { kind: 'rename'; from: TableAddress; to: TableAddress }
   | { kind: 'discardColumn'; from: ColumnAddress }
   | { kind: 'discardTable'; from: TableAddress };
+
+/**
+ * The row correlation of a move: which source columns look up the target row to write.
+ */
+interface Correlation {
+  sourceKey: readonly string[];
+  targetKey: readonly string[];
+}
 
 /**
  * Runs every pending migration in order, inside the sync's transaction, before the structural diff.
@@ -170,7 +179,11 @@ function runMigration(
 }
 
 /**
- * Renames a table and follows it in the claim record.
+ * Renames a table, follows it in the claim record, and cascades over its derived tables.
+ * Every junction and child table whose origin names the renamed owner renames with it.
+ * Each physical name recomputes from the new owner, fresh truncation hashes included.
+ * The new name doubles as the logical owner the derived names recompute from.
+ * A cascade onto a name past the physical cap therefore refuses: nothing recomposes from a hash.
  * Constraint names derive from the table name; the sync's diff recreates them under the new one.
  * A case-only rename passes the collision check, since its target is the table itself.
  */
@@ -188,25 +201,61 @@ async function runRename(
     }
     return skipStamp(meta, `\`${from.table}\` is absent and \`${to.table}\` is satisfied`);
   }
+  const derived = Object.entries(engine.claimed)
+    .flatMap(([table, claim]) =>
+      isUndefined(claim.derived) ||
+      collectionTableName(claim.derived.collection) !== from.table ||
+      !engine.names.has(table)
+        ? []
+        : [{ table, claim, origin: claim.derived }],
+    )
+    .sort((a, b) => (a.table < b.table ? -1 : 1));
+  if (derived.length > 0 && to.table.includes('$')) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot cascade onto a truncated name`,
+      body: [
+        `\`${to.table}\` is capped at the physical boundary, so the names of the derived tables owned by \`${from.table}\` cannot recompose from it.`,
+        'Pick a collection name under the cap.',
+      ],
+      path: meta.file,
+    });
+  }
+  await renameOwned(engine, meta, from.table, to.table);
+  for (const { table, claim, origin } of derived) {
+    const renamed = derivedTableName(to.table, ...origin.path);
+    await renameOwned(engine, meta, table, renamed);
+    engine.claimed[renamed] = { ...claim, derived: { ...origin, collection: to.table } };
+  }
+  return { name: meta.name, status: 'applied' };
+}
+
+/**
+ * Renames one owned table: collision-checked, executed, and followed in the run's bookkeeping.
+ */
+async function renameOwned(
+  engine: Engine,
+  meta: MigrationMeta,
+  from: string,
+  to: string,
+): Promise<void> {
   const taken = [...engine.names].find(
-    (name) => name.toLowerCase() === to.table.toLowerCase() && name !== from.table,
+    (name) => name.toLowerCase() === to.toLowerCase() && name !== from,
   );
   if (!isUndefined(taken)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` renames onto an existing table`,
       body: [
-        `\`${from.table}\` cannot become \`${to.table}\`: \`${taken}\` already exists.`,
+        `\`${from}\` cannot become \`${to}\`: \`${taken}\` already exists.`,
         'Migrate the occupying table away first, or pick another name.',
       ],
       path: meta.file,
     });
   }
-  await engine.dialect.renameTable(engine.db, from.table, to.table);
-  engine.names.delete(from.table);
-  engine.names.add(to.table);
-  engine.claimed[to.table] = engine.claimed[from.table] ?? {};
-  delete engine.claimed[from.table];
-  return { name: meta.name, status: 'applied' };
+  await engine.dialect.renameTable(engine.db, from, to);
+  engine.names.delete(from);
+  engine.names.add(to);
+  engine.claimed[to] = engine.claimed[from] ?? { columns: {} };
+  delete engine.claimed[from];
 }
 
 /**
@@ -248,7 +297,7 @@ async function runDiscardColumn(
   assertColumnMatches(engine, meta, from, column);
   assertNotPrimaryKey(meta, schema, from);
   await dropColumn(engine, schema, column);
-  delete engine.claimed[from.table]?.[from.column];
+  delete engine.claimed[from.table]?.columns[from.column];
   return { name: meta.name, status: 'applied' };
 }
 
@@ -290,7 +339,7 @@ async function runMove(
   const fresh = await describe(engine, from.table);
   const dropped = fresh.columns.find((item) => item.name === from.column);
   if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
-  delete engine.claimed[from.table]?.[from.column];
+  delete engine.claimed[from.table]?.columns[from.column];
   return { name: meta.name, status: 'applied' };
 }
 
@@ -358,9 +407,10 @@ async function materializeTarget(
       table: { ...wanted, uniques: [], indexes: [] },
     });
     engine.names.add(to.table);
-    engine.claimed[to.table] = Object.fromEntries(
-      wanted.columns.map((item) => [item.name, item.type]),
-    );
+    const columns = Object.fromEntries(wanted.columns.map((item) => [item.name, item.type]));
+    engine.claimed[to.table] = isUndefined(wanted.derived)
+      ? { columns }
+      : { columns, derived: wanted.derived };
   }
   const schema = await describe(engine, to.table);
   const column = schema.columns.find((item) => item.name === to.column);
@@ -398,7 +448,7 @@ function readRows(engine: Engine, source: TableSchema): Promise<Record<string, S
 }
 
 /**
- * Carries every held value through the dialect codec, one row at a time, correlated by equal primary key.
+ * Carries every held value through the dialect codec, one row at a time, correlated per classification.
  * A cross-table row with no target row loses its value when FROM drops: refused unless force.
  * Force drops the values and reports them.
  */
@@ -412,10 +462,9 @@ async function writeValues(
 ): Promise<void> {
   const { db, dialect } = engine;
   const { from, to, transform } = form;
-  assertCorrelatable(meta, source, target);
+  const { sourceKey, targetKey } = resolveCorrelation(engine, meta, source, target);
   if (rows.length === 0) return;
-  const key = source.primaryKey;
-  const where = key.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
+  const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
   const ctx: MigrationContext = {
     query: <T>(sql: string, params?: SQLParams) => db.query<T>(sql, params),
@@ -427,7 +476,10 @@ async function writeValues(
     const output = isUndefined(transform)
       ? value
       : await transform(value, deserializeRow(dialect, source, row), ctx);
-    const params = [dialect.serialize(to.type, output), ...key.map((name) => row[name] ?? null)];
+    const params = [
+      dialect.serialize(to.type, output),
+      ...sourceKey.map((name) => row[name] ?? null),
+    ];
     const { changes } = await db.run(update, params);
     if (changes === 0) unmatched++;
   }
@@ -449,9 +501,36 @@ async function writeValues(
 }
 
 /**
- * Rows correlate by equal primary key, so the source must have one and the target must share it.
+ * Resolves how source rows map onto target rows, pinned by table classification.
+ *
+ * Within one table, the row is its own target, keyed by the primary key.
+ * A child table moving onto its parent joins `_parentUUID = UUID`.
+ * A parent moving onto its child-one table joins the other way around.
+ * A child-many table holds many rows per parent, so no row mapping exists in either direction.
+ * Everything else correlates by equal primary key: the source must own one and the target must share it.
  */
-function assertCorrelatable(meta: MigrationMeta, source: TableSchema, target: TableSchema): void {
+function resolveCorrelation(
+  engine: Engine,
+  meta: MigrationMeta,
+  source: TableSchema,
+  target: TableSchema,
+): Correlation {
+  if (source.name !== target.name) {
+    const sourceOrigin = engine.claimed[source.name]?.derived;
+    if (!isUndefined(sourceOrigin) && parentTableOf(sourceOrigin) === target.name) {
+      if (sourceOrigin.kind === 'childMany') refuseManyRows(meta, source.name, target.name);
+      if (sourceOrigin.kind === 'childOne') {
+        return { sourceKey: ['_parentUUID'], targetKey: ['UUID'] };
+      }
+    }
+    const targetOrigin = engine.claimed[target.name]?.derived;
+    if (!isUndefined(targetOrigin) && parentTableOf(targetOrigin) === source.name) {
+      if (targetOrigin.kind === 'childMany') refuseManyRows(meta, target.name, source.name);
+      if (targetOrigin.kind === 'childOne') {
+        return { sourceKey: ['UUID'], targetKey: ['_parentUUID'] };
+      }
+    }
+  }
   if (source.primaryKey.length === 0) {
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot correlate rows`,
@@ -459,12 +538,34 @@ function assertCorrelatable(meta: MigrationMeta, source: TableSchema, target: Ta
       path: meta.file,
     });
   }
-  if (deepEqual(source.primaryKey, target.primaryKey)) return;
+  if (deepEqual(source.primaryKey, target.primaryKey)) {
+    return { sourceKey: source.primaryKey, targetKey: target.primaryKey };
+  }
   throw ohneError({
     title: `Migration \`${meta.name}\` cannot correlate rows`,
     body: [
       `\`${source.name}\` and \`${target.name}\` do not share a primary key, so no row maps onto another.`,
     ],
+    path: meta.file,
+  });
+}
+
+/**
+ * The physical table a derived table hangs off: its collection, or the next composite up.
+ */
+function parentTableOf(origin: DerivedOrigin): string {
+  const [first, ...rest] = origin.path;
+  if (rest.length === 0) return collectionTableName(origin.collection);
+  return derivedTableName(origin.collection, first, ...rest.slice(0, -1));
+}
+
+/**
+ * The refusal for a move touching a child-many table across tables: no single row wins.
+ */
+function refuseManyRows(meta: MigrationMeta, child: string, parent: string): never {
+  throw ohneError({
+    title: `Migration \`${meta.name}\` cannot correlate rows`,
+    body: [`\`${child}\` holds many rows per \`${parent}\` row, so no row maps onto another.`],
     path: meta.file,
   });
 }
@@ -618,7 +719,7 @@ function foreign(engine: Engine, table: string): boolean {
  * Records a column's logical type in the claim record.
  */
 function setClaim(engine: Engine, table: string, column: string, type: LogicalType): void {
-  (engine.claimed[table] ??= {})[column] = type;
+  (engine.claimed[table] ??= { columns: {} }).columns[column] = type;
 }
 
 /**

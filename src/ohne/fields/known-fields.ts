@@ -1,7 +1,9 @@
 import type { boolean } from './builtin/boolean.ts';
 import type { integer } from './builtin/integer.ts';
+import type { object } from './builtin/object.ts';
 import type { record } from './builtin/record.ts';
 import type { records } from './builtin/records.ts';
+import type { repeater } from './builtin/repeater.ts';
 import type { text } from './builtin/text.ts';
 
 /**
@@ -45,6 +47,16 @@ export interface KnownFields {
    * An ordered many-to-many relation to another collection.
    */
   records: typeof records;
+
+  /**
+   * A nested group of fields, stored at most once per parent row.
+   */
+  object: typeof object;
+
+  /**
+   * An ordered list of nested field groups.
+   */
+  repeater: typeof repeater;
 }
 
 /**

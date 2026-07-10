@@ -103,4 +103,27 @@ describe('field over a column-less field type', () => {
     // @ts-expect-error a junction field is never `NULL`
     field('records', { collection: 'Users', nullable: true });
   });
+
+  it('requires the subfields of a composite, barring the common options', () => {
+    // @ts-expect-error `object` requires its `fields` option
+    field('object');
+
+    // @ts-expect-error `repeater` requires its `fields` option
+    field('repeater');
+
+    field('object', { fields: { street: field('text') } });
+    field('repeater', { fields: { title: field('text', { unique: true }) } });
+    field('repeater', {
+      fields: { nested: field('object', { fields: { deep: field('integer') } }) },
+    });
+
+    // @ts-expect-error a composite field has no column to constrain
+    field('object', { fields: { street: field('text') }, unique: true });
+
+    // @ts-expect-error an absent object row already reads as `null`
+    field('object', { fields: { street: field('text') }, nullable: true });
+
+    // @ts-expect-error a repeater with no items is empty, never `NULL`
+    field('repeater', { fields: { title: field('text') }, nullable: true });
+  });
 });

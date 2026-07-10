@@ -5,6 +5,7 @@ import type { ScannedMigration } from '../database/migrations/scan-layer-migrati
 import type { CollectedFieldType } from '../fields/collect-fields.ts';
 import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
+import type { ChildHint } from '../fields/storage-hint.ts';
 
 import {
   type CodeBuilder,
@@ -12,6 +13,7 @@ import {
   createCodeGenerator,
   createTypeImports,
   importSpecifier,
+  indent,
   literalString,
   propertyKey,
   type TypeImports,
@@ -302,6 +304,7 @@ function emittableFieldTypes(
 
 /**
  * Emits one field's TypeScript value type, resolving its type name against the emittable set.
+ * A child hint assembles its shape from its subfields here, where the emittable set is at hand.
  */
 function valueTypeOf(
   collection: CollectedCollection,
@@ -320,13 +323,39 @@ function valueTypeOf(
       path: collection.file,
     });
   }
+  const { fieldType } = registered;
+  if (fieldType.columnType === false && !isUndefined(fieldType.schema)) {
+    const options = resolveFieldOptions(fieldType, { ...instance.options });
+    const hint = fieldType.schema({ name, options });
+    if (hint.kind === 'child') return childValueType(collection, hint, types, imports);
+  }
   return fieldValueType({
-    fieldType: registered.fieldType,
+    fieldType,
     name,
     options: { ...instance.options },
     fieldDir: registered.dir,
     imports,
   });
+}
+
+/**
+ * Assembles a composite's inline record shape from its subfields, recursively.
+ * Each line carries its relative indentation; the emission site indents the whole block.
+ * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
+ */
+function childValueType(
+  collection: CollectedCollection,
+  hint: ChildHint,
+  types: Map<string, EmittableFieldType>,
+  imports: TypeImports,
+): string {
+  const lines = ['{'];
+  for (const [name, instance] of Object.entries(hint.subfields)) {
+    const type = valueTypeOf(collection, name, instance, types, imports);
+    lines.push(indent(`${propertyKey(name)}: ${type};`));
+  }
+  lines.push(hint.cardinality === 'one' ? '} | null' : '}[]');
+  return lines.join('\n');
 }
 
 /**

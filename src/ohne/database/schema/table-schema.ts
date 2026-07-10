@@ -67,6 +67,29 @@ export interface ForeignKeySchema {
 }
 
 /**
+ * Where a derived table comes from: the owning collection and the field path that declared it.
+ * The snapshot persists it as part of the claim record, since no name is ever parsed back.
+ * A collection rename recomputes the table's name from it, so derived tables follow their owner.
+ */
+export interface DerivedOrigin {
+  /**
+   * The owning collection's logical name.
+   */
+  collection: string;
+
+  /**
+   * The field path from the collection to this table, one segment per nesting level.
+   */
+  path: readonly [string, ...string[]];
+
+  /**
+   * The storage shape behind the table.
+   * `junction` links two collections; `childOne` and `childMany` hold composite rows per parent.
+   */
+  kind: 'junction' | 'childOne' | 'childMany';
+}
+
+/**
  * The normalized shape of one table: columns, primary key, uniques, indexes, and foreign keys.
  */
 export interface TableSchema {
@@ -99,6 +122,12 @@ export interface TableSchema {
    * The foreign keys.
    */
   foreignKeys: readonly ForeignKeySchema[];
+
+  /**
+   * The derivation origin of a junction or child table; absent on collection main tables.
+   * Introspection never reports it: the desired builder sets it and the snapshot preserves it.
+   */
+  derived?: DerivedOrigin;
 }
 
 /**

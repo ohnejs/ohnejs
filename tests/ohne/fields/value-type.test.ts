@@ -5,6 +5,7 @@ import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
 import type { AnyOptionDef } from '../../../src/ohne/fields/option.ts';
 
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
+import { field } from '../../../src/ohne/fields/field.ts';
 import { option } from '../../../src/ohne/fields/option.ts';
 import { fieldValueType } from '../../../src/ohne/fields/value-type.ts';
 import { createTypeImports } from '../../../src/utils/codegen/index.ts';
@@ -103,6 +104,14 @@ describe('fieldValueType', () => {
       schema: () => ({ kind: 'junction', collection: 'Users' }),
     });
     strictEqual(emit(junction).type, 'string[]');
+  });
+
+  it('throws for a child hint, whose shape assembles at codegen instead', () => {
+    const composite = defineField({
+      columnType: false,
+      schema: () => ({ kind: 'child', cardinality: 'one', subfields: { x: field('text') } }),
+    });
+    throws(() => emit(composite), /column-less/);
   });
 
   it('wraps a force-nullable foreign-key field with null', () => {

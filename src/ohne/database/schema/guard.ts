@@ -1,6 +1,12 @@
 import type { Transaction } from '../adapter.ts';
 import type { Dialect } from '../dialect.ts';
-import type { ForeignKeySchema, TableAlter, TableDiff, TableSchema } from './table-schema.ts';
+import type {
+  ForeignKeySchema,
+  IndexSchema,
+  TableAlter,
+  TableDiff,
+  TableSchema,
+} from './table-schema.ts';
 
 import { isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
@@ -11,7 +17,8 @@ import { ohneError } from '../../error/ohne-error.ts';
 export interface GuardOptions {
   /**
    * Authorizes destructive findings for this run and performs the purges they report.
-   * Duplicate-unique and NULL-over-NOT-NULL findings stay refusals - force cannot resolve them.
+   * Duplicate-unique and NULL-over-NOT-NULL findings stay refusals - force cannot pick winners.
+   * A cardinality collapse is the exception: its winner is pinned to each parent's first row.
    */
   force: boolean;
 }
@@ -38,9 +45,15 @@ interface DanglingFinding {
   targetCreated: boolean;
 }
 
+interface CollapseFinding {
+  table: string;
+  groups: number;
+}
+
 interface Findings {
   losses: string[];
   purgeable: DanglingFinding[];
+  collapses: CollapseFinding[];
   blockers: string[];
   orphans: DanglingFinding[];
 }
@@ -49,6 +62,8 @@ interface Findings {
  * The destructive guard: probes every diff and refuses what would silently lose data.
  * A populated table or column drop and a populated retype refuse unless `force` authorizes them.
  * A new unique over duplicates or `NOT NULL` over NULLs refuses regardless - force cannot pick winners.
+ * A repeater collapsing to one row per parent is the exception, since its winner is pinned.
+ * Force keeps each parent's first row - lowest `_parentPosition`, `UUID` breaking ties - and drops the rest.
  * Rows dangling under a foreign key being added refuse too; under force they are purged here.
  * Pre-existing orphans under a surviving foreign key only warn; under force they are purged as well.
  * A purge clears the dangling values where the column permits `NULL` both live and desired.
@@ -63,7 +78,13 @@ export async function guardDiffs(
   live: readonly TableSchema[],
   options: GuardOptions,
 ): Promise<GuardReport> {
-  const findings: Findings = { losses: [], purgeable: [], blockers: [], orphans: [] };
+  const findings: Findings = {
+    losses: [],
+    purgeable: [],
+    collapses: [],
+    blockers: [],
+    orphans: [],
+  };
   const creating = new Set(
     diffs.flatMap((diff) => (diff.kind === 'create' ? [diff.table.name] : [])),
   );
@@ -79,6 +100,7 @@ export async function guardDiffs(
   const destructive = [
     ...findings.losses,
     ...findings.purgeable.map((item) => danglingLine(item.table, item.foreignKey, item.count)),
+    ...findings.collapses.map((item) => collapseLine(item.table, item.groups)),
   ];
   if (findings.blockers.length > 0 || (destructive.length > 0 && !options.force)) {
     throw ohneError({
@@ -98,6 +120,7 @@ export async function guardDiffs(
     db,
     dialect,
     [...findings.purgeable, ...findings.orphans],
+    findings.collapses,
     diffs,
     live,
   );
@@ -109,6 +132,7 @@ export async function guardDiffs(
  * Structure arriving in this sync is never probed against the live table.
  * A just-added column holds no values, so nothing over it can collide or dangle.
  * A foreign key to a table created this sync makes every non-NULL value dangle by definition.
+ * A detected cardinality collapse absorbs its `_parentPosition` drop: ordering is structure, not data.
  */
 async function guardAlter(
   db: Transaction,
@@ -119,8 +143,10 @@ async function guardAlter(
 ): Promise<void> {
   const table = alter.desired.name;
   const added = new Set(alter.addColumns.map((column) => column.name));
+  const collapse = detectCollapse(alter);
   const rows = await countRows(db, dialect, table);
   for (const column of alter.dropColumns) {
+    if (!isUndefined(collapse) && column.name === '_parentPosition') continue;
     const values = await countWhere(
       db,
       dialect,
@@ -168,9 +194,12 @@ async function guardAlter(
   for (const unique of alter.addUniques) {
     if (unique.columns.some((column) => added.has(column))) continue;
     const groups = await countDuplicateGroups(db, dialect, table, unique.columns);
-    if (groups > 0) {
-      findings.blockers.push(`- unique \`${unique.name}\` covers \`${groups}\` duplicate groups`);
+    if (groups === 0) continue;
+    if (unique === collapse) {
+      findings.collapses.push({ table, groups });
+      continue;
     }
+    findings.blockers.push(`- unique \`${unique.name}\` covers \`${groups}\` duplicate groups`);
   }
   if (
     alter.changePrimaryKey &&
@@ -204,7 +233,8 @@ async function guardAlter(
 }
 
 /**
- * Executes the dangling purges to a fixed point, following foreign keys onto rows they orphan.
+ * Executes the collapse and dangling purges to a fixed point, following foreign keys onto orphans.
+ * A collapse deletes every row after each parent's first, before the dangling purges run.
  * A dangling value is cleared to `NULL` where the column permits it both live and desired.
  * Live governs because purges run before any structural apply; desired governs the end state.
  * Everywhere else the rows are deleted.
@@ -217,6 +247,7 @@ async function purgeDangling(
   db: Transaction,
   dialect: Dialect,
   initial: readonly DanglingFinding[],
+  collapses: readonly CollapseFinding[],
   diffs: readonly TableDiff[],
   live: readonly TableSchema[],
 ): Promise<string[]> {
@@ -224,8 +255,18 @@ async function purgeDangling(
   const universe = probeUniverse(diffs, live);
   const nullable = nullableColumns(diffs, live);
   let queue = [...initial];
-  while (queue.length > 0) {
+  let pending = [...collapses];
+  while (queue.length > 0 || pending.length > 0) {
     const affected = new Set<string>();
+    for (const item of pending) {
+      const { changes } = await db.run(collapseSQL(dialect, item.table));
+      if (changes === 0) continue;
+      lines.push(
+        `- \`${changes}\` rows of \`${item.table}\` deleted, keeping each parent's first row`,
+      );
+      affected.add(item.table);
+    }
+    pending = [];
     for (const item of queue) {
       const clears = nullable.has(`${item.table}.${item.foreignKey.column}`);
       const purge = clears
@@ -332,10 +373,29 @@ function refusalBody(destructive: string[], blockers: string[]): string[] {
 }
 
 /**
+ * Detects a many -> one cardinality collapse on one alter, returning the unique that pins it.
+ * The signature: the desired shape uniques exactly `_parentUUID` while `_parentPosition` drops.
+ * Only the desired builder emits these internal columns, so the signature is unambiguous.
+ */
+function detectCollapse(alter: TableAlter): IndexSchema | undefined {
+  if (!alter.dropColumns.some((column) => column.name === '_parentPosition')) return undefined;
+  return alter.addUniques.find(
+    (unique) => unique.columns.length === 1 && unique.columns[0] === '_parentUUID',
+  );
+}
+
+/**
  * One report line for rows dangling from a foreign key.
  */
 function danglingLine(table: string, foreignKey: ForeignKeySchema, count: number): string {
   return `- \`${count}\` rows of \`${table}\` dangle from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
+}
+
+/**
+ * One report line for parents whose many rows collapse onto one.
+ */
+function collapseLine(table: string, groups: number): string {
+  return `- \`${groups}\` parents of \`${table}\` hold multiple rows; only each parent's first row survives`;
 }
 
 /**
@@ -467,5 +527,23 @@ function deleteSQL(
   return (
     `DELETE FROM ${dialect.quote(table)} ` +
     `WHERE ${danglingCondition(dialect, table, foreignKey, targetCreated)}`
+  );
+}
+
+/**
+ * Builds the `DELETE` keeping each parent's first row: lowest `_parentPosition`, `UUID` breaking ties.
+ * Set-based on purpose: the table's indexes are already down, so a correlated scan would go quadratic.
+ */
+function collapseSQL(dialect: Dialect, table: string): string {
+  const parent = dialect.quote('_parentUUID');
+  const position = dialect.quote('_parentPosition');
+  const uuid = dialect.quote('UUID');
+  const from = `FROM ${dialect.quote(table)}`;
+  return (
+    `DELETE ${from} WHERE ${uuid} NOT IN (` +
+    `SELECT MIN(${uuid}) ${from} ` +
+    `WHERE (${parent}, ${position}) IN (` +
+    `SELECT ${parent}, MIN(${position}) ${from} GROUP BY ${parent}) ` +
+    `GROUP BY ${parent})`
   );
 }

@@ -1,3 +1,5 @@
+import type { FieldInstance } from './field.ts';
+
 /**
  * The storage layout of a `record` field: a foreign-key column on the owning collection's table.
  * The column holds the target row's `UUID` and is named after the field.
@@ -52,7 +54,31 @@ export interface JunctionHint {
 }
 
 /**
+ * The storage layout of an `object` or `repeater` field: a child table beside the owner.
+ * The child carries no column on the owner's table; its name joins owner and field with `_`.
+ * Each row belongs to one parent row and disappears with it.
+ */
+export interface ChildHint {
+  /**
+   * Marks the hint as a child table.
+   */
+  kind: 'child';
+
+  /**
+   * How many child rows a parent row may hold.
+   * `one` enforces a single row per parent; `many` orders the rows with a position column.
+   */
+  cardinality: 'one' | 'many';
+
+  /**
+   * The child table's fields, each a regular `field(...)` instance.
+   * Composites and relations nest freely; deeper composites derive further child tables.
+   */
+  subfields: Record<string, FieldInstance>;
+}
+
+/**
  * Every storage layout a field type's `schema` can return.
  * The union is closed: new shapes are framework work, not field-type work.
  */
-export type StorageHint = ForeignKeyHint | JunctionHint;
+export type StorageHint = ForeignKeyHint | JunctionHint | ChildHint;
