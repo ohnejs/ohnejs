@@ -21,8 +21,9 @@ export default defineCollection({
 });
 ```
 
-The file name is the collection name: `collections/Posts.ts` becomes the `Posts` table. Collection
-names are PascalCase; field names are camelCase.
+The file's path names the collection: `collections/Posts.ts` becomes the `Posts` table. A
+subdirectory joins the name - `collections/blog/Posts.ts` becomes `BlogPosts` - and a
+`blog/index.ts` collapses to `Blog`. Names normalize to PascalCase; field names are camelCase.
 
 Every collection gets two columns you never declare: `UUID`, the text primary key, and
 `_updatedAt`, an internal timestamp. Your fields become the other columns. A field is `NOT NULL`
@@ -97,3 +98,31 @@ FORCE_SYNC=1 pnpm serve:api
 Force does not skip the checks - it performs the deletions they warned about, and reports
 everything it deleted in one block. Reach for a migration first; force is for the cases where the
 data is truly disposable.
+
+## Rolling back
+
+Rolling back the code rolls the schema with it: the next boot reconciles the database back to
+what the old build declares, and the destructive guard treats that like any other change. A
+rollback that only removes empty additions syncs freely. One that would lose data refuses until
+a migration covers it - a move carrying values back, a discard declaring them disposable - or
+force authorizes it.
+
+If you need the old data too, restore the database backup together with the old code.
+
+## Syncing without serving
+
+`ohne sync` runs the same sync as the server boot and exits - no port opens:
+
+```sh
+pnpm exec ohne sync
+```
+
+Use it as a deploy step: stop the app, sync, start the new build. A guard refusal then fails the
+deploy instead of the first boot, and you see it before anything serves. `--force` authorizes the
+destructive changes, exactly like `FORCE_SYNC`:
+
+```sh
+pnpm exec ohne sync --force
+```
+
+A database already in shape makes the command a no-op, so it is always safe to run.
