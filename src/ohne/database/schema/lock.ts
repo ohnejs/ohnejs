@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from '../adapter.ts';
 import type { Dialect, LockHandle } from '../dialect.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
-import { ensureSchemaTable, readSnapshot, refuseIfSuperseded } from './snapshot.ts';
+import { ensureSchemaTable, readSnapshot } from './snapshot.ts';
 
 /**
  * Timing and identity of one instance's bid for the sync lock.
@@ -41,8 +41,7 @@ const DEFAULT_STALE_AFTER = 60_000;
  * A busy database during the race reads as a held lock: the instance waits and re-races.
  * A loser waits; once the lock clears it compares the written snapshot against `desiredHash`.
  * A match returns `undefined` - the schema is already realized and the caller boots without syncing.
- * A hash found in the snapshot's history means this build was superseded: it refuses loudly.
- * Any other outcome re-races, covering a crashed winner and a schema the database has never seen.
+ * Any other outcome re-races, covering a crashed winner and a schema the database does not hold yet.
  */
 export async function acquireSyncLock(
   db: DatabaseAdapter,
@@ -64,6 +63,5 @@ export async function acquireSyncLock(
     const snapshot = await readSnapshot(db, dialect);
     if (isUndefined(snapshot)) continue;
     if (snapshot.hash === options.desiredHash) return undefined;
-    refuseIfSuperseded(snapshot, options.desiredHash);
   }
 }

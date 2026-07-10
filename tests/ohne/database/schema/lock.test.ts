@@ -1,4 +1,4 @@
-import { match, notStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { match, notStrictEqual, ok, strictEqual } from 'node:assert';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,14 +25,9 @@ async function openPair(): Promise<[DatabaseAdapter, DatabaseAdapter]> {
   return [await dialect.connect(path), await dialect.connect(path)];
 }
 
-async function snapshotOf(
-  db: DatabaseAdapter,
-  generation: number,
-  hash: string,
-  history: { generation: number; hash: string }[] = [],
-): Promise<void> {
+async function snapshotOf(db: DatabaseAdapter, generation: number, hash: string): Promise<void> {
   const classification: SchemaClassification = {};
-  await writeSnapshot(db, dialect, { generation, hash, history, classification });
+  await writeSnapshot(db, dialect, { generation, hash, classification });
 }
 
 describe('acquireSyncLock', () => {
@@ -83,15 +78,15 @@ describe('acquireSyncLock', () => {
     await b.close();
   });
 
-  it('refuses loudly when its hash sits in the snapshot history', async () => {
+  it('re-races and wins when the database holds a different shape', async () => {
     const [a, b] = await openPair();
     const handle = await acquireSyncLock(a, dialect, { desiredHash: 'H2' });
     ok(handle);
     const pending = acquireSyncLock(b, dialect, { desiredHash: 'H1', pollInterval: 5 });
     await sleep(20);
-    await snapshotOf(a, 2, 'H2', [{ generation: 1, hash: 'H1' }]);
+    await snapshotOf(a, 2, 'H2');
     await dialect.releaseLock(a, handle);
-    await rejects(pending, /newer than this build/);
+    ok(await pending);
     await a.close();
     await b.close();
   });

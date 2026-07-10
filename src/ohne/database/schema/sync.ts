@@ -17,7 +17,6 @@ import {
   applyClassification,
   classifySchema,
   readSnapshot,
-  refuseIfSuperseded,
   schemaHash,
   writeSnapshot,
 } from './snapshot.ts';
@@ -73,7 +72,6 @@ const INTERNAL_TABLES = new Set<string>([OHNE_LOCKS, OHNE_MIGRATIONS, OHNE_SCHEM
  * Live structure is authoritative; the snapshot supplies classification and the claim record.
  * Unclaimed tables are foreign: never dropped, and a name collision with the desired set refuses.
  * Collisions match case-insensitively - the weakest dialect's rule, so schemas stay portable.
- * A build whose hash sits in the snapshot history refuses instead of reverting the schema.
  *
  * Pending migrations run inside the transaction, before the structural diff.
  * Uniques and indexes drop first on every touched table, so migrations write under no constraint.
@@ -100,7 +98,13 @@ export async function syncDatabase(
   try {
     await dialect.sweepRebuilds(db);
     const snapshot = await readSnapshot(db, dialect);
-    refuseIfSuperseded(snapshot, desiredHash);
+    const migrations = options.migrations ?? [];
+    let pending: MigrationMeta[] = [];
+    if (migrations.length > 0) {
+      await ensureMigrationsTable(db, dialect);
+      const stamped = await readStampedNames(db, dialect);
+      pending = migrations.filter((meta) => !stamped.has(meta.name));
+    }
     const names = await dialect.listTables(db);
     const claimed = snapshot?.classification ?? {};
     const desiredNames = new Set(desired.map((table) => table.name.toLowerCase()));
@@ -126,13 +130,6 @@ export async function syncDatabase(
       live.push(await dialect.describeTable(db, name));
     }
     const classified = applyClassification(live, claimed, dialect);
-    const migrations = options.migrations ?? [];
-    let pending: MigrationMeta[] = [];
-    if (migrations.length > 0) {
-      await ensureMigrationsTable(db, dialect);
-      const stamped = await readStampedNames(db, dialect);
-      pending = migrations.filter((meta) => !stamped.has(meta.name));
-    }
     const touched = touchedTables(diffSchemas(classified, desired, dialect), pending);
     const force = options.force ?? false;
     return await dialect.schemaTransaction(db, async (tx) => {

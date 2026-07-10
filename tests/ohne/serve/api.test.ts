@@ -9,11 +9,7 @@ import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
-import {
-  ensureSchemaTable,
-  schemaHash,
-  writeSnapshot,
-} from '../../../src/ohne/database/schema/snapshot.ts';
+import { ensureSchemaTable, writeSnapshot } from '../../../src/ohne/database/schema/snapshot.ts';
 import {
   closeDatabases,
   type HTTPServer,
@@ -172,17 +168,18 @@ describe('serveAPI', () => {
     useEnv().set('DATABASE', path);
     const seed = await dialect.connect(path);
     await ensureSchemaTable(seed, dialect);
+    await seed.exec('CREATE TABLE "Orphans" ("UUID" TEXT NOT NULL, PRIMARY KEY ("UUID"))');
+    await seed.run('INSERT INTO "Orphans" ("UUID") VALUES (?)', ['o1']);
     await writeSnapshot(seed, dialect, {
-      generation: 2,
-      hash: 'future',
-      history: [{ generation: 1, hash: schemaHash([]) }],
-      classification: {},
+      generation: 1,
+      hash: 'seeded',
+      classification: { Orphans: { columns: { UUID: 'text' } } },
     });
     await seed.close();
     const port = await freePort();
     useEnv().set('PORT', port);
 
-    await rejects(serveAPI(dir), /newer than this build/);
+    await rejects(serveAPI(dir), /Destructive sync refused/);
 
     await rejects(get(port, '/'));
     useEnv().set('PORT', 0);

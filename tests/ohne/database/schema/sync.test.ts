@@ -7,11 +7,7 @@ import type { MigrationMeta } from '../../../../src/ohne/database/migrations/use
 import type { TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
-import {
-  readSnapshot,
-  schemaHash,
-  writeSnapshot,
-} from '../../../../src/ohne/database/schema/snapshot.ts';
+import { readSnapshot, schemaHash } from '../../../../src/ohne/database/schema/snapshot.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 
 const dialect = new SQLiteDialect();
@@ -75,7 +71,7 @@ describe('syncDatabase', () => {
     await db.close();
   });
 
-  it('bumps the generation and keeps history across an evolution', async () => {
+  it('bumps the generation across an evolution', async () => {
     const db = await open();
     const before = table('Posts');
     const after = table('Posts', {
@@ -85,7 +81,7 @@ describe('syncDatabase', () => {
     await syncDatabase(db, dialect, { desired: [after] });
     const snapshot = await readSnapshot(db, dialect);
     strictEqual(snapshot?.generation, 2);
-    deepStrictEqual(snapshot.history, [{ generation: 1, hash: schemaHash([before]) }]);
+    strictEqual(snapshot.hash, schemaHash([after]));
     strictEqual((await dialect.describeTable(db, 'Posts')).columns.length, 2);
     await db.close();
   });
@@ -129,19 +125,51 @@ describe('syncDatabase', () => {
     await db.close();
   });
 
-  it('refuses to sync a superseded build', async () => {
+  it('syncs a previously-seen shape forward', async () => {
     const db = await open();
-    const posts = table('Posts');
-    await syncDatabase(db, dialect, { desired: [] });
-    const current = await readSnapshot(db, dialect);
-    ok(current);
-    await writeSnapshot(db, dialect, {
-      generation: 2,
-      hash: 'newer',
-      history: [{ generation: 1, hash: schemaHash([posts]) }],
-      classification: {},
+    const before = table('Posts');
+    const after = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
-    await rejects(syncDatabase(db, dialect, { desired: [posts] }), /newer than this build/);
+    await syncDatabase(db, dialect, { desired: [before] });
+    await syncDatabase(db, dialect, { desired: [after] });
+    const report = await syncDatabase(db, dialect, { desired: [before] });
+    deepStrictEqual(report, { deletions: [], warnings: [] });
+    const snapshot = await readSnapshot(db, dialect);
+    strictEqual(snapshot?.generation, 3);
+    strictEqual(snapshot.hash, schemaHash([before]));
+    deepStrictEqual(await dialect.describeTable(db, 'Posts'), before);
+    await lockIsFree(db);
+    await db.close();
+  });
+
+  it('rolls back a populated change through a migration', async () => {
+    const db = await open();
+    const before = table('Posts');
+    const after = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+    });
+    await syncDatabase(db, dialect, { desired: [before] });
+    await syncDatabase(db, dialect, { desired: [after] });
+    await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?)', ['a', 'unwanted']);
+    await rejects(syncDatabase(db, dialect, { desired: [before] }), /Destructive sync refused/);
+    const migrations = [
+      meta('app/001-drop-title', {
+        from: { table: 'Posts', column: 'title', type: 'text' },
+        to: null,
+      }),
+    ];
+    const report = await syncDatabase(db, dialect, { desired: [before], migrations });
+    deepStrictEqual(report, { deletions: [], warnings: [] });
+    deepStrictEqual(await dialect.describeTable(db, 'Posts'), before);
+    const snapshot = await readSnapshot(db, dialect);
+    strictEqual(snapshot?.hash, schemaHash([before]));
+    deepStrictEqual(
+      (await stampedRows(db)).map((row) => [row.name, row.status]),
+      [['app/001-drop-title', 'applied']],
+    );
+    const again = await syncDatabase(db, dialect, { desired: [before], migrations });
+    deepStrictEqual(again, { deletions: [], warnings: [] });
     await lockIsFree(db);
     await db.close();
   });
