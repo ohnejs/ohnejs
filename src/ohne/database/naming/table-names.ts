@@ -1,4 +1,21 @@
+import { isUndefined } from '../../../utils/index.ts';
 import { physicalName } from './_physical.ts';
+
+/**
+ * The owner a derived table's names compose from: a collection, or a block's per-type root.
+ * Exactly one of the two is set.
+ */
+interface DerivedOwner {
+  collection?: string;
+  block?: string;
+}
+
+/**
+ * A derived table's origin as the naming builders read it: the owner plus the field path down to it.
+ */
+interface DerivedOwnerPath extends DerivedOwner {
+  path: readonly [string, ...string[]];
+}
 
 /**
  * The cluster-lock table backing the base `acquireLock` and `releaseLock`.
@@ -68,5 +85,49 @@ export function companionTableName(owner: string): string {
  * ```
  */
 export function blockTableName(block: string): string {
-  return physicalName(`block_${block}`);
+  return physicalName(blockRootName(block));
+}
+
+/**
+ * The logical root name of a block's table family, before the physical cap.
+ * Derived tables under a block compose from it through `derivedTableName`.
+ *
+ * @example
+ * ```ts
+ * blockRootName('Hero') // -> 'block_Hero'
+ * ```
+ */
+export function blockRootName(block: string): string {
+  return `block_${block}`;
+}
+
+/**
+ * The logical root name a derived table's family composes from.
+ * The owning collection's name, or the `block_<Name>` root when a block owns the family.
+ *
+ * @example
+ * ```ts
+ * derivedRootName({ collection: 'Posts' }) // -> 'Posts'
+ * derivedRootName({ block: 'Hero' })       // -> 'block_Hero'
+ * ```
+ */
+export function derivedRootName(owner: DerivedOwner): string {
+  return isUndefined(owner.collection) ? blockRootName(owner.block as string) : owner.collection;
+}
+
+/**
+ * The physical table a derived table hangs off: its owner's root table, or the next composite up.
+ *
+ * @example
+ * ```ts
+ * derivedParentName({ collection: 'Posts', path: ['sections'] })          // -> 'Posts'
+ * derivedParentName({ collection: 'Posts', path: ['sections', 'items'] }) // -> 'Posts_sections'
+ * derivedParentName({ block: 'Hero', path: ['links'] })                   // -> 'block_Hero'
+ * ```
+ */
+export function derivedParentName(origin: DerivedOwnerPath): string {
+  const root = derivedRootName(origin);
+  const [first, ...rest] = origin.path;
+  if (rest.length === 0) return physicalName(root);
+  return derivedTableName(root, first, ...rest.slice(0, -1));
 }

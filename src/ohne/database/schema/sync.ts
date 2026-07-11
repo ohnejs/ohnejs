@@ -4,9 +4,10 @@ import type { MigrationMeta } from '../migrations/use-migrations.ts';
 import type { GuardReport } from './guard.ts';
 import type { TableDiff, TableSchema } from './table-schema.ts';
 
-import { isNull, isUndefined } from '../../../utils/index.ts';
+import { isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { executeMigrations } from '../migrations/execute.ts';
+import { touchedByMigration } from '../migrations/resolve-address.ts';
 import { ensureMigrationsTable, readStampedNames, stampMigration } from '../migrations/state.ts';
 import { OHNE_LOCKS, OHNE_MIGRATIONS, OHNE_SCHEMA } from '../naming/table-names.ts';
 import { diffSchemas } from './diff.ts';
@@ -141,6 +142,7 @@ export async function syncDatabase(
         desired,
         claimed,
         force,
+        ownership: snapshot?.ownership ?? true,
       });
       const migrated: TableSchema[] = [];
       for (const name of await dialect.listTables(tx)) {
@@ -149,7 +151,7 @@ export async function syncDatabase(
       }
       const current = applyClassification(migrated, outcome.claimed, dialect);
       const diffs = diffSchemas(current, desired, dialect);
-      const report = await guardDiffs(tx, dialect, diffs, current, { force });
+      const report = await guardDiffs(tx, dialect, diffs, current, desired, { force });
       for (const diff of diffs) {
         await dialect.applyTableDiff(tx, diff);
       }
@@ -175,7 +177,8 @@ export async function syncDatabase(
 
 /**
  * Collects the tables whose constraints come down before migrations run.
- * Over-approximation is safe: every table differing pre-migration, plus every migration FROM and TO.
+ * Over-approximation is safe: every table differing pre-migration, plus every migration `from` and `to`.
+ * Logical addresses lower purely to physical names here; an ambiguous one counts both readings.
  */
 function touchedTables(
   diffs: readonly TableDiff[],
@@ -185,9 +188,8 @@ function touchedTables(
   for (const diff of diffs) {
     touched.add(diff.kind === 'alter' ? diff.desired.name : diff.table.name);
   }
-  for (const { migration } of pending) {
-    touched.add(migration.from.table);
-    if (!isNull(migration.to)) touched.add(migration.to.table);
+  for (const meta of pending) {
+    for (const table of touchedByMigration(meta)) touched.add(table);
   }
   return touched;
 }

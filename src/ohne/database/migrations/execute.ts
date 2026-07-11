@@ -1,22 +1,29 @@
 import type { SQLParams, SQLValue, Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
-import type { SchemaClassification } from '../schema/snapshot.ts';
-import type { ColumnSchema, DerivedOrigin, TableSchema } from '../schema/table-schema.ts';
+import type { SchemaClassification, TableClaim } from '../schema/snapshot.ts';
+import type { ColumnSchema, TableSchema } from '../schema/table-schema.ts';
 import type {
   ColumnAddress,
   MigrationContext,
   MigrationTransform,
-  MoveMigration,
-  RenameMigration,
   TableAddress,
 } from './define-migration.ts';
+import type {
+  ConsumedAddress,
+  LogicalSubtree,
+  LoweredMigration,
+  RenameMember,
+  ResolveState,
+} from './resolve-address.ts';
 import type { MigrationStamp } from './state.ts';
 import type { MigrationMeta } from './use-migrations.ts';
 
-import { deepEqual, isNull, isUndefined, jsonClone } from '../../../utils/index.ts';
+import { deepEqual, errorMessage, isNull, isUndefined, jsonClone } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { collectionTableName, derivedTableName } from '../naming/table-names.ts';
+import { collectionTableName, derivedParentName, derivedTableName } from '../naming/table-names.ts';
+import { sweepWrapperRows, type SweepTable } from '../schema/purge.ts';
 import { applyClassification } from '../schema/snapshot.ts';
+import { consumedByMigration, lowerMigration, pathStartsWith } from './resolve-address.ts';
 
 /**
  * One migration run's inputs.
@@ -28,7 +35,7 @@ export interface ExecuteMigrationsOptions {
   migrations: readonly MigrationMeta[];
 
   /**
-   * The tables the running code wants live, the source a missing TO materializes from.
+   * The tables the running code wants live, the source a missing `to` materializes from.
    */
   desired: readonly TableSchema[];
 
@@ -44,6 +51,15 @@ export interface ExecuteMigrationsOptions {
    * false
    */
   force: boolean;
+
+  /**
+   * Whether the snapshot recorded derivation ownership on its claims.
+   * Without it, a logical rename verifies its family through the `to` tree and a table discard refuses.
+   *
+   * @default
+   * true
+   */
+  ownership?: boolean;
 }
 
 /**
@@ -71,16 +87,11 @@ interface Engine {
   dialect: Dialect;
   desired: readonly TableSchema[];
   force: boolean;
+  ownership: boolean;
   names: Set<string>;
   claimed: SchemaClassification;
   deletions: string[];
 }
-
-type MigrationForm =
-  | { kind: 'move'; from: ColumnAddress; to: ColumnAddress; transform?: MigrationTransform }
-  | { kind: 'rename'; from: TableAddress; to: TableAddress }
-  | { kind: 'discardColumn'; from: ColumnAddress }
-  | { kind: 'discardTable'; from: TableAddress };
 
 /**
  * The row correlation of a move: which source columns look up the target row to write.
@@ -93,12 +104,14 @@ interface Correlation {
 /**
  * Runs every pending migration in order, inside the sync's transaction, before the structural diff.
  *
+ * Each migration lowers to physical form just in time, against the state its predecessors left.
  * Each migration mutates live structure itself.
- * A move materializes a missing TO, carries values through the dialect codec, and drops FROM.
+ * A move materializes a missing `to`, carries values through the dialect codec, and drops `from`.
  * A rename renames; a discard drops.
- * FROM must match the live schema - a drifted type is a hard error, never a silent skip.
- * A FROM that is entirely absent skips and stamps, but only when TO is already satisfied.
- * TO is satisfied when it is live, in the desired schema, or consumed by a later pending migration.
+ * A logical collection rename or discard runs as a compound, one member op per owned table.
+ * `from` must match the live schema - a drifted type is a hard error, never a silent skip.
+ * A `from` that is entirely absent skips and stamps, but only when `to` is already satisfied.
+ * `to` is satisfied when it is live, in the desired schema, or consumed by a later pending migration.
  * Chains therefore skip end to end.
  * Everything else refuses loudly and rolls the sync back.
  */
@@ -112,70 +125,143 @@ export async function executeMigrations(
     dialect,
     desired: options.desired,
     force: options.force,
+    ownership: options.ownership ?? true,
     names: new Set(await dialect.listTables(db)),
     claimed: jsonClone(options.claimed),
     deletions: [],
   };
-  const queue = options.migrations.map((meta) => ({ meta, form: formOf(meta) }));
+  const queue = options.migrations.map((meta) => ({ meta, consumed: consumedByMigration(meta) }));
   const stamps: MigrationStamp[] = [];
-  for (const [index, { meta, form }] of queue.entries()) {
-    const later = queue.slice(index + 1).map((entry) => entry.form);
-    stamps.push(await runMigration(engine, meta, form, later));
+  for (const [index, { meta }] of queue.entries()) {
+    const later = queue.slice(index + 1).flatMap((entry) => entry.consumed);
+    const lowered = await lowerMigration(resolveState(engine), meta);
+    stamps.push(await runMigration(engine, meta, lowered, later));
   }
   return { stamps, claimed: engine.claimed, deletions: engine.deletions };
 }
 
 /**
- * Normalizes a migration into its executable form.
- * The public union carries no tag: a `null` TO marks a discard, a column in the address marks the level.
- * A `ColumnAddress` satisfies `TableAddress` structurally, so a mixed pair typechecks; refuse it here.
+ * The engine's live and desired state, as the address resolver consumes it.
+ * The sets and records are the engine's own, so lowering follows the run's mutations just in time.
  */
-function formOf(meta: MigrationMeta): MigrationForm {
-  const { migration } = meta;
-  if (isNull(migration.to)) {
-    return 'column' in migration.from
-      ? { kind: 'discardColumn', from: migration.from }
-      : { kind: 'discardTable', from: migration.from };
-  }
-  const fromColumn = 'column' in migration.from;
-  const toColumn = 'column' in migration.to;
-  if (fromColumn !== toColumn) {
-    throw ohneError({
-      title: `Migration \`${meta.name}\` mixes a column and a table address`,
-      body: [
-        'A move addresses two columns; a rename addresses two tables.',
-        'Give `from` and `to` the same shape.',
-      ],
-      path: meta.file,
-    });
-  }
-  if (fromColumn) {
-    const { from, to, transform } = migration as MoveMigration;
-    return { kind: 'move', from, to, transform };
-  }
-  const { from, to } = migration as RenameMigration;
-  return { kind: 'rename', from, to };
+function resolveState(engine: Engine): ResolveState {
+  return {
+    names: engine.names,
+    claimed: engine.claimed,
+    desired: engine.desired,
+    ownership: engine.ownership,
+    describe: (table) => describe(engine, table),
+  };
 }
 
 /**
- * Dispatches one migration to its form's runner and returns the stamp to persist.
+ * Dispatches one lowered migration to its runner and returns the stamp to persist.
  */
 function runMigration(
   engine: Engine,
   meta: MigrationMeta,
-  form: MigrationForm,
-  later: readonly MigrationForm[],
+  lowered: LoweredMigration,
+  later: readonly ConsumedAddress[],
 ): Promise<MigrationStamp> {
-  switch (form.kind) {
+  switch (lowered.kind) {
     case 'move':
-      return runMove(engine, meta, form, later);
+      return runMove(engine, meta, lowered, later);
     case 'rename':
-      return runRename(engine, meta, form, later);
+      return runRename(engine, meta, lowered, later);
     case 'discardColumn':
-      return runDiscardColumn(engine, meta, form.from);
+      return runDiscardColumn(engine, meta, lowered.from);
     case 'discardTable':
-      return runDiscardTable(engine, meta, form.from);
+      return runDiscardTable(engine, meta, lowered.from);
+    case 'compoundRename':
+      return runCompoundRename(engine, meta, lowered.members, lowered.to, later);
+    case 'compoundDiscard':
+      return runCompoundDiscard(engine, meta, lowered.tables);
   }
+}
+
+/**
+ * Runs a logical rename's members: each present table renames, each absent one skips if satisfied.
+ * One identity, one stamp: any applied member stamps `applied`.
+ * All skipped stamps `skipped`, naming the members.
+ */
+async function runCompoundRename(
+  engine: Engine,
+  meta: MigrationMeta,
+  members: readonly RenameMember[],
+  to: LogicalSubtree,
+  later: readonly ConsumedAddress[],
+): Promise<MigrationStamp> {
+  let applied = 0;
+  const skipped: string[] = [];
+  for (const member of members) {
+    const subtree = isUndefined(member.origin?.collection)
+      ? to
+      : { collection: member.origin.collection, path: member.origin.path };
+    if (foreign(engine, member.from)) refuseForeign(meta, member.from);
+    if (!present(engine, member.from)) {
+      if (!tableSatisfied(engine, member.to, later) && !subtreeSatisfied(later, subtree)) {
+        refuseUnrunnable(meta, `\`${member.from}\``, `\`${member.to}\``);
+      }
+      skipped.push(member.from);
+      continue;
+    }
+    await renameOwned(engine, meta, member.from, member.to);
+    if (!isUndefined(member.origin)) {
+      const claim = engine.claimed[member.to] ?? { columns: {} };
+      engine.claimed[member.to] = { ...claim, derived: member.origin };
+    }
+    applied++;
+  }
+  if (applied > 0) return { name: meta.name, status: 'applied' };
+  const names = skipped.map((table) => `\`${table}\``).join(', ');
+  return skipStamp(
+    meta,
+    `${names} ${skipped.length === 1 ? 'is' : 'are'} absent and the new names are satisfied`,
+  );
+}
+
+/**
+ * Runs a logical discard's members: each present table drops, each absent one skips.
+ * One identity, one stamp: any applied member stamps `applied`.
+ * All skipped stamps `skipped`, naming the members.
+ */
+async function runCompoundDiscard(
+  engine: Engine,
+  meta: MigrationMeta,
+  tables: readonly string[],
+): Promise<MigrationStamp> {
+  let applied = 0;
+  const skipped: string[] = [];
+  for (const table of tables) {
+    if (foreign(engine, table)) refuseForeign(meta, table);
+    if (!present(engine, table)) {
+      skipped.push(table);
+      continue;
+    }
+    await dropOwnedTable(engine, table);
+    applied++;
+  }
+  if (applied > 0) return { name: meta.name, status: 'applied' };
+  const names = skipped.map((table) => `\`${table}\``).join(', ');
+  return skipStamp(meta, `${names} ${skipped.length === 1 ? 'is' : 'are'} already absent`);
+}
+
+/**
+ * Drops one owned table and follows it in the run's bookkeeping.
+ * A blocks wrapper sweeps its block references first: the discard is the authorization.
+ * The instances only its rows referenced go with it, reported like every other deletion.
+ */
+async function dropOwnedTable(engine: Engine, table: string): Promise<void> {
+  if (engine.claimed[table]?.derived?.kind === 'blocksWrapper') {
+    const universe: SweepTable[] = Object.entries(engine.claimed)
+      .filter(([name]) => engine.names.has(name) && name !== table)
+      .map(([name, claim]) => ({ name, derived: claim.derived, block: claim.block }));
+    engine.deletions.push(...(await sweepWrapperRows(engine.db, engine.dialect, universe, table)));
+  }
+  const schema = await describe(engine, table);
+  await engine.dialect.applyTableDiff(engine.db, { kind: 'drop', table: schema });
+  engine.names.delete(table);
+  delete engine.claimed[table];
 }
 
 /**
@@ -191,7 +277,7 @@ async function runRename(
   engine: Engine,
   meta: MigrationMeta,
   form: { from: TableAddress; to: TableAddress },
-  later: readonly MigrationForm[],
+  later: readonly ConsumedAddress[],
 ): Promise<MigrationStamp> {
   const { from, to } = form;
   if (foreign(engine, from.table)) refuseForeign(meta, from.table);
@@ -204,6 +290,7 @@ async function runRename(
   const derived = Object.entries(engine.claimed)
     .flatMap(([table, claim]) =>
       isUndefined(claim.derived) ||
+      isUndefined(claim.derived.collection) ||
       collectionTableName(claim.derived.collection) !== from.table ||
       !engine.names.has(table)
         ? []
@@ -270,10 +357,7 @@ async function runDiscardTable(
   if (!present(engine, from.table)) {
     return skipStamp(meta, `\`${from.table}\` is already absent`);
   }
-  const schema = await describe(engine, from.table);
-  await engine.dialect.applyTableDiff(engine.db, { kind: 'drop', table: schema });
-  engine.names.delete(from.table);
-  delete engine.claimed[from.table];
+  await dropOwnedTable(engine, from.table);
   return { name: meta.name, status: 'applied' };
 }
 
@@ -304,21 +388,26 @@ async function runDiscardColumn(
 /**
  * Moves a column's values onto another column, in place, across columns, or across tables.
  * Every row is read first; an in-place retype then swaps the column's physical type, nullable.
- * The held values are written back as the TO type - the old affinity would mangle them otherwise.
- * A cross move materializes TO, carries values row by row, then drops FROM.
+ * The held values are written back as the `to` type - the old affinity would mangle them otherwise.
+ * A cross move materializes `to`, carries values row by row, then drops `from`.
  */
 async function runMove(
   engine: Engine,
   meta: MigrationMeta,
-  form: { from: ColumnAddress; to: ColumnAddress; transform?: MigrationTransform },
-  later: readonly MigrationForm[],
+  form: {
+    from: ColumnAddress;
+    to: ColumnAddress;
+    toSubtree?: LogicalSubtree;
+    transform?: MigrationTransform;
+  },
+  later: readonly ConsumedAddress[],
 ): Promise<MigrationStamp> {
   const { from, to } = form;
   if (foreign(engine, from.table)) refuseForeign(meta, from.table);
   const source = present(engine, from.table) ? await describe(engine, from.table) : undefined;
   const column = source?.columns.find((item) => item.name === from.column);
   if (isUndefined(source) || isUndefined(column)) {
-    if (!(await columnSatisfied(engine, to, later))) {
+    if (!(await columnSatisfied(engine, to, later)) && !subtreeSatisfied(later, form.toSubtree)) {
       refuseUnrunnable(meta, `\`${from.table}.${from.column}\``, `\`${to.table}.${to.column}\``);
     }
     return skipStamp(
@@ -408,9 +497,10 @@ async function materializeTarget(
     });
     engine.names.add(to.table);
     const columns = Object.fromEntries(wanted.columns.map((item) => [item.name, item.type]));
-    engine.claimed[to.table] = isUndefined(wanted.derived)
-      ? { columns }
-      : { columns, derived: wanted.derived };
+    const claim: TableClaim = { columns };
+    if (!isUndefined(wanted.derived)) claim.derived = wanted.derived;
+    if (!isUndefined(wanted.block)) claim.block = wanted.block;
+    engine.claimed[to.table] = claim;
   }
   const schema = await describe(engine, to.table);
   const column = schema.columns.find((item) => item.name === to.column);
@@ -449,7 +539,8 @@ function readRows(engine: Engine, source: TableSchema): Promise<Record<string, S
 
 /**
  * Carries every held value through the dialect codec, one row at a time, correlated per classification.
- * A cross-table row with no target row loses its value when FROM drops: refused unless force.
+ * A throwing transform and a `NULL` bound for a `NOT NULL` column refuse, naming the migration.
+ * A cross-table row with no target row loses its value when `from` drops: refused unless force.
  * Force drops the values and reports them.
  */
 async function writeValues(
@@ -464,6 +555,7 @@ async function writeValues(
   const { from, to, transform } = form;
   const { sourceKey, targetKey } = resolveCorrelation(engine, meta, source, target);
   if (rows.length === 0) return;
+  const notNull = target.columns.find((column) => column.name === to.column)?.notNull === true;
   const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
   const ctx: MigrationContext = {
@@ -473,13 +565,30 @@ async function writeValues(
   let unmatched = 0;
   for (const row of rows) {
     const value = dialect.deserialize(from.type, row[from.column] ?? null);
-    const output = isUndefined(transform)
-      ? value
-      : await transform(value, deserializeRow(dialect, source, row), ctx);
-    const params = [
-      dialect.serialize(to.type, output),
-      ...sourceKey.map((name) => row[name] ?? null),
-    ];
+    let output = value;
+    if (!isUndefined(transform)) {
+      try {
+        output = await transform(value, deserializeRow(dialect, source, row), ctx);
+      } catch (error) {
+        throw ohneError({
+          title: `Migration \`${meta.name}\` fails in its transform`,
+          body: [errorMessage(error), '', `Thrown for a \`${from.table}\` row; fix the transform.`],
+          path: meta.file,
+        });
+      }
+    }
+    const serialized = dialect.serialize(to.type, output);
+    if (isNull(serialized) && notNull) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` moves \`NULL\` into a \`NOT NULL\` column`,
+        body: [
+          `\`${from.table}.${from.column}\` holds \`NULL\` values, and \`${to.table}.${to.column}\` refuses them.`,
+          'Return a fallback from a `transform`, or relax the column.',
+        ],
+        path: meta.file,
+      });
+    }
+    const params = [serialized, ...sourceKey.map((name) => row[name] ?? null)];
     const { changes } = await db.run(update, params);
     if (changes === 0) unmatched++;
   }
@@ -506,7 +615,7 @@ async function writeValues(
  * Within one table, the row is its own target, keyed by the primary key.
  * A child table moving onto its parent joins `_parentUUID = UUID`.
  * A parent moving onto its child-one table joins the other way around.
- * A child-many table holds many rows per parent, so no row mapping exists in either direction.
+ * A junction, child-many, or blocks-wrapper table holds many rows per parent: no row mapping exists.
  * Everything else correlates by equal primary key: the source must own one and the target must share it.
  */
 function resolveCorrelation(
@@ -517,18 +626,14 @@ function resolveCorrelation(
 ): Correlation {
   if (source.name !== target.name) {
     const sourceOrigin = engine.claimed[source.name]?.derived;
-    if (!isUndefined(sourceOrigin) && parentTableOf(sourceOrigin) === target.name) {
-      if (sourceOrigin.kind === 'childMany') refuseManyRows(meta, source.name, target.name);
-      if (sourceOrigin.kind === 'childOne') {
-        return { sourceKey: ['_parentUUID'], targetKey: ['UUID'] };
-      }
+    if (!isUndefined(sourceOrigin) && derivedParentName(sourceOrigin) === target.name) {
+      if (sourceOrigin.kind !== 'childOne') refuseManyRows(meta, source.name, target.name);
+      return { sourceKey: ['_parentUUID'], targetKey: ['UUID'] };
     }
     const targetOrigin = engine.claimed[target.name]?.derived;
-    if (!isUndefined(targetOrigin) && parentTableOf(targetOrigin) === source.name) {
-      if (targetOrigin.kind === 'childMany') refuseManyRows(meta, target.name, source.name);
-      if (targetOrigin.kind === 'childOne') {
-        return { sourceKey: ['UUID'], targetKey: ['_parentUUID'] };
-      }
+    if (!isUndefined(targetOrigin) && derivedParentName(targetOrigin) === source.name) {
+      if (targetOrigin.kind !== 'childOne') refuseManyRows(meta, target.name, source.name);
+      return { sourceKey: ['UUID'], targetKey: ['_parentUUID'] };
     }
   }
   if (source.primaryKey.length === 0) {
@@ -551,16 +656,7 @@ function resolveCorrelation(
 }
 
 /**
- * The physical table a derived table hangs off: its collection, or the next composite up.
- */
-function parentTableOf(origin: DerivedOrigin): string {
-  const [first, ...rest] = origin.path;
-  if (rest.length === 0) return collectionTableName(origin.collection);
-  return derivedTableName(origin.collection, first, ...rest.slice(0, -1));
-}
-
-/**
- * The refusal for a move touching a child-many table across tables: no single row wins.
+ * The refusal for a move touching a many-rows-per-parent table across tables: no single row wins.
  */
 function refuseManyRows(meta: MigrationMeta, child: string, parent: string): never {
   throw ohneError({
@@ -604,22 +700,41 @@ async function dropColumn(
 }
 
 /**
- * Whether a rename's target is already realized: live and owned, desired, or consumed by a later FROM.
+ * Whether a later logical `from` consumes the whole subtree a logical `to` sits under.
+ * No physical name can line up there: a collection-level `from` enumerates its family only at run time.
+ * A `to` on one of its derived tables therefore satisfies through the subtree instead.
+ * An empty consumed path covers the whole collection.
  */
-function tableSatisfied(engine: Engine, table: string, later: readonly MigrationForm[]): boolean {
-  if (present(engine, table)) return true;
-  if (engine.desired.some((schema) => schema.name === table)) return true;
-  return later.some((form) => form.from.table === table);
+function subtreeSatisfied(
+  later: readonly ConsumedAddress[],
+  subtree: LogicalSubtree | undefined,
+): boolean {
+  if (isUndefined(subtree)) return false;
+  return later.some(
+    (consumed) =>
+      !isUndefined(consumed.subtree) &&
+      consumed.subtree.collection === subtree.collection &&
+      pathStartsWith(subtree.path, consumed.subtree.path),
+  );
 }
 
 /**
- * Whether a move's target column is already realized: live, desired, or consumed by a later FROM.
- * A later whole-table FROM counts, since it consumes every column on it.
+ * Whether a rename's target is already realized: live and owned, desired, or consumed by a later `from`.
+ */
+function tableSatisfied(engine: Engine, table: string, later: readonly ConsumedAddress[]): boolean {
+  if (present(engine, table)) return true;
+  if (engine.desired.some((schema) => schema.name === table)) return true;
+  return later.some((consumed) => consumed.table === table);
+}
+
+/**
+ * Whether a move's target column is already realized: live, desired, or consumed by a later `from`.
+ * A later whole-table `from` counts, since it consumes every column on it.
  */
 async function columnSatisfied(
   engine: Engine,
   address: ColumnAddress,
-  later: readonly MigrationForm[],
+  later: readonly ConsumedAddress[],
 ): Promise<boolean> {
   if (present(engine, address.table)) {
     const schema = await describe(engine, address.table);
@@ -629,15 +744,15 @@ async function columnSatisfied(
   if (!isUndefined(wanted) && wanted.columns.some((column) => column.name === address.column)) {
     return true;
   }
-  return later.some((form) =>
-    'column' in form.from
-      ? form.from.table === address.table && form.from.column === address.column
-      : form.from.table === address.table,
+  return later.some(
+    (consumed) =>
+      consumed.table === address.table &&
+      (isUndefined(consumed.column) || consumed.column === address.column),
   );
 }
 
 /**
- * A drifted FROM or TO is a hard error naming the mismatch, never a silent skip.
+ * A drifted `from` or `to` is a hard error naming the mismatch, never a silent skip.
  * Types compare through the dialect, so two primitives sharing a native type never differ.
  */
 function assertColumnMatches(
@@ -730,7 +845,7 @@ function skipStamp(meta: MigrationMeta, reason: string): MigrationStamp {
 }
 
 /**
- * The hard refusal for a FROM that is absent while TO is nowhere: a stale or mistyped migration.
+ * The hard refusal for a `from` that is absent while `to` is nowhere: a stale or mistyped migration.
  */
 function refuseUnrunnable(meta: MigrationMeta, from: string, to: string): never {
   throw ohneError({

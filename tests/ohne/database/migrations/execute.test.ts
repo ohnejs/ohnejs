@@ -635,3 +635,546 @@ describe('executeMigrations', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations with logical addresses', () => {
+  it('moves a field logically, the types read from the claims and the desired schema', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'isDraft', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "isDraft") VALUES (?, ?), (?, ?)', [
+      'a',
+      'yes',
+      'b',
+      'no',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-draft', {
+          from: { collection: 'Posts', field: 'isDraft' },
+          to: { collection: 'Posts', field: 'draft' },
+          transform: (value) => value === 'yes',
+        }),
+      ],
+      desired: [
+        table('Posts', {
+          columns: [UUID, { name: 'draft', type: 'boolean', notNull: false }],
+        }),
+      ],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-draft', status: 'applied' }]);
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID', 'draft']);
+    const rows = await db.query<{ UUID: string; draft: number }>(
+      'SELECT "UUID", "draft" FROM "Posts" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row.draft]),
+      [
+        ['a', 1],
+        ['b', 0],
+      ],
+    );
+    deepStrictEqual(outcome.claimed['Posts'], { columns: { UUID: 'text', draft: 'boolean' } });
+    await db.close();
+  });
+
+  it('moves a dot-path column on a child table, correlated through `_parentUUID`', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'summary', type: 'text', notNull: false }],
+    });
+    const sections = table('Posts_sections', {
+      columns: [
+        UUID,
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: 'intro', type: 'text', notNull: false },
+      ],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childOne' },
+    });
+    await materialize(db, [posts, sections]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    await db.run('INSERT INTO "Posts_sections" ("UUID", "_parentUUID", "intro") VALUES (?, ?, ?)', [
+      's1',
+      'p1',
+      'hello',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-promote', {
+          from: { collection: 'Posts', field: 'sections.intro' },
+          to: { collection: 'Posts', field: 'summary' },
+        }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, sections]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-promote', status: 'applied' }]);
+    const rows = await db.query<{ summary: string }>('SELECT "summary" FROM "Posts"');
+    deepStrictEqual(
+      rows.map((row) => row.summary),
+      ['hello'],
+    );
+    deepStrictEqual(await columnNames(db, 'Posts_sections'), ['UUID', '_parentUUID']);
+    await db.close();
+  });
+
+  it('renames a collection as a compound, every owned table and claim origin following', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const tags = table('Posts_tags', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_targetUUID', type: 'text', notNull: true },
+      ],
+      primaryKey: [],
+      derived: { collection: 'Posts', path: ['tags'], kind: 'junction' },
+    });
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+    });
+    const items = table('Posts_sections_items', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections', 'items'], kind: 'childMany' },
+    });
+    await materialize(db, [posts, tags, sections, items]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, tags, sections, items]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-articles', status: 'applied' }]);
+    const names = await dialect.listTables(db);
+    deepStrictEqual(names.filter((name) => !name.startsWith('ohne_')).sort(), [
+      'Articles',
+      'Articles_sections',
+      'Articles_sections_items',
+      'Articles_tags',
+    ]);
+    deepStrictEqual(outcome.claimed['Articles_sections_items']?.derived, {
+      collection: 'Articles',
+      path: ['sections', 'items'],
+      kind: 'childMany',
+    });
+    deepStrictEqual(outcome.claimed['Articles_tags']?.derived, {
+      collection: 'Articles',
+      path: ['tags'],
+      kind: 'junction',
+    });
+    await db.close();
+  });
+
+  it('composes a compound rename with a same-sync field migration', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+    });
+    await materialize(db, [posts, sections]);
+    const desired = [
+      table('Articles'),
+      table('Articles_chapters', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        derived: { collection: 'Articles', path: ['chapters'], kind: 'childMany' },
+      }),
+    ];
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-chapters', {
+          from: { collection: 'Posts', field: 'sections' },
+          to: { collection: 'Posts', field: 'chapters' },
+        }),
+        meta('app/002-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired,
+      claimed: classifySchema([posts, sections]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-chapters', status: 'applied' },
+      { name: 'app/002-articles', status: 'applied' },
+    ]);
+    const names = await dialect.listTables(db);
+    deepStrictEqual(names.filter((name) => !name.startsWith('ohne_')).sort(), [
+      'Articles',
+      'Articles_chapters',
+    ]);
+    deepStrictEqual(outcome.claimed['Articles_chapters']?.derived, {
+      collection: 'Articles',
+      path: ['chapters'],
+      kind: 'childMany',
+    });
+    await db.close();
+  });
+
+  it('skips an absent family member whose new name is satisfied, applying the rest', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    const claimed = classifySchema([
+      posts,
+      table('Posts_sections', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+      }),
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired: [
+        table('Articles'),
+        table('Articles_sections', {
+          columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+          derived: { collection: 'Articles', path: ['sections'], kind: 'childMany' },
+        }),
+      ],
+      claimed,
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-articles', status: 'applied' }]);
+    ok((await dialect.listTables(db)).includes('Articles'));
+    await db.close();
+  });
+
+  it('skips a whole logical chain on a fresh database, reading no FROM type', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-move', {
+          from: { collection: 'Posts', field: 'a' },
+          to: { collection: 'Posts', field: 'b', type: 'text' },
+        }),
+        meta('app/002-discard', {
+          from: { collection: 'Posts', field: 'b' },
+          to: null,
+        }),
+        meta('app/003-rename', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired: [table('Articles')],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(
+      outcome.stamps.map((stamp) => stamp.status),
+      ['skipped', 'skipped', 'skipped'],
+    );
+    await db.close();
+  });
+
+  it('skips a move onto a derived table a later collection rename consumes, fresh database', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-fresh', {
+          from: { collection: 'Posts', field: 'sections.old' },
+          to: { collection: 'Posts', field: 'sections.fresh', type: 'text' },
+        }),
+        meta('app/002-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired: [
+        table('Articles'),
+        table('Articles_sections', {
+          columns: [
+            UUID,
+            { name: '_parentUUID', type: 'text', notNull: true },
+            { name: 'fresh', type: 'text', notNull: false },
+          ],
+          derived: { collection: 'Articles', path: ['sections'], kind: 'childMany' },
+        }),
+      ],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(
+      outcome.stamps.map((stamp) => stamp.status),
+      ['skipped', 'skipped'],
+    );
+    await db.close();
+  });
+
+  it('skips a field rename a later collection rename consumes, fresh database', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-parts', {
+          from: { collection: 'Posts', field: 'sections' },
+          to: { collection: 'Posts', field: 'parts' },
+        }),
+        meta('app/002-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired: [
+        table('Articles'),
+        table('Articles_parts', {
+          columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+          derived: { collection: 'Articles', path: ['parts'], kind: 'childMany' },
+        }),
+      ],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(
+      outcome.stamps.map((stamp) => stamp.status),
+      ['skipped', 'skipped'],
+    );
+    await db.close();
+  });
+
+  it('skips an unpinned chain on a fresh database: no intermediate demands a type', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-chapters', {
+          from: { collection: 'Posts', field: 'sections' },
+          to: { collection: 'Posts', field: 'chapters' },
+        }),
+        meta('app/002-parts', {
+          from: { collection: 'Posts', field: 'chapters' },
+          to: { collection: 'Posts', field: 'parts' },
+        }),
+        meta('app/003-title', {
+          from: { collection: 'Posts', field: 'heading' },
+          to: { collection: 'Posts', field: 'caption' },
+        }),
+        meta('app/004-label', {
+          from: { collection: 'Posts', field: 'caption' },
+          to: { collection: 'Posts', field: 'label' },
+        }),
+      ],
+      desired: [
+        table('Posts', { columns: [UUID, { name: 'label', type: 'text', notNull: false }] }),
+        table('Posts_parts', {
+          columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+          derived: { collection: 'Posts', path: ['parts'], kind: 'childMany' },
+        }),
+      ],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(
+      outcome.stamps.map((stamp) => stamp.status),
+      ['skipped', 'skipped', 'skipped', 'skipped'],
+    );
+    await db.close();
+  });
+
+  it('discards a composite field as a compound, nested children first', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+    });
+    const items = table('Posts_sections_items', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections', 'items'], kind: 'childMany' },
+    });
+    await materialize(db, [posts, sections, items]);
+    await db.run('INSERT INTO "Posts_sections" ("UUID", "_parentUUID") VALUES (?, ?)', [
+      's1',
+      'p1',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-drop', { from: { collection: 'Posts', field: 'sections' }, to: null }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, sections, items]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-drop', status: 'applied' }]);
+    const names = await dialect.listTables(db);
+    deepStrictEqual(names.filter((name) => !name.startsWith('ohne_')).sort(), ['Posts']);
+    strictEqual(outcome.claimed['Posts_sections'], undefined);
+    strictEqual(outcome.claimed['Posts_sections_items'], undefined);
+    await db.close();
+  });
+
+  it('renames through the TO-tree bootstrap when the snapshot predates ownership', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+    });
+    await materialize(db, [posts, sections]);
+    const desired = [
+      table('Articles'),
+      table('Articles_sections', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        derived: { collection: 'Articles', path: ['sections'], kind: 'childMany' },
+      }),
+    ];
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', {
+          from: { collection: 'Posts' },
+          to: { collection: 'Articles' },
+        }),
+      ],
+      desired,
+      claimed: classifySchema([posts, sections]),
+      force: false,
+      ownership: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-articles', status: 'applied' }]);
+    const names = await dialect.listTables(db);
+    deepStrictEqual(names.filter((name) => !name.startsWith('ohne_')).sort(), [
+      'Articles',
+      'Articles_sections',
+    ]);
+    deepStrictEqual(outcome.claimed['Articles_sections']?.derived, {
+      collection: 'Articles',
+      path: ['sections'],
+      kind: 'childMany',
+    });
+    await db.close();
+  });
+
+  it('refuses a move onto a junction with the many-rows wording, not a key mismatch', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'note', type: 'text', notNull: false }],
+    });
+    const tags = table('Posts_tags', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: 'label', type: 'text', notNull: false },
+      ],
+      primaryKey: [],
+      derived: { collection: 'Posts', path: ['tags'], kind: 'junction' },
+    });
+    await materialize(db, [posts, tags]);
+    await db.run('INSERT INTO "Posts" ("UUID", "note") VALUES (?, ?)', ['a', 'x']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-junction', {
+            from: { collection: 'Posts', field: 'note' },
+            to: { collection: 'Posts', field: 'tags.label' },
+          }),
+        ],
+        desired: [],
+        claimed: classifySchema([posts, tags]),
+        force: false,
+      }),
+      (error: Error & { body?: string[] }) =>
+        /cannot correlate rows/.test(error.message) &&
+        /holds many rows per `Posts` row/.test(String(error.body)),
+    );
+    await db.close();
+  });
+
+  it('names the migration when its transform throws', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'flag', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "flag") VALUES (?, ?)', ['a', 'zzz']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-flag', {
+            from: { collection: 'Posts', field: 'flag' },
+            to: { collection: 'Posts', field: 'draft', type: 'boolean' },
+            transform: () => {
+              throw new Error('cannot parse legacy flag');
+            },
+          }),
+        ],
+        desired: [],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      (error: Error & { body?: string[] }) =>
+        /Migration `app\/001-flag` fails in its transform/.test(error.message) &&
+        /cannot parse legacy flag/.test(String(error.body)),
+    );
+    await db.close();
+  });
+
+  it('refuses to move `NULL` into a `NOT NULL` column instead of leaking the constraint', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'opt', type: 'text', notNull: false }],
+    });
+    const archive = table('Archive', {
+      columns: [UUID, { name: 'req', type: 'text', notNull: true }],
+    });
+    await materialize(db, [posts, archive]);
+    await db.run('INSERT INTO "Posts" ("UUID", "opt") VALUES (?, ?)', ['a', null]);
+    await db.run('INSERT INTO "Archive" ("UUID", "req") VALUES (?, ?)', ['a', 'seed']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-tighten', {
+            from: { collection: 'Posts', field: 'opt' },
+            to: { collection: 'Archive', field: 'req' },
+          }),
+        ],
+        desired: [],
+        claimed: classifySchema([posts, archive]),
+        force: false,
+      }),
+      /moves `NULL` into a `NOT NULL` column/,
+    );
+    await db.close();
+  });
+
+  it('refuses a bootstrap rename when the same deploy edited the field tree', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+    });
+    await materialize(db, [posts, sections]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-articles', {
+            from: { collection: 'Posts' },
+            to: { collection: 'Articles' },
+          }),
+        ],
+        desired: [
+          table('Articles'),
+          table('Articles_chapters', {
+            columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+            derived: { collection: 'Articles', path: ['chapters'], kind: 'childMany' },
+          }),
+        ],
+        claimed: classifySchema([posts, sections]),
+        force: false,
+        ownership: false,
+      }),
+      /cannot verify the rename family/,
+    );
+    await db.close();
+  });
+});

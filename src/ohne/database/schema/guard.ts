@@ -1,5 +1,6 @@
 import type { Transaction } from '../adapter.ts';
 import type { Dialect } from '../dialect.ts';
+import type { SweepTable } from './purge.ts';
 import type {
   ForeignKeySchema,
   IndexSchema,
@@ -8,8 +9,9 @@ import type {
   TableSchema,
 } from './table-schema.ts';
 
-import { isUndefined } from '../../../utils/index.ts';
+import { isUndefined, keyBy } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { clearSQL, danglingCondition, deleteSQL, purgedLine, sweepWrapperRows } from './purge.ts';
 
 /**
  * Guard behavior switches.
@@ -50,10 +52,19 @@ interface CollapseFinding {
   groups: number;
 }
 
+interface DisallowedFinding {
+  table: string;
+  type: string;
+  count: number;
+  allowed: readonly string[];
+}
+
 interface Findings {
   losses: string[];
+  blockLosses: string[];
   purgeable: DanglingFinding[];
   collapses: CollapseFinding[];
+  disallowed: DisallowedFinding[];
   blockers: string[];
   orphans: DanglingFinding[];
 }
@@ -69,6 +80,13 @@ interface Findings {
  * A purge clears the dangling values where the column permits `NULL` both live and desired.
  * Everywhere else it deletes the rows: a `record` reference clears, a junction row vanishes.
  * Purges run to a fixed point: rows orphaned by a deletion are purged and reported too, `live`-wide.
+ *
+ * Wrapper rows holding a block type outside their field's `allow` refuse too.
+ * A type removal and an allow-list shrink surface as that same finding.
+ * Under force those rows are deleted, and the block instances only they referenced sweep with them.
+ * A loss on a `block_` per-type table or a disallowed block row has no migration to point at.
+ * Their refusal therefore names force alone.
+ *
  * Every finding lands in one error block; probes run before any mutation, so a re-add cannot explode.
  */
 export async function guardDiffs(
@@ -76,12 +94,15 @@ export async function guardDiffs(
   dialect: Dialect,
   diffs: readonly TableDiff[],
   live: readonly TableSchema[],
+  desired: readonly TableSchema[],
   options: GuardOptions,
 ): Promise<GuardReport> {
   const findings: Findings = {
     losses: [],
+    blockLosses: [],
     purgeable: [],
     collapses: [],
+    disallowed: [],
     blockers: [],
     orphans: [],
   };
@@ -92,20 +113,30 @@ export async function guardDiffs(
     if (diff.kind === 'create') continue;
     if (diff.kind === 'drop') {
       const rows = await countRows(db, dialect, diff.table.name);
-      if (rows > 0) findings.losses.push(`- table \`${diff.table.name}\` (\`${rows}\` rows)`);
+      if (rows === 0) continue;
+      const losses = blockOwned(diff.table) ? findings.blockLosses : findings.losses;
+      losses.push(`- table \`${diff.table.name}\` (\`${rows}\` rows)`);
       continue;
     }
     await guardAlter(db, dialect, diff, creating, findings);
   }
-  const destructive = [
+  await probeDisallowed(db, dialect, live, desired, findings);
+  const migratable = [
     ...findings.losses,
     ...findings.purgeable.map((item) => danglingLine(item.table, item.foreignKey, item.count)),
     ...findings.collapses.map((item) => collapseLine(item.table, item.groups)),
   ];
-  if (findings.blockers.length > 0 || (destructive.length > 0 && !options.force)) {
+  const blockGrade = [
+    ...findings.blockLosses,
+    ...findings.disallowed.map((item) => disallowedLine(item.table, item.type, item.count)),
+  ];
+  if (
+    findings.blockers.length > 0 ||
+    ((migratable.length > 0 || blockGrade.length > 0) && !options.force)
+  ) {
     throw ohneError({
       title: 'Destructive sync refused',
-      body: refusalBody(destructive, findings.blockers),
+      body: refusalBody(migratable, blockGrade, findings.blockers),
     });
   }
   if (!options.force) {
@@ -116,15 +147,11 @@ export async function guardDiffs(
       ),
     };
   }
-  const purged = await purgeDangling(
-    db,
-    dialect,
-    [...findings.purgeable, ...findings.orphans],
-    findings.collapses,
-    diffs,
-    live,
-  );
-  return { deletions: [...findings.losses, ...purged], warnings: [] };
+  const purged = await purgeDangling(db, dialect, findings, diffs, live, desired);
+  return {
+    deletions: [...findings.losses, ...findings.blockLosses, ...purged],
+    warnings: [],
+  };
 }
 
 /**
@@ -133,6 +160,7 @@ export async function guardDiffs(
  * A just-added column holds no values, so nothing over it can collide or dangle.
  * A foreign key to a table created this sync makes every non-NULL value dangle by definition.
  * A detected cardinality collapse absorbs its `_parentPosition` drop: ordering is structure, not data.
+ * A value loss on a block-owned table grades block: no migration can address it in place.
  */
 async function guardAlter(
   db: Transaction,
@@ -142,6 +170,7 @@ async function guardAlter(
   findings: Findings,
 ): Promise<void> {
   const table = alter.desired.name;
+  const losses = blockOwned(alter.live) ? findings.blockLosses : findings.losses;
   const added = new Set(alter.addColumns.map((column) => column.name));
   const collapse = detectCollapse(alter);
   const rows = await countRows(db, dialect, table);
@@ -153,8 +182,7 @@ async function guardAlter(
       table,
       `${dialect.quote(column.name)} IS NOT NULL`,
     );
-    if (values > 0)
-      findings.losses.push(`- column \`${table}.${column.name}\` (\`${values}\` values)`);
+    if (values > 0) losses.push(`- column \`${table}.${column.name}\` (\`${values}\` values)`);
   }
   for (const change of alter.changeColumns) {
     const name = change.desired.name;
@@ -169,7 +197,7 @@ async function guardAlter(
     if (retyped) {
       const values = await countWhere(db, dialect, table, `${dialect.quote(name)} IS NOT NULL`);
       if (values > 0) {
-        findings.losses.push(
+        losses.push(
           `- column \`${table}.${name}\` (\`${values}\` values, \`${change.live.type}\` -> \`${change.desired.type}\`)`,
         );
       }
@@ -233,11 +261,56 @@ async function guardAlter(
 }
 
 /**
- * Executes the collapse and dangling purges to a fixed point, following foreign keys onto orphans.
+ * Probes every surviving wrapper for rows whose block type left the desired `allow` set.
+ * A removed block type and a shrunk allow-list surface identically: the rows have nowhere to belong.
+ * Runs off the live and desired schemas directly.
+ * An allow-list shrink changes no structure, so no diff exists to hang the probe on.
+ */
+async function probeDisallowed(
+  db: Transaction,
+  dialect: Dialect,
+  live: readonly TableSchema[],
+  desired: readonly TableSchema[],
+  findings: Findings,
+): Promise<void> {
+  const desiredByName = keyBy(desired, (table) => table.name);
+  for (const table of live) {
+    if (table.derived?.kind !== 'blocksWrapper') continue;
+    if (!table.columns.some((column) => column.name === '_blockType')) continue;
+    const wanted = desiredByName[table.name];
+    if (wanted?.derived?.kind !== 'blocksWrapper') continue;
+    const allowed = wanted.derived.allow ?? [];
+    const rows = await db.query<{ type: string; count: number }>(
+      `SELECT ${dialect.quote('_blockType')} AS ${dialect.quote('type')}, ` +
+        `COUNT(*) AS ${dialect.quote('count')} FROM ${dialect.quote(table.name)}` +
+        `${allowed.length > 0 ? ` WHERE ${disallowedCondition(dialect, table.name, allowed)}` : ''} ` +
+        `GROUP BY ${dialect.quote('_blockType')}`,
+    );
+    for (const row of rows) {
+      findings.disallowed.push({ table: table.name, type: row.type, count: row.count, allowed });
+    }
+  }
+}
+
+/**
+ * The condition matching wrapper rows whose block type sits outside the allowed set.
+ * Block names are validated PascalCase, so they inline as literals safely.
+ */
+function disallowedCondition(dialect: Dialect, table: string, allowed: readonly string[]): string {
+  const list = allowed.map((name) => `'${name}'`).join(', ');
+  return `${dialect.quote(table)}.${dialect.quote('_blockType')} NOT IN (${list})`;
+}
+
+/**
+ * Executes the collapse, disallowed-block, and dangling purges to a fixed point.
+ *
+ * Wrappers leaving the schema - dropped, or reshaped into something else - sweep first.
+ * The block instances only their rows referenced are deleted before the structure goes.
+ * Disallowed wrapper rows sweep the same way, then delete.
  * A collapse deletes every row after each parent's first, before the dangling purges run.
  * A dangling value is cleared to `NULL` where the column permits it both live and desired.
  * Live governs because purges run before any structural apply; desired governs the end state.
- * Everywhere else the rows are deleted.
+ * Everywhere else the rows are deleted, a wrapper's block references sweeping ahead of the delete.
  * A deleted row can strand rows referencing it, on tables this sync never touched.
  * Every foreign key aiming at a purged table is therefore re-probed until a pass deletes nothing.
  * Clearing values orphans nothing, so only deletions feed the re-probe.
@@ -246,16 +319,35 @@ async function guardAlter(
 async function purgeDangling(
   db: Transaction,
   dialect: Dialect,
-  initial: readonly DanglingFinding[],
-  collapses: readonly CollapseFinding[],
+  findings: Findings,
   diffs: readonly TableDiff[],
   live: readonly TableSchema[],
+  desired: readonly TableSchema[],
 ): Promise<string[]> {
   const lines: string[] = [];
   const universe = probeUniverse(diffs, live);
   const nullable = nullableColumns(diffs, live);
-  let queue = [...initial];
-  let pending = [...collapses];
+  const sweepable = sweepUniverse(diffs, live, desired);
+  const wrappers = new Set(
+    sweepable.flatMap((table) => (table.derived?.kind === 'blocksWrapper' ? [table.name] : [])),
+  );
+  for (const retired of retiredWrappers(live, desired)) {
+    lines.push(...(await sweepWrapperRows(db, dialect, sweepable, retired)));
+  }
+  const disallowedByTable = new Map<string, readonly string[]>();
+  for (const item of findings.disallowed) disallowedByTable.set(item.table, item.allowed);
+  for (const [table, allowed] of disallowedByTable) {
+    const doomed = disallowedCondition(dialect, table, allowed);
+    lines.push(...(await sweepWrapperRows(db, dialect, sweepable, table, doomed)));
+    const { changes } = await db.run(`DELETE FROM ${dialect.quote(table)} WHERE ${doomed}`);
+    if (changes > 0) {
+      lines.push(
+        `- \`${changes}\` rows of \`${table}\` deleted, holding blocks no longer allowed there`,
+      );
+    }
+  }
+  let queue = [...findings.purgeable, ...findings.orphans];
+  let pending = [...findings.collapses];
   while (queue.length > 0 || pending.length > 0) {
     const affected = new Set<string>();
     for (const item of pending) {
@@ -269,6 +361,10 @@ async function purgeDangling(
     pending = [];
     for (const item of queue) {
       const clears = nullable.has(`${item.table}.${item.foreignKey.column}`);
+      if (!clears && wrappers.has(item.table)) {
+        const doomed = danglingCondition(dialect, item.table, item.foreignKey, item.targetCreated);
+        lines.push(...(await sweepWrapperRows(db, dialect, sweepable, item.table, doomed)));
+      }
       const purge = clears
         ? clearSQL(dialect, item.table, item.foreignKey, item.targetCreated)
         : deleteSQL(dialect, item.table, item.foreignKey, item.targetCreated);
@@ -285,6 +381,52 @@ async function purgeDangling(
     }
   }
   return lines;
+}
+
+/**
+ * The live owned tables the block sweep may touch: everything this sync keeps.
+ * A table being dropped dies whole - its rows are already accounted as a loss, never swept twice.
+ * A wrapper reshaped into something else keeps its table but leaves the wrapper universe.
+ */
+function sweepUniverse(
+  diffs: readonly TableDiff[],
+  live: readonly TableSchema[],
+  desired: readonly TableSchema[],
+): SweepTable[] {
+  const dropping = new Set(
+    diffs.flatMap((diff) => (diff.kind === 'drop' ? [diff.table.name] : [])),
+  );
+  const desiredByName = keyBy(desired, (table) => table.name);
+  return live
+    .filter((table) => !dropping.has(table.name))
+    .map((table) => {
+      const retired =
+        table.derived?.kind === 'blocksWrapper' &&
+        desiredByName[table.name]?.derived?.kind !== 'blocksWrapper';
+      return retired
+        ? { name: table.name, block: table.block }
+        : { name: table.name, derived: table.derived, block: table.block };
+    });
+}
+
+/**
+ * The live wrappers leaving the schema this sync: dropped, or no longer a wrapper as desired.
+ * Their rows all die, so every block instance only they referenced sweeps before the structure goes.
+ */
+function retiredWrappers(live: readonly TableSchema[], desired: readonly TableSchema[]): string[] {
+  const desiredByName = keyBy(desired, (table) => table.name);
+  return live
+    .filter((table) => table.derived?.kind === 'blocksWrapper')
+    .filter((table) => table.columns.some((column) => column.name === '_blockType'))
+    .filter((table) => desiredByName[table.name]?.derived?.kind !== 'blocksWrapper')
+    .map((table) => table.name);
+}
+
+/**
+ * Whether a table belongs to a block: the per-type table itself, or one derived beneath it.
+ */
+function blockOwned(table: TableSchema): boolean {
+  return !isUndefined(table.block) || !isUndefined(table.derived?.block);
 }
 
 /**
@@ -348,9 +490,11 @@ function probeUniverse(
 
 /**
  * Assembles the sectioned refusal body: destructions first, unforceable blockers after, then the fix.
+ * Block-owned findings have no migration to write, so the migration hint appears only for the rest.
  */
-function refusalBody(destructive: string[], blockers: string[]): string[] {
+function refusalBody(migratable: string[], blockGrade: string[], blockers: string[]): string[] {
   const body: string[] = [];
+  const destructive = [...migratable, ...blockGrade];
   if (destructive.length > 0) {
     body.push('Applying the desired schema would destroy:', '', ...destructive);
   }
@@ -363,12 +507,18 @@ function refusalBody(destructive: string[], blockers: string[]): string[] {
     body.push(
       'Fix the data behind these rows first, or rewrite it with a move migration; `force` cannot resolve them.',
     );
-  } else {
+    return body;
+  }
+  if (migratable.length > 0) {
     body.push('Cover these with a discard or move migration.');
     body.push(
       'Or set `FORCE_SYNC` or `database.sync.force` to authorize this destruction for one boot.',
     );
+    return body;
   }
+  body.push(
+    'Set `FORCE_SYNC` or `database.sync.force` to authorize this destruction for one boot.',
+  );
   return body;
 }
 
@@ -399,17 +549,10 @@ function collapseLine(table: string, groups: number): string {
 }
 
 /**
- * One report line for an executed purge: values cleared to `NULL`, or rows deleted.
+ * One report line for wrapper rows holding a block type outside the desired allow set.
  */
-function purgedLine(
-  table: string,
-  foreignKey: ForeignKeySchema,
-  count: number,
-  cleared: boolean,
-): string {
-  return cleared
-    ? `- \`${count}\` values of \`${table}.${foreignKey.column}\` cleared, dangling to missing \`${foreignKey.targetTable}\` rows`
-    : `- \`${count}\` rows of \`${table}\` deleted, dangling from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
+function disallowedLine(table: string, type: string, count: number): string {
+  return `- \`${count}\` rows of \`${table}\` hold block \`${type}\`, no longer allowed there`;
 }
 
 /**
@@ -475,59 +618,6 @@ async function countDangling(
       `${dialect.quote('_row')}.${dialect.quote(foreignKey.column)})`,
   );
   return row?.count ?? 0;
-}
-
-/**
- * Builds the condition matching rows whose foreign-key value dangles.
- * When the target table arrives this sync it is empty, so every non-NULL value dangles by definition.
- *
- * The purge target cannot wear an alias inside `UPDATE`/`DELETE`, so the outer column is table-qualified.
- * The subquery alias is therefore `_`-prefixed: user identifiers never start with `_`.
- * No table name can capture the outer qualifier the way a table named `Target` would capture `target`.
- */
-function danglingCondition(
-  dialect: Dialect,
-  table: string,
-  foreignKey: ForeignKeySchema,
-  targetCreated: boolean,
-): string {
-  const column = `${dialect.quote(table)}.${dialect.quote(foreignKey.column)}`;
-  if (targetCreated) return `${column} IS NOT NULL`;
-  return (
-    `${column} IS NOT NULL AND NOT EXISTS (` +
-    `SELECT 1 FROM ${dialect.quote(foreignKey.targetTable)} AS ${dialect.quote('_target')} ` +
-    `WHERE ${dialect.quote('_target')}.${dialect.quote(foreignKey.targetColumn)} = ${column})`
-  );
-}
-
-/**
- * Builds the `UPDATE` that clears dangling foreign-key values to `NULL`.
- */
-function clearSQL(
-  dialect: Dialect,
-  table: string,
-  foreignKey: ForeignKeySchema,
-  targetCreated: boolean,
-): string {
-  return (
-    `UPDATE ${dialect.quote(table)} SET ${dialect.quote(foreignKey.column)} = NULL ` +
-    `WHERE ${danglingCondition(dialect, table, foreignKey, targetCreated)}`
-  );
-}
-
-/**
- * Builds the `DELETE` that removes rows dangling from `foreignKey`.
- */
-function deleteSQL(
-  dialect: Dialect,
-  table: string,
-  foreignKey: ForeignKeySchema,
-  targetCreated: boolean,
-): string {
-  return (
-    `DELETE FROM ${dialect.quote(table)} ` +
-    `WHERE ${danglingCondition(dialect, table, foreignKey, targetCreated)}`
-  );
 }
 
 /**

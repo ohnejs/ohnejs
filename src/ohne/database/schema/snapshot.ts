@@ -4,7 +4,7 @@ import type { Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
 import type { DerivedOrigin, TableSchema } from './table-schema.ts';
 
-import { isUndefined, jsonSerialize, mapValues } from '../../../utils/index.ts';
+import { isUndefined, jsonSerialize, mapValues, pick } from '../../../utils/index.ts';
 import { OHNE_SCHEMA } from '../naming/table-names.ts';
 
 /**
@@ -17,9 +17,14 @@ export interface TableClaim {
   columns: Record<string, LogicalType>;
 
   /**
-   * The derivation origin of a junction or child table; absent on collection main tables.
+   * The derivation origin of a junction, child, or blocks-wrapper table; absent on root tables.
    */
   derived?: DerivedOrigin;
+
+  /**
+   * The block whose instances the claimed per-type table stores; absent everywhere else.
+   */
+  block?: string;
 }
 
 /**
@@ -48,6 +53,13 @@ export interface SchemaSnapshot {
    * Restores `boolean` and `json` over the storage primitives introspection reports.
    */
   classification: SchemaClassification;
+
+  /**
+   * Whether the persisted snapshot recorded derivation ownership on its claims.
+   * `false` only when reading a version-1 snapshot, written before ownership tracking existed.
+   * A logical rename then verifies its family through the `to` tree instead of the claims.
+   */
+  ownership: boolean;
 }
 
 /**
@@ -83,7 +95,7 @@ export async function readSnapshot(
           (_, columns): TableClaim => ({ columns }),
         )
       : parsed.classification;
-  return { generation, hash, classification };
+  return { generation, hash, classification, ownership: parsed.version >= 2 };
 }
 
 /**
@@ -94,7 +106,10 @@ export async function writeSnapshot(
   dialect: Dialect,
   snapshot: SchemaSnapshot,
 ): Promise<void> {
-  const data = JSON.stringify({ version: 2, ...snapshot });
+  const data = JSON.stringify({
+    version: 2,
+    ...pick(snapshot, ['generation', 'hash', 'classification']),
+  });
   await db.run(
     `INSERT INTO ${dialect.quote(OHNE_SCHEMA)} (${dialect.quote('key')}, ${dialect.quote('data')}) ` +
       `VALUES (?, ?) ON CONFLICT (${dialect.quote('key')}) ` +
@@ -114,9 +129,9 @@ export function advanceSnapshot(
   classification: SchemaClassification,
 ): SchemaSnapshot {
   if (!isUndefined(previous) && previous.hash === hash) {
-    return { ...previous, classification };
+    return { ...previous, classification, ownership: true };
   }
-  return { generation: (previous?.generation ?? 0) + 1, hash, classification };
+  return { generation: (previous?.generation ?? 0) + 1, hash, classification, ownership: true };
 }
 
 /**
@@ -133,19 +148,21 @@ export function schemaHash(tables: readonly TableSchema[]): string {
 export function classifySchema(desired: readonly TableSchema[]): SchemaClassification {
   return Object.fromEntries(
     desired.map((table) => {
-      const columns = Object.fromEntries(table.columns.map((column) => [column.name, column.type]));
-      return [
-        table.name,
-        isUndefined(table.derived) ? { columns } : { columns, derived: table.derived },
-      ];
+      const claim: TableClaim = {
+        columns: Object.fromEntries(table.columns.map((column) => [column.name, column.type])),
+      };
+      if (!isUndefined(table.derived)) claim.derived = table.derived;
+      if (!isUndefined(table.block)) claim.block = table.block;
+      return [table.name, claim];
     }),
   );
 }
 
 /**
- * Restores logical column types over an introspected schema.
- * A stored type wins only while it shares the introspected type's native column type.
+ * Restores what the snapshot knows over an introspected schema.
+ * A stored column type wins only while it shares the introspected type's native column type.
  * A column hand-retyped since the snapshot keeps what the database reports.
+ * The claim's derivation origin and block marker attach too, so live tables classify like desired ones.
  */
 export function applyClassification(
   live: readonly TableSchema[],
@@ -155,7 +172,7 @@ export function applyClassification(
   return live.map((table) => {
     const claim = classification[table.name];
     if (isUndefined(claim)) return table;
-    return {
+    const classified: TableSchema = {
       ...table,
       columns: table.columns.map((column) => {
         const stored = claim.columns[column.name];
@@ -164,5 +181,8 @@ export function applyClassification(
         return { ...column, type: stored };
       }),
     };
+    if (!isUndefined(claim.derived)) classified.derived = claim.derived;
+    if (!isUndefined(claim.block)) classified.block = claim.block;
+    return classified;
   });
 }

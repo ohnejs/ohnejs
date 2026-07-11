@@ -67,26 +67,39 @@ export interface ForeignKeySchema {
 }
 
 /**
- * Where a derived table comes from: the owning collection and the field path that declared it.
+ * Where a derived table comes from: the owner and the field path that declared it.
+ * Exactly one of `collection` and `block` names the owner.
  * The snapshot persists it as part of the claim record, since no name is ever parsed back.
  * A collection rename recomputes the table's name from it, so derived tables follow their owner.
  */
 export interface DerivedOrigin {
   /**
-   * The owning collection's logical name.
+   * The owning collection's logical name; absent when a block owns the table.
    */
-  collection: string;
+  collection?: string;
 
   /**
-   * The field path from the collection to this table, one segment per nesting level.
+   * The owning block's name; absent when a collection owns the table.
+   */
+  block?: string;
+
+  /**
+   * The field path from the owner to this table, one segment per nesting level.
    */
   path: readonly [string, ...string[]];
 
   /**
    * The storage shape behind the table.
-   * `junction` links two collections; `childOne` and `childMany` hold composite rows per parent.
+   * `junction` links the owner to a collection; `childOne` and `childMany` hold composite rows.
+   * `blocksWrapper` holds one polymorphic block reference per row.
    */
-  kind: 'junction' | 'childOne' | 'childMany';
+  kind: 'junction' | 'childOne' | 'childMany' | 'blocksWrapper';
+
+  /**
+   * The block types the wrapper may hold, resolved against the block registry; `blocksWrapper` only.
+   * The guard probes live rows against it, so a type removal or allow-list shrink never passes silently.
+   */
+  allow?: readonly string[];
 }
 
 /**
@@ -124,10 +137,16 @@ export interface TableSchema {
   foreignKeys: readonly ForeignKeySchema[];
 
   /**
-   * The derivation origin of a junction or child table; absent on collection main tables.
+   * The derivation origin of a junction, child, or blocks-wrapper table; absent on root tables.
    * Introspection never reports it: the desired builder sets it and the snapshot preserves it.
    */
   derived?: DerivedOrigin;
+
+  /**
+   * The block whose instances this per-type table stores; absent everywhere else.
+   * Introspection never reports it: the desired builder sets it and the snapshot preserves it.
+   */
+  block?: string;
 }
 
 /**

@@ -174,6 +174,7 @@ describe('serveAPI', () => {
       generation: 1,
       hash: 'seeded',
       classification: { Orphans: { columns: { UUID: 'text' } } },
+      ownership: true,
     });
     await seed.close();
     const port = await freePort();

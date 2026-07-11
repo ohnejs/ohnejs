@@ -47,7 +47,7 @@ async function guard(
   desired: TableSchema[],
   force = false,
 ): Promise<ReturnType<typeof guardDiffs>> {
-  return guardDiffs(db, dialect, diffSchemas(live, desired, dialect), live, { force });
+  return guardDiffs(db, dialect, diffSchemas(live, desired, dialect), live, desired, { force });
 }
 
 async function refusalOf(promise: Promise<unknown>): Promise<OhneError> {
@@ -446,7 +446,7 @@ describe('guardDiffs', () => {
     const live = [bosses, parents, children];
     const desired = [bosses, desiredParents, children];
     const report = await dialect.schemaTransaction(db, (tx) =>
-      guardDiffs(tx, dialect, diffSchemas(live, desired, dialect), live, { force: true }),
+      guardDiffs(tx, dialect, diffSchemas(live, desired, dialect), live, desired, { force: true }),
     );
     strictEqual(report.deletions.length, 2);
     match(report.deletions.join('\n'), /rows of `Parents` deleted/);

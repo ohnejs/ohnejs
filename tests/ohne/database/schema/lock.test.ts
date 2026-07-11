@@ -27,7 +27,7 @@ async function openPair(): Promise<[DatabaseAdapter, DatabaseAdapter]> {
 
 async function snapshotOf(db: DatabaseAdapter, generation: number, hash: string): Promise<void> {
   const classification: SchemaClassification = {};
-  await writeSnapshot(db, dialect, { generation, hash, classification });
+  await writeSnapshot(db, dialect, { generation, hash, classification, ownership: true });
 }
 
 describe('acquireSyncLock', () => {

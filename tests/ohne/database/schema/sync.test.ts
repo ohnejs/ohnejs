@@ -347,6 +347,72 @@ describe('syncDatabase', () => {
       await db.close();
     });
 
+    it('renames a collection logically, the derived family and constraints following', async () => {
+      const db = await open();
+      const posts = table('Posts', {
+        columns: [UUID, { name: 'email', type: 'text', notNull: false }],
+        uniques: [{ name: 'UX__Posts__email', columns: ['email'] }],
+      });
+      const sections = table('Posts_sections', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        indexes: [{ name: 'IX__Posts_sections___parentUUID', columns: ['_parentUUID'] }],
+        foreignKeys: [
+          {
+            column: '_parentUUID',
+            targetTable: 'Posts',
+            targetColumn: 'UUID',
+            onDelete: 'cascade',
+          },
+        ],
+        derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+      });
+      await syncDatabase(db, dialect, { desired: [posts, sections] });
+      await db.run('INSERT INTO "Posts" ("UUID", "email") VALUES (?, ?)', ['p1', 'a@b.c']);
+      await db.run('INSERT INTO "Posts_sections" ("UUID", "_parentUUID") VALUES (?, ?)', [
+        's1',
+        'p1',
+      ]);
+      const articles = table('Articles', {
+        columns: [UUID, { name: 'email', type: 'text', notNull: false }],
+        uniques: [{ name: 'UX__Articles__email', columns: ['email'] }],
+      });
+      const chapters = table('Articles_sections', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        indexes: [{ name: 'IX__Articles_sections___parentUUID', columns: ['_parentUUID'] }],
+        foreignKeys: [
+          {
+            column: '_parentUUID',
+            targetTable: 'Articles',
+            targetColumn: 'UUID',
+            onDelete: 'cascade',
+          },
+        ],
+        derived: { collection: 'Articles', path: ['sections'], kind: 'childMany' },
+      });
+      const report = await syncDatabase(db, dialect, {
+        desired: [articles, chapters],
+        migrations: [
+          meta('app/001-articles', {
+            from: { collection: 'Posts' },
+            to: { collection: 'Articles' },
+          }),
+        ],
+      });
+      deepStrictEqual(report, { deletions: [], warnings: [] });
+      const names = await dialect.listTables(db);
+      ok(names.includes('Articles') && names.includes('Articles_sections'));
+      ok(!names.includes('Posts') && !names.includes('Posts_sections'));
+      deepStrictEqual(await dialect.describeTable(db, 'Articles'), articles);
+      const { derived: _origin, ...chapterShape } = chapters;
+      deepStrictEqual(await dialect.describeTable(db, 'Articles_sections'), chapterShape);
+      strictEqual((await db.query('SELECT * FROM "Articles_sections"')).length, 1);
+      deepStrictEqual(await stampedRows(db), [
+        Object.assign(Object.create(null), { name: 'app/001-articles', status: 'applied' }),
+      ]);
+      await lockIsFree(db);
+      await db.close();
+    });
+
     it('rolls back an applied migration and its stamp on a later refusal', async () => {
       const db = await open();
       const posts = table('Posts', {

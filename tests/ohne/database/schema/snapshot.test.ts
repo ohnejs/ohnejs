@@ -28,6 +28,7 @@ function snapshot(overrides: Partial<SchemaSnapshot> = {}): SchemaSnapshot {
     generation: 1,
     hash: 'h1',
     classification: { Posts: { columns: { UUID: 'text' } } },
+    ownership: true,
     ...overrides,
   };
 }
@@ -100,6 +101,7 @@ describe('readSnapshot and writeSnapshot', () => {
       generation: 2,
       hash: 'h2',
       classification: { Posts: { columns: { UUID: 'text', meta: 'json' } } },
+      ownership: false,
     });
     await db.close();
   });
@@ -111,6 +113,7 @@ describe('advanceSnapshot', () => {
       generation: 1,
       hash: 'h1',
       classification: {},
+      ownership: true,
     });
   });
 

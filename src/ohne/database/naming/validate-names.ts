@@ -1,7 +1,11 @@
 import { isCamelCase, isEmpty, isPascalCase, isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 
-const RESERVED_COLLECTIONS = new Set(['ohne', 'block']);
+/**
+ * The collection names the framework reserves, matched case-insensitively.
+ * `Ohne` guards the `ohne_` internals, `Block` the `block_` per-type tables.
+ */
+export const RESERVED_COLLECTIONS = new Set(['ohne', 'block']);
 
 /**
  * Rejects a collection name that is not PascalCase or is reserved.
@@ -32,6 +36,31 @@ export function validateCollectionName(name: string, path?: string): void {
       title: `Collection name \`${name}\` is reserved`,
       body: [
         '`Ohne` and `Block` are reserved framework names, matched case-insensitively.',
+        'Rename it.',
+      ],
+      path,
+    });
+  }
+}
+
+/**
+ * Rejects a block name that is not PascalCase.
+ * Block tables live behind the `block_` prefix, so no name is reserved.
+ * Pass `path` when the name comes from a file, so the error lands on it.
+ */
+export function validateBlockName(name: string, path?: string): void {
+  if (isEmpty(name, { trim: true })) {
+    throw ohneError({
+      title: 'A block name cannot be empty',
+      body: ['The name holds no letters or digits to build an identifier from.', 'Rename it.'],
+      path,
+    });
+  }
+  if (!isPascalCase(name)) {
+    throw ohneError({
+      title: `Block name \`${name}\` is not PascalCase`,
+      body: [
+        'Block names are PascalCase: an uppercase letter, then letters and digits.',
         'Rename it.',
       ],
       path,
@@ -71,15 +100,16 @@ export function validateFieldName(name: string, scope?: string): void {
 }
 
 /**
- * Rejects a case-insensitive duplicate within a set of collection names or one scope's field names.
- * The scope is a collection, or a dotted composite path like `Posts.sections`.
+ * Rejects a case-insensitive duplicate within a set of collection, block, or one scope's field names.
+ * The scope is a collection or block, or a dotted composite path like `Posts.sections`.
  * SQLite matches identifiers case-insensitively even when quoted, so `title` and `Title` cannot coexist.
  */
 export function validateUniqueNames(
   names: readonly string[],
-  kind: 'collection' | 'field',
+  kind: 'collection' | 'block' | 'field',
   scope?: string,
 ): void {
+  const labels = { collection: 'Collection', block: 'Block', field: 'Field' };
   const seen = new Map<string, string>();
   for (const name of names) {
     const key = name.toLowerCase();
@@ -87,10 +117,7 @@ export function validateUniqueNames(
     if (!isUndefined(first)) {
       const where = isUndefined(scope) ? '' : ` in \`${scope}\``;
       throw ohneError({
-        title:
-          kind === 'collection'
-            ? `Collection names \`${first}\` and \`${name}\` collide`
-            : `Field names \`${first}\` and \`${name}\` collide`,
+        title: `${labels[kind]} names \`${first}\` and \`${name}\` collide`,
         body: [
           `Identifiers match case-insensitively, so these cannot coexist${where}.`,
           'Rename one of them.',
