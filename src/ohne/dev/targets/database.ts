@@ -5,12 +5,12 @@ import { generateDatabase } from '../../codegen/generate-database.ts';
 import { DIR_DEFAULTS } from '../../layers/config.ts';
 import { useLayers } from '../../layers/use-layers.ts';
 
-const DIRS = ['collections', 'fields', 'migrations'] as const;
+const DIRS = ['collections', 'fields', 'blocks', 'migrations'] as const;
 
 /**
  * The database target.
  *
- * Its closure is every layer's `dirs.collections`, `dirs.fields`, and `dirs.migrations`.
+ * Its closure is every layer's `dirs.collections`, `dirs.fields`, `dirs.blocks`, and `dirs.migrations`.
  * The generated types depend on file contents, not just the set of files.
  * `regen` runs unconditionally and lets `generateDatabase` write only when its output changes.
  * Definitions re-import fresh, so an edited collection or field type is read again.

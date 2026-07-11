@@ -13,12 +13,12 @@ const RESERVED_OPTIONS = new Set(['nullable', 'unique', 'index']);
  */
 export interface ValidateFieldArgs {
   /**
-   * The collection the field belongs to, for the error messages.
+   * Where the field lives, formatted for the error messages: 'collection `Posts`' or 'block `Hero`'.
    */
-  collection: string;
+  owner: string;
 
   /**
-   * The field's name in its collection.
+   * The field's name in its owner.
    */
   name: string;
 
@@ -46,15 +46,17 @@ export interface ValidateFieldArgs {
  * - A `foreignKey` hint requires `columnType: 'text'`: it stores the target's text `UUID`.
  * - A `junction` hint requires `columnType: false`: its links live in the junction table alone.
  * - A `child` hint requires `columnType: false` too, and must declare at least one subfield.
+ * - A `blocks` hint requires `columnType: false` too; its `allow` must not be empty or repeat a name.
  * - `unique` and `index` need a column, so a column-less field takes neither.
  * - A junction field with no links is empty, never `NULL`, so it takes no `nullable` either.
  * - A child field takes no `nullable`: an absent one-row already reads as `null`, a list is never `NULL`.
+ * - A blocks field takes no `nullable` on the same terms: with no blocks it is empty, never `NULL`.
  * - A force-nullable type locks `nullable` on, so a field of it takes no `nullable` at all.
  * - A force-index type locks its index on the same terms: the field takes no `index`.
  */
 export function validateField(args: ValidateFieldArgs): void {
-  const { collection, name, instance, fieldType, hint } = args;
-  const where = `Field \`${name}\` in collection \`${collection}\``;
+  const { owner, name, instance, fieldType, hint } = args;
+  const where = `Field \`${name}\` in ${owner}`;
   if (fieldType.columnType === false && isUndefined(hint)) {
     throw ohneError({
       title: `Field type \`${instance.type}\` owns no column and no storage`,
@@ -100,6 +102,36 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
+  if (hint?.kind === 'blocks' && fieldType.columnType !== false) {
+    throw ohneError({
+      title: `Field type \`${instance.type}\` pairs a blocks wrapper with a column`,
+      body: [
+        'A `blocks` hint stores its references in the wrapper table alone.',
+        'Set `columnType: false` on the field type.',
+      ],
+    });
+  }
+  if (hint?.kind === 'blocks' && !isUndefined(hint.allow)) {
+    if (hint.allow.length === 0) {
+      throw ohneError({
+        title: `Field \`${name}\` allows no block types`,
+        body: [
+          `${where} sets \`allow: []\`, so the field could never hold a block.`,
+          'List at least one block, or drop `allow` to accept every registered one.',
+        ],
+      });
+    }
+    const seen = new Set<string>();
+    for (const block of hint.allow) {
+      if (seen.has(block)) {
+        throw ohneError({
+          title: `Field \`${name}\` lists block \`${block}\` twice`,
+          body: [`${where} repeats \`${block}\` in \`allow\`.`, 'Drop the duplicate.'],
+        });
+      }
+      seen.add(block);
+    }
+  }
   const options: Record<string, unknown> = { ...instance.options };
   if (fieldType.columnType === false) {
     for (const key of ['unique', 'index'] as const) {
@@ -129,6 +161,15 @@ export function validateField(args: ValidateFieldArgs): void {
         hint.cardinality === 'one'
           ? `${where} holds at most one child row, and an absent row already reads as \`null\`.`
           : `${where} is an ordered list: with no items it is empty, never \`NULL\`.`,
+        'Drop `nullable`.',
+      ],
+    });
+  }
+  if (hint?.kind === 'blocks' && !isUndefined(options.nullable)) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be nullable`,
+      body: [
+        `${where} is an ordered list of blocks: with no blocks it is empty, never \`NULL\`.`,
         'Drop `nullable`.',
       ],
     });

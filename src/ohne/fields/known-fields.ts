@@ -1,3 +1,4 @@
+import type { blocks } from './builtin/blocks.ts';
 import type { boolean } from './builtin/boolean.ts';
 import type { integer } from './builtin/integer.ts';
 import type { object } from './builtin/object.ts';
@@ -57,6 +58,11 @@ export interface KnownFields {
    * An ordered list of nested field groups.
    */
   repeater: typeof repeater;
+
+  /**
+   * An ordered list of block instances.
+   */
+  blocks: typeof blocks;
 }
 
 /**

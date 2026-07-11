@@ -1,6 +1,7 @@
 import { deepStrictEqual, match, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { BlockMeta } from '../../../../src/ohne/blocks/use-blocks.ts';
 import type { CollectionMeta } from '../../../../src/ohne/collections/use-collections.ts';
 import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
@@ -15,6 +16,12 @@ import { createRegistry, type Registry } from '../../../../src/utils/index.ts';
 
 function collections(...metas: CollectionMeta[]): Registry<CollectionMeta> {
   const registry = createRegistry<CollectionMeta>();
+  for (const meta of metas) registry.register(meta.name, meta);
+  return registry;
+}
+
+function blocks(...metas: BlockMeta[]): Registry<BlockMeta> {
+  const registry = createRegistry<BlockMeta>();
   for (const meta of metas) registry.register(meta.name, meta);
   return registry;
 }
@@ -1108,6 +1115,401 @@ describe('buildDesiredSchema', () => {
         name: truncateWithHash(`UX__${long}_address___parentUUID`),
         columns: ['_parentUUID'],
       },
+    ]);
+  });
+
+  it('emits a wrapper table for a blocks field, nothing on the main table', () => {
+    const [posts, wrapper] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks({ name: 'Hero', block: { fields: { title: field('text') } } }),
+    );
+    deepStrictEqual(posts!.columns.slice(2), []);
+    strictEqual(wrapper!.name, 'Posts_content');
+    deepStrictEqual(wrapper!.primaryKey, ['UUID']);
+    deepStrictEqual(wrapper!.columns, [
+      { name: 'UUID', type: 'text', notNull: true },
+      { name: '_parentUUID', type: 'text', notNull: true },
+      { name: '_parentPosition', type: 'integer', notNull: true },
+      { name: '_blockType', type: 'text', notNull: true },
+      { name: '_blockUUID', type: 'text', notNull: true },
+    ]);
+    deepStrictEqual(wrapper!.uniques, []);
+    deepStrictEqual(wrapper!.indexes, [
+      { name: 'IX__Posts_content___parentUUID', columns: ['_parentUUID'] },
+      { name: 'IX__Posts_content___blockUUID', columns: ['_blockUUID'] },
+    ]);
+    deepStrictEqual(wrapper!.foreignKeys, [
+      { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+    ]);
+    deepStrictEqual(wrapper!.derived, {
+      collection: 'Posts',
+      path: ['content'],
+      kind: 'blocksWrapper',
+      allow: ['Hero'],
+    });
+  });
+
+  it('emits a shared per-type table per allowed block, constraints composing from its root', () => {
+    const [, , hero] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks({
+        name: 'Hero',
+        block: { fields: { title: field('text'), slug: field('text', { unique: true }) } },
+      }),
+    );
+    strictEqual(hero!.name, 'block_Hero');
+    strictEqual(hero!.block, 'Hero');
+    deepStrictEqual(hero!.primaryKey, ['UUID']);
+    deepStrictEqual(hero!.columns, [
+      { name: 'UUID', type: 'text', notNull: true },
+      { name: 'title', type: 'text', notNull: true },
+      { name: 'slug', type: 'text', notNull: true },
+    ]);
+    deepStrictEqual(hero!.uniques, [{ name: 'UX__block_Hero__slug', columns: ['slug'] }]);
+    deepStrictEqual(hero!.indexes, []);
+    deepStrictEqual(hero!.foreignKeys, []);
+  });
+
+  it('resolves an omitted allow to every registered block, sorted', () => {
+    const tables = buildDesiredSchema(
+      collections({ name: 'Posts', collection: { fields: { content: field('blocks') } } }),
+      useFields(),
+      blocks({ name: 'Quote', block: { fields: {} } }, { name: 'Hero', block: { fields: {} } }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_content', 'block_Hero', 'block_Quote'],
+    );
+    deepStrictEqual(tables[1]!.derived?.allow, ['Hero', 'Quote']);
+  });
+
+  it('emits block tables after every collection, sorted regardless of allow order', () => {
+    const tables = buildDesiredSchema(
+      collections(
+        {
+          name: 'Pages',
+          collection: { fields: { body: field('blocks', { allow: ['Quote', 'Hero'] }) } },
+        },
+        { name: 'Posts', collection: { fields: {} } },
+      ),
+      useFields(),
+      blocks({ name: 'Quote', block: { fields: {} } }, { name: 'Hero', block: { fields: {} } }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Pages', 'Pages_body', 'Posts', 'block_Hero', 'block_Quote'],
+    );
+    deepStrictEqual(tables[1]!.derived?.allow, ['Hero', 'Quote']);
+  });
+
+  it('materializes blocks by reachability, a nested blocks field closing over further types', () => {
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks(
+        { name: 'Hero', block: { fields: { content: field('blocks', { allow: ['CTA'] }) } } },
+        { name: 'CTA', block: { fields: { label: field('text') } } },
+        { name: 'Unused', block: { fields: {} } },
+      ),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_content', 'block_CTA', 'block_Hero', 'block_Hero_content'],
+    );
+    const wrapper = tables[4]!;
+    strictEqual(wrapper.foreignKeys[0]?.targetTable, 'block_Hero');
+    deepStrictEqual(wrapper.derived, {
+      block: 'Hero',
+      path: ['content'],
+      kind: 'blocksWrapper',
+      allow: ['CTA'],
+    });
+  });
+
+  it('builds a self-allowing block, its wrapper hanging off its own table', () => {
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks({
+        name: 'Hero',
+        block: { fields: { nested: field('blocks', { allow: ['Hero'] }) } },
+      }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_content', 'block_Hero', 'block_Hero_nested'],
+    );
+    strictEqual(tables[3]!.foreignKeys[0]?.targetTable, 'block_Hero');
+  });
+
+  it('nests composites inside a block, child tables deriving from the block root', () => {
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks({
+        name: 'Hero',
+        block: {
+          fields: {
+            meta: field('object', { fields: { alt: field('text') } }),
+            links: field('repeater', { fields: { url: field('text') } }),
+          },
+        },
+      }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_content', 'block_Hero', 'block_Hero_meta', 'block_Hero_links'],
+    );
+    const meta = tables[3]!;
+    deepStrictEqual(meta.uniques, [
+      { name: 'UX__block_Hero_meta___parentUUID', columns: ['_parentUUID'] },
+    ]);
+    deepStrictEqual(meta.foreignKeys, [
+      {
+        column: '_parentUUID',
+        targetTable: 'block_Hero',
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+    ]);
+    deepStrictEqual(meta.derived, { block: 'Hero', path: ['meta'], kind: 'childOne' });
+    deepStrictEqual(tables[4]!.derived, { block: 'Hero', path: ['links'], kind: 'childMany' });
+  });
+
+  it('attaches relations declared in a block to its per-type table', () => {
+    const tables = buildDesiredSchema(
+      collections(
+        { name: 'Users', collection: { fields: {} } },
+        {
+          name: 'Posts',
+          collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+        },
+      ),
+      useFields(),
+      blocks({
+        name: 'Hero',
+        block: {
+          fields: {
+            author: field('record', { collection: 'Users' }),
+            tags: field('records', { collection: 'Users' }),
+          },
+        },
+      }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Users', 'Posts', 'Posts_content', 'block_Hero', 'block_Hero_tags'],
+    );
+    const hero = tables[3]!;
+    deepStrictEqual(hero.foreignKeys, [
+      { column: 'author', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'setNull' },
+    ]);
+    deepStrictEqual(hero.indexes, [{ name: 'IX__block_Hero__author', columns: ['author'] }]);
+    const junction = tables[4]!;
+    deepStrictEqual(junction.foreignKeys, [
+      {
+        column: '_parentUUID',
+        targetTable: 'block_Hero',
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+      { column: '_targetUUID', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'cascade' },
+    ]);
+    deepStrictEqual(junction.derived, { block: 'Hero', path: ['tags'], kind: 'junction' });
+  });
+
+  it('derives a wrapper from a nested blocks field, hung off the child table', () => {
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: {
+            sections: field('repeater', {
+              fields: { content: field('blocks', { allow: ['Hero'] }) },
+            }),
+          },
+        },
+      }),
+      useFields(),
+      blocks({ name: 'Hero', block: { fields: {} } }),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_sections', 'Posts_sections_content', 'block_Hero'],
+    );
+    const wrapper = tables[2]!;
+    deepStrictEqual(wrapper.foreignKeys, [
+      {
+        column: '_parentUUID',
+        targetTable: 'Posts_sections',
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+    ]);
+    deepStrictEqual(wrapper.derived, {
+      collection: 'Posts',
+      path: ['sections', 'content'],
+      kind: 'blocksWrapper',
+      allow: ['Hero'],
+    });
+  });
+
+  it('rejects an inverse on a records field inside a block', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections(
+            { name: 'Users', collection: { fields: {} } },
+            {
+              name: 'Posts',
+              collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+            },
+          ),
+          useFields(),
+          blocks({
+            name: 'Hero',
+            block: {
+              fields: { tags: field('records', { collection: 'Users', inverse: 'posts' }) },
+            },
+          }),
+        ),
+      bodyMatching(/pairs top-level collection fields/),
+    );
+  });
+
+  it('rejects an unknown allowed block, naming the reference', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+          }),
+          useFields(),
+          blocks({ name: 'Quote', block: { fields: {} } }),
+        ),
+      /Unknown block `Hero`/,
+    );
+  });
+
+  it('rejects an empty allow list', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { content: field('blocks', { allow: [] }) } },
+          }),
+          useFields(),
+          blocks({ name: 'Hero', block: { fields: {} } }),
+        ),
+      /Field `content` allows no block types/,
+    );
+  });
+
+  it('rejects a block listed twice in allow', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { content: field('blocks', { allow: ['Hero', 'Hero'] }) } },
+          }),
+          useFields(),
+          blocks({ name: 'Hero', block: { fields: {} } }),
+        ),
+      /Field `content` lists block `Hero` twice/,
+    );
+  });
+
+  it('rejects a blocks field when no block is registered', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({ name: 'Posts', collection: { fields: { content: field('blocks') } } }),
+          useFields(),
+        ),
+      /Field `content` has no block types to hold/,
+    );
+  });
+
+  it('rejects unique, index, and nullable on a blocks field', () => {
+    for (const [key, message] of [
+      ['unique', /Field `content` has no column to constrain/],
+      ['index', /Field `content` has no column to constrain/],
+      ['nullable', /Field `content` cannot be nullable/],
+    ] as const) {
+      throws(
+        () =>
+          buildDesiredSchema(
+            collections({
+              name: 'Posts',
+              collection: {
+                fields: {
+                  content: {
+                    type: 'blocks',
+                    options: { allow: ['Hero'], [key]: true },
+                  } as unknown as FieldInstance,
+                },
+              },
+            }),
+            useFields(),
+            blocks({ name: 'Hero', block: { fields: {} } }),
+          ),
+        message,
+      );
+    }
+  });
+
+  it('rejects a composite index covering a blocks field', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { title: field('text'), content: field('blocks', { allow: ['Hero'] }) },
+              compositeIndexes: [{ fields: ['title', 'content'] }],
+            },
+          }),
+          useFields(),
+          blocks({ name: 'Hero', block: { fields: {} } }),
+        ),
+      /Composite index covers column-less field `content`/,
+    );
+  });
+
+  it('truncates a long wrapper name once, indexes composing from the logical name', () => {
+    const long = `A${'b'.repeat(70)}`;
+    const [, wrapper] = buildDesiredSchema(
+      collections({
+        name: long,
+        collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+      }),
+      useFields(),
+      blocks({ name: 'Hero', block: { fields: {} } }),
+    );
+    strictEqual(wrapper!.name, truncateWithHash(`${long}_content`));
+    deepStrictEqual(wrapper!.indexes, [
+      { name: truncateWithHash(`IX__${long}_content___parentUUID`), columns: ['_parentUUID'] },
+      { name: truncateWithHash(`IX__${long}_content___blockUUID`), columns: ['_blockUUID'] },
     ]);
   });
 });

@@ -78,7 +78,26 @@ export interface ChildHint {
 }
 
 /**
+ * The storage layout of a `blocks` field: a wrapper table of ordered, polymorphic block references.
+ * The wrapper carries no column on the owner's table; its name joins owner and field with `_`.
+ * Each row names its block type and instance; the instances live in shared per-type `block_` tables.
+ */
+export interface BlocksHint {
+  /**
+   * Marks the hint as a blocks wrapper.
+   */
+  kind: 'blocks';
+
+  /**
+   * The block types the field may hold, by name.
+   * Resolved against the block registry when the desired schema builds; an unknown name throws.
+   * Omitted means every registered block.
+   */
+  allow?: readonly string[];
+}
+
+/**
  * Every storage layout a field type's `schema` can return.
  * The union is closed: new shapes are framework work, not field-type work.
  */
-export type StorageHint = ForeignKeyHint | JunctionHint | ChildHint;
+export type StorageHint = ForeignKeyHint | JunctionHint | ChildHint | BlocksHint;

@@ -88,8 +88,10 @@ describe('generateDatabase', () => {
     const shared = readFileSync(paths[0] ?? '', 'utf8');
     const node = readFileSync(paths[1] ?? '', 'utf8');
     ok(shared.includes('export interface GeneratedCollections {}'));
+    ok(shared.includes('export interface GeneratedBlocks {}'));
     ok(shared.includes('export interface GeneratedDatabases {}'));
     ok(node.includes('interface KnownCollections extends GeneratedCollections {}'));
+    ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes('interface KnownDatabases extends GeneratedDatabases {}'));
     ok(node.includes('interface KnownFields {}'));
     ok(!node.includes('useMigrations'));
@@ -204,6 +206,80 @@ describe('generateDatabase', () => {
     );
   });
 
+  it('types block shapes into GeneratedBlocks, a blocks field unioning its allowed names', async () => {
+    const app = join(root, 'blocks');
+    writePackage(app, 'blocks');
+    write(
+      app,
+      'blocks/CTA.ts',
+      'export default { fields: {\n' +
+        "  label: { type: 'text', options: {} },\n" +
+        "  url: { type: 'text', options: { nullable: true } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'blocks/Hero.ts',
+      "export default { fields: { title: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'collections/Pages.ts',
+      'export default { fields: {\n' +
+        "  body: { type: 'blocks', options: {} },\n" +
+        "  hero: { type: 'blocks', options: { allow: ['Hero'] } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    ok(shared.includes('export interface GeneratedBlocks {'));
+    ok(shared.includes('  CTA: {\n    label: string;\n    url: string | null;\n  };'));
+    ok(shared.includes('  Hero: {\n    title: string;\n  };'));
+    ok(shared.includes("    hero: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+    ok(
+      shared.includes(
+        '    body: (\n' +
+          "      | { block: 'CTA'; fields: GeneratedBlocks['CTA'] }\n" +
+          "      | { block: 'Hero'; fields: GeneratedBlocks['Hero'] }\n" +
+          '    )[];',
+      ),
+    );
+    ok(node.includes("import { useCollections, useBlocks } from 'ohne';"));
+    ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
+    ok(node.includes("import b0 from '../../blocks/CTA.ts';"));
+    ok(node.includes("blocks.register('CTA', { name: 'CTA', block: b0 });"));
+    ok(node.includes("blocks.register('Hero', { name: 'Hero', block: b1 });"));
+  });
+
+  it('nests a blocks field inside a block, a self-reference included', async () => {
+    const app = join(root, 'nested-blocks');
+    writePackage(app, 'nested-blocks');
+    write(
+      app,
+      'blocks/CTA.ts',
+      "export default { fields: { label: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'blocks/Hero.ts',
+      'export default { fields: {\n' +
+        "  cards: { type: 'blocks', options: { allow: ['CTA'] } },\n" +
+        "  more: { type: 'blocks', options: { allow: ['Hero'] } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes("    cards: { block: 'CTA'; fields: GeneratedBlocks['CTA'] }[];"));
+    ok(shared.includes("    more: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+  });
+
   it('drops disabled collections and field types, deleting a disabled built-in', async () => {
     const app = join(root, 'disabled');
     writePackage(
@@ -227,6 +303,60 @@ describe('generateDatabase', () => {
     ok(node.includes("fields.delete('boolean');"));
     ok(shared.includes('Authors: {};'));
     ok(!shared.includes('Posts'));
+  });
+
+  it('drops a disabled block, an open blocks field shrinking around it', async () => {
+    const app = join(root, 'disabled-block');
+    writePackage(
+      app,
+      'disabled-block',
+      undefined,
+      "export default { disable: { blocks: ['CTA'] } };\n",
+    );
+    write(
+      app,
+      'blocks/CTA.ts',
+      "export default { fields: { label: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'blocks/Hero.ts',
+      "export default { fields: { title: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'collections/Pages.ts',
+      "export default { fields: { body: { type: 'blocks', options: {} } } };\n",
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    ok(shared.includes("    body: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+    ok(!shared.includes('CTA'));
+    ok(node.includes("blocks.register('Hero'"));
+    ok(!node.includes('CTA'));
+  });
+
+  it('rejects a blocks field still allowing a disabled block', async () => {
+    const app = join(root, 'disabled-allow');
+    writePackage(
+      app,
+      'disabled-allow',
+      undefined,
+      "export default { disable: { blocks: ['CTA'] } };\n",
+    );
+    write(app, 'blocks/CTA.ts', 'export default { fields: {} };\n');
+    write(
+      app,
+      'collections/Pages.ts',
+      "export default { fields: { body: { type: 'blocks', options: { allow: ['CTA'] } } } };\n",
+    );
+
+    await loadLayers(app);
+    await rejects(generateDatabase(app), /Unknown block `CTA`/);
   });
 
   it('registers a built-in override without augmenting its name', async () => {
@@ -421,6 +551,136 @@ describe('generateDatabase', () => {
     );
   });
 
+  it('narrows block names in a consumer app, rejecting the illegal shapes', async () => {
+    const app = join(root, 'block-typing');
+    writePackage(app, 'block-typing');
+    mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(
+      join(FRAMEWORK, 'node_modules', '@types', 'node'),
+      join(app, 'node_modules', '@types', 'node'),
+      'dir',
+    );
+    writeFileSync(
+      join(app, 'tsconfig.json'),
+      JSON.stringify({
+        extends: 'ohne/tsconfig.node.json',
+        include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
+      }),
+    );
+    write(
+      app,
+      'blocks/Hero.ts',
+      "import { defineBlock, field } from 'ohne';\n" +
+        'export default defineBlock({\n' +
+        "  fields: { title: field('text'), banner: field('blocks', { allow: ['Hero'] }) },\n" +
+        '});\n',
+    );
+    write(
+      app,
+      'blocks/CTA.ts',
+      "import { defineBlock, field } from 'ohne';\n" +
+        "export default defineBlock({ fields: { label: field('text') } });\n",
+    );
+    write(
+      app,
+      'collections/Pages.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        'export default defineCollection({\n' +
+        "  fields: { body: field('blocks'), hero: field('blocks', { allow: ['Hero'] }) },\n" +
+        '});\n',
+    );
+    write(
+      app,
+      'typing.ts',
+      "import type { KnownCollections } from 'ohne';\n" +
+        '\n' +
+        "import { field } from 'ohne';\n" +
+        '\n' +
+        "field('blocks');\n" +
+        "field('blocks', { allow: ['Hero'] });\n" +
+        '// @ts-expect-error an unknown block is not a legal type\n' +
+        "field('blocks', { allow: ['Typo'] });\n" +
+        '// @ts-expect-error a blocks field owns no column, so the commons are barred\n' +
+        "field('blocks', { nullable: true });\n" +
+        '\n' +
+        "export function shape(page: KnownCollections['Pages']): string {\n" +
+        '  const titles = page.hero.map((item) => item.fields.title);\n' +
+        '  const labels = page.body.map((item) =>\n' +
+        "    item.block === 'Hero' ? item.fields.title : item.fields.label,\n" +
+        '  );\n' +
+        "  return [...titles, ...labels].join(' ');\n" +
+        '}\n',
+    );
+
+    await loadLayers(app);
+    await generateDatabase(app);
+
+    execFileSync(
+      process.execPath,
+      [join(FRAMEWORK, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', app],
+      { encoding: 'utf8' },
+    );
+  });
+
+  it('narrows migration address fields in a consumer app, staying open to any string', async () => {
+    const app = join(root, 'migration-typing');
+    writePackage(app, 'migration-typing');
+    mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(
+      join(FRAMEWORK, 'node_modules', '@types', 'node'),
+      join(app, 'node_modules', '@types', 'node'),
+      'dir',
+    );
+    writeFileSync(
+      join(app, 'tsconfig.json'),
+      JSON.stringify({
+        extends: 'ohne/tsconfig.node.json',
+        include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
+      }),
+    );
+    write(
+      app,
+      'collections/Todos.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        "export default defineCollection({ fields: { title: field('text'), done: field('boolean') } });\n",
+    );
+    write(
+      app,
+      'typing.ts',
+      "import { defineMigration, type Config, type MoveMigration } from 'ohne';\n" +
+        '\n' +
+        'defineMigration({\n' +
+        "  from: { collection: 'Todos', field: 'title' },\n" +
+        "  to: { collection: 'Todos', field: 'heading' },\n" +
+        '});\n' +
+        "defineMigration({ from: { collection: 'Todos', field: 'sections.title' }, to: null });\n" +
+        "defineMigration({ from: { collection: 'Ghost', field: 'anything', type: 'text' }, to: null });\n" +
+        '\n' +
+        "const known: Extract<Extract<MoveMigration['from'], { collection: 'Todos' }>['field'], 'title'> =\n" +
+        "  'title';\n" +
+        '// @ts-expect-error an unknown collection has no dedicated member, so its fields never narrow\n' +
+        "const unknown: Extract<Extract<MoveMigration['from'], { collection: 'Ghost' }>['field'], 'title'> =\n" +
+        "  'title';\n" +
+        '\n' +
+        "type Disable = NonNullable<Config['disable']>;\n" +
+        "const disabled: Extract<NonNullable<Disable['collections']>[number], 'Todos'> = 'Todos';\n" +
+        "const open: NonNullable<Disable['collections']>[number] = 'Ghost';\n" +
+        '// @ts-expect-error an unregistered name is never suggested\n' +
+        "const ghost: Extract<NonNullable<Disable['collections']>[number], 'Ghost'> = 'Ghost';\n",
+    );
+
+    await loadLayers(app);
+    await generateDatabase(app);
+
+    execFileSync(
+      process.execPath,
+      [join(FRAMEWORK, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', app],
+      { encoding: 'utf8' },
+    );
+  });
+
   it('rejects a collection referencing an unknown field type, naming the file', async () => {
     const app = join(root, 'unknown');
     writePackage(app, 'unknown');
@@ -432,5 +692,19 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     await rejects(generateDatabase(app), /Unknown field type `gallery`/);
+  });
+
+  it('rejects a blocks field allowing an unknown block', async () => {
+    const app = join(root, 'unknown-block');
+    writePackage(app, 'unknown-block');
+    write(app, 'blocks/Hero.ts', 'export default { fields: {} };\n');
+    write(
+      app,
+      'collections/Pages.ts',
+      "export default { fields: { body: { type: 'blocks', options: { allow: ['Ghost'] } } } };\n",
+    );
+
+    await loadLayers(app);
+    await rejects(generateDatabase(app), /Unknown block `Ghost`/);
   });
 });

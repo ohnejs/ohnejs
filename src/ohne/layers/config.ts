@@ -5,7 +5,10 @@ import type {
   LiteralUnion,
   RequireByShape,
 } from '../../utils/index.ts';
+import type { KnownBlocks } from '../blocks/known-blocks.ts';
+import type { KnownCollections } from '../collections/known-collections.ts';
 import type { DialectName } from '../database/known-dialects.ts';
+import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { LayerName } from './layer-name.ts';
 
@@ -119,6 +122,17 @@ export interface Config {
     fields?: string;
 
     /**
+     * Directory each layer's blocks are read from.
+     * Each `.ts` file default-exports one `defineBlock` result; the file names the block.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'blocks'
+     */
+    blocks?: string;
+
+    /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
      * A `_`-prefixed file or directory is a helper and is skipped.
@@ -194,7 +208,7 @@ export interface Config {
      * @default
      * []
      */
-    collections?: string[];
+    collections?: LiteralUnion<Extract<keyof KnownCollections, string>>[];
 
     /**
      * Field-type names to drop, matched exactly.
@@ -203,7 +217,17 @@ export interface Config {
      * @default
      * []
      */
-    fields?: string[];
+    fields?: LiteralUnion<Extract<keyof KnownFields, string>>[];
+
+    /**
+     * Block names to drop, matched exactly.
+     * A dropped block vanishes from registration, the desired schema, and the generated types.
+     * A `blocks` field still allowing a dropped block fails at codegen.
+     *
+     * @default
+     * []
+     */
+    blocks?: LiteralUnion<Extract<keyof KnownBlocks, string>>[];
   };
 
   /**
@@ -623,7 +647,7 @@ export interface ConfigExtensions {}
  */
 export const DEFAULTS = {
   layers: [],
-  disable: { routes: [], messages: [], collections: [], fields: [] },
+  disable: { routes: [], messages: [], collections: [], fields: [], blocks: [] },
   messages: { defaultLanguage: 'en' },
   api: {
     basePath: '',
@@ -655,6 +679,7 @@ export const DIR_DEFAULTS = {
   messages: 'messages',
   collections: 'collections',
   fields: 'fields',
+  blocks: 'blocks',
   migrations: 'migrations',
   dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
@@ -690,7 +715,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
  * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
- * - `disable.collections` and `disable.fields` accumulate and dedupe, like `disable.routes`.
+ * - `disable.collections`, `disable.fields`, and `disable.blocks` accumulate and dedupe, like `disable.routes`.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
@@ -704,6 +729,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'disable.messages': 'concat-unique',
   'disable.collections': 'concat-unique',
   'disable.fields': 'concat-unique',
+  'disable.blocks': 'concat-unique',
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',

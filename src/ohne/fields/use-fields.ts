@@ -2,6 +2,7 @@ import type { FieldType } from './define-field.ts';
 import type { FieldTypeName } from './known-fields.ts';
 
 import { createRegistry, type Registry } from '../../utils/index.ts';
+import { blocks } from './builtin/blocks.ts';
 import { boolean } from './builtin/boolean.ts';
 import { integer } from './builtin/integer.ts';
 import { object } from './builtin/object.ts';
@@ -35,6 +36,7 @@ for (const [name, fieldType] of [
   ['records', records],
   ['object', object],
   ['repeater', repeater],
+  ['blocks', blocks],
 ] as const) {
   registry.register(name, { name, fieldType });
 }

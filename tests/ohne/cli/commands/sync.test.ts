@@ -1,4 +1,4 @@
-import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, doesNotMatch, match, ok, strictEqual } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -68,6 +68,57 @@ describe('ohne sync', () => {
     const again = sync(dir);
     strictEqual(again.status, 0);
     match(again.output, /Database synced/);
+  });
+
+  it('reports a discard migration sweeping block data, no force involved', () => {
+    const dir = makeApp('blocks');
+    mkdirSync(join(dir, 'collections'), { recursive: true });
+    mkdirSync(join(dir, 'blocks'), { recursive: true });
+    writeFileSync(
+      join(dir, 'blocks', 'Hero.ts'),
+      "import { defineBlock, field } from 'ohne';\n" +
+        "export default defineBlock({ fields: { title: field('text') } });\n",
+    );
+    writeFileSync(
+      join(dir, 'collections', 'Pages.ts'),
+      "import { defineCollection, field } from 'ohne';\n" +
+        "export default defineCollection({ fields: { content: field('blocks') } });\n",
+    );
+    strictEqual(sync(dir).status, 0);
+
+    const db = new DatabaseSync(join(dir, '.data', 'ohne.db'));
+    db.prepare('INSERT INTO "Pages" ("UUID", "_updatedAt") VALUES (?, ?)').run('p1', 0);
+    db.prepare('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)').run('h1', 'Hi');
+    db.prepare(
+      'INSERT INTO "Pages_content" ("UUID", "_parentUUID", "_parentPosition", "_blockType", "_blockUUID") ' +
+        'VALUES (?, ?, ?, ?, ?)',
+    ).run('w1', 'p1', 0, 'Hero', 'h1');
+    db.close();
+
+    writeFileSync(
+      join(dir, 'collections', 'Pages.ts'),
+      "import { defineCollection } from 'ohne';\n" +
+        'export default defineCollection({ fields: {} });\n',
+    );
+    mkdirSync(join(dir, 'migrations'), { recursive: true });
+    writeFileSync(
+      join(dir, 'migrations', '001-drop-content.ts'),
+      "import { defineMigration } from 'ohne';\n" +
+        "export default defineMigration({ from: { collection: 'Pages', field: 'content' }, to: null });\n",
+    );
+
+    const discarded = sync(dir);
+    strictEqual(discarded.status, 0);
+    match(discarded.output, /Migrations removed data/);
+    match(discarded.output, /1 rows of block_Hero deleted, no longer referenced/);
+    doesNotMatch(discarded.output, /under force/);
+
+    const after = new DatabaseSync(join(dir, '.data', 'ohne.db'));
+    const tables = after
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'block%'")
+      .all();
+    after.close();
+    deepStrictEqual(tables, []);
   });
 
   it('refuses a destructive change, then performs it under --force', () => {

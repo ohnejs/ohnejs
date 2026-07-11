@@ -6,6 +6,7 @@ import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 describe('useFields', () => {
   it('pre-registers the built-in field types', () => {
     deepStrictEqual(useFields().keys().sort(), [
+      'blocks',
       'boolean',
       'integer',
       'object',

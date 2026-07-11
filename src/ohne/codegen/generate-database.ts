@@ -1,11 +1,12 @@
 import { fileURLToPath } from 'node:url';
 
+import type { CollectedBlock } from '../blocks/collect-blocks.ts';
 import type { CollectedCollection } from '../collections/collect-collections.ts';
 import type { ScannedMigration } from '../database/migrations/scan-layer-migrations.ts';
 import type { CollectedFieldType } from '../fields/collect-fields.ts';
 import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
-import type { ChildHint } from '../fields/storage-hint.ts';
+import type { BlocksHint, ChildHint } from '../fields/storage-hint.ts';
 
 import {
   type CodeBuilder,
@@ -18,7 +19,15 @@ import {
   propertyKey,
   type TypeImports,
 } from '../../utils/codegen/index.ts';
-import { dirname, isNull, isString, isUndefined, joinPath } from '../../utils/index.ts';
+import {
+  dirname,
+  isNull,
+  isString,
+  isUndefined,
+  joinPath,
+  naturalCompare,
+} from '../../utils/index.ts';
+import { collectBlocks } from '../blocks/collect-blocks.ts';
 import { collectCollections } from '../collections/collect-collections.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
 import { ohneError } from '../error/ohne-error.ts';
@@ -53,6 +62,23 @@ interface EmittableFieldType {
 }
 
 /**
+ * The definition a field under emission belongs to, as the error messages name it.
+ */
+interface EmissionOwner {
+  subject: string;
+  file: string;
+}
+
+/**
+ * Everything one field's value type resolves against.
+ */
+interface EmissionContext {
+  types: Map<string, EmittableFieldType>;
+  blocks: readonly CollectedBlock[];
+  imports: TypeImports;
+}
+
+/**
  * The directory of the built-in field types, used when a built-in's `importType` resolves a path.
  */
 const BUILTIN_DIR = fileURLToPath(new URL('../fields/builtin/', import.meta.url));
@@ -60,15 +86,16 @@ const BUILTIN_DIR = fileURLToPath(new URL('../fields/builtin/', import.meta.url)
 /**
  * Generates the database types and registrations from every layer's schema directories.
  *
- * `shared/database.ts` carries the pure types: `GeneratedCollections` and `GeneratedDatabases`.
- * `node/database.ts` imports every collection, field-type, and migration definition and registers it.
- * It also augments `KnownCollections`, `KnownFields`, and `KnownDatabases` via `declare module`.
+ * `shared/database.ts` carries the pure types: `GeneratedCollections`, `GeneratedBlocks`, and friends.
+ * `node/database.ts` imports every collection, block, field-type, and migration definition.
+ * Importing it registers them all.
+ * It also augments `KnownCollections`, `KnownBlocks`, `KnownFields`, and `KnownDatabases`.
  * Migration registration order is the execution order: furthest layer first, name order within a layer.
  * Both files are written even when empty, so a stale one never imports deleted files.
  *
  * Definitions are read from each layer's `Config.dirs` directories and combined closer-wins.
  * Layers come from the registered stack, so `loadLayers` must have run first.
- * Names in `Config.disable.collections` and `Config.disable.fields` are dropped before emission.
+ * Names in `Config.disable.collections`, `disable.fields`, and `disable.blocks` drop before emission.
  * A disabled built-in field type is deleted from the registry at registration time.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
@@ -87,39 +114,54 @@ export async function generateDatabase(
   const { fresh = false } = options;
   const disable = useConfig().disable;
   const helpers = Object.keys(useConfig().database?.helpers ?? {}).sort();
-  const [collections, fields, migrations] = await Promise.all([
+  const [collections, fields, blocks, migrations] = await Promise.all([
     collectCollections(stackedLayers(), { disable: disable.collections, fresh }),
     collectFields(stackedLayers(), { disable: disable.fields, fresh }),
+    collectBlocks(stackedLayers(), { disable: disable.blocks, fresh }),
     collectMigrations(stackedLayers()),
   ]);
 
   return Promise.all([
-    writeShared(joinPath(dir, 'shared'), collections, fields, disable.fields, helpers),
-    writeNode(joinPath(dir, 'node'), collections, fields, migrations, disable.fields),
+    writeShared(joinPath(dir, 'shared'), collections, fields, blocks, disable.fields, helpers),
+    writeNode(joinPath(dir, 'node'), collections, fields, blocks, migrations, disable.fields),
   ]);
 }
 
 /**
  * Writes `shared/database.ts`, the pure type bucket.
- * It carries `GeneratedCollections`, `GeneratedRelations`, and `GeneratedDatabases`.
- * The collection traversal runs before emission, so `importType` records its `import type` lines first.
+ * It carries `GeneratedCollections`, `GeneratedRelations`, `GeneratedBlocks`, and `GeneratedDatabases`.
+ * The traversals run before emission, so `importType` records its `import type` lines first.
  */
 async function writeShared(
   dir: string,
   collections: readonly CollectedCollection[],
   fields: readonly CollectedFieldType[],
+  blocks: readonly CollectedBlock[],
   disabledFields: readonly string[],
   helpers: readonly string[],
 ): Promise<string> {
   const imports = createTypeImports(dir);
-  const types = emittableFieldTypes(fields, disabledFields);
+  const context: EmissionContext = {
+    types: emittableFieldTypes(fields, disabledFields),
+    blocks,
+    imports,
+  };
   const members = collections.map((collection) => ({
     name: collection.name,
-    fields: Object.entries(collection.collection.fields).map(([name, instance]) => ({
-      name,
-      type: valueTypeOf(collection, name, instance, types, imports),
-    })),
-    relations: owningRelationsOf(collection, types),
+    fields: fieldShapesOf(
+      { subject: `Collection \`${collection.name}\``, file: collection.file },
+      collection.collection.fields,
+      context,
+    ),
+    relations: owningRelationsOf(collection, context.types),
+  }));
+  const blockMembers = blocks.map((block) => ({
+    name: block.name,
+    fields: fieldShapesOf(
+      { subject: `Block \`${block.name}\``, file: block.file },
+      block.block.fields,
+      context,
+    ),
   }));
 
   const code = createCodeBuilder();
@@ -133,19 +175,7 @@ async function writeShared(
   } else {
     code.line('export interface GeneratedCollections {');
     code.indent(() => {
-      for (const member of members) {
-        if (member.fields.length === 0) {
-          code.line(`${propertyKey(member.name)}: {};`);
-          continue;
-        }
-        code.line(`${propertyKey(member.name)}: {`);
-        code.indent(() => {
-          for (const field of member.fields) {
-            code.line(`${propertyKey(field.name)}: ${field.type};`);
-          }
-        });
-        code.line('};');
-      }
+      for (const member of members) emitFieldShapes(code, member.name, member.fields);
     });
     code.line('}');
   }
@@ -172,6 +202,16 @@ async function writeShared(
     code.line('}');
   }
   code.line();
+  if (blockMembers.length === 0) {
+    code.line('export interface GeneratedBlocks {}');
+  } else {
+    code.line('export interface GeneratedBlocks {');
+    code.indent(() => {
+      for (const member of blockMembers) emitFieldShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
   if (helpers.length === 0) {
     code.line('export interface GeneratedDatabases {}');
   } else {
@@ -185,12 +225,48 @@ async function writeShared(
 }
 
 /**
+ * Resolves one definition's field map into named value types, ready for interface emission.
+ */
+function fieldShapesOf(
+  owner: EmissionOwner,
+  fields: Record<string, FieldInstance>,
+  context: EmissionContext,
+): { name: string; type: string }[] {
+  return Object.entries(fields).map(([name, instance]) => ({
+    name,
+    type: valueTypeOf(owner, name, instance, context),
+  }));
+}
+
+/**
+ * Emits one interface member: the name, then its field shape, `{}` when the definition holds none.
+ */
+function emitFieldShapes(
+  code: CodeBuilder,
+  name: string,
+  fields: readonly { name: string; type: string }[],
+): void {
+  if (fields.length === 0) {
+    code.line(`${propertyKey(name)}: {};`);
+    return;
+  }
+  code.line(`${propertyKey(name)}: {`);
+  code.indent(() => {
+    for (const field of fields) {
+      code.line(`${propertyKey(field.name)}: ${field.type};`);
+    }
+  });
+  code.line('};');
+}
+
+/**
  * Writes `node/database.ts`: imports every definition, augments `ohne`, and registers each one.
  */
 async function writeNode(
   dir: string,
   collections: readonly CollectedCollection[],
   fields: readonly CollectedFieldType[],
+  blocks: readonly CollectedBlock[],
   migrations: readonly ScannedMigration[],
   disabledFields: readonly string[],
 ): Promise<string> {
@@ -202,6 +278,7 @@ async function writeNode(
   const uses = [
     collections.length > 0 ? 'useCollections' : null,
     fields.length > 0 || deletions.length > 0 ? 'useFields' : null,
+    blocks.length > 0 ? 'useBlocks' : null,
     migrations.length > 0 ? 'useMigrations' : null,
   ].filter(isString);
   if (uses.length > 0) {
@@ -214,19 +291,23 @@ async function writeNode(
   fields.forEach((fieldType, i) => {
     code.line(`import f${i} from ${literalString(importSpecifier(dir, fieldType.file))};`);
   });
+  blocks.forEach((block, i) => {
+    code.line(`import b${i} from ${literalString(importSpecifier(dir, block.file))};`);
+  });
   migrations.forEach((migration, i) => {
     code.line(`import m${i} from ${literalString(importSpecifier(dir, migration.file))};`);
   });
-  if (collections.length + fields.length + migrations.length > 0) code.line();
+  if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedCollections, GeneratedDatabases, GeneratedRelations } from '../shared/database.ts';",
+    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedRelations } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
   code.indent(() => {
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');
+    code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     if (augmented.length === 0) {
       code.line('interface KnownFields {}');
@@ -258,6 +339,14 @@ async function writeNode(
     fields.forEach((fieldType, i) => {
       const name = literalString(fieldType.name);
       code.line(`fields.register(${name}, { name: ${name}, fieldType: f${i} });`);
+    });
+  }
+  if (blocks.length > 0) {
+    code.line();
+    code.line('const blocks = useBlocks();');
+    blocks.forEach((block, i) => {
+      const name = literalString(block.name);
+      code.line(`blocks.register(${name}, { name: ${name}, block: b${i} });`);
     });
   }
   if (migrations.length > 0) {
@@ -305,36 +394,37 @@ function emittableFieldTypes(
 /**
  * Emits one field's TypeScript value type, resolving its type name against the emittable set.
  * A child hint assembles its shape from its subfields here, where the emittable set is at hand.
+ * A blocks hint assembles its union from the collected blocks on the same terms.
  */
 function valueTypeOf(
-  collection: CollectedCollection,
+  owner: EmissionOwner,
   name: string,
   instance: FieldInstance,
-  types: Map<string, EmittableFieldType>,
-  imports: TypeImports,
+  context: EmissionContext,
 ): string {
-  const registered = types.get(instance.type);
+  const registered = context.types.get(instance.type);
   if (isUndefined(registered)) {
     throw ohneError({
       title: `Unknown field type \`${instance.type}\``,
       body: [
-        `Collection \`${collection.name}\` references field type \`${instance.type}\`, which is not registered.`,
+        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
       ],
-      path: collection.file,
+      path: owner.file,
     });
   }
   const { fieldType } = registered;
   if (fieldType.columnType === false && !isUndefined(fieldType.schema)) {
     const options = resolveFieldOptions(fieldType, { ...instance.options });
     const hint = fieldType.schema({ name, options });
-    if (hint.kind === 'child') return childValueType(collection, hint, types, imports);
+    if (hint.kind === 'child') return childValueType(owner, hint, context);
+    if (hint.kind === 'blocks') return blocksValueType(owner, name, hint, context);
   }
   return fieldValueType({
     fieldType,
     name,
     options: { ...instance.options },
     fieldDir: registered.dir,
-    imports,
+    imports: context.imports,
   });
 }
 
@@ -343,19 +433,55 @@ function valueTypeOf(
  * Each line carries its relative indentation; the emission site indents the whole block.
  * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
  */
-function childValueType(
-  collection: CollectedCollection,
-  hint: ChildHint,
-  types: Map<string, EmittableFieldType>,
-  imports: TypeImports,
-): string {
+function childValueType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
   const lines = ['{'];
   for (const [name, instance] of Object.entries(hint.subfields)) {
-    const type = valueTypeOf(collection, name, instance, types, imports);
+    const type = valueTypeOf(owner, name, instance, context);
     lines.push(indent(`${propertyKey(name)}: ${type};`));
   }
   lines.push(hint.cardinality === 'one' ? '} | null' : '}[]');
   return lines.join('\n');
+}
+
+/**
+ * Assembles a blocks field's value type: an array over the union of its allowed block shapes.
+ * Each item names its block and carries that block's `GeneratedBlocks` member as `fields`.
+ * Allowed names sort and resolve like the desired schema's, so the two never disagree.
+ */
+function blocksValueType(
+  owner: EmissionOwner,
+  name: string,
+  hint: BlocksHint,
+  context: EmissionContext,
+): string {
+  const collected = new Set(context.blocks.map((block) => block.name));
+  const allowed = isUndefined(hint.allow)
+    ? [...collected].sort(naturalCompare)
+    : [...hint.allow].sort(naturalCompare);
+  if (allowed.length === 0) {
+    throw ohneError({
+      title: `Field \`${name}\` has no block types to hold`,
+      body: [
+        `${owner.subject} declares a blocks field, but no block is registered.`,
+        'Define one under `dirs.blocks`, or drop the field.',
+      ],
+      path: owner.file,
+    });
+  }
+  for (const block of allowed) {
+    if (collected.has(block)) continue;
+    throw ohneError({
+      title: `Unknown block \`${block}\``,
+      body: [`${owner.subject} allows block \`${block}\`, which is not registered.`],
+      path: owner.file,
+    });
+  }
+  const items = allowed.map(
+    (block) =>
+      `{ block: ${literalString(block)}; fields: GeneratedBlocks[${literalString(block)}] }`,
+  );
+  if (items.length === 1) return `${items[0] as string}[]`;
+  return ['(', ...items.map((item) => indent(`| ${item}`)), ')[]'].join('\n');
 }
 
 /**
