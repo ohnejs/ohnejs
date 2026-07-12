@@ -33,7 +33,10 @@ import {
   collectionTableName,
   companionTableName,
   derivedParentName,
+  derivedRootName,
   derivedTableName,
+  ownerTableName,
+  type DerivedOwner,
 } from '../naming/table-names.ts';
 import { sweepWrapperRows, type SweepTable } from '../schema/purge.ts';
 import { applyClassification } from '../schema/snapshot.ts';
@@ -204,7 +207,7 @@ function runMigration(
     case 'discardTable':
       return runDiscardTable(engine, meta, lowered.from);
     case 'compoundRename':
-      return runCompoundRename(engine, meta, lowered.members, lowered.to, later);
+      return runCompoundRename(engine, meta, lowered, later);
     case 'compoundDiscard':
       return runCompoundDiscard(engine, meta, lowered.tables);
     case 'switch':
@@ -216,20 +219,28 @@ function runMigration(
  * Runs a logical rename's members: each present table renames, each absent one skips if satisfied.
  * One identity, one stamp: any applied member stamps `applied`.
  * All skipped stamps `skipped`, naming the members.
+ * A block rename then rewrites `_blockType` in every live wrapper, the renamed family included.
  */
 async function runCompoundRename(
   engine: Engine,
   meta: MigrationMeta,
-  members: readonly RenameMember[],
-  to: LogicalSubtree,
+  form: {
+    members: readonly RenameMember[];
+    to: LogicalSubtree;
+    blockType?: { from: string; to: string };
+  },
   later: readonly ConsumedAddress[],
 ): Promise<MigrationStamp> {
   let applied = 0;
   const skipped: string[] = [];
-  for (const member of members) {
-    const subtree = isUndefined(member.origin?.collection)
-      ? to
-      : { collection: member.origin.collection, path: member.origin.path };
+  for (const member of form.members) {
+    const subtree = isUndefined(member.origin)
+      ? form.to
+      : {
+          collection: member.origin.collection,
+          block: member.origin.block,
+          path: member.origin.path,
+        };
     if (foreign(engine, member.from)) refuseForeign(meta, member.from);
     if (!present(engine, member.from)) {
       if (!tableSatisfied(engine, member.to, later) && !subtreeSatisfied(later, subtree)) {
@@ -245,15 +256,41 @@ async function runCompoundRename(
     } else if (!isUndefined(member.companion)) {
       const claim = engine.claimed[member.to] ?? { columns: {} };
       engine.claimed[member.to] = { ...claim, companion: member.companion };
+    } else if (!isUndefined(member.block)) {
+      const claim = engine.claimed[member.to] ?? { columns: {} };
+      engine.claimed[member.to] = { ...claim, block: member.block };
     }
     applied++;
   }
-  if (applied > 0) return { name: meta.name, status: 'applied' };
+  if (applied > 0) {
+    if (!isUndefined(form.blockType)) await rewriteBlockType(engine, form.blockType);
+    return { name: meta.name, status: 'applied' };
+  }
   const names = skipped.map((table) => `\`${table}\``).join(', ');
   return skipStamp(
     meta,
     `${names} ${skipped.length === 1 ? 'is' : 'are'} absent and the new names are satisfied`,
   );
+}
+
+/**
+ * Rewrites a renamed block's `_blockType` value in every live wrapper.
+ * Wrapper rows reference blocks polymorphically by name, so no key follows the rename for them.
+ * Runs after the members renamed: a nested wrapper the rename carried is already under its new name.
+ */
+async function rewriteBlockType(
+  engine: Engine,
+  blockType: { from: string; to: string },
+): Promise<void> {
+  const { db, dialect } = engine;
+  for (const [table, claim] of Object.entries(engine.claimed)) {
+    if (claim.derived?.kind !== 'blocksWrapper' || !engine.names.has(table)) continue;
+    await db.run(
+      `UPDATE ${dialect.quote(table)} SET ${dialect.quote('_blockType')} = ? ` +
+        `WHERE ${dialect.quote('_blockType')} = ?`,
+      [blockType.to, blockType.from],
+    );
+  }
 }
 
 /**
@@ -803,9 +840,9 @@ async function runSwitch(
   const target = lowered.to ?? desiredState;
   const live = await liveSwitchState(engine, meta, lowered);
   if (isUndefined(live)) {
-    const subtree = isUndefined(lowered.collection)
+    const subtree = isUndefined(switchOwner(lowered))
       ? undefined
-      : { collection: lowered.collection, path: lowered.segments ?? [] };
+      : { collection: lowered.collection, block: lowered.block, path: lowered.segments ?? [] };
     if (isUndefined(desiredState) && !subtreeSatisfied(later, subtree)) {
       refuseUnrunnable(meta, subject, `its switched \`${lowered.attribute}\` state`);
     }
@@ -897,6 +934,7 @@ function desiredSwitchState(engine: Engine, lowered: LoweredSwitch): boolean | u
 /**
  * The desired table and column a switch's field lands on: the field-path table, or the companion.
  * A dotted path homes on its prefix's derived table, exactly as the address lowering reads it.
+ * A block-rooted switch homes on the per-type table's path; blocks never own a companion.
  */
 function desiredHomeOf(
   engine: Engine,
@@ -904,14 +942,13 @@ function desiredHomeOf(
 ): { table: TableSchema; column: ColumnSchema } | undefined {
   const column = lowered.column ?? last(lowered.segments ?? []);
   if (isUndefined(column)) return undefined;
-  const tables = isUndefined(lowered.collection)
+  const owner = switchOwner(lowered);
+  const tables = isUndefined(owner)
     ? [engine.desired.find((table) => table.name === lowered.table)]
     : [
-        engine.desired.find(
-          (table) => table.name === fieldPathTable(lowered.collection as string, lowered.segments),
-        ),
-        lowered.segments?.length === 1
-          ? engine.desired.find((table) => table.companion === lowered.collection)
+        engine.desired.find((table) => table.name === fieldPathTable(owner, lowered.segments)),
+        lowered.segments?.length === 1 && !isUndefined(owner.collection)
+          ? engine.desired.find((table) => table.companion === owner.collection)
           : undefined,
       ];
   for (const table of tables) {
@@ -922,12 +959,21 @@ function desiredHomeOf(
 }
 
 /**
- * The table a field path's column sits on: the main table, or the dotted prefix's derived table.
+ * The logical owner of a switch's field, or nothing on a physically addressed switch.
  */
-function fieldPathTable(collection: string, segments: readonly string[] | undefined): string {
+function switchOwner(lowered: LoweredSwitch): DerivedOwner | undefined {
+  if (!isUndefined(lowered.collection)) return { collection: lowered.collection };
+  if (!isUndefined(lowered.block)) return { block: lowered.block };
+  return undefined;
+}
+
+/**
+ * The table a field path's column sits on: the owner's root table, or the dotted prefix's derived table.
+ */
+function fieldPathTable(owner: DerivedOwner, segments: readonly string[] | undefined): string {
   const prefix = segments?.slice(0, -1) ?? [];
-  if (prefix.length === 0) return collectionTableName(collection);
-  return derivedTableName(collection, prefix[0] as string, ...prefix.slice(1));
+  if (prefix.length === 0) return ownerTableName(owner);
+  return derivedTableName(derivedRootName(owner), prefix[0] as string, ...prefix.slice(1));
 }
 
 /**
@@ -1585,6 +1631,7 @@ function subtreeSatisfied(
     (consumed) =>
       !isUndefined(consumed.subtree) &&
       consumed.subtree.collection === subtree.collection &&
+      consumed.subtree.block === subtree.block &&
       pathStartsWith(subtree.path, consumed.subtree.path),
   );
 }

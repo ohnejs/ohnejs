@@ -3,7 +3,6 @@ import type { SchemaClassification } from '../schema/snapshot.ts';
 import type { DerivedOrigin, TableSchema } from '../schema/table-schema.ts';
 import type {
   ColumnAddress,
-  DiscardAddress,
   DiscardMigration,
   MigrationTransform,
   MoveMigration,
@@ -16,24 +15,32 @@ import type { MigrationMeta } from './use-migrations.ts';
 import { isNull, isObject, isUndefined, last } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import {
-  collectionTableName,
   companionTableName,
+  derivedRootName,
   derivedTableName,
+  ownerTableName,
+  type DerivedOwner,
 } from '../naming/table-names.ts';
 import { RESERVED_COLLECTIONS } from '../naming/validate-names.ts';
 
 /**
- * The logical subtree an address covers: a collection and the field path below it.
- * An empty path covers the whole collection, derived tables included.
+ * The logical subtree an address covers: an owner and the field path below it.
+ * Exactly one of `collection` and `block` names the owner.
+ * An empty path covers the whole owner, derived tables included.
  */
 export interface LogicalSubtree {
   /**
-   * The collection's logical name.
+   * The owning collection's logical name; absent when a block owns the subtree.
    */
-  collection: string;
+  collection?: string;
 
   /**
-   * The field path below the collection; empty for the collection itself.
+   * The owning block's name; absent when a collection owns the subtree.
+   */
+  block?: string;
+
+  /**
+   * The field path below the owner; empty for the owner itself.
    */
   path: readonly string[];
 }
@@ -85,6 +92,12 @@ export interface RenameMember {
    * The claim's `companion` marker follows the rename through it.
    */
   companion?: string;
+
+  /**
+   * The block whose per-type table the renamed member becomes; absent everywhere else.
+   * The claim's `block` marker follows the rename through it.
+   */
+  block?: string;
 }
 
 /**
@@ -96,7 +109,8 @@ export type SwitchAttribute = keyof SwitchAttributes;
  * A switch migration lowered against the live state: the flipped attribute and where it lives.
  * `table` is the column's live home - main table or companion - or the main reading when absent.
  * `column` is absent when the field is live as a locale-scoped derived table.
- * `collection` and `segments` carry the logical spelling, so the executor can resolve placements.
+ * The owner - `collection` or `block` - and `segments` carry the logical spelling.
+ * The executor resolves placements through them.
  */
 export interface LoweredSwitch {
   kind: 'switch';
@@ -106,6 +120,7 @@ export interface LoweredSwitch {
   table: string;
   column?: string;
   collection?: string;
+  block?: string;
   segments?: readonly string[];
   type?: LogicalType;
   transform?: MigrationTransform;
@@ -113,6 +128,7 @@ export interface LoweredSwitch {
 
 /**
  * A migration lowered to physical form: one of the single ops, a compound's member list, or a switch.
+ * A block-level rename carries `blockType`: the `_blockType` value every live wrapper rewrites.
  */
 export type LoweredMigration =
   | {
@@ -125,7 +141,12 @@ export type LoweredMigration =
   | { kind: 'rename'; from: TableAddress; to: TableAddress }
   | { kind: 'discardColumn'; from: ColumnAddress }
   | { kind: 'discardTable'; from: TableAddress }
-  | { kind: 'compoundRename'; members: readonly RenameMember[]; to: LogicalSubtree }
+  | {
+      kind: 'compoundRename';
+      members: readonly RenameMember[];
+      to: LogicalSubtree;
+      blockType?: { from: string; to: string };
+    }
   | { kind: 'compoundDiscard'; tables: readonly string[] }
   | LoweredSwitch;
 
@@ -163,7 +184,12 @@ export interface ResolveState {
 /**
  * A logical address in its loosest runtime shape, the union every form's address satisfies.
  */
-type LogicalAddress = DiscardAddress;
+interface LogicalAddress {
+  collection?: string;
+  block?: string;
+  field?: string;
+  type?: LogicalType;
+}
 
 /**
  * A physical address in its loosest runtime shape.
@@ -176,32 +202,67 @@ type PhysicalAddress = ColumnAddress | TableAddress;
 type AnyAddress = MoveMigration['from'] | RenameMigration['from'] | DiscardMigration['from'];
 
 /**
+ * Whether an address is spelled logically: it roots at a collection or a block.
+ */
+function isLogicalAddress(address: object): boolean {
+  return 'collection' in address || 'block' in address;
+}
+
+/**
+ * The one set owner as keys to spread into a subtree or origin, never an `undefined` key beside it.
+ */
+function ownerKeys(owner: DerivedOwner): DerivedOwner {
+  return isUndefined(owner.collection) ? { block: owner.block } : { collection: owner.collection };
+}
+
+/**
+ * Whether two owners name the same family root: the same kind and the same name.
+ */
+function sameOwner(a: DerivedOwner, b: DerivedOwner): boolean {
+  return a.collection === b.collection && a.block === b.block;
+}
+
+/**
+ * Whether a derived origin sits under the given owner.
+ */
+function ownedBy(origin: DerivedOrigin, owner: DerivedOwner): boolean {
+  return isUndefined(owner.collection)
+    ? origin.block === owner.block
+    : origin.collection === owner.collection;
+}
+
+/**
  * The physical readings of one address: the tables it may name, purely from the address itself.
  * An ambiguous logical address lists both readings; over-approximation is safe for both callers.
  * A collection and a top-level field list the companion reading too: a translatable column lives there.
+ * A block owner never has one, so its readings stop at the column and the table.
  */
 function readingsOf(meta: MigrationMeta, address: AnyAddress): ConsumedAddress[] {
-  if (!('collection' in address)) {
-    return 'column' in address
-      ? [{ table: address.table, column: address.column }]
-      : [{ table: address.table }];
+  if (!isLogicalAddress(address)) {
+    const physical = address as PhysicalAddress;
+    return 'column' in physical
+      ? [{ table: physical.table, column: physical.column }]
+      : [{ table: physical.table }];
   }
   const logical = address as LogicalAddress;
-  const collection = logicalCollection(meta, logical);
+  const owner = logicalOwner(meta, logical);
   if (isUndefined(logical.field)) {
-    return [
-      { table: collectionTableName(collection), subtree: { collection, path: [] } },
-      { table: companionTableName(collection) },
+    const readings: ConsumedAddress[] = [
+      { table: ownerTableName(owner), subtree: { ...ownerKeys(owner), path: [] } },
     ];
+    if (!isUndefined(owner.collection)) {
+      readings.push({ table: companionTableName(owner.collection) });
+    }
+    return readings;
   }
   const segments = fieldSegments(meta, logical.field);
-  const column = columnReading(collection, segments);
+  const column = columnReading(owner, segments);
   const readings: ConsumedAddress[] = [
     { table: column.table, column: column.column },
-    { table: tableReading(collection, segments), subtree: { collection, path: segments } },
+    { table: tableReading(owner, segments), subtree: { ...ownerKeys(owner), path: segments } },
   ];
-  if (segments.length === 1) {
-    readings.push({ table: companionTableName(collection), column: column.column });
+  if (segments.length === 1 && !isUndefined(owner.collection)) {
+    readings.push({ table: companionTableName(owner.collection), column: column.column });
   }
   return readings;
 }
@@ -300,7 +361,7 @@ export async function lowerMigration(
     );
   }
   const to = toAddress(meta);
-  const fromLogical = 'collection' in from;
+  const fromLogical = isLogicalAddress(from);
   const transform =
     'transform' in migration ? (migration.transform as MigrationTransform | undefined) : undefined;
   if (isNull(to)) {
@@ -324,12 +385,12 @@ export async function lowerMigration(
     assertPurelyLogical(meta, from as LogicalAddress);
     return lowerDiscard(state, meta, from as LogicalAddress);
   }
-  const toLogical = 'collection' in to;
+  const toLogical = isLogicalAddress(to);
   if (fromLogical !== toLogical) {
     throw ohneError({
       title: `Migration \`${meta.name}\` mixes a logical and a physical address`,
       body: [
-        'A logical `collection` address pairs with a logical one; a physical `table` with a physical one.',
+        'A logical `collection` or `block` address pairs with a logical one; a physical `table` with a physical one.',
         'Give `from` and `to` the same form.',
       ],
       path: meta.file,
@@ -441,7 +502,7 @@ function assertPurelyPhysical(meta: MigrationMeta, address: PhysicalAddress): vo
  */
 function attributesOnly(to: unknown): boolean {
   if (!isObject(to)) return false;
-  return !('collection' in to) && !('table' in to);
+  return !isLogicalAddress(to) && !('table' in to);
 }
 
 /**
@@ -493,7 +554,7 @@ async function lowerSwitch(
   }
   const toValue = resolveSwitchTo(meta, attribute, fromValue, rawTo);
 
-  if (!('collection' in from)) {
+  if (!isLogicalAddress(from)) {
     const physical = from as PhysicalAddress;
     if (attribute === 'translatable') {
       throw ohneError({
@@ -530,36 +591,50 @@ async function lowerSwitch(
 
   assertPurelyLogical(meta, from as LogicalAddress);
   const logical = from as LogicalAddress;
-  const collection = logicalCollection(meta, logical);
+  const owner = logicalOwner(meta, logical);
+  const root = derivedRootName(owner);
   if (isUndefined(logical.field)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` switches without a field`,
       body: [
-        "A switch flips one field's attribute, and a collection has none of its own.",
+        `A switch flips one field's attribute, and a ${ownerNoun(owner)} has none of its own.`,
         'Name the `field`.',
       ],
       path: meta.file,
     });
   }
   const segments = fieldSegments(meta, logical.field);
+  if (
+    !isUndefined(owner.block) &&
+    (attribute === 'translatable' || attribute === 'uniquePerLocale')
+  ) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches \`${attribute}\` on a block field`,
+      body: [
+        `\`${root}.${logical.field}\` lives on a per-type block table, and blocks store no locale dimension.`,
+        'Address a collection field.',
+      ],
+      path: meta.file,
+    });
+  }
   if (attribute === 'translatable' && segments.length > 1) {
     throw ohneError({
       title: `Migration \`${meta.name}\` switches \`translatable\` on a subfield`,
       body: [
-        `\`${collection}.${logical.field}\` sits below a composite, and a composite is per-locale as a whole.`,
+        `\`${root}.${logical.field}\` sits below a composite, and a composite is per-locale as a whole.`,
         'Switch the top-level composite instead.',
       ],
       path: meta.file,
     });
   }
-  const home = await liveColumnHome(state, collection, segments);
-  const tableRead = tableReading(collection, segments);
+  const home = await liveColumnHome(state, owner, segments);
+  const tableRead = tableReading(owner, segments);
   const tableLive = state.names.has(tableRead);
   if (!isUndefined(home) && tableLive) {
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${collection}.${logical.field}\` is a live column on \`${home.table}\` and the live table \`${tableRead}\` at once.`,
+        `\`${root}.${logical.field}\` is a live column on \`${home.table}\` and the live table \`${tableRead}\` at once.`,
         'Use the physical `table` and `column` spelling to pick one.',
       ],
       path: meta.file,
@@ -570,7 +645,7 @@ async function lowerSwitch(
       throw ohneError({
         title: `Migration \`${meta.name}\` switches \`${attribute}\` on a table`,
         body: [
-          `A \`${attribute}\` switch flips one column's state, and \`${collection}.${logical.field}\` is live as the table \`${tableRead}\`.`,
+          `A \`${attribute}\` switch flips one column's state, and \`${root}.${logical.field}\` is live as the table \`${tableRead}\`.`,
           'Fix the address.',
         ],
         path: meta.file,
@@ -582,13 +657,13 @@ async function lowerSwitch(
       from: fromValue,
       to: toValue,
       table: tableRead,
-      collection,
+      ...ownerKeys(owner),
       segments,
       type: logical.type,
       transform,
     };
   }
-  const column = home ?? columnReading(collection, segments);
+  const column = home ?? columnReading(owner, segments);
   return {
     kind: 'switch',
     attribute,
@@ -596,7 +671,7 @@ async function lowerSwitch(
     to: toValue,
     table: column.table,
     column: column.column,
-    collection,
+    ...ownerKeys(owner),
     segments,
     type: logical.type,
     transform,
@@ -648,6 +723,8 @@ function resolveSwitchTo(
 
 /**
  * Lowers a logical pair: resolves the reading, then builds the move or the rename compound.
+ * A field pair may cross owners as a move; a rename stays within its owner, and never crosses kinds.
+ * An owner-level block pair is the mechanical block rename, `_blockType` rewrite included.
  */
 async function lowerLogicalPair(
   state: ResolveState,
@@ -656,14 +733,16 @@ async function lowerLogicalPair(
   to: LogicalAddress,
   transform: MigrationTransform | undefined,
 ): Promise<LoweredMigration> {
-  const fromCollection = logicalCollection(meta, from);
-  const toCollection = logicalCollection(meta, to);
+  const fromOwner = logicalOwner(meta, from);
+  const toOwner = logicalOwner(meta, to);
+  const fromRoot = derivedRootName(fromOwner);
+  const toRoot = derivedRootName(toOwner);
 
   if (isUndefined(from.field) !== isUndefined(to.field)) {
     throw ohneError({
-      title: `Migration \`${meta.name}\` pairs a collection with a field`,
+      title: `Migration \`${meta.name}\` pairs a ${ownerNoun(fromOwner)} with a field`,
       body: [
-        'A collection renames onto a collection; a field moves or renames onto a field.',
+        'A collection or block renames onto its own kind; a field moves or renames onto a field.',
         'Give `from` and `to` the same shape.',
       ],
       path: meta.file,
@@ -684,18 +763,31 @@ async function lowerLogicalPair(
     if (!isUndefined(from.type) || !isUndefined(to.type)) {
       throw ohneError({
         title: `Migration \`${meta.name}\` pins a \`type\` without a field`,
-        body: ['A collection rename names no column.', 'Name the field, or drop `type`.'],
+        body: [
+          `A ${ownerNoun(fromOwner)} rename names no column.`,
+          'Name the field, or drop `type`.',
+        ],
         path: meta.file,
       });
     }
-    if (fromCollection === toCollection) {
+    if (isUndefined(fromOwner.collection) !== isUndefined(toOwner.collection)) {
       throw ohneError({
-        title: `Migration \`${meta.name}\` renames \`${fromCollection}\` onto itself`,
-        body: ['Point `to` at the new collection name, or delete the migration.'],
+        title: `Migration \`${meta.name}\` renames a ${ownerNoun(fromOwner)} onto a ${ownerNoun(toOwner)}`,
+        body: [
+          'A collection renames onto a collection; a block onto a block.',
+          'Fix the addresses.',
+        ],
         path: meta.file,
       });
     }
-    return lowerRenameCompound(state, meta, fromCollection, [], toCollection, []);
+    if (sameOwner(fromOwner, toOwner)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` renames \`${fromOwner.collection ?? fromOwner.block}\` onto itself`,
+        body: [`Point \`to\` at the new ${ownerNoun(fromOwner)} name, or delete the migration.`],
+        path: meta.file,
+      });
+    }
+    return lowerRenameCompound(state, meta, fromOwner, [], toOwner, []);
   }
 
   const fromSegments = fieldSegments(meta, from.field);
@@ -703,29 +795,31 @@ async function lowerLogicalPair(
   const { reading, fromLive } = await resolveReading(
     state,
     meta,
-    from,
+    fromOwner,
     fromSegments,
-    to,
+    toOwner,
     toSegments,
+    from.type,
+    to.type,
     transform,
   );
 
   if (reading === 'column') {
     return {
       kind: 'move',
-      from: await lowerColumn(state, meta, from, fromCollection, fromSegments, 'from', fromLive),
-      to: await lowerColumn(state, meta, to, toCollection, toSegments, 'to', fromLive),
-      toSubtree: { collection: toCollection, path: toSegments },
+      from: await lowerColumn(state, meta, from, fromOwner, fromSegments, 'from', fromLive),
+      to: await lowerColumn(state, meta, to, toOwner, toSegments, 'to', fromLive),
+      toSubtree: { ...ownerKeys(toOwner), path: toSegments },
       transform,
     };
   }
 
-  if (fromCollection !== toCollection) {
+  if (!sameOwner(fromOwner, toOwner)) {
     throw ohneError({
-      title: `Migration \`${meta.name}\` renames a field across collections`,
+      title: `Migration \`${meta.name}\` renames a field across ${ownerNoun(fromOwner)}s`,
       body: [
-        `\`${fromCollection}.${from.field}\` cannot become \`${toCollection}.${to.field}\`: a rename stays within its collection.`,
-        'Rename the collection separately, or move the data instead.',
+        `\`${fromRoot}.${from.field}\` cannot become \`${toRoot}.${to.field}\`: a rename stays within its ${ownerNoun(fromOwner)}.`,
+        `Rename the ${ownerNoun(fromOwner)} separately, or move the data instead.`,
       ],
       path: meta.file,
     });
@@ -745,12 +839,12 @@ async function lowerLogicalPair(
   }
   if (from.field === to.field) {
     throw ohneError({
-      title: `Migration \`${meta.name}\` renames \`${fromCollection}.${from.field}\` onto itself`,
+      title: `Migration \`${meta.name}\` renames \`${fromRoot}.${from.field}\` onto itself`,
       body: ['Point `to` at the new field name, or delete the migration.'],
       path: meta.file,
     });
   }
-  return lowerRenameCompound(state, meta, fromCollection, fromSegments, toCollection, toSegments);
+  return lowerRenameCompound(state, meta, fromOwner, fromSegments, toOwner, toSegments);
 }
 
 /**
@@ -769,23 +863,25 @@ async function lowerLogicalPair(
 async function resolveReading(
   state: ResolveState,
   meta: MigrationMeta,
-  from: LogicalAddress,
+  fromOwner: DerivedOwner,
   fromSegments: readonly string[],
-  to: LogicalAddress,
+  toOwner: DerivedOwner,
   toSegments: readonly string[],
+  fromType: LogicalType | undefined,
+  toType: LogicalType | undefined,
   transform: MigrationTransform | undefined,
 ): Promise<{ reading: 'column' | 'table'; fromLive: boolean }> {
-  const fromCollection = from.collection;
-  const fromHome = await liveColumnHome(state, fromCollection, fromSegments);
-  const fromTable = tableReading(fromCollection, fromSegments);
+  const fromRoot = derivedRootName(fromOwner);
+  const fromHome = await liveColumnHome(state, fromOwner, fromSegments);
+  const fromTable = tableReading(fromOwner, fromSegments);
   const columnLive = !isUndefined(fromHome);
   const tableLive = state.names.has(fromTable);
-  if (!isUndefined(transform) || !isUndefined(from.type) || !isUndefined(to.type)) {
+  if (!isUndefined(transform) || !isUndefined(fromType) || !isUndefined(toType)) {
     if (tableLive && !columnLive) {
       throw ohneError({
         title: `Migration \`${meta.name}\` addresses the table \`${fromTable}\` as a column`,
         body: [
-          `\`${fromCollection}.${fromSegments.join('.')}\` is live as the table \`${fromTable}\`, and a transform or \`type\` pin selects the column reading.`,
+          `\`${fromRoot}.${fromSegments.join('.')}\` is live as the table \`${fromTable}\`, and a transform or \`type\` pin selects the column reading.`,
           'Drop it to rename the table, or address the column you meant.',
         ],
         path: meta.file,
@@ -797,7 +893,7 @@ async function resolveReading(
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${fromCollection}.${fromSegments.join('.')}\` is a live column on \`${fromHome.table}\` and the live table \`${fromTable}\` at once.`,
+        `\`${fromRoot}.${fromSegments.join('.')}\` is a live column on \`${fromHome.table}\` and the live table \`${fromTable}\` at once.`,
         'Pin `type` to address the column, or use the physical `table` spelling for the table.',
       ],
       path: meta.file,
@@ -806,14 +902,14 @@ async function resolveReading(
   if (columnLive) return { reading: 'column', fromLive: true };
   if (tableLive) return { reading: 'table', fromLive: false };
 
-  const toTable = tableReading(to.collection, toSegments);
-  if (!isUndefined(desiredColumnHome(state, to.collection, toSegments))) {
+  const toTable = tableReading(toOwner, toSegments);
+  if (!isUndefined(desiredColumnHome(state, toOwner, toSegments))) {
     return { reading: 'column', fromLive: false };
   }
   if (state.desired.some((table) => table.name === toTable)) {
     return { reading: 'table', fromLive: false };
   }
-  const toHome = await liveColumnHome(state, to.collection, toSegments);
+  const toHome = await liveColumnHome(state, toOwner, toSegments);
   const toTableLive = state.names.has(toTable);
   if (toTableLive && isUndefined(toHome)) return { reading: 'table', fromLive: false };
   return { reading: 'column', fromLive: false };
@@ -836,15 +932,15 @@ async function lowerColumn(
   state: ResolveState,
   meta: MigrationMeta,
   address: LogicalAddress,
-  collection: string,
+  owner: DerivedOwner,
   segments: readonly string[],
   role: 'from' | 'to',
   fromLive: boolean,
 ): Promise<ColumnAddress> {
-  const reading = columnReading(collection, segments);
+  const reading = columnReading(owner, segments);
   const column = reading.column;
-  const desiredHome = role === 'to' ? desiredColumnHome(state, collection, segments) : undefined;
-  const liveHome = await liveColumnHome(state, collection, segments);
+  const desiredHome = role === 'to' ? desiredColumnHome(state, owner, segments) : undefined;
+  const liveHome = await liveColumnHome(state, owner, segments);
   const table = desiredHome?.table ?? liveHome?.table ?? reading.table;
   if (!isUndefined(address.type)) return { table, column, type: address.type };
   if (!isUndefined(desiredHome)) return { table, column, type: desiredHome.type };
@@ -859,7 +955,7 @@ async function lowerColumn(
   throw ohneError({
     title: `Migration \`${meta.name}\` needs a \`type\` on its \`to\``,
     body: [
-      `\`${collection}.${segments.join('.')}\` exists nowhere yet - neither live nor in the desired schema - so nothing supplies its type.`,
+      `\`${derivedRootName(owner)}.${segments.join('.')}\` exists nowhere yet - neither live nor in the desired schema - so nothing supplies its type.`,
       'Set `type` on the `to` address, so the engine knows what to create the column as.',
     ],
     path: meta.file,
@@ -869,18 +965,19 @@ async function lowerColumn(
 /**
  * The live home of a field's column: the main-path table, or the collection's claimed companion.
  * A translatable field's column lives on the companion, reachable for top-level fields only.
+ * A block owner has no companion, so its columns live on the main path alone.
  * Returns nothing when the column is live on neither.
  */
 async function liveColumnHome(
   state: ResolveState,
-  collection: string,
+  owner: DerivedOwner,
   segments: readonly string[],
 ): Promise<{ table: string; column: string } | undefined> {
-  const { table, column } = columnReading(collection, segments);
+  const { table, column } = columnReading(owner, segments);
   if (await liveColumn(state, table, column)) return { table, column };
-  if (segments.length !== 1) return undefined;
-  const companion = companionTableName(collection);
-  if (state.claimed[companion]?.companion !== collection) return undefined;
+  if (isUndefined(owner.collection) || segments.length !== 1) return undefined;
+  const companion = companionTableName(owner.collection);
+  if (state.claimed[companion]?.companion !== owner.collection) return undefined;
   if (await liveColumn(state, companion, column)) return { table: companion, column };
   return undefined;
 }
@@ -888,22 +985,23 @@ async function liveColumnHome(
 /**
  * The desired home of a field's column: the main-path table, or the collection's desired companion.
  * Supplies the type beside the table, so a lowered `to` creates the column as the schema wants it.
+ * A block owner has no companion, so its columns land on the main path alone.
  * Returns nothing when the desired schema holds the column on neither.
  */
 function desiredColumnHome(
   state: ResolveState,
-  collection: string,
+  owner: DerivedOwner,
   segments: readonly string[],
 ): { table: string; column: string; type: LogicalType } | undefined {
-  const { table, column } = columnReading(collection, segments);
+  const { table, column } = columnReading(owner, segments);
   const wanted = state.desired
     .find((schema) => schema.name === table)
     ?.columns.find((item) => item.name === column);
   if (!isUndefined(wanted)) return { table, column, type: wanted.type };
-  if (segments.length !== 1) return undefined;
-  const companionName = companionTableName(collection);
+  if (isUndefined(owner.collection) || segments.length !== 1) return undefined;
+  const companionName = companionTableName(owner.collection);
   const held = state.desired
-    .find((schema) => schema.name === companionName && schema.companion === collection)
+    .find((schema) => schema.name === companionName && schema.companion === owner.collection)
     ?.columns.find((item) => item.name === column);
   if (!isUndefined(held)) return { table: companionName, column, type: held.type };
   return undefined;
@@ -913,7 +1011,7 @@ function desiredColumnHome(
  * Lowers a logical rename to its compound: the primary table plus every family member.
  *
  * With ownership the family enumerates from the claims whose origin sits under the `from` path.
- * A collection rename carries the claimed companion along; a field path never owns one.
+ * A collection rename carries the claimed companion along; a field path and a block never own one.
  * Each member's new name and claim origin recompute from the `to` side, fresh truncation included.
  * Without ownership the family bootstraps from the `to` tree in the desired schema.
  * Each implied member must then be live while the primary is, or the fields changed with the rename.
@@ -921,23 +1019,24 @@ function desiredColumnHome(
  * A field-path primary takes its origin from the claims, or from the `to` tree when the snapshot lacks it.
  * A derived table must never rename origin-less, or later correlation misreads it.
  * Members order primary first, then by live name, so runs are deterministic.
+ * A block-level rename attaches the `_blockType` rewrite every live wrapper applies after the members.
  */
 function lowerRenameCompound(
   state: ResolveState,
   meta: MigrationMeta,
-  collection: string,
+  fromOwner: DerivedOwner,
   fromPath: readonly string[],
-  toCollection: string,
+  toOwner: DerivedOwner,
   toPath: readonly string[],
 ): LoweredMigration {
   const fromPrimary =
     fromPath.length === 0
-      ? collectionTableName(collection)
-      : derivedTableName(collection, fromPath[0] as string, ...fromPath.slice(1));
+      ? ownerTableName(fromOwner)
+      : derivedTableName(derivedRootName(fromOwner), fromPath[0] as string, ...fromPath.slice(1));
   const toPrimary =
     toPath.length === 0
-      ? collectionTableName(toCollection)
-      : derivedTableName(toCollection, toPath[0] as string, ...toPath.slice(1));
+      ? ownerTableName(toOwner)
+      : derivedTableName(derivedRootName(toOwner), toPath[0] as string, ...toPath.slice(1));
   // A field-path primary reads its origin from the claims; a pre-ownership snapshot has none
   // there, so the desired `to` tree supplies it - the claim must never rename origin-less.
   const claimedOrigin = fromPath.length === 0 ? undefined : state.claimed[fromPrimary]?.derived;
@@ -945,7 +1044,7 @@ function lowerRenameCompound(
     ? state.desired.find((table) => table.name === toPrimary)?.derived
     : {
         ...claimedOrigin,
-        collection: toCollection,
+        ...ownerKeys(toOwner),
         path: renamedPath(claimedOrigin.path, fromPath, toPath),
       };
   if (
@@ -957,35 +1056,40 @@ function lowerRenameCompound(
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot verify the rename family`,
       body: [
-        'The schema snapshot comes from an older ohne and does not record which tables the collection owns.',
+        `The schema snapshot comes from an older ohne and does not record which tables the ${ownerNoun(fromOwner)} owns.`,
         `The renamed family recomputes from the new field tree instead - and \`${toPrimary}\` is not in it, so the fields changed in the same deploy as the rename.`,
         'Deploy the rename alone on the unchanged fields first, or rename the tables physically.',
       ],
       path: meta.file,
     });
   }
-  const members: RenameMember[] = [
-    {
-      from: fromPrimary,
-      to: toPrimary,
-      origin: fromPath.length === 0 ? undefined : primaryOrigin,
-    },
-  ];
+  const primary: RenameMember = {
+    from: fromPrimary,
+    to: toPrimary,
+    origin: fromPath.length === 0 ? undefined : primaryOrigin,
+  };
+  if (fromPath.length === 0 && !isUndefined(toOwner.block)) primary.block = toOwner.block;
+  const members: RenameMember[] = [primary];
 
   if (state.ownership) {
     for (const [table, claim] of Object.entries(state.claimed)) {
-      if (fromPath.length === 0 && claim.companion === collection && table !== fromPrimary) {
+      if (
+        fromPath.length === 0 &&
+        !isUndefined(fromOwner.collection) &&
+        claim.companion === fromOwner.collection &&
+        table !== fromPrimary
+      ) {
         members.push({
           from: table,
-          to: companionTableName(toCollection),
-          companion: toCollection,
+          to: companionTableName(toOwner.collection as string),
+          companion: toOwner.collection,
         });
         continue;
       }
       const origin = claim.derived;
       if (
         isUndefined(origin) ||
-        origin.collection !== collection ||
+        !ownedBy(origin, fromOwner) ||
         !pathStartsWith(origin.path, fromPath) ||
         table === fromPrimary
       ) {
@@ -994,8 +1098,8 @@ function lowerRenameCompound(
       const path = renamedPath(origin.path, fromPath, toPath);
       members.push({
         from: table,
-        to: derivedTableName(toCollection, path[0] as string, ...path.slice(1)),
-        origin: { ...origin, collection: toCollection, path },
+        to: derivedTableName(derivedRootName(toOwner), path[0] as string, ...path.slice(1)),
+        origin: { ...origin, ...ownerKeys(toOwner), path },
       });
     }
   } else {
@@ -1004,7 +1108,7 @@ function lowerRenameCompound(
       const origin = table.derived;
       if (
         isUndefined(origin) ||
-        origin.collection !== toCollection ||
+        !ownedBy(origin, toOwner) ||
         !pathStartsWith(origin.path, toPath) ||
         table.name === toPrimary
       ) {
@@ -1012,7 +1116,7 @@ function lowerRenameCompound(
       }
       const fromMemberPath = renamedPath(origin.path, toPath, fromPath);
       const fromMember = derivedTableName(
-        collection,
+        derivedRootName(fromOwner),
         fromMemberPath[0] as string,
         ...fromMemberPath.slice(1),
       );
@@ -1022,7 +1126,7 @@ function lowerRenameCompound(
         throw ohneError({
           title: `Migration \`${meta.name}\` cannot verify the rename family`,
           body: [
-            'The schema snapshot comes from an older ohne and does not record which tables the collection owns.',
+            `The schema snapshot comes from an older ohne and does not record which tables the ${ownerNoun(fromOwner)} owns.`,
             `The renamed family recomputes from the new field tree instead - and its member \`${fromMember}\` is not live, so the fields changed in the same deploy as the rename.`,
             'Deploy the rename alone on the unchanged fields first, or rename the tables physically.',
           ],
@@ -1032,13 +1136,17 @@ function lowerRenameCompound(
     }
   }
 
-  const [primary, ...rest] = members;
+  const [head, ...rest] = members;
   rest.sort((a, b) => (a.from < b.from ? -1 : 1));
-  return {
+  const lowered: Extract<LoweredMigration, { kind: 'compoundRename' }> = {
     kind: 'compoundRename',
-    members: [primary as RenameMember, ...rest],
-    to: { collection: toCollection, path: toPath },
+    members: [head as RenameMember, ...rest],
+    to: { ...ownerKeys(toOwner), path: toPath },
   };
+  if (fromPath.length === 0 && !isUndefined(fromOwner.block)) {
+    lowered.blockType = { from: fromOwner.block, to: toOwner.block as string };
+  }
+  return lowered;
 }
 
 /**
@@ -1049,6 +1157,7 @@ function lowerRenameCompound(
  * Both at once refuses unless `type` pins the column; the physical spelling stays the escape hatch.
  * A collection-level discard drops the whole family, companion included, the main table last.
  * Without ownership the family cannot be enumerated, so table-grain discards refuse.
+ * A block-level discard refuses outright: removing a type purges wrapper rows, which is force-only.
  *
  * A discard of the companion's last user column escalates to the whole companion table.
  * It does so only when the desired schema omits the table.
@@ -1060,31 +1169,45 @@ async function lowerDiscard(
   meta: MigrationMeta,
   from: LogicalAddress,
 ): Promise<LoweredMigration> {
-  const collection = logicalCollection(meta, from);
+  const owner = logicalOwner(meta, from);
+  const root = derivedRootName(owner);
 
   if (isUndefined(from.field)) {
     if (!isUndefined(from.type)) {
       throw ohneError({
         title: `Migration \`${meta.name}\` pins a \`type\` without a field`,
-        body: ['A collection discard names no column.', 'Name the field, or drop `type`.'],
+        body: [`A ${ownerNoun(owner)} discard names no column.`, 'Name the field, or drop `type`.'],
         path: meta.file,
       });
     }
-    assertOwnership(state, meta, collection);
+    if (!isUndefined(owner.block)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` discards the block \`${owner.block}\``,
+        body: [
+          `Removing a block type purges the wrapper rows that reference \`${owner.block}\` - row-grain work outside the migration vocabulary.`,
+          'Remove the block from the code and set `FORCE_SYNC` or `database.sync.force` for one boot instead.',
+        ],
+        path: meta.file,
+      });
+    }
+    assertOwnership(state, meta, owner.collection as string);
     return {
       kind: 'compoundDiscard',
-      tables: discardFamily(state, collection, [], collectionTableName(collection)),
+      tables: discardFamily(state, owner, [], ownerTableName(owner)),
     };
   }
 
   const segments = fieldSegments(meta, from.field);
-  const column = columnReading(collection, segments);
-  const table = tableReading(collection, segments);
+  const column = columnReading(owner, segments);
+  const table = tableReading(owner, segments);
   const mainLive = await liveColumn(state, column.table, column.column);
-  const companion = segments.length === 1 ? companionTableName(collection) : undefined;
+  const companion =
+    segments.length === 1 && !isUndefined(owner.collection)
+      ? companionTableName(owner.collection)
+      : undefined;
   const companionLive =
     !isUndefined(companion) &&
-    state.claimed[companion]?.companion === collection &&
+    state.claimed[companion]?.companion === owner.collection &&
     (await liveColumn(state, companion, column.column));
   const tableLive = state.names.has(table);
 
@@ -1092,7 +1215,7 @@ async function lowerDiscard(
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${collection}.${from.field}\` is a live column on \`${column.table}\` and on \`${companion}\` at once.`,
+        `\`${root}.${from.field}\` is a live column on \`${column.table}\` and on \`${companion}\` at once.`,
         'Use the physical `table` and `column` spelling to pick one.',
       ],
       path: meta.file,
@@ -1121,7 +1244,7 @@ async function lowerDiscard(
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${collection}.${from.field}\` is a live column on \`${home}\` and the live table \`${table}\` at once.`,
+        `\`${root}.${from.field}\` is a live column on \`${home}\` and the live table \`${table}\` at once.`,
         'Pin `type` to discard the column, or use the physical `table` spelling for the table.',
       ],
       path: meta.file,
@@ -1129,8 +1252,8 @@ async function lowerDiscard(
   }
 
   if (tableLive) {
-    assertOwnership(state, meta, `${collection}.${from.field}`);
-    return { kind: 'compoundDiscard', tables: discardFamily(state, collection, segments, table) };
+    assertOwnership(state, meta, `${root}.${from.field}`);
+    return { kind: 'compoundDiscard', tables: discardFamily(state, owner, segments, table) };
   }
 
   return {
@@ -1156,24 +1279,26 @@ async function escalatesToCompanionTable(
 
 /**
  * The tables a table-grain discard drops: the family under the path, deepest first, primary last.
- * A collection-level discard carries the companion along; a field path never owns one.
+ * A collection-level discard carries the companion along; a field path and a block never own one.
  */
 function discardFamily(
   state: ResolveState,
-  collection: string,
+  owner: DerivedOwner,
   path: readonly string[],
   primary: string,
 ): string[] {
   const family = Object.entries(state.claimed)
     .filter(([table, claim]) => {
       if (table === primary) return false;
-      if (path.length === 0 && claim.companion === collection) return true;
+      if (
+        path.length === 0 &&
+        !isUndefined(owner.collection) &&
+        claim.companion === owner.collection
+      ) {
+        return true;
+      }
       const origin = claim.derived;
-      return (
-        !isUndefined(origin) &&
-        origin.collection === collection &&
-        pathStartsWith(origin.path, path)
-      );
+      return !isUndefined(origin) && ownedBy(origin, owner) && pathStartsWith(origin.path, path);
     })
     .map(([table, claim]) => ({ table, depth: claim.derived?.path.length ?? 1 }))
     .sort((a, b) => b.depth - a.depth || (a.table < b.table ? -1 : 1))
@@ -1209,23 +1334,23 @@ async function liveColumn(state: ResolveState, table: string, column: string): P
  * The physical column reading of a field path: the table its prefix names, plus the last segment.
  */
 function columnReading(
-  collection: string,
+  owner: DerivedOwner,
   segments: readonly string[],
 ): { table: string; column: string } {
   const column = last(segments) as string;
   const prefix = segments.slice(0, -1);
   const table =
     prefix.length === 0
-      ? collectionTableName(collection)
-      : derivedTableName(collection, prefix[0] as string, ...prefix.slice(1));
+      ? ownerTableName(owner)
+      : derivedTableName(derivedRootName(owner), prefix[0] as string, ...prefix.slice(1));
   return { table, column };
 }
 
 /**
  * The physical table reading of a field path: the derived table the whole path names.
  */
-function tableReading(collection: string, segments: readonly string[]): string {
-  return derivedTableName(collection, segments[0] as string, ...segments.slice(1));
+function tableReading(owner: DerivedOwner, segments: readonly string[]): string {
+  return derivedTableName(derivedRootName(owner), segments[0] as string, ...segments.slice(1));
 }
 
 /**
@@ -1253,10 +1378,25 @@ export function pathStartsWith(path: readonly string[], prefix: readonly string[
 const NAME_SHAPE = /^[A-Za-z][A-Za-z0-9]*$/;
 
 /**
- * The collection a logical address names, validated against the naming grammar.
+ * The owner a logical address roots at, validated against the naming grammar.
+ * A collection also refuses the reserved names; blocks live behind `block_`, so none are reserved.
  */
-function logicalCollection(meta: MigrationMeta, address: LogicalAddress): string {
-  const collection = address.collection;
+function logicalOwner(meta: MigrationMeta, address: LogicalAddress): DerivedOwner {
+  if (!isUndefined(address.block)) {
+    const block = address.block;
+    if (!NAME_SHAPE.test(block)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` names an invalid block`,
+        body: [
+          `\`${block}\` cannot be a block: a name is letters and digits, starting with a letter.`,
+          'Use the physical `table` spelling for names outside the grammar.',
+        ],
+        path: meta.file,
+      });
+    }
+    return { block };
+  }
+  const collection = address.collection as string;
   if (!NAME_SHAPE.test(collection)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` names an invalid collection`,
@@ -1277,7 +1417,14 @@ function logicalCollection(meta: MigrationMeta, address: LogicalAddress): string
       path: meta.file,
     });
   }
-  return collection;
+  return { collection };
+}
+
+/**
+ * The kind of an owner, for the error messages: `collection` or `block`.
+ */
+function ownerNoun(owner: DerivedOwner): 'block' | 'collection' {
+  return isUndefined(owner.collection) ? 'block' : 'collection';
 }
 
 /**
@@ -1299,16 +1446,24 @@ function fieldSegments(meta: MigrationMeta, field: string): string[] {
 }
 
 /**
- * Refuses an address that carries both the logical and the physical spelling at once.
+ * Refuses an address that carries both the logical and the physical spelling, or both owners, at once.
  */
 function assertPurelyLogical(meta: MigrationMeta, address: LogicalAddress): void {
-  if (!('table' in address) && !('column' in address)) return;
-  throw ohneError({
-    title: `Migration \`${meta.name}\` mixes address spellings`,
-    body: [
-      'An address is logical (`collection`, `field`) or physical (`table`, `column`), never both.',
-      'Drop one spelling.',
-    ],
-    path: meta.file,
-  });
+  if ('table' in address || 'column' in address) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` mixes address spellings`,
+      body: [
+        'An address is logical (`collection` or `block`, `field`) or physical (`table`, `column`), never both.',
+        'Drop one spelling.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (!isUndefined(address.collection) && !isUndefined(address.block)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` names two owners`,
+      body: ['An address roots at one `collection` or one `block`, never both.', 'Drop one owner.'],
+      path: meta.file,
+    });
+  }
 }

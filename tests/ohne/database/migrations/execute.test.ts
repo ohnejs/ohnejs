@@ -1241,3 +1241,209 @@ describe('executeMigrations over the translations companion', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations with block addresses', () => {
+  const wrapperColumns = [
+    UUID,
+    { name: '_parentUUID', type: 'text', notNull: true },
+    { name: '_parentPosition', type: 'integer', notNull: true },
+    { name: '_blockType', type: 'text', notNull: true },
+    { name: '_blockUUID', type: 'text', notNull: true },
+  ] as const;
+
+  it('renames a block as a compound, wrapper rows and claims rewritten', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const wrapper = table('Posts_content', {
+      columns: [...wrapperColumns],
+      derived: {
+        collection: 'Posts',
+        path: ['content'],
+        kind: 'blocksWrapper',
+        allow: ['Hero', 'Quote'],
+      },
+    });
+    const hero = table('block_Hero', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+    const links = table('block_Hero_links', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { block: 'Hero', path: ['links'], kind: 'childMany' },
+    });
+    const quote = table('block_Quote', { columns: [UUID], block: 'Quote' });
+    await materialize(db, [posts, wrapper, hero, links, quote]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'hello']);
+    await db.run('INSERT INTO "block_Quote" ("UUID") VALUES (?)', ['q1']);
+    await db.run('INSERT INTO "block_Hero_links" ("UUID", "_parentUUID") VALUES (?, ?)', [
+      'l1',
+      'h1',
+    ]);
+    await db.run(
+      'INSERT INTO "Posts_content" ' +
+        '("UUID", "_parentUUID", "_parentPosition", "_blockType", "_blockUUID") ' +
+        'VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+      ['w1', 'p1', 0, 'Hero', 'h1', 'w2', 'p1', 1, 'Quote', 'q1'],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [meta('app/001-banner', { from: { block: 'Hero' }, to: { block: 'Banner' } })],
+      desired: [],
+      claimed: classifySchema([posts, wrapper, hero, links, quote]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-banner', status: 'applied' }]);
+    deepStrictEqual(await columnNames(db, 'block_Banner'), ['UUID', 'title']);
+    deepStrictEqual(await columnNames(db, 'block_Banner_links'), ['UUID', '_parentUUID']);
+    const rows = await db.query<{ UUID: string; _blockType: string }>(
+      'SELECT "UUID", "_blockType" FROM "Posts_content" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row._blockType]),
+      [
+        ['w1', 'Banner'],
+        ['w2', 'Quote'],
+      ],
+    );
+    const titles = await db.query<{ title: string }>('SELECT "title" FROM "block_Banner"');
+    deepStrictEqual(
+      titles.map((row) => row.title),
+      ['hello'],
+    );
+    strictEqual(outcome.claimed['block_Banner']?.block, 'Banner');
+    deepStrictEqual(outcome.claimed['block_Banner_links']?.derived, {
+      block: 'Banner',
+      path: ['links'],
+      kind: 'childMany',
+    });
+    strictEqual(outcome.claimed['block_Hero'], undefined);
+    await db.close();
+  });
+
+  it('skips a block chain end to end on a fresh database', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-heading', {
+          from: { block: 'Hero', field: 'title' },
+          to: { block: 'Hero', field: 'heading' },
+        }),
+        meta('app/002-banner', { from: { block: 'Hero' }, to: { block: 'Banner' } }),
+      ],
+      desired: [
+        table('block_Banner', {
+          columns: [UUID, { name: 'heading', type: 'text', notNull: false }],
+          block: 'Banner',
+        }),
+      ],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      {
+        name: 'app/001-heading',
+        status: 'skipped',
+        reason: '`block_Hero.title` is absent and `block_Hero.heading` is satisfied',
+      },
+      {
+        name: 'app/002-banner',
+        status: 'skipped',
+        reason: '`block_Hero` is absent and the new names are satisfied',
+      },
+    ]);
+    await db.close();
+  });
+
+  it('moves a block column in place, retyping through the transform', async () => {
+    const db = await open();
+    const hero = table('block_Hero', {
+      columns: [UUID, { name: 'size', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+    await materialize(db, [hero]);
+    await db.run('INSERT INTO "block_Hero" ("UUID", "size") VALUES (?, ?), (?, ?)', [
+      'h1',
+      '10',
+      'h2',
+      '20',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-size', {
+          from: { block: 'Hero', field: 'size', type: 'text' },
+          to: { block: 'Hero', field: 'size', type: 'integer' },
+          transform: (value) => Number(value),
+        }),
+      ],
+      desired: [],
+      claimed: classifySchema([hero]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-size', status: 'applied' }]);
+    const rows = await db.query<{ UUID: string; size: number }>(
+      'SELECT "UUID", "size" FROM "block_Hero" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row.size]),
+      [
+        ['h1', 10],
+        ['h2', 20],
+      ],
+    );
+    await db.close();
+  });
+
+  it('discards a composite inside a block as a compound', async () => {
+    const db = await open();
+    const hero = table('block_Hero', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+    const links = table('block_Hero_links', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { block: 'Hero', path: ['links'], kind: 'childMany' },
+    });
+    await materialize(db, [hero, links]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-drop-links', { from: { block: 'Hero', field: 'links' }, to: null }),
+      ],
+      desired: [],
+      claimed: classifySchema([hero, links]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-drop-links', status: 'applied' }]);
+    const tables = await dialect.listTables(db);
+    ok(!tables.includes('block_Hero_links'));
+    ok(tables.includes('block_Hero'));
+    await db.close();
+  });
+
+  it('composes a block rename with a same-run field discard inside it', async () => {
+    const db = await open();
+    const hero = table('block_Hero', {
+      columns: [
+        UUID,
+        { name: 'title', type: 'text', notNull: false },
+        { name: 'legacy', type: 'text', notNull: false },
+      ],
+      block: 'Hero',
+    });
+    await materialize(db, [hero]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-banner', { from: { block: 'Hero' }, to: { block: 'Banner' } }),
+        meta('app/002-drop-legacy', { from: { block: 'Banner', field: 'legacy' }, to: null }),
+      ],
+      desired: [],
+      claimed: classifySchema([hero]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-banner', status: 'applied' },
+      { name: 'app/002-drop-legacy', status: 'applied' },
+    ]);
+    deepStrictEqual(await columnNames(db, 'block_Banner'), ['UUID', 'title']);
+    await db.close();
+  });
+});

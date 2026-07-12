@@ -5,8 +5,15 @@ import { physicalName } from './_physical.ts';
  * The owner a derived table's names compose from: a collection, or a block's per-type root.
  * Exactly one of the two is set.
  */
-interface DerivedOwner {
+export interface DerivedOwner {
+  /**
+   * The owning collection's logical name; absent when a block owns the family.
+   */
   collection?: string;
+
+  /**
+   * The owning block's name; absent when a collection owns the family.
+   */
   block?: string;
 }
 
@@ -113,6 +120,21 @@ export function blockRootName(block: string): string {
  */
 export function derivedRootName(owner: DerivedOwner): string {
   return isUndefined(owner.collection) ? blockRootName(owner.block as string) : owner.collection;
+}
+
+/**
+ * The root table of an owner: the collection's own table, or the block's per-type table.
+ *
+ * @example
+ * ```ts
+ * ownerTableName({ collection: 'Posts' }) // -> 'Posts'
+ * ownerTableName({ block: 'Hero' })       // -> 'block_Hero'
+ * ```
+ */
+export function ownerTableName(owner: DerivedOwner): string {
+  return isUndefined(owner.collection)
+    ? blockTableName(owner.block as string)
+    : collectionTableName(owner.collection);
 }
 
 /**

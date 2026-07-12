@@ -1,4 +1,5 @@
 import type { LiteralUnion } from '../../../utils/index.ts';
+import type { KnownBlocks } from '../../blocks/known-blocks.ts';
 import type { KnownCollections } from '../../collections/known-collections.ts';
 import type { Transaction } from '../adapter.ts';
 import type { LogicalType } from '../dialect.ts';
@@ -98,6 +99,53 @@ export interface DiscardAddress<
 }
 
 /**
+ * The address of one block field's column: a block and a dot path over its field tree.
+ * The last path segment is the column; the segments before it name the derived table it sits on.
+ * A bare field addresses a column on the block's per-type `block_<Name>` table.
+ */
+export interface BlockFieldAddress<B extends string = string, F extends string = string> {
+  /**
+   * The block's name.
+   * A `from` may name a block that no longer exists in code.
+   */
+  block: B;
+
+  /**
+   * The field's dot path from the block: `'title'`, or `'links.url'` inside a composite.
+   */
+  field: F;
+
+  /**
+   * The logical type the column is expected to hold, asserted against the live schema when given.
+   * Omitted, the engine resolves it from the live and desired schema.
+   * Required only when the `from` is live and the `to` exists nowhere yet.
+   * The engine then knows what to create the new column as.
+   */
+  type?: LogicalType;
+}
+
+/**
+ * The address of one block, or of one composite field's table inside it.
+ * Without `field` it names the block itself.
+ * A rename then carries `block_<Name>`, its derived tables, and every wrapper's `_blockType` rows.
+ * The rewrite is mechanical: no transform ever rides it.
+ * With `field` it names the composite's derived table, nested children included.
+ */
+export interface BlockAddress<B extends string = string, F extends string = string> {
+  /**
+   * The block's name.
+   * A `from` may name a block that no longer exists in code.
+   */
+  block: B;
+
+  /**
+   * A composite field's dot path from the block, naming its derived table.
+   * Omitted, the address names the whole block.
+   */
+  field?: F;
+}
+
+/**
  * The suggested field names of one known collection, open to any string for dot paths.
  */
 type SuggestedFields<C extends keyof KnownCollections> = LiteralUnion<
@@ -140,6 +188,40 @@ export type KnownDiscardAddress =
       [C in keyof KnownCollections & string]: DiscardAddress<C, SuggestedFields<C>>;
     }[keyof KnownCollections & string]
   | DiscardAddress<SuggestedCollections>;
+
+/**
+ * The suggested field names of one known block, open to any string for dot paths.
+ */
+type SuggestedBlockFields<B extends keyof KnownBlocks> = LiteralUnion<
+  Extract<keyof KnownBlocks[B], string>
+>;
+
+/**
+ * The known block names as suggestions, open to any string.
+ * The open member must carry the literals too.
+ * A union member whose `block` is a bare string silences every suggestion, the literal ones included.
+ */
+type SuggestedBlocks = LiteralUnion<Extract<keyof KnownBlocks, string>>;
+
+/**
+ * `BlockFieldAddress` narrowed by the known blocks.
+ * Any block and field string stays legal: a migration may name things gone from the code.
+ */
+export type KnownBlockFieldAddress =
+  | {
+      [B in keyof KnownBlocks & string]: BlockFieldAddress<B, SuggestedBlockFields<B>>;
+    }[keyof KnownBlocks & string]
+  | BlockFieldAddress<SuggestedBlocks>;
+
+/**
+ * `BlockAddress` narrowed by the known blocks.
+ * Any block and field string stays legal: a migration may name things gone from the code.
+ */
+export type KnownBlockAddress =
+  | {
+      [B in keyof KnownBlocks & string]: BlockAddress<B, SuggestedBlockFields<B>>;
+    }[keyof KnownBlocks & string]
+  | BlockAddress<SuggestedBlocks>;
 
 /**
  * The sentinel `deleteRecord()` returns: the whole row dies, not just the transformed cell.
@@ -221,12 +303,12 @@ export interface MoveMigration {
   /**
    * The field or column the values live in; it must match the live schema or the migration errors.
    */
-  from: ColumnAddress | KnownFieldAddress;
+  from: ColumnAddress | KnownFieldAddress | KnownBlockFieldAddress;
 
   /**
    * The field or column the values move onto, created from the desired schema when missing.
    */
-  to: ColumnAddress | KnownFieldAddress;
+  to: ColumnAddress | KnownFieldAddress | KnownBlockFieldAddress;
 
   /**
    * Per-row value transform.
@@ -236,33 +318,35 @@ export interface MoveMigration {
 }
 
 /**
- * Renames a collection, a composite field's table, or a physical table.
+ * Renames a collection, a block, a composite field's table, or a physical table.
  * A collection rename carries every owned table along: junctions, child tables, nested children.
+ * A block rename carries `block_<Name>`, its derived tables, and every wrapper's `_blockType` rows.
  * A composite field rename carries its nested children along the same way.
  * Constraint names derive from table names, so the sync's diff recreates them under the new one.
  */
 export interface RenameMigration {
   /**
-   * The collection or table as it exists live.
+   * The collection, block, or table as it exists live.
    */
-  from: TableAddress | KnownCollectionAddress;
+  from: TableAddress | KnownCollectionAddress | KnownBlockAddress;
 
   /**
    * The new name.
    * A field path changes its last segment only; the path prefix stays.
    */
-  to: TableAddress | KnownCollectionAddress;
+  to: TableAddress | KnownCollectionAddress | KnownBlockAddress;
 }
 
 /**
  * Drops a field, a composite's table, a whole collection, or a physical column or table on purpose.
  * An intentional drop never needs `force`; the discard is the authorization.
+ * A block address names a field inside the block; removing a whole block type stays force-only.
  */
 export interface DiscardMigration {
   /**
    * What to drop, matched against the live schema.
    */
-  from: ColumnAddress | TableAddress | KnownDiscardAddress;
+  from: ColumnAddress | TableAddress | KnownDiscardAddress | KnownBlockFieldAddress;
 
   /**
    * Marks the discard: the data is gone on purpose.
@@ -289,12 +373,13 @@ type SwitchState = {
  * A `nullable` or `unique` switch runs the transform once per row.
  * Backfills and dedups then satisfy the constraint the guard would otherwise refuse.
  * `translatable` is logical-only: a raw table has no translatable concept.
+ * A block field flips `nullable` and `unique` only: blocks store no locale dimension.
  */
 export interface SwitchMigration {
   /**
    * The field whose attribute flips, carrying the asserted live state.
    */
-  from: (ColumnAddress | KnownFieldAddress) & SwitchState;
+  from: (ColumnAddress | KnownFieldAddress | KnownBlockFieldAddress) & SwitchState;
 
   /**
    * The target attribute state, as an explicit assertion.
@@ -363,6 +448,17 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'legacy' },
  *   to: null,
+ * })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // migrations/2026-09-banner.ts - rename a block, wrapper rows rewritten mechanically
+ * import { defineMigration } from 'ohne'
+ *
+ * export default defineMigration({
+ *   from: { block: 'Hero' },
+ *   to: { block: 'Banner' },
  * })
  * ```
  *

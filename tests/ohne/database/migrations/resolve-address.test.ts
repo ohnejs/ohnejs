@@ -40,6 +40,7 @@ function state(live: TableSchema[], overrides: Partial<ResolveState> = {}): Reso
         {
           columns: Object.fromEntries(schema.columns.map((column) => [column.name, column.type])),
           ...(schema.derived ? { derived: schema.derived } : {}),
+          ...(schema.block ? { block: schema.block } : {}),
           ...(schema.companion ? { companion: schema.companion } : {}),
         },
       ]),
@@ -1084,6 +1085,241 @@ describe('lowerMigration switch subfield refusal', () => {
         }),
       ),
       /switches `translatable` on a subfield/,
+    );
+  });
+});
+
+describe('lowerMigration with block addresses', () => {
+  const hero = () =>
+    table('block_Hero', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+  const links = () =>
+    table('block_Hero_links', {
+      columns: [
+        UUID,
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: 'url', type: 'text', notNull: false },
+      ],
+      derived: { block: 'Hero', path: ['links'], kind: 'childMany' },
+    });
+
+  it('lists a block address without any companion reading', () => {
+    deepStrictEqual(
+      consumedByMigration(meta({ from: { block: 'Hero', field: 'title' }, to: null })),
+      [
+        { table: 'block_Hero', column: 'title' },
+        { table: 'block_Hero_title', subtree: { block: 'Hero', path: ['title'] } },
+      ],
+    );
+    deepStrictEqual(
+      consumedByMigration(meta({ from: { block: 'Hero' }, to: { block: 'Banner' } })),
+      [{ table: 'block_Hero', subtree: { block: 'Hero', path: [] } }],
+    );
+  });
+
+  it('reads a live block column as a move, typed from the desired per-type table', async () => {
+    const desired = [
+      table('block_Hero', {
+        columns: [UUID, { name: 'heading', type: 'text', notNull: false }],
+        block: 'Hero',
+      }),
+    ];
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero()], { desired }),
+        meta({
+          from: { block: 'Hero', field: 'title' },
+          to: { block: 'Hero', field: 'heading' },
+        }),
+      ),
+      {
+        kind: 'move',
+        from: { table: 'block_Hero', column: 'title', type: 'text' },
+        to: { table: 'block_Hero', column: 'heading', type: 'text' },
+        toSubtree: { block: 'Hero', path: ['heading'] },
+        transform: undefined,
+      },
+    );
+  });
+
+  it('reads a dot path into the block: the prefix names the derived table', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero(), links()]),
+        meta({
+          from: { block: 'Hero', field: 'links.url', type: 'text' },
+          to: { block: 'Hero', field: 'links.href', type: 'text' },
+        }),
+      ),
+      {
+        kind: 'move',
+        from: { table: 'block_Hero_links', column: 'url', type: 'text' },
+        to: { table: 'block_Hero_links', column: 'href', type: 'text' },
+        toSubtree: { block: 'Hero', path: ['links', 'href'] },
+        transform: undefined,
+      },
+    );
+  });
+
+  it('lowers a block-level rename to the family compound plus the `_blockType` rewrite', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero(), links()]),
+        meta({ from: { block: 'Hero' }, to: { block: 'Banner' } }),
+      ),
+      {
+        kind: 'compoundRename',
+        members: [
+          { from: 'block_Hero', to: 'block_Banner', origin: undefined, block: 'Banner' },
+          {
+            from: 'block_Hero_links',
+            to: 'block_Banner_links',
+            origin: { block: 'Banner', path: ['links'], kind: 'childMany' },
+          },
+        ],
+        to: { block: 'Banner', path: [] },
+        blockType: { from: 'Hero', to: 'Banner' },
+      },
+    );
+  });
+
+  it('renames a composite field inside a block without any rewrite', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero(), links()]),
+        meta({
+          from: { block: 'Hero', field: 'links' },
+          to: { block: 'Hero', field: 'items' },
+        }),
+      ),
+      {
+        kind: 'compoundRename',
+        members: [
+          {
+            from: 'block_Hero_links',
+            to: 'block_Hero_items',
+            origin: { block: 'Hero', path: ['items'], kind: 'childMany' },
+          },
+        ],
+        to: { block: 'Hero', path: ['items'] },
+      },
+    );
+  });
+
+  it('lowers a block field discard by what it materialized as', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero()]),
+        meta({ from: { block: 'Hero', field: 'title' }, to: null }),
+      ),
+      {
+        kind: 'discardColumn',
+        from: { table: 'block_Hero', column: 'title', type: 'text' },
+      },
+    );
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero(), links()]),
+        meta({ from: { block: 'Hero', field: 'links' }, to: null }),
+      ),
+      { kind: 'compoundDiscard', tables: ['block_Hero_links'] },
+    );
+  });
+
+  it('refuses a block-level discard: removing a type stays force-only', async () => {
+    await rejects(
+      lowerMigration(
+        state([hero()]),
+        meta({ from: { block: 'Hero' }, to: null } as unknown as Migration),
+      ),
+      /discards the block `Hero`/,
+    );
+  });
+
+  it('refuses a table-grain block discard without ownership', async () => {
+    await rejects(
+      lowerMigration(
+        state([hero(), links()], { ownership: false }),
+        meta({ from: { block: 'Hero', field: 'links' }, to: null }),
+      ),
+      /cannot enumerate `block_Hero.links`/,
+    );
+  });
+
+  it('lowers a `nullable` switch onto the per-type table', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([hero()]),
+        meta({ from: { block: 'Hero', field: 'title', nullable: true } }),
+      ),
+      {
+        kind: 'switch',
+        attribute: 'nullable',
+        from: true,
+        to: undefined,
+        table: 'block_Hero',
+        column: 'title',
+        block: 'Hero',
+        segments: ['title'],
+        type: undefined,
+        transform: undefined,
+      },
+    );
+  });
+
+  it('refuses the locale switches on a block field: blocks store no locale dimension', async () => {
+    await rejects(
+      lowerMigration(
+        state([hero()]),
+        meta({ from: { block: 'Hero', field: 'title', translatable: false } }),
+      ),
+      /switches `translatable` on a block field/,
+    );
+    await rejects(
+      lowerMigration(
+        state([hero()]),
+        meta({ from: { block: 'Hero', field: 'title', uniquePerLocale: false } }),
+      ),
+      /switches `uniquePerLocale` on a block field/,
+    );
+  });
+
+  it('refuses crossing owners and doubled owners', async () => {
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({ from: { collection: 'Posts' }, to: { block: 'Hero' } } as unknown as Migration),
+      ),
+      /renames a collection onto a block/,
+    );
+    await rejects(
+      lowerMigration(
+        state([hero(), links()]),
+        meta({
+          from: { block: 'Hero', field: 'links' },
+          to: { block: 'Quote', field: 'links' },
+        }),
+      ),
+      /renames a field across blocks/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', block: 'Hero', field: 'title' },
+          to: null,
+        } as unknown as Migration),
+      ),
+      /names two owners/,
+    );
+  });
+
+  it('refuses a block name outside the grammar', async () => {
+    await rejects(
+      lowerMigration(state([]), meta({ from: { block: 'block_Hero', field: 'title' }, to: null })),
+      /names an invalid block/,
     );
   });
 });
