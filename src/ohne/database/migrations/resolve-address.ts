@@ -1,3 +1,4 @@
+import type { LogicalType } from '../dialect.ts';
 import type { SchemaClassification } from '../schema/snapshot.ts';
 import type { DerivedOrigin, TableSchema } from '../schema/table-schema.ts';
 import type {
@@ -7,13 +8,18 @@ import type {
   MigrationTransform,
   MoveMigration,
   RenameMigration,
+  SwitchAttributes,
   TableAddress,
 } from './define-migration.ts';
 import type { MigrationMeta } from './use-migrations.ts';
 
-import { isNull, isObject, isUndefined } from '../../../utils/index.ts';
+import { isNull, isObject, isUndefined, last } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { collectionTableName, derivedTableName } from '../naming/table-names.ts';
+import {
+  collectionTableName,
+  companionTableName,
+  derivedTableName,
+} from '../naming/table-names.ts';
 import { RESERVED_COLLECTIONS } from '../naming/validate-names.ts';
 
 /**
@@ -73,10 +79,40 @@ export interface RenameMember {
    * The derivation origin the renamed table's claim takes; absent on a collection main table.
    */
   origin?: DerivedOrigin;
+
+  /**
+   * The collection whose translations the renamed companion stores; absent everywhere else.
+   * The claim's `companion` marker follows the rename through it.
+   */
+  companion?: string;
 }
 
 /**
- * A migration lowered to physical form: one of the four single ops, or a compound's member list.
+ * The one attribute a switch migration flips.
+ */
+export type SwitchAttribute = keyof SwitchAttributes;
+
+/**
+ * A switch migration lowered against the live state: the flipped attribute and where it lives.
+ * `table` is the column's live home - main table or companion - or the main reading when absent.
+ * `column` is absent when the field is live as a locale-scoped derived table.
+ * `collection` and `segments` carry the logical spelling, so the executor can resolve placements.
+ */
+export interface LoweredSwitch {
+  kind: 'switch';
+  attribute: SwitchAttribute;
+  from: boolean;
+  to?: boolean;
+  table: string;
+  column?: string;
+  collection?: string;
+  segments?: readonly string[];
+  type?: LogicalType;
+  transform?: MigrationTransform;
+}
+
+/**
+ * A migration lowered to physical form: one of the single ops, a compound's member list, or a switch.
  */
 export type LoweredMigration =
   | {
@@ -90,7 +126,8 @@ export type LoweredMigration =
   | { kind: 'discardColumn'; from: ColumnAddress }
   | { kind: 'discardTable'; from: TableAddress }
   | { kind: 'compoundRename'; members: readonly RenameMember[]; to: LogicalSubtree }
-  | { kind: 'compoundDiscard'; tables: readonly string[] };
+  | { kind: 'compoundDiscard'; tables: readonly string[] }
+  | LoweredSwitch;
 
 /**
  * The live and desired state a logical address lowers against, just in time in the executor loop.
@@ -141,6 +178,7 @@ type AnyAddress = MoveMigration['from'] | RenameMigration['from'] | DiscardMigra
 /**
  * The physical readings of one address: the tables it may name, purely from the address itself.
  * An ambiguous logical address lists both readings; over-approximation is safe for both callers.
+ * A collection and a top-level field list the companion reading too: a translatable column lives there.
  */
 function readingsOf(meta: MigrationMeta, address: AnyAddress): ConsumedAddress[] {
   if (!('collection' in address)) {
@@ -151,14 +189,21 @@ function readingsOf(meta: MigrationMeta, address: AnyAddress): ConsumedAddress[]
   const logical = address as LogicalAddress;
   const collection = logicalCollection(meta, logical);
   if (isUndefined(logical.field)) {
-    return [{ table: collectionTableName(collection), subtree: { collection, path: [] } }];
+    return [
+      { table: collectionTableName(collection), subtree: { collection, path: [] } },
+      { table: companionTableName(collection) },
+    ];
   }
   const segments = fieldSegments(meta, logical.field);
   const column = columnReading(collection, segments);
-  return [
+  const readings: ConsumedAddress[] = [
     { table: column.table, column: column.column },
     { table: tableReading(collection, segments), subtree: { collection, path: segments } },
   ];
+  if (segments.length === 1) {
+    readings.push({ table: companionTableName(collection), column: column.column });
+  }
+  return readings;
 }
 
 /**
@@ -201,12 +246,27 @@ export function consumedByMigration(meta: MigrationMeta): ConsumedAddress[] {
 /**
  * The physical tables a migration may touch, for the sync's constraint bracket.
  * Pure over the addresses; an ambiguous logical address contributes both of its readings.
+ * A switch flips in place, so its `from` readings already cover everything it touches.
  */
 export function touchedByMigration(meta: MigrationMeta): string[] {
-  const tables = consumedByMigration(meta).map((consumed) => consumed.table);
+  const from = fromAddress(meta);
+  const tables = readingsOf(meta, from).map((consumed) => consumed.table);
+  if (switchKeysOf(from).length > 0) return tables;
   const to = toAddress(meta);
   if (isNull(to)) return tables;
   return [...tables, ...readingsOf(meta, to).map((consumed) => consumed.table)];
+}
+
+/**
+ * The attribute keys of the four switches, in one place for detection and validation.
+ */
+const SWITCH_KEYS = ['nullable', 'unique', 'uniquePerLocale', 'translatable'] as const;
+
+/**
+ * The switch keys an address carries; a non-empty result marks the migration as a switch.
+ */
+function switchKeysOf(address: object): SwitchAttribute[] {
+  return SWITCH_KEYS.filter((key) => !isUndefined((address as Record<string, unknown>)[key]));
 }
 
 /**
@@ -219,6 +279,7 @@ export function touchedByMigration(meta: MigrationMeta): string[] {
  * A collection-level rename or discard lowers to its family of member tables, claims-enumerated.
  * A pre-ownership snapshot bootstraps a rename's family from the `to` tree.
  * Table-grain discards refuse there, since nothing records what they cover.
+ * A switch key on `from` marks the fourth form and lowers first, before any address pairing.
  */
 export async function lowerMigration(
   state: ResolveState,
@@ -226,9 +287,22 @@ export async function lowerMigration(
 ): Promise<LoweredMigration> {
   const { migration } = meta;
   const from = fromAddress(meta);
+  const rawTo = (migration as { to?: unknown }).to;
+  if (switchKeysOf(from).length > 0 || attributesOnly(rawTo)) {
+    return lowerSwitch(
+      state,
+      meta,
+      from,
+      rawTo,
+      'transform' in migration
+        ? (migration.transform as MigrationTransform | undefined)
+        : undefined,
+    );
+  }
   const to = toAddress(meta);
   const fromLogical = 'collection' in from;
-  const transform = 'transform' in migration ? migration.transform : undefined;
+  const transform =
+    'transform' in migration ? (migration.transform as MigrationTransform | undefined) : undefined;
   if (isNull(to)) {
     if (!isUndefined(transform)) {
       throw ohneError({
@@ -363,6 +437,216 @@ function assertPurelyPhysical(meta: MigrationMeta, address: PhysicalAddress): vo
 }
 
 /**
+ * Whether a `to` is a bare attribute-state object: no address keys, no `null`, just switch states.
+ */
+function attributesOnly(to: unknown): boolean {
+  if (!isObject(to)) return false;
+  return !('collection' in to) && !('table' in to);
+}
+
+/**
+ * Lowers a switch migration: validates the one flipped attribute and resolves the field's live home.
+ *
+ * `from` carries exactly one switch key, asserting the live state; `to` at most the same key flipped.
+ * `translatable` is logical-only - a raw table has no translatable concept.
+ * It is top-level only too: a subfield's composite is per-locale as a whole, so a dot path refuses.
+ * The other switches flip a column, so a field live as a derived table refuses them.
+ * A field live as a table lowers column-less: the executor scopes the whole table by locale.
+ * An absent field lowers onto the main reading; the executor's skip logic checks the desired side.
+ */
+async function lowerSwitch(
+  state: ResolveState,
+  meta: MigrationMeta,
+  from: AnyAddress,
+  rawTo: unknown,
+  transform: MigrationTransform | undefined,
+): Promise<LoweredMigration> {
+  const keys = switchKeysOf(from);
+  if (keys.length === 0) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches without a \`from\` state`,
+      body: [
+        'A switch migration asserts the live attribute state on `from`, so drift refuses instead of guessing.',
+        'Set the flipped attribute on `from`.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (keys.length > 1) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` flips ${keys.length} attributes at once`,
+      body: [
+        'One migration flips one attribute; files chain for more.',
+        `Split ${keys.map((key) => `\`${key}\``).join(', ')} into one migration each.`,
+      ],
+      path: meta.file,
+    });
+  }
+  const attribute = keys[0] as SwitchAttribute;
+  const fromValue = (from as unknown as Record<string, unknown>)[attribute];
+  if (typeof fromValue !== 'boolean') {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` asserts a non-boolean \`${attribute}\``,
+      body: ['A switch attribute is a plain boolean state.', `Set \`${attribute}\` to one.`],
+      path: meta.file,
+    });
+  }
+  const toValue = resolveSwitchTo(meta, attribute, fromValue, rawTo);
+
+  if (!('collection' in from)) {
+    const physical = from as PhysicalAddress;
+    if (attribute === 'translatable') {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` switches \`translatable\` on a physical address`,
+        body: [
+          'A raw table has no translatable concept; the flip needs the logical spelling.',
+          'Address the `collection` and `field`.',
+        ],
+        path: meta.file,
+      });
+    }
+    assertPurelyPhysical(meta, physical);
+    if (!('column' in physical)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` switches without a column`,
+        body: [
+          `A \`${attribute}\` switch flips one column's state, and the address names none.`,
+          'Name the `column`.',
+        ],
+        path: meta.file,
+      });
+    }
+    return {
+      kind: 'switch',
+      attribute,
+      from: fromValue,
+      to: toValue,
+      table: physical.table,
+      column: physical.column,
+      type: physical.type,
+      transform,
+    };
+  }
+
+  assertPurelyLogical(meta, from as LogicalAddress);
+  const logical = from as LogicalAddress;
+  const collection = logicalCollection(meta, logical);
+  if (isUndefined(logical.field)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches without a field`,
+      body: [
+        "A switch flips one field's attribute, and a collection has none of its own.",
+        'Name the `field`.',
+      ],
+      path: meta.file,
+    });
+  }
+  const segments = fieldSegments(meta, logical.field);
+  if (attribute === 'translatable' && segments.length > 1) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches \`translatable\` on a subfield`,
+      body: [
+        `\`${collection}.${logical.field}\` sits below a composite, and a composite is per-locale as a whole.`,
+        'Switch the top-level composite instead.',
+      ],
+      path: meta.file,
+    });
+  }
+  const home = await liveColumnHome(state, collection, segments);
+  const tableRead = tableReading(collection, segments);
+  const tableLive = state.names.has(tableRead);
+  if (!isUndefined(home) && tableLive) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` matches two readings`,
+      body: [
+        `\`${collection}.${logical.field}\` is a live column on \`${home.table}\` and the live table \`${tableRead}\` at once.`,
+        'Use the physical `table` and `column` spelling to pick one.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (tableLive) {
+    if (attribute !== 'translatable') {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` switches \`${attribute}\` on a table`,
+        body: [
+          `A \`${attribute}\` switch flips one column's state, and \`${collection}.${logical.field}\` is live as the table \`${tableRead}\`.`,
+          'Fix the address.',
+        ],
+        path: meta.file,
+      });
+    }
+    return {
+      kind: 'switch',
+      attribute,
+      from: fromValue,
+      to: toValue,
+      table: tableRead,
+      collection,
+      segments,
+      type: logical.type,
+      transform,
+    };
+  }
+  const column = home ?? columnReading(collection, segments);
+  return {
+    kind: 'switch',
+    attribute,
+    from: fromValue,
+    to: toValue,
+    table: column.table,
+    column: column.column,
+    collection,
+    segments,
+    type: logical.type,
+    transform,
+  };
+}
+
+/**
+ * Resolves a switch's `to` into the target state, or nothing when the desired schema supplies it.
+ * A `to` carrying an address, another attribute, or the unchanged state refuses by name.
+ */
+function resolveSwitchTo(
+  meta: MigrationMeta,
+  attribute: SwitchAttribute,
+  fromValue: boolean,
+  rawTo: unknown,
+): boolean | undefined {
+  if (isUndefined(rawTo)) return undefined;
+  if (!attributesOnly(rawTo)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` pairs a switch with an address`,
+      body: [
+        "A switch's `to` carries only the target attribute state, or is omitted for the desired schema's.",
+        'Drop the address from `to`.',
+      ],
+      path: meta.file,
+    });
+  }
+  const toKeys = switchKeysOf(rawTo as object);
+  const toValue = (rawTo as Record<string, unknown>)[attribute];
+  if (toKeys.length !== 1 || toKeys[0] !== attribute || typeof toValue !== 'boolean') {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches \`${attribute}\` onto something else`,
+      body: [
+        '`to` states the one flipped attribute, matching `from`.',
+        `Set \`${attribute}\` alone on \`to\`, or omit \`to\` for the desired schema's state.`,
+      ],
+      path: meta.file,
+    });
+  }
+  if (toValue === fromValue) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches \`${attribute}\` onto itself`,
+      body: ['Point `to` at the other state, or delete the migration.'],
+      path: meta.file,
+    });
+  }
+  return toValue;
+}
+
+/**
  * Lowers a logical pair: resolves the reading, then builds the move or the rename compound.
  */
 async function lowerLogicalPair(
@@ -492,9 +776,9 @@ async function resolveReading(
   transform: MigrationTransform | undefined,
 ): Promise<{ reading: 'column' | 'table'; fromLive: boolean }> {
   const fromCollection = from.collection;
-  const fromColumn = columnReading(fromCollection, fromSegments);
+  const fromHome = await liveColumnHome(state, fromCollection, fromSegments);
   const fromTable = tableReading(fromCollection, fromSegments);
-  const columnLive = await liveColumn(state, fromColumn.table, fromColumn.column);
+  const columnLive = !isUndefined(fromHome);
   const tableLive = state.names.has(fromTable);
   if (!isUndefined(transform) || !isUndefined(from.type) || !isUndefined(to.type)) {
     if (tableLive && !columnLive) {
@@ -513,7 +797,7 @@ async function resolveReading(
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${fromCollection}.${fromSegments.join('.')}\` is a live column on \`${fromColumn.table}\` and the live table \`${fromTable}\` at once.`,
+        `\`${fromCollection}.${fromSegments.join('.')}\` is a live column on \`${fromHome.table}\` and the live table \`${fromTable}\` at once.`,
         'Pin `type` to address the column, or use the physical `table` spelling for the table.',
       ],
       path: meta.file,
@@ -522,24 +806,24 @@ async function resolveReading(
   if (columnLive) return { reading: 'column', fromLive: true };
   if (tableLive) return { reading: 'table', fromLive: false };
 
-  const toColumn = columnReading(to.collection, toSegments);
   const toTable = tableReading(to.collection, toSegments);
-  const desiredTo = state.desired.find((table) => table.name === toColumn.table);
-  if (desiredTo?.columns.some((column) => column.name === toColumn.column)) {
+  if (!isUndefined(desiredColumnHome(state, to.collection, toSegments))) {
     return { reading: 'column', fromLive: false };
   }
   if (state.desired.some((table) => table.name === toTable)) {
     return { reading: 'table', fromLive: false };
   }
-  const toColumnLive = await liveColumn(state, toColumn.table, toColumn.column);
+  const toHome = await liveColumnHome(state, to.collection, toSegments);
   const toTableLive = state.names.has(toTable);
-  if (toTableLive && !toColumnLive) return { reading: 'table', fromLive: false };
+  if (toTableLive && isUndefined(toHome)) return { reading: 'table', fromLive: false };
   return { reading: 'column', fromLive: false };
 }
 
 /**
- * Lowers one side of a move to its physical column address, resolving the type it asserts.
+ * Lowers one side of a move to its physical column address, resolving the table and type it asserts.
  *
+ * The table is the column's home: the main-path table, or the companion when the column lives
+ * (or is desired) there - a translatable field's column moves with its flag, and so must the address.
  * An explicit `type` wins and stays the live-drift assertion.
  * A `from` falls back to the claim record, then the live column, then a placeholder.
  * The executor never reads the placeholder: an absent `from` skips before any type is read.
@@ -557,13 +841,13 @@ async function lowerColumn(
   role: 'from' | 'to',
   fromLive: boolean,
 ): Promise<ColumnAddress> {
-  const { table, column } = columnReading(collection, segments);
+  const reading = columnReading(collection, segments);
+  const column = reading.column;
+  const desiredHome = role === 'to' ? desiredColumnHome(state, collection, segments) : undefined;
+  const liveHome = await liveColumnHome(state, collection, segments);
+  const table = desiredHome?.table ?? liveHome?.table ?? reading.table;
   if (!isUndefined(address.type)) return { table, column, type: address.type };
-  if (role === 'to') {
-    const desired = state.desired.find((schema) => schema.name === table);
-    const wanted = desired?.columns.find((item) => item.name === column);
-    if (!isUndefined(wanted)) return { table, column, type: wanted.type };
-  }
+  if (!isUndefined(desiredHome)) return { table, column, type: desiredHome.type };
   const claimed = state.claimed[table]?.columns[column];
   if (!isUndefined(claimed)) return { table, column, type: claimed };
   if (state.names.has(table)) {
@@ -583,9 +867,53 @@ async function lowerColumn(
 }
 
 /**
+ * The live home of a field's column: the main-path table, or the collection's claimed companion.
+ * A translatable field's column lives on the companion, reachable for top-level fields only.
+ * Returns nothing when the column is live on neither.
+ */
+async function liveColumnHome(
+  state: ResolveState,
+  collection: string,
+  segments: readonly string[],
+): Promise<{ table: string; column: string } | undefined> {
+  const { table, column } = columnReading(collection, segments);
+  if (await liveColumn(state, table, column)) return { table, column };
+  if (segments.length !== 1) return undefined;
+  const companion = companionTableName(collection);
+  if (state.claimed[companion]?.companion !== collection) return undefined;
+  if (await liveColumn(state, companion, column)) return { table: companion, column };
+  return undefined;
+}
+
+/**
+ * The desired home of a field's column: the main-path table, or the collection's desired companion.
+ * Supplies the type beside the table, so a lowered `to` creates the column as the schema wants it.
+ * Returns nothing when the desired schema holds the column on neither.
+ */
+function desiredColumnHome(
+  state: ResolveState,
+  collection: string,
+  segments: readonly string[],
+): { table: string; column: string; type: LogicalType } | undefined {
+  const { table, column } = columnReading(collection, segments);
+  const wanted = state.desired
+    .find((schema) => schema.name === table)
+    ?.columns.find((item) => item.name === column);
+  if (!isUndefined(wanted)) return { table, column, type: wanted.type };
+  if (segments.length !== 1) return undefined;
+  const companionName = companionTableName(collection);
+  const held = state.desired
+    .find((schema) => schema.name === companionName && schema.companion === collection)
+    ?.columns.find((item) => item.name === column);
+  if (!isUndefined(held)) return { table: companionName, column, type: held.type };
+  return undefined;
+}
+
+/**
  * Lowers a logical rename to its compound: the primary table plus every family member.
  *
  * With ownership the family enumerates from the claims whose origin sits under the `from` path.
+ * A collection rename carries the claimed companion along; a field path never owns one.
  * Each member's new name and claim origin recompute from the `to` side, fresh truncation included.
  * Without ownership the family bootstraps from the `to` tree in the desired schema.
  * Each implied member must then be live while the primary is, or the fields changed with the rename.
@@ -646,6 +974,14 @@ function lowerRenameCompound(
 
   if (state.ownership) {
     for (const [table, claim] of Object.entries(state.claimed)) {
+      if (fromPath.length === 0 && claim.companion === collection && table !== fromPrimary) {
+        members.push({
+          from: table,
+          to: companionTableName(toCollection),
+          companion: toCollection,
+        });
+        continue;
+      }
       const origin = claim.derived;
       if (
         isUndefined(origin) ||
@@ -708,11 +1044,16 @@ function lowerRenameCompound(
 /**
  * Lowers a logical discard: the reading decides between a column drop and a table compound.
  *
- * A field that materialized as a live column drops as a column.
+ * A field that materialized as a live column drops as a column, on the main table or the companion.
  * A live derived table drops as a table with every nested child, deepest first.
  * Both at once refuses unless `type` pins the column; the physical spelling stays the escape hatch.
- * A collection-level discard drops the whole family, the main table last.
+ * A collection-level discard drops the whole family, companion included, the main table last.
  * Without ownership the family cannot be enumerated, so table-grain discards refuse.
+ *
+ * A discard of the companion's last user column escalates to the whole companion table.
+ * It does so only when the desired schema omits the table.
+ * Migrations mutate live themselves, so a column-only drop would leave a populated companion behind.
+ * The guard would still refuse that - the discard must actually unblock the sync.
  */
 async function lowerDiscard(
   state: ResolveState,
@@ -739,26 +1080,48 @@ async function lowerDiscard(
   const segments = fieldSegments(meta, from.field);
   const column = columnReading(collection, segments);
   const table = tableReading(collection, segments);
-  const columnLive = await liveColumn(state, column.table, column.column);
+  const mainLive = await liveColumn(state, column.table, column.column);
+  const companion = segments.length === 1 ? companionTableName(collection) : undefined;
+  const companionLive =
+    !isUndefined(companion) &&
+    state.claimed[companion]?.companion === collection &&
+    (await liveColumn(state, companion, column.column));
   const tableLive = state.names.has(table);
 
-  if (!isUndefined(from.type) || (columnLive && !tableLive)) {
-    const type =
-      from.type ??
-      state.claimed[column.table]?.columns[column.column] ??
-      (columnLive
-        ? (await state.describe(column.table)).columns.find((item) => item.name === column.column)
-            ?.type
-        : undefined) ??
-      'text';
-    return { kind: 'discardColumn', from: { table: column.table, column: column.column, type } };
-  }
-
-  if (columnLive && tableLive) {
+  if (mainLive && companionLive) {
     throw ohneError({
       title: `Migration \`${meta.name}\` matches two readings`,
       body: [
-        `\`${collection}.${from.field}\` is a live column on \`${column.table}\` and the live table \`${table}\` at once.`,
+        `\`${collection}.${from.field}\` is a live column on \`${column.table}\` and on \`${companion}\` at once.`,
+        'Use the physical `table` and `column` spelling to pick one.',
+      ],
+      path: meta.file,
+    });
+  }
+  const home = mainLive ? column.table : companionLive ? (companion as string) : undefined;
+
+  if (!isUndefined(from.type) || (!isUndefined(home) && !tableLive)) {
+    const target = home ?? column.table;
+    if (!isUndefined(companion) && target === companion) {
+      if (await escalatesToCompanionTable(state, companion, column.column)) {
+        return { kind: 'discardTable', from: { table: companion } };
+      }
+    }
+    const type =
+      from.type ??
+      state.claimed[target]?.columns[column.column] ??
+      (!isUndefined(home)
+        ? (await state.describe(target)).columns.find((item) => item.name === column.column)?.type
+        : undefined) ??
+      'text';
+    return { kind: 'discardColumn', from: { table: target, column: column.column, type } };
+  }
+
+  if (!isUndefined(home) && tableLive) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` matches two readings`,
+      body: [
+        `\`${collection}.${from.field}\` is a live column on \`${home}\` and the live table \`${table}\` at once.`,
         'Pin `type` to discard the column, or use the physical `table` spelling for the table.',
       ],
       path: meta.file,
@@ -777,7 +1140,23 @@ async function lowerDiscard(
 }
 
 /**
+ * Whether a companion-column discard covers the whole companion table.
+ * True when the column is the companion's last user column and the desired schema omits the table.
+ */
+async function escalatesToCompanionTable(
+  state: ResolveState,
+  companion: string,
+  column: string,
+): Promise<boolean> {
+  if (state.desired.some((table) => table.name === companion)) return false;
+  const live = await state.describe(companion);
+  const users = live.columns.filter((item) => !item.name.startsWith('_'));
+  return users.length === 1 && users[0]?.name === column;
+}
+
+/**
  * The tables a table-grain discard drops: the family under the path, deepest first, primary last.
+ * A collection-level discard carries the companion along; a field path never owns one.
  */
 function discardFamily(
   state: ResolveState,
@@ -787,15 +1166,16 @@ function discardFamily(
 ): string[] {
   const family = Object.entries(state.claimed)
     .filter(([table, claim]) => {
+      if (table === primary) return false;
+      if (path.length === 0 && claim.companion === collection) return true;
       const origin = claim.derived;
       return (
         !isUndefined(origin) &&
         origin.collection === collection &&
-        pathStartsWith(origin.path, path) &&
-        table !== primary
+        pathStartsWith(origin.path, path)
       );
     })
-    .map(([table, claim]) => ({ table, depth: claim.derived?.path.length ?? 0 }))
+    .map(([table, claim]) => ({ table, depth: claim.derived?.path.length ?? 1 }))
     .sort((a, b) => b.depth - a.depth || (a.table < b.table ? -1 : 1))
     .map((entry) => entry.table);
   return [...family, primary];
@@ -832,7 +1212,7 @@ function columnReading(
   collection: string,
   segments: readonly string[],
 ): { table: string; column: string } {
-  const column = segments[segments.length - 1] as string;
+  const column = last(segments) as string;
   const prefix = segments.slice(0, -1);
   const table =
     prefix.length === 0

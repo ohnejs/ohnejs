@@ -48,6 +48,15 @@ export interface SyncOptions {
   force?: boolean;
 
   /**
+   * The locale the flip machinery pivots on, inside the migration run.
+   * The fan-out lands existing values on it, and a transform-less fan-in promotes and keeps its rows.
+   *
+   * @default
+   * 'en'
+   */
+  defaultLocale?: string;
+
+  /**
    * Milliseconds between polls of a held sync lock.
    *
    * @default
@@ -76,6 +85,7 @@ const INTERNAL_TABLES = new Set<string>([OHNE_LOCKS, OHNE_MIGRATIONS, OHNE_SCHEM
  *
  * Pending migrations run inside the transaction, before the structural diff.
  * Uniques and indexes drop first on every touched table, so migrations write under no constraint.
+ * The automatic translatable fan-out follows them, moving flipped values to the default locale.
  * The diff then runs against the migrated structure and re-adds them, each add probed by the guard.
  * Migration stamps persist in the same transaction; a refusal rolls them back with everything else.
  *
@@ -143,6 +153,7 @@ export async function syncDatabase(
         claimed,
         force,
         ownership: snapshot?.ownership ?? true,
+        defaultLocale: options.defaultLocale,
       });
       const migrated: TableSchema[] = [];
       for (const name of await dialect.listTables(tx)) {

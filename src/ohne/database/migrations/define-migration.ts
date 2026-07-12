@@ -142,15 +142,69 @@ export type KnownDiscardAddress =
   | DiscardAddress<SuggestedCollections>;
 
 /**
- * Read-only queries a transform may run, bound to the sync transaction.
- * A transform can look values up mid-migration; everything it reads sees the migration so far.
+ * The sentinel `deleteRecord()` returns: the whole row dies, not just the transformed cell.
  */
-export type MigrationContext = Pick<Transaction, 'query' | 'queryOne'>;
+export type DeleteRecord = typeof DELETE_RECORD;
 
 /**
- * Maps one stored value onto its migrated form, called once per row.
- * `value` arrives deserialized as the `from` type; the return value is serialized as the `to` type.
- * `row` is the full `from` row, deserialized by column; `ctx` runs read-only queries in the transaction.
+ * The one value of `DeleteRecord`, compared by identity inside the executor.
+ */
+export const DELETE_RECORD: unique symbol = Symbol('deleteRecord');
+
+/**
+ * The context a transform runs in: read-only queries in the sync transaction, and the row in hand.
+ * A transform can look values up mid-migration; everything it reads sees the migration so far.
+ * `locale` is set on a locale-keyed row - a companion or a locale-scoped derived table - absent otherwise.
+ * `deleteRecord()` returns the sentinel that deletes the whole row; return it, never just call it.
+ * Only a switch honors the sentinel: a move carries values, so it refuses a deletion.
+ */
+export interface MigrationContext extends Pick<Transaction, 'query' | 'queryOne'> {
+  /**
+   * The content locale of the row in hand; absent when the source rows carry no locale.
+   */
+  locale?: string;
+
+  /**
+   * Returns the delete sentinel: `return ctx.deleteRecord()` drops the whole row.
+   * A fan-in uses it to resolve surplus locales; everything the row held goes with it.
+   */
+  deleteRecord(): DeleteRecord;
+}
+
+/**
+ * The schema attributes a switch migration flips, each a plain boolean state.
+ * On `from` they assert the live state; on `to` the target state, usually left to the desired schema.
+ */
+export interface SwitchAttributes {
+  /**
+   * Whether the column permits `NULL`.
+   */
+  nullable?: boolean;
+
+  /**
+   * Whether a unique constraint covers the column.
+   */
+  unique?: boolean;
+
+  /**
+   * Whether the column's unique is scoped to one locale.
+   */
+  uniquePerLocale?: boolean;
+
+  /**
+   * Whether the field stores per locale.
+   */
+  translatable?: boolean;
+}
+
+/**
+ * Maps one stored value onto its migrated or switched form, called once per row.
+ *
+ * `value` arrives deserialized as the `from` type; a returned value serializes as the `to` type.
+ * `row` is the full `from` row, deserialized by column.
+ * On a move, each value carries over rewritten.
+ * On a switch, `undefined` keeps the row untouched and `ctx.deleteRecord()` deletes it whole:
+ * a fan-in promotes one locale's value per entity this way, and a fan-out reshapes per entity.
  * May return a promise.
  */
 export type MigrationTransform = (
@@ -217,9 +271,48 @@ export interface DiscardMigration {
 }
 
 /**
- * One declarative migration: a move, a rename, or a discard.
+ * At least one switch attribute set, so a switch is never mistaken for a move at the type level.
+ * Distributes over the four attributes: each member requires its own key and keeps the rest optional.
  */
-export type Migration = MoveMigration | RenameMigration | DiscardMigration;
+type SwitchState = {
+  [K in keyof SwitchAttributes]-?: Required<Pick<SwitchAttributes, K>> & SwitchAttributes;
+}[keyof SwitchAttributes];
+
+/**
+ * Flips one schema attribute of one field, carrying the data the new state needs.
+ *
+ * `from` addresses the field and asserts its live attribute state; a drifted state is a hard error.
+ * Exactly one attribute switches per migration; chain files to flip several.
+ * `to` is optional: a boolean has exactly one other state, and the desired schema already holds it.
+ * The `translatable` switch is the flip machinery's handle.
+ * On -> off runs the fan-in transform once per (entity, locale); off -> on reshapes each entity's value.
+ * A `nullable` or `unique` switch runs the transform once per row.
+ * Backfills and dedups then satisfy the constraint the guard would otherwise refuse.
+ * `translatable` is logical-only: a raw table has no translatable concept.
+ */
+export interface SwitchMigration {
+  /**
+   * The field whose attribute flips, carrying the asserted live state.
+   */
+  from: (ColumnAddress | KnownFieldAddress) & SwitchState;
+
+  /**
+   * The target attribute state, as an explicit assertion.
+   * Omitted, the engine materializes it from the desired schema.
+   */
+  to?: SwitchAttributes;
+
+  /**
+   * Per-row (or per-entity, on a fan-out) value transform.
+   * If omitted, a fan-in promotes the default locale and a value pass keeps every row as it is.
+   */
+  transform?: MigrationTransform;
+}
+
+/**
+ * One declarative migration: a move, a rename, a discard, or a switch.
+ */
+export type Migration = MoveMigration | RenameMigration | DiscardMigration | SwitchMigration;
 
 /**
  * Defines a database migration.
@@ -270,6 +363,20 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration;
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'legacy' },
  *   to: null,
+ * })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // migrations/2026-10-title-per-post.ts - turn a translatable field back off
+ * import { defineMigration } from 'ohne'
+ *
+ * export default defineMigration({
+ *   from: { collection: 'Posts', field: 'title', translatable: true },
+ *   transform: (value, row, ctx) => {
+ *     if (ctx.locale === 'en') return value
+ *     return ctx.deleteRecord()
+ *   },
  * })
  * ```
  */

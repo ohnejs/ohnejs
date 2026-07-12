@@ -1,6 +1,7 @@
 import type { GuardReport } from './schema/guard.ts';
 
 import { useBlocks } from '../blocks/use-blocks.ts';
+import { resolveLocales } from '../collections/resolve-locales.ts';
 import { useCollections } from '../collections/use-collections.ts';
 import { useEnv } from '../env/use-env.ts';
 import { useFields } from '../fields/use-fields.ts';
@@ -27,6 +28,7 @@ export interface SyncProjectOptions {
  * Connects the project's database and reconciles it with the schema the registries declare.
  * The desired schema builds from the collection, field, and block registries; migrations run inside.
  * Force resolves from `options.force`, then the `FORCE_SYNC` env, then `Config.database.sync.force`.
+ * The default content locale resolves from `Config.collections`, feeding the translatable fan-out.
  * Deletions - forced, or authorized by an applied migration - land in a warn block.
  * Orphan warnings land in another; a refusal throws through the funnel.
  * `serveAPI` runs it before `listen()`; `ohne sync` runs it standalone.
@@ -41,6 +43,7 @@ export async function syncProjectDatabase(options: SyncProjectOptions = {}): Pro
     desired: buildDesiredSchema(useCollections(), useFields(), useBlocks()),
     migrations: Object.values(useMigrations().all()),
     force,
+    defaultLocale: resolveLocales(useConfig().collections).defaultLocale,
   });
   if (report.deletions.length > 0) {
     usePrinter().warnBlock({

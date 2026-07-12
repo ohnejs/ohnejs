@@ -12,17 +12,32 @@ import type {
   ConsumedAddress,
   LogicalSubtree,
   LoweredMigration,
+  LoweredSwitch,
   RenameMember,
   ResolveState,
 } from './resolve-address.ts';
 import type { MigrationStamp } from './state.ts';
 import type { MigrationMeta } from './use-migrations.ts';
 
-import { deepEqual, errorMessage, isNull, isUndefined, jsonClone } from '../../../utils/index.ts';
+import {
+  chunk,
+  deepEqual,
+  errorMessage,
+  isNull,
+  isUndefined,
+  jsonClone,
+  last,
+} from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { collectionTableName, derivedParentName, derivedTableName } from '../naming/table-names.ts';
+import {
+  collectionTableName,
+  companionTableName,
+  derivedParentName,
+  derivedTableName,
+} from '../naming/table-names.ts';
 import { sweepWrapperRows, type SweepTable } from '../schema/purge.ts';
 import { applyClassification } from '../schema/snapshot.ts';
+import { DELETE_RECORD } from './define-migration.ts';
 import { consumedByMigration, lowerMigration, pathStartsWith } from './resolve-address.ts';
 
 /**
@@ -60,6 +75,15 @@ export interface ExecuteMigrationsOptions {
    * true
    */
   ownership?: boolean;
+
+  /**
+   * The locale the flip machinery pivots on; nothing stores it.
+   * The fan-out lands existing values on it, and a transform-less fan-in promotes and keeps its rows.
+   *
+   * @default
+   * 'en'
+   */
+  defaultLocale?: string;
 }
 
 /**
@@ -88,6 +112,7 @@ interface Engine {
   desired: readonly TableSchema[];
   force: boolean;
   ownership: boolean;
+  defaultLocale: string;
   names: Set<string>;
   claimed: SchemaClassification;
   deletions: string[];
@@ -114,6 +139,10 @@ interface Correlation {
  * `to` is satisfied when it is live, in the desired schema, or consumed by a later pending migration.
  * Chains therefore skip end to end.
  * Everything else refuses loudly and rolls the sync back.
+ *
+ * The automatic off -> on fan-out runs last, over whatever flips the migrations left uncovered.
+ * A field turned translatable moves its values to the default locale and sheds its main column here.
+ * The diff that follows therefore never sees a loss.
  */
 export async function executeMigrations(
   db: Transaction,
@@ -126,6 +155,7 @@ export async function executeMigrations(
     desired: options.desired,
     force: options.force,
     ownership: options.ownership ?? true,
+    defaultLocale: options.defaultLocale ?? 'en',
     names: new Set(await dialect.listTables(db)),
     claimed: jsonClone(options.claimed),
     deletions: [],
@@ -137,6 +167,7 @@ export async function executeMigrations(
     const lowered = await lowerMigration(resolveState(engine), meta);
     stamps.push(await runMigration(engine, meta, lowered, later));
   }
+  await applyFanOuts(engine);
   return { stamps, claimed: engine.claimed, deletions: engine.deletions };
 }
 
@@ -176,6 +207,8 @@ function runMigration(
       return runCompoundRename(engine, meta, lowered.members, lowered.to, later);
     case 'compoundDiscard':
       return runCompoundDiscard(engine, meta, lowered.tables);
+    case 'switch':
+      return runSwitch(engine, meta, lowered, later);
   }
 }
 
@@ -209,6 +242,9 @@ async function runCompoundRename(
     if (!isUndefined(member.origin)) {
       const claim = engine.claimed[member.to] ?? { columns: {} };
       engine.claimed[member.to] = { ...claim, derived: member.origin };
+    } else if (!isUndefined(member.companion)) {
+      const claim = engine.claimed[member.to] ?? { columns: {} };
+      engine.claimed[member.to] = { ...claim, companion: member.companion };
     }
     applied++;
   }
@@ -267,6 +303,7 @@ async function dropOwnedTable(engine: Engine, table: string): Promise<void> {
 /**
  * Renames a table, follows it in the claim record, and cascades over its derived tables.
  * Every junction and child table whose origin names the renamed owner renames with it.
+ * The claimed translations companion follows the same way.
  * Each physical name recomputes from the new owner, fresh truncation hashes included.
  * The new name doubles as the logical owner the derived names recompute from.
  * A cascade onto a name past the physical cap therefore refuses: nothing recomposes from a hash.
@@ -297,7 +334,16 @@ async function runRename(
         : [{ table, claim, origin: claim.derived }],
     )
     .sort((a, b) => (a.table < b.table ? -1 : 1));
-  if (derived.length > 0 && to.table.includes('$')) {
+  const companions = Object.entries(engine.claimed)
+    .flatMap(([table, claim]) =>
+      isUndefined(claim.companion) ||
+      collectionTableName(claim.companion) !== from.table ||
+      !engine.names.has(table)
+        ? []
+        : [{ table, claim }],
+    )
+    .sort((a, b) => (a.table < b.table ? -1 : 1));
+  if ((derived.length > 0 || companions.length > 0) && to.table.includes('$')) {
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot cascade onto a truncated name`,
       body: [
@@ -312,6 +358,11 @@ async function runRename(
     const renamed = derivedTableName(to.table, ...origin.path);
     await renameOwned(engine, meta, table, renamed);
     engine.claimed[renamed] = { ...claim, derived: { ...origin, collection: to.table } };
+  }
+  for (const { table, claim } of companions) {
+    const renamed = companionTableName(to.table);
+    await renameOwned(engine, meta, table, renamed);
+    engine.claimed[renamed] = { ...claim, companion: to.table };
   }
   return { name: meta.name, status: 'applied' };
 }
@@ -500,6 +551,7 @@ async function materializeTarget(
     const claim: TableClaim = { columns };
     if (!isUndefined(wanted.derived)) claim.derived = wanted.derived;
     if (!isUndefined(wanted.block)) claim.block = wanted.block;
+    if (!isUndefined(wanted.companion)) claim.companion = wanted.companion;
     engine.claimed[to.table] = claim;
   }
   const schema = await describe(engine, to.table);
@@ -509,12 +561,25 @@ async function materializeTarget(
     assertNotPrimaryKey(meta, schema, to);
     return schema;
   }
-  const added: ColumnSchema = { name: to.column, type: to.type, notNull: false };
+  await addColumn(engine, schema, { name: to.column, type: to.type, notNull: false });
+  setClaim(engine, to.table, to.column, to.type);
+  return describe(engine, to.table);
+}
+
+/**
+ * Adds one column through a per-table diff, always nullable; the sync's diff tightens it later.
+ * A `NOT NULL` add would refuse over live rows, and the caller fills the values right after anyway.
+ */
+async function addColumn(
+  engine: Engine,
+  schema: TableSchema,
+  column: ColumnSchema,
+): Promise<TableSchema> {
   await engine.dialect.applyTableDiff(engine.db, {
     kind: 'alter',
     live: schema,
-    desired: { ...schema, columns: [...schema.columns, added] },
-    addColumns: [added],
+    desired: { ...schema, columns: [...schema.columns, column] },
+    addColumns: [column],
     dropColumns: [],
     changeColumns: [],
     changePrimaryKey: false,
@@ -525,8 +590,806 @@ async function materializeTarget(
     addForeignKeys: [],
     dropForeignKeys: [],
   });
-  setClaim(engine, to.table, to.column, to.type);
-  return describe(engine, to.table);
+  return describe(engine, schema.name);
+}
+
+/**
+ * Applies every off -> on translatable flip the migrations left uncovered, automatic and lossless.
+ * Scalar flips move main-column values into default-locale companion rows and shed the main column.
+ * Composite flips stamp `_localeCode = defaultLocale` onto the live derived rows.
+ * The structural remainder - `NOT NULL` tightening, unique widening - stays with the diff.
+ * Its guard probes then pass over the freshly stamped data.
+ */
+async function applyFanOuts(engine: Engine): Promise<void> {
+  for (const wanted of engine.desired) {
+    if (!isUndefined(wanted.companion)) {
+      await fanOutScalars(engine, wanted, engine.defaultLocale);
+    }
+    const scoped = wanted.columns.some((column) => column.name === '_localeCode');
+    if (!isUndefined(wanted.derived) && scoped) {
+      await fanOutDerived(engine, wanted, engine.defaultLocale);
+    }
+  }
+}
+
+/**
+ * Fans one collection's freshly translatable columns out to its companion.
+ *
+ * A flip is a live main column the desired main table lost while the desired companion gained it.
+ * The companion materializes nullable and without constraints, exactly as a move target does.
+ * Rows already holding the default locale take the values in place; missing ones are inserted.
+ * An entity whose flipped values are all `NULL` needs no row: an absent row already reads as `NULL`.
+ * The main columns then drop - the engine covers the loss, so the guard has nothing to refuse.
+ *
+ * A flip that retypes at the same time refuses: values cannot carry across types untransformed.
+ * A `NOT NULL` companion column outside the flip refuses too when new rows would need a value for it.
+ */
+async function fanOutScalars(
+  engine: Engine,
+  wanted: TableSchema,
+  defaultLocale: string,
+): Promise<void> {
+  const { db, dialect } = engine;
+  const collection = wanted.companion as string;
+  const main = collectionTableName(collection);
+  if (!present(engine, main)) return;
+  const live = await describe(engine, main);
+  const desiredMain = engine.desired.find((table) => table.name === main);
+  const flips = wanted.columns.filter(
+    (column) =>
+      !column.name.startsWith('_') &&
+      live.columns.some((item) => item.name === column.name) &&
+      desiredMain?.columns.every((item) => item.name !== column.name) === true,
+  );
+  if (flips.length === 0) return;
+  for (const column of flips) {
+    const source = live.columns.find((item) => item.name === column.name) as ColumnSchema;
+    if (dialect.columnType(source.type) !== dialect.columnType(column.type)) {
+      throw ohneError({
+        title: `Field \`${collection}.${column.name}\` retypes while turning translatable`,
+        body: [
+          `The live column holds \`${source.type}\` and the companion wants \`${column.type}\`; the fan-out cannot carry values across types.`,
+          'Retype first and flip in the next deploy, or cover the flip with a migration.',
+        ],
+      });
+    }
+  }
+  const companion = await ensureCompanion(engine, wanted, flips);
+  const anyValue = flips
+    .map((column) => `${dialect.quote(main)}.${dialect.quote(column.name)} IS NOT NULL`)
+    .join(' OR ');
+  const missing =
+    `FROM ${dialect.quote(main)} WHERE (${anyValue}) AND NOT EXISTS (` +
+    `SELECT 1 FROM ${dialect.quote(companion.name)} ` +
+    `WHERE ${dialect.quote('_parentUUID')} = ${dialect.quote(main)}.${dialect.quote('UUID')} ` +
+    `AND ${dialect.quote('_localeCode')} = ?)`;
+  const strict = companion.columns.find(
+    (column) =>
+      !column.name.startsWith('_') &&
+      column.notNull &&
+      flips.every((flip) => flip.name !== column.name),
+  );
+  if (!isUndefined(strict)) {
+    const row = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) AS ${dialect.quote('count')} ${missing}`,
+      [defaultLocale],
+    );
+    if ((row?.count ?? 0) > 0) {
+      throw ohneError({
+        title: `Cannot fan \`${collection}\` out to its translations`,
+        body: [
+          `\`${row?.count}\` entities need a fresh \`${defaultLocale}\` row, and \`${companion.name}.${strict.name}\` is \`NOT NULL\` with nothing to fill it.`,
+          `Create the missing \`${defaultLocale}\` rows first, or make \`${strict.name}\` nullable.`,
+        ],
+      });
+    }
+  }
+  const sets = flips
+    .map(
+      (column) =>
+        `${dialect.quote(column.name)} = (SELECT ${dialect.quote(column.name)} ` +
+        `FROM ${dialect.quote(main)} WHERE ${dialect.quote('UUID')} = ` +
+        `${dialect.quote(companion.name)}.${dialect.quote('_parentUUID')})`,
+    )
+    .join(', ');
+  await db.run(
+    `UPDATE ${dialect.quote(companion.name)} SET ${sets} WHERE ${dialect.quote('_localeCode')} = ? ` +
+      `AND EXISTS (SELECT 1 FROM ${dialect.quote(main)} WHERE ${dialect.quote('UUID')} = ` +
+      `${dialect.quote(companion.name)}.${dialect.quote('_parentUUID')})`,
+    [defaultLocale],
+  );
+  const names = flips.map((column) => dialect.quote(column.name)).join(', ');
+  await db.run(
+    `INSERT INTO ${dialect.quote(companion.name)} ` +
+      `(${dialect.quote('_parentUUID')}, ${dialect.quote('_localeCode')}, ${names}) ` +
+      `SELECT ${dialect.quote('UUID')}, ?, ${names} ${missing}`,
+    [defaultLocale, defaultLocale],
+  );
+  for (const column of flips) {
+    const fresh = await describe(engine, main);
+    const dropped = fresh.columns.find((item) => item.name === column.name);
+    if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
+    delete engine.claimed[main]?.columns[column.name];
+  }
+}
+
+/**
+ * Ensures a fan-out's companion exists with every flipped column present, all of them nullable.
+ * A fresh companion relaxes its user columns and skips constraints, exactly as a move target does.
+ * The sync's diff tightens and re-adds them once the values landed, each add probed by the guard.
+ */
+async function ensureCompanion(
+  engine: Engine,
+  wanted: TableSchema,
+  flips: readonly ColumnSchema[],
+): Promise<TableSchema> {
+  if (!present(engine, wanted.name)) {
+    const relaxed = wanted.columns.map((column) =>
+      column.name.startsWith('_') ? column : { ...column, notNull: false },
+    );
+    await engine.dialect.applyTableDiff(engine.db, {
+      kind: 'create',
+      table: { ...wanted, columns: relaxed, uniques: [], indexes: [] },
+    });
+    engine.names.add(wanted.name);
+    engine.claimed[wanted.name] = {
+      columns: Object.fromEntries(wanted.columns.map((item) => [item.name, item.type])),
+      companion: wanted.companion as string,
+    };
+    return describe(engine, wanted.name);
+  }
+  let schema = await describe(engine, wanted.name);
+  for (const flip of flips) {
+    if (schema.columns.some((item) => item.name === flip.name)) continue;
+    schema = await addColumn(engine, schema, { ...flip, notNull: false });
+    setClaim(engine, wanted.name, flip.name, flip.type);
+  }
+  return schema;
+}
+
+/**
+ * Fans one freshly locale-scoped derived table out: `_localeCode` arrives stamped `defaultLocale`.
+ * The column lands nullable and full; the diff tightens it to `NOT NULL` over zero probed NULLs.
+ * The `one`-cardinality unique and a junction's link unique widen through the same diff.
+ */
+async function fanOutDerived(
+  engine: Engine,
+  wanted: TableSchema,
+  defaultLocale: string,
+): Promise<void> {
+  if (!present(engine, wanted.name)) return;
+  const live = await describe(engine, wanted.name);
+  if (live.columns.some((column) => column.name === '_localeCode')) return;
+  await addColumn(engine, live, { name: '_localeCode', type: 'text', notNull: false });
+  await engine.db.run(
+    `UPDATE ${engine.dialect.quote(wanted.name)} SET ${engine.dialect.quote('_localeCode')} = ?`,
+    [defaultLocale],
+  );
+  setClaim(engine, wanted.name, '_localeCode', 'text');
+}
+
+/**
+ * Runs one switch migration: asserts the live state, flips the data, and stamps.
+ *
+ * A binary state has one other value, so a live state on the target side is already switched.
+ * That case skips with a reason - the switch analog of a move's absent `from`.
+ * An absent field skips when the desired schema or a later migration covers it, and refuses otherwise.
+ * A target state equal to `from` refuses too: the desired schema never flips it, so nothing can run.
+ * A `translatable` on -> off runs the fan-in.
+ * Off -> on reshapes the automatic fan-out's values, or leaves the mechanics to it entirely.
+ * The other switches run the transform once per row; the structural change stays with the diff.
+ */
+async function runSwitch(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+  later: readonly ConsumedAddress[],
+): Promise<MigrationStamp> {
+  if (foreign(engine, lowered.table)) refuseForeign(meta, lowered.table);
+  const subject = isUndefined(lowered.column)
+    ? `\`${lowered.table}\``
+    : `\`${lowered.table}.${lowered.column}\``;
+  const desiredState = desiredSwitchState(engine, lowered);
+  if (!isUndefined(lowered.to) && !isUndefined(desiredState) && lowered.to !== desiredState) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches against the desired schema`,
+      body: [
+        `\`to\` asserts \`${lowered.attribute}: ${lowered.to}\`, and the desired schema wants \`${desiredState}\`.`,
+        'Align the migration with the schema, or drop `to`.',
+      ],
+      path: meta.file,
+    });
+  }
+  const target = lowered.to ?? desiredState;
+  const live = await liveSwitchState(engine, meta, lowered);
+  if (isUndefined(live)) {
+    const subtree = isUndefined(lowered.collection)
+      ? undefined
+      : { collection: lowered.collection, path: lowered.segments ?? [] };
+    if (isUndefined(desiredState) && !subtreeSatisfied(later, subtree)) {
+      refuseUnrunnable(meta, subject, `its switched \`${lowered.attribute}\` state`);
+    }
+    return skipStamp(meta, `${subject} is absent and the switch is satisfied`);
+  }
+  if (isUndefined(target)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot materialize its target state`,
+      body: [
+        `Neither \`to\` nor the desired schema states where \`${lowered.attribute}\` lands.`,
+        'Set `to`, or add the field to the schema.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (live !== 'unknown' && live !== lowered.from) {
+    return skipStamp(meta, `${subject} already holds \`${lowered.attribute}: ${String(live)}\``);
+  }
+  if (target === lowered.from) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` switches \`${lowered.attribute}\` onto its own state`,
+      body: [
+        `Both sides resolve to \`${lowered.attribute}: ${String(target)}\` - the desired schema never flips it.`,
+        'Flip the field in the schema, or delete the migration.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (lowered.attribute === 'translatable') {
+    if (lowered.from) {
+      if (isUndefined(lowered.column)) {
+        await runFanInDerived(engine, meta, lowered);
+      } else {
+        await runFanInScalar(engine, meta, lowered);
+      }
+      return { name: meta.name, status: 'applied' };
+    }
+    if (!isUndefined(lowered.transform)) {
+      if (isUndefined(lowered.column)) {
+        throw ohneError({
+          title: `Migration \`${meta.name}\` reshapes a composite fan-out`,
+          body: [
+            'An off -> on composite flip only stamps its rows onto the default locale; there is no value to reshape.',
+            'Drop the transform.',
+          ],
+          path: meta.file,
+        });
+      }
+      await runFanOutScalar(engine, meta, lowered);
+    }
+    // Without a transform the automatic fan-out performs the flip; the migration asserted the states.
+    return { name: meta.name, status: 'applied' };
+  }
+  await runValuePass(engine, meta, lowered);
+  return { name: meta.name, status: 'applied' };
+}
+
+/**
+ * The desired side of a switch: what the schema says about the flipped attribute, if it says anything.
+ * `translatable` reads from the column's desired home or the derived table's `_localeCode`.
+ * `nullable` reads the column's `notNull`; the unique switches scan the home table's uniques.
+ */
+function desiredSwitchState(engine: Engine, lowered: LoweredSwitch): boolean | undefined {
+  if (lowered.attribute === 'translatable') {
+    const collection = lowered.collection as string;
+    const segments = lowered.segments as readonly string[];
+    const derived = engine.desired.find(
+      (table) =>
+        table.name === derivedTableName(collection, ...(segments as [string, ...string[]])),
+    );
+    if (!isUndefined(derived)) {
+      return derived.columns.some((column) => column.name === '_localeCode');
+    }
+    const home = desiredHomeOf(engine, lowered);
+    if (isUndefined(home)) return undefined;
+    return !isUndefined(home.table.companion);
+  }
+  const home = desiredHomeOf(engine, lowered);
+  if (isUndefined(home)) return undefined;
+  const column = lowered.column as string;
+  if (lowered.attribute === 'nullable') return !home.column.notNull;
+  const scoped = home.table.uniques.some((unique) =>
+    deepEqual(unique.columns, ['_localeCode', column]),
+  );
+  if (lowered.attribute === 'uniquePerLocale') return scoped;
+  return scoped || home.table.uniques.some((unique) => deepEqual(unique.columns, [column]));
+}
+
+/**
+ * The desired table and column a switch's field lands on: the field-path table, or the companion.
+ * A dotted path homes on its prefix's derived table, exactly as the address lowering reads it.
+ */
+function desiredHomeOf(
+  engine: Engine,
+  lowered: LoweredSwitch,
+): { table: TableSchema; column: ColumnSchema } | undefined {
+  const column = lowered.column ?? last(lowered.segments ?? []);
+  if (isUndefined(column)) return undefined;
+  const tables = isUndefined(lowered.collection)
+    ? [engine.desired.find((table) => table.name === lowered.table)]
+    : [
+        engine.desired.find(
+          (table) => table.name === fieldPathTable(lowered.collection as string, lowered.segments),
+        ),
+        lowered.segments?.length === 1
+          ? engine.desired.find((table) => table.companion === lowered.collection)
+          : undefined,
+      ];
+  for (const table of tables) {
+    const found = table?.columns.find((item) => item.name === column);
+    if (!isUndefined(table) && !isUndefined(found)) return { table, column: found };
+  }
+  return undefined;
+}
+
+/**
+ * The table a field path's column sits on: the main table, or the dotted prefix's derived table.
+ */
+function fieldPathTable(collection: string, segments: readonly string[] | undefined): string {
+  const prefix = segments?.slice(0, -1) ?? [];
+  if (prefix.length === 0) return collectionTableName(collection);
+  return derivedTableName(collection, prefix[0] as string, ...prefix.slice(1));
+}
+
+/**
+ * The live side of a switch: the flipped attribute's current state, when it can be read at all.
+ * `undefined` means the field is live nowhere.
+ * `'unknown'` marks a live column whose unique state is unreadable under the sync bracket.
+ * Every unique is already dropped there, so the pass simply runs.
+ */
+async function liveSwitchState(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+): Promise<boolean | 'unknown' | undefined> {
+  if (lowered.attribute === 'translatable') {
+    const collection = lowered.collection as string;
+    const segments = lowered.segments as readonly string[];
+    const derivedName = derivedTableName(collection, ...(segments as [string, ...string[]]));
+    if (present(engine, derivedName)) {
+      const derived = await describe(engine, derivedName);
+      return derived.columns.some((column) => column.name === '_localeCode');
+    }
+    const column = last(segments) as string;
+    const companionName = companionTableName(collection);
+    if (engine.claimed[companionName]?.companion === collection && present(engine, companionName)) {
+      const companion = await describe(engine, companionName);
+      if (companion.columns.some((item) => item.name === column)) return true;
+    }
+    const main = collectionTableName(collection);
+    if (segments.length === 1 && present(engine, main)) {
+      const schema = await describe(engine, main);
+      if (schema.columns.some((item) => item.name === column)) return false;
+    }
+    return undefined;
+  }
+  if (!present(engine, lowered.table)) return undefined;
+  const schema = await describe(engine, lowered.table);
+  const column = schema.columns.find((item) => item.name === lowered.column);
+  if (isUndefined(column)) return undefined;
+  if (!isUndefined(lowered.type)) {
+    assertColumnMatches(
+      engine,
+      meta,
+      { table: lowered.table, column: lowered.column as string, type: lowered.type },
+      column,
+    );
+  }
+  if (lowered.attribute === 'nullable') return !column.notNull;
+  return 'unknown';
+}
+
+/**
+ * Runs an off -> on scalar flip with its transform: each entity's value reshapes on its way over.
+ * The mechanics mirror the automatic fan-out; the transform sees the value, the row, and no locale.
+ * Returning nothing keeps the value; `deleteRecord()` has no row to delete yet and refuses.
+ */
+async function runFanOutScalar(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+): Promise<void> {
+  const { db, dialect } = engine;
+  const collection = lowered.collection as string;
+  const column = lowered.column as string;
+  const wanted = engine.desired.find((table) => table.companion === collection);
+  if (isUndefined(wanted)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot fan \`${collection}.${column}\` out`,
+      body: [
+        'The desired schema holds no translations companion for the collection.',
+        'Mark the field `translatable`, or fix the migration.',
+      ],
+      path: meta.file,
+    });
+  }
+  const flip = wanted.columns.find((item) => item.name === column);
+  if (isUndefined(flip)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot fan \`${collection}.${column}\` out`,
+      body: [
+        `The desired companion \`${wanted.name}\` holds no \`${column}\` column.`,
+        'Mark the field `translatable` in the schema, or delete the migration.',
+      ],
+      path: meta.file,
+    });
+  }
+  const main = collectionTableName(collection);
+  const source = await describe(engine, main);
+  const sourceColumn = source.columns.find((item) => item.name === column) as ColumnSchema;
+  const rows = await readRows(engine, source);
+  const companion = await ensureCompanion(engine, wanted, [flip]);
+  const ctx = switchContext(engine, undefined);
+  const update =
+    `UPDATE ${dialect.quote(companion.name)} SET ${dialect.quote(column)} = ? ` +
+    `WHERE ${dialect.quote('_parentUUID')} = ? AND ${dialect.quote('_localeCode')} = ?`;
+  const insert =
+    `INSERT INTO ${dialect.quote(companion.name)} ` +
+    `(${dialect.quote('_parentUUID')}, ${dialect.quote('_localeCode')}, ${dialect.quote(column)}) ` +
+    `VALUES (?, ?, ?)`;
+  for (const row of rows) {
+    const value = dialect.deserialize(sourceColumn.type, row[column] ?? null);
+    const out = await applySwitchTransform(
+      meta,
+      lowered.transform,
+      value,
+      source,
+      row,
+      ctx,
+      engine,
+    );
+    if (out === DELETE_RECORD) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` deletes on a fan-out`,
+        body: [
+          'A fan-out reshapes values on their way to the default locale; no locale row exists to delete yet.',
+          'Return a value, or nothing to keep it.',
+        ],
+        path: meta.file,
+      });
+    }
+    const serialized = dialect.serialize(flip.type, isUndefined(out) ? value : out);
+    const parent = row.UUID ?? null;
+    const { changes } = await db.run(update, [serialized, parent, engine.defaultLocale]);
+    if (changes === 0 && !isNull(serialized)) {
+      await db.run(insert, [parent, engine.defaultLocale, serialized]);
+    }
+  }
+  const fresh = await describe(engine, main);
+  const dropped = fresh.columns.find((item) => item.name === column);
+  if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
+  delete engine.claimed[main]?.columns[column];
+}
+
+/**
+ * Runs an on -> off scalar flip: the fan-in resolves every (entity, locale) row of the companion.
+ *
+ * The transform promotes a value onto the entity's main column, skips, or deletes the whole row.
+ * Without one the default locale promotes and the other locales keep their rows.
+ * A transform-less flip that retypes at the same time refuses: values cannot carry across types raw.
+ * Two promotions for one entity refuse by name - never a silent last-wins.
+ * A `NOT NULL` main column probes early.
+ * An entity that promoted nothing refuses here, naming the migration instead of aborting mid-apply.
+ * The companion column then drops.
+ * The whole companion goes instead when it held the last translatable field and desired omits it.
+ */
+async function runFanInScalar(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+): Promise<void> {
+  const { db, dialect } = engine;
+  const collection = lowered.collection as string;
+  const column = lowered.column as string;
+  const companionName = lowered.table;
+  const schema = await describe(engine, companionName);
+  const sourceColumn = schema.columns.find((item) => item.name === column) as ColumnSchema;
+  const main = collectionTableName(collection);
+  if (!present(engine, main)) refuseForeign(meta, main);
+  let mainSchema = await describe(engine, main);
+  const wantedColumn = engine.desired
+    .find((table) => table.name === main)
+    ?.columns.find((item) => item.name === column);
+  const targetType = wantedColumn?.type ?? sourceColumn.type;
+  if (
+    isUndefined(lowered.transform) &&
+    dialect.columnType(sourceColumn.type) !== dialect.columnType(targetType)
+  ) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` retypes \`${collection}.${column}\` untransformed`,
+      body: [
+        `The companion holds \`${sourceColumn.type}\` and the main column wants \`${targetType}\`; values cannot carry across types raw.`,
+        'Attach a transform returning the new type, or align the types.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (!mainSchema.columns.some((item) => item.name === column)) {
+    mainSchema = await addColumn(engine, mainSchema, {
+      name: column,
+      type: targetType,
+      notNull: false,
+    });
+    setClaim(engine, main, column, targetType);
+  }
+  const rows = await readRows(engine, schema);
+  const update = `UPDATE ${dialect.quote(main)} SET ${dialect.quote(column)} = ? WHERE ${dialect.quote('UUID')} = ?`;
+  const erase =
+    `DELETE FROM ${dialect.quote(companionName)} ` +
+    `WHERE ${dialect.quote('_parentUUID')} = ? AND ${dialect.quote('_localeCode')} = ?`;
+  const promoted = new Set<string>();
+  let unmatched = 0;
+  for (const row of rows) {
+    const locale = String(row._localeCode);
+    const parent = row._parentUUID ?? null;
+    const value = dialect.deserialize(sourceColumn.type, row[column] ?? null);
+    const ctx = switchContext(engine, locale);
+    const out = isUndefined(lowered.transform)
+      ? locale === engine.defaultLocale
+        ? value
+        : undefined
+      : await applySwitchTransform(meta, lowered.transform, value, schema, row, ctx, engine);
+    if (out === DELETE_RECORD) {
+      await db.run(erase, [parent, locale]);
+      continue;
+    }
+    if (isUndefined(out)) continue;
+    if (promoted.has(String(parent))) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` promotes two values for one entity`,
+        body: [
+          `\`${String(parent)}\` of \`${main}\` received a second promoted value, from locale \`${locale}\`.`,
+          'Return a value once per entity; the other locales return nothing or `deleteRecord()`.',
+        ],
+        path: meta.file,
+      });
+    }
+    promoted.add(String(parent));
+    const { changes } = await db.run(update, [dialect.serialize(targetType, out), parent]);
+    if (changes === 0) unmatched++;
+  }
+  if (unmatched > 0) {
+    if (!engine.force) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` cannot map every row`,
+        body: [
+          `\`${unmatched}\` rows of \`${companionName}\` have no \`${main}\` row to receive their \`${column}\` value.`,
+          '',
+          'Create the missing rows, or set `FORCE_SYNC` or `database.sync.force` to drop these values for one boot.',
+        ],
+        path: meta.file,
+      });
+    }
+    engine.deletions.push(
+      `- \`${unmatched}\` \`${companionName}.${column}\` values had no \`${main}\` row to promote onto`,
+    );
+  }
+  if (wantedColumn?.notNull === true) {
+    const row = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) AS ${dialect.quote('count')} FROM ${dialect.quote(main)} ` +
+        `WHERE ${dialect.quote(column)} IS NULL`,
+    );
+    if ((row?.count ?? 0) > 0) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` leaves \`${row?.count}\` entities without a value`,
+        body: [
+          `\`${main}.${column}\` is \`NOT NULL\`, and these entities promoted nothing from any locale.`,
+          'Return a value for one locale of each entity, or relax the column.',
+        ],
+        path: meta.file,
+      });
+    }
+  }
+  const fresh = await describe(engine, companionName);
+  const users = fresh.columns.filter((item) => !item.name.startsWith('_'));
+  const desiredOmits = engine.desired.every((table) => table.name !== companionName);
+  if (desiredOmits && users.length === 1 && users[0]?.name === column) {
+    await dropOwnedTable(engine, companionName);
+    return;
+  }
+  const dropped = fresh.columns.find((item) => item.name === column);
+  if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
+  delete engine.claimed[companionName]?.columns[column];
+}
+
+/**
+ * Runs an on -> off composite flip: the fan-in resolves every locale-scoped row of the derived table.
+ * There is no main column, so the outcomes are keeping the row and deleting it; a value refuses.
+ * Without a transform the default locale's rows survive and every other locale's row dies.
+ * Doomed rows die through the owned-row cascade, so nested children and block references follow.
+ * `_localeCode` then drops; the diff narrows the uniques, and the guard aborts surplus survivors.
+ */
+async function runFanInDerived(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+): Promise<void> {
+  const schema = await describe(engine, lowered.table);
+  const rows = await readRows(engine, schema);
+  const doomed: Record<string, SQLValue>[] = [];
+  for (const row of rows) {
+    const locale = String(row._localeCode);
+    const ctx = switchContext(engine, locale);
+    const out = isUndefined(lowered.transform)
+      ? locale === engine.defaultLocale
+        ? undefined
+        : DELETE_RECORD
+      : await applySwitchTransform(meta, lowered.transform, undefined, schema, row, ctx, engine);
+    if (out === DELETE_RECORD) {
+      doomed.push(row);
+      continue;
+    }
+    if (!isUndefined(out)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` promotes a value from a composite`,
+        body: [
+          'A composite fan-in keeps or deletes rows; there is no main column to promote onto.',
+          'Return nothing to keep the row, or `deleteRecord()`.',
+        ],
+        path: meta.file,
+      });
+    }
+  }
+  await deleteOwnedRows(engine, schema, doomed);
+  const fresh = await describe(engine, lowered.table);
+  const dropped = fresh.columns.find((item) => item.name === '_localeCode');
+  if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
+  delete engine.claimed[lowered.table]?.columns._localeCode;
+}
+
+/**
+ * Runs a `nullable` or unique switch's transform once per row, rewriting values in place.
+ * The structural change stays with the diff, whose guard probes then pass over the massaged data.
+ * `deleteRecord()` resolves a duplicate by dropping its row through the owned-row cascade.
+ * Junction and record references aimed at a deleted row surface on the next sync's orphan probe.
+ * Without a transform nothing runs.
+ */
+async function runValuePass(
+  engine: Engine,
+  meta: MigrationMeta,
+  lowered: LoweredSwitch,
+): Promise<void> {
+  if (isUndefined(lowered.transform)) return;
+  const { db, dialect } = engine;
+  const column = lowered.column as string;
+  const schema = await describe(engine, lowered.table);
+  const columnDef = schema.columns.find((item) => item.name === column) as ColumnSchema;
+  assertNotPrimaryKey(meta, schema, { table: lowered.table, column, type: columnDef.type });
+  if (schema.primaryKey.length === 0) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot correlate rows`,
+      body: [`\`${lowered.table}\` has no primary key to correlate rows by.`],
+      path: meta.file,
+    });
+  }
+  const localeKeyed = schema.columns.some((item) => item.name === '_localeCode');
+  const where = schema.primaryKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
+  const update = `UPDATE ${dialect.quote(lowered.table)} SET ${dialect.quote(column)} = ? WHERE ${where}`;
+  const rows = await readRows(engine, schema);
+  const doomed: Record<string, SQLValue>[] = [];
+  for (const row of rows) {
+    const locale = localeKeyed ? String(row._localeCode) : undefined;
+    const ctx = switchContext(engine, locale);
+    const value = dialect.deserialize(columnDef.type, row[column] ?? null);
+    const out = await applySwitchTransform(
+      meta,
+      lowered.transform,
+      value,
+      schema,
+      row,
+      ctx,
+      engine,
+    );
+    if (out === DELETE_RECORD) {
+      doomed.push(row);
+      continue;
+    }
+    if (isUndefined(out)) continue;
+    const key = schema.primaryKey.map((name) => row[name] ?? null);
+    await db.run(update, [dialect.serialize(columnDef.type, out), ...key]);
+  }
+  await deleteOwnedRows(engine, schema, doomed);
+}
+
+/**
+ * Deletes the given rows of one owned table, everything hanging off them following.
+ *
+ * The sync bracket runs with foreign keys off, so nothing cascades on its own.
+ * A blocks wrapper first sweeps the instances only its doomed rows reference, reported like any purge.
+ * Child tables, junctions, wrappers, and companions keyed to the deleted rows die next, recursively.
+ * A junction row deletes by its link triple; every other table by its primary key.
+ */
+async function deleteOwnedRows(
+  engine: Engine,
+  schema: TableSchema,
+  doomed: readonly Record<string, SQLValue>[],
+): Promise<void> {
+  if (doomed.length === 0) return;
+  const { db, dialect } = engine;
+  const claim = engine.claimed[schema.name];
+  const keyColumns =
+    schema.primaryKey.length > 0
+      ? schema.primaryKey
+      : ['_parentUUID', '_targetUUID', '_localeCode'];
+  if (claim?.derived?.kind === 'blocksWrapper') {
+    const universe: SweepTable[] = Object.entries(engine.claimed)
+      .filter(([name]) => engine.names.has(name))
+      .map(([name, item]) => ({ name, derived: item.derived, block: item.block }));
+    const list = doomed.map((row) => `'${String(row.UUID).replaceAll("'", "''")}'`).join(', ');
+    const condition = `${dialect.quote(schema.name)}.${dialect.quote('UUID')} IN (${list})`;
+    engine.deletions.push(
+      ...(await sweepWrapperRows(db, dialect, universe, schema.name, condition)),
+    );
+  }
+  const where = keyColumns.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
+  const erase = `DELETE FROM ${dialect.quote(schema.name)} WHERE ${where}`;
+  for (const row of doomed) {
+    await db.run(
+      erase,
+      keyColumns.map((name) => row[name] ?? null),
+    );
+  }
+  const parents = doomed.flatMap((row) => (isUndefined(row.UUID) ? [] : [row.UUID as SQLValue]));
+  if (parents.length === 0) return;
+  for (const [name, child] of Object.entries(engine.claimed)) {
+    if (!engine.names.has(name)) continue;
+    const under =
+      (!isUndefined(child.derived) && derivedParentName(child.derived) === schema.name) ||
+      (!isUndefined(child.companion) && collectionTableName(child.companion) === schema.name);
+    if (!under) continue;
+    const childSchema = await describe(engine, name);
+    const orphaned: Record<string, SQLValue>[] = [];
+    for (const batch of chunk(parents, 500)) {
+      const marks = batch.map(() => '?').join(', ');
+      orphaned.push(
+        ...(await db.query<Record<string, SQLValue>>(
+          `SELECT * FROM ${dialect.quote(name)} WHERE ${dialect.quote('_parentUUID')} IN (${marks})`,
+          batch,
+        )),
+      );
+    }
+    if (orphaned.length === 0) continue;
+    engine.deletions.push(
+      `- \`${orphaned.length}\` rows of \`${name}\` deleted, following their deleted parents`,
+    );
+    await deleteOwnedRows(engine, childSchema, orphaned);
+  }
+}
+
+/**
+ * The transform context of one switch row: read-only queries, the locale in hand, and the sentinel.
+ */
+function switchContext(engine: Engine, locale: string | undefined): MigrationContext {
+  const { db } = engine;
+  return {
+    query: <T>(sql: string, params?: SQLParams) => db.query<T>(sql, params),
+    queryOne: <T>(sql: string, params?: SQLParams) => db.queryOne<T>(sql, params),
+    ...(isUndefined(locale) ? {} : { locale }),
+    deleteRecord: () => DELETE_RECORD,
+  };
+}
+
+/**
+ * Invokes a switch transform on one row, wrapping a throw into an error naming the migration.
+ */
+async function applySwitchTransform(
+  meta: MigrationMeta,
+  transform: MigrationTransform | undefined,
+  value: unknown,
+  schema: TableSchema,
+  row: Record<string, SQLValue>,
+  ctx: MigrationContext,
+  engine: Engine,
+): Promise<unknown> {
+  if (isUndefined(transform)) return undefined;
+  try {
+    return await transform(value, deserializeRow(engine.dialect, schema, row), ctx);
+  } catch (error) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fails in its transform`,
+      body: [errorMessage(error), '', `Thrown for a \`${schema.name}\` row; fix the transform.`],
+      path: meta.file,
+    });
+  }
 }
 
 /**
@@ -558,12 +1421,10 @@ async function writeValues(
   const notNull = target.columns.find((column) => column.name === to.column)?.notNull === true;
   const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
-  const ctx: MigrationContext = {
-    query: <T>(sql: string, params?: SQLParams) => db.query<T>(sql, params),
-    queryOne: <T>(sql: string, params?: SQLParams) => db.queryOne<T>(sql, params),
-  };
+  const localeKeyed = source.columns.some((column) => column.name === '_localeCode');
   let unmatched = 0;
   for (const row of rows) {
+    const ctx = switchContext(engine, localeKeyed ? String(row._localeCode) : undefined);
     const value = dialect.deserialize(from.type, row[from.column] ?? null);
     let output = value;
     if (!isUndefined(transform)) {
@@ -576,6 +1437,16 @@ async function writeValues(
           path: meta.file,
         });
       }
+    }
+    if (output === DELETE_RECORD) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` deletes on a move`,
+        body: [
+          "A move carries values onto their new column; deleting rows is the switch fan-in's tool.",
+          'Return a value, or make the migration a switch.',
+        ],
+        path: meta.file,
+      });
     }
     const serialized = dialect.serialize(to.type, output);
     if (isNull(serialized) && notNull) {

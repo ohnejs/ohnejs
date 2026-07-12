@@ -1178,3 +1178,66 @@ describe('executeMigrations with logical addresses', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations over the translations companion', () => {
+  function companionSchema(collection: string): TableSchema {
+    return table(`${collection}__translations`, {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        { name: 'title', type: 'text', notNull: true },
+      ],
+      primaryKey: ['_parentUUID', '_localeCode'],
+      companion: collection,
+    });
+  }
+
+  it('cascades a physical collection rename over the claimed companion', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const companion = companionSchema('Posts');
+    await materialize(db, [posts, companion]);
+    await db.run(
+      'INSERT INTO "Posts__translations" ("_parentUUID", "_localeCode", "title") VALUES (?, ?, ?)',
+      ['p1', 'en', 'Hello'],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', { from: { table: 'Posts' }, to: { table: 'Articles' } }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, companion]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-articles', status: 'applied' }]);
+    deepStrictEqual(await columnNames(db, 'Articles__translations'), [
+      '_parentUUID',
+      '_localeCode',
+      'title',
+    ]);
+    deepStrictEqual(outcome.claimed['Articles__translations'], {
+      columns: { _parentUUID: 'text', _localeCode: 'text', title: 'text' },
+      companion: 'Articles',
+    });
+    strictEqual(outcome.claimed['Posts__translations'], undefined);
+    await db.close();
+  });
+
+  it('installs the companion claim through a logical rename compound', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const companion = companionSchema('Posts');
+    await materialize(db, [posts, companion]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-articles', { from: { collection: 'Posts' }, to: { collection: 'Articles' } }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts, companion]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-articles', status: 'applied' }]);
+    deepStrictEqual(outcome.claimed['Articles__translations']?.companion, 'Articles');
+    await db.close();
+  });
+});

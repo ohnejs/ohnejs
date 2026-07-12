@@ -40,6 +40,7 @@ function state(live: TableSchema[], overrides: Partial<ResolveState> = {}): Reso
         {
           columns: Object.fromEntries(schema.columns.map((column) => [column.name, column.type])),
           ...(schema.derived ? { derived: schema.derived } : {}),
+          ...(schema.companion ? { companion: schema.companion } : {}),
         },
       ]),
     ),
@@ -71,16 +72,18 @@ describe('consumedByMigration', () => {
     );
   });
 
-  it('lists both readings of a logical field, and only the main table of a collection', () => {
+  it('lists every reading of a logical address, the companion included', () => {
     deepStrictEqual(
       consumedByMigration(meta({ from: { collection: 'Posts', field: 'title' }, to: null })),
       [
         { table: 'Posts', column: 'title' },
         { table: 'Posts_title', subtree: { collection: 'Posts', path: ['title'] } },
+        { table: 'Posts__translations', column: 'title' },
       ],
     );
     deepStrictEqual(consumedByMigration(meta({ from: { collection: 'Posts' }, to: null })), [
       { table: 'Posts', subtree: { collection: 'Posts', path: [] } },
+      { table: 'Posts__translations' },
     ]);
   });
 
@@ -109,11 +112,18 @@ describe('touchedByMigration', () => {
           to: { collection: 'Posts', field: 'draft' },
         }),
       ),
-      ['Posts', 'Posts_isDraft', 'Posts', 'Posts_draft'],
+      [
+        'Posts',
+        'Posts_isDraft',
+        'Posts__translations',
+        'Posts',
+        'Posts_draft',
+        'Posts__translations',
+      ],
     );
     deepStrictEqual(
       touchedByMigration(meta({ from: { collection: 'Posts' }, to: { collection: 'Articles' } })),
-      ['Posts', 'Articles'],
+      ['Posts', 'Posts__translations', 'Articles', 'Articles__translations'],
     );
   });
 
@@ -792,6 +802,288 @@ describe('lowerMigration', () => {
         meta({ from: { collection: 'Posts', field: 'tags' }, to: null }),
       ),
       /cannot enumerate `Posts.tags`/,
+    );
+  });
+});
+
+describe('lowerMigration over the translations companion', () => {
+  function companion(collection: string, users: TableSchema['columns']): TableSchema {
+    return table(`${collection}__translations`, {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        ...users,
+      ],
+      primaryKey: ['_parentUUID', '_localeCode'],
+      companion: collection,
+    });
+  }
+
+  it('homes a translatable field move on the companion, both sides', async () => {
+    const posts = table('Posts');
+    const live = companion('Posts', [{ name: 'title', type: 'text', notNull: true }]);
+    const lowered = await lowerMigration(
+      state([posts, live], {
+        desired: [posts, companion('Posts', [{ name: 'headline', type: 'text', notNull: true }])],
+      }),
+      meta({
+        from: { collection: 'Posts', field: 'title' },
+        to: { collection: 'Posts', field: 'headline' },
+      }),
+    );
+    deepStrictEqual(lowered, {
+      kind: 'move',
+      from: { table: 'Posts__translations', column: 'title', type: 'text' },
+      to: { table: 'Posts__translations', column: 'headline', type: 'text' },
+      toSubtree: { collection: 'Posts', path: ['headline'] },
+      transform: undefined,
+    });
+  });
+
+  it('discards a companion column while other translatable fields keep the table', async () => {
+    const posts = table('Posts');
+    const live = companion('Posts', [
+      { name: 'title', type: 'text', notNull: true },
+      { name: 'subtitle', type: 'text', notNull: false },
+    ]);
+    const lowered = await lowerMigration(
+      state([posts, live], {
+        desired: [posts, companion('Posts', [{ name: 'subtitle', type: 'text', notNull: false }])],
+      }),
+      meta({ from: { collection: 'Posts', field: 'title' }, to: null }),
+    );
+    deepStrictEqual(lowered, {
+      kind: 'discardColumn',
+      from: { table: 'Posts__translations', column: 'title', type: 'text' },
+    });
+  });
+
+  it('escalates a discard of the last translatable field to the companion table', async () => {
+    const posts = table('Posts');
+    const live = companion('Posts', [{ name: 'title', type: 'text', notNull: true }]);
+    const lowered = await lowerMigration(
+      state([posts, live], { desired: [posts] }),
+      meta({ from: { collection: 'Posts', field: 'title' }, to: null }),
+    );
+    deepStrictEqual(lowered, {
+      kind: 'discardTable',
+      from: { table: 'Posts__translations' },
+    });
+  });
+
+  it('refuses a field live as a column on the main table and the companion at once', async () => {
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: true }],
+    });
+    const live = companion('Posts', [{ name: 'title', type: 'text', notNull: true }]);
+    await rejects(
+      lowerMigration(
+        state([posts, live]),
+        meta({ from: { collection: 'Posts', field: 'title' }, to: null }),
+      ),
+      /matches two readings/,
+    );
+  });
+
+  it('carries the companion through a collection rename compound', async () => {
+    const live = [
+      table('Posts'),
+      companion('Posts', [{ name: 'title', type: 'text', notNull: true }]),
+    ];
+    const lowered = await lowerMigration(
+      state(live),
+      meta({ from: { collection: 'Posts' }, to: { collection: 'Articles' } }),
+    );
+    deepStrictEqual(lowered, {
+      kind: 'compoundRename',
+      members: [
+        { from: 'Posts', to: 'Articles', origin: undefined },
+        { from: 'Posts__translations', to: 'Articles__translations', companion: 'Articles' },
+      ],
+      to: { collection: 'Articles', path: [] },
+    });
+  });
+
+  it('drops the companion with a collection discard, the main table last', async () => {
+    const live = [
+      table('Posts'),
+      companion('Posts', [{ name: 'title', type: 'text', notNull: true }]),
+      table('Posts_tags', {
+        derived: { collection: 'Posts', path: ['tags'], kind: 'junction' },
+      }),
+    ];
+    const lowered = await lowerMigration(
+      state(live),
+      meta({ from: { collection: 'Posts' }, to: null }),
+    );
+    deepStrictEqual(lowered, {
+      kind: 'compoundDiscard',
+      tables: ['Posts__translations', 'Posts_tags', 'Posts'],
+    });
+  });
+});
+
+describe('lowerMigration with switches', () => {
+  it('lowers a switch onto the column home, the companion included', async () => {
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'note', type: 'text', notNull: false }],
+    });
+    const companion = table('Posts__translations', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        { name: 'title', type: 'text', notNull: true },
+      ],
+      primaryKey: ['_parentUUID', '_localeCode'],
+      companion: 'Posts',
+    });
+    deepStrictEqual(
+      await lowerMigration(
+        state([posts, companion]),
+        meta({ from: { collection: 'Posts', field: 'note', nullable: true } }),
+      ),
+      {
+        kind: 'switch',
+        attribute: 'nullable',
+        from: true,
+        to: undefined,
+        table: 'Posts',
+        column: 'note',
+        collection: 'Posts',
+        segments: ['note'],
+        type: undefined,
+        transform: undefined,
+      },
+    );
+    deepStrictEqual(
+      await lowerMigration(
+        state([posts, companion]),
+        meta({ from: { collection: 'Posts', field: 'title', translatable: true } }),
+      ),
+      {
+        kind: 'switch',
+        attribute: 'translatable',
+        from: true,
+        to: undefined,
+        table: 'Posts__translations',
+        column: 'title',
+        collection: 'Posts',
+        segments: ['title'],
+        type: undefined,
+        transform: undefined,
+      },
+    );
+  });
+
+  it('lowers a composite translatable switch column-less, onto the live table', async () => {
+    const posts = table('Posts');
+    const address = table('Posts_address', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['address'], kind: 'childOne' },
+    });
+    deepStrictEqual(
+      await lowerMigration(
+        state([posts, address]),
+        meta({ from: { collection: 'Posts', field: 'address', translatable: false } }),
+      ),
+      {
+        kind: 'switch',
+        attribute: 'translatable',
+        from: false,
+        to: undefined,
+        table: 'Posts_address',
+        collection: 'Posts',
+        segments: ['address'],
+        type: undefined,
+        transform: undefined,
+      },
+    );
+  });
+
+  it('refuses the switch shapes the grammar cannot mean', async () => {
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', field: 'note', nullable: true, unique: false },
+        } as unknown as Migration),
+      ),
+      /flips 2 attributes at once/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { table: 'Posts', column: 'note', type: 'text', translatable: true },
+        } as unknown as Migration),
+      ),
+      /switches `translatable` on a physical address/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({ from: { collection: 'Posts', nullable: true } } as unknown as Migration),
+      ),
+      /switches without a field/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', field: 'note', nullable: true },
+          to: { collection: 'Posts', field: 'note', nullable: false },
+        } as unknown as Migration),
+      ),
+      /pairs a switch with an address/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', field: 'note', nullable: true },
+          to: { nullable: true },
+        }),
+      ),
+      /switches `nullable` onto itself/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', field: 'note' },
+          to: { nullable: false },
+        } as unknown as Migration),
+      ),
+      /switches without a `from` state/,
+    );
+  });
+
+  it('refuses a column switch on a field live as a table', async () => {
+    const posts = table('Posts');
+    const address = table('Posts_address', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['address'], kind: 'childOne' },
+    });
+    await rejects(
+      lowerMigration(
+        state([posts, address]),
+        meta({ from: { collection: 'Posts', field: 'address', nullable: true } }),
+      ),
+      /switches `nullable` on a table/,
+    );
+  });
+});
+
+describe('lowerMigration switch subfield refusal', () => {
+  it('refuses a `translatable` switch on a dot path: composites flip whole', async () => {
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: { collection: 'Posts', field: 'sections.title', translatable: true },
+        }),
+      ),
+      /switches `translatable` on a subfield/,
     );
   });
 });
