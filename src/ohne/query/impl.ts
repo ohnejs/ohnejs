@@ -1,0 +1,131 @@
+import type { ConditionNode } from '../../utils/index.ts';
+import type { OrderDirection, OrderEntry } from './ir.ts';
+import type { CollectionQueryMeta } from './metadata.ts';
+import type { QueryRecord } from './read/find.ts';
+import type { PaginatedResult } from './read/paginate.ts';
+import type { ConditionInput, UntypedQueryBuilder } from './untyped.ts';
+import type { QueryLimits } from './wire/limits.ts';
+
+import { isUndefined, parseCondition } from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
+import { freezeIR, type QueryIR } from './ir.ts';
+import { count as countRows, exists as existsRows } from './read/count.ts';
+import { findFirst as readFirst, findMany as readMany } from './read/find.ts';
+import { paginate as readPage } from './read/paginate.ts';
+import { unknownFieldError, validateCondition } from './validate-condition.ts';
+
+/**
+ * The one runtime query builder every typed state and the wire path drive.
+ *
+ * It accumulates plain state and freezes an immutable `QueryIR` when a terminal runs.
+ * `where` AND-appends, `select` and the sort keys accumulate, `limit`/`offset` replace.
+ * Each accumulation is append-only: no call silently discards a prior one.
+ */
+export class QueryBuilderImpl implements UntypedQueryBuilder {
+  private readonly conditions: ConditionNode[] = [];
+  private readonly orderKeys: OrderEntry[] = [];
+  private readonly populateFields: string[] = [];
+  private selected: string[] | null = null;
+  private limitValue: number | null = null;
+  private offsetValue: number | null = null;
+  readonly limitOverrides: Partial<QueryLimits> = {};
+  private readonly meta: CollectionQueryMeta;
+
+  constructor(meta: CollectionQueryMeta) {
+    this.meta = meta;
+  }
+
+  where(condition: ConditionInput): this {
+    const parsed = parseCondition(condition);
+    if (!parsed.ok) {
+      const { code, path } = parsed.error;
+      throw ohneError({
+        title: `Invalid condition on \`${this.meta.collection}\``,
+        body: [`The condition is malformed (${code})${path === '' ? '' : ` at \`${path}\``}.`],
+      });
+    }
+    validateCondition(parsed.node, this.meta);
+    this.conditions.push(parsed.node);
+    return this;
+  }
+
+  select(...fields: string[]): this {
+    for (const field of fields) {
+      if (isUndefined(this.meta.fields[field])) throw unknownFieldError(field, this.meta);
+    }
+    this.selected = [...(this.selected ?? []), ...fields];
+    return this;
+  }
+
+  orderBy(field: string, direction: OrderDirection = 'asc'): this {
+    const entry = this.meta.fields[field];
+    if (isUndefined(entry)) throw unknownFieldError(field, this.meta);
+    if (isUndefined(entry.column)) {
+      throw ohneError({
+        title: `Cannot order by \`${field}\``,
+        body: [
+          `Field \`${field}\` on collection \`${this.meta.collection}\` has no column to sort by.`,
+        ],
+      });
+    }
+    this.orderKeys.push({ field, direction });
+    return this;
+  }
+
+  limit(count: number): this {
+    this.limitValue = count;
+    return this;
+  }
+
+  offset(count: number): this {
+    this.offsetValue = count;
+    return this;
+  }
+
+  limits(overrides: Partial<QueryLimits>): this {
+    Object.assign(this.limitOverrides, overrides);
+    return this;
+  }
+
+  findMany(): Promise<QueryRecord[]> {
+    return readMany(this.freeze());
+  }
+
+  findFirst(): Promise<QueryRecord | undefined> {
+    return readFirst(this.freeze());
+  }
+
+  count(): Promise<number> {
+    return countRows(this.freeze());
+  }
+
+  exists(): Promise<boolean> {
+    return existsRows(this.freeze());
+  }
+
+  paginate(page: number, perPage: number): Promise<PaginatedResult> {
+    return readPage(this.freeze(), page, perPage);
+  }
+
+  /**
+   * Snapshots the accumulated state into an immutable IR for a terminal to compile and execute.
+   */
+  private freeze(): QueryIR {
+    return freezeIR({
+      collection: this.meta.collection,
+      conditions: this.conditions,
+      select: this.selected,
+      order: this.orderKeys,
+      limit: this.limitValue,
+      offset: this.offsetValue,
+      populate: this.populateFields,
+    });
+  }
+}
+
+/**
+ * Reads the wire-limit overrides a builder accumulated, the internal seam the wire parser resolves through.
+ */
+export function builderLimits(builder: UntypedQueryBuilder): Partial<QueryLimits> {
+  return (builder as QueryBuilderImpl).limitOverrides;
+}
