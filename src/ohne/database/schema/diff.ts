@@ -2,6 +2,7 @@ import type { Dialect } from '../dialect.ts';
 import type {
   ColumnChange,
   ColumnSchema,
+  DerivedOrigin,
   TableAlter,
   TableDiff,
   TableSchema,
@@ -14,6 +15,9 @@ import { deepEqual, isUndefined, keyBy } from '../../../utils/index.ts';
  * Output order is the apply order: drops first, then creates, then alters.
  * Column types compare through `dialect.columnType`, so two primitives sharing a native type never differ.
  * Unchanged tables produce nothing.
+ *
+ * A same-named table whose field changed kind incompatibly is a drop plus a create, never an alter.
+ * The old shape's rows cannot morph into the new one, so the whole table is replaced.
  */
 export function diffSchemas(
   live: readonly TableSchema[],
@@ -24,18 +28,60 @@ export function diffSchemas(
   const desiredByName = keyBy(desired, (table) => table.name);
   const diffs: TableDiff[] = [];
   for (const table of live) {
-    if (isUndefined(desiredByName[table.name])) diffs.push({ kind: 'drop', table });
+    const wanted = desiredByName[table.name];
+    if (isUndefined(wanted) || incompatibleReshape(table, wanted))
+      diffs.push({ kind: 'drop', table });
   }
   for (const table of desired) {
-    if (isUndefined(liveByName[table.name])) diffs.push({ kind: 'create', table });
+    const liveTable = liveByName[table.name];
+    if (isUndefined(liveTable) || incompatibleReshape(liveTable, table))
+      diffs.push({ kind: 'create', table });
   }
   for (const desiredTable of desired) {
     const liveTable = liveByName[desiredTable.name];
-    if (isUndefined(liveTable)) continue;
+    if (isUndefined(liveTable) || incompatibleReshape(liveTable, desiredTable)) continue;
     const alter = diffTable(liveTable, desiredTable, dialect);
     if (!isUndefined(alter)) diffs.push(alter);
   }
   return diffs;
+}
+
+/**
+ * Whether a derived kind is one of the composite child tables.
+ * `childOne` and `childMany` share their core columns, so a change between them alters in place.
+ */
+function isChildKind(kind: DerivedOrigin['kind'] | undefined): boolean {
+  return kind === 'childOne' || kind === 'childMany';
+}
+
+/**
+ * Whether a column is a structural one the desired builder emits, never a user value.
+ * The `UUID` key and every `_`-prefixed internal column; no value can fill these across a reshape.
+ */
+function isStructuralColumn(name: string): boolean {
+  return name === 'UUID' || name.startsWith('_');
+}
+
+/**
+ * Whether two same-named tables are an incompatible kind reshape that cannot alter in place.
+ *
+ * A field kept its name but changed kind, and the new shape needs a structural `NOT NULL` column.
+ * The live table lacks such a column and no value can fill it.
+ * A junction needs `_targetUUID`, a wrapper needs `_blockType`, a child needs `UUID`.
+ * Such a change replaces the table, so the diff drops the old and creates the new.
+ * A change within the child family (`childOne` <-> `childMany`) alters in place instead.
+ * A reshape that only sheds structural columns, a wrapper collapsing into a child, alters too.
+ * Both therefore return `false`.
+ */
+function incompatibleReshape(live: TableSchema, desired: TableSchema): boolean {
+  const liveKind = live.derived?.kind;
+  const desiredKind = desired.derived?.kind;
+  if (liveKind === desiredKind) return false;
+  if (isChildKind(liveKind) && isChildKind(desiredKind)) return false;
+  const liveColumns = new Set(live.columns.map((column) => column.name));
+  return desired.columns.some(
+    (column) => column.notNull && isStructuralColumn(column.name) && !liveColumns.has(column.name),
+  );
 }
 
 /**
