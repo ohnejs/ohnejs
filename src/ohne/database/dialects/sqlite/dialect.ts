@@ -105,6 +105,15 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
+   * SQLite's default `LIKE` is ASCII-case-insensitive, exactly the operator contract.
+   * The plain operator suffices, with backslash declared as the escape character.
+   * `PRAGMA case_sensitive_like` must never be set: it would make the trio case-sensitive.
+   */
+  textMatch(quotedColumn: string): string {
+    return `${quotedColumn} LIKE ? ESCAPE '\\'`;
+  }
+
+  /**
    * Lists tables from `sqlite_master`, excluding SQLite's own internals.
    */
   listTables(db: Transaction): Promise<string[]> {

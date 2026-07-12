@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import type { DatabaseAdapter } from '../../../../../src/ohne/database/adapter.ts';
 
 import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { escapeLike } from '../../../../../src/ohne/query/sql/escape-like.ts';
 import { sleep } from '../../../../../src/utils/index.ts';
 
 const dialect = new SQLiteDialect();
@@ -107,6 +108,66 @@ describe('SQLiteDialect', () => {
       strictEqual(dialect.serialize('boolean', null), null);
       strictEqual(dialect.deserialize('boolean', null), null);
       strictEqual(dialect.deserialize('json', null), null);
+    });
+  });
+
+  describe('textMatch', () => {
+    async function seed(names: string[]): Promise<DatabaseAdapter> {
+      const db = await open();
+      await db.exec('CREATE TABLE t (name TEXT)');
+      for (const name of names) await db.run('INSERT INTO t (name) VALUES (?)', [name]);
+      return db;
+    }
+
+    function match(db: DatabaseAdapter, pattern: string): Promise<{ name: string }[]> {
+      return db.query(`SELECT name FROM t WHERE ${dialect.textMatch('"name"')} ORDER BY name`, [
+        pattern,
+      ]);
+    }
+
+    it('emits LIKE with a backslash escape and one placeholder', () => {
+      strictEqual(dialect.textMatch('"name"'), `"name" LIKE ? ESCAPE '\\'`);
+    });
+
+    it('matches case-insensitively', async () => {
+      const db = await seed(['Hello World', 'goodbye']);
+      deepStrictEqual(await match(db, `%${escapeLike('HELLO')}%`), [
+        nullObj({ name: 'Hello World' }),
+      ]);
+      await db.close();
+    });
+
+    it('matches an escaped `%` literally while a raw `%` wildcards', async () => {
+      const db = await seed(['100%', '100x']);
+      deepStrictEqual(await match(db, '100%'), [
+        nullObj({ name: '100%' }),
+        nullObj({ name: '100x' }),
+      ]);
+      deepStrictEqual(await match(db, escapeLike('100%')), [nullObj({ name: '100%' })]);
+      await db.close();
+    });
+
+    it('matches an escaped `_` literally while a raw `_` wildcards', async () => {
+      const db = await seed(['a_b', 'axb']);
+      deepStrictEqual(await match(db, 'a_b'), [nullObj({ name: 'a_b' }), nullObj({ name: 'axb' })]);
+      deepStrictEqual(await match(db, escapeLike('a_b')), [nullObj({ name: 'a_b' })]);
+      await db.close();
+    });
+
+    it('round-trips a backslash', async () => {
+      const db = await seed(['C:\\dir\\file', 'C:dir']);
+      deepStrictEqual(await match(db, `%${escapeLike('\\dir')}%`), [
+        nullObj({ name: 'C:\\dir\\file' }),
+      ]);
+      await db.close();
+    });
+
+    it('rides the default insensitive LIKE: the pragmas never set `case_sensitive_like`', async () => {
+      const db = await seed(['ABC']);
+      deepStrictEqual(await db.query(`SELECT name FROM t WHERE name LIKE 'a%'`), [
+        nullObj({ name: 'ABC' }),
+      ]);
+      await db.close();
     });
   });
 

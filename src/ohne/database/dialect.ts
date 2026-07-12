@@ -117,6 +117,21 @@ export abstract class Dialect {
   abstract deserialize(type: LogicalType, value: SQLValue): unknown;
 
   /**
+   * The dialect's case-insensitive text-match expression over an already-quoted column.
+   * Holds exactly one `?` placeholder.
+   * The caller binds a pattern whose literal parts went through `escapeLike`.
+   * Backslash is the escape character.
+   * Backs `contains`/`startsWith`/`endsWith` - case-insensitivity is their cross-dialect contract.
+   *
+   * @example
+   * ```ts
+   * dialect.textMatch('"title"')
+   * // -> `"title" LIKE ? ESCAPE '\'` on SQLite
+   * ```
+   */
+  abstract textMatch(quotedColumn: string): string;
+
+  /**
    * Lists every table in the database, framework and app alike.
    * Driver internals, like SQLite's `sqlite_*` tables, are excluded.
    *
