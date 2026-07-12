@@ -1,0 +1,6 @@
+{
+  "emptyValue": "This value must not be empty",
+  "invalidValue": "This value is invalid",
+  "notNullable": "This field does not accept null",
+  "required": "This field is required"
+}

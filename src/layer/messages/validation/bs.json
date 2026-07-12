@@ -1,0 +1,6 @@
+{
+  "emptyValue": "Ova vrijednost ne smije biti prazna",
+  "invalidValue": "Ova vrijednost nije važeća",
+  "notNullable": "Ovo polje ne prihvata null",
+  "required": "Ovo polje je obavezno"
+}
