@@ -72,6 +72,46 @@ describe('parseSearchParams', () => {
     deepStrictEqual(parseSearchParams('a=[1,2]x'), { a: '[1,2]x' });
   });
 
+  it('parses structure nested to exactly the depth cap', () => {
+    let expected: unknown = 1;
+    for (let i = 0; i < 32; i++) expected = { a: expected };
+    deepStrictEqual(parseSearchParams('a=' + '{a:'.repeat(32) + '1' + '}'.repeat(32)), {
+      a: expected,
+    });
+
+    let list: unknown = 1;
+    for (let i = 0; i < 32; i++) list = [list];
+    deepStrictEqual(parseSearchParams('a=' + '['.repeat(32) + '1' + ']'.repeat(32)), { a: list });
+  });
+
+  it('degrades a subtree one past the depth cap to its raw text', () => {
+    let expected: unknown = '{a:1}';
+    for (let i = 0; i < 32; i++) expected = { a: expected };
+    deepStrictEqual(parseSearchParams('a=' + '{a:'.repeat(33) + '1' + '}'.repeat(33)), {
+      a: expected,
+    });
+
+    let list: unknown = '[1]';
+    for (let i = 0; i < 32; i++) list = [list];
+    deepStrictEqual(parseSearchParams('a=' + '['.repeat(33) + '1' + ']'.repeat(33)), { a: list });
+  });
+
+  it('honors a custom maxDepth, degrading structures past it to text', () => {
+    deepStrictEqual(parseSearchParams('a={b:{c:1}}', { maxDepth: 1 }), { a: { b: '{c:1}' } });
+    deepStrictEqual(parseSearchParams('a={b:1}', { maxDepth: 0 }), { a: '{b:1}' });
+    deepStrictEqual(parseSearchParams('a={b:{c:1}}'), { a: { b: { c: 1 } } });
+  });
+
+  it('caps a 100k-deep bomb to a structure instead of overflowing the stack', () => {
+    // Without the cap the recursion overflows and the catch-all returns the raw string;
+    // capped, the outer levels parse and the tail past the cap degrades to flat text.
+    const objectBomb = 'a=' + '{a:'.repeat(100_000) + '1' + '}'.repeat(100_000);
+    strictEqual(typeof parseSearchParams(objectBomb).a, 'object');
+
+    const arrayBomb = 'a=' + '['.repeat(100_000) + '1' + ']'.repeat(100_000);
+    strictEqual(Array.isArray(parseSearchParams(arrayBomb).a), true);
+  });
+
   it('stores a __proto__ key as an own property without polluting', () => {
     const result = parseSearchParams('__proto__={polluted:1}');
     strictEqual(Object.hasOwn(result, '__proto__'), true);

@@ -2,12 +2,30 @@ import { coerceToken, type SearchParamValue } from './coerce-token.ts';
 
 export type { SearchParamValue } from './coerce-token.ts';
 
+/**
+ * Options for `parseSearchParams`.
+ */
+export interface ParseSearchParamsOptions {
+  /**
+   * Maximum nesting depth of structured values.
+   * A structure nested past this parses as flat text, never deeper.
+   * Hostile depth then cannot overflow the stack; parsing never throws.
+   *
+   * @default
+   * 32
+   */
+  maxDepth?: number;
+}
+
 interface Cursor {
   src: string;
   pos: number;
+  maxDepth: number;
 }
 
 const VALUE_STOP = ',]}';
+
+const DEFAULT_MAX_DEPTH = 32;
 
 function assign(
   obj: { [key: string]: SearchParamValue },
@@ -40,7 +58,24 @@ function parseKey(cur: Cursor): string {
   return decode(cur.src.slice(start, cur.pos));
 }
 
-function parseArray(cur: Cursor): SearchParamValue[] {
+/**
+ * Consumes an over-cap subtree as raw text instead of parsing it.
+ * Tracks bracket balance so the enclosing structure still closes cleanly around it.
+ */
+function parseFlat(cur: Cursor, stop: string): string {
+  const start = cur.pos;
+  let open = 0;
+  while (cur.pos < cur.src.length) {
+    const ch = cur.src[cur.pos];
+    if (ch === '[' || ch === '{') open++;
+    else if (open === 0 && stop.includes(ch)) break;
+    else if (ch === ']' || ch === '}') open--;
+    cur.pos++;
+  }
+  return decode(cur.src.slice(start, cur.pos));
+}
+
+function parseArray(cur: Cursor, depth: number): SearchParamValue[] {
   cur.pos++;
   const arr: SearchParamValue[] = [];
   if (cur.src[cur.pos] === ']') {
@@ -48,14 +83,14 @@ function parseArray(cur: Cursor): SearchParamValue[] {
     return arr;
   }
   for (;;) {
-    arr.push(parseValue(cur, VALUE_STOP));
+    arr.push(parseValue(cur, VALUE_STOP, depth + 1));
     const ch = cur.src[cur.pos++];
     if (ch === ']') return arr;
     if (ch !== ',') throw new Error('expected , or ] in array');
   }
 }
 
-function parseObject(cur: Cursor): SearchParamValue {
+function parseObject(cur: Cursor, depth: number): SearchParamValue {
   cur.pos++;
   const obj: { [key: string]: SearchParamValue } = {};
   if (cur.src[cur.pos] === '}') {
@@ -65,25 +100,25 @@ function parseObject(cur: Cursor): SearchParamValue {
   for (;;) {
     const key = parseKey(cur);
     cur.pos++;
-    assign(obj, key, parseValue(cur, VALUE_STOP));
+    assign(obj, key, parseValue(cur, VALUE_STOP, depth + 1));
     const ch = cur.src[cur.pos++];
     if (ch === '}') return obj;
     if (ch !== ',') throw new Error('expected , or } in object');
   }
 }
 
-function parseValue(cur: Cursor, stop: string): SearchParamValue {
+function parseValue(cur: Cursor, stop: string, depth: number): SearchParamValue {
   const ch = cur.src[cur.pos];
-  if (ch === '[') return parseArray(cur);
-  if (ch === '{') return parseObject(cur);
-  return parseScalar(cur, stop);
+  if (ch !== '[' && ch !== '{') return parseScalar(cur, stop);
+  if (depth > cur.maxDepth) return parseFlat(cur, stop);
+  return ch === '[' ? parseArray(cur, depth) : parseObject(cur, depth);
 }
 
-function parseTopValue(raw: string): SearchParamValue {
+function parseTopValue(raw: string, maxDepth: number): SearchParamValue {
   if (raw === '') return '';
-  const cur: Cursor = { src: raw, pos: 0 };
+  const cur: Cursor = { src: raw, pos: 0, maxDepth };
   try {
-    const value = parseValue(cur, '');
+    const value = parseValue(cur, '', 1);
     return cur.pos === raw.length ? value : decode(raw);
   } catch {
     return decode(raw);
@@ -97,6 +132,7 @@ function parseTopValue(raw: string): SearchParamValue {
  * A bare key with no value is `true`; a repeated key collects into an array.
  *
  * Untrusted input never throws: a malformed value falls back to its decoded string.
+ * Nesting caps at `maxDepth` levels, `32` by default; a structure past it parses as raw text.
  * A `__proto__` key lands as an own property, so it cannot pollute a prototype.
  *
  * @example
@@ -106,9 +142,15 @@ function parseTopValue(raw: string): SearchParamValue {
  * parseSearchParams('p={x:1,y:2}')    // -> { p: { x: 1, y: 2 } }
  * parseSearchParams('t=true&t=false') // -> { t: [true, false] }
  * parseSearchParams('flag')           // -> { flag: true }
+ *
+ * parseSearchParams('a={b:1}', { maxDepth: 0 }) // -> { a: '{b:1}' }
  * ```
  */
-export function parseSearchParams(input: string): { [key: string]: SearchParamValue } {
+export function parseSearchParams(
+  input: string,
+  options: ParseSearchParamsOptions = {},
+): { [key: string]: SearchParamValue } {
+  const { maxDepth = DEFAULT_MAX_DEPTH } = options;
   const out: { [key: string]: SearchParamValue } = {};
   let query = input;
   if (query.startsWith('?') || query.startsWith('#')) query = query.slice(1);
@@ -120,7 +162,7 @@ export function parseSearchParams(input: string): { [key: string]: SearchParamVa
     if (pair === '') continue;
     const eq = pair.indexOf('=');
     const key = decode(eq === -1 ? pair : pair.slice(0, eq));
-    const value = eq === -1 ? true : parseTopValue(pair.slice(eq + 1));
+    const value = eq === -1 ? true : parseTopValue(pair.slice(eq + 1), maxDepth);
 
     if (!seen.has(key)) {
       seen.add(key);
