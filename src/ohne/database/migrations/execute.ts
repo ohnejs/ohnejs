@@ -27,6 +27,7 @@ import {
   isUndefined,
   jsonClone,
   last,
+  uuidv7,
 } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import {
@@ -1424,16 +1425,72 @@ async function deleteOwnedRows(
 }
 
 /**
+ * One `ctx` query opened by a transform, tracking whether its result was ever awaited.
+ */
+interface TrackedQuery {
+  awaited: boolean;
+}
+
+/**
+ * The `ctx` queries opened through each migration context, for the unawaited-query guard.
+ */
+const contextQueries = new WeakMap<MigrationContext, TrackedQuery[]>();
+
+/**
+ * Wraps a `ctx` query result so the guard can tell whether the transform awaited it.
+ * Awaiting or `.then`-ing it marks it consumed; reading a property off it (a forgotten `await`) does not.
+ * The inner rejection is swallowed on the untaken path, so a never-awaited query cannot warn unhandled.
+ */
+function trackQuery<T>(inner: Promise<T>, tracked: TrackedQuery[]): Promise<T> {
+  const marker: TrackedQuery = { awaited: false };
+  tracked.push(marker);
+  inner.catch(() => undefined);
+  const guarded: PromiseLike<T> & Pick<Promise<T>, 'catch' | 'finally'> = {
+    // oxlint-disable-next-line no-thenable
+    then: (onFulfilled, onRejected) => (
+      (marker.awaited = true),
+      inner.then(onFulfilled, onRejected)
+    ),
+    catch: (onRejected) => ((marker.awaited = true), inner.catch(onRejected)),
+    finally: (onFinally) => ((marker.awaited = true), inner.finally(onFinally)),
+  };
+  return guarded as Promise<T>;
+}
+
+/**
  * The transform context of one switch row: read-only queries, the locale in hand, and the sentinel.
+ * Each query is tracked, so a result used without `await` is caught rather than read as `undefined`.
  */
 function switchContext(engine: Engine, locale: string | undefined): MigrationContext {
   const { db } = engine;
-  return {
-    query: <T>(sql: string, params?: SQLParams) => db.query<T>(sql, params),
-    queryOne: <T>(sql: string, params?: SQLParams) => db.queryOne<T>(sql, params),
+  const tracked: TrackedQuery[] = [];
+  const ctx: MigrationContext = {
+    query: <T>(sql: string, params?: SQLParams) => trackQuery(db.query<T>(sql, params), tracked),
+    queryOne: <T>(sql: string, params?: SQLParams) =>
+      trackQuery(db.queryOne<T>(sql, params), tracked),
     ...(isUndefined(locale) ? {} : { locale }),
     deleteRecord: () => DELETE_RECORD,
   };
+  contextQueries.set(ctx, tracked);
+  return ctx;
+}
+
+/**
+ * Refuses a transform that opened a `ctx` query without awaiting it.
+ * Such a call reads as `undefined` or a truthy object, so it would silently corrupt every row.
+ */
+function assertQueriesAwaited(meta: MigrationMeta, ctx: MigrationContext): void {
+  const tracked = contextQueries.get(ctx);
+  if (isUndefined(tracked) || tracked.every((query) => query.awaited)) return;
+  throw ohneError({
+    title: `Migration \`${meta.name}\` did not \`await\` a \`ctx\` query`,
+    body: [
+      'A `ctx.query` or `ctx.queryOne` result is a `Promise`.',
+      'Used without `await` it reads as `undefined` or a truthy object, silently corrupting the transform.',
+      'Await it, for example `const row = await ctx.queryOne(...)`.',
+    ],
+    path: meta.file,
+  });
 }
 
 /**
@@ -1449,8 +1506,9 @@ async function applySwitchTransform(
   engine: Engine,
 ): Promise<unknown> {
   if (isUndefined(transform)) return undefined;
+  let out: unknown;
   try {
-    return await transform(value, deserializeRow(engine.dialect, schema, row), ctx);
+    out = await transform(value, deserializeRow(engine.dialect, schema, row), ctx);
   } catch (error) {
     throw ohneError({
       title: `Migration \`${meta.name}\` fails in its transform`,
@@ -1458,6 +1516,8 @@ async function applySwitchTransform(
       path: meta.file,
     });
   }
+  assertQueriesAwaited(meta, ctx);
+  return out;
 }
 
 /**
@@ -1471,8 +1531,10 @@ function readRows(engine: Engine, source: TableSchema): Promise<Record<string, S
 /**
  * Carries every held value through the dialect codec, one row at a time, correlated per classification.
  * A throwing transform and a `NULL` bound for a `NOT NULL` column refuse, naming the migration.
- * A cross-table row with no target row loses its value when `from` drops: refused unless force.
- * Force drops the values and reports them.
+ * A parent moving onto its child-one table with no child row yet inserts a fresh one.
+ * So nesting a column into a newly added object materializes the child rows instead of refusing.
+ * Any other cross-table row with no target row loses its value when `from` drops: refused unless force.
+ * Force drops those values and reports them.
  */
 async function writeValues(
   engine: Engine,
@@ -1489,6 +1551,14 @@ async function writeValues(
   const notNull = target.columns.find((column) => column.name === to.column)?.notNull === true;
   const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
+  // A parent moving onto its child-one table can materialize the child row a plain move would miss.
+  const insertsChild =
+    target.derived?.kind === 'childOne' && targetKey.length === 1 && targetKey[0] === '_parentUUID';
+  const insert = insertsChild
+    ? `INSERT INTO ${dialect.quote(to.table)} ` +
+      `(${dialect.quote('UUID')}, ${dialect.quote('_parentUUID')}, ${dialect.quote(to.column)}) ` +
+      `VALUES (?, ?, ?)`
+    : undefined;
   const localeKeyed = source.columns.some((column) => column.name === '_localeCode');
   let unmatched = 0;
   for (const row of rows) {
@@ -1505,6 +1575,7 @@ async function writeValues(
           path: meta.file,
         });
       }
+      assertQueriesAwaited(meta, ctx);
     }
     if (output === DELETE_RECORD) {
       throw ohneError({
@@ -1529,7 +1600,12 @@ async function writeValues(
     }
     const params = [serialized, ...sourceKey.map((name) => row[name] ?? null)];
     const { changes } = await db.run(update, params);
-    if (changes === 0) unmatched++;
+    if (changes > 0) continue;
+    if (!isUndefined(insert)) {
+      await db.run(insert, [uuidv7(), row[sourceKey[0] as string] ?? null, serialized]);
+      continue;
+    }
+    unmatched++;
   }
   if (unmatched === 0) return;
   if (!engine.force) {
