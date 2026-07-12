@@ -19,6 +19,7 @@ import { OHNE_REBUILD_PREFIX } from '../../naming/table-names.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
 import { createIndex, createIndexes, createTable, rebuildTable, sweepRebuilds } from './rebuild.ts';
+import { createStatementCache } from './statements.ts';
 
 // SQLite extended result codes for the constraint violations the engine classifies.
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
@@ -271,19 +272,21 @@ function errcodeOf(error: unknown): number | undefined {
  * Transactions run `BEGIN`/`COMMIT`/`ROLLBACK` explicitly, since `DatabaseSync` has no transaction helper.
  */
 function createAdapter(db: DatabaseSync): DatabaseAdapter {
+  const statements = createStatementCache((sql) => db.prepare(sql));
   const adapter: DatabaseAdapter = {
     async exec(sql) {
       db.exec(sql);
+      statements.clear();
     },
     async run(sql, params = []) {
-      const { changes } = db.prepare(sql).run(...params);
+      const { changes } = statements.get(sql).run(...params);
       return { changes: Number(changes) };
     },
     async query(sql, params = []) {
-      return db.prepare(sql).all(...params) as never;
+      return statements.get(sql).all(...params) as never;
     },
     async queryOne(sql, params = []) {
-      return db.prepare(sql).get(...params) as never;
+      return statements.get(sql).get(...params) as never;
     },
     async transaction(fn) {
       db.exec('BEGIN');
@@ -297,6 +300,7 @@ function createAdapter(db: DatabaseSync): DatabaseAdapter {
       }
     },
     async close() {
+      statements.clear();
       db.close();
     },
   };
