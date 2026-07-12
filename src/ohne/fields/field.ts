@@ -19,6 +19,9 @@ export interface FieldOptions {
 
   /**
    * Emits a unique index over the field's column.
+   * The constraint covers the whole table the column lands in, wherever the field sits.
+   * Inside a repeater that is every item of every parent row; `uniquePerParent` narrows it to one list.
+   * Inside a block it is every instance of the block, database-wide.
    * Set together with `index`, the unique index alone is emitted: it serves plain lookups too.
    *
    * @default
@@ -34,6 +37,36 @@ export interface FieldOptions {
    * false
    */
   index?: boolean;
+
+  /**
+   * Routes the field to per-locale storage, so each content locale holds its own value.
+   * A column-bearing field moves its column to the collection's `__translations` companion.
+   * A composite or relation field scopes its own derived table by locale instead.
+   * Top-level collection fields only: a composite is per-locale as a whole, never per subfield.
+   *
+   * @default
+   * false
+   */
+  translatable?: boolean;
+
+  /**
+   * Scopes the field's `unique` to one locale, so a value may repeat across locales.
+   * Requires `unique` and `translatable`; the index then covers `(_localeCode, <column>)`.
+   *
+   * @default
+   * false
+   */
+  uniquePerLocale?: boolean;
+
+  /**
+   * Scopes the field's `unique` to one parent's item list, so a value may repeat across parents.
+   * Requires `unique` and a place inside a repeater; the index then covers `(_parentUUID, <column>)`.
+   * In a translatable repeater a list is per (parent, locale), so the index widens over both.
+   *
+   * @default
+   * false
+   */
+  uniquePerParent?: boolean;
 }
 
 /**
@@ -51,17 +84,14 @@ type DeclaredOptions<K extends FieldTypeName> =
 
 /**
  * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
- * A column-less type stores through its hint alone, so it takes no common option.
- * With declared options the excess-property check already rejects them, so nothing joins.
- * Without any, `Record<string, never>` rejects every key through its index signature.
- * Both leave the suggestion list empty; a bare `{}` would instead let anything through.
+ * A column-less type stores through its hint alone, so only `translatable` survives there.
+ * Its derived table can still be locale-scoped.
+ * The unique flags and `index` have no column to cover; `nullable` no cell to hold `NULL`.
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
  */
 type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] extends false
-  ? [keyof DeclaredOptions<K>] extends [never]
-    ? Record<string, never>
-    : {}
+  ? Pick<FieldOptions, 'translatable'>
   : Omit<
       FieldOptions,
       | (NonNullable<KnownFields[K]['forceNullable']> extends true ? 'nullable' : never)
@@ -100,6 +130,9 @@ const FIELD_OPTION_DEFAULTS = {
   nullable: false,
   unique: false,
   index: false,
+  translatable: false,
+  uniquePerLocale: false,
+  uniquePerParent: false,
 } satisfies Partial<FieldOptions>;
 
 /**

@@ -6,21 +6,63 @@ import type { StorageHint } from './storage-hint.ts';
 import { isCamelCase, isEmpty, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
-const RESERVED_OPTIONS = new Set(['nullable', 'unique', 'index']);
+const RESERVED_OPTIONS = new Set([
+  'nullable',
+  'unique',
+  'index',
+  'translatable',
+  'uniquePerLocale',
+  'uniquePerParent',
+]);
+
+/**
+ * The definition root a field tree hangs off: a collection, or a block's per-type table.
+ */
+export interface FieldOwner {
+  /**
+   * Whether a collection or a block declares the field tree.
+   */
+  kind: 'collection' | 'block';
+
+  /**
+   * The owner's name.
+   */
+  name: string;
+}
+
+/**
+ * An owner as the error messages locate a field: 'collection `Posts`' or 'block `Hero`'.
+ */
+export function ownerLabel(owner: FieldOwner): string {
+  return `${owner.kind} \`${owner.name}\``;
+}
+
+/**
+ * An owner as the error messages open a sentence: 'Collection `Posts`' or 'Block `Hero`'.
+ */
+export function ownerSubject(owner: FieldOwner): string {
+  return owner.kind === 'collection' ? `Collection \`${owner.name}\`` : `Block \`${owner.name}\``;
+}
 
 /**
  * Arguments to `validateField`.
  */
 export interface ValidateFieldArgs {
   /**
-   * Where the field lives, formatted for the error messages: 'collection `Posts`' or 'block `Hero`'.
+   * The collection or block the field lives in.
    */
-  owner: string;
+  owner: FieldOwner;
 
   /**
    * The field's name in its owner.
    */
   name: string;
+
+  /**
+   * Whether the field sits below a composite, as a subfield.
+   * Per-field `translatable` is top-level only, so a nested one is rejected here.
+   */
+  nested: boolean;
 
   /**
    * The field instance, its options read raw: resolution erases what was explicitly passed.
@@ -47,16 +89,20 @@ export interface ValidateFieldArgs {
  * - A `junction` hint requires `columnType: false`: its links live in the junction table alone.
  * - A `child` hint requires `columnType: false` too, and must declare at least one subfield.
  * - A `blocks` hint requires `columnType: false` too; its `allow` must not be empty or repeat a name.
- * - `unique` and `index` need a column, so a column-less field takes neither.
+ * - The unique flags and `index` need a column, so a column-less field takes none.
  * - A junction field with no links is empty, never `NULL`, so it takes no `nullable` either.
  * - A child field takes no `nullable`: an absent one-row already reads as `null`, a list is never `NULL`.
  * - A blocks field takes no `nullable` on the same terms: with no blocks it is empty, never `NULL`.
  * - A force-nullable type locks `nullable` on, so a field of it takes no `nullable` at all.
  * - A force-index type locks its index on the same terms: the field takes no `index`.
+ * - `translatable` is a top-level collection field's flag: subfields and block fields reject it.
+ * - An `inverse` field follows the owning side's junction, so it rejects `translatable` too.
+ * - `uniquePerLocale` narrows a unique on a translatable field, so it requires both flags.
+ * - `uniquePerParent` narrows a unique too, so it requires the flag; its placement is the schema's rule.
  */
 export function validateField(args: ValidateFieldArgs): void {
-  const { owner, name, instance, fieldType, hint } = args;
-  const where = `Field \`${name}\` in ${owner}`;
+  const { owner, name, nested, instance, fieldType, hint } = args;
+  const where = `Field \`${name}\` in ${ownerLabel(owner)}`;
   if (fieldType.columnType === false && isUndefined(hint)) {
     throw ohneError({
       title: `Field type \`${instance.type}\` owns no column and no storage`,
@@ -134,7 +180,7 @@ export function validateField(args: ValidateFieldArgs): void {
   }
   const options: Record<string, unknown> = { ...instance.options };
   if (fieldType.columnType === false) {
-    for (const key of ['unique', 'index'] as const) {
+    for (const key of ['unique', 'uniquePerLocale', 'uniquePerParent', 'index'] as const) {
       if (isUndefined(options[key])) continue;
       throw ohneError({
         title: `Field \`${name}\` has no column to constrain`,
@@ -144,6 +190,57 @@ export function validateField(args: ValidateFieldArgs): void {
         ],
       });
     }
+  }
+  if (options.translatable === true && owner.kind === 'block') {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be translatable`,
+      body: [
+        `${where} belongs to a block, and a block's fields are never individually translatable.`,
+        'Mark the collection field holding the blocks translatable instead.',
+      ],
+    });
+  }
+  if (options.translatable === true && nested) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be translatable`,
+      body: [
+        `${where} is a subfield, and a composite is per-locale as a whole.`,
+        'Mark the top-level composite translatable instead.',
+      ],
+    });
+  }
+  if (options.translatable === true && hint?.kind === 'junction' && !isUndefined(hint.inverse)) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be translatable`,
+      body: [
+        "An inverse field reuses the owning side's junction, so the owning field decides translatability.",
+        'Drop `translatable`.',
+      ],
+    });
+  }
+  if (options.uniquePerLocale === true) {
+    const missing = [
+      ...(options.unique === true ? [] : ['unique']),
+      ...(options.translatable === true ? [] : ['translatable']),
+    ];
+    if (missing.length > 0) {
+      throw ohneError({
+        title: `Field \`${name}\` cannot scope its unique per locale`,
+        body: [
+          '`uniquePerLocale` narrows a unique on a translatable field to one locale.',
+          `Set ${missing.map((key) => `\`${key}: true\``).join(' and ')} alongside it.`,
+        ],
+      });
+    }
+  }
+  if (options.uniquePerParent === true && options.unique !== true) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot scope its unique per parent`,
+      body: [
+        "`uniquePerParent` narrows a unique to one parent's item list.",
+        'Set `unique: true` alongside it.',
+      ],
+    });
   }
   if (hint?.kind === 'junction' && !isUndefined(options.nullable)) {
     throw ohneError({

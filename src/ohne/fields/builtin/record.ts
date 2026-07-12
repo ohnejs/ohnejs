@@ -23,6 +23,8 @@ export const record = defineField({
     /**
      * What happens to this field when the referenced row is deleted.
      * `setNull` clears the reference, `cascade` deletes the referencing row, `restrict` blocks the delete.
+     * The referencing row is whichever row holds the column: inside a repeater, the item, not its owner.
+     * `cascade` here deletes real data; on `records` it only removes a link, so the defaults differ.
      *
      * @default
      * 'setNull'

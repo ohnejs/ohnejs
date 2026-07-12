@@ -15,7 +15,8 @@ export const blocks = defineField({
   options: {
     /**
      * The block types this field may hold, by name.
-     * Omitted means every registered block.
+     * Omitted means every registered block - an open set: a block a layer adds later joins it silently.
+     * Inside a block, the open set includes the enclosing block itself, so nesting is unbounded.
      */
     allow: option<readonly BlockName[]>(),
   },

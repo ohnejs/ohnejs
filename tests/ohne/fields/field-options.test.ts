@@ -81,8 +81,9 @@ describe('field over a field type with forced flags', () => {
 });
 
 describe('field over a column-less field type', () => {
-  it('takes no common options', () => {
+  it('takes only `translatable` of the common options', () => {
     field('fixtureLinked');
+    field('fixtureLinked', { translatable: true });
 
     // @ts-expect-error a column-less field has no column to constrain
     field('fixtureLinked', { unique: true });
@@ -90,18 +91,28 @@ describe('field over a column-less field type', () => {
     // @ts-expect-error a column-less field has no column to constrain
     field('fixtureLinked', { index: true });
 
+    // @ts-expect-error a column-less field has no column to constrain
+    field('fixtureLinked', { uniquePerLocale: true });
+
     // @ts-expect-error a column-less field has no column to be nullable
     field('fixtureLinked', { nullable: true });
   });
 
   it('narrows `records` to its call-site shape', () => {
     field('records', { collection: 'Users', inverse: 'authors' });
+    field('records', { collection: 'Users', onDelete: 'restrict', translatable: true });
 
     // @ts-expect-error a `records` field owns no column to constrain
     field('records', { collection: 'Users', unique: true });
 
     // @ts-expect-error a junction field is never `NULL`
     field('records', { collection: 'Users', nullable: true });
+
+    // @ts-expect-error the owning side configures `onDelete`
+    field('records', { collection: 'Users', inverse: 'authors', onDelete: 'restrict' });
+
+    // @ts-expect-error an inverse field follows the owning side's junction
+    field('records', { collection: 'Users', inverse: 'authors', translatable: true });
   });
 
   it('requires the subfields of a composite, barring the common options', () => {
@@ -125,5 +136,36 @@ describe('field over a column-less field type', () => {
 
     // @ts-expect-error a repeater with no items is empty, never `NULL`
     field('repeater', { fields: { title: field('text') }, nullable: true });
+  });
+});
+
+describe('field with per-locale options', () => {
+  it('keeps `translatable` on every kind, column-less included', () => {
+    field('text', { translatable: true });
+    field('record', { collection: 'Users', translatable: true });
+    field('records', { collection: 'Users', translatable: true });
+    field('object', { fields: { street: field('text') }, translatable: true });
+    field('repeater', { fields: { title: field('text') }, translatable: true });
+    field('blocks', { translatable: true });
+  });
+
+  it('keeps `uniquePerLocale` beside `unique` on a column-bearing field', () => {
+    field('text', { unique: true, translatable: true, uniquePerLocale: true });
+
+    // @ts-expect-error a composite field has no column to constrain
+    field('object', { fields: { street: field('text') }, uniquePerLocale: true });
+
+    // @ts-expect-error a `records` field owns no column to constrain
+    field('records', { collection: 'Users', uniquePerLocale: true });
+  });
+
+  it('keeps `uniquePerParent` beside `unique` on a column-bearing field', () => {
+    field('text', { unique: true, uniquePerParent: true });
+
+    // @ts-expect-error a composite field has no column to constrain
+    field('repeater', { fields: { title: field('text') }, uniquePerParent: true });
+
+    // @ts-expect-error a `records` field owns no column to constrain
+    field('records', { collection: 'Users', uniquePerParent: true });
   });
 });

@@ -28,6 +28,7 @@ export const records = defineField({
     /**
      * What happens to a link when its target row is deleted.
      * `cascade` removes the link, `restrict` blocks the delete while links exist.
+     * Here `cascade` deletes only the link row; on `record` it deletes the referencing row itself.
      * Only the owning side configures this; an `inverse` field cannot.
      *
      * @default
