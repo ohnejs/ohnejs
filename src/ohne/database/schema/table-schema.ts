@@ -147,6 +147,13 @@ export interface TableSchema {
    * Introspection never reports it: the desired builder sets it and the snapshot preserves it.
    */
   block?: string;
+
+  /**
+   * The collection whose translatable columns this `__translations` companion stores.
+   * Absent everywhere else.
+   * Introspection never reports it: the desired builder sets it and the snapshot preserves it.
+   */
+  companion?: string;
 }
 
 /**

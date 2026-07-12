@@ -875,6 +875,109 @@ describe('buildDesiredSchema', () => {
     ]);
   });
 
+  it('widens a uniquePerParent subfield over the parent key, standing in for the parent index', () => {
+    const [, child] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: {
+            links: field('repeater', {
+              fields: {
+                platform: field('text', { unique: true, uniquePerParent: true }),
+                url: field('text', { index: true }),
+              },
+            }),
+          },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(child!.uniques, [
+      { name: 'UX__Posts_links___parentUUID_platform', columns: ['_parentUUID', 'platform'] },
+    ]);
+    deepStrictEqual(child!.indexes, [{ name: 'IX__Posts_links__url', columns: ['url'] }]);
+  });
+
+  it('widens a uniquePerParent subfield over the locale of a translatable repeater', () => {
+    const [, child] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: {
+            links: field('repeater', {
+              translatable: true,
+              fields: { platform: field('text', { unique: true, uniquePerParent: true }) },
+            }),
+          },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(child!.uniques, [
+      {
+        name: 'UX__Posts_links___parentUUID__localeCode_platform',
+        columns: ['_parentUUID', '_localeCode', 'platform'],
+      },
+    ]);
+    deepStrictEqual(child!.indexes, []);
+  });
+
+  it('rejects uniquePerParent on a top-level field', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { slug: field('text', { unique: true, uniquePerParent: true }) },
+            },
+          }),
+          useFields(),
+        ),
+      bodyMatching(/is top-level, and its `unique` already scopes to the whole table/),
+    );
+  });
+
+  it('rejects uniquePerParent inside an object', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                meta: field('object', {
+                  fields: { canonical: field('text', { unique: true, uniquePerParent: true }) },
+                }),
+              },
+            },
+          }),
+          useFields(),
+        ),
+      bodyMatching(/sits in an object, which holds one row per parent/),
+    );
+  });
+
+  it('rejects uniquePerParent without unique', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                links: field('repeater', {
+                  fields: { platform: field('text', { uniquePerParent: true }) },
+                }),
+              },
+            },
+          }),
+          useFields(),
+        ),
+      bodyMatching(/Set `unique: true` alongside it/),
+    );
+  });
+
   it('derives a junction from a nested records field, hung off the child table', () => {
     const tables = buildDesiredSchema(
       collections(
@@ -1137,10 +1240,11 @@ describe('buildDesiredSchema', () => {
       { name: '_blockType', type: 'text', notNull: true },
       { name: '_blockUUID', type: 'text', notNull: true },
     ]);
-    deepStrictEqual(wrapper!.uniques, []);
+    deepStrictEqual(wrapper!.uniques, [
+      { name: 'UX__Posts_content___blockUUID', columns: ['_blockUUID'] },
+    ]);
     deepStrictEqual(wrapper!.indexes, [
       { name: 'IX__Posts_content___parentUUID', columns: ['_parentUUID'] },
-      { name: 'IX__Posts_content___blockUUID', columns: ['_blockUUID'] },
     ]);
     deepStrictEqual(wrapper!.foreignKeys, [
       { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
@@ -1507,9 +1611,11 @@ describe('buildDesiredSchema', () => {
       blocks({ name: 'Hero', block: { fields: {} } }),
     );
     strictEqual(wrapper!.name, truncateWithHash(`${long}_content`));
+    deepStrictEqual(wrapper!.uniques, [
+      { name: truncateWithHash(`UX__${long}_content___blockUUID`), columns: ['_blockUUID'] },
+    ]);
     deepStrictEqual(wrapper!.indexes, [
       { name: truncateWithHash(`IX__${long}_content___parentUUID`), columns: ['_parentUUID'] },
-      { name: truncateWithHash(`IX__${long}_content___blockUUID`), columns: ['_blockUUID'] },
     ]);
   });
 });

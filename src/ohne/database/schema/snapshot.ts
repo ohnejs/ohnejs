@@ -25,6 +25,11 @@ export interface TableClaim {
    * The block whose instances the claimed per-type table stores; absent everywhere else.
    */
   block?: string;
+
+  /**
+   * The collection whose translatable columns the claimed companion table stores; absent everywhere else.
+   */
+  companion?: string;
 }
 
 /**
@@ -153,6 +158,7 @@ export function classifySchema(desired: readonly TableSchema[]): SchemaClassific
       };
       if (!isUndefined(table.derived)) claim.derived = table.derived;
       if (!isUndefined(table.block)) claim.block = table.block;
+      if (!isUndefined(table.companion)) claim.companion = table.companion;
       return [table.name, claim];
     }),
   );
@@ -162,7 +168,7 @@ export function classifySchema(desired: readonly TableSchema[]): SchemaClassific
  * Restores what the snapshot knows over an introspected schema.
  * A stored column type wins only while it shares the introspected type's native column type.
  * A column hand-retyped since the snapshot keeps what the database reports.
- * The claim's derivation origin and block marker attach too, so live tables classify like desired ones.
+ * The claim's origin, block, and companion markers attach too, so live tables classify like desired ones.
  */
 export function applyClassification(
   live: readonly TableSchema[],
@@ -183,6 +189,7 @@ export function applyClassification(
     };
     if (!isUndefined(claim.derived)) classified.derived = claim.derived;
     if (!isUndefined(claim.block)) classified.block = claim.block;
+    if (!isUndefined(claim.companion)) classified.companion = claim.companion;
     return classified;
   });
 }

@@ -372,6 +372,26 @@ describe('syncDatabase with blocks', () => {
     await db.close();
   });
 
+  it('bars one wrapper from placing a block instance twice, other wrappers staying free', async () => {
+    const db = await open();
+    await syncDatabase(db, dialect, {
+      desired: desiredOf([hero()], posts(['Hero']), pages(['Hero'])),
+    });
+    await insertRow(db, 'Posts', 'p1');
+    await insertRow(db, 'Posts', 'p2');
+    await insertRow(db, 'Pages', 'g1');
+    await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
+    await insertReference(db, 'Posts_content', 'w1', 'p1', 'Hero', 'h1');
+    await rejects(
+      insertReference(db, 'Posts_content', 'w2', 'p2', 'Hero', 'h1'),
+      /UNIQUE constraint failed: Posts_content\._blockUUID/,
+    );
+    await insertReference(db, 'Pages_content', 'w3', 'g1', 'Hero', 'h1');
+    strictEqual(await countRows(db, 'Posts_content'), 1);
+    strictEqual(await countRows(db, 'Pages_content'), 1);
+    await db.close();
+  });
+
   it('leaves unreferenced block rows alone: cleanup is the write layer to own, never the sync', async () => {
     const db = await open();
     const desired = desiredOf([hero()], posts(['Hero']));

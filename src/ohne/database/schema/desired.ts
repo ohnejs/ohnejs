@@ -24,12 +24,18 @@ import { validateBlockDefinition } from '../../blocks/validate-block.ts';
 import { validateCollectionDefinition } from '../../collections/validate-collection.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { resolveFieldOptions } from '../../fields/field.ts';
-import { validateField } from '../../fields/validate-field.ts';
+import {
+  type FieldOwner,
+  ownerLabel,
+  ownerSubject,
+  validateField,
+} from '../../fields/validate-field.ts';
 import { indexName, uniqueName } from '../naming/constraint-names.ts';
 import {
   blockRootName,
   blockTableName,
   collectionTableName,
+  companionTableName,
   derivedTableName,
 } from '../naming/table-names.ts';
 import {
@@ -49,14 +55,6 @@ interface SchemaRegistries {
 }
 
 /**
- * The definition root a field tree hangs off: a collection, or a block's per-type table.
- */
-interface SchemaOwner {
-  kind: 'collection' | 'block';
-  name: string;
-}
-
-/**
  * One field resolved against the registries: its type and materialized storage hint.
  */
 interface ResolvedField {
@@ -68,17 +66,33 @@ interface ResolvedField {
  * The table a derived structure hangs off: an owner's root table, or a child table when nesting.
  * `logical` is the untruncated name constraint names compose from; `physical` the foreign-key target.
  * `origin` is absent at the root table and carries the field path below it.
+ * `parentKey` names the columns identifying one item list, set only inside a cardinality-many child.
+ * A `uniquePerParent` subfield widens its unique over it.
  */
 interface DerivedParent {
-  owner: SchemaOwner;
+  owner: FieldOwner;
   logical: string;
   physical: string;
   origin: DerivedOrigin | undefined;
+  parentKey: readonly string[] | undefined;
+}
+
+/**
+ * What one collection's translatable column-bearing fields contribute to its companion table.
+ * `fields` names them, so the composite-index routing knows where an entry's columns live.
+ */
+interface CompanionMembers {
+  columns: ColumnSchema[];
+  uniques: IndexSchema[];
+  indexes: IndexSchema[];
+  foreignKeys: ForeignKeySchema[];
+  fields: Set<string>;
 }
 
 /**
  * Everything one field map contributes to its table, plus the derived tables hanging off it.
  * `columnless` names the fields whose data lives outside the table, for the composite-index guard.
+ * `companion` collects what the translatable column-bearing fields route away from the main table.
  */
 interface FieldMembers {
   columns: ColumnSchema[];
@@ -87,6 +101,7 @@ interface FieldMembers {
   foreignKeys: ForeignKeySchema[];
   derived: TableSchema[];
   columnless: Set<string>;
+  companion: CompanionMembers;
 }
 
 /**
@@ -112,6 +127,11 @@ const UPDATED_AT_COLUMN: ColumnSchema = { name: '_updatedAt', type: 'integer', n
  * Field-level `unique`/`index` and every `compositeIndexes` entry become constraints on their table.
  * Junction, child, and wrapper tables carry a `DerivedOrigin`, so a collection rename can follow them.
  * Names funnel through the naming builders, so the diff and introspection agree on them.
+ *
+ * Translatable fields partition by `columnType`.
+ * A column-bearing one routes its column, constraints, and foreign key to the `__translations` companion.
+ * A table-deriving one locale-scopes its own derived table with `_localeCode` instead.
+ * The companion exists iff some translatable field carries a column, and it follows its collection's name.
  *
  * Blocks materialize by reachability: a `block_<Name>` table exists once any wrapper allows the type.
  * A block allowed only inside another block counts as reachable too.
@@ -168,6 +188,7 @@ function buildCollectionTables(
     logical: meta.name,
     physical: collectionTableName(meta.name),
     origin: undefined,
+    parentKey: undefined,
   };
   const members = buildFieldMembers(meta.collection.fields, parent, registries, reachable);
   const columns = [UUID_COLUMN, UPDATED_AT_COLUMN, ...members.columns];
@@ -183,12 +204,37 @@ function buildCollectionTables(
         ],
       });
     }
-    const target = composite.unique === true ? members.uniques : members.indexes;
+    const translated = composite.fields.filter((name) => members.companion.fields.has(name));
+    if (translated.length > 0 && translated.length < composite.fields.length) {
+      throw ohneError({
+        title: `Composite index spans \`${meta.name}\` and its translations`,
+        body: [
+          `A \`compositeIndexes\` entry in collection \`${meta.name}\` mixes translatable and plain fields:`,
+          '',
+          ...composite.fields.map(
+            (name) => `- \`${name}\`${members.companion.fields.has(name) ? ' (translatable)' : ''}`,
+          ),
+          '',
+          'A constraint cannot span tables; split the entry, or align the fields on one side.',
+        ],
+      });
+    }
+    const home = translated.length > 0 ? members.companion : members;
+    const logical = translated.length > 0 ? `${meta.name}__translations` : meta.name;
+    const target = composite.unique === true ? home.uniques : home.indexes;
     const build = composite.unique === true ? uniqueName : indexName;
-    target.push({ name: build(meta.name, composite.fields), columns: composite.fields });
+    target.push({ name: build(logical, composite.fields), columns: composite.fields });
   }
 
-  assertDistinctConstraintNames([...members.uniques, ...members.indexes], meta.name);
+  assertDistinctConstraintNames(
+    [
+      ...members.uniques,
+      ...members.indexes,
+      ...members.companion.uniques,
+      ...members.companion.indexes,
+    ],
+    meta.name,
+  );
   return [
     {
       name: parent.physical,
@@ -198,8 +244,44 @@ function buildCollectionTables(
       indexes: members.indexes,
       foreignKeys: members.foreignKeys,
     },
+    ...(members.companion.columns.length > 0
+      ? [buildCompanionTable(meta.name, members.companion)]
+      : []),
     ...members.derived,
   ];
+}
+
+/**
+ * Builds the translations companion of one collection: one row per (parent, locale).
+ *
+ * The companion holds every translatable column-bearing field's column, `title` and FK columns alike.
+ * `_parentUUID` cascades with its parent row; `_localeCode` names the row's content locale.
+ * The pair is the primary key, so one locale holds one value per field and parent.
+ * No `_updatedAt`: a translation write bumps the parent row's instead.
+ * `_localeCode` carries no foreign key - the valid locale set is the write layer's rule, not sync's.
+ */
+function buildCompanionTable(collection: string, companion: CompanionMembers): TableSchema {
+  return {
+    name: companionTableName(collection),
+    columns: [
+      { name: '_parentUUID', type: 'text', notNull: true },
+      { name: '_localeCode', type: 'text', notNull: true },
+      ...companion.columns,
+    ],
+    primaryKey: ['_parentUUID', '_localeCode'],
+    uniques: companion.uniques,
+    indexes: companion.indexes,
+    foreignKeys: [
+      {
+        column: '_parentUUID',
+        targetTable: collectionTableName(collection),
+        targetColumn: 'UUID',
+        onDelete: 'cascade',
+      },
+      ...companion.foreignKeys,
+    ],
+    companion: collection,
+  };
 }
 
 /**
@@ -237,6 +319,7 @@ function buildBlockTables(
     logical: blockRootName(meta.name),
     physical: blockTableName(meta.name),
     origin: undefined,
+    parentKey: undefined,
   };
   const members = buildFieldMembers(meta.block.fields, parent, registries, reachable);
   return [
@@ -257,6 +340,9 @@ function buildBlockTables(
  * Walks one field map and assembles what it contributes to its table.
  * The one routing switch: junction, child, and blocks hints derive tables, everything else is a column.
  * `record` foreign keys, field-level `unique`/`index`, and forced indexes attach where the column is.
+ * A translatable column-bearing field routes its column and constraints to the companion instead.
+ * A translatable table-deriving field locale-scopes its own derived table.
+ * A `uniquePerParent` unique widens over the parent's list key, resolved against the parent table.
  */
 function buildFieldMembers(
   fieldMap: Record<string, FieldInstance>,
@@ -271,38 +357,47 @@ function buildFieldMembers(
     foreignKeys: [],
     derived: [],
     columnless: new Set(),
+    companion: { columns: [], uniques: [], indexes: [], foreignKeys: [], fields: new Set() },
   };
   for (const [name, instance] of Object.entries(fieldMap)) {
     const label = isUndefined(parent.origin) ? name : `${parent.origin.path.join('.')}.${name}`;
     const { fieldType, hint } = resolveField(parent, name, label, instance, registries);
+    const options: Record<string, unknown> = { ...instance.options };
+    const locale = options.translatable === true;
 
     if (hint?.kind === 'junction') {
       members.columnless.add(name);
-      const junction = buildJunctionTable(parent, name, label, hint, registries);
+      const junction = buildJunctionTable(parent, name, label, hint, registries, locale);
       if (!isUndefined(junction)) members.derived.push(junction);
       continue;
     }
 
     if (hint?.kind === 'child') {
       members.columnless.add(name);
-      members.derived.push(...buildChildTable(parent, name, label, hint, registries, reachable));
+      members.derived.push(
+        ...buildChildTable(parent, name, label, hint, registries, reachable, locale),
+      );
       continue;
     }
 
     if (hint?.kind === 'blocks') {
       members.columnless.add(name);
-      members.derived.push(buildWrapperTable(parent, name, label, hint, registries, reachable));
+      members.derived.push(
+        buildWrapperTable(parent, name, label, hint, registries, reachable, locale),
+      );
       continue;
     }
 
     // `validateField` leaves only junction, child, and blocks hints column-less, so a column type remains.
-    const options: Record<string, unknown> = { ...instance.options };
     const notNull = !(options.nullable === true || fieldType.forceNullable === true);
-    members.columns.push({ name, type: fieldType.columnType as LogicalType, notNull });
+    const logical = locale ? `${parent.logical}__translations` : parent.logical;
+    const home = locale ? members.companion : members;
+    if (locale) members.companion.fields.add(name);
+    home.columns.push({ name, type: fieldType.columnType as LogicalType, notNull });
 
     if (hint?.kind === 'foreignKey') {
       const target = resolveCollection(hint.collection, parent, label, registries);
-      members.foreignKeys.push({
+      home.foreignKeys.push({
         column: name,
         targetTable: collectionTableName(target.name),
         targetColumn: 'UUID',
@@ -310,13 +405,43 @@ function buildFieldMembers(
       });
     }
 
+    const listKey = resolveListKey(parent, label, options);
     if (options.unique === true) {
-      members.uniques.push({ name: uniqueName(parent.logical, [name]), columns: [name] });
+      const columns =
+        options.uniquePerLocale === true
+          ? ['_localeCode', name]
+          : isUndefined(listKey)
+            ? [name]
+            : [...listKey, name];
+      home.uniques.push({ name: uniqueName(logical, columns), columns });
     } else if (options.index === true || fieldType.forceIndex === true) {
-      members.indexes.push({ name: indexName(parent.logical, [name]), columns: [name] });
+      home.indexes.push({ name: indexName(logical, [name]), columns: [name] });
     }
   }
   return members;
+}
+
+/**
+ * Resolves the item-list key a `uniquePerParent` field widens its unique over, or throws misplaced.
+ * The key exists only inside a cardinality-many child table; everywhere else the narrowing is empty.
+ * A top-level field has no parent; an object's child table already holds one row per parent key.
+ */
+function resolveListKey(
+  parent: DerivedParent,
+  label: string,
+  options: Record<string, unknown>,
+): readonly string[] | undefined {
+  if (options.uniquePerParent !== true) return undefined;
+  if (!isUndefined(parent.parentKey)) return parent.parentKey;
+  throw ohneError({
+    title: `Field \`${label}\` cannot scope its unique per parent`,
+    body: [
+      isUndefined(parent.origin)
+        ? `Field \`${label}\` in ${ownerLabel(parent.owner)} is top-level, and its \`unique\` already scopes to the whole table.`
+        : `Field \`${label}\` in ${ownerLabel(parent.owner)} sits in an object, which holds one row per parent, so the narrowing adds nothing.`,
+      'Drop `uniquePerParent`.',
+    ],
+  });
 }
 
 /**
@@ -340,7 +465,14 @@ function resolveField(
   const fieldType = registered.fieldType;
   const resolved = resolveFieldOptions(fieldType, { ...instance.options });
   const hint = fieldType.schema?.({ name, options: resolved });
-  validateField({ owner: ownerLabel(parent.owner), name: label, instance, fieldType, hint });
+  validateField({
+    owner: parent.owner,
+    name: label,
+    nested: !isUndefined(parent.origin),
+    instance,
+    fieldType,
+    hint,
+  });
   return { fieldType, hint };
 }
 
@@ -355,6 +487,8 @@ function resolveField(
  * A top-level `inverse` field is validated against its owning counterpart and contributes no table.
  * A nested `records` always owns its junction: `inverse` pairs top-level fields, so it is refused.
  * A `records` field in a block owns its junction on the same terms: no collection field can pair with it.
+ * A translatable field's junction gains `_localeCode`: each locale holds its own links.
+ * The unique widens over it, so one link may exist per locale.
  */
 function buildJunctionTable(
   parent: DerivedParent,
@@ -362,6 +496,7 @@ function buildJunctionTable(
   label: string,
   hint: JunctionHint,
   registries: SchemaRegistries,
+  locale: boolean,
 ): TableSchema | undefined {
   const target = resolveCollection(hint.collection, parent, label, registries);
   if (!isUndefined(hint.inverse)) {
@@ -388,21 +523,20 @@ function buildJunctionTable(
   }
 
   const logical = `${parent.logical}_${name}`;
+  const link = locale
+    ? ['_parentUUID', '_targetUUID', '_localeCode']
+    : ['_parentUUID', '_targetUUID'];
   return {
     name: derivedTableName(parent.logical, name),
     columns: [
       { name: '_parentUUID', type: 'text', notNull: true },
       { name: '_targetUUID', type: 'text', notNull: true },
+      ...(locale ? [{ name: '_localeCode', type: 'text', notNull: true } as const] : []),
       { name: '_parentPosition', type: 'integer', notNull: true },
       { name: '_targetPosition', type: 'integer', notNull: true },
     ],
     primaryKey: [],
-    uniques: [
-      {
-        name: uniqueName(logical, ['_parentUUID', '_targetUUID']),
-        columns: ['_parentUUID', '_targetUUID'],
-      },
-    ],
+    uniques: [{ name: uniqueName(logical, link), columns: link }],
     indexes: [{ name: indexName(logical, ['_targetUUID']), columns: ['_targetUUID'] }],
     foreignKeys: [
       {
@@ -429,6 +563,13 @@ function buildJunctionTable(
  * `one` cardinality makes `_parentUUID` unique; `many` adds `_parentPosition` and indexes the parent.
  * Subfields walk the same routing as collection fields, so composites and relations nest freely.
  * Returns the child table first, its own derived tables after, depth-first.
+ *
+ * A translatable composite's child table gains `_localeCode` and is scoped per (parent, locale).
+ * The `one` unique widens over it; a `many` list orders per locale.
+ * Nested tables stay plain: they scope through their parent chain.
+ *
+ * A `uniquePerParent` subfield widens its unique over the list's parent key.
+ * That unique leads with `_parentUUID`, so it stands in for the parent index.
  */
 function buildChildTable(
   parent: DerivedParent,
@@ -437,19 +578,23 @@ function buildChildTable(
   hint: ChildHint,
   registries: SchemaRegistries,
   reachable: Set<string>,
+  locale: boolean,
 ): TableSchema[] {
   const scope = `${parent.owner.name}.${label}`;
   const subnames = Object.keys(hint.subfields);
   for (const subname of subnames) validateFieldName(subname, scope);
   validateUniqueNames(subnames, 'field', scope);
 
+  const one = hint.cardinality === 'one';
+  const parentKey = locale ? ['_parentUUID', '_localeCode'] : ['_parentUUID'];
   const logical = `${parent.logical}_${name}`;
-  const origin = originOf(parent, name, hint.cardinality === 'one' ? 'childOne' : 'childMany');
+  const origin = originOf(parent, name, one ? 'childOne' : 'childMany');
   const next: DerivedParent = {
     owner: parent.owner,
     logical,
     physical: derivedTableName(parent.logical, name),
     origin,
+    parentKey: one ? undefined : parentKey,
   };
   const members = buildFieldMembers(hint.subfields, next, registries, reachable);
 
@@ -457,18 +602,21 @@ function buildChildTable(
     UUID_COLUMN,
     { name: '_parentUUID', type: 'text', notNull: true },
   ];
-  if (hint.cardinality === 'many') {
-    columns.push({ name: '_parentPosition', type: 'integer', notNull: true });
-  }
+  if (locale) columns.push({ name: '_localeCode', type: 'text', notNull: true });
+  if (!one) columns.push({ name: '_parentPosition', type: 'integer', notNull: true });
   columns.push(...members.columns);
 
-  const one = hint.cardinality === 'one';
   const uniques = one
-    ? [{ name: uniqueName(logical, ['_parentUUID']), columns: ['_parentUUID'] }, ...members.uniques]
+    ? [{ name: uniqueName(logical, parentKey), columns: parentKey }, ...members.uniques]
     : members.uniques;
-  const indexes = one
-    ? members.indexes
-    : [{ name: indexName(logical, ['_parentUUID']), columns: ['_parentUUID'] }, ...members.indexes];
+  const parentServed = members.uniques.some((unique) => unique.columns[0] === '_parentUUID');
+  const indexes =
+    one || parentServed
+      ? members.indexes
+      : [
+          { name: indexName(logical, ['_parentUUID']), columns: ['_parentUUID'] },
+          ...members.indexes,
+        ];
 
   return [
     {
@@ -498,8 +646,11 @@ function buildChildTable(
  * Each row places one block instance under one parent row.
  * `_blockType` names the per-type table; `_blockUUID` the instance's row in it.
  * The reference is polymorphic on purpose, so no foreign key covers it; the write layer owns cleanup.
- * `_parentUUID` cascades with its parent; both sides of the reference are indexed for lookups and sweeps.
+ * The `_blockUUID` unique bars two rows of one wrapper from placing one instance, and serves the sweeps.
+ * `_parentUUID` cascades with its parent and is indexed for lookups.
  * The wrapper's `allow` rides its origin, resolved, so the guard can probe live rows against it.
+ * A translatable field's wrapper gains `_localeCode` and holds one block list per (parent, locale).
+ * The per-type `block_` tables stay global: a block instance belongs to whichever wrapper row placed it.
  */
 function buildWrapperTable(
   parent: DerivedParent,
@@ -508,6 +659,7 @@ function buildWrapperTable(
   hint: BlocksHint,
   registries: SchemaRegistries,
   reachable: Set<string>,
+  locale: boolean,
 ): TableSchema {
   const allow = resolveAllow(parent, label, hint, registries);
   for (const block of allow) reachable.add(block);
@@ -518,16 +670,14 @@ function buildWrapperTable(
     columns: [
       UUID_COLUMN,
       { name: '_parentUUID', type: 'text', notNull: true },
+      ...(locale ? [{ name: '_localeCode', type: 'text', notNull: true } as const] : []),
       { name: '_parentPosition', type: 'integer', notNull: true },
       { name: '_blockType', type: 'text', notNull: true },
       { name: '_blockUUID', type: 'text', notNull: true },
     ],
     primaryKey: ['UUID'],
-    uniques: [],
-    indexes: [
-      { name: indexName(logical, ['_parentUUID']), columns: ['_parentUUID'] },
-      { name: indexName(logical, ['_blockUUID']), columns: ['_blockUUID'] },
-    ],
+    uniques: [{ name: uniqueName(logical, ['_blockUUID']), columns: ['_blockUUID'] }],
+    indexes: [{ name: indexName(logical, ['_parentUUID']), columns: ['_parentUUID'] }],
     foreignKeys: [
       {
         column: '_parentUUID',
@@ -679,20 +829,6 @@ function originOf(parent: DerivedParent, name: string, kind: DerivedOrigin['kind
   return parent.owner.kind === 'collection'
     ? { collection: parent.owner.name, path, kind }
     : { block: parent.owner.name, path, kind };
-}
-
-/**
- * An owner as the error messages locate a field: 'collection `Posts`' or 'block `Hero`'.
- */
-function ownerLabel(owner: SchemaOwner): string {
-  return `${owner.kind} \`${owner.name}\``;
-}
-
-/**
- * An owner as the error messages open a sentence: 'Collection `Posts`' or 'Block `Hero`'.
- */
-function ownerSubject(owner: SchemaOwner): string {
-  return owner.kind === 'collection' ? `Collection \`${owner.name}\`` : `Block \`${owner.name}\``;
 }
 
 /**

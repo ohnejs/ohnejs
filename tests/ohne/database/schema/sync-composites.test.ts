@@ -108,6 +108,37 @@ describe('syncDatabase with composites', () => {
     await db.close();
   });
 
+  it('enforces a uniquePerParent subfield within one list, other parents staying free', async () => {
+    const db = await open();
+    const desired = desiredOf({
+      name: 'Posts',
+      collection: {
+        fields: {
+          links: field('repeater', {
+            fields: { platform: field('text', { unique: true, uniquePerParent: true }) },
+          }),
+        },
+      },
+    });
+    await syncDatabase(db, dialect, { desired });
+    for (const table of desired) {
+      const live = await dialect.describeTable(db, table.name);
+      deepStrictEqual(diffSchemas([live], [table], dialect), []);
+    }
+    await insertRow(db, 'Posts', 'p1');
+    await insertRow(db, 'Posts', 'p2');
+    const place = (uuid: string, parent: string, position: number, platform: string) =>
+      db.run(
+        'INSERT INTO "Posts_links" ("UUID", "_parentUUID", "_parentPosition", "platform") VALUES (?, ?, ?, ?)',
+        [uuid, parent, position, platform],
+      );
+    await place('l1', 'p1', 0, 'twitter');
+    await place('l2', 'p2', 0, 'twitter');
+    await rejects(place('l3', 'p1', 1, 'twitter'), /UNIQUE constraint failed/);
+    strictEqual(await countRows(db, 'Posts_links'), 2);
+    await db.close();
+  });
+
   it('cascades deletes through nested repeaters', async () => {
     const db = await open();
     const desired = desiredOf({
