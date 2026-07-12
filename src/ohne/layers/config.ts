@@ -231,6 +231,41 @@ export interface Config {
   };
 
   /**
+   * Collection content settings.
+   */
+  collections?: {
+    /**
+     * The content locales records may hold, as BCP-47 tags.
+     * Canonicalized before use; an invalid tag or a duplicate is an error.
+     * The write layer enforces the set; sync never reads it.
+     * Content locales are not UI languages, so the set is independent of the message catalogs.
+     *
+     * @default
+     * ['en']
+     *
+     * @example
+     * ```ts
+     * collections: {
+     *   locales: ['en', 'de-AT', 'fr'],
+     *   defaultLocale: 'en',
+     * }
+     * ```
+     */
+    locales?: string[];
+
+    /**
+     * The locale existing values land on when a field turns translatable.
+     * Must be one of `locales`; it never falls back to the set's first entry.
+     * The one locale the schema engine consumes.
+     * Inherited across layers, so a base layer can set the content dimension once.
+     *
+     * @default
+     * 'en'
+     */
+    defaultLocale?: string;
+  };
+
+  /**
    * Message catalog settings.
    */
   messages?: {
@@ -648,6 +683,7 @@ export interface ConfigExtensions {}
 export const DEFAULTS = {
   layers: [],
   disable: { routes: [], messages: [], collections: [], fields: [], blocks: [] },
+  collections: { locales: ['en'], defaultLocale: 'en' },
   messages: { defaultLanguage: 'en' },
   api: {
     basePath: '',
