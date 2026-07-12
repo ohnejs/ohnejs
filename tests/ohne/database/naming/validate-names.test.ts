@@ -1,4 +1,4 @@
-import { doesNotThrow, throws } from 'node:assert';
+import { doesNotThrow, match, ok, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import {
@@ -6,6 +6,17 @@ import {
   validateFieldName,
   validateUniqueNames,
 } from '../../../../src/ohne/database/naming/validate-names.ts';
+import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
+
+function namesConditionGrammar(error: unknown): boolean {
+  ok(isOhneError(error));
+  match(error.message, /reserved/);
+  match(
+    Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? ''),
+    /condition grammar/,
+  );
+  return true;
+}
 
 describe('validateCollectionName', () => {
   it('accepts a PascalCase name, embedded acronym included', () => {
@@ -52,6 +63,24 @@ describe('validateFieldName', () => {
 
   it('rejects `uuid`, which collides with the primary key', () => {
     throws(() => validateFieldName('uuid', 'Posts'), /reserved/);
+  });
+
+  it('rejects the condition grammar keys `and`, `or`, and `not`', () => {
+    throws(() => validateFieldName('and', 'Posts'), namesConditionGrammar);
+    throws(() => validateFieldName('or', 'Posts'), namesConditionGrammar);
+    throws(() => validateFieldName('not', 'Posts'), namesConditionGrammar);
+  });
+
+  it('rejects the condition grammar keys case-insensitively', () => {
+    throws(() => validateFieldName('aND', 'Posts'), namesConditionGrammar);
+    throws(() => validateFieldName('oR', 'Posts'), namesConditionGrammar);
+    throws(() => validateFieldName('nOt', 'Posts'), namesConditionGrammar);
+  });
+
+  it('rejects the condition grammar keys in composite subfields', () => {
+    throws(() => validateFieldName('and', 'Posts.sections'), namesConditionGrammar);
+    throws(() => validateFieldName('or', 'Posts.sections'), namesConditionGrammar);
+    throws(() => validateFieldName('not', 'Posts.sections'), namesConditionGrammar);
   });
 });
 

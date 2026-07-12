@@ -68,9 +68,13 @@ export function validateBlockName(name: string, path?: string): void {
   }
 }
 
+const LOGICAL_KEYS = new Set(['and', 'or', 'not']);
+
 /**
- * Rejects a field name that is not camelCase or collides with the `UUID` primary key.
+ * Rejects a field name that is not camelCase or is reserved, matched case-insensitively.
  * A camelCase name is a lowercase letter, then letters and digits: no underscores, no leading uppercase.
+ * `uuid` collides with the `UUID` primary key.
+ * `and`, `or`, and `not` are the condition grammar's logical keys in `where` and `when`.
  * A known scope - the collection, or a dotted composite path like `Posts.sections` - sharpens the message.
  * Omit it before the name is known.
  */
@@ -93,6 +97,15 @@ export function validateFieldName(name: string, scope?: string): void {
       title: `Field name \`${name}\` is reserved`,
       body: [
         '`uuid` collides with the `UUID` primary key on case-insensitive dialects.',
+        `Rename it${where}.`,
+      ],
+    });
+  }
+  if (LOGICAL_KEYS.has(name.toLowerCase())) {
+    throw ohneError({
+      title: `Field name \`${name}\` is reserved`,
+      body: [
+        "`and`, `or`, and `not` are the condition grammar's logical keys in `where` and `when`.",
         `Rename it${where}.`,
       ],
     });
