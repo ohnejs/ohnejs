@@ -23,7 +23,7 @@ import { createRegistry, isUndefined, naturalCompare } from '../../../utils/inde
 import { validateBlockDefinition } from '../../blocks/validate-block.ts';
 import { validateCollectionDefinition } from '../../collections/validate-collection.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { resolveFieldOptions } from '../../fields/field.ts';
+import { resolveFieldStorage } from '../../fields/resolve-field.ts';
 import {
   type FieldOwner,
   ownerLabel,
@@ -462,9 +462,7 @@ function resolveField(
       body: `${ownerSubject(parent.owner)} references field type \`${instance.type}\`, which is not registered.`,
     });
   }
-  const fieldType = registered.fieldType;
-  const resolved = resolveFieldOptions(fieldType, { ...instance.options });
-  const hint = fieldType.schema?.({ name, options: resolved });
+  const { fieldType, hint } = resolveFieldStorage(name, instance, registered.fieldType);
   validateField({
     owner: parent.owner,
     name: label,
@@ -771,8 +769,7 @@ function validateInverse(
       body: `Collection \`${target.name}\` references field type \`${owning.type}\`, which is not registered.`,
     });
   }
-  const resolved = resolveFieldOptions(registered.fieldType, { ...owning.options });
-  const owningHint = registered.fieldType.schema?.({ name: inverse, options: resolved });
+  const { hint: owningHint } = resolveFieldStorage(inverse, owning, registered.fieldType);
   if (owningHint?.kind !== 'junction') {
     throw ohneError({
       title: `Field \`${inverse}\` cannot be an inverse target`,
