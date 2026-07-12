@@ -1342,6 +1342,8 @@ async function runValuePass(
  * The sync bracket runs with foreign keys off, so nothing cascades on its own.
  * A blocks wrapper first sweeps the instances only its doomed rows reference, reported like any purge.
  * Child tables, junctions, wrappers, and companions keyed to the deleted rows die next, recursively.
+ * Rows of a per-type block table pull the wrapper rows referencing them along too:
+ * the link is polymorphic, so no key would ever cascade it.
  * A junction row deletes by its link triple; every other table by its primary key.
  */
 async function deleteOwnedRows(
@@ -1376,6 +1378,26 @@ async function deleteOwnedRows(
   }
   const parents = doomed.flatMap((row) => (isUndefined(row.UUID) ? [] : [row.UUID as SQLValue]));
   if (parents.length === 0) return;
+  const block = claim?.block;
+  if (!isUndefined(block)) {
+    for (const [name, item] of Object.entries(engine.claimed)) {
+      if (item.derived?.kind !== 'blocksWrapper' || !engine.names.has(name)) continue;
+      let removed = 0;
+      for (const batch of chunk(parents, 500)) {
+        const marks = batch.map(() => '?').join(', ');
+        const { changes } = await db.run(
+          `DELETE FROM ${dialect.quote(name)} WHERE ${dialect.quote('_blockType')} = ? ` +
+            `AND ${dialect.quote('_blockUUID')} IN (${marks})`,
+          [block, ...batch],
+        );
+        removed += changes;
+      }
+      if (removed === 0) continue;
+      engine.deletions.push(
+        `- \`${removed}\` rows of \`${name}\` deleted, referencing deleted \`${schema.name}\` rows`,
+      );
+    }
+  }
   for (const [name, child] of Object.entries(engine.claimed)) {
     if (!engine.names.has(name)) continue;
     const under =

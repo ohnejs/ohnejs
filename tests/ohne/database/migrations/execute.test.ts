@@ -1419,6 +1419,66 @@ describe('executeMigrations with block addresses', () => {
     await db.close();
   });
 
+  it('deletes wrapper links when a block-field switch deletes instances', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const wrapper = table('Posts_content', {
+      columns: [...wrapperColumns],
+      derived: { collection: 'Posts', path: ['content'], kind: 'blocksWrapper', allow: ['Hero'] },
+    });
+    const hero = table('block_Hero', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+    await materialize(db, [posts, wrapper, hero]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?), (?, ?)', [
+      'h1',
+      'keep',
+      'h2',
+      null,
+    ]);
+    await db.run(
+      'INSERT INTO "Posts_content" ' +
+        '("UUID", "_parentUUID", "_parentPosition", "_blockType", "_blockUUID") ' +
+        'VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+      ['w1', 'p1', 0, 'Hero', 'h1', 'w2', 'p1', 1, 'Hero', 'h2'],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-title-required', {
+          from: { block: 'Hero', field: 'title', nullable: true },
+          transform: (value, _row, ctx) => (value === null ? ctx.deleteRecord() : undefined),
+        }),
+      ],
+      desired: [
+        table('block_Hero', {
+          columns: [UUID, { name: 'title', type: 'text', notNull: true }],
+          block: 'Hero',
+        }),
+      ],
+      claimed: classifySchema([posts, wrapper, hero]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-title-required', status: 'applied' }]);
+    const instances = await db.query<{ UUID: string }>('SELECT "UUID" FROM "block_Hero"');
+    deepStrictEqual(
+      instances.map((row) => row.UUID),
+      ['h1'],
+    );
+    const wrappers = await db.query<{ UUID: string }>('SELECT "UUID" FROM "Posts_content"');
+    deepStrictEqual(
+      wrappers.map((row) => row.UUID),
+      ['w1'],
+    );
+    ok(
+      outcome.deletions.some((line) =>
+        /rows of `Posts_content` deleted, referencing deleted `block_Hero` rows/.test(line),
+      ),
+    );
+    await db.close();
+  });
+
   it('composes a block rename with a same-run field discard inside it', async () => {
     const db = await open();
     const hero = table('block_Hero', {
