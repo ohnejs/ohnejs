@@ -6,7 +6,12 @@ import type { ScannedMigration } from '../database/migrations/scan-layer-migrati
 import type { CollectedFieldType } from '../fields/collect-fields.ts';
 import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
-import type { BlocksHint, ChildHint } from '../fields/storage-hint.ts';
+import type {
+  BlocksHint,
+  ChildHint,
+  ForeignKeyHint,
+  JunctionHint,
+} from '../fields/storage-hint.ts';
 
 import {
   type CodeBuilder,
@@ -33,8 +38,9 @@ import { collectMigrations } from '../database/migrations/collect-migrations.ts'
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
 import { resolveFieldOptions } from '../fields/field.ts';
+import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
-import { fieldValueType } from '../fields/value-type.ts';
+import { fieldBaseType, fieldValueType } from '../fields/value-type.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
@@ -82,6 +88,16 @@ interface EmissionContext {
  * The directory of the built-in field types, used when a built-in's `importType` resolves a path.
  */
 const BUILTIN_DIR = fileURLToPath(new URL('../fields/builtin/', import.meta.url));
+
+/**
+ * The `UUID` entry every collection and composite scope leads its query-field table with.
+ */
+const UUID_QUERY_ENTRY = '{ scalar: string; id: true }';
+
+/**
+ * The `_updatedAt` entry every collection carries in its query-field table.
+ */
+const UPDATED_AT_QUERY_ENTRY = '{ scalar: number }';
 
 /**
  * Generates the database types and registrations from every layer's schema directories.
@@ -167,6 +183,18 @@ async function writeShared(
       context,
     ),
   }));
+  const queryMembers = collections.map((collection) => ({
+    name: collection.name,
+    fields: [
+      { name: 'UUID', type: UUID_QUERY_ENTRY },
+      { name: '_updatedAt', type: UPDATED_AT_QUERY_ENTRY },
+      ...queryFieldsOf(
+        { subject: `Collection \`${collection.name}\``, file: collection.file },
+        collection.collection.fields,
+        context,
+      ),
+    ],
+  }));
 
   const code = createCodeBuilder();
   const statements = imports.statements();
@@ -202,6 +230,16 @@ async function writeShared(
         });
         code.line('};');
       }
+    });
+    code.line('}');
+  }
+  code.line();
+  if (queryMembers.length === 0) {
+    code.line('export interface GeneratedQueryFields {}');
+  } else {
+    code.line('export interface GeneratedQueryFields {');
+    code.indent(() => {
+      for (const member of queryMembers) emitFieldShapes(code, member.name, member.fields);
     });
     code.line('}');
   }
@@ -304,13 +342,14 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedRelations } from '../shared/database.ts';",
+    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedQueryFields, GeneratedRelations } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
   code.indent(() => {
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');
+    code.line('interface KnownQueryFields extends GeneratedQueryFields {}');
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     if (augmented.length === 0) {
@@ -487,6 +526,76 @@ function blocksValueType(
   );
   if (items.length === 1) return `${items[0] as string}[]`;
   return ['(', ...items.map((item) => indent(`| ${item}`)), ')[]'].join('\n');
+}
+
+/**
+ * Resolves one collection or composite field map into named `QueryFieldMeta` type literals.
+ * A blocks field is skipped, exactly as the runtime query metadata skips it.
+ */
+function queryFieldsOf(
+  owner: EmissionOwner,
+  fields: Record<string, FieldInstance>,
+  context: EmissionContext,
+): { name: string; type: string }[] {
+  const entries: { name: string; type: string }[] = [];
+  for (const [name, instance] of Object.entries(fields)) {
+    const type = queryFieldType(owner, name, instance, context);
+    if (!isNull(type)) entries.push({ name, type });
+  }
+  return entries;
+}
+
+/**
+ * Emits one field's `QueryFieldMeta` type literal: the markers it carries decide its operators.
+ * A column carries `scalar` (and `nullable`); a `record` adds its target.
+ * A `records` or composite field carries only its relation marker.
+ * A blocks field has no query metadata and returns `null`.
+ * The kind is read through the same `resolveFieldStorage` walk the runtime metadata uses.
+ */
+function queryFieldType(
+  owner: EmissionOwner,
+  name: string,
+  instance: FieldInstance,
+  context: EmissionContext,
+): string | null {
+  const registered = context.types.get(instance.type);
+  if (isUndefined(registered)) {
+    throw ohneError({
+      title: `Unknown field type \`${instance.type}\``,
+      body: [
+        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
+      ],
+      path: owner.file,
+    });
+  }
+  const { hint, kind } = resolveFieldStorage(name, instance, registered.fieldType);
+
+  if (kind === 'blocks') return null;
+  if (kind === 'junction')
+    return `{ records: ${literalString((hint as JunctionHint).collection)} }`;
+  if (kind === 'childOne' || kind === 'childMany') {
+    const cardinality = kind === 'childOne' ? 'one' : 'many';
+    const subfields = [
+      { name: 'UUID', type: UUID_QUERY_ENTRY },
+      ...queryFieldsOf(owner, (hint as ChildHint).subfields, context),
+    ];
+    const body = subfields.map((field) => `${propertyKey(field.name)}: ${field.type}`).join('; ');
+    return `{ child: ${literalString(cardinality)}; fields: { ${body} } }`;
+  }
+
+  const { base, nullable } = fieldBaseType({
+    fieldType: registered.fieldType,
+    name,
+    options: { ...instance.options },
+    fieldDir: registered.dir,
+    imports: context.imports,
+  });
+  const parts = [`scalar: ${base}`];
+  if (kind === 'foreignKey') {
+    parts.push(`record: ${literalString((hint as ForeignKeyHint).collection)}`);
+  }
+  if (nullable) parts.push('nullable: true');
+  return `{ ${parts.join('; ')} }`;
 }
 
 /**
