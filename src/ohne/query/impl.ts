@@ -12,6 +12,7 @@ import { freezeIR, type QueryIR } from './ir.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
 import { findFirst as readFirst, findMany as readMany } from './read/find.ts';
 import { paginate as readPage } from './read/paginate.ts';
+import { pluck as pluckRows } from './read/pluck.ts';
 import { unknownFieldError, validateCondition } from './validate-condition.ts';
 
 /**
@@ -54,6 +55,23 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       if (isUndefined(this.meta.fields[field])) throw unknownFieldError(field, this.meta);
     }
     this.selected = [...(this.selected ?? []), ...fields];
+    return this;
+  }
+
+  populate(...fields: string[]): this {
+    for (const field of fields) {
+      const entry = this.meta.fields[field];
+      if (isUndefined(entry)) throw unknownFieldError(field, this.meta);
+      if (entry.kind !== 'record' && entry.kind !== 'records') {
+        throw ohneError({
+          title: `Cannot populate \`${field}\``,
+          body: [
+            `Field \`${field}\` on collection \`${this.meta.collection}\` is not a relation; only \`record\` and \`records\` fields populate.`,
+          ],
+        });
+      }
+      this.populateFields.push(field);
+    }
     return this;
   }
 
@@ -105,6 +123,11 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   paginate(page: number, perPage: number): Promise<PaginatedResult> {
     return readPage(this.freeze(), page, perPage);
+  }
+
+  pluck(field: string): Promise<unknown[]> {
+    if (isUndefined(this.meta.fields[field])) throw unknownFieldError(field, this.meta);
+    return pluckRows(this.freeze(), field);
   }
 
   /**

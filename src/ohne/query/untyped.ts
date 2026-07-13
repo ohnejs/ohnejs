@@ -28,6 +28,12 @@ export interface UntypedQueryBuilder {
   select(...fields: string[]): this;
 
   /**
+   * Marks `record`/`records` fields to hydrate to full target records, accumulating across calls.
+   * A populated field must be one the read fetches; populating a non-relation field is rejected.
+   */
+  populate(...fields: string[]): this;
+
+  /**
    * Adds a sort key, stacking after the keys already set; a repeated field keeps its first direction.
    */
   orderBy(field: string, direction?: OrderDirection): this;
@@ -72,4 +78,9 @@ export interface UntypedQueryBuilder {
    * Reads one page of records with its totals.
    */
   paginate(page: number, perPage: number): Promise<PaginatedResult>;
+
+  /**
+   * Reads one field's value from every matching record, in the query's order.
+   */
+  pluck(field: string): Promise<unknown[]>;
 }

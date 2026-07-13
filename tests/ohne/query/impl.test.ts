@@ -130,6 +130,43 @@ describe('QueryBuilderImpl gating', () => {
   });
 });
 
+describe('QueryBuilderImpl populate', () => {
+  it('rejects populating a field that is not a relation', () => {
+    throws(
+      () => queryUntyped('IPosts').populate('title'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /Cannot populate `title`/);
+        return true;
+      },
+    );
+  });
+
+  it('rejects populating an unknown field', () => {
+    throws(
+      () => queryUntyped('IPosts').populate('nope'),
+      (error: unknown) => isOhneError(error),
+    );
+  });
+});
+
+describe('QueryBuilderImpl pluck', () => {
+  it('reads one field from every matching row', async () => {
+    deepStrictEqual(await queryUntyped('IPosts').orderBy('title').pluck('title'), [
+      'Alpha',
+      'Beta',
+      'Gamma',
+    ]);
+  });
+
+  it('rejects plucking an unknown field', () => {
+    throws(
+      () => queryUntyped('IPosts').pluck('nope'),
+      (error: unknown) => isOhneError(error),
+    );
+  });
+});
+
 describe('QueryBuilderImpl limits', () => {
   it('accumulates overrides per key, the last value winning', () => {
     const builder = queryUntyped('IPosts')

@@ -1,6 +1,6 @@
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { QueryIR } from '../ir.ts';
-import type { CollectionQueryMeta } from '../metadata.ts';
+import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
 
@@ -25,31 +25,32 @@ export interface SelectedColumn {
 }
 
 /**
- * Compiles the `SELECT ... FROM` head and names the columns each row assembles from.
+ * The column-bearing fields of a scope, in declaration order, each as a `SelectedColumn`.
+ *
+ * A scope is a collection's fields or a composite's subfields; column-less kinds hydrate elsewhere.
+ * A `record` field is column-bearing here - its foreign-key column holds the target `UUID`.
+ */
+export function scopeColumns(fields: Record<string, FieldQueryMeta>): SelectedColumn[] {
+  const columns: SelectedColumn[] = [];
+  for (const [name, field] of Object.entries(fields)) {
+    if (isUndefined(field.column) || isUndefined(field.logicalType)) continue;
+    columns.push({ name, column: field.column, logicalType: field.logicalType });
+  }
+  return columns;
+}
+
+/**
+ * Compiles the `SELECT ... FROM` head, naming the columns a top-level read fetches.
  *
  * Column-bearing fields in declaration order form the projection; column-less fields hydrate elsewhere.
- * `UUID` is always fetched, since relation anchoring needs it, but is stripped from an unselecting read.
- * A `select` narrows the output to its named fields; the full record is read when none was set.
- * A projection that names no column still fetches `UUID` alone, never falling back to `SELECT *`.
+ * `UUID` is always fetched, since relation anchoring needs it, even when a `select` leaves it out.
+ * A `select` narrows the projection to its named fields; the full column set is read when none was set.
+ * A projection that names no other column still fetches `UUID` alone, never falling back to `SELECT *`.
  */
-export function compileSelect(
-  ir: QueryIR,
-  meta: CollectionQueryMeta,
-  dialect: Dialect,
-): { sql: string; output: SelectedColumn[] } {
-  const output: SelectedColumn[] = [];
-  const fetched: SelectedColumn[] = [];
-  for (const [name, field] of Object.entries(meta.fields)) {
-    if (isUndefined(field.column) || isUndefined(field.logicalType)) continue;
-    const selected = isNull(ir.select) || ir.select.includes(name);
-    const entry: SelectedColumn = { name, column: field.column, logicalType: field.logicalType };
-    if (selected) {
-      output.push(entry);
-      fetched.push(entry);
-    } else if (name === 'UUID') {
-      fetched.push(entry);
-    }
-  }
+export function compileSelect(ir: QueryIR, meta: CollectionQueryMeta, dialect: Dialect): string {
+  const fetched = scopeColumns(meta.fields).filter(
+    (entry) => isNull(ir.select) || ir.select.includes(entry.name) || entry.name === 'UUID',
+  );
   const columns = fetched.map((entry) => dialect.quote(entry.column)).join(', ');
-  return { sql: `SELECT ${columns} FROM ${dialect.quote(meta.table)}`, output };
+  return `SELECT ${columns} FROM ${dialect.quote(meta.table)}`;
 }
