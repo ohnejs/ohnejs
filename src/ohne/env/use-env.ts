@@ -28,7 +28,7 @@ export function boolEnv(raw: string, name: string): boolean {
   throw new Error(`\`${name}\` must be \`1\`/\`true\` or \`0\`/\`false\`, got \`${raw}\`.`);
 }
 
-registry.define('NODE_ENV', { default: 'development', parse: nodeEnv });
+registry.define('NODE_ENV', { default: 'development', parse: nodeEnv, flag: 'value' });
 registry.define('PORT', {
   default: undefined,
   parse: (raw) => {
@@ -39,22 +39,28 @@ registry.define('PORT', {
       );
     return port;
   },
+  flag: 'value',
 });
-registry.define('HOST', { default: undefined, parse: (raw) => raw });
-registry.define('API_URL', { default: undefined, parse: (raw) => raw });
-registry.define('COOKIE_SECRET', { default: undefined });
-registry.define('SILENT', { default: false, parse: boolEnv });
-registry.define('DEBUG', { default: false, parse: (raw) => isDebugEnabled('ohne', raw) });
-registry.define('NO_COLOR', { default: false, parse: (raw) => raw !== '' });
+registry.define('HOST', { default: undefined, parse: (raw) => raw, flag: 'value' });
+registry.define('API_URL', { default: undefined, parse: (raw) => raw, flag: 'value' });
+registry.define('COOKIE_SECRET', { default: undefined, flag: 'value' });
+registry.define('SILENT', { default: false, parse: boolEnv, flag: 'boolean' });
+registry.define('DEBUG', {
+  default: false,
+  parse: (raw) => isDebugEnabled('ohne', raw),
+  flag: 'boolean',
+});
+registry.define('NO_COLOR', { default: false, parse: (raw) => raw !== '', flag: 'boolean' });
 registry.define('FORCE_COLOR', {
   default: undefined,
   parse: (raw) => coerceToBoolean(raw) !== false,
+  flag: 'boolean',
 });
-registry.define('SKIP_CODEGEN', { default: false, parse: boolEnv });
-registry.define('DASHBOARD_RELOAD', { default: false, parse: boolEnv });
-registry.define('DATABASE', { default: undefined, parse: (raw) => raw });
-registry.define('DB', { default: undefined, parse: (raw) => raw });
-registry.define('FORCE_SYNC', { default: false, parse: boolEnv });
+registry.define('SKIP_CODEGEN', { default: false, parse: boolEnv, flag: 'boolean' });
+registry.define('DASHBOARD_RELOAD', { default: false, parse: boolEnv, flag: 'boolean' });
+registry.define('DATABASE', { default: undefined, parse: (raw) => raw, flag: 'value' });
+registry.define('DB', { default: undefined, parse: (raw) => raw, flag: 'value' });
+registry.define('FORCE_SYNC', { default: false, parse: boolEnv, flag: 'boolean' });
 
 /**
  * Returns the process-wide env registry for `Env`.

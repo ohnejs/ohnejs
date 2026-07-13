@@ -89,10 +89,12 @@ transaction, before the diff, so a covered change passes the guard.
 
 ## Force
 
-`FORCE_SYNC` (or `database.sync.force` in config) authorizes the guard's deletions for one boot:
+`FORCE_SYNC` (or its `--force-sync` flag, or `database.sync.force` in config) authorizes the guard's
+deletions for one boot:
 
 ```sh
 FORCE_SYNC=1 pnpm serve:api
+pnpm serve:api --force-sync
 ```
 
 Force does not skip the checks - it performs the deletions they warned about, and reports

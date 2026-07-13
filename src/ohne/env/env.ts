@@ -20,6 +20,10 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  * - `DB` - alias of `DATABASE`; setting both throws.
  * - `FORCE_SYNC` - truthy authorizes and performs a destructive schema sync for one boot.
  *
+ * Each built-in is also a CLI flag - the kebab-case of its name, so `FORCE_SYNC` is `--force-sync`.
+ * A booleanish var is a switch (`--force-sync` / `--no-force-sync`); the rest take a value (`--host x`).
+ * The flag wins over the env var for that run.
+ *
  * @example
  * ```ts
  * declare module 'ohne' {
