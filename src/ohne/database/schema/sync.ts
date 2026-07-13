@@ -48,6 +48,17 @@ export interface SyncOptions {
   force?: boolean;
 
   /**
+   * Runs the full reconciliation, then rolls it back instead of committing.
+   * Migrations, the diff, the guard, and the apply all execute against the live data.
+   * A refusal or a failing statement surfaces exactly as a real sync would raise it.
+   * The returned report describes what a real sync would change; the database is left untouched.
+   *
+   * @default
+   * false
+   */
+  dryRun?: boolean;
+
+  /**
    * The locale the flip machinery pivots on, inside the migration run.
    * The fan-out lands existing values on it, and a transform-less fan-in promotes and keeps its rows.
    *
@@ -92,6 +103,10 @@ const INTERNAL_TABLES = new Set<string>([OHNE_LOCKS, OHNE_MIGRATIONS, OHNE_SCHEM
  * Bracket, migrations, diff, guard, apply, snapshot write, stamps, and lock release are one transaction.
  * On failure everything rolls back, the lock frees best-effort, and the boot dies with the thrown error.
  * A loser instance returns an empty report once the winner realized the same hash.
+ *
+ * Under `dryRun` the same transaction runs in full and then rolls back, so nothing is committed.
+ * The in-transaction lock release rolls back with it, so the lock frees on the raw connection afterwards.
+ * A refusal still throws: a dry run fails exactly where a real sync would, which is the point.
  */
 export async function syncDatabase(
   db: DatabaseAdapter,
@@ -143,43 +158,50 @@ export async function syncDatabase(
     const classified = applyClassification(live, claimed, dialect);
     const touched = touchedTables(diffSchemas(classified, desired, dialect), pending);
     const force = options.force ?? false;
-    return await dialect.schemaTransaction(db, async (tx) => {
-      for (const table of classified) {
-        if (touched.has(table.name)) await dropConstraints(tx, dialect, table);
-      }
-      const outcome = await executeMigrations(tx, dialect, {
-        migrations: pending,
-        desired,
-        claimed,
-        force,
-        ownership: snapshot?.ownership ?? true,
-        defaultLocale: options.defaultLocale,
-      });
-      const migrated: TableSchema[] = [];
-      for (const name of await dialect.listTables(tx)) {
-        if (INTERNAL_TABLES.has(name) || isUndefined(outcome.claimed[name])) continue;
-        migrated.push(await dialect.describeTable(tx, name));
-      }
-      const current = applyClassification(migrated, outcome.claimed, dialect);
-      const diffs = diffSchemas(current, desired, dialect);
-      const report = await guardDiffs(tx, dialect, diffs, current, desired, { force });
-      for (const diff of diffs) {
-        await dialect.applyTableDiff(tx, diff);
-      }
-      await writeSnapshot(
-        tx,
-        dialect,
-        advanceSnapshot(snapshot, desiredHash, classifySchema(desired)),
-      );
-      for (const stamp of outcome.stamps) {
-        await stampMigration(tx, dialect, stamp);
-      }
-      await dialect.releaseLock(tx, handle);
-      return {
-        deletions: [...outcome.deletions, ...report.deletions],
-        warnings: report.warnings,
-      };
-    });
+    const dryRun = options.dryRun ?? false;
+    const report = await dialect.schemaTransaction(
+      db,
+      async (tx) => {
+        for (const table of classified) {
+          if (touched.has(table.name)) await dropConstraints(tx, dialect, table);
+        }
+        const outcome = await executeMigrations(tx, dialect, {
+          migrations: pending,
+          desired,
+          claimed,
+          force,
+          ownership: snapshot?.ownership ?? true,
+          defaultLocale: options.defaultLocale,
+        });
+        const migrated: TableSchema[] = [];
+        for (const name of await dialect.listTables(tx)) {
+          if (INTERNAL_TABLES.has(name) || isUndefined(outcome.claimed[name])) continue;
+          migrated.push(await dialect.describeTable(tx, name));
+        }
+        const current = applyClassification(migrated, outcome.claimed, dialect);
+        const diffs = diffSchemas(current, desired, dialect);
+        const guarded = await guardDiffs(tx, dialect, diffs, current, desired, { force });
+        for (const diff of diffs) {
+          await dialect.applyTableDiff(tx, diff);
+        }
+        await writeSnapshot(
+          tx,
+          dialect,
+          advanceSnapshot(snapshot, desiredHash, classifySchema(desired)),
+        );
+        for (const stamp of outcome.stamps) {
+          await stampMigration(tx, dialect, stamp);
+        }
+        if (!dryRun) await dialect.releaseLock(tx, handle);
+        return {
+          deletions: [...outcome.deletions, ...guarded.deletions],
+          warnings: guarded.warnings,
+        };
+      },
+      { commit: !dryRun },
+    );
+    if (dryRun) await dialect.releaseLock(db, handle);
+    return report;
   } catch (error) {
     await dialect.releaseLock(db, handle).catch(() => undefined);
     throw error;

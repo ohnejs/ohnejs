@@ -47,6 +47,20 @@ export interface LockTiming {
 }
 
 /**
+ * Options for `schemaTransaction`.
+ */
+export interface SchemaTransactionOptions {
+  /**
+   * Commits on success when `true`; rolls back on success too when `false`, still returning the result.
+   * A `false` run is a rehearsal: every statement executes against live data, then the whole unwinds.
+   *
+   * @default
+   * true
+   */
+  commit?: boolean;
+}
+
+/**
  * A database dialect: the single place a driver and its SQL live.
  *
  * The engine speaks intent - logical types, quoted identifiers, a per-table diff.
@@ -191,6 +205,10 @@ export abstract class Dialect {
    * A failure rolls back every statement, schema changes among them, and re-throws.
    * A dialect over a database with non-transactional DDL must journal its own undo to honor this.
    *
+   * With `options.commit` false the success path rolls back as well, still returning `fn`'s result.
+   * Every statement runs against live data, then the whole unwinds - a rehearsal.
+   * The failure path is unchanged: it always rolls back and re-throws.
+   *
    * @example
    * ```ts
    * await dialect.schemaTransaction(db, (tx) => tx.exec('DROP TABLE "legacy"'))
@@ -199,6 +217,7 @@ export abstract class Dialect {
   abstract schemaTransaction<T>(
     db: DatabaseAdapter,
     fn: (tx: Transaction) => Promise<T>,
+    options?: SchemaTransactionOptions,
   ): Promise<T>;
 
   /**

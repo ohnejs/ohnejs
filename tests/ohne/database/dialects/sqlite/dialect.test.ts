@@ -246,6 +246,22 @@ describe('SQLiteDialect', () => {
       await db.close();
     });
 
+    it('rolls back on success but returns the result when commit is false', async () => {
+      const db = await open();
+      const result = await dialect.schemaTransaction(
+        db,
+        async (tx) => {
+          await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+          await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+          return 'done';
+        },
+        { commit: false },
+      );
+      strictEqual(result, 'done');
+      deepStrictEqual(await dialect.listTables(db), []);
+      await db.close();
+    });
+
     it('rolls back DDL atomically when fn throws, then rethrows', async () => {
       const db = await open();
       await rejects(

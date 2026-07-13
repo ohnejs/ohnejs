@@ -26,6 +26,8 @@ import { isOhneProject } from '../../project/is-ohne-project.ts';
  * Boot files run first, so layer dialects register; codegen refreshes the database registrations.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  * `--force` authorizes and performs destructive changes, exactly like the `FORCE_SYNC` env.
+ * `--dry-run` rehearses the sync against the live database and rolls it back, writing nothing.
+ * It exits non-zero where a real sync would be refused, so a deploy can gate on it before cutover.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
  */
@@ -37,6 +39,7 @@ export const syncCommand = defineCommand({
   args: {
     cwd: { type: 'string', description: 'Project root to sync.' },
     force: { type: 'boolean', description: 'Authorize and perform destructive changes.' },
+    dryRun: { type: 'boolean', description: 'Rehearse the sync and roll it back without writing.' },
   },
   async run({ values }) {
     const cwd = resolvePath(values.cwd ?? '.');
@@ -62,12 +65,19 @@ export const syncCommand = defineCommand({
         if (await exists(file)) await import(pathToFileURL(file).href);
       }
       try {
-        await syncProjectDatabase(values.force ? { force: true } : {});
+        await syncProjectDatabase({
+          ...(values.force ? { force: true } : {}),
+          ...(values.dryRun ? { dryRun: true } : {}),
+        });
       } finally {
         await closeDatabases();
       }
     });
 
-    print.success(`Database synced __in ${formatDuration(ms)}__`);
+    print.success(
+      values.dryRun
+        ? `Dry run passed, the database is unchanged __in ${formatDuration(ms)}__`
+        : `Database synced __in ${formatDuration(ms)}__`,
+    );
   },
 });

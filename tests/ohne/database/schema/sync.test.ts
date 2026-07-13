@@ -481,4 +481,93 @@ describe('syncDatabase', () => {
       await db.close();
     });
   });
+
+  describe('dry run', () => {
+    it('rehearses an additive change without touching the schema', async () => {
+      const db = await open();
+      const before = table('Posts');
+      const after = table('Posts', {
+        columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      });
+      await syncDatabase(db, dialect, { desired: [before] });
+      const report = await syncDatabase(db, dialect, { desired: [after], dryRun: true });
+      deepStrictEqual(report, { deletions: [], warnings: [] });
+      deepStrictEqual(await dialect.describeTable(db, 'Posts'), before);
+      strictEqual((await readSnapshot(db, dialect))?.generation, 1);
+      await lockIsFree(db);
+      await syncDatabase(db, dialect, { desired: [after] });
+      deepStrictEqual(await dialect.describeTable(db, 'Posts'), after);
+      strictEqual((await readSnapshot(db, dialect))?.generation, 2);
+      await db.close();
+    });
+
+    it('creates nothing on a fresh database and writes no snapshot', async () => {
+      const db = await open();
+      const report = await syncDatabase(db, dialect, { desired: [table('Posts')], dryRun: true });
+      deepStrictEqual(report, { deletions: [], warnings: [] });
+      deepStrictEqual(await dialect.listTables(db), ['ohne_locks', 'ohne_schema']);
+      strictEqual(await readSnapshot(db, dialect), undefined);
+      await lockIsFree(db);
+      await db.close();
+    });
+
+    it('still refuses a destructive change, leaving data and the lock intact', async () => {
+      const db = await open();
+      await syncDatabase(db, dialect, { desired: [table('Posts')] });
+      await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+      await rejects(
+        syncDatabase(db, dialect, { desired: [], dryRun: true }),
+        /Destructive sync refused/,
+      );
+      strictEqual((await db.query('SELECT * FROM "Posts"')).length, 1);
+      strictEqual((await readSnapshot(db, dialect))?.generation, 1);
+      await lockIsFree(db);
+      await db.close();
+    });
+
+    it('previews forced deletions but keeps the data', async () => {
+      const db = await open();
+      await syncDatabase(db, dialect, { desired: [table('Posts')] });
+      await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+      const report = await syncDatabase(db, dialect, { desired: [], dryRun: true, force: true });
+      strictEqual(report.deletions.length, 1);
+      strictEqual((await db.query('SELECT * FROM "Posts"')).length, 1);
+      strictEqual((await readSnapshot(db, dialect))?.generation, 1);
+      await lockIsFree(db);
+      await syncDatabase(db, dialect, { desired: [], force: true });
+      deepStrictEqual(await dialect.listTables(db), ['ohne_locks', 'ohne_schema']);
+      await db.close();
+    });
+
+    it('leaves a rehearsed migration unstamped', async () => {
+      const db = await open();
+      const before = table('Posts', {
+        columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      });
+      const after = table('Posts');
+      await syncDatabase(db, dialect, { desired: [before] });
+      await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?)', ['a', 'kept']);
+      const migrations = [
+        meta('app/001-drop-title', {
+          from: { table: 'Posts', column: 'title', type: 'text' },
+          to: null,
+        }),
+      ];
+      const report = await syncDatabase(db, dialect, {
+        desired: [after],
+        migrations,
+        dryRun: true,
+      });
+      deepStrictEqual(report, { deletions: [], warnings: [] });
+      deepStrictEqual(await dialect.describeTable(db, 'Posts'), before);
+      deepStrictEqual(await stampedRows(db), []);
+      await lockIsFree(db);
+      await syncDatabase(db, dialect, { desired: [after], migrations });
+      deepStrictEqual(
+        (await stampedRows(db)).map((row) => [row.name, row.status]),
+        [['app/001-drop-title', 'applied']],
+      );
+      await db.close();
+    });
+  });
 });

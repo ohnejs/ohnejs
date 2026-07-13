@@ -14,7 +14,7 @@ import {
   isObject,
   isUndefined,
 } from '../../../../utils/index.ts';
-import { Dialect, type LogicalType } from '../../dialect.ts';
+import { Dialect, type LogicalType, type SchemaTransactionOptions } from '../../dialect.ts';
 import { OHNE_REBUILD_PREFIX } from '../../naming/table-names.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
@@ -192,14 +192,20 @@ export class SQLiteDialect extends Dialect {
    * Runs its own `BEGIN`/`COMMIT`/`ROLLBACK` with `foreign_keys = OFF` hoisted outside the transaction.
    * The pragma no-ops inside one, which is why this never delegates to the adapter's `transaction`.
    * `foreign_keys = ON` is restored on both the commit and the rollback path.
+   * With `options.commit` false the success path rolls back too, so a rehearsal writes nothing.
    */
-  async schemaTransaction<T>(db: DatabaseAdapter, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  async schemaTransaction<T>(
+    db: DatabaseAdapter,
+    fn: (tx: Transaction) => Promise<T>,
+    options: SchemaTransactionOptions = {},
+  ): Promise<T> {
+    const commit = options.commit ?? true;
     await db.exec('PRAGMA foreign_keys = OFF');
     try {
       await db.exec('BEGIN');
       try {
         const result = await fn(db);
-        await db.exec('COMMIT');
+        await db.exec(commit ? 'COMMIT' : 'ROLLBACK');
         return result;
       } catch (error) {
         await db.exec('ROLLBACK');
