@@ -21,7 +21,7 @@ function defineAll(env: ReturnType<typeof createEnvRegistry<SampleEnv>>): void {
   env.define('NUM', { default: 0, parse: parseNumber });
   env.define('INT', { default: 0, parse: parseInteger });
   env.define('BOOL', { default: false, parse: parseBoolean });
-  env.define('JSON', { default: { a: 0 }, parse: JSON.parse });
+  env.define('JSON', { default: { a: 0 }, parse: (raw) => JSON.parse(raw) });
   env.define('CUSTOM', { default: { value: '' }, parse: (raw) => ({ value: raw.toUpperCase() }) });
 }
 
@@ -87,6 +87,13 @@ describe('createEnvRegistry', () => {
       const env = createEnvRegistry<SampleEnv>();
       defineAll(env);
       deepStrictEqual(env.get('CUSTOM'), { value: 'MIXED' });
+    });
+
+    it('passes the var name to the parser as its second argument', () => {
+      process.env['STR'] = 'raw';
+      const env = createEnvRegistry<SampleEnv>();
+      env.define('STR', { default: '', parse: (raw, name) => `${name}=${raw}` });
+      strictEqual(env.get('STR'), 'STR=raw');
     });
   });
 

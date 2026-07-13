@@ -13,9 +13,10 @@ export interface EnvSpec<T> {
   /**
    * Converts the raw env-var string into the typed value.
    * Defaults to identity (the raw string passes through).
-   * Compose with `parseInteger`, `parseNumber`, `parseBoolean`, `JSON.parse`, etc.
+   * The var name arrives as the second argument, so a parser can name it when it throws.
+   * Compose with single-arg parsers like `parseInteger`, `parseNumber`, or `parseBoolean`.
    */
-  parse?: (raw: string) => T;
+  parse?: (raw: string, name: string) => T;
 }
 
 /**
@@ -120,7 +121,7 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
       if (isUndefined(spec)) throw new Error(`Env var not defined: ${name}`);
       const raw = process.env[name];
       if (isUndefined(raw)) return spec.default as never;
-      return (isUndefined(spec.parse) ? raw : spec.parse(raw)) as never;
+      return (isUndefined(spec.parse) ? raw : spec.parse(raw, name)) as never;
     },
     set(name, value) {
       slot(name).value = { has: true, value };
