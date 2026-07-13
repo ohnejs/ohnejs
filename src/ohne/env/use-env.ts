@@ -4,13 +4,29 @@ import { createEnvRegistry, type EnvRegistry, nodeEnv } from '../../utils/env/in
 import {
   coerceToBoolean,
   coerceToInteger,
+  isBoolean,
   isDebugEnabled,
   isPort,
   MAX_PORT,
-  parseBoolean,
 } from '../../utils/index.ts';
 
 const registry: EnvRegistry<Env> = createEnvRegistry<Env>();
+
+/**
+ * Parses a boolean env var, accepting `1`/`true`/`0`/`false` case-insensitively.
+ * Throws naming the var and the offending value when the raw string is none of those.
+ * Pass it straight as a spec's `parse`; the registry supplies `name`.
+ *
+ * @example
+ * ```ts
+ * useEnv().define('MY_FLAG', { default: false, parse: boolEnv })
+ * ```
+ */
+export function boolEnv(raw: string, name: string): boolean {
+  const value = coerceToBoolean(raw);
+  if (isBoolean(value)) return value;
+  throw new Error(`\`${name}\` must be \`1\`/\`true\` or \`0\`/\`false\`, got \`${raw}\`.`);
+}
 
 registry.define('NODE_ENV', { default: 'development', parse: nodeEnv });
 registry.define('PORT', {
@@ -27,18 +43,18 @@ registry.define('PORT', {
 registry.define('HOST', { default: undefined, parse: (raw) => raw });
 registry.define('API_URL', { default: undefined, parse: (raw) => raw });
 registry.define('COOKIE_SECRET', { default: undefined });
-registry.define('SILENT', { default: false, parse: parseBoolean });
+registry.define('SILENT', { default: false, parse: boolEnv });
 registry.define('DEBUG', { default: false, parse: (raw) => isDebugEnabled('ohne', raw) });
 registry.define('NO_COLOR', { default: false, parse: (raw) => raw !== '' });
 registry.define('FORCE_COLOR', {
   default: undefined,
   parse: (raw) => coerceToBoolean(raw) !== false,
 });
-registry.define('SKIP_CODEGEN', { default: false, parse: parseBoolean });
-registry.define('DASHBOARD_RELOAD', { default: false, parse: parseBoolean });
+registry.define('SKIP_CODEGEN', { default: false, parse: boolEnv });
+registry.define('DASHBOARD_RELOAD', { default: false, parse: boolEnv });
 registry.define('DATABASE', { default: undefined, parse: (raw) => raw });
 registry.define('DB', { default: undefined, parse: (raw) => raw });
-registry.define('FORCE_SYNC', { default: false, parse: parseBoolean });
+registry.define('FORCE_SYNC', { default: false, parse: boolEnv });
 
 /**
  * Returns the process-wide env registry for `Env`.

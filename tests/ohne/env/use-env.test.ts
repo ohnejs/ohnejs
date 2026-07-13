@@ -1,6 +1,6 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
-import { useEnv } from 'ohne';
+import { boolEnv, useEnv } from 'ohne';
 import { effect } from 'ohne/utils';
 
 const KEYS = [
@@ -65,9 +65,9 @@ describe('useEnv', () => {
       strictEqual(useEnv().get('SILENT'), false);
     });
 
-    it('SILENT throws on unrecognized strings', () => {
+    it('SILENT throws on unrecognized strings, naming the var and the value', () => {
       process.env['SILENT'] = 'random';
-      throws(() => useEnv().get('SILENT'), /Expected boolean/);
+      throws(() => useEnv().get('SILENT'), /`SILENT` must be .* got `random`/);
     });
 
     it('DEBUG resolves through `isDebugEnabled` against the `ohne` namespace', () => {
@@ -226,5 +226,18 @@ describe('useEnv', () => {
       process.env['DB'] = ':memory:';
       strictEqual(useEnv().has('DATABASE') && useEnv().has('DB'), true);
     });
+  });
+});
+
+describe('boolEnv', () => {
+  it('parses the accepted truthy and falsy forms', () => {
+    strictEqual(boolEnv('1', 'MY_FLAG'), true);
+    strictEqual(boolEnv('TRUE', 'MY_FLAG'), true);
+    strictEqual(boolEnv('0', 'MY_FLAG'), false);
+    strictEqual(boolEnv('false', 'MY_FLAG'), false);
+  });
+
+  it('throws naming the var and the value on anything else', () => {
+    throws(() => boolEnv('nope', 'MY_FLAG'), /`MY_FLAG` must be .* got `nope`/);
   });
 });
