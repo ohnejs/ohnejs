@@ -1,0 +1,173 @@
+# Reading records
+
+`query` opens a typed builder over a collection and reads its records. Every field name, operator,
+and returned row is typed from your schema, so a typo or a wrong-typed value is a compile error,
+not a runtime surprise.
+
+```ts
+import { query } from 'ohne';
+
+const posts = await query('Posts').findMany();
+```
+
+`findMany` returns every record as a full object: your fields, plus the `UUID` primary key and the
+`_updatedAt` timestamp. `findFirst` returns the first match or `undefined`.
+
+```ts
+const post = await query('Posts').findFirst();
+```
+
+The collection is defined in a file under `collections/`; see [collections](./collections.md) for
+the field types and [schema sync](./sync.md) for how a collection becomes a table.
+
+## Filtering
+
+`where` narrows the read. The short form takes a field and a value, and matches on equality:
+
+```ts
+await query('Posts').where('status', 'published').findMany();
+```
+
+The value is typed to the field. Passing a number to a text field, or `null` to any field, is a
+compile error - `null` is never a value, and `isNull` is the only null test (below).
+
+For anything past equality, pass a callback. It receives a builder carrying exactly the operators
+that field admits:
+
+```ts
+await query('Posts')
+  .where('views', (w) => w.atLeast(100))
+  .where('title', (w) => w.contains('ohne'))
+  .findMany();
+```
+
+Which operators appear depends on the field's type. A text column offers `contains`,
+`startsWith`, `endsWith`, and the raw `like`; a number offers the ordering pair
+`greaterThan`/`atLeast`/`lessThan`/`atMost`; both offer `equalsTo` and `in`. Asking for an operator
+the field does not admit - ordering on a boolean, `contains` on a number - does not compile.
+
+Chained `where` calls AND together. Each returns the builder, so you keep filtering.
+
+### Negation
+
+`not` negates the next operator. It reads as a namespace, never a suffixed operator name:
+
+```ts
+await query('Posts').where('status', (w) => w.not.equalsTo('draft')).findMany();
+```
+
+### Null
+
+A nullable field admits `isNull`. It is the only way to test null - `equalsTo(null)` does not
+compile:
+
+```ts
+await query('Posts').where('summary', (w) => w.isNull()).findMany();
+```
+
+### Either-or
+
+`where` clauses AND. For an OR, `whereAny` opens a group of branches; a record matches when any
+branch matches. Chaining `where` on one branch ANDs within it.
+
+```ts
+await query('Posts')
+  .whereAny((q) => [
+    q.where('featured', true),
+    q.where('views', (w) => w.atLeast(1000)),
+  ])
+  .findMany();
+```
+
+A `whereAny` ANDs onto the rest of the query, so you can read "published, and either featured or
+popular" by placing it after a `where`.
+
+## Relations
+
+A `record` or `records` field relates to another collection. `has` filters by the related rows,
+re-scoped to the target's fields:
+
+```ts
+await query('Posts')
+  .where('author', (w) => w.has((a) => a.where('name', 'Ada')))
+  .findMany();
+```
+
+Bare `has()` tests that the relation is set at all; `empty()` is its opposite:
+
+```ts
+await query('Posts').where('author', (w) => w.has()).findMany();
+await query('Posts').where('tags', (w) => w.empty()).findMany();
+```
+
+By default a relation field reads back as `UUID`s - the id of the related row, or an array of them.
+`populate` swaps those ids for the full related records:
+
+```ts
+const posts = await query('Posts').populate('author', 'tags').findMany();
+
+posts[0].author; // the full author record, or null
+posts[0].tags; // an array of full tag records
+```
+
+Population is one level deep. The populated records carry their own relations as `UUID`s; to go
+deeper, run a follow-up query. The same rows are shared across parents that link them, so do not
+mutate a populated record.
+
+## Ordering
+
+`orderBy` sorts by a field. A leading direction is optional and defaults to ascending; call it
+again to add a tiebreaker:
+
+```ts
+await query('Posts').orderBy('publishedAt', 'desc').orderBy('title').findMany();
+```
+
+Ties always resolve by `UUID` last, so a paginated read never reorders rows between pages.
+
+## Selecting fields
+
+By default a read returns every field. `select` narrows it to the ones you name, and the returned
+type carries only those:
+
+```ts
+const rows = await query('Posts').select('title', 'views').findMany();
+
+rows[0].title; // string
+rows[0].views; // number
+rows[0].author; // compile error: not selected
+```
+
+`select` accumulates across calls.
+
+## Pagination
+
+`paginate` reads one page and its totals in a single call:
+
+```ts
+const page = await query('Posts').orderBy('publishedAt', 'desc').paginate(1, 20);
+
+page.records; // the rows on this page
+page.total; // matching rows across every page
+page.lastPage; // the number of the last page
+```
+
+`limit` and `offset` are the lower-level pair when you want a window without the totals.
+
+## Counting and checking
+
+`count` returns how many records match; `exists` returns whether any do. Both ignore ordering and
+the row window:
+
+```ts
+const total = await query('Posts').where('status', 'published').count();
+const any = await query('Posts').where('featured', true).exists();
+```
+
+`pluck` reads one field's value from every matching record:
+
+```ts
+const titles = await query('Posts').pluck('title'); // string[]
+```
+
+Plucking a populated relation field returns the hydrated records, exactly as a full read would.
