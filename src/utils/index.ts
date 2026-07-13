@@ -173,6 +173,7 @@ export * from './slug/slugify.ts';
 export * from './sort/natural-compare.ts';
 export * from './sse/format-sse.ts';
 export * from './text/decode-text.ts';
+export * from './text/pluralize.ts';
 export * from './timeout/with-timeout.ts';
 export * from './types/deep-prettify.ts';
 export * from './types/defaults-marker.ts';
