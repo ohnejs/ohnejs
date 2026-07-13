@@ -9,6 +9,41 @@ import type { QueryLimits } from './wire/limits.ts';
 export type ConditionInput = Record<string, unknown>;
 
 /**
+ * The callback `whereAny` runs: it opens branches off `group` and returns the ones to OR together.
+ */
+export type WhereGroupBuild = (group: UntypedWhereGroup) => UntypedWhereBranch[];
+
+/**
+ * The factory a `whereAny` callback receives: each call opens a fresh OR branch.
+ */
+export interface UntypedWhereGroup {
+  /**
+   * Opens a branch seeded with one condition; chain `where` on it to AND more into the same branch.
+   */
+  where(condition: ConditionInput): UntypedWhereBranch;
+
+  /**
+   * Opens a branch that is itself a nested OR group.
+   */
+  whereAny(build: WhereGroupBuild): UntypedWhereBranch;
+}
+
+/**
+ * One OR branch under `whereAny`: its conditions AND together, and it may nest further groups.
+ */
+export interface UntypedWhereBranch {
+  /**
+   * ANDs another condition into this branch.
+   */
+  where(condition: ConditionInput): UntypedWhereBranch;
+
+  /**
+   * ANDs a nested OR group into this branch.
+   */
+  whereAny(build: WhereGroupBuild): UntypedWhereBranch;
+}
+
+/**
  * The runtime query surface every typed builder state is a view of.
  *
  * One class implements it; the typed states narrow its methods, so impl and views can never drift.
@@ -21,6 +56,12 @@ export interface UntypedQueryBuilder {
    * The object form parses to the shared AST, and each leaf is gated against the collection's metadata.
    */
   where(condition: ConditionInput): this;
+
+  /**
+   * Adds a disjunction, ANDed onto whatever was already there: the callback's branches OR together.
+   * A branch's own conditions AND; zero branches match nothing, mirroring an empty `or` group.
+   */
+  whereAny(build: WhereGroupBuild): this;
 
   /**
    * Narrows the read to the named top-level fields, accumulating across calls.

@@ -1,8 +1,9 @@
 import type { ConditionNode } from '../../utils/index.ts';
-import type { CollectionQueryMeta } from './metadata.ts';
+import type { CollectionQueryMeta, FieldQueryMeta } from './metadata.ts';
 
-import { didYouMean, isUndefined } from '../../utils/index.ts';
+import { didYouMean, isNull, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { queryMetadata } from './metadata.ts';
 import { allowedOperators, type QueryOperator } from './operators.ts';
 
 /**
@@ -11,6 +12,7 @@ import { allowedOperators, type QueryOperator } from './operators.ts';
  * Every leaf must address a real field and apply an operator that field admits.
  * An unknown field throws, with a `didYouMean` suggestion when one is close.
  * An inapplicable operator throws, naming the field and the operator.
+ * A `has`'s nested condition re-scopes to the relation's target and is gated there in turn.
  * A `where` path is a single segment in v1: an anchored or dotted path reads as an unknown field.
  * Untyped callers thus hit the same failures the typed surface prevents at compile time.
  */
@@ -31,6 +33,28 @@ export function validateCondition(node: ConditionNode, meta: CollectionQueryMeta
       ],
     });
   }
+  if (node.kind === 'has' && !isNull(node.condition)) {
+    validateCondition(node.condition, targetScope(field, node.path[0], meta));
+  }
+}
+
+/**
+ * The metadata a `has`'s nested condition is gated against, resolved by the field's kind.
+ * A relation names its target collection; a child kind gets a synthetic scope over its subfields.
+ */
+function targetScope(
+  field: FieldQueryMeta,
+  name: string,
+  meta: CollectionQueryMeta,
+): CollectionQueryMeta {
+  if (field.kind === 'record' || field.kind === 'records') {
+    return queryMetadata(field.target as string);
+  }
+  return {
+    collection: `${meta.collection}.${name}`,
+    table: field.table as string,
+    fields: field.subfields as Record<string, FieldQueryMeta>,
+  };
 }
 
 /**

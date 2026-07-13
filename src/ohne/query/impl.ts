@@ -3,7 +3,13 @@ import type { OrderDirection, OrderEntry } from './ir.ts';
 import type { CollectionQueryMeta } from './metadata.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
-import type { ConditionInput, UntypedQueryBuilder } from './untyped.ts';
+import type {
+  ConditionInput,
+  UntypedQueryBuilder,
+  UntypedWhereBranch,
+  UntypedWhereGroup,
+  WhereGroupBuild,
+} from './untyped.ts';
 import type { QueryLimits } from './wire/limits.ts';
 
 import { isUndefined, parseCondition } from '../../utils/index.ts';
@@ -37,16 +43,12 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   where(condition: ConditionInput): this {
-    const parsed = parseCondition(condition);
-    if (!parsed.ok) {
-      const { code, path } = parsed.error;
-      throw ohneError({
-        title: `Invalid condition on \`${this.meta.collection}\``,
-        body: [`The condition is malformed (${code})${path === '' ? '' : ` at \`${path}\``}.`],
-      });
-    }
-    validateCondition(parsed.node, this.meta);
-    this.conditions.push(parsed.node);
+    this.conditions.push(toConditionNode(condition, this.meta));
+    return this;
+  }
+
+  whereAny(build: WhereGroupBuild): this {
+    this.conditions.push(orGroup(build, this.meta));
     return this;
   }
 
@@ -151,4 +153,64 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
  */
 export function builderLimits(builder: UntypedQueryBuilder): Partial<QueryLimits> {
   return (builder as QueryBuilderImpl).limitOverrides;
+}
+
+/**
+ * Parses and gates one condition-object input into an AST node, the step `where` and every branch share.
+ * A malformed shape throws naming the parse code and its path; an inapplicable leaf throws through gating.
+ */
+function toConditionNode(condition: ConditionInput, meta: CollectionQueryMeta): ConditionNode {
+  const parsed = parseCondition(condition);
+  if (!parsed.ok) {
+    const { code, path } = parsed.error;
+    throw ohneError({
+      title: `Invalid condition on \`${meta.collection}\``,
+      body: [`The condition is malformed (${code})${path === '' ? '' : ` at \`${path}\``}.`],
+    });
+  }
+  validateCondition(parsed.node, meta);
+  return parsed.node;
+}
+
+/**
+ * One OR branch: it accumulates ANDed conditions and folds them into an `and` node on demand.
+ */
+class ConditionBranch implements UntypedWhereBranch {
+  private readonly nodes: ConditionNode[] = [];
+  private readonly meta: CollectionQueryMeta;
+
+  constructor(meta: CollectionQueryMeta) {
+    this.meta = meta;
+  }
+
+  where(condition: ConditionInput): this {
+    this.nodes.push(toConditionNode(condition, this.meta));
+    return this;
+  }
+
+  whereAny(build: WhereGroupBuild): this {
+    this.nodes.push(orGroup(build, this.meta));
+    return this;
+  }
+
+  /**
+   * The branch as one node: its conditions ANDed.
+   * An empty branch is `and([])`, which matches all.
+   */
+  toNode(): ConditionNode {
+    return { kind: 'and', nodes: [...this.nodes] };
+  }
+}
+
+/**
+ * Runs a `whereAny` callback and folds its branches into one `or` node.
+ * Zero branches yield `or([])`, which matches nothing - the same single point as an empty wire `or`.
+ */
+function orGroup(build: WhereGroupBuild, meta: CollectionQueryMeta): ConditionNode {
+  const group: UntypedWhereGroup = {
+    where: (condition) => new ConditionBranch(meta).where(condition),
+    whereAny: (nested) => new ConditionBranch(meta).whereAny(nested),
+  };
+  const branches = build(group);
+  return { kind: 'or', nodes: branches.map((branch) => (branch as ConditionBranch).toNode()) };
 }
