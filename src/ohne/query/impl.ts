@@ -12,7 +12,7 @@ import type {
 } from './untyped.ts';
 import type { QueryLimits } from './wire/limits.ts';
 
-import { isUndefined, parseCondition } from '../../utils/index.ts';
+import { isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { freezeIR, type QueryIR } from './ir.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
@@ -20,6 +20,7 @@ import { findFirst as readFirst, findMany as readMany } from './read/find.ts';
 import { paginate as readPage } from './read/paginate.ts';
 import { pluck as pluckRows } from './read/pluck.ts';
 import { unknownFieldError, validateCondition } from './validate-condition.ts';
+import { lowerField } from './where-field.ts';
 
 /**
  * The one runtime query builder every typed state and the wire path drive.
@@ -42,8 +43,8 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     this.meta = meta;
   }
 
-  where(condition: ConditionInput): this {
-    this.conditions.push(toConditionNode(condition, this.meta));
+  where(fieldOrCondition: string | ConditionInput, value?: unknown): this {
+    this.conditions.push(toConditionNode(toConditionInput(fieldOrCondition, value), this.meta));
     return this;
   }
 
@@ -156,6 +157,17 @@ export function builderLimits(builder: UntypedQueryBuilder): Partial<QueryLimits
 }
 
 /**
+ * Resolves either `where` form into the object condition the AST parser reads.
+ * A field name plus value (or callback) lowers to the object grammar; an object passes straight through.
+ */
+function toConditionInput(
+  fieldOrCondition: string | ConditionInput,
+  value: unknown,
+): ConditionInput {
+  return isString(fieldOrCondition) ? lowerField(fieldOrCondition, value) : fieldOrCondition;
+}
+
+/**
  * Parses and gates one condition-object input into an AST node, the step `where` and every branch share.
  * A malformed shape throws naming the parse code and its path; an inapplicable leaf throws through gating.
  */
@@ -183,8 +195,8 @@ class ConditionBranch implements UntypedWhereBranch {
     this.meta = meta;
   }
 
-  where(condition: ConditionInput): this {
-    this.nodes.push(toConditionNode(condition, this.meta));
+  where(fieldOrCondition: string | ConditionInput, value?: unknown): this {
+    this.nodes.push(toConditionNode(toConditionInput(fieldOrCondition, value), this.meta));
     return this;
   }
 
@@ -208,7 +220,8 @@ class ConditionBranch implements UntypedWhereBranch {
  */
 function orGroup(build: WhereGroupBuild, meta: CollectionQueryMeta): ConditionNode {
   const group: UntypedWhereGroup = {
-    where: (condition) => new ConditionBranch(meta).where(condition),
+    where: (fieldOrCondition: string | ConditionInput, value?: unknown) =>
+      new ConditionBranch(meta).where(fieldOrCondition, value),
     whereAny: (nested) => new ConditionBranch(meta).whereAny(nested),
   };
   const branches = build(group);
