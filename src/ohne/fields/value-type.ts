@@ -49,37 +49,48 @@ const FALLBACK: Record<LogicalType, string> = {
 };
 
 /**
- * Emits one field's TypeScript value type as a source string.
+ * One field's value type split into its non-null base and whether the field admits `null`.
+ * The generated read shape wants `base | null`; the query metadata wants the base and the flag apart.
+ */
+export interface FieldBaseType {
+  /**
+   * The value type without any `| null`, exactly as `emitType` (or the fallback) produced it.
+   */
+  base: string;
+
+  /**
+   * Whether the field's value shape admits `null` (instance `nullable` or type `forceNullable`).
+   */
+  nullable: boolean;
+}
+
+/**
+ * Emits one field's non-null base type and its nullability, the shared core of the value-type emitters.
  *
  * Runs the field type's `emitType` when it declares one, otherwise falls back from `columnType`.
  * The type's own options are resolved with their defaults before reaching `emitType` as `ctx.options`.
  * An `emitType` returning `string[]` is joined with `\n`, so a multiline type comes back as one string.
- * A nullable field (instance `nullable` or type `forceNullable`) is wrapped with `| null`.
- * This is the value type only; the caller assembles the surrounding property and indents each line.
  *
  * A column-less field derives its type from its storage hint.
- * A junction holds the linked rows' `UUID` values in order, so it emits `string[]`.
+ * A junction holds the linked rows' `UUID` values in order, so its base is `string[]`, never null.
  * A child hint is assembled from its subfields at codegen, where the registered types are at hand.
  * It therefore throws here, as does a column-less type without a hint.
  *
  * @example
  * ```ts
- * fieldValueType({ fieldType: text, name: 'title', options: {}, fieldDir, imports })
- * // -> 'string'
- *
- * fieldValueType({ fieldType: text, name: 'title', options: { nullable: true }, fieldDir, imports })
- * // -> 'string | null'
+ * fieldBaseType({ fieldType: text, name: 'title', options: { nullable: true }, fieldDir, imports })
+ * // -> { base: 'string', nullable: true }
  * ```
  */
-export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
+export function fieldBaseType<TOptions extends Record<string, AnyOptionDef>>(
   args: FieldValueTypeArgs<TOptions>,
-): string {
+): FieldBaseType {
   const { fieldType, name, options, fieldDir, imports } = args;
   const resolved = resolveFieldOptions(fieldType, options);
 
   if (fieldType.columnType === false) {
     const hint = fieldType.schema?.({ name, options: resolved });
-    if (hint?.kind === 'junction') return 'string[]';
+    if (hint?.kind === 'junction') return { base: 'string[]', nullable: false };
     throw ohneError({
       title: 'Cannot emit a type for a column-less field',
       body: [
@@ -97,5 +108,27 @@ export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
 
   const emitted = fieldType.emitType ? fieldType.emitType(ctx) : FALLBACK[fieldType.columnType];
   const base = isArray(emitted) ? emitted.join('\n') : emitted;
-  return resolved.nullable ? `${base} | null` : base;
+  return { base, nullable: resolved.nullable };
+}
+
+/**
+ * Emits one field's TypeScript value type as a source string, `| null` folded in when nullable.
+ *
+ * The read-shape emitter: a nullable field comes back as `base | null`, everything else as its base.
+ * This is the value type only; the caller assembles the surrounding property and indents each line.
+ *
+ * @example
+ * ```ts
+ * fieldValueType({ fieldType: text, name: 'title', options: {}, fieldDir, imports })
+ * // -> 'string'
+ *
+ * fieldValueType({ fieldType: text, name: 'title', options: { nullable: true }, fieldDir, imports })
+ * // -> 'string | null'
+ * ```
+ */
+export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
+  args: FieldValueTypeArgs<TOptions>,
+): string {
+  const { base, nullable } = fieldBaseType(args);
+  return nullable ? `${base} | null` : base;
 }
