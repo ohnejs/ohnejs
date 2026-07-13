@@ -165,6 +165,8 @@ describe('generateDatabase', () => {
 
     ok(shared.includes("import type { LatLng } from '../../fields/_geo.ts';"));
     ok(shared.includes('  Posts: {'));
+    ok(shared.includes('    UUID: string;'));
+    ok(shared.includes('    _updatedAt: number;'));
     ok(shared.includes('    location: {'));
     ok(shared.includes('      lat: number'));
     ok(shared.includes('      lng: LatLng'));
@@ -196,12 +198,12 @@ describe('generateDatabase', () => {
 
     ok(
       shared.includes(
-        '    address: {\n      street: string;\n      city: string | null;\n    } | null;',
+        '    address: {\n      UUID: string;\n      street: string;\n      city: string | null;\n    } | null;',
       ),
     );
     ok(
       shared.includes(
-        '    sections: {\n      title: string;\n      items: {\n        label: string;\n      }[];\n    }[];',
+        '    sections: {\n      UUID: string;\n      title: string;\n      items: {\n        UUID: string;\n        label: string;\n      }[];\n    }[];',
       ),
     );
   });
@@ -301,7 +303,7 @@ describe('generateDatabase', () => {
     ok(!node.includes("collections.register('Posts'"));
     ok(!node.includes('slug'));
     ok(node.includes("fields.delete('boolean');"));
-    ok(shared.includes('Authors: {};'));
+    ok(shared.includes('Authors: {\n    UUID: string;\n    _updatedAt: number;\n  };'));
     ok(!shared.includes('Posts'));
   });
 

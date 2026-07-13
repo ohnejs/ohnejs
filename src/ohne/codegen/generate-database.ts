@@ -148,11 +148,15 @@ async function writeShared(
   };
   const members = collections.map((collection) => ({
     name: collection.name,
-    fields: fieldShapesOf(
-      { subject: `Collection \`${collection.name}\``, file: collection.file },
-      collection.collection.fields,
-      context,
-    ),
+    fields: [
+      { name: 'UUID', type: 'string' },
+      { name: '_updatedAt', type: 'number' },
+      ...fieldShapesOf(
+        { subject: `Collection \`${collection.name}\``, file: collection.file },
+        collection.collection.fields,
+        context,
+      ),
+    ],
     relations: owningRelationsOf(collection, context.types),
   }));
   const blockMembers = blocks.map((block) => ({
@@ -431,10 +435,11 @@ function valueTypeOf(
 /**
  * Assembles a composite's inline record shape from its subfields, recursively.
  * Each line carries its relative indentation; the emission site indents the whole block.
+ * The item `UUID` leads the shape, matching the read: every child row exposes its stable identity.
  * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
  */
 function childValueType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
-  const lines = ['{'];
+  const lines = ['{', indent('UUID: string;')];
   for (const [name, instance] of Object.entries(hint.subfields)) {
     const type = valueTypeOf(owner, name, instance, context);
     lines.push(indent(`${propertyKey(name)}: ${type};`));
