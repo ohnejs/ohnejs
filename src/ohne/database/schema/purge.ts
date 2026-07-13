@@ -2,7 +2,7 @@ import type { Transaction } from '../adapter.ts';
 import type { Dialect } from '../dialect.ts';
 import type { DerivedOrigin, ForeignKeySchema } from './table-schema.ts';
 
-import { isUndefined } from '../../../utils/index.ts';
+import { isUndefined, pluralize } from '../../../utils/index.ts';
 import { derivedParentName } from '../naming/table-names.ts';
 
 /**
@@ -89,8 +89,8 @@ export function purgedLine(
   cleared: boolean,
 ): string {
   return cleared
-    ? `- \`${count}\` values of \`${table}.${foreignKey.column}\` cleared, dangling to missing \`${foreignKey.targetTable}\` rows`
-    : `- \`${count}\` rows of \`${table}\` deleted, dangling from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
+    ? `- \`${count}\` ${pluralize(count, 'value')} of \`${table}.${foreignKey.column}\` cleared, dangling to missing \`${foreignKey.targetTable}\` rows`
+    : `- \`${count}\` ${pluralize(count, 'row')} of \`${table}\` deleted, dangling from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
 }
 
 /**
@@ -183,7 +183,7 @@ async function sweepBlocks(
     );
     if (changes === 0) continue;
     lines.push(
-      `- \`${changes}\` rows of \`${blockTable.name}\` deleted, no longer referenced by any blocks field`,
+      `- \`${changes}\` ${pluralize(changes, 'row')} of \`${blockTable.name}\` deleted, no longer referenced by any blocks field`,
     );
     affected.push(blockTable.name);
   }

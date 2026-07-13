@@ -200,7 +200,7 @@ describe('syncDatabase with composites', () => {
     });
     await rejects(
       syncDatabase(db, dialect, { desired: object }),
-      refusalMatching(/`1` parents of `Posts_sections` hold multiple rows/),
+      refusalMatching(/`1` parent of `Posts_sections` holds multiple rows/),
     );
     const report = await syncDatabase(db, dialect, { desired: object, force: true });
     match(
@@ -331,8 +331,8 @@ describe('syncDatabase with composites', () => {
       desired: desiredOf(fields('object')),
       force: true,
     });
-    match(report.deletions.join('\n'), /`1` rows of `Posts_sections` deleted/);
-    match(report.deletions.join('\n'), /`1` rows of `Posts_sections_items` deleted, dangling/);
+    match(report.deletions.join('\n'), /`1` row of `Posts_sections` deleted/);
+    match(report.deletions.join('\n'), /`1` row of `Posts_sections_items` deleted, dangling/);
     const items = await db.query<{ UUID: string }>('SELECT "UUID" FROM "Posts_sections_items"');
     deepStrictEqual(
       items.map((row) => row.UUID),
@@ -370,7 +370,7 @@ describe('syncDatabase with composites', () => {
     await rejects(
       syncDatabase(db, dialect, { desired: without }),
       refusalMatching(
-        /table `Posts_sections` \(`1` rows\)[\s\S]*table `Posts_sections_items` \(`1` rows\)/,
+        /table `Posts_sections` \(`1` row\)[\s\S]*table `Posts_sections_items` \(`1` row\)/,
       ),
     );
     await syncDatabase(db, dialect, { desired: without, force: true });

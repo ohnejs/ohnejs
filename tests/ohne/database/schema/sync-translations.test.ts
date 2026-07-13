@@ -674,7 +674,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
       }),
       (error: unknown) => {
         ok(isOhneError(error));
-        match(error.title ?? '', /leaves `1` entities without a value/);
+        match(error.title ?? '', /leaves `1` entity without a value/);
         return true;
       },
     );
@@ -748,7 +748,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
           }),
         ],
       }),
-      refusalMatching(/duplicate groups/),
+      refusalMatching(/duplicate group/),
     );
     await syncDatabase(db, dialect, {
       desired: after,
@@ -791,7 +791,7 @@ describe('syncDatabase switch migrations, value passes', () => {
     });
     await rejects(
       syncDatabase(db, dialect, { desired: after }),
-      refusalMatching(/becomes NOT NULL over `1` NULL rows/),
+      refusalMatching(/becomes NOT NULL over `1` NULL row/),
     );
     await syncDatabase(db, dialect, {
       desired: after,
@@ -838,7 +838,7 @@ describe('syncDatabase switch migrations, value passes', () => {
           }),
         ],
       }),
-      refusalMatching(/duplicate groups/),
+      refusalMatching(/duplicate group/),
     );
     await syncDatabase(db, dialect, {
       desired: after,
@@ -1075,7 +1075,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
       Object.assign(Object.create(null), { UUID: 's1' }),
     ]);
     strictEqual(await countRows(db, 'Posts__translations'), 0);
-    match(report.deletions.join('\n'), /`Posts_sections`.*deleted parents/);
+    match(report.deletions.join('\n'), /`Posts_sections`.*deleted parent/);
     await db.close();
   });
 

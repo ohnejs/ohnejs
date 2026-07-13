@@ -78,7 +78,7 @@ describe('guardDiffs', () => {
     await materialize(db, [posts, empty]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
     const error = await refusalOf(guard(db, [posts, empty], [empty]));
-    match(bodyOf(error), /table `Posts` \(`1` rows\)/);
+    match(bodyOf(error), /table `Posts` \(`1` row\)/);
     deepStrictEqual(await guard(db, [posts, empty], [posts]), { deletions: [], warnings: [] });
     await db.close();
   });
@@ -93,7 +93,7 @@ describe('guardDiffs', () => {
     deepStrictEqual(await guard(db, [live], [table('Posts')]), { deletions: [], warnings: [] });
     await db.run('INSERT INTO "Posts" ("UUID", "legacy") VALUES (?, ?)', ['b', 'kept']);
     const error = await refusalOf(guard(db, [live], [table('Posts')]));
-    match(bodyOf(error), /column `Posts.legacy` \(`1` values\)/);
+    match(bodyOf(error), /column `Posts.legacy` \(`1` value\)/);
     await db.close();
   });
 
@@ -109,7 +109,7 @@ describe('guardDiffs', () => {
     deepStrictEqual(await guard(db, [live], [desired]), { deletions: [], warnings: [] });
     await db.run('INSERT INTO "Posts" ("UUID", "count") VALUES (?, ?)', ['a', '42']);
     const error = await refusalOf(guard(db, [live], [desired]));
-    match(bodyOf(error), /column `Posts.count` \(`1` values, `text` -> `integer`\)/);
+    match(bodyOf(error), /column `Posts.count` \(`1` value, `text` -> `integer`\)/);
     await db.close();
   });
 
@@ -125,7 +125,7 @@ describe('guardDiffs', () => {
     deepStrictEqual(await guard(db, [live], [desired], true), { deletions: [], warnings: [] });
     await db.run('INSERT INTO "Posts" ("UUID", "views") VALUES (?, ?)', ['a', '9']);
     const error = await refusalOf(guard(db, [live], [desired], true));
-    match(bodyOf(error), /`Posts.views` retypes under NOT NULL, leaving `1` rows/);
+    match(bodyOf(error), /`Posts.views` retypes under NOT NULL, leaving `1` row/);
     match(bodyOf(error), /cannot resolve them/);
     await db.close();
   });
@@ -141,7 +141,7 @@ describe('guardDiffs', () => {
     await materialize(db, [live]);
     await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?)', ['a', null]);
     const error = await refusalOf(guard(db, [live], [desired], true));
-    match(bodyOf(error), /`Posts.title` becomes NOT NULL over `1` NULL rows/);
+    match(bodyOf(error), /`Posts.title` becomes NOT NULL over `1` NULL row/);
     match(bodyOf(error), /cannot resolve them/);
     await db.close();
   });
@@ -156,7 +156,7 @@ describe('guardDiffs', () => {
     deepStrictEqual(await guard(db, [live], [desired]), { deletions: [], warnings: [] });
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
     const error = await refusalOf(guard(db, [live], [desired], true));
-    match(bodyOf(error), /new column `Posts.role` is NOT NULL but `Posts` holds `1` rows/);
+    match(bodyOf(error), /new column `Posts.role` is NOT NULL but `Posts` holds `1` row/);
     await db.close();
   });
 
@@ -173,7 +173,7 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Posts" ("UUID", "slug") VALUES (?, ?)', ['c', 'dupe']);
     await db.run('INSERT INTO "Posts" ("UUID", "slug") VALUES (?, ?)', ['d', 'dupe']);
     const error = await refusalOf(guard(db, [live], [desired], true));
-    match(bodyOf(error), /unique `UX__Posts__slug` covers `1` duplicate groups/);
+    match(bodyOf(error), /unique `UX__Posts__slug` covers `1` duplicate group/);
     await db.close();
   });
 
@@ -187,7 +187,7 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Posts" ("UUID", "locale") VALUES (?, ?)', ['a', 'en']);
     await db.run('INSERT INTO "Posts" ("UUID", "locale") VALUES (?, ?)', ['b', 'en']);
     const error = await refusalOf(guard(db, [live], [desired]));
-    match(bodyOf(error), /primary key over `locale` covers `1` duplicate groups/);
+    match(bodyOf(error), /primary key over `locale` covers `1` duplicate group/);
     await db.close();
   });
 
@@ -225,10 +225,10 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'u1']);
     await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p2', 'ghost']);
     const error = await refusalOf(guard(db, [users, live], [users, desired]));
-    match(bodyOf(error), /`1` rows of `Posts` dangle from `Posts.author` to missing `Users` rows/);
+    match(bodyOf(error), /`1` row of `Posts` dangles from `Posts.author` to missing `Users` rows/);
     const report = await guard(db, [users, live], [users, desired], true);
     strictEqual(report.deletions.length, 1);
-    match(report.deletions[0] ?? '', /`1` values of `Posts.author` cleared/);
+    match(report.deletions[0] ?? '', /`1` value of `Posts.author` cleared/);
     deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts" ORDER BY "UUID"'), [
       Object.assign(Object.create(null), { UUID: 'p1', author: 'u1' }),
       Object.assign(Object.create(null), { UUID: 'p2', author: null }),
@@ -257,7 +257,7 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'ghost']);
     const report = await guard(db, [users, tightened], [users, tightenedDesired], true);
     strictEqual(report.deletions.length, 1);
-    match(report.deletions[0] ?? '', /`1` rows of `Posts` deleted/);
+    match(report.deletions[0] ?? '', /`1` row of `Posts` deleted/);
     deepStrictEqual(await db.query('SELECT * FROM "Posts"'), []);
     await db.close();
   });
@@ -283,7 +283,7 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'ghost']);
     const report = await guard(db, [users, live], [users, desired], true);
     strictEqual(report.deletions.length, 1);
-    match(report.deletions[0] ?? '', /`1` rows of `Posts` deleted/);
+    match(report.deletions[0] ?? '', /`1` row of `Posts` deleted/);
     deepStrictEqual(await db.query('SELECT * FROM "Posts"'), []);
     await db.close();
   });
@@ -312,11 +312,11 @@ describe('guardDiffs', () => {
     };
     const report = await guard(db, [users, posts], [users, touched]);
     strictEqual(report.warnings.length, 1);
-    match(report.warnings[0] ?? '', /`1` rows of `Posts` dangle/);
+    match(report.warnings[0] ?? '', /`1` row of `Posts` dangles/);
     deepStrictEqual(report.deletions, []);
     const forced = await guard(db, [users, posts], [users, touched], true);
     strictEqual(forced.deletions.length, 1);
-    match(forced.deletions[0] ?? '', /`1` values of `Posts.author` cleared/);
+    match(forced.deletions[0] ?? '', /`1` value of `Posts.author` cleared/);
     deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts"'), [
       Object.assign(Object.create(null), { UUID: 'p1', author: null }),
     ]);
@@ -449,8 +449,8 @@ describe('guardDiffs', () => {
       guardDiffs(tx, dialect, diffSchemas(live, desired, dialect), live, desired, { force: true }),
     );
     strictEqual(report.deletions.length, 2);
-    match(report.deletions.join('\n'), /rows of `Parents` deleted/);
-    match(report.deletions.join('\n'), /rows of `Children` deleted/);
+    match(report.deletions.join('\n'), /row of `Parents` deleted/);
+    match(report.deletions.join('\n'), /row of `Children` deleted/);
     deepStrictEqual(await db.query('SELECT "UUID" FROM "Parents"'), [
       Object.assign(Object.create(null), { UUID: 'P2' }),
     ]);
@@ -485,7 +485,7 @@ describe('guardDiffs', () => {
     await db.run('INSERT INTO "Target" ("UUID", "author") VALUES (?, ?)', ['t2', 'ghost']);
     const report = await guard(db, [users, live], [users, desired], true);
     strictEqual(report.deletions.length, 1);
-    match(report.deletions[0] ?? '', /`1` values of `Target.author` cleared/);
+    match(report.deletions[0] ?? '', /`1` value of `Target.author` cleared/);
     deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Target" ORDER BY "UUID"'), [
       Object.assign(Object.create(null), { UUID: 't1', author: 'u1' }),
       Object.assign(Object.create(null), { UUID: 't2', author: null }),

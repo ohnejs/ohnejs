@@ -110,7 +110,7 @@ describe('ohne sync', () => {
     const discarded = sync(dir);
     strictEqual(discarded.status, 0);
     match(discarded.output, /Migrations removed data/);
-    match(discarded.output, /1 rows of block_Hero deleted, no longer referenced/);
+    match(discarded.output, /1 row of block_Hero deleted, no longer referenced/);
     doesNotMatch(discarded.output, /under force/);
 
     const after = new DatabaseSync(join(dir, '.data', 'ohne.db'));
@@ -138,13 +138,13 @@ describe('ohne sync', () => {
     const refused = sync(dir);
     strictEqual(refused.status, 1);
     match(refused.output, /Destructive sync refused/);
-    match(refused.output, /table Notes \(1 rows\)/);
+    match(refused.output, /table Notes \(1 row\)/);
     match(refused.output, /FORCE_SYNC/);
 
     const forced = sync(dir, '--force');
     strictEqual(forced.status, 0);
     match(forced.output, /Sync removed data under force/);
-    match(forced.output, /table Notes \(1 rows\)/);
+    match(forced.output, /table Notes \(1 row\)/);
     match(forced.output, /Database synced/);
 
     const after = new DatabaseSync(join(dir, '.data', 'ohne.db'));

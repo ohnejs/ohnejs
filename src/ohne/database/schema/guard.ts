@@ -9,7 +9,7 @@ import type {
   TableSchema,
 } from './table-schema.ts';
 
-import { isUndefined, keyBy } from '../../../utils/index.ts';
+import { isUndefined, keyBy, pluralize } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { clearSQL, danglingCondition, deleteSQL, purgedLine, sweepWrapperRows } from './purge.ts';
 
@@ -115,7 +115,7 @@ export async function guardDiffs(
       const rows = await countRows(db, dialect, diff.table.name);
       if (rows === 0) continue;
       const losses = blockOwned(diff.table) ? findings.blockLosses : findings.losses;
-      losses.push(`- table \`${diff.table.name}\` (\`${rows}\` rows)`);
+      losses.push(`- table \`${diff.table.name}\` (\`${rows}\` ${pluralize(rows, 'row')})`);
       continue;
     }
     await guardAlter(db, dialect, diff, creating, findings);
@@ -182,7 +182,11 @@ async function guardAlter(
       table,
       `${dialect.quote(column.name)} IS NOT NULL`,
     );
-    if (values > 0) losses.push(`- column \`${table}.${column.name}\` (\`${values}\` values)`);
+    if (values > 0) {
+      losses.push(
+        `- column \`${table}.${column.name}\` (\`${values}\` ${pluralize(values, 'value')})`,
+      );
+    }
   }
   for (const change of alter.changeColumns) {
     const name = change.desired.name;
@@ -190,7 +194,7 @@ async function guardAlter(
       dialect.columnType(change.live.type) !== dialect.columnType(change.desired.type);
     if (retyped && change.desired.notNull && rows > 0) {
       findings.blockers.push(
-        `- column \`${table}.${name}\` retypes under NOT NULL, leaving \`${rows}\` rows without a value`,
+        `- column \`${table}.${name}\` retypes under NOT NULL, leaving \`${rows}\` ${pluralize(rows, 'row')} without a value`,
       );
       continue;
     }
@@ -198,7 +202,7 @@ async function guardAlter(
       const values = await countWhere(db, dialect, table, `${dialect.quote(name)} IS NOT NULL`);
       if (values > 0) {
         losses.push(
-          `- column \`${table}.${name}\` (\`${values}\` values, \`${change.live.type}\` -> \`${change.desired.type}\`)`,
+          `- column \`${table}.${name}\` (\`${values}\` ${pluralize(values, 'value')}, \`${change.live.type}\` -> \`${change.desired.type}\`)`,
         );
       }
     }
@@ -206,7 +210,7 @@ async function guardAlter(
       const nulls = await countWhere(db, dialect, table, `${dialect.quote(name)} IS NULL`);
       if (nulls > 0) {
         findings.blockers.push(
-          `- column \`${table}.${name}\` becomes NOT NULL over \`${nulls}\` NULL rows`,
+          `- column \`${table}.${name}\` becomes NOT NULL over \`${nulls}\` NULL ${pluralize(nulls, 'row')}`,
         );
       }
     }
@@ -215,7 +219,7 @@ async function guardAlter(
     for (const column of alter.addColumns) {
       if (!column.notNull) continue;
       findings.blockers.push(
-        `- new column \`${table}.${column.name}\` is NOT NULL but \`${table}\` holds \`${rows}\` rows`,
+        `- new column \`${table}.${column.name}\` is NOT NULL but \`${table}\` holds \`${rows}\` ${pluralize(rows, 'row')}`,
       );
     }
   }
@@ -227,7 +231,9 @@ async function guardAlter(
       findings.collapses.push({ table, groups });
       continue;
     }
-    findings.blockers.push(`- unique \`${unique.name}\` covers \`${groups}\` duplicate groups`);
+    findings.blockers.push(
+      `- unique \`${unique.name}\` covers \`${groups}\` duplicate ${pluralize(groups, 'group')}`,
+    );
   }
   if (
     alter.changePrimaryKey &&
@@ -238,7 +244,9 @@ async function guardAlter(
     const groups = await countDuplicateGroups(db, dialect, table, alter.desired.primaryKey);
     if (groups > 0) {
       const key = alter.desired.primaryKey.map((column) => `\`${column}\``).join(', ');
-      findings.blockers.push(`- primary key over ${key} covers \`${groups}\` duplicate groups`);
+      findings.blockers.push(
+        `- primary key over ${key} covers \`${groups}\` duplicate ${pluralize(groups, 'group')}`,
+      );
     }
   }
   for (const foreignKey of alter.addForeignKeys) {
@@ -342,7 +350,7 @@ async function purgeDangling(
     const { changes } = await db.run(`DELETE FROM ${dialect.quote(table)} WHERE ${doomed}`);
     if (changes > 0) {
       lines.push(
-        `- \`${changes}\` rows of \`${table}\` deleted, holding blocks no longer allowed there`,
+        `- \`${changes}\` ${pluralize(changes, 'row')} of \`${table}\` deleted, holding blocks no longer allowed there`,
       );
     }
   }
@@ -354,7 +362,7 @@ async function purgeDangling(
       const { changes } = await db.run(collapseSQL(dialect, item.table));
       if (changes === 0) continue;
       lines.push(
-        `- \`${changes}\` rows of \`${item.table}\` deleted, keeping each parent's first row`,
+        `- \`${changes}\` ${pluralize(changes, 'row')} of \`${item.table}\` deleted, keeping each parent's first row`,
       );
       affected.add(item.table);
     }
@@ -538,21 +546,21 @@ function detectCollapse(alter: TableAlter): IndexSchema | undefined {
  * One report line for rows dangling from a foreign key.
  */
 function danglingLine(table: string, foreignKey: ForeignKeySchema, count: number): string {
-  return `- \`${count}\` rows of \`${table}\` dangle from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
+  return `- \`${count}\` ${pluralize(count, 'row')} of \`${table}\` ${count === 1 ? 'dangles' : 'dangle'} from \`${table}.${foreignKey.column}\` to missing \`${foreignKey.targetTable}\` rows`;
 }
 
 /**
  * One report line for parents whose many rows collapse onto one.
  */
 function collapseLine(table: string, groups: number): string {
-  return `- \`${groups}\` parents of \`${table}\` hold multiple rows; only each parent's first row survives`;
+  return `- \`${groups}\` ${pluralize(groups, 'parent')} of \`${table}\` ${groups === 1 ? 'holds' : 'hold'} multiple rows; only each parent's first row survives`;
 }
 
 /**
  * One report line for wrapper rows holding a block type outside the desired allow set.
  */
 function disallowedLine(table: string, type: string, count: number): string {
-  return `- \`${count}\` rows of \`${table}\` hold block \`${type}\`, no longer allowed there`;
+  return `- \`${count}\` ${pluralize(count, 'row')} of \`${table}\` ${count === 1 ? 'holds' : 'hold'} block \`${type}\`, no longer allowed there`;
 }
 
 /**

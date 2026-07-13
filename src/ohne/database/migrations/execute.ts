@@ -27,6 +27,7 @@ import {
   isUndefined,
   jsonClone,
   last,
+  pluralize,
   uuidv7,
 } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
@@ -716,7 +717,7 @@ async function fanOutScalars(
       throw ohneError({
         title: `Cannot fan \`${collection}\` out to its translations`,
         body: [
-          `\`${row?.count}\` entities need a fresh \`${defaultLocale}\` row, and \`${companion.name}.${strict.name}\` is \`NOT NULL\` with nothing to fill it.`,
+          `\`${row?.count}\` ${pluralize(row?.count ?? 0, 'entity', 'entities')} ${(row?.count ?? 0) === 1 ? 'needs' : 'need'} a fresh \`${defaultLocale}\` row, and \`${companion.name}.${strict.name}\` is \`NOT NULL\` with nothing to fill it.`,
           `Create the missing \`${defaultLocale}\` rows first, or make \`${strict.name}\` nullable.`,
         ],
       });
@@ -1199,7 +1200,7 @@ async function runFanInScalar(
       throw ohneError({
         title: `Migration \`${meta.name}\` cannot map every row`,
         body: [
-          `\`${unmatched}\` rows of \`${companionName}\` have no \`${main}\` row to receive their \`${column}\` value.`,
+          `\`${unmatched}\` ${pluralize(unmatched, 'row')} of \`${companionName}\` ${unmatched === 1 ? 'has' : 'have'} no \`${main}\` row to receive ${unmatched === 1 ? 'its' : 'their'} \`${column}\` value.`,
           '',
           'Create the missing rows, or set `FORCE_SYNC` or `database.sync.force` to drop these values for one boot.',
         ],
@@ -1207,7 +1208,7 @@ async function runFanInScalar(
       });
     }
     engine.deletions.push(
-      `- \`${unmatched}\` \`${companionName}.${column}\` values had no \`${main}\` row to promote onto`,
+      `- \`${unmatched}\` \`${companionName}.${column}\` ${pluralize(unmatched, 'value')} had no \`${main}\` row to promote onto`,
     );
   }
   if (wantedColumn?.notNull === true) {
@@ -1217,9 +1218,9 @@ async function runFanInScalar(
     );
     if ((row?.count ?? 0) > 0) {
       throw ohneError({
-        title: `Migration \`${meta.name}\` leaves \`${row?.count}\` entities without a value`,
+        title: `Migration \`${meta.name}\` leaves \`${row?.count}\` ${pluralize(row?.count ?? 0, 'entity', 'entities')} without a value`,
         body: [
-          `\`${main}.${column}\` is \`NOT NULL\`, and these entities promoted nothing from any locale.`,
+          `\`${main}.${column}\` is \`NOT NULL\`, and ${(row?.count ?? 0) === 1 ? 'this entity' : 'these entities'} promoted nothing from any locale.`,
           'Return a value for one locale of each entity, or relax the column.',
         ],
         path: meta.file,
@@ -1395,7 +1396,7 @@ async function deleteOwnedRows(
       }
       if (removed === 0) continue;
       engine.deletions.push(
-        `- \`${removed}\` rows of \`${name}\` deleted, referencing deleted \`${schema.name}\` rows`,
+        `- \`${removed}\` ${pluralize(removed, 'row')} of \`${name}\` deleted, referencing deleted \`${schema.name}\` rows`,
       );
     }
   }
@@ -1418,7 +1419,7 @@ async function deleteOwnedRows(
     }
     if (orphaned.length === 0) continue;
     engine.deletions.push(
-      `- \`${orphaned.length}\` rows of \`${name}\` deleted, following their deleted parents`,
+      `- \`${orphaned.length}\` ${pluralize(orphaned.length, 'row')} of \`${name}\` deleted, following ${orphaned.length === 1 ? 'its deleted parent' : 'their deleted parents'}`,
     );
     await deleteOwnedRows(engine, childSchema, orphaned);
   }
@@ -1612,7 +1613,7 @@ async function writeValues(
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot map every row`,
       body: [
-        `\`${unmatched}\` rows of \`${from.table}\` have no \`${to.table}\` row to receive their \`${from.column}\` value.`,
+        `\`${unmatched}\` ${pluralize(unmatched, 'row')} of \`${from.table}\` ${unmatched === 1 ? 'has' : 'have'} no \`${to.table}\` row to receive ${unmatched === 1 ? 'its' : 'their'} \`${from.column}\` value.`,
         '',
         'Create the missing rows, or set `FORCE_SYNC` or `database.sync.force` to drop these values for one boot.',
       ],
@@ -1620,7 +1621,7 @@ async function writeValues(
     });
   }
   engine.deletions.push(
-    `- \`${unmatched}\` \`${from.table}.${from.column}\` values had no \`${to.table}\` row to move onto`,
+    `- \`${unmatched}\` \`${from.table}.${from.column}\` ${pluralize(unmatched, 'value')} had no \`${to.table}\` row to move onto`,
   );
 }
 

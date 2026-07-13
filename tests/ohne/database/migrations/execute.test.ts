@@ -196,7 +196,7 @@ describe('executeMigrations', () => {
       force: true,
     });
     strictEqual(outcome.deletions.length, 1);
-    match(outcome.deletions[0] ?? '', /`1` `Posts.title` values/);
+    match(outcome.deletions[0] ?? '', /`1` `Posts.title` value/);
     deepStrictEqual(await columnNames(db, 'Posts'), ['UUID']);
     await db.close();
   });
@@ -1473,7 +1473,7 @@ describe('executeMigrations with block addresses', () => {
     );
     ok(
       outcome.deletions.some((line) =>
-        /rows of `Posts_content` deleted, referencing deleted `block_Hero` rows/.test(line),
+        /row of `Posts_content` deleted, referencing deleted `block_Hero` rows/.test(line),
       ),
     );
     await db.close();

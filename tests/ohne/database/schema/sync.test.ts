@@ -476,7 +476,7 @@ describe('syncDatabase', () => {
       await rejects(syncDatabase(db, dialect, { desired, migrations }), /cannot map every row/);
       const report = await syncDatabase(db, dialect, { desired, migrations, force: true });
       strictEqual(report.deletions.length, 1);
-      match(report.deletions[0] ?? '', /`1` `Posts.title` values/);
+      match(report.deletions[0] ?? '', /`1` `Posts.title` value/);
       deepStrictEqual(await dialect.describeTable(db, 'Posts'), table('Posts'));
       await db.close();
     });

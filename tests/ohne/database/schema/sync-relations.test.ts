@@ -178,7 +178,7 @@ describe('syncDatabase with relations', () => {
     await rejects(syncDatabase(db, dialect, { desired: after }), refusalMatching(/dangle/));
 
     const report = await syncDatabase(db, dialect, { desired: after, force: true });
-    match(report.deletions.join('\n'), /`1` values of `Posts.author` cleared/);
+    match(report.deletions.join('\n'), /`1` value of `Posts.author` cleared/);
     deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts"'), [
       Object.assign(Object.create(null), { UUID: 'p1', author: null }),
     ]);
@@ -210,7 +210,7 @@ describe('syncDatabase with relations', () => {
     await rejects(syncDatabase(db, dialect, { desired: after }), refusalMatching(/dangle/));
 
     const report = await syncDatabase(db, dialect, { desired: after, force: true });
-    match(report.deletions.join('\n'), /`1` rows of `Posts_reviewers` deleted/);
+    match(report.deletions.join('\n'), /`1` row of `Posts_reviewers` deleted/);
     deepStrictEqual(await db.query('SELECT * FROM "Posts_reviewers"'), []);
     deepStrictEqual(
       (await dialect.describeTable(db, 'Posts_reviewers')).foreignKeys
@@ -235,7 +235,7 @@ describe('syncDatabase with relations', () => {
     const after = desiredOf(users(), { name: 'Posts', collection: { fields: {} } });
     await rejects(
       syncDatabase(db, dialect, { desired: after }),
-      refusalMatching(/table `Posts_reviewers` \(`1` rows\)/),
+      refusalMatching(/table `Posts_reviewers` \(`1` row\)/),
     );
     await syncDatabase(db, dialect, { desired: after, force: true });
     strictEqual((await dialect.listTables(db)).includes('Posts_reviewers'), false);
@@ -279,7 +279,7 @@ describe('syncDatabase with relations', () => {
     );
     await rejects(
       syncDatabase(db, dialect, { desired: flipped }),
-      refusalMatching(/table `Posts_authors` \(`1` rows\)/),
+      refusalMatching(/table `Posts_authors` \(`1` row\)/),
     );
     await syncDatabase(db, dialect, { desired: flipped, force: true });
     const after = await dialect.listTables(db);

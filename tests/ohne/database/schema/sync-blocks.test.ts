@@ -223,16 +223,16 @@ describe('syncDatabase with blocks', () => {
     await rejects(syncDatabase(db, dialect, { desired: shrunk }), (error: unknown) => {
       ok(isOhneError(error));
       const body = Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? '');
-      match(body, /`1` rows of `Posts_content` hold block `Hero`, no longer allowed there/);
+      match(body, /`1` row of `Posts_content` holds block `Hero`, no longer allowed there/);
       match(body, /Set `FORCE_SYNC`/);
       doesNotMatch(body, /Cover these with a discard or move migration/);
       return true;
     });
     const report = await syncDatabase(db, dialect, { desired: shrunk, force: true });
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero` deleted, no longer referenced/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted, no longer referenced/);
     match(
       report.deletions.join('\n'),
-      /`1` rows of `Posts_content` deleted, holding blocks no longer allowed/,
+      /`1` row of `Posts_content` deleted, holding blocks no longer allowed/,
     );
     strictEqual(await countRows(db, 'Posts_content'), 0);
     strictEqual(await countRows(db, 'block_Hero'), 0);
@@ -273,14 +273,14 @@ describe('syncDatabase with blocks', () => {
     await rejects(
       syncDatabase(db, dialect, { desired: withoutHero }),
       refusalMatching(
-        /table `block_Hero` \(`1` rows\)[\s\S]*`1` rows of `Posts_content` hold block `Hero`/,
+        /table `block_Hero` \(`1` row\)[\s\S]*`1` row of `Posts_content` holds block `Hero`/,
       ),
     );
     const report = await syncDatabase(db, dialect, { desired: withoutHero, force: true });
     match(report.deletions.join('\n'), /table `block_Hero`/);
     match(
       report.deletions.join('\n'),
-      /rows of `Posts_content` deleted, holding blocks no longer allowed/,
+      /row of `Posts_content` deleted, holding blocks no longer allowed/,
     );
     ok(!(await dialect.listTables(db)).includes('block_Hero'));
     strictEqual(await countRows(db, 'Posts_content'), 1);
@@ -305,9 +305,9 @@ describe('syncDatabase with blocks', () => {
       desired: desiredOf([nestingHero, cta()], posts(['CTA']), pages(['Hero'])),
       force: true,
     });
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero` deleted/);
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero_content` deleted, dangling/);
-    match(report.deletions.join('\n'), /`1` rows of `block_CTA` deleted/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero_content` deleted, dangling/);
+    match(report.deletions.join('\n'), /`1` row of `block_CTA` deleted/);
     strictEqual(await countRows(db, 'block_Hero'), 0);
     strictEqual(await countRows(db, 'block_Hero_content'), 0);
     strictEqual(await countRows(db, 'block_CTA'), 0);
@@ -335,9 +335,9 @@ describe('syncDatabase with blocks', () => {
         meta('app/001-drop-content', { from: { collection: 'Posts', field: 'content' }, to: null }),
       ],
     });
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero` deleted, no longer referenced/);
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero_content` deleted, dangling/);
-    match(report.deletions.join('\n'), /`1` rows of `block_CTA` deleted/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted, no longer referenced/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero_content` deleted, dangling/);
+    match(report.deletions.join('\n'), /`1` row of `block_CTA` deleted/);
     deepStrictEqual(
       (await dialect.listTables(db)).filter((name) => !name.startsWith('ohne_')),
       ['Posts'],
@@ -362,8 +362,8 @@ describe('syncDatabase with blocks', () => {
       (error: unknown) => {
         ok(isOhneError(error));
         const body = Array.isArray(error.body) ? error.body.join('\n') : (error.body ?? '');
-        match(body, /table `Posts_content` \(`1` rows\)/);
-        match(body, /table `block_Hero` \(`1` rows\)/);
+        match(body, /table `Posts_content` \(`1` row\)/);
+        match(body, /table `block_Hero` \(`1` row\)/);
         match(body, /Cover these with a discard or move migration/);
         match(body, /Or set `FORCE_SYNC`/);
         return true;
@@ -524,9 +524,9 @@ describe('syncDatabase with blocks', () => {
       ),
       force: true,
     });
-    match(report.deletions.join('\n'), /table `Posts_content` \(`1` rows\)/);
-    match(report.deletions.join('\n'), /rows of `block_Hero` deleted/);
-    match(report.deletions.join('\n'), /rows of `block_Hero_content` deleted, dangling/);
+    match(report.deletions.join('\n'), /table `Posts_content` \(`1` row\)/);
+    match(report.deletions.join('\n'), /row of `block_Hero` deleted/);
+    match(report.deletions.join('\n'), /row of `block_Hero_content` deleted, dangling/);
     strictEqual(await countRows(db, 'block_Hero'), 0);
     strictEqual(await countRows(db, 'block_Hero_content'), 0);
     await db.close();
@@ -548,7 +548,7 @@ describe('syncDatabase with blocks', () => {
     });
     await rejects(syncDatabase(db, dialect, { desired: reshaped }), refusalMatching(/block_Hero/));
     const report = await syncDatabase(db, dialect, { desired: reshaped, force: true });
-    match(report.deletions.join('\n'), /table `block_Hero` \(`1` rows\)/);
+    match(report.deletions.join('\n'), /table `block_Hero` \(`1` row\)/);
     ok(!(await dialect.listTables(db)).includes('block_Hero'));
     strictEqual(await countRows(db, 'Posts_content'), 1);
     const live = await dialect.describeTable(db, 'Posts_content');
@@ -604,12 +604,12 @@ describe('syncDatabase with blocks', () => {
       ],
     });
     const lines = report.deletions.join('\n');
-    match(lines, /`1` rows of `block_Hero` deleted, no longer referenced/);
-    match(lines, /`1` rows of `block_Hero_gallery` deleted, dangling/);
-    match(lines, /`1` rows of `block_Hero_gallery_cta` deleted, dangling/);
-    match(lines, /`1` rows of `block_CTA` deleted, no longer referenced/);
-    match(lines, /`1` rows of `block_CTA_tags` deleted, dangling/);
-    match(lines, /`1` rows of `block_CTA_meta` deleted, dangling/);
+    match(lines, /`1` row of `block_Hero` deleted, no longer referenced/);
+    match(lines, /`1` row of `block_Hero_gallery` deleted, dangling/);
+    match(lines, /`1` row of `block_Hero_gallery_cta` deleted, dangling/);
+    match(lines, /`1` row of `block_CTA` deleted, no longer referenced/);
+    match(lines, /`1` row of `block_CTA_tags` deleted, dangling/);
+    match(lines, /`1` row of `block_CTA_meta` deleted, dangling/);
     deepStrictEqual(
       (await dialect.listTables(db)).filter((name) => !name.startsWith('ohne_')),
       ['Posts', 'Tags'],
@@ -644,11 +644,11 @@ describe('syncDatabase with blocks', () => {
     await rejects(
       syncDatabase(db, dialect, { desired: shrunk }),
       refusalMatching(
-        /`1` rows of `Posts_sections_content` hold block `Hero`, no longer allowed there/,
+        /`1` row of `Posts_sections_content` holds block `Hero`, no longer allowed there/,
       ),
     );
     const report = await syncDatabase(db, dialect, { desired: shrunk, force: true });
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero` deleted, no longer referenced/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted, no longer referenced/);
     strictEqual(await countRows(db, 'Posts_sections_content'), 0);
     strictEqual(await countRows(db, 'block_Hero'), 0);
     ok((await dialect.listTables(db)).includes('block_Hero'));
@@ -731,13 +731,13 @@ describe('syncDatabase with blocks', () => {
     const reshaped = desiredOf([hero()], sections('object'));
     await rejects(
       syncDatabase(db, dialect, { desired: reshaped }),
-      refusalMatching(/`1` parents of `Posts_sections` hold multiple rows/),
+      refusalMatching(/`1` parent of `Posts_sections` holds multiple rows/),
     );
     const report = await syncDatabase(db, dialect, { desired: reshaped, force: true });
     const lines = report.deletions.join('\n');
-    match(lines, /`1` rows of `Posts_sections` deleted, keeping each parent's first row/);
-    match(lines, /`1` rows of `block_Hero` deleted, no longer referenced/);
-    match(lines, /`1` rows of `Posts_sections_content` deleted, dangling/);
+    match(lines, /`1` row of `Posts_sections` deleted, keeping each parent's first row/);
+    match(lines, /`1` row of `block_Hero` deleted, no longer referenced/);
+    match(lines, /`1` row of `Posts_sections_content` deleted, dangling/);
     deepStrictEqual(await db.query('SELECT "label" FROM "Posts_sections"'), [
       Object.assign(Object.create(null), { label: 'kept' }),
     ]);
@@ -796,13 +796,13 @@ describe('syncDatabase with blocks', () => {
     ];
     await rejects(
       syncDatabase(db, dialect, { desired: renamed, migrations }),
-      refusalMatching(/`1` rows of `Articles_content` hold block `Hero`, no longer allowed there/),
+      refusalMatching(/`1` row of `Articles_content` holds block `Hero`, no longer allowed there/),
     );
     strictEqual(await countRows(db, 'ohne_migrations'), 0);
     ok((await dialect.listTables(db)).includes('Posts_content'));
     const report = await syncDatabase(db, dialect, { desired: renamed, migrations, force: true });
-    match(report.deletions.join('\n'), /`1` rows of `block_Hero` deleted, no longer referenced/);
-    match(report.deletions.join('\n'), /`1` rows of `Articles_content` deleted, holding blocks/);
+    match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted, no longer referenced/);
+    match(report.deletions.join('\n'), /`1` row of `Articles_content` deleted, holding blocks/);
     deepStrictEqual(await db.query('SELECT "name", "status" FROM "ohne_migrations"'), [
       Object.assign(Object.create(null), { name: 'app/001-articles', status: 'applied' }),
     ]);
