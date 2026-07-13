@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { resolveArgs } from '../../../../src/utils/cli/index.ts';
@@ -168,6 +168,45 @@ describe('resolveArgs', () => {
         },
       ],
       positionals: [],
+    });
+  });
+
+  describe('recognize', () => {
+    it('accepts a recognized flag without reporting it unknown, and omits it from values', () => {
+      const schema = { cwd: { type: 'string' } } as const;
+      const recognize = { host: { type: 'string' } } as const;
+      deepStrictEqual(resolveArgs(schema, ['--host', '0.0.0.0'], recognize), {
+        ok: true,
+        values: {},
+        positionals: [],
+      });
+    });
+
+    it('keeps a recognized `no-` boolean verbatim instead of negating', () => {
+      const recognize = { noColor: { type: 'boolean' } } as const;
+      deepStrictEqual(resolveArgs({}, ['--no-color'], recognize), {
+        ok: true,
+        values: {},
+        positionals: [],
+      });
+    });
+
+    it('does not consume a positional after a recognized boolean flag', () => {
+      const schema = { cwd: { type: 'string' } } as const;
+      const recognize = { forceSync: { type: 'boolean' } } as const;
+      deepStrictEqual(resolveArgs(schema, ['--force-sync', 'build'], recognize), {
+        ok: true,
+        values: {},
+        positionals: ['build'],
+      });
+    });
+
+    it('still reports a truly unknown flag', () => {
+      const schema = { cwd: { type: 'string' } } as const;
+      const recognize = { host: { type: 'string' } } as const;
+      const result = resolveArgs(schema, ['--bogus'], recognize);
+      strictEqual(result.ok, false);
+      if (!result.ok) strictEqual(result.errors[0]!.kind, 'unknown');
     });
   });
 });

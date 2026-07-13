@@ -133,6 +133,67 @@ describe('createEnvRegistry', () => {
     });
   });
 
+  describe('setRaw', () => {
+    it('parses the raw string through the spec and stores it as an override', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.setRaw('INT', '42');
+      strictEqual(env.get('INT'), 42);
+    });
+
+    it('wins over `process.env`, like `set`', () => {
+      process.env['INT'] = '1';
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.setRaw('INT', '99');
+      strictEqual(env.get('INT'), 99);
+    });
+
+    it('marks the var present for `has`', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.setRaw('STR', 'x');
+      strictEqual(env.has('STR'), true);
+    });
+
+    it('passes the raw string through when `parse` is omitted', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.setRaw('STR', 'raw');
+      strictEqual(env.get('STR'), 'raw');
+    });
+
+    it('propagates parser errors', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      throws(() => env.setRaw('INT', '1.5'), /Expected integer/);
+    });
+
+    it('does not mutate `process.env`', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.setRaw('STR', 'x');
+      strictEqual(process.env['STR'], undefined);
+    });
+
+    it('throws on an undefined name', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      throws(() => env.setRaw('STR', 'x'), /Env var not defined: STR/);
+    });
+  });
+
+  describe('flag', () => {
+    it('returns the registered flag kind, or undefined when none', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      env.define('STR', { default: '', flag: 'value' });
+      env.define('BOOL', { default: false, parse: parseBoolean, flag: 'boolean' });
+      env.define('NUM', { default: 0, parse: parseNumber });
+      strictEqual(env.flag('STR'), 'value');
+      strictEqual(env.flag('BOOL'), 'boolean');
+      strictEqual(env.flag('NUM'), undefined);
+    });
+  });
+
   describe('has', () => {
     it('returns `true` for an override', () => {
       const env = createEnvRegistry<SampleEnv>();

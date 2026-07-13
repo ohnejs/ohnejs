@@ -37,6 +37,14 @@ export interface RunOptions {
    * process.stderr
    */
   stderr?: { write(text: string): void };
+
+  /**
+   * Extra flags recognized at every command level, on top of each command's own args.
+   * They are accepted rather than reported as unknown, but never resolved into a command's `values`.
+   * A caller-side pre-pass owns their meaning.
+   * Listed under `GLOBAL OPTIONS` in the root command's help.
+   */
+  globals?: ArgsSchema;
 }
 
 /**
@@ -56,20 +64,35 @@ export async function runCommand(
   argv: string[],
   options: RunOptions = {},
 ): Promise<number> {
+  return dispatch(command, argv, options, true);
+}
+
+/**
+ * Recursive body of `runCommand`.
+ * `top` is `true` only for the entry command, so the root help alone lists `GLOBAL OPTIONS`.
+ * `options.globals` is recognized (never reported as unknown) at every level.
+ */
+async function dispatch(
+  command: Command,
+  argv: string[],
+  options: RunOptions,
+  top: boolean,
+): Promise<number> {
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const colors = pickANSIColors(options.color ?? isColorStream(stdout));
+  const globals = top ? options.globals : undefined;
   const sub = command.subCommands;
   const first = argv[0];
   const isCommandToken = !isUndefined(first) && !first.startsWith('-');
 
   if (sub && isCommandToken && hasKey(sub, first)) {
-    return runCommand(sub[first]!, argv.slice(1), options);
+    return dispatch(sub[first]!, argv.slice(1), options, false);
   }
 
   const peek = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
   if (peek.flags.help || peek.flags.h) {
-    stdout.write(renderHelp(command, colors));
+    stdout.write(renderHelp(command, colors, globals));
     return 0;
   }
   if (command.meta.version && (peek.flags.version || peek.flags.v)) {
@@ -84,12 +107,12 @@ export async function runCommand(
   }
 
   if (!command.run) {
-    stdout.write(renderHelp(command, colors));
+    stdout.write(renderHelp(command, colors, globals));
     return 0;
   }
 
   const schema: ArgsSchema = command.args ?? {};
-  const resolved = resolveArgs(schema, argv);
+  const resolved = resolveArgs(schema, argv, options.globals);
   if (!resolved.ok) {
     for (const error of resolved.errors) stderr.write(`${error.message}\n`);
     stderr.write(`\nRun \`${command.meta.name} --help\` for usage.\n`);

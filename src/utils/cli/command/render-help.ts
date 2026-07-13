@@ -1,5 +1,5 @@
 import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
-import type { ArgSchema } from '../args/define-args.ts';
+import type { ArgSchema, ArgsSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
 import { toArray } from '../../array/to-array.ts';
@@ -16,6 +16,7 @@ interface Row {
  * Renders the help text for a command as a string, ending with a newline.
  * Includes the title, description, a usage line, the subcommand list, and the option list.
  * Long flags are shown in kebab-case; `--help` (and `--version` when set) are appended automatically.
+ * A `globals` schema, when passed, is rendered under a `GLOBAL OPTIONS` section after the options.
  * The `colors` styler set tints the output; pass the plain set to emit no codes.
  *
  * @example
@@ -24,7 +25,7 @@ interface Row {
  * // -> 'app\n\nUSAGE\n  app [options]\n\nOPTIONS\n  --help, -h  Show help\n'
  * ```
  */
-export function renderHelp(command: Command, colors: ANSIColors): string {
+export function renderHelp(command: Command, colors: ANSIColors, globals?: ArgsSchema): string {
   const { meta, args, subCommands } = command;
   const title = meta.version
     ? `${colors.bold(meta.name)} ${colors.dim(meta.version)}`
@@ -52,16 +53,26 @@ export function renderHelp(command: Command, colors: ANSIColors): string {
 
   lines.push('', colors.bold('OPTIONS'), ...renderRows(optionRows(command, args, colors)));
 
+  const globalRows = globals ? schemaRows(globals, colors) : [];
+  if (globalRows.length > 0) {
+    lines.push('', colors.bold('GLOBAL OPTIONS'), ...renderRows(globalRows));
+  }
+
   return lines.join('\n') + '\n';
 }
 
-function optionRows(command: Command, args: Command['args'], colors: ANSIColors): Row[] {
+function schemaRows(args: ArgsSchema | undefined, colors: ANSIColors): Row[] {
   const rows: Row[] = [];
   for (const name of Object.keys(args ?? {})) {
     const def = args![name]!;
     if (def.hidden) continue;
     rows.push(optionRow(name, def, colors));
   }
+  return rows;
+}
+
+function optionRows(command: Command, args: Command['args'], colors: ANSIColors): Row[] {
+  const rows = schemaRows(args, colors);
   if (command.meta.version)
     rows.push({
       label: '--version, -v',

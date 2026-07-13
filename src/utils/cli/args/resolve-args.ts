@@ -63,6 +63,8 @@ export type ResolveArgsResult<S extends ArgsSchema> =
  * A `no`-prefixed key of any other type must be passed as `--no-foo=value`; the bare form negates `foo`.
  * A scalar flag repeated under one name takes its last value.
  * When a flag is given under both its canonical name and an alias, the canonical name wins.
+ * A `recognize` schema is folded into flag recognition and boolean hinting but not resolved into `values`.
+ * Use it to accept flags owned by another layer without reporting them as unknown.
  *
  * @example
  * ```ts
@@ -78,27 +80,33 @@ export type ResolveArgsResult<S extends ArgsSchema> =
 export function resolveArgs<const S extends ArgsSchema>(
   schema: S,
   argv: string[],
+  recognize?: ArgsSchema,
 ): ResolveArgsResult<S> {
   const names = Object.keys(schema);
   const aliasToName = new Map<string, string>();
   const canonByForm = new Map<string, string>();
   const booleans: string[] = [];
 
-  for (const name of names) {
-    canonByForm.set(toCamelCase(name), name);
-    const def = schema[name]!;
-    const aliases = toArray(def.alias ?? []);
-    for (const alias of aliases) aliasToName.set(alias, name);
-    if (def.type === 'boolean') booleans.push(name, toKebabCase(name), ...aliases);
-  }
+  const register = (defs: ArgsSchema): void => {
+    for (const name of Object.keys(defs)) {
+      canonByForm.set(toCamelCase(name), name);
+      const def = defs[name]!;
+      const aliases = toArray(def.alias ?? []);
+      for (const alias of aliases) aliasToName.set(alias, name);
+      if (def.type === 'boolean') booleans.push(name, toKebabCase(name), ...aliases);
+    }
+  };
+  register(schema);
+  if (recognize) register(recognize);
 
+  const known = recognize ? [...names, ...Object.keys(recognize)] : names;
   const parsed = parseArgv(argv, { booleans });
   const errors: ArgError[] = [];
   const values: Record<string, string | number | boolean> = {};
 
   for (const flag of Object.keys(parsed.flags)) {
     if (aliasToName.has(flag) || canonByForm.has(toCamelCase(flag))) continue;
-    const suggestion = didYouMean(toCamelCase(flag), names);
+    const suggestion = didYouMean(toCamelCase(flag), known);
     errors.push({
       kind: 'unknown',
       name: flag,

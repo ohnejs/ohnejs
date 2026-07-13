@@ -87,4 +87,22 @@ describe('renderHelp', () => {
     strictEqual(help.includes('--out'), true);
     strictEqual(help.includes('--secret'), false);
   });
+
+  it('renders a GLOBAL OPTIONS section when globals are passed', () => {
+    const build = { meta: { name: 'build' }, args: { out: { type: 'string' } } } as const;
+    const globals = {
+      forceSync: { type: 'boolean', description: 'Sets FORCE_SYNC' },
+      host: { type: 'string', description: 'Sets HOST' },
+    } as const;
+    const help = renderHelp(build, plain, globals);
+    strictEqual(help.includes('GLOBAL OPTIONS'), true);
+    strictEqual(help.includes('--force-sync'), true);
+    strictEqual(help.includes('--host <string>'), true);
+    strictEqual(help.includes('Sets HOST'), true);
+  });
+
+  it('omits the GLOBAL OPTIONS section when globals are absent', () => {
+    const build = { meta: { name: 'build' }, args: { out: { type: 'string' } } } as const;
+    strictEqual(renderHelp(build, plain).includes('GLOBAL OPTIONS'), false);
+  });
 });

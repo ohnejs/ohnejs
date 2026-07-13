@@ -17,6 +17,13 @@ export interface EnvSpec<T> {
    * Compose with single-arg parsers like `parseInteger`, `parseNumber`, or `parseBoolean`.
    */
   parse?: (raw: string, name: string) => T;
+
+  /**
+   * How this var is surfaced as a CLI flag, for tools that mirror env vars onto flags.
+   * `'boolean'` is a switch (`--force-sync` / `--no-force-sync`); `'value'` takes a value (`--host x`).
+   * Omitted means the var has no flag.
+   */
+  flag?: 'boolean' | 'value';
 }
 
 /**
@@ -53,6 +60,13 @@ export interface EnvRegistry<E extends object> {
   set<K extends keyof E & string>(name: K, value: E[K]): void;
 
   /**
+   * Sets an in-memory override for `name` from a raw string, parsed as a `process.env[name]` value would be.
+   * Runs the registered `parse` (identity by default), so a flag's value gets the exact env validation.
+   * Does not mutate `process.env`.
+   */
+  setRaw<K extends keyof E & string>(name: K, raw: string): void;
+
+  /**
    * Removes any in-memory override for `name`.
    * Returns `true` if an override was cleared.
    */
@@ -67,6 +81,11 @@ export interface EnvRegistry<E extends object> {
    * Returns every defined var name in registration order.
    */
   names(): readonly (keyof E & string)[];
+
+  /**
+   * Returns the CLI flag kind registered for `name` via its spec, or `undefined` when it has none.
+   */
+  flag<K extends keyof E & string>(name: K): 'boolean' | 'value' | undefined;
 }
 
 interface Slot {
@@ -126,6 +145,14 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
     set(name, value) {
       slot(name).value = { has: true, value };
     },
+    setRaw(name, raw) {
+      const spec = specs.get(name);
+      if (isUndefined(spec)) throw new Error(`Env var not defined: ${name}`);
+      slot(name).value = {
+        has: true,
+        value: isUndefined(spec.parse) ? raw : spec.parse(raw, name),
+      };
+    },
     unset(name) {
       const s = slots.get(name);
       if (isUndefined(s) || !s.value.has) return false;
@@ -138,6 +165,9 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
     },
     names() {
       return [...specs.keys()] as unknown as readonly (keyof E & string)[];
+    },
+    flag(name) {
+      return specs.get(name)?.flag;
     },
   };
 }

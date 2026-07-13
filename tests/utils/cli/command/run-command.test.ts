@@ -99,4 +99,35 @@ describe('runCommand', () => {
     await runCommand(cli, [], { stdout: { write() {} }, stderr: { write() {} } });
     strictEqual(done, true);
   });
+
+  it('accepts a global flag on a subcommand without reporting it unknown', async () => {
+    let ran = false;
+    const build = defineCommand({
+      meta: { name: 'build' },
+      args: { out: { type: 'string' } },
+      run() {
+        ran = true;
+      },
+    });
+    const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
+    const globals = { host: { type: 'string' } } as const;
+    const { err, options } = capture();
+    strictEqual(await runCommand(cli, ['build', '--host', '0.0.0.0'], { ...options, globals }), 0);
+    strictEqual(ran, true);
+    deepStrictEqual(err, []);
+  });
+
+  it('lists globals in the root help but not in a subcommand help', async () => {
+    const build = defineCommand({ meta: { name: 'build' }, run() {} });
+    const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
+    const globals = { host: { type: 'string' } } as const;
+
+    const root = capture();
+    await runCommand(cli, ['--help'], { ...root.options, globals });
+    strictEqual(root.out[0]!.includes('GLOBAL OPTIONS'), true);
+
+    const subHelp = capture();
+    await runCommand(cli, ['build', '--help'], { ...subHelp.options, globals });
+    strictEqual(subHelp.out[0]!.includes('GLOBAL OPTIONS'), false);
+  });
 });
