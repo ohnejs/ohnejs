@@ -8,7 +8,8 @@ import type { Config } from './config.ts';
  * ```ts
  * export default defineConfig({
  *   layers: ['ohne', '@acme/base'],
- *   dirs: { api: 'routes' },
+ *   database: { url: '.data/app.db' },
+ *   api: { port: 3000 },
  * })
  * ```
  */
