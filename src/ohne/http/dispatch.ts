@@ -9,8 +9,8 @@ import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isBusyError } from '../query/write/busy.ts';
-import { isValidationError } from '../query/write/errors.ts';
-import { HTTPError, unprocessable } from './http-error.ts';
+import { isReferenceViolation, isValidationError } from '../query/write/errors.ts';
+import { conflict, HTTPError, unprocessable } from './http-error.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
 import { resolveMessage, translate } from './translate.ts';
@@ -179,6 +179,10 @@ export async function dispatch(
         const response = toResponse(http, event.response);
         response.headers.set('Retry-After', '1');
         return resolveErrorResponse(response, http, event);
+      }
+      if (isReferenceViolation(error)) {
+        const http = conflict();
+        return resolveErrorResponse(toResponse(http, event.response), http, event);
       }
       if (error instanceof HTTPError) {
         return resolveErrorResponse(toResponse(error, event.response), error, event);

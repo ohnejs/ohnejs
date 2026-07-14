@@ -13,6 +13,8 @@ export type FieldErrors = { [path: string]: Message };
 
 const VALIDATION_ERROR = Symbol('ohne.validationError');
 
+const REFERENCE_VIOLATION = Symbol('ohne.referenceViolation');
+
 /**
  * The error an `*OrThrow` write raises, carrying the same field-error map the result form returns.
  */
@@ -54,4 +56,34 @@ export function validationError(errors: FieldErrors): ValidationError {
  */
 export function isValidationError(value: unknown): value is ValidationError {
   return value instanceof Error && hasKey(value, VALIDATION_ERROR);
+}
+
+/**
+ * The error a `delete` raises when another record's `restrict` reference still points at a matched row.
+ *
+ * It carries the driver failure as its `cause`, so the classification stays inspectable under `DEBUG`.
+ * The HTTP seam maps it to a `409`, since the delete conflicts with a row that depends on the target.
+ *
+ * @example
+ * ```ts
+ * if (dialect.isForeignKeyViolation(error)) throw referenceViolation(error)
+ * ```
+ */
+export function referenceViolation(cause?: unknown): Error {
+  const error = new Error('A referenced record blocks this delete', { cause });
+  Object.defineProperty(error, REFERENCE_VIOLATION, { value: true });
+  return error;
+}
+
+/**
+ * Whether `value` is a `referenceViolation`.
+ *
+ * @example
+ * ```ts
+ * isReferenceViolation(referenceViolation()) // -> true
+ * isReferenceViolation(new Error('x'))       // -> false
+ * ```
+ */
+export function isReferenceViolation(value: unknown): value is Error {
+  return value instanceof Error && hasKey(value, REFERENCE_VIOLATION);
 }

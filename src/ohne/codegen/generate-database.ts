@@ -39,7 +39,7 @@ import { collectMigrations } from '../database/migrations/collect-migrations.ts'
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
 import { resolveFieldOptions } from '../fields/field.ts';
-import { resolveFieldStorage } from '../fields/resolve-field.ts';
+import { resolveFieldStorage, type ResolvedFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { fieldBaseType, fieldValueType } from '../fields/value-type.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
@@ -204,6 +204,14 @@ async function writeShared(
       context,
     ),
   }));
+  const updateMembers = collections.map((collection) => ({
+    name: collection.name,
+    fields: updateShapesOf(
+      { subject: `Collection \`${collection.name}\``, file: collection.file },
+      collection.collection.fields,
+      context,
+    ),
+  }));
 
   const code = createCodeBuilder();
   const statements = imports.statements();
@@ -269,6 +277,16 @@ async function writeShared(
     code.line('export interface GeneratedInserts {');
     code.indent(() => {
       for (const member of insertMembers) emitInsertShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
+  if (updateMembers.length === 0) {
+    code.line('export interface GeneratedUpdates {}');
+  } else {
+    code.line('export interface GeneratedUpdates {');
+    code.indent(() => {
+      for (const member of updateMembers) emitUpdateShapes(code, member.name, member.fields);
     });
     code.line('}');
   }
@@ -343,6 +361,25 @@ function emitInsertShapes(
 }
 
 /**
+ * Emits one update-input member: each field's name, always optional, and its input type.
+ */
+function emitUpdateShapes(
+  code: CodeBuilder,
+  name: string,
+  fields: readonly { name: string; type: string }[],
+): void {
+  if (fields.length === 0) {
+    code.line(`${propertyKey(name)}: {};`);
+    return;
+  }
+  code.line(`${propertyKey(name)}: {`);
+  code.indent(() => {
+    for (const field of fields) code.line(`${propertyKey(field.name)}?: ${field.type};`);
+  });
+  code.line('};');
+}
+
+/**
  * Writes `node/database.ts`: imports every definition, augments `ohne`, and registers each one.
  */
 async function writeNode(
@@ -383,7 +420,7 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedQueryFields, GeneratedRelations } from '../shared/database.ts';",
+    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
@@ -392,6 +429,7 @@ async function writeNode(
     code.line('interface KnownRelations extends GeneratedRelations {}');
     code.line('interface KnownQueryFields extends GeneratedQueryFields {}');
     code.line('interface KnownInserts extends GeneratedInserts {}');
+    code.line('interface KnownUpdates extends GeneratedUpdates {}');
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     if (augmented.length === 0) {
@@ -657,6 +695,54 @@ function insertShapesOf(
 }
 
 /**
+ * Resolves one field's storage for input emission, throwing when its type is not registered.
+ */
+function resolveInputStorage(
+  owner: EmissionOwner,
+  name: string,
+  instance: FieldInstance,
+  context: EmissionContext,
+): { registered: EmittableFieldType } & Pick<ResolvedFieldStorage, 'hint' | 'kind' | 'options'> {
+  const registered = context.types.get(instance.type);
+  if (isUndefined(registered)) {
+    throw ohneError({
+      title: `Unknown field type \`${instance.type}\``,
+      body: [
+        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
+      ],
+      path: owner.file,
+    });
+  }
+  const { hint, kind, options } = resolveFieldStorage(name, instance, registered.fieldType);
+  return { registered, hint, kind, options };
+}
+
+/**
+ * The input value type of one column or `record` field, `| null` folded in when the field is nullable.
+ * Shared by the create and update shapes, which differ only in optionality and item identity.
+ */
+function inputScalarType(
+  name: string,
+  instance: FieldInstance,
+  context: EmissionContext,
+  resolved: ReturnType<typeof resolveInputStorage>,
+): { type: string; nullable: boolean } {
+  const { registered, kind, options } = resolved;
+  if (kind === 'foreignKey') {
+    const nullable = options.nullable === true;
+    return { type: nullable ? 'string | null' : 'string', nullable };
+  }
+  const { base, nullable } = fieldBaseType({
+    fieldType: registered.fieldType,
+    name,
+    options: { ...instance.options },
+    fieldDir: registered.dir,
+    imports: context.imports,
+  });
+  return { type: nullable ? `${base} | null` : base, nullable };
+}
+
+/**
  * Emits one field's create-input type and whether it is optional.
  *
  * A column or `record` takes its value type, optional when nullable or defaulted.
@@ -670,17 +756,8 @@ function insertFieldType(
   instance: FieldInstance,
   context: EmissionContext,
 ): { type: string; optional: boolean } | null {
-  const registered = context.types.get(instance.type);
-  if (isUndefined(registered)) {
-    throw ohneError({
-      title: `Unknown field type \`${instance.type}\``,
-      body: [
-        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
-      ],
-      path: owner.file,
-    });
-  }
-  const { hint, kind, options } = resolveFieldStorage(name, instance, registered.fieldType);
+  const resolved = resolveInputStorage(owner, name, instance, context);
+  const { hint, kind, options } = resolved;
   if (kind === 'blocks') return null;
   if (kind === 'junction') return { type: 'string[]', optional: true };
   if (kind === 'childOne') {
@@ -693,20 +770,10 @@ function insertFieldType(
     return { type: `${insertObjectType(owner, hint as ChildHint, context)}[]`, optional: true };
   }
 
-  const defaulted = hasKey(options, 'default') || !isUndefined(registered.fieldType.defaultValue);
-  if (kind === 'foreignKey') {
-    const nullable = options.nullable === true;
-    return { type: nullable ? 'string | null' : 'string', optional: nullable || defaulted };
-  }
-
-  const { base, nullable } = fieldBaseType({
-    fieldType: registered.fieldType,
-    name,
-    options: { ...instance.options },
-    fieldDir: registered.dir,
-    imports: context.imports,
-  });
-  return { type: nullable ? `${base} | null` : base, optional: nullable || defaulted };
+  const defaulted =
+    hasKey(options, 'default') || !isUndefined(resolved.registered.fieldType.defaultValue);
+  const { type, nullable } = inputScalarType(name, instance, context, resolved);
+  return { type, optional: nullable || defaulted };
 }
 
 /**
@@ -717,6 +784,76 @@ function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: Emissi
   const body = shapes
     .map((field) => `${propertyKey(field.name)}${field.optional ? '?' : ''}: ${field.type}`)
     .join('; ');
+  return `{ ${body} }`;
+}
+
+/**
+ * Resolves one field map into named update-input shapes, skipping system fields and blocks.
+ */
+function updateShapesOf(
+  owner: EmissionOwner,
+  fields: Record<string, FieldInstance>,
+  context: EmissionContext,
+): { name: string; type: string; optional: boolean }[] {
+  const entries: { name: string; type: string; optional: boolean }[] = [];
+  for (const [name, instance] of Object.entries(fields)) {
+    const shape = updateFieldType(owner, name, instance, context);
+    if (!isNull(shape)) entries.push({ name, ...shape });
+  }
+  return entries;
+}
+
+/**
+ * Emits one field's update-input type and whether it is optional within a composite item.
+ *
+ * The value type matches the create shape, `| null` folded when nullable.
+ * A provided composite item is a full item, so a subfield is optional exactly when create makes it so.
+ * The top level relaxes every field to optional separately, for a partial update.
+ * A repeater item carries an optional `UUID`, so a matched item keeps its identity.
+ * A blocks field returns `null`, so it is skipped, exactly as the read shape skips it.
+ */
+function updateFieldType(
+  owner: EmissionOwner,
+  name: string,
+  instance: FieldInstance,
+  context: EmissionContext,
+): { type: string; optional: boolean } | null {
+  const resolved = resolveInputStorage(owner, name, instance, context);
+  const { hint, kind, options } = resolved;
+  if (kind === 'blocks') return null;
+  if (kind === 'junction') return { type: 'string[]', optional: true };
+  if (kind === 'childOne') {
+    return {
+      type: `${updateObjectType(owner, hint as ChildHint, context, false)} | null`,
+      optional: true,
+    };
+  }
+  if (kind === 'childMany') {
+    return {
+      type: `${updateObjectType(owner, hint as ChildHint, context, true)}[]`,
+      optional: true,
+    };
+  }
+  const defaulted =
+    hasKey(options, 'default') || !isUndefined(resolved.registered.fieldType.defaultValue);
+  const { type, nullable } = inputScalarType(name, instance, context, resolved);
+  return { type, optional: nullable || defaulted };
+}
+
+/**
+ * Emits a composite item's update-input object type, each subfield at its create-time optionality.
+ * A repeater item carries `UUID?: string`, so a matched item keeps its identity across the update.
+ */
+function updateObjectType(
+  owner: EmissionOwner,
+  hint: ChildHint,
+  context: EmissionContext,
+  identified: boolean,
+): string {
+  const fields = updateShapesOf(owner, hint.subfields, context).map(
+    (field) => `${propertyKey(field.name)}${field.optional ? '?' : ''}: ${field.type}`,
+  );
+  const body = (identified ? [`${propertyKey('UUID')}?: string`, ...fields] : fields).join('; ');
   return `{ ${body} }`;
 }
 

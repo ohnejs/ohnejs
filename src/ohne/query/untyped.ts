@@ -4,6 +4,8 @@ import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
 import type { QueryLimits } from './wire/limits.ts';
 import type { CreateOutcome } from './write/create.ts';
+import type { DeleteOutcome } from './write/delete.ts';
+import type { UpdateOutcome } from './write/update.ts';
 
 /**
  * The condition object form a `where` accepts: field keys, comparisons, and logical groups.
@@ -137,6 +139,23 @@ export interface UntypedQueryBuilder {
    * Creates one record and returns it, throwing a `validationError` carrying the failures instead.
    */
   createOrThrow(input: Record<string, unknown>): Promise<QueryRecord>;
+
+  /**
+   * Updates every matching record, returning them re-read on success or the field failures on error.
+   * The whole write runs in one transaction; nothing persists when it returns a failure.
+   */
+  update(input: Record<string, unknown>): Promise<UpdateOutcome>;
+
+  /**
+   * Updates every matching record and returns them re-read, throwing a `validationError` on failure instead.
+   */
+  updateOrThrow(input: Record<string, unknown>): Promise<QueryRecord[]>;
+
+  /**
+   * Deletes every matching record and reports how many were removed.
+   * A `restrict` reference still pointing at a matched row throws a `referenceViolation`.
+   */
+  delete(): Promise<DeleteOutcome>;
 
   /**
    * Joins an open transaction, so a write terminal runs inside it rather than opening its own.

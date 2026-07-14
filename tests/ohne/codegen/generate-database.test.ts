@@ -518,6 +518,11 @@ describe('generateDatabase', () => {
     ok(shared.includes('tags?: string[];'));
     ok(shared.includes('items?: { label: string }[];'));
     ok(node.includes('interface KnownInserts extends GeneratedInserts {}'));
+
+    ok(shared.includes('export interface GeneratedUpdates {'));
+    ok(shared.includes('title?: string;'));
+    ok(shared.includes('items?: { UUID?: string; label: string }[];'));
+    ok(node.includes('interface KnownUpdates extends GeneratedUpdates {}'));
   });
 
   it('narrows relation options in a consumer app, rejecting the illegal shapes', async () => {

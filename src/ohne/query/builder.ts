@@ -4,6 +4,7 @@ import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
 import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
+import type { UpdateInputOf } from './known-updates.ts';
 import type { UntypedQueryBuilder } from './untyped.ts';
 import type { QueryLimits } from './wire/limits.ts';
 import type { FieldErrors } from './write/errors.ts';
@@ -663,6 +664,11 @@ interface Limitable<Self> {
 export type CreateResult<T> = { ok: true; record: T } | { ok: false; errors: FieldErrors };
 
 /**
+ * An update's result: the matched records re-read in their final state, or the field failures by dot-path.
+ */
+export type UpdateResult<T> = { ok: true; records: T } | { ok: false; errors: FieldErrors };
+
+/**
  * The `use` join, present on every state and returning that same state.
  */
 interface Joinable<Self> {
@@ -705,6 +711,43 @@ interface WriteEntry<C extends CollectionName, S, P> {
 }
 
 /**
+ * The update and delete terminals, available once a filter has narrowed the query to a set of rows.
+ */
+interface WriteMutations<C extends CollectionName, S, P> {
+  /**
+   * Updates every matching record, returning them re-read on success or the field failures on error.
+   * Only provided fields change; the whole write runs in one transaction and persists nothing on failure.
+   *
+   * @example
+   * ```ts
+   * const result = await query('Posts').where('status', 'draft').update({ status: 'published' })
+   * if (result.ok) result.records // every updated post
+   * ```
+   */
+  update(input: UpdateInputOf<C>): Promise<UpdateResult<QueryRow<C, S, P>[]>>;
+
+  /**
+   * Updates every matching record and returns them re-read, throwing a `validationError` on failure instead.
+   *
+   * @example
+   * ```ts
+   * const posts = await query('Posts').where('status', 'draft').updateOrThrow({ status: 'published' })
+   * ```
+   */
+  updateOrThrow(input: UpdateInputOf<C>): Promise<QueryRow<C, S, P>[]>;
+
+  /**
+   * Deletes every matching record and reports how many were removed.
+   *
+   * @example
+   * ```ts
+   * const { deleted } = await query('Posts').where('status', 'spam').delete()
+   * ```
+   */
+  delete(): Promise<{ deleted: number }>;
+}
+
+/**
  * A query before any filter: reads, refinements, `create`, and the filters that move it to `ReadyQuery`.
  */
 export interface PendingQuery<C extends CollectionName, S = never, P = never>
@@ -717,13 +760,14 @@ export interface PendingQuery<C extends CollectionName, S = never, P = never>
     Joinable<PendingQuery<C, S, P>> {}
 
 /**
- * A query with a filter in place: reads, refinements, and further filters that keep it here.
+ * A query with a filter in place: reads, refinements, `update`/`delete`, and further filters that keep it here.
  */
 export interface ReadyQuery<C extends CollectionName, S = never, P = never>
   extends
     WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P>>,
     Refinements<C, S, P>,
     Terminals<C, S, P>,
+    WriteMutations<C, S, P>,
     Limitable<ReadyQuery<C, S, P>>,
     Joinable<ReadyQuery<C, S, P>> {}
 

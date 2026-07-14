@@ -1,7 +1,12 @@
 import { deepStrictEqual, match, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { isValidationError, validationError } from '../../../../src/ohne/query/write/errors.ts';
+import {
+  isReferenceViolation,
+  isValidationError,
+  referenceViolation,
+  validationError,
+} from '../../../../src/ohne/query/write/errors.ts';
 
 describe('validationError', () => {
   it('carries the field-error map verbatim', () => {
@@ -17,5 +22,18 @@ describe('validationError', () => {
     strictEqual(isValidationError(validationError({ a: 'b' })), true);
     strictEqual(isValidationError(new Error('nope')), false);
     strictEqual(isValidationError('nope'), false);
+  });
+});
+
+describe('referenceViolation', () => {
+  it('carries the driver failure as its cause', () => {
+    const cause = new Error('FOREIGN KEY constraint failed');
+    strictEqual(referenceViolation(cause).cause, cause);
+  });
+
+  it('is recognized by its guard, and neither a plain nor a validation error is', () => {
+    strictEqual(isReferenceViolation(referenceViolation()), true);
+    strictEqual(isReferenceViolation(validationError({ a: 'b' })), false);
+    strictEqual(isReferenceViolation(new Error('nope')), false);
   });
 });

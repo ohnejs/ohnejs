@@ -115,7 +115,12 @@ export interface ProcessedChild {
   meta: FieldQueryMeta;
 
   /**
-   * The processed items, in order; an `object` holds at most one.
+   * The field's dot-path from the record root, so an update keys a bad item at its exact location.
+   */
+  path: string;
+
+  /**
+   * The processed items, in order; an `object` holds at most one, and a cleared `object` holds none.
    */
   items: ProcessedScope[];
 }
@@ -124,6 +129,12 @@ export interface ProcessedChild {
  * One validated, serialized scope ready to write: its columns, relations, children, and references.
  */
 export interface ProcessedScope {
+  /**
+   * A composite item's input `UUID`, correlating it to an existing child row on update; absent otherwise.
+   * Present only for a repeater item under an update, where it names the row to keep.
+   */
+  itemUUID?: string;
+
   /**
    * The column values by column name, each field-serialized; the dialect codec applies at bind time.
    */

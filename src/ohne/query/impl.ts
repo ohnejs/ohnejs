@@ -14,7 +14,7 @@ import type {
 import type { QueryLimits } from './wire/limits.ts';
 import type { CreateOutcome } from './write/create.ts';
 
-import { isString, isUndefined, parseCondition } from '../../utils/index.ts';
+import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { freezeIR, type QueryIR } from './ir.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
@@ -24,7 +24,9 @@ import { pluck as pluckRows } from './read/pluck.ts';
 import { unknownFieldError, validateCondition } from './validate-condition.ts';
 import { lowerField } from './where-field.ts';
 import { runCreate } from './write/create.ts';
+import { runDelete, type DeleteOutcome } from './write/delete.ts';
 import { validationError } from './write/errors.ts';
+import { runUpdate, type UpdateOutcome } from './write/update.ts';
 
 /**
  * The one runtime query builder every typed state and the wire path drive.
@@ -148,9 +150,46 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return outcome.record;
   }
 
+  update(input: Record<string, unknown>): Promise<UpdateOutcome> {
+    return runUpdate(this.meta.collection, input, this.requireCondition('update'), this.joinedTx);
+  }
+
+  async updateOrThrow(input: Record<string, unknown>): Promise<QueryRecord[]> {
+    const outcome = await runUpdate(
+      this.meta.collection,
+      input,
+      this.requireCondition('update'),
+      this.joinedTx,
+    );
+    if (!outcome.ok) throw validationError(outcome.errors);
+    return outcome.records;
+  }
+
+  delete(): Promise<DeleteOutcome> {
+    return runDelete(this.meta.collection, this.requireCondition('delete'), this.joinedTx);
+  }
+
   use(tx: Transaction): this {
     this.joinedTx = tx;
     return this;
+  }
+
+  /**
+   * Folds the accumulated conditions into one node, refusing a write that would touch every record.
+   * The typed `ReadyQuery` state already gates this, so the throw catches only an untyped caller.
+   */
+  private requireCondition(operation: 'update' | 'delete'): ConditionNode {
+    const condition = this.freeze().condition;
+    if (isNull(condition)) {
+      throw ohneError({
+        title: `Cannot \`${operation}\` without a filter`,
+        body: [
+          `A \`${operation}\` on \`${this.meta.collection}\` must be narrowed by \`where\` or \`whereAny\` first.`,
+          'An unfiltered write would touch every record, so the builder requires a condition.',
+        ],
+      });
+    }
+    return condition;
   }
 
   /**

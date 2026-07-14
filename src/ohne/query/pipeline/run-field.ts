@@ -87,7 +87,8 @@ export async function defaultPath(
 /**
  * Phase A for a column or `record` field: the default path, the null gate, and the soft coerce.
  *
- * An absent field on create takes its default; on update it is skipped.
+ * An absent field takes its default, except at the top level of an update, where it is skipped.
+ * A composite item is always a full item, so its absent subfields default even under an update.
  * A `null` on a non-nullable field is rejected; a nullable `null` carries through, skipping the coerce.
  */
 export async function prepareScalar(
@@ -97,7 +98,7 @@ export async function prepareScalar(
   ctx: ScopeContext,
 ): Promise<Prepared> {
   if (!hasKey(input, name)) {
-    if (ctx.operation === 'update') return { skip: true };
+    if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }
   const value = input[name];

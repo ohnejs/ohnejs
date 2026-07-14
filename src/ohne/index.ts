@@ -123,6 +123,7 @@ export * from './project/resolve-layer-stack.ts';
 export * from './project/resolve-ohne-layers.ts';
 export * from './query/builder.ts';
 export * from './query/known-inserts.ts';
+export * from './query/known-updates.ts';
 export * from './query/known-query-fields.ts';
 export * from './query/query.ts';
 export * from './query/untyped.ts';

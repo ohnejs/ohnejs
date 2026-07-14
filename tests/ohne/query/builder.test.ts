@@ -242,6 +242,32 @@ export async function reads(): Promise<void> {
   await query('Posts').paginate(1, 20);
 }
 
+export async function writes(): Promise<void> {
+  const created = await query('Posts').create({ title: 'x', views: 1, featured: true });
+  if (created.ok) {
+    const ct: string = created.record.title;
+    void ct;
+  }
+
+  const updated = await query('Posts').where('title', 'x').update({ views: 5 });
+  if (updated.ok) {
+    const uv: number = updated.records[0]!.views;
+    void uv;
+  }
+
+  const rows = await query('Posts').where('title', 'x').updateOrThrow({ summary: null });
+  const rt: string = rows[0]!.title;
+  void rt;
+
+  await query('Posts')
+    .where('title', 'x')
+    .update({ tags: ['a'], meta: null, sections: [{ UUID: 's1', heading: 'h' }, { heading: 'new' }] });
+
+  const { deleted } = await query('Posts').where('views', (c) => c.atLeast(1)).delete();
+  const d: number = deleted;
+  void d;
+}
+
 // @ts-expect-error title is text, not a number
 query('Posts').where('title', 123);
 // @ts-expect-error null is never a value; use isNull
@@ -268,4 +294,20 @@ query('Posts').orderBy('tags');
 query('Posts').populate('title');
 // @ts-expect-error unknown collection
 query('Nope');
+// @ts-expect-error update is not available before a filter narrows the query
+query('Posts').update({ views: 1 });
+// @ts-expect-error delete is not available before a filter narrows the query
+query('Posts').delete();
+// @ts-expect-error create is not available once a filter is in place
+query('Posts').where('title', 'x').create({ title: 'y', views: 1, featured: true });
+// @ts-expect-error create is not available after a refinement strips the write terminals
+query('Posts').select('title').create({ title: 'y', views: 1, featured: true });
+// @ts-expect-error a refinement strips the write terminals for the rest of the chain
+query('Posts').where('title', 'x').select('title').update({ views: 1 });
+// @ts-expect-error views is an integer, not a string
+query('Posts').where('title', 'x').update({ views: 'lots' });
+// @ts-expect-error a create item carries no UUID
+query('Posts').create({ title: 'y', views: 1, featured: true, sections: [{ UUID: 's', heading: 'h' }] });
+// @ts-expect-error a provided repeater item still requires its non-optional subfields
+query('Posts').where('title', 'x').update({ sections: [{ UUID: 's' }] });
 `;

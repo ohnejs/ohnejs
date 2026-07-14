@@ -83,6 +83,19 @@ export function notFound(message = translate('api.http.notFound'), data?: unknow
 }
 
 /**
+ * Builds a `409 Conflict` error.
+ * The status when a write conflicts with a record's current state, such as a blocked delete.
+ *
+ * @example
+ * ```ts
+ * throw conflict()
+ * ```
+ */
+export function conflict(message = translate('api.http.conflict'), data?: unknown): HTTPError {
+  return new HTTPError(409, message, data);
+}
+
+/**
  * Builds a `413 Content Too Large` error.
  * The status the server returns when a request body exceeds `server.maxBodySize`.
  *

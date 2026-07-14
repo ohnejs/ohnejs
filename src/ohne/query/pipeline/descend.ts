@@ -18,6 +18,7 @@ import {
   isNullish,
   isObject,
   isString,
+  isUndefined,
   uniqueArray,
 } from '../../../utils/index.ts';
 import { prefixErrors, prefixPath } from './prefix-errors.ts';
@@ -33,7 +34,8 @@ function fieldPath(name: string, ctx: ScopeContext): string {
 /**
  * Phase A for a `records`, `object`, or `repeater` field: the default path, the null gate, the shape check.
  *
- * An absent field on create takes its empty default; on update it is skipped.
+ * An absent field takes its empty default, except at the top level of an update, where it is skipped.
+ * A nested composite item is always full, so its absent list or object subfield defaults even under an update.
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
  */
 export async function prepareComposite(
@@ -43,7 +45,7 @@ export async function prepareComposite(
   ctx: ScopeContext,
 ): Promise<Prepared> {
   if (!hasKey(input, name)) {
-    if (ctx.operation === 'update') return { skip: true };
+    if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }
   const value = input[name];
@@ -63,6 +65,8 @@ export async function prepareComposite(
  * A `records` list yields one relation write plus a reference per linked `UUID`.
  * A repeated `UUID` is rejected as `notUnique`: the junction's link is unique, so one create links once.
  * A composite recurses through `processScope` per item, its errors and refs re-pathed under the field.
+ * On update a repeater item's `UUID` is lifted off, so the write step can correlate it to an existing row.
+ * A `null` object on update clears the existing child row instead of descending into it.
  */
 export async function finishComposite(
   name: string,
@@ -87,14 +91,15 @@ export async function finishComposite(
 
   const subfields = meta.subfields as Record<string, FieldQueryMeta>;
   if (meta.kind === 'childOne') {
-    if (isNull(value)) return {};
+    if (isNull(value))
+      return ctx.operation === 'update' ? { child: { meta, path, items: [] } } : {};
     const result = await processScope(subfields, value as Record<string, unknown>, {
       ...ctx,
       path,
     });
     if (!result.ok) return { errors: prefixErrors(name, result.errors) };
     return {
-      child: { meta, items: [result.scope] },
+      child: { meta, path, items: [result.scope] },
       refs: result.scope.refs,
       uniqueProbes: [
         ...tableWideProbes(meta, [result.scope], () => path),
@@ -104,26 +109,51 @@ export async function finishComposite(
   }
 
   const items = value as Record<string, unknown>[];
-  const errors = {};
-  const scopes = [];
+  const errors: FieldErrors = {};
+  const scopes: ProcessedScope[] = [];
   for (let index = 0; index < items.length; index++) {
-    const result = await processScope(subfields, items[index], {
+    const correlated = liftItemUUID(items[index], ctx.operation);
+    if ('error' in correlated) {
+      errors[`${path}[${index}].UUID`] = correlated.error;
+      continue;
+    }
+    const result = await processScope(subfields, correlated.input, {
       ...ctx,
       path: `${path}[${index}]`,
     });
-    if (result.ok) scopes.push(result.scope);
-    else Object.assign(errors, prefixErrors(name, prefixErrors(`[${index}]`, result.errors)));
+    if (!result.ok) {
+      Object.assign(errors, prefixErrors(name, prefixErrors(`[${index}]`, result.errors)));
+      continue;
+    }
+    if (!isUndefined(correlated.uuid)) result.scope.itemUUID = correlated.uuid;
+    scopes.push(result.scope);
   }
   if (isEmpty(errors)) Object.assign(errors, duplicateSubfieldErrors(name, subfields, scopes));
   if (!isEmpty(errors)) return { errors };
   return {
-    child: { meta, items: scopes },
+    child: { meta, path, items: scopes },
     refs: scopes.flatMap((scope) => scope.refs),
     uniqueProbes: [
       ...tableWideProbes(meta, scopes, (index) => `${path}[${index}]`),
       ...scopes.flatMap((scope) => scope.uniqueProbes),
     ],
   };
+}
+
+/**
+ * Lifts a repeater item's `UUID` off for correlation on update, leaving the rest to process as a full item.
+ * On create the `UUID` stays in, so `processScope` rejects it as an unknown field - a create item carries none.
+ * A present-but-non-string `UUID` is an invalid value.
+ */
+function liftItemUUID(
+  item: Record<string, unknown>,
+  operation: ScopeContext['operation'],
+): { input: Record<string, unknown>; uuid?: string } | { error: 'validation.invalidValue' } {
+  if (operation !== 'update' || !hasKey(item, 'UUID')) return { input: item };
+  const uuid = item.UUID;
+  if (!isString(uuid)) return { error: 'validation.invalidValue' };
+  const { UUID: _lifted, ...input } = item;
+  return { input, uuid };
 }
 
 /**
