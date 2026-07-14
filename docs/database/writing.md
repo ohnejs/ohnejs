@@ -118,6 +118,89 @@ result.ok; // false
 result.errors.author; // the reference does not exist
 ```
 
+## Updating records
+
+`update` changes every record a filter matches. Narrow the query with `where` first, then pass the
+fields to change:
+
+```ts
+const result = await query('Posts').where('status', 'draft').update({ status: 'published' });
+```
+
+An update is partial. Only the fields you pass change; every other column is left exactly as it was.
+A field you omit is never defaulted or cleared.
+
+It runs the same pipeline `create` does - validation, sanitizers, uniqueness, references - once for
+the whole call. A field error fails the call before anything is written.
+
+`update` returns every matched record, re-read in its final state:
+
+```ts
+const result = await query('Posts').where('status', 'draft').update({ status: 'published' });
+
+if (result.ok) {
+  result.records; // every matched post, in its new state
+} else {
+  result.errors; // { [field: string]: string }
+}
+```
+
+`updateOrThrow` returns the array directly and throws a `validationError` on failure, exactly as
+`createOrThrow` does.
+
+A `where` is required. `update` and `delete` are offered only once a filter narrows the query, so an
+unfiltered write that would touch every record can never happen by accident.
+
+## Lists on update
+
+An update replaces a list field with the value you pass, but by the shortest path, not by tearing
+the list down and rebuilding it.
+
+A `records` relation takes the new list of `UUID`s. Links you drop are removed, links you add are
+appended, and the order follows your list. A link that stays keeps its place on the other side of
+the relation, so reordering one side never disturbs the other.
+
+```ts
+await query('Posts').where('UUID', id).update({ tags: ['t3', 't1'] });
+```
+
+A `repeater` takes the new list of items, each a complete item just as `create` expects. Give an
+item its `UUID` to keep it: that row survives with its identity, rewritten to the item you pass.
+Omit the `UUID` to insert a fresh item. An item you leave out is deleted, and the positions renumber
+to your order.
+
+```ts
+await query('Posts').where('UUID', id).update({
+  sections: [
+    { UUID: 'sec-1', heading: 'Kept, and edited' }, // survives, rewritten
+    { heading: 'A brand new section' }, // inserted fresh
+  ],
+}); // any section you did not list is deleted
+```
+
+A `UUID` that names no item on that record is an error, never a silent adoption from another record.
+
+An `object` upserts its single child: pass a value to set it, or `null` to clear it.
+
+```ts
+await query('Posts').where('UUID', id).update({ meta: null }); // clears the object
+```
+
+## Deleting records
+
+`delete` removes every record a filter matches and reports the count:
+
+```ts
+const { deleted } = await query('Posts').where('status', 'spam').delete();
+```
+
+A delete cascades: a record's child rows and its relation links go with it. A `record` reference
+from elsewhere follows its own `onDelete` rule - `cascade` deletes the referencing row, `setNull`
+clears the link. A `restrict` reference still pointing at the record blocks the delete, and inside
+an HTTP handler becomes a `409`.
+
+Like `update`, `delete` requires a `where`.
+
 ## Transactions
 
 Pass an open transaction with `use` to run the write inside it, rather than opening its own:
