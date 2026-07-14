@@ -1,3 +1,4 @@
+import type { ColumnValue, FieldDefault, FieldSanitizer, FieldValidator } from './context.ts';
 import type { FieldType } from './define-field.ts';
 import type { KnownFieldOptions } from './known-field-options.ts';
 import type { FieldTypeName, KnownFields } from './known-fields.ts';
@@ -70,11 +71,65 @@ export interface FieldOptions {
 }
 
 /**
+ * The value-behaviour options every field instance accepts, whatever its storage kind.
+ * They sit outside the column gate, so a column-less relation or composite carries them too.
+ * `TOptions` is the field type's own declared options, so an instance callback's `ctx.options` carries them.
+ * `TValue` is the field's storage primitive, the type its `default` value must satisfy.
+ */
+export interface ValueOptions<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+  TValue = unknown,
+> {
+  /**
+   * A value to store when this field is left out of a create.
+   * Pass the value, or a function to compute it - the function can read the record's other input.
+   * A relation or composite (`records`/`object`/`repeater`) default must be a function, never a literal.
+   *
+   * @example
+   * ```ts
+   * field('text', { default: 'draft' })
+   * field('integer', { default: () => Date.now() })
+   * ```
+   */
+  default?: FieldDefault<TValue, TOptions>;
+
+  /**
+   * Functions that clean this field's value before it is stored, run in order.
+   * Each takes the value and returns a cleaned one; use them to normalise, not to reject.
+   *
+   * @example
+   * ```ts
+   * field('text', { sanitizers: [(value) => value.trim().toLowerCase()] })
+   * ```
+   */
+  sanitizers?: readonly FieldSanitizer<TOptions, TValue>[];
+
+  /**
+   * Functions that reject this field's value, run in order.
+   * Return a message to reject, or nothing to accept; the first message wins.
+   * A message is a plain string, a message key, or a `[key, params]` tuple for a parameterized message.
+   *
+   * @example
+   * ```ts
+   * field('text', {
+   *   validators: [
+   *     (value) => (value === '' ? 'This field is required' : undefined),
+   *     (value) => (value.length > 10 ? ['field.max', { max: 10 }] : undefined),
+   *   ],
+   * })
+   * ```
+   */
+  validators?: readonly FieldValidator<TOptions, TValue>[];
+}
+
+/**
  * The common options after resolution: keys in `FIELD_OPTION_DEFAULTS` are required, the rest stay `?:`.
  * The framework fills those defaults, so a resolved field reads them directly, without a fallback.
+ * The value options join here so a resolved field carries its `default`, `sanitizers`, and `validators`.
  */
 export type ResolvedFieldOptions = Omit<FieldOptions, keyof typeof FIELD_OPTION_DEFAULTS> &
-  Required<Pick<FieldOptions, keyof typeof FIELD_OPTION_DEFAULTS>>;
+  Required<Pick<FieldOptions, keyof typeof FIELD_OPTION_DEFAULTS>> &
+  ValueOptions;
 
 /**
  * The options field type `K` declares via `defineField({ options })`.
@@ -103,10 +158,15 @@ type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] exten
  * A `KnownFieldOptions` member is the complete shape.
  * Otherwise the type's declared options resolve homomorphically.
  * The common options then join per the column gate.
+ * The value options join outside that gate, so every kind - relations and composites included - carries them.
  */
-type InstanceOptions<K extends FieldTypeName> = K extends keyof KnownFieldOptions
-  ? KnownFieldOptions[K]
-  : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>;
+type InstanceOptions<K extends FieldTypeName> = ValueOptions<
+  DeclaredOptions<K>,
+  ColumnValue<KnownFields[K]['columnType']>
+> &
+  (K extends keyof KnownFieldOptions
+    ? KnownFieldOptions[K]
+    : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>);
 
 /**
  * One field instance: the field-type name and options from a `field(...)` call.

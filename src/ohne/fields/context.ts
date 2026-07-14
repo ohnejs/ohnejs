@@ -1,3 +1,7 @@
+import type { CollectionName } from '../collections/known-collections.ts';
+import type { Transaction } from '../database/adapter.ts';
+import type { LogicalType } from '../database/dialect.ts';
+import type { Message } from '../messages/known-messages.ts';
 import type { ResolvedFieldOptions } from './field.ts';
 import type { AnyOptionDef, ResolvedOptions } from './option.ts';
 
@@ -52,3 +56,115 @@ export interface EmitTypeContext<
    */
   importType(path: string, exportName: string): string;
 }
+
+/**
+ * Whether a write pipeline is creating a record or updating one.
+ */
+export type FieldOperation = 'create' | 'update';
+
+/**
+ * The context a field's write-time callbacks receive.
+ * `defaultValue` computes its value from it, and sanitizers clean against it.
+ * It carries no error channel, so a sanitizer is structurally unable to report a failure.
+ *
+ * `input` is the record's raw input, never another field's sanitized output.
+ * On update it is the partial input alone, never the stored row.
+ */
+export interface FieldWriteContext<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+> extends FieldContext<TOptions> {
+  /**
+   * The field's dot-path from the record root, composite prefixes included (`sections[2].title`).
+   * Equal to `name` for a top-level field.
+   */
+  path: string;
+
+  /**
+   * The name of the collection the record belongs to, narrowed to your schema's collections.
+   */
+  collection: CollectionName;
+
+  /**
+   * Whether the record is being created or updated.
+   */
+  operation: FieldOperation;
+
+  /**
+   * The record's raw input, frozen: sibling values as the caller passed them, never a sanitized read.
+   */
+  input: Readonly<Record<string, unknown>>;
+
+  /**
+   * The open write transaction, so a callback can read committed-in-transaction state.
+   */
+  tx: Transaction;
+}
+
+/**
+ * The context a field's validators receive: the write context plus a channel to report sub-path errors.
+ * A validator returns a message for its own field; a composite validator instead writes nested paths here.
+ */
+export interface FieldValidateContext<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+> extends FieldWriteContext<TOptions> {
+  /**
+   * The field's error slice, keyed by dot-path, for a composite validator to record a subfield failure.
+   * Each value is a message: a key, a `[key, params]` tuple, or a plain string, resolved at the boundary.
+   */
+  errors: Record<string, Message>;
+}
+
+/**
+ * A field sanitizer: cleans a value of `TValue` and returns one, never reporting.
+ * Runs in order within its tier - the type's sanitizers first, then the instance's.
+ * It is type-preserving: the base-type gate runs first, so a sanitizer only ever cleans the primitive.
+ *
+ * A bivariant method call keeps a concrete field type assignable to the registry's wide `FieldType`.
+ * This mirrors `schema` and `emitType`, which are declared as methods for the same reason.
+ */
+export type FieldSanitizer<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+  TValue = unknown,
+> = {
+  clean(value: TValue, ctx: FieldWriteContext<TOptions>): TValue | Promise<TValue>;
+}['clean'];
+
+/**
+ * A field validator: returns a message to reject its value, or `undefined` to accept it.
+ * A message is a param-free key, a `[key, params]` tuple, or a plain string (`Message`).
+ * The first own-message stops its tier.
+ * A composite validator may instead write sub-path errors into `ctx.errors`.
+ *
+ * The call is a bivariant method, for the same assignability reason as `FieldSanitizer`.
+ */
+export type FieldValidator<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+  TValue = unknown,
+> = {
+  check(
+    value: TValue,
+    ctx: FieldValidateContext<TOptions>,
+  ): Message | undefined | Promise<Message | undefined>;
+}['check'];
+
+/**
+ * The storage primitive a column of `TColumn` holds: the type a default value must satisfy.
+ * A default enters the pipeline at the base-type gate, before the sanitizer bridge, so it is the primitive.
+ * A `json` or column-less type has no single primitive, so its default value stays `unknown`.
+ */
+export type ColumnValue<TColumn extends LogicalType | false> = TColumn extends 'text'
+  ? string
+  : TColumn extends 'integer'
+    ? number
+    : TColumn extends 'boolean'
+      ? boolean
+      : unknown;
+
+/**
+ * A field's default: a value of `TValue`, `null` for a nullable field, or a callback computing one.
+ * The callback receives the write context, so a default may read sibling input or the operation.
+ */
+export type FieldDefault<TValue, TOptions extends Record<string, AnyOptionDef>> =
+  | TValue
+  | null
+  | ((ctx: FieldWriteContext<TOptions>) => TValue | null | Promise<TValue | null>);

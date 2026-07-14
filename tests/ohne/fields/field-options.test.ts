@@ -52,6 +52,41 @@ describe('field over a field type with declared options', () => {
     field('fixtureField', { to: 'Users', nope: 1 });
   });
 
+  it('types the instance default as the field type storage primitive, callback ctx included', () => {
+    field('text', { default: 'draft' });
+    field('text', { default: null });
+    field('integer', { default: 0 });
+    field('fixtureField', {
+      to: 'Users',
+      default: (ctx) => {
+        const limit: number = ctx.options.limit;
+        const operation: 'create' | 'update' = ctx.operation;
+        return `${limit}${operation}`;
+      },
+    });
+
+    // @ts-expect-error a number is not a text default
+    field('text', { default: 5 });
+  });
+
+  it('types an instance validator/sanitizer value and ctx.options', () => {
+    field('fixtureField', {
+      to: 'Users',
+      sanitizers: [(value, ctx) => (ctx.options.limit > 0 ? value.trim() : value)],
+      validators: [
+        (value, ctx) => {
+          const length: number = value.length; // value is `string`, the text primitive
+          const to: string = ctx.options.to;
+          const limit: number = ctx.options.limit;
+          const nullable: boolean = ctx.options.nullable;
+          // @ts-expect-error `nope` is neither a declared nor a common option
+          const nope: unknown = ctx.options.nope;
+          return `${length}${to}${limit}${nullable}${nope}`.length === 0 ? 'x' : undefined;
+        },
+      ],
+    });
+  });
+
   it('stores the type name and options at runtime', () => {
     deepStrictEqual(field('fixtureField', { to: 'Users' }), {
       type: 'fixtureField',

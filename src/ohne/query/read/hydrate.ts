@@ -46,11 +46,27 @@ export async function hydrateScope(
       if (!isSelected(name)) continue;
       const resolve = resolvers.get(name);
       record[name] = isUndefined(resolve)
-        ? dialect.deserialize(field.logicalType as LogicalType, row[field.column as string])
+        ? deserializeColumn(name, field, dialect, row[field.column as string])
         : resolve(parents[index] as string);
     }
     return record;
   });
+}
+
+/**
+ * Reads one column back to its domain value: the dialect codec, then the field type's `deserialize` hook.
+ * The hook is optional and null-bypassed, so a `null` column never reaches it.
+ */
+function deserializeColumn(
+  name: string,
+  field: FieldQueryMeta,
+  dialect: Dialect,
+  stored: SQLValue,
+): unknown {
+  const value = dialect.deserialize(field.logicalType as LogicalType, stored);
+  const hook = field.fieldType?.deserialize;
+  if (isUndefined(hook) || isNull(value)) return value;
+  return hook(value, { name, options: (field.options ?? {}) as never });
 }
 
 /**

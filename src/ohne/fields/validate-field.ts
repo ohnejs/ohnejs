@@ -3,7 +3,15 @@ import type { FieldInstance } from './field.ts';
 import type { AnyOptionDef } from './option.ts';
 import type { StorageHint } from './storage-hint.ts';
 
-import { isCamelCase, isEmpty, isUndefined } from '../../utils/index.ts';
+import {
+  hasKey,
+  isArray,
+  isCamelCase,
+  isEmpty,
+  isFunction,
+  isNull,
+  isUndefined,
+} from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
 const RESERVED_OPTIONS = new Set([
@@ -13,6 +21,9 @@ const RESERVED_OPTIONS = new Set([
   'translatable',
   'uniquePerLocale',
   'uniquePerParent',
+  'default',
+  'sanitizers',
+  'validators',
 ]);
 
 /**
@@ -289,6 +300,37 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
+  if (hasKey(options, 'default') && !isUndefined(options.default)) {
+    const value = options.default;
+    const valueShapeNullable =
+      hint?.kind === 'child'
+        ? hint.cardinality === 'one'
+        : hint?.kind === 'junction' || hint?.kind === 'blocks'
+          ? false
+          : options.nullable === true || fieldType.forceNullable === true;
+    if (isNull(value) && !valueShapeNullable) {
+      throw ohneError({
+        title: `Field \`${name}\` cannot default to \`null\``,
+        body: [
+          `${where} has no nullable value shape, so \`null\` is not a value it can hold.`,
+          'Make the field nullable, or drop the `null` default.',
+        ],
+      });
+    }
+    if (
+      (hint?.kind === 'junction' || hint?.kind === 'child') &&
+      !isNull(value) &&
+      !isFunction(value)
+    ) {
+      throw ohneError({
+        title: `Field \`${name}\` needs a callback default`,
+        body: [
+          `${where} is a relation or composite; a shared literal default would be shared mutable state.`,
+          'Return it from a callback instead: `default: () => []`.',
+        ],
+      });
+    }
+  }
 }
 
 /**
@@ -321,6 +363,7 @@ export function validateFieldTypeName(name: string, path?: string): void {
  *
  * - A column-less type (`columnType: false`) owns no column, so it cannot force `nullable` or an index.
  * - `emitType` and `schema` are mutually exclusive: the framework derives value types from the hint.
+ * - `sanitizers` and `validators` are lists of functions, run in order by the write pipeline.
  * - Every declared option name must be camelCase and must not shadow a common option.
  */
 export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>(
@@ -334,6 +377,18 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
         'This type sets `columnType: false`, so drop them or give it a column type.',
       ],
     });
+  }
+  for (const member of ['sanitizers', 'validators'] as const) {
+    const value = type[member];
+    if (!isUndefined(value) && (!isArray(value) || !value.every(isFunction))) {
+      throw ohneError({
+        title: `A field type's \`${member}\` must be an array of functions`,
+        body: [
+          `\`${member}\` is a list of value functions the write pipeline runs in order.`,
+          `Set \`${member}\` to an array.`,
+        ],
+      });
+    }
   }
   if (!isUndefined(type.schema) && !isUndefined(type.emitType)) {
     throw ohneError({

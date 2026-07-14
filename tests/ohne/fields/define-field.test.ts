@@ -48,6 +48,63 @@ describe('defineField', () => {
     );
   });
 
+  it('rejects an option name that shadows a value option', () => {
+    for (const name of ['default', 'sanitizers', 'validators']) {
+      throws(
+        () => defineField({ columnType: 'text', options: { [name]: option() } }),
+        new RegExp(`\`${name}\` is reserved`),
+      );
+    }
+  });
+
+  it('rejects `sanitizers` or `validators` that are not arrays of functions', () => {
+    throws(
+      () => defineField({ columnType: 'text', sanitizers: 'nope' as never }),
+      /`sanitizers` must be an array of functions/,
+    );
+    throws(
+      () => defineField({ columnType: 'text', validators: [42 as never] }),
+      /`validators` must be an array of functions/,
+    );
+  });
+
+  it('types sanitizer and validator value as the column primitive', () => {
+    const def = defineField({
+      columnType: 'text',
+      sanitizers: [(value) => value.trim()],
+      validators: [(value) => (value.length > 280 ? 'too long' : undefined)],
+    });
+    strictEqual(typeof def.sanitizers?.[0], 'function');
+
+    defineField({
+      columnType: 'integer',
+      validators: [(value) => (value < 0 ? 'negative' : undefined)],
+    });
+
+    // @ts-expect-error a text sanitizer must return a string, not a number
+    defineField({ columnType: 'text', sanitizers: [(value) => Number(value)] });
+  });
+
+  it('types defaultValue as the column storage primitive, callback ctx included', () => {
+    defineField({ columnType: 'text', defaultValue: 'draft' });
+    defineField({ columnType: 'integer', defaultValue: 0 });
+    defineField({ columnType: 'boolean', defaultValue: false });
+    defineField({ columnType: 'text', defaultValue: null });
+    defineField({
+      columnType: 'text',
+      options: { max: option({ default: 10 }) },
+      defaultValue: (ctx) => {
+        const max: number = ctx.options.max;
+        const operation: 'create' | 'update' = ctx.operation;
+        const title: unknown = ctx.input.title;
+        return `${max}${operation}${String(title)}`;
+      },
+    });
+
+    // @ts-expect-error a number is not a text default
+    defineField({ columnType: 'text', defaultValue: 5 });
+  });
+
   it('keeps an emitType callback on the definition', () => {
     const emitType = () => 'string';
     strictEqual(defineField({ columnType: 'text', emitType }).emitType, emitType);

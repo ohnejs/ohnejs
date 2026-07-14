@@ -24,6 +24,8 @@ const COMMON = {
   uniquePerParent: false,
 };
 
+const TEXT = { ...COMMON, allowEmpty: false };
+
 const UUID_ENTRY = {
   kind: 'column',
   nullable: false,
@@ -85,7 +87,7 @@ describe('queryMetadata', () => {
         title: {
           kind: 'column',
           fieldType: text,
-          options: COMMON,
+          options: TEXT,
           nullable: false,
           logicalType: 'text',
           column: 'title',
@@ -93,7 +95,7 @@ describe('queryMetadata', () => {
         summary: {
           kind: 'column',
           fieldType: text,
-          options: { ...COMMON, nullable: true },
+          options: { ...TEXT, nullable: true },
           nullable: true,
           logicalType: 'text',
           column: 'summary',
@@ -142,7 +144,7 @@ describe('queryMetadata', () => {
             description: {
               kind: 'column',
               fieldType: text,
-              options: { ...COMMON, nullable: true },
+              options: { ...TEXT, nullable: true },
               nullable: true,
               logicalType: 'text',
               column: 'description',
@@ -158,7 +160,7 @@ describe('queryMetadata', () => {
                 url: {
                   kind: 'column',
                   fieldType: text,
-                  options: COMMON,
+                  options: TEXT,
                   nullable: false,
                   logicalType: 'text',
                   column: 'url',
@@ -178,7 +180,7 @@ describe('queryMetadata', () => {
             heading: {
               kind: 'column',
               fieldType: text,
-              options: COMMON,
+              options: TEXT,
               nullable: false,
               logicalType: 'text',
               column: 'heading',

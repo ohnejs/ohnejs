@@ -12,6 +12,16 @@ export type SQLValue = null | number | string;
 export type SQLParams = readonly SQLValue[];
 
 /**
+ * How a transaction takes its write lock.
+ *
+ * `deferred` acquires nothing at `BEGIN`, escalating to the write lock on the first write.
+ * `immediate` reserves the write lock at `BEGIN`, so cross-connection contention waits there.
+ * It waits under the busy timeout instead of failing mid-transaction with a busy-snapshot.
+ * Write terminals open `immediate`; reads and the default open `deferred`.
+ */
+export type TransactionMode = 'deferred' | 'immediate';
+
+/**
  * A live database connection ohne speaks to.
  *
  * Async even over a synchronous driver, so the driver stays swappable behind the same surface.
@@ -67,6 +77,8 @@ export interface DatabaseAdapter {
   /**
    * Runs `fn` inside a transaction, committing its result or rolling back on a throw.
    * The dialect owns `BEGIN`/`COMMIT`/`ROLLBACK`; `fn` sees a `Transaction`, which cannot nest another.
+   * Transactions on one connection serialize: a second call waits for the first to settle, never nesting.
+   * `mode` picks how the transaction takes its lock; a write pass opens `immediate` (below).
    *
    * @example
    * ```ts
@@ -76,7 +88,7 @@ export interface DatabaseAdapter {
    * })
    * ```
    */
-  transaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T>;
+  transaction<T>(fn: (tx: Transaction) => Promise<T>, mode?: TransactionMode): Promise<T>;
 
   /**
    * Closes the connection and releases its handle.

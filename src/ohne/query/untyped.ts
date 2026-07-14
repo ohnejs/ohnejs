@@ -1,7 +1,9 @@
+import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
 import type { QueryLimits } from './wire/limits.ts';
+import type { CreateOutcome } from './write/create.ts';
 
 /**
  * The condition object form a `where` accepts: field keys, comparisons, and logical groups.
@@ -124,4 +126,20 @@ export interface UntypedQueryBuilder {
    * Reads one field's value from every matching record, in the query's order.
    */
   pluck(field: string): Promise<unknown[]>;
+
+  /**
+   * Creates one record, returning it on success or the field failures on validation error.
+   * The whole write runs in one transaction; nothing persists when it returns a failure.
+   */
+  create(input: Record<string, unknown>): Promise<CreateOutcome>;
+
+  /**
+   * Creates one record and returns it, throwing a `validationError` carrying the failures instead.
+   */
+  createOrThrow(input: Record<string, unknown>): Promise<QueryRecord>;
+
+  /**
+   * Joins an open transaction, so a write terminal runs inside it rather than opening its own.
+   */
+  use(tx: Transaction): this;
 }

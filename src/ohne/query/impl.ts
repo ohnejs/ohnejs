@@ -1,4 +1,5 @@
 import type { ConditionNode } from '../../utils/index.ts';
+import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection, OrderEntry } from './ir.ts';
 import type { CollectionQueryMeta } from './metadata.ts';
 import type { QueryRecord } from './read/find.ts';
@@ -11,6 +12,7 @@ import type {
   WhereGroupBuild,
 } from './untyped.ts';
 import type { QueryLimits } from './wire/limits.ts';
+import type { CreateOutcome } from './write/create.ts';
 
 import { isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
@@ -21,6 +23,8 @@ import { paginate as readPage } from './read/paginate.ts';
 import { pluck as pluckRows } from './read/pluck.ts';
 import { unknownFieldError, validateCondition } from './validate-condition.ts';
 import { lowerField } from './where-field.ts';
+import { runCreate } from './write/create.ts';
+import { validationError } from './write/errors.ts';
 
 /**
  * The one runtime query builder every typed state and the wire path drive.
@@ -36,6 +40,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private selected: string[] | null = null;
   private limitValue: number | null = null;
   private offsetValue: number | null = null;
+  private joinedTx?: Transaction;
   readonly limitOverrides: Partial<QueryLimits> = {};
   private readonly meta: CollectionQueryMeta;
 
@@ -131,6 +136,21 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   pluck(field: string): Promise<unknown[]> {
     if (isUndefined(this.meta.fields[field])) throw unknownFieldError(field, this.meta);
     return pluckRows(this.freeze(), field);
+  }
+
+  create(input: Record<string, unknown>): Promise<CreateOutcome> {
+    return runCreate(this.meta.collection, input, this.joinedTx);
+  }
+
+  async createOrThrow(input: Record<string, unknown>): Promise<QueryRecord> {
+    const outcome = await runCreate(this.meta.collection, input, this.joinedTx);
+    if (!outcome.ok) throw validationError(outcome.errors);
+    return outcome.record;
+  }
+
+  use(tx: Transaction): this {
+    this.joinedTx = tx;
+    return this;
   }
 
   /**

@@ -61,6 +61,59 @@ describe('SQLiteDialect', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  describe('transaction', () => {
+    it('commits its writes and returns the result', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      const result = await db.transaction(async (tx) => {
+        await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+        return 'done';
+      });
+      strictEqual(result, 'done');
+      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+
+    it('rolls back every write on a throw and re-throws', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      await rejects(
+        db.transaction(async (tx) => {
+          await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+          throw new Error('boom');
+        }),
+        /boom/,
+      );
+      deepStrictEqual(await db.query('SELECT id FROM t'), []);
+      await db.close();
+    });
+
+    it('serializes overlapping transactions on one connection', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      const write = (a: string, b: string) =>
+        db.transaction(async (tx) => {
+          await tx.run('INSERT INTO t (id) VALUES (?)', [a]);
+          await Promise.resolve();
+          await tx.run('INSERT INTO t (id) VALUES (?)', [b]);
+        });
+      await Promise.all([write('a', 'b'), write('c', 'd')]);
+      const ids = (await db.query<{ id: string }>('SELECT id FROM t ORDER BY id')).map((r) => r.id);
+      deepStrictEqual(ids, ['a', 'b', 'c', 'd']);
+      await db.close();
+    });
+
+    it('opens `immediate` and commits', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
+      await db.transaction(async (tx) => {
+        await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
+      }, 'immediate');
+      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
+      await db.close();
+    });
+  });
+
   describe('quote', () => {
     it('wraps in double quotes', () => {
       strictEqual(dialect.quote('Posts'), '"Posts"');

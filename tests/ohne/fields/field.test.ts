@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
@@ -93,5 +93,24 @@ describe('resolveFieldOptions', () => {
       uniquePerLocale: false,
       uniquePerParent: false,
     });
+  });
+
+  it('carries the value options through, presence-tracked for `default`', () => {
+    const clean = (value: unknown) => value;
+    const resolved = resolveFieldOptions(defineField({ columnType: 'text' }), {
+      default: null,
+      sanitizers: [clean],
+    });
+    strictEqual('default' in resolved, true);
+    strictEqual(resolved.default, null);
+    deepStrictEqual(resolved.sanitizers, [clean]);
+    strictEqual('validators' in resolved, false);
+  });
+
+  it('treats an explicit undefined default as absent', () => {
+    const resolved = resolveFieldOptions(defineField({ columnType: 'text' }), {
+      default: undefined,
+    });
+    strictEqual('default' in resolved, false);
   });
 });

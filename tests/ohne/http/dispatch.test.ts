@@ -16,6 +16,9 @@ import {
   usePrinter,
   waitUntil,
 } from '../../../src/ohne/index.ts';
+import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
+import { busyError } from '../../../src/ohne/query/write/busy.ts';
+import { validationError } from '../../../src/ohne/query/write/errors.ts';
 import { sleep } from '../../../src/utils/index.ts';
 
 function makeRoute(pattern: string, handler: AnyHandler): Route {
@@ -91,6 +94,49 @@ describe('dispatch', () => {
     const { response } = await dispatch(route, req(), url(), {});
     strictEqual(response.status, 404);
     deepStrictEqual(await response.json(), { statusCode: 404, message: 'gone' });
+  });
+
+  it('maps a thrown validationError to 422 carrying the field errors', async () => {
+    const route = makeRoute('/', () => {
+      throw validationError({ title: 'This field is required' });
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.status, 422);
+    const body = (await response.json()) as { data: unknown };
+    deepStrictEqual(body.data, { errors: { title: 'This field is required' } });
+  });
+
+  it('resolves structured field-error messages to strings on the 422 wire', async () => {
+    useMessages().register('en', {
+      ...useMessages().get('en'),
+      'dispatchTest.required': 'Required.',
+    });
+    const route = makeRoute('/', () => {
+      throw validationError({ title: 'dispatchTest.required' });
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    const body = (await response.json()) as { data: unknown };
+    deepStrictEqual(body.data, { errors: { title: 'Required.' } });
+  });
+
+  it('keeps a reserved field path like `__proto__` on the 422 wire', async () => {
+    const errors: Record<string, string> = Object.create(null);
+    errors['__proto__'] = 'stays';
+    const route = makeRoute('/', () => {
+      throw validationError(errors);
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    const body = (await response.json()) as { data: { errors: Record<string, string> } };
+    strictEqual(Object.hasOwn(body.data.errors, '__proto__'), true);
+  });
+
+  it('maps a thrown busyError to 503 with a Retry-After header', async () => {
+    const route = makeRoute('/', () => {
+      throw busyError();
+    });
+    const { response } = await dispatch(route, req(), url(), {});
+    strictEqual(response.status, 503);
+    strictEqual(response.headers.get('Retry-After'), '1');
   });
 
   it('maps a returned HTTPError', async () => {

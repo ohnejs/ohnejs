@@ -480,6 +480,46 @@ describe('generateDatabase', () => {
     ok(node.includes('interface KnownRelations extends GeneratedRelations {}'));
   });
 
+  it('emits create-input shapes into GeneratedInserts, optional where nullable or defaulted', async () => {
+    const app = join(root, 'inserts');
+    writePackage(app, 'inserts');
+    write(
+      app,
+      'collections/Users.ts',
+      "export default { fields: { name: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'collections/Tags.ts',
+      "export default { fields: { label: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'collections/Posts.ts',
+      'export default { fields: {\n' +
+        "  title: { type: 'text', options: {} },\n" +
+        "  summary: { type: 'text', options: { nullable: true } },\n" +
+        "  rank: { type: 'integer', options: { default: 0 } },\n" +
+        "  author: { type: 'record', options: { collection: 'Users' } },\n" +
+        "  tags: { type: 'records', options: { collection: 'Tags' } },\n" +
+        "  items: { type: 'repeater', options: { fields: { label: { type: 'text', options: {} } } } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    ok(shared.includes('export interface GeneratedInserts {'));
+    ok(shared.includes('summary?: string | null;'));
+    ok(shared.includes('rank?: number;'));
+    ok(shared.includes('author?: string | null;'));
+    ok(shared.includes('tags?: string[];'));
+    ok(shared.includes('items?: { label: string }[];'));
+    ok(node.includes('interface KnownInserts extends GeneratedInserts {}'));
+  });
+
   it('narrows relation options in a consumer app, rejecting the illegal shapes', async () => {
     const app = join(root, 'relation-typing');
     writePackage(app, 'relation-typing');

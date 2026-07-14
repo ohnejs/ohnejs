@@ -1,9 +1,12 @@
 import type { DeepPrettify } from '../../utils/index.ts';
 import type { CollectionName, KnownCollections } from '../collections/known-collections.ts';
+import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
+import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
 import type { UntypedQueryBuilder } from './untyped.ts';
 import type { QueryLimits } from './wire/limits.ts';
+import type { FieldErrors } from './write/errors.ts';
 
 /**
  * The query-field table of one collection or relation target, by name.
@@ -655,26 +658,74 @@ interface Limitable<Self> {
 }
 
 /**
- * A query before any filter: reads, refinements, and the filters that move it to `ReadyQuery`.
- * The write terminals join here in a later phase; today it is the read entry point.
+ * A create's result: the new record, or the field failures keyed by dot-path.
+ */
+export type CreateResult<T> = { ok: true; record: T } | { ok: false; errors: FieldErrors };
+
+/**
+ * The `use` join, present on every state and returning that same state.
+ */
+interface Joinable<Self> {
+  /**
+   * Joins an open transaction, so a write terminal runs inside it rather than opening its own.
+   *
+   * @example
+   * ```ts
+   * query('Posts').use(tx).create({ title: 'Hi' })
+   * ```
+   */
+  use(tx: Transaction): Self;
+}
+
+/**
+ * The create terminals, available before a filter narrows the query to a specific set of rows.
+ */
+interface WriteEntry<C extends CollectionName, S, P> {
+  /**
+   * Creates one record, returning it on success or the field failures on a validation error.
+   * The whole write runs in one transaction; nothing persists when it returns a failure.
+   *
+   * @example
+   * ```ts
+   * const result = await query('Posts').create({ title: 'Hi' })
+   * if (result.ok) result.record // the new post
+   * ```
+   */
+  create(input: InsertInputOf<C>): Promise<CreateResult<QueryRow<C, S, P>>>;
+
+  /**
+   * Creates one record and returns it, throwing a `validationError` carrying the failures instead.
+   *
+   * @example
+   * ```ts
+   * const post = await query('Posts').createOrThrow({ title: 'Hi' })
+   * ```
+   */
+  createOrThrow(input: InsertInputOf<C>): Promise<QueryRow<C, S, P>>;
+}
+
+/**
+ * A query before any filter: reads, refinements, `create`, and the filters that move it to `ReadyQuery`.
  */
 export interface PendingQuery<C extends CollectionName, S = never, P = never>
   extends
     WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P>>,
     Refinements<C, S, P>,
     Terminals<C, S, P>,
-    Limitable<PendingQuery<C, S, P>> {}
+    WriteEntry<C, S, P>,
+    Limitable<PendingQuery<C, S, P>>,
+    Joinable<PendingQuery<C, S, P>> {}
 
 /**
  * A query with a filter in place: reads, refinements, and further filters that keep it here.
- * The row-mutating terminals join here in a later phase; today it reads like `PendingQuery`.
  */
 export interface ReadyQuery<C extends CollectionName, S = never, P = never>
   extends
     WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P>>,
     Refinements<C, S, P>,
     Terminals<C, S, P>,
-    Limitable<ReadyQuery<C, S, P>> {}
+    Limitable<ReadyQuery<C, S, P>>,
+    Joinable<ReadyQuery<C, S, P>> {}
 
 /**
  * A read-only query: one refinement stripped the write terminals for the rest of the chain.
@@ -685,7 +736,8 @@ export interface ReadOnlyQuery<C extends CollectionName, S = never, P = never>
     WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P>>,
     Refinements<C, S, P>,
     Terminals<C, S, P>,
-    Limitable<ReadOnlyQuery<C, S, P>> {}
+    Limitable<ReadOnlyQuery<C, S, P>>,
+    Joinable<ReadOnlyQuery<C, S, P>> {}
 
 /**
  * The typed builder a `query(collection)` opens on.

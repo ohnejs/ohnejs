@@ -8,10 +8,12 @@ import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
-import { HTTPError } from './http-error.ts';
+import { isBusyError } from '../query/write/busy.ts';
+import { isValidationError } from '../query/write/errors.ts';
+import { HTTPError, unprocessable } from './http-error.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
-import { translate } from './translate.ts';
+import { resolveMessage, translate } from './translate.ts';
 import { runWithEvent } from './use-event.ts';
 
 declare module 'ohne' {
@@ -164,6 +166,20 @@ export async function dispatch(
       const result = await (route.handler as Handler)({ params });
       return toResponse(result, event.response);
     } catch (error) {
+      if (isValidationError(error)) {
+        // A field path may be `__proto__`/`constructor`/`prototype`, which `mapValues` drops; keep them all.
+        const errors: Record<string, string> = Object.create(null);
+        for (const path of Object.keys(error.errors))
+          errors[path] = resolveMessage(error.errors[path]);
+        const http = unprocessable(undefined, { errors });
+        return resolveErrorResponse(toResponse(http, event.response), http, event);
+      }
+      if (isBusyError(error)) {
+        const http = new HTTPError(503, translate('api.http.serviceUnavailable'));
+        const response = toResponse(http, event.response);
+        response.headers.set('Retry-After', '1');
+        return resolveErrorResponse(response, http, event);
+      }
       if (error instanceof HTTPError) {
         return resolveErrorResponse(toResponse(error, event.response), error, event);
       }

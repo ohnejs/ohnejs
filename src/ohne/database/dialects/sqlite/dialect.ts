@@ -6,6 +6,7 @@ import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-sche
 import { truncateWithHash } from '../../../../utils/crypto/index.ts';
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import {
+  createMutex,
   dirname,
   errorMessage,
   isNull,
@@ -276,9 +277,13 @@ function errcodeOf(error: unknown): number | undefined {
  * Wraps a `node:sqlite` connection in the async `DatabaseAdapter` surface.
  * The driver is synchronous, so each method resolves at once.
  * Transactions run `BEGIN`/`COMMIT`/`ROLLBACK` explicitly, since `DatabaseSync` has no transaction helper.
+ * A per-connection FIFO mutex serializes them, since a second `BEGIN` while one is open is a plain error.
+ * The write pipeline awaits async validators inside the bracket, so overlapping writes are real without it.
+ * `immediate` reserves the write lock at `BEGIN`, so contention waits there under `busy_timeout`.
  */
 function createAdapter(db: DatabaseSync): DatabaseAdapter {
   const statements = createStatementCache((sql) => db.prepare(sql));
+  const serialize = createMutex();
   const adapter: DatabaseAdapter = {
     async exec(sql) {
       db.exec(sql);
@@ -294,16 +299,18 @@ function createAdapter(db: DatabaseSync): DatabaseAdapter {
     async queryOne(sql, params = []) {
       return statements.get(sql).get(...params) as never;
     },
-    async transaction(fn) {
-      db.exec('BEGIN');
-      try {
-        const result = await fn(adapter);
-        db.exec('COMMIT');
-        return result;
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      }
+    transaction(fn, mode = 'deferred') {
+      return serialize(async () => {
+        db.exec(mode === 'immediate' ? 'BEGIN IMMEDIATE' : 'BEGIN');
+        try {
+          const result = await fn(adapter);
+          db.exec('COMMIT');
+          return result;
+        } catch (error) {
+          db.exec('ROLLBACK');
+          throw error;
+        }
+      });
     },
     async close() {
       statements.clear();

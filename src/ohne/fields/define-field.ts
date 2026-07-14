@@ -1,5 +1,12 @@
 import type { LogicalType } from '../database/dialect.ts';
-import type { EmitTypeContext, FieldContext } from './context.ts';
+import type {
+  ColumnValue,
+  EmitTypeContext,
+  FieldContext,
+  FieldDefault,
+  FieldSanitizer,
+  FieldValidator,
+} from './context.ts';
 import type { AnyOptionDef } from './option.ts';
 import type { StorageHint } from './storage-hint.ts';
 
@@ -95,6 +102,80 @@ export interface FieldType<
    * ```
    */
   emitType?(ctx: EmitTypeContext<TOptions>): string | string[];
+
+  /**
+   * A value every field of this type takes when a create leaves it out.
+   * Pass the value, or a function to compute it; a field's own `default` option overrides it.
+   *
+   * @example
+   * ```ts
+   * defineField({ columnType: 'integer', defaultValue: 0 })
+   *
+   * defineField({
+   *   columnType: 'text',
+   *   defaultValue: (ctx) => `${ctx.name}-draft`,
+   * })
+   * ```
+   */
+  defaultValue?: FieldDefault<ColumnValue<TColumn>, TOptions>;
+
+  /**
+   * Functions that clean the value of this type before it is validated, run in order.
+   * Each returns the cleaned value and never rejects; leave rejection to a validator.
+   *
+   * @example
+   * ```ts
+   * defineField({
+   *   columnType: 'text',
+   *   sanitizers: [(value) => value.trim()],
+   * })
+   * ```
+   */
+  sanitizers?: readonly FieldSanitizer<TOptions, ColumnValue<TColumn>>[];
+
+  /**
+   * Functions that check every value of this type, run in order.
+   * Return a message to reject the value, or `undefined` to accept it; the first message stops the field.
+   * A composite type writes subfield failures into `ctx.errors` instead of returning one.
+   *
+   * @example
+   * ```ts
+   * defineField({
+   *   columnType: 'text',
+   *   validators: [(value) => (value === '' ? 'validation.emptyValue' : undefined)],
+   * })
+   * ```
+   */
+  validators?: readonly FieldValidator<TOptions, ColumnValue<TColumn>>[];
+
+  /**
+   * Encodes the value into what the column stores, run just before the driver's own codec.
+   * Pair it with `deserialize` to invert it on read; a `null` value skips both.
+   *
+   * @example
+   * ```ts
+   * // store a Date as epoch milliseconds
+   * defineField({
+   *   columnType: 'integer',
+   *   serialize: (value) => (value as Date).getTime(),
+   * })
+   * ```
+   */
+  serialize?(value: unknown, ctx: FieldContext<TOptions>): unknown;
+
+  /**
+   * Decodes a stored value back into the value a read returns, run just after the driver's codec.
+   * The generated record type reflects what this returns; a `null` value skips it.
+   *
+   * @example
+   * ```ts
+   * defineField({
+   *   columnType: 'integer',
+   *   deserialize: (value) => new Date(value as number),
+   * })
+   * ```
+   */
+  deserialize?(value: unknown, ctx: FieldContext<TOptions>): unknown;
 }
 
 /**

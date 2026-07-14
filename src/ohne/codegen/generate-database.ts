@@ -26,6 +26,7 @@ import {
 } from '../../utils/codegen/index.ts';
 import {
   dirname,
+  hasKey,
   isNull,
   isString,
   isUndefined,
@@ -195,6 +196,14 @@ async function writeShared(
       ),
     ],
   }));
+  const insertMembers = collections.map((collection) => ({
+    name: collection.name,
+    fields: insertShapesOf(
+      { subject: `Collection \`${collection.name}\``, file: collection.file },
+      collection.collection.fields,
+      context,
+    ),
+  }));
 
   const code = createCodeBuilder();
   const statements = imports.statements();
@@ -254,6 +263,16 @@ async function writeShared(
     code.line('}');
   }
   code.line();
+  if (insertMembers.length === 0) {
+    code.line('export interface GeneratedInserts {}');
+  } else {
+    code.line('export interface GeneratedInserts {');
+    code.indent(() => {
+      for (const member of insertMembers) emitInsertShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
   if (helpers.length === 0) {
     code.line('export interface GeneratedDatabases {}');
   } else {
@@ -302,6 +321,28 @@ function emitFieldShapes(
 }
 
 /**
+ * Emits one create-input member: each field's name, an optional marker, and its input type.
+ * A nullable-or-defaulted field is optional; a required field is not.
+ */
+function emitInsertShapes(
+  code: CodeBuilder,
+  name: string,
+  fields: readonly { name: string; type: string; optional: boolean }[],
+): void {
+  if (fields.length === 0) {
+    code.line(`${propertyKey(name)}: {};`);
+    return;
+  }
+  code.line(`${propertyKey(name)}: {`);
+  code.indent(() => {
+    for (const field of fields) {
+      code.line(`${propertyKey(field.name)}${field.optional ? '?' : ''}: ${field.type};`);
+    }
+  });
+  code.line('};');
+}
+
+/**
  * Writes `node/database.ts`: imports every definition, augments `ohne`, and registers each one.
  */
 async function writeNode(
@@ -342,7 +383,7 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedQueryFields, GeneratedRelations } from '../shared/database.ts';",
+    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedQueryFields, GeneratedRelations } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
@@ -350,6 +391,7 @@ async function writeNode(
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');
     code.line('interface KnownQueryFields extends GeneratedQueryFields {}');
+    code.line('interface KnownInserts extends GeneratedInserts {}');
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     if (augmented.length === 0) {
@@ -596,6 +638,86 @@ function queryFieldType(
   }
   if (nullable) parts.push('nullable: true');
   return `{ ${parts.join('; ')} }`;
+}
+
+/**
+ * Resolves one field map into named create-input shapes, skipping system fields and blocks.
+ */
+function insertShapesOf(
+  owner: EmissionOwner,
+  fields: Record<string, FieldInstance>,
+  context: EmissionContext,
+): { name: string; type: string; optional: boolean }[] {
+  const entries: { name: string; type: string; optional: boolean }[] = [];
+  for (const [name, instance] of Object.entries(fields)) {
+    const shape = insertFieldType(owner, name, instance, context);
+    if (!isNull(shape)) entries.push({ name, ...shape });
+  }
+  return entries;
+}
+
+/**
+ * Emits one field's create-input type and whether it is optional.
+ *
+ * A column or `record` takes its value type, optional when nullable or defaulted.
+ * A `records` list is optional and defaults to `[]`; an `object` is optional and accepts `null`.
+ * A `repeater` is an optional list of item shapes; a create item carries no `UUID`.
+ * A blocks field returns `null`, so it is skipped, exactly as the read shape skips it.
+ */
+function insertFieldType(
+  owner: EmissionOwner,
+  name: string,
+  instance: FieldInstance,
+  context: EmissionContext,
+): { type: string; optional: boolean } | null {
+  const registered = context.types.get(instance.type);
+  if (isUndefined(registered)) {
+    throw ohneError({
+      title: `Unknown field type \`${instance.type}\``,
+      body: [
+        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
+      ],
+      path: owner.file,
+    });
+  }
+  const { hint, kind, options } = resolveFieldStorage(name, instance, registered.fieldType);
+  if (kind === 'blocks') return null;
+  if (kind === 'junction') return { type: 'string[]', optional: true };
+  if (kind === 'childOne') {
+    return {
+      type: `${insertObjectType(owner, hint as ChildHint, context)} | null`,
+      optional: true,
+    };
+  }
+  if (kind === 'childMany') {
+    return { type: `${insertObjectType(owner, hint as ChildHint, context)}[]`, optional: true };
+  }
+
+  const defaulted = hasKey(options, 'default') || !isUndefined(registered.fieldType.defaultValue);
+  if (kind === 'foreignKey') {
+    const nullable = options.nullable === true;
+    return { type: nullable ? 'string | null' : 'string', optional: nullable || defaulted };
+  }
+
+  const { base, nullable } = fieldBaseType({
+    fieldType: registered.fieldType,
+    name,
+    options: { ...instance.options },
+    fieldDir: registered.dir,
+    imports: context.imports,
+  });
+  return { type: nullable ? `${base} | null` : base, optional: nullable || defaulted };
+}
+
+/**
+ * Emits a composite item's create-input object type from its subfields.
+ */
+function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
+  const shapes = insertShapesOf(owner, hint.subfields, context);
+  const body = shapes
+    .map((field) => `${propertyKey(field.name)}${field.optional ? '?' : ''}: ${field.type}`)
+    .join('; ');
+  return `{ ${body} }`;
 }
 
 /**
