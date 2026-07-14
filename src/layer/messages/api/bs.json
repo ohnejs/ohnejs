@@ -7,6 +7,7 @@
   },
   "http": {
     "badRequest": "Neispravan zahtjev",
+    "conflict": "Sukob",
     "contentTooLarge": "Sadržaj prevelik",
     "forbidden": "Zabranjeno",
     "internalServerError": "Interna greška servera",

@@ -7,6 +7,7 @@
   },
   "http": {
     "badRequest": "Ungültige Anfrage",
+    "conflict": "Konflikt",
     "contentTooLarge": "Inhalt zu groß",
     "forbidden": "Verboten",
     "internalServerError": "Interner Serverfehler",
