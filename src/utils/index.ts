@@ -112,6 +112,7 @@ export * from './keys/stroke-from-readline-key.ts';
 export * from './media-type/parse-media-type.ts';
 export * from './merge/merge.ts';
 export * from './mime/mime-type-for.ts';
+export * from './mutex/mutex.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
 export * from './number/clamp.ts';
