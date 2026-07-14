@@ -1,6 +1,9 @@
 {
   "emptyValue": "Ova vrijednost ne smije biti prazna",
+  "invalidReference": "Referencirani zapis ne postoji",
   "invalidValue": "Ova vrijednost nije važeća",
   "notNullable": "Ovo polje ne prihvata null",
-  "required": "Ovo polje je obavezno"
+  "notUnique": "Ova vrijednost je već zauzeta",
+  "required": "Ovo polje je obavezno",
+  "unknownField": "Ovo polje nije prepoznato"
 }

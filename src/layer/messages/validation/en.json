@@ -1,6 +1,9 @@
 {
   "emptyValue": "This value must not be empty",
+  "invalidReference": "The referenced record does not exist",
   "invalidValue": "This value is invalid",
   "notNullable": "This field does not accept null",
-  "required": "This field is required"
+  "notUnique": "This value is already taken",
+  "required": "This field is required",
+  "unknownField": "This field is not recognized"
 }
