@@ -1,3 +1,4 @@
+import type { ConditionObject } from '../../utils/index.ts';
 import type { CollectionName } from '../collections/known-collections.ts';
 
 /**
@@ -50,6 +51,12 @@ export interface QueryFieldMeta {
    * A composite child's own field table, its item `UUID` included; `child` kinds only.
    */
   fields?: Record<string, QueryFieldMeta>;
+
+  /**
+   * The field's `when` condition, in object form, present only when the instance declares one.
+   * A type-only passenger: the dashboard's field-visibility logic reads it; the query builder ignores it.
+   */
+  when?: ConditionObject;
 }
 
 /**

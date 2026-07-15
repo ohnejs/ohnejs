@@ -208,6 +208,25 @@ describe('generateDatabase', () => {
     );
   });
 
+  it('carries a field `when` into GeneratedQueryFields as a type literal', async () => {
+    const app = join(root, 'when');
+    writePackage(app, 'when');
+    write(
+      app,
+      'collections/Products.ts',
+      'export default { fields: {\n' +
+        "  kind: { type: 'text', options: {} },\n" +
+        "  discount: { type: 'integer', options: { nullable: true, when: { kind: 'sale' } } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes("discount: { scalar: number; nullable: true; when: { kind: 'sale' } };"));
+  });
+
   it('types block shapes into GeneratedBlocks, a blocks field unioning its allowed names', async () => {
     const app = join(root, 'blocks');
     writePackage(app, 'blocks');

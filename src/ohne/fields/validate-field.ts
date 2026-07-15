@@ -24,6 +24,7 @@ const RESERVED_OPTIONS = new Set([
   'default',
   'sanitizers',
   'validators',
+  'when',
 ]);
 
 /**

@@ -3,15 +3,35 @@ import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
+import type { ScopeValues } from '../pipeline/when.ts';
 import type { QueryRecord } from '../read/find.ts';
 import type { FieldErrors } from './errors.ts';
 
-import { chunk, first, isEmpty, isString, isUndefined, uuidv7 } from '../../../utils/index.ts';
+import {
+  chunk,
+  first,
+  isEmpty,
+  isNull,
+  isString,
+  isUndefined,
+  uuidv7,
+} from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { queryMetadata } from '../metadata.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
 import { compileWhere } from '../sql/where.ts';
+import {
+  activeScope,
+  coercedOverlay,
+  gateNested,
+  gateSubtree,
+  hasNestedGates,
+  isEmptyScope,
+  partitionActivation,
+  whenGates,
+  type WhenGate,
+} from './activation.ts';
 import { busyError } from './busy.ts';
 import { appendPositions, columnTypes, insertScope, junctionColumns } from './insert.ts';
 import { checkReferences } from './references.ts';
@@ -98,8 +118,13 @@ async function attemptUpdate(
   const correlationErrors = await checkCorrelation(tx, dialect, matched, scope.children);
   if (!isEmpty(correlationErrors)) return { ok: false, errors: correlationErrors };
 
-  await updateColumns(tx, dialect, meta.table, meta.fields, scope.columns, matched);
-  for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope);
+  const gates = whenGates(meta.fields, input, scope);
+  if (gates.length === 0 && !hasNestedGates(scope)) {
+    await updateColumns(tx, dialect, meta.table, meta.fields, scope.columns, matched);
+    for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null);
+  } else {
+    await gatedUpdate(tx, dialect, meta, input, matched, scope, gates);
+  }
 
   return { ok: true, records: await readMatched(meta.collection, matched) };
 }
@@ -203,15 +228,51 @@ async function updateColumns(
 
 /**
  * Applies one existing row's derived writes: junction diffs for its relations, correlation for its children.
+ * The `ancestry` carries each matched parent's resolution context down for nested gating.
+ * It is `null` on the cheap path, where no field gates and every child writes verbatim.
  */
 async function applyDerived(
   tx: Transaction,
   dialect: Dialect,
   uuid: string,
   scope: ProcessedScope,
+  ancestry: readonly ScopeValues[] | null,
 ): Promise<void> {
   for (const relation of scope.relations) await diffJunction(tx, dialect, relation, uuid);
-  for (const child of scope.children) await correlateChild(tx, dialect, child, uuid);
+  for (const child of scope.children) await correlateChild(tx, dialect, child, uuid, ancestry);
+}
+
+/**
+ * Applies an update whose top-level fields or nested subfields gate, deciding activation per matched record.
+ *
+ * Top-level fields partition the matched records by signature, dropping each inactive gate's column and rows.
+ * A record whose whole top-level signature is inactive is untouched, with no `_updatedAt` bump.
+ * Each record carries its own overlay as the ancestry root - its stored shape under the provided input.
+ * A nested `when` reaching the root therefore reads that record's stored state.
+ * A `has`/`empty` gate over a relation or composite reads its persisted membership; validation ran call-wide.
+ */
+async function gatedUpdate(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: CollectionQueryMeta,
+  input: Record<string, unknown>,
+  matched: readonly string[],
+  scope: ProcessedScope,
+  gates: readonly WhenGate[],
+): Promise<void> {
+  const records = await readMatched(meta.collection, matched);
+  const provided = coercedOverlay(meta.fields, input);
+  const overlays = new Map(
+    records.map((record) => [record.UUID as string, { ...record, ...provided }]),
+  );
+  for (const group of partitionActivation(records, gates, provided)) {
+    const groupScope = activeScope(scope, gates, group.active);
+    if (isEmptyScope(groupScope)) continue;
+    await updateColumns(tx, dialect, meta.table, meta.fields, groupScope.columns, group.uuids);
+    for (const uuid of group.uuids) {
+      await applyDerived(tx, dialect, uuid, groupScope, [overlays.get(uuid) as ScopeValues]);
+    }
+  }
 }
 
 /**
@@ -294,12 +355,16 @@ async function diffJunction(
  * A repeater matches by item `UUID`: a match updates, an unmatched row deletes, a new item inserts.
  * An `object` upserts its single row by parent: an empty list clears it, a value sets it.
  * A matched or existing row keeps its identity, so a nested repeater's own items correlate one level down.
+ * When `ancestry` is set, each item gates per this parent, resolving its subfields' `when` against it.
+ * A matched item narrows in place; a fresh item and its whole subtree pre-gate before the insert.
+ * The recursion extends the ancestry with the item's own values.
  */
 async function correlateChild(
   tx: Transaction,
   dialect: Dialect,
   child: ProcessedChild,
   parentUUID: string,
+  ancestry: readonly ScopeValues[] | null,
 ): Promise<void> {
   const table = child.meta.table as string;
   const subfields = child.meta.subfields as Record<string, FieldQueryMeta>;
@@ -313,11 +378,13 @@ async function correlateChild(
       return;
     }
     if (isUndefined(objectUUID)) {
-      await insertScope(tx, dialect, table, subfields, uuidv7(), item, { uuid: parentUUID });
+      const fresh = isNull(ancestry) ? item : gateSubtree(item, subfields, ancestry);
+      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, { uuid: parentUUID });
       return;
     }
-    await updateChildRow(tx, dialect, table, subfields, item, objectUUID);
-    await applyDerived(tx, dialect, objectUUID, item);
+    const gated = isNull(ancestry) ? item : gateNested(item, subfields, ancestry);
+    await updateChildRow(tx, dialect, table, subfields, gated, objectUUID);
+    await applyDerived(tx, dialect, objectUUID, gated, descend(ancestry, item));
     return;
   }
 
@@ -331,15 +398,27 @@ async function correlateChild(
   for (let index = 0; index < child.items.length; index++) {
     const item = child.items[index];
     if (isUndefined(item.itemUUID)) {
-      await insertScope(tx, dialect, table, subfields, uuidv7(), item, {
+      const fresh = isNull(ancestry) ? item : gateSubtree(item, subfields, ancestry);
+      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, {
         uuid: parentUUID,
         position: index,
       });
       continue;
     }
-    await updateChildRow(tx, dialect, table, subfields, item, item.itemUUID, index);
-    await applyDerived(tx, dialect, item.itemUUID, item);
+    const gated = isNull(ancestry) ? item : gateNested(item, subfields, ancestry);
+    await updateChildRow(tx, dialect, table, subfields, gated, item.itemUUID, index);
+    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item));
   }
+}
+
+/**
+ * Extends a nested-gating ancestry by one level with the item's own values, or stays `null` on the cheap path.
+ */
+function descend(
+  ancestry: readonly ScopeValues[] | null,
+  item: ProcessedScope,
+): readonly ScopeValues[] | null {
+  return isNull(ancestry) ? null : [...ancestry, item.values];
 }
 
 /**

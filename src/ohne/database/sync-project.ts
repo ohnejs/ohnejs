@@ -7,6 +7,7 @@ import { useEnv } from '../env/use-env.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { warmQueryMetadata } from '../query/metadata.ts';
 import { connect } from './connect.ts';
 import { useMigrations } from './migrations/use-migrations.ts';
 import { buildDesiredSchema } from './schema/desired.ts';
@@ -36,6 +37,7 @@ export interface SyncProjectOptions {
 
 /**
  * Connects the project's database and reconciles it with the schema the registries declare.
+ * Every collection's query metadata builds first, so a malformed `when` fails before the reconcile.
  * The desired schema builds from the collection, field, and block registries; migrations run inside.
  * Force resolves from `options.force`, then the `FORCE_SYNC` env, then `Config.database.sync.force`.
  * The default content locale resolves from `Config.collections`, feeding the translatable fan-out.
@@ -45,6 +47,7 @@ export interface SyncProjectOptions {
  * `serveAPI` runs it before `listen()`; `ohne sync` runs it standalone.
  */
 export async function syncProjectDatabase(options: SyncProjectOptions = {}): Promise<GuardReport> {
+  warmQueryMetadata();
   const dialect = await connect();
   const database = useConfig().database;
   const force =

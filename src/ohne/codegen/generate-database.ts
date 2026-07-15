@@ -27,7 +27,9 @@ import {
 import {
   dirname,
   hasKey,
+  isArray,
   isNull,
+  isObject,
   isString,
   isUndefined,
   joinPath,
@@ -649,10 +651,12 @@ function queryFieldType(
     });
   }
   const { hint, kind } = resolveFieldStorage(name, instance, registered.fieldType);
+  const when = hasKey(instance.options, 'when') ? conditionLiteral(instance.options.when) : null;
 
   if (kind === 'blocks') return null;
-  if (kind === 'junction')
-    return `{ records: ${literalString((hint as JunctionHint).collection)} }`;
+  if (kind === 'junction') {
+    return metaLiteral([`records: ${literalString((hint as JunctionHint).collection)}`], when);
+  }
   if (kind === 'childOne' || kind === 'childMany') {
     const cardinality = kind === 'childOne' ? 'one' : 'many';
     const subfields = [
@@ -660,7 +664,7 @@ function queryFieldType(
       ...queryFieldsOf(owner, (hint as ChildHint).subfields, context),
     ];
     const body = subfields.map((field) => `${propertyKey(field.name)}: ${field.type}`).join('; ');
-    return `{ child: ${literalString(cardinality)}; fields: { ${body} } }`;
+    return metaLiteral([`child: ${literalString(cardinality)}`, `fields: { ${body} }`], when);
   }
 
   const { base, nullable } = fieldBaseType({
@@ -675,7 +679,30 @@ function queryFieldType(
     parts.push(`record: ${literalString((hint as ForeignKeyHint).collection)}`);
   }
   if (nullable) parts.push('nullable: true');
-  return `{ ${parts.join('; ')} }`;
+  return metaLiteral(parts, when);
+}
+
+/**
+ * Joins one field's metadata parts into its literal, appending the `when` passenger when the field has one.
+ */
+function metaLiteral(parts: string[], when: string | null): string {
+  return `{ ${(isNull(when) ? parts : [...parts, `when: ${when}`]).join('; ')} }`;
+}
+
+/**
+ * Renders a `when` condition object as a TypeScript type literal, the passenger the dashboard reads.
+ * String values quote through `literalString`; keys quote through `propertyKey`, so an anchored path holds.
+ */
+function conditionLiteral(value: unknown): string {
+  if (isString(value)) return literalString(value);
+  if (isArray(value)) return `[${value.map(conditionLiteral).join(', ')}]`;
+  if (isObject(value)) {
+    const body = Object.entries(value)
+      .map(([key, nested]) => `${propertyKey(key)}: ${conditionLiteral(nested)}`)
+      .join('; ');
+    return `{ ${body} }`;
+  }
+  return String(value);
 }
 
 /**

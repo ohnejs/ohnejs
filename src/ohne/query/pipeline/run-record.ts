@@ -4,9 +4,10 @@ import type { FieldOperation } from '../../fields/context.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
 
-import { isEmpty, isUndefined } from '../../../utils/index.ts';
+import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { finishComposite, prepareComposite } from './descend.ts';
-import { finishScalar, prepareScalar } from './run-field.ts';
+import { defaultPath, finishScalar, prepareScalar, writeContext } from './run-field.ts';
+import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
 
 /**
  * The pipeline's per-scope threading: where in the record tree it runs, and against which transaction.
@@ -32,6 +33,12 @@ export interface ScopeContext {
    * The scope's full path from the record root: `''` at the top, `sections[0]` inside a repeater item.
    */
   path: string;
+
+  /**
+   * The coerced values of every enclosing scope, root-first, so a `when` can climb with `../` or `/`.
+   * Empty at the record root; each composite descent appends the parent scope's values.
+   */
+  ancestors: readonly ScopeValues[];
 }
 
 /**
@@ -141,6 +148,18 @@ export interface ProcessedScope {
   columns: Record<string, unknown>;
 
   /**
+   * The scope's coerced phase-A values by field name, the substrate a nested `when` resolves against.
+   * Distinct from `columns`, which are field-serialized; a gate reads the pre-serialize domain value.
+   */
+  values: ScopeValues;
+
+  /**
+   * The field-serialized default of each `when`-bearing column subfield; nested update items only.
+   * When a subfield gates inactive for a matched record, the write substitutes this default.
+   */
+  gatedDefaults?: Record<string, unknown>;
+
+  /**
    * The `records` writes this scope contributes.
    */
   relations: ProcessedRelation[];
@@ -223,6 +242,10 @@ function isScalarField(meta: FieldQueryMeta): boolean {
  * Processes one scope's fields through the two-phase pipeline, dispatching each field on its kind.
  *
  * Phase A runs every field's default path, null gate, and coerce.
+ * A create gates each field on its `when` (step 3) between the phases, reading coerced siblings and ancestry.
+ * An inactive field drops its value, `null` included, and takes the default path.
+ * An update never gates here; its activation is per matched record, resolved by the executor.
+ * Provided fields there validate once, whether active or not.
  * Phase B then validates and serializes each field in parallel, each owning its own error slice.
  * An unknown input key is rejected up front: writes are strict, and a silent drop hides a caller's typo.
  */
@@ -248,31 +271,78 @@ export async function processScope(
     }),
   );
 
+  const scopeValues = scopeValuesOf(names, prepared);
+  const descentCtx: ScopeContext = { ...ctx, ancestors: [...ctx.ancestors, scopeValues] };
+  const resolve =
+    ctx.operation === 'create' && names.some((name) => !isUndefined(fields[name].when))
+      ? whenResolver(scopeValues, ctx.ancestors)
+      : undefined;
+  const gatedDefaults =
+    ctx.operation === 'update' && ctx.path !== ''
+      ? await gatedDefaultsOf(names, fields, input, ctx)
+      : undefined;
+
   const scope: ProcessedScope = {
     columns: {},
+    values: scopeValues,
     relations: [],
     children: [],
     refs: [],
     uniqueProbes: [],
+    ...(isUndefined(gatedDefaults) ? {} : { gatedDefaults }),
   };
   await Promise.all(
     names.map(async (name) => {
-      const entry = prepared[name];
+      const meta = fields[name];
+      let entry = prepared[name];
+      if (
+        !isUndefined(resolve) &&
+        !isUndefined(meta.when) &&
+        !evaluateCondition(meta.when, resolve)
+      ) {
+        entry = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
+      }
       if ('skip' in entry) return;
       if ('errors' in entry) {
         Object.assign(errors, entry.errors);
         return;
       }
-      const meta = fields[name];
       const output = isScalarField(meta)
-        ? await finishScalar(name, meta, entry.value, input, ctx)
-        : await finishComposite(name, meta, entry.value, ctx, processScope);
+        ? await finishScalar(name, meta, entry.value, input, descentCtx)
+        : await finishComposite(name, meta, entry.value, descentCtx, processScope);
       mergeOutput(scope, errors, output);
     }),
   );
 
   if (!isEmpty(errors)) return { ok: false, errors };
   return { ok: true, scope };
+}
+
+/**
+ * The stored default of every `when`-bearing column subfield in a nested update item.
+ *
+ * A gated subfield that turns inactive for a matched record takes this default, exactly as a create would.
+ * The default runs through the same `finishScalar` path a create does - null short-circuit, tiers, serialize.
+ * The reset value therefore equals what a create or an omitted subfield stores.
+ * The default is parent-independent, so it computes once here rather than per matched parent in the executor.
+ * Relations and composites default structurally (empty), so only column and `record` kinds appear here.
+ */
+async function gatedDefaultsOf(
+  names: readonly string[],
+  fields: Record<string, FieldQueryMeta>,
+  input: Readonly<Record<string, unknown>>,
+  ctx: ScopeContext,
+): Promise<Record<string, unknown> | undefined> {
+  let defaults: Record<string, unknown> | undefined;
+  for (const name of names) {
+    const meta = fields[name];
+    if (isUndefined(meta.when) || (meta.kind !== 'column' && meta.kind !== 'record')) continue;
+    const prepared = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
+    if (!('value' in prepared)) continue;
+    const output = await finishScalar(name, meta, prepared.value, input, ctx);
+    if (!isUndefined(output.column)) (defaults ??= {})[name] = output.column.value;
+  }
+  return defaults;
 }
 
 /**
@@ -303,6 +373,7 @@ export async function runRecord(
     collection: collectionMeta.collection,
     tx: options.tx,
     path: '',
+    ancestors: [],
   };
   return processScope(collectionMeta.fields, input, ctx);
 }

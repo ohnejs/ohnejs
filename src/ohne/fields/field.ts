@@ -1,3 +1,4 @@
+import type { ConditionObject } from '../../utils/index.ts';
 import type { ColumnValue, FieldDefault, FieldSanitizer, FieldValidator } from './context.ts';
 import type { FieldType } from './define-field.ts';
 import type { KnownFieldOptions } from './known-field-options.ts';
@@ -120,6 +121,26 @@ export interface ValueOptions<
    * ```
    */
   validators?: readonly FieldValidator<TOptions, TValue>[];
+
+  /**
+   * A condition that decides whether this field is active for a record, in the condition object form.
+   * An inactive field (the condition is false) drops its input, `null` included.
+   * A create then takes the default path, and an update leaves the column untouched.
+   * Paths resolve in the field's own scope; `/` anchors at the record root, `../` climbs one level.
+   * Dots descend into a composite (`address.city`).
+   * A gated field must be nullable or carry a default, since an inactive create still needs a value.
+   *
+   * @example
+   * ```ts
+   * field('text', { nullable: true, when: { kind: 'discounted' } })
+   *
+   * field('integer', {
+   *   nullable: true,
+   *   when: { published: true, views: { atLeast: 100 } },
+   * })
+   * ```
+   */
+  when?: ConditionObject;
 }
 
 /**

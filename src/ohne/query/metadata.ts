@@ -1,15 +1,17 @@
+import type { ConditionError, ConditionNode } from '../../utils/index.ts';
 import type { CollectionMeta } from '../collections/use-collections.ts';
 import type { LogicalType } from '../database/dialect.ts';
 import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type { ChildHint, ForeignKeyHint, JunctionHint } from '../fields/storage-hint.ts';
 
-import { isUndefined } from '../../utils/index.ts';
+import { hasKey, isUndefined, parseCondition } from '../../utils/index.ts';
 import { useCollections } from '../collections/use-collections.ts';
 import { collectionTableName, derivedTableName } from '../database/naming/table-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
+import { validateWhen } from './validate-when.ts';
 
 /**
  * The query-facing shape of one field: where its value lives and how a condition may address it.
@@ -82,6 +84,12 @@ export interface FieldQueryMeta {
    * The child table's own fields, its item `UUID` included; child kinds only.
    */
   subfields?: Record<string, FieldQueryMeta>;
+
+  /**
+   * The field's parsed `when` condition, present when the instance declares one.
+   * Its paths resolve in the field's own scope, so the pipeline reads the same node every write.
+   */
+  when?: ConditionNode;
 }
 
 /**
@@ -116,12 +124,13 @@ const cache = new Map<string, CollectionQueryMeta>();
  * The single runtime source the compiler, loaders, pipeline, and wire validation read.
  * Built from the collection and field-type registries through the shared field-walk.
  * It therefore partitions fields exactly as the desired schema does.
+ * Building validates every declared `when` against the field graph, so a bad condition throws here.
  * An unknown collection throws.
  *
  * @example
  * ```ts
  * queryMetadata('Posts')
- * // -> { collection: 'Posts', table: 'Posts', fields: { UUID: {...}, _updatedAt: {...}, ... } }
+ * // -> { collection: 'Posts', table: 'Posts', fields: { UUID: {...}, ... } }
  * ```
  */
 export function queryMetadata(collection: string): CollectionQueryMeta {
@@ -130,8 +139,19 @@ export function queryMetadata(collection: string): CollectionQueryMeta {
   const meta = useCollections().get(collection);
   if (isUndefined(meta)) throw ohneError(`Unknown collection \`${collection}\``);
   const built = buildCollectionMeta(meta);
+  validateWhen(built);
   cache.set(collection, built);
   return built;
+}
+
+/**
+ * Builds and caches every collection's query metadata, validating each declared `when` in the process.
+ *
+ * Run at boot so a malformed or misaddressed `when` fails before the server serves, not on a first write.
+ * The build is memoized, so this warms the cache every later read and write then reuses.
+ */
+export function warmQueryMetadata(): void {
+  for (const meta of Object.values(useCollections().all())) queryMetadata(meta.name);
 }
 
 /**
@@ -149,21 +169,23 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
     UUID: uuidEntry(),
     _updatedAt: { kind: 'column', nullable: false, logicalType: 'integer', column: '_updatedAt' },
   };
-  addFieldEntries(fields, meta.collection.fields, meta.name);
+  addFieldEntries(fields, meta.collection.fields, meta.name, meta.name);
   return { collection: meta.name, table: collectionTableName(meta.name), fields };
 }
 
 /**
  * Walks one field map in declaration order and adds each field's entry.
  * `logical` is the untruncated name derived tables under this scope compose from.
+ * `collection` names the owning collection, so a malformed `when` reads its home in the error.
  */
 function addFieldEntries(
   into: Record<string, FieldQueryMeta>,
   fieldMap: Record<string, FieldInstance>,
   logical: string,
+  collection: string,
 ): void {
   for (const [name, instance] of Object.entries(fieldMap)) {
-    const entry = fieldEntry(name, instance, logical);
+    const entry = fieldEntry(name, instance, logical, collection);
     if (!isUndefined(entry)) into[name] = entry;
   }
 }
@@ -171,11 +193,13 @@ function addFieldEntries(
 /**
  * Builds one field's entry through the shared field-walk, recursing into composite subfields.
  * Options freeze here, once, so every pipeline invocation shares one readonly object.
+ * A declared `when` parses into its node here too, so the pipeline reads one parsed condition.
  */
 function fieldEntry(
   name: string,
   instance: FieldInstance,
   logical: string,
+  collection: string,
 ): FieldQueryMeta | undefined {
   const registered = useFields().get(instance.type);
   if (isUndefined(registered)) throw ohneError(`Unknown field type \`${instance.type}\``);
@@ -185,23 +209,27 @@ function fieldEntry(
 
   if (kind === 'blocks') return undefined;
 
+  const when = parseFieldWhen(options, name, collection);
+  const gate = isUndefined(when) ? {} : { when };
+
   if (kind === 'junction') {
-    const { collection, inverse } = hint as JunctionHint;
+    const { collection: target, inverse } = hint as JunctionHint;
     return {
       kind: 'records',
       fieldType,
       options,
       nullable: false,
-      target: collection,
+      target,
+      ...gate,
       ...(isUndefined(inverse)
         ? { table: derivedTableName(logical, name) }
-        : { inverse: true, table: derivedTableName(collection, inverse) }),
+        : { inverse: true, table: derivedTableName(target, inverse) }),
     };
   }
 
   if (kind === 'childOne' || kind === 'childMany') {
     const subfields: Record<string, FieldQueryMeta> = { UUID: uuidEntry() };
-    addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`);
+    addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`, collection);
     return {
       kind,
       fieldType,
@@ -209,6 +237,7 @@ function fieldEntry(
       nullable: kind === 'childOne',
       table: derivedTableName(logical, name),
       subfields,
+      ...gate,
     };
   }
 
@@ -219,6 +248,47 @@ function fieldEntry(
     nullable: options.nullable,
     logicalType: fieldType.columnType as LogicalType,
     column: name,
+    ...gate,
     ...(kind === 'foreignKey' ? { target: (hint as ForeignKeyHint).collection } : {}),
   };
+}
+
+/**
+ * Parses a field's `when` option into its condition node, or throws when the object is malformed.
+ * Only the grammar is checked here; whether each path and operator fits the field is `validateWhen`'s job.
+ */
+function parseFieldWhen(
+  options: Readonly<Record<string, unknown>>,
+  name: string,
+  collection: string,
+): ConditionNode | undefined {
+  if (!hasKey(options, 'when')) return undefined;
+  const result = parseCondition(options.when);
+  if (result.ok) return result.node;
+  const at = result.error.path === '' ? '' : ` at \`${result.error.path}\``;
+  throw ohneError({
+    title: `Invalid \`when\` condition on \`${name}\``,
+    body: [
+      `Field \`${name}\` on collection \`${collection}\` has a malformed \`when\` condition${at}.`,
+      whenGrammarHint(result.error.code),
+    ],
+  });
+}
+
+/**
+ * A one-line hint for a malformed `when`, keyed on the parse failure's category.
+ */
+function whenGrammarHint(code: ConditionError['code']): string {
+  switch (code) {
+    case 'unknownOperator':
+      return 'The key is not a known operator.';
+    case 'invalidValue':
+      return 'An operator carries a value of the wrong kind; `isNull` takes only `true`.';
+    case 'nullEquality':
+      return '`null` is not a valid value - use `isNull` to test for it.';
+    case 'tooDeep':
+      return 'The condition nests too deeply.';
+    case 'invalidShape':
+      return 'A value or key does not fit the condition grammar.';
+  }
 }
