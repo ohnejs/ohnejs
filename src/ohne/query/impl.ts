@@ -11,7 +11,7 @@ import type {
   UntypedWhereGroup,
   WhereGroupBuild,
 } from './untyped.ts';
-import type { QueryLimits } from './wire/limits.ts';
+import type { QueryGuards } from './wire/guards.ts';
 import type { CreateOutcome } from './write/create.ts';
 
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
@@ -43,7 +43,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private limitValue: number | null = null;
   private offsetValue: number | null = null;
   private joinedTx?: Transaction;
-  readonly limitOverrides: Partial<QueryLimits> = {};
+  readonly guardOverrides: Partial<QueryGuards> = {};
   private readonly meta: CollectionQueryMeta;
 
   constructor(meta: CollectionQueryMeta) {
@@ -110,8 +110,8 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return this;
   }
 
-  limits(overrides: Partial<QueryLimits>): this {
-    Object.assign(this.limitOverrides, overrides);
+  guards(overrides: Partial<QueryGuards>): this {
+    Object.assign(this.guardOverrides, overrides);
     return this;
   }
 
@@ -209,10 +209,10 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 }
 
 /**
- * Reads the wire-limit overrides a builder accumulated, the internal seam the wire parser resolves through.
+ * Reads the wire-guard overrides a builder accumulated, the internal seam the wire parser resolves through.
  */
-export function builderLimits(builder: UntypedQueryBuilder): Partial<QueryLimits> {
-  return (builder as QueryBuilderImpl).limitOverrides;
+export function builderGuards(builder: UntypedQueryBuilder): Partial<QueryGuards> {
+  return (builder as QueryBuilderImpl).guardOverrides;
 }
 
 /**

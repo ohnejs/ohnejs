@@ -6,7 +6,7 @@ import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
 import type { UpdateInputOf } from './known-updates.ts';
 import type { UntypedQueryBuilder } from './untyped.ts';
-import type { QueryLimits } from './wire/limits.ts';
+import type { QueryGuards } from './wire/guards.ts';
 import type { FieldErrors } from './write/errors.ts';
 
 /**
@@ -646,19 +646,19 @@ interface Terminals<C extends CollectionName, S, P> {
 }
 
 /**
- * The `limits` override, present on every state and returning that same state.
+ * The `guards` override, present on every state and returning that same state.
  */
-interface Limitable<Self> {
+interface Guardable<Self> {
   /**
-   * Overrides the wire limits for this builder, merging per key so the last value for a key wins.
-   * These gate the untrusted wire path; the fluent path is trusted and never limit-checked.
+   * Overrides the wire guards for this builder, merging per key so the last value for a key wins.
+   * These gate the untrusted wire path; the fluent path is trusted and never guard-checked.
    *
    * @example
    * ```ts
-   * query('Posts').limits({ maxSelect: 50 })
+   * query('Posts').guards({ maxSelect: 50 })
    * ```
    */
-  limits(overrides: Partial<QueryLimits>): Self;
+  guards(overrides: Partial<QueryGuards>): Self;
 }
 
 /**
@@ -763,7 +763,7 @@ export interface PendingQuery<C extends CollectionName, S = never, P = never>
     Refinements<C, S, P>,
     Terminals<C, S, P>,
     WriteEntry<C, S, P>,
-    Limitable<PendingQuery<C, S, P>>,
+    Guardable<PendingQuery<C, S, P>>,
     Joinable<PendingQuery<C, S, P>> {}
 
 /**
@@ -775,7 +775,7 @@ export interface ReadyQuery<C extends CollectionName, S = never, P = never>
     Refinements<C, S, P>,
     Terminals<C, S, P>,
     WriteMutations<C, S, P>,
-    Limitable<ReadyQuery<C, S, P>>,
+    Guardable<ReadyQuery<C, S, P>>,
     Joinable<ReadyQuery<C, S, P>> {}
 
 /**
@@ -787,7 +787,7 @@ export interface ReadOnlyQuery<C extends CollectionName, S = never, P = never>
     WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P>>,
     Refinements<C, S, P>,
     Terminals<C, S, P>,
-    Limitable<ReadOnlyQuery<C, S, P>>,
+    Guardable<ReadOnlyQuery<C, S, P>>,
     Joinable<ReadOnlyQuery<C, S, P>> {}
 
 /**

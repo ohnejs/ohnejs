@@ -5,7 +5,7 @@ import { isNull, isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { queryMetadata } from '../metadata.ts';
 import { compileWhere } from '../sql/where.ts';
-import { assertBoundParams } from '../wire/limits.ts';
+import { assertBoundParams } from '../wire/guards.ts';
 
 /**
  * Counts every matching row, ignoring order and the row window, which a count never applies.

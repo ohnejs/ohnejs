@@ -1,13 +1,14 @@
 import { ohneError } from '../../error/ohne-error.ts';
+import { useConfig } from '../../layers/use-config.ts';
 
 /**
  * The DoS guards that bound a wire-driven query, resolved per key from three tiers.
  *
- * Framework defaults, then `config.query.limits` app-wide, then `.limits()` per builder.
- * They gate the untrusted wire path; the fluent path is trusted and never limit-checked.
+ * Framework defaults, then `config.query.guards` app-wide, then `.guards()` per builder.
+ * They gate the untrusted wire path; the fluent path is trusted and never guard-checked.
  * Every field is a generous ceiling, not policy: a real query never approaches one.
  */
-export interface QueryLimits {
+export interface QueryGuards {
   /**
    * The most comparison leaves one condition may carry.
    *
@@ -82,9 +83,9 @@ export interface QueryLimits {
 }
 
 /**
- * The framework's generous default limits, the base tier the config and the builder override onto.
+ * The framework's generous default guards, the base tier the config and the builder override onto.
  */
-export const DEFAULT_QUERY_LIMITS: Readonly<QueryLimits> = {
+export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
   maxConditions: 100,
   maxHasDepth: 8,
   maxInLength: 2000,
@@ -97,15 +98,26 @@ export const DEFAULT_QUERY_LIMITS: Readonly<QueryLimits> = {
 };
 
 /**
+ * Folds the three guard tiers into one effective table: defaults, then config, then the builder.
+ *
+ * The framework defaults are the base; `config.query.guards` overrides them app-wide.
+ * A builder's own `.guards()` overrides win last, per key.
+ * Only the untrusted wire path resolves through this; the fluent path is trusted and never guard-checked.
+ */
+export function resolveGuards(overrides: Partial<QueryGuards> = {}): QueryGuards {
+  return { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...overrides };
+}
+
+/**
  * Refuses a compiled statement carrying more bound parameters than the framework backstop allows.
  * The driver's own variable limit is the hard wall; this cap sits below it and names the count.
  */
 export function assertBoundParams(count: number): void {
-  if (count <= DEFAULT_QUERY_LIMITS.maxBoundParams) return;
+  if (count <= DEFAULT_QUERY_GUARDS.maxBoundParams) return;
   throw ohneError({
     title: 'Query exceeds the bound-parameter cap',
     body: [
-      `The compiled statement binds ${count} parameters, past the cap of ${DEFAULT_QUERY_LIMITS.maxBoundParams}.`,
+      `The compiled statement binds ${count} parameters, past the cap of ${DEFAULT_QUERY_GUARDS.maxBoundParams}.`,
       'Narrow the condition, or shrink an `in` list.',
     ],
   });

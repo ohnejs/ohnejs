@@ -1,0 +1,106 @@
+import { deepStrictEqual } from 'node:assert';
+import { describe, it } from 'node:test';
+
+import type { OrderDirection } from '../../../../src/ohne/query/ir.ts';
+import type { UntypedQueryBuilder } from '../../../../src/ohne/query/untyped.ts';
+import type { ParsedQuery } from '../../../../src/ohne/query/wire/parse.ts';
+
+import { applyQuery, type QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
+
+function recorder(): { builder: UntypedQueryBuilder; calls: string[] } {
+  const calls: string[] = [];
+  const builder = {
+    where: (condition: unknown) => (calls.push(`where:${JSON.stringify(condition)}`), builder),
+    select: (...fields: string[]) => (calls.push(`select:${fields.join(',')}`), builder),
+    orderBy: (f: string, d: OrderDirection) => (calls.push(`order:${f}:${d}`), builder),
+    limit: (n: number) => (calls.push(`limit:${n}`), builder),
+    offset: (n: number) => (calls.push(`offset:${n}`), builder),
+    populate: (...fields: string[]) => (calls.push(`populate:${fields.join(',')}`), builder),
+  };
+  return { builder: builder as unknown as UntypedQueryBuilder, calls };
+}
+
+function query(overrides: Partial<ParsedQuery> = {}): ParsedQuery {
+  return {
+    where: null,
+    select: null,
+    order: [],
+    populate: [],
+    limit: null,
+    offset: null,
+    page: null,
+    perPage: null,
+    ...overrides,
+  };
+}
+
+describe('applyQuery replays a parsed query onto the builder', () => {
+  it('applies each part in one chain', () => {
+    const { builder, calls } = recorder();
+    applyQuery(
+      builder,
+      query({
+        where: { views: { atLeast: 10 } },
+        select: ['title'],
+        order: [{ field: 'views', direction: 'desc' }],
+        populate: ['author'],
+        limit: 20,
+        offset: 5,
+      }),
+    );
+    deepStrictEqual(calls, [
+      'where:{"views":{"atLeast":10}}',
+      'select:title',
+      'order:views:desc',
+      'populate:author',
+      'limit:20',
+      'offset:5',
+    ]);
+  });
+
+  it('applies nothing for an empty query', () => {
+    const { builder, calls } = recorder();
+    applyQuery(builder, query());
+    deepStrictEqual(calls, []);
+  });
+});
+
+describe('applyQuery composes a request under a scope', () => {
+  it('ANDs the scope filter before the request filter', () => {
+    const { builder, calls } = recorder();
+    const scope: QueryScope = { where: { published: true } };
+    applyQuery(builder, query({ where: { views: { atLeast: 10 } } }), scope);
+    deepStrictEqual(calls, ['where:{"published":true}', 'where:{"views":{"atLeast":10}}']);
+  });
+
+  it('intersects the scoped select with the request select', () => {
+    const { builder, calls } = recorder();
+    const scope: QueryScope = { select: ['title', 'body'] };
+    applyQuery(builder, query({ select: ['body', 'secret'] }), scope);
+    deepStrictEqual(calls, ['select:body']);
+  });
+
+  it('keeps the scope select when the request names only out-of-scope fields', () => {
+    const { builder, calls } = recorder();
+    const scope: QueryScope = { select: ['title', 'body'] };
+    applyQuery(builder, query({ select: ['secret'] }), scope);
+    deepStrictEqual(calls, ['select:title,body']);
+  });
+
+  it('keeps the scope select when the request names none', () => {
+    const { builder, calls } = recorder();
+    const scope: QueryScope = { select: ['title'] };
+    applyQuery(builder, query(), scope);
+    deepStrictEqual(calls, ['select:title']);
+  });
+
+  it('takes the smaller of the scoped and requested limit', () => {
+    const under = recorder();
+    applyQuery(under.builder, query({ limit: 10 }), { limit: 50 });
+    deepStrictEqual(under.calls, ['limit:10']);
+
+    const over = recorder();
+    applyQuery(over.builder, query({ limit: 500 }), { limit: 50 });
+    deepStrictEqual(over.calls, ['limit:50']);
+  });
+});

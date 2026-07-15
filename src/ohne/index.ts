@@ -127,7 +127,7 @@ export * from './query/known-updates.ts';
 export * from './query/known-query-fields.ts';
 export * from './query/query.ts';
 export * from './query/untyped.ts';
-export * from './query/wire/limits.ts';
+export * from './query/wire/guards.ts';
 export * from './routes/collect-routes.ts';
 export * from './routes/define-handler.ts';
 export * from './routes/known-routes.ts';

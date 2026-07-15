@@ -10,7 +10,7 @@ import { queryMetadata } from '../metadata.ts';
 import { compileLimit, compileOrder } from '../sql/order.ts';
 import { compileSelect } from '../sql/select.ts';
 import { compileWhere } from '../sql/where.ts';
-import { assertBoundParams } from '../wire/limits.ts';
+import { assertBoundParams } from '../wire/guards.ts';
 import { hydrateScope } from './hydrate.ts';
 import { applyPopulate } from './loaders/populate.ts';
 

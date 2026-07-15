@@ -9,7 +9,7 @@ import { registerDatabase, registerDialect } from '../../../src/ohne/database/us
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
-import { builderLimits } from '../../../src/ohne/query/impl.ts';
+import { builderGuards } from '../../../src/ohne/query/impl.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 
 useCollections().register('IPosts', {
@@ -170,8 +170,8 @@ describe('QueryBuilderImpl pluck', () => {
 describe('QueryBuilderImpl limits', () => {
   it('accumulates overrides per key, the last value winning', () => {
     const builder = queryUntyped('IPosts')
-      .limits({ maxSelect: 5 })
-      .limits({ maxSelect: 10, maxOrder: 3 });
-    deepStrictEqual(builderLimits(builder), { maxSelect: 10, maxOrder: 3 });
+      .guards({ maxSelect: 5 })
+      .guards({ maxSelect: 10, maxOrder: 3 });
+    deepStrictEqual(builderGuards(builder), { maxSelect: 10, maxOrder: 3 });
   });
 });

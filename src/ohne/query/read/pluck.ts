@@ -5,7 +5,7 @@ import type { QueryIR } from '../ir.ts';
 import { isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { queryMetadata } from '../metadata.ts';
-import { assertBoundParams } from '../wire/limits.ts';
+import { assertBoundParams } from '../wire/guards.ts';
 import { compileReadTail, readRows } from './find.ts';
 
 /**

@@ -10,6 +10,7 @@ import type { KnownCollections } from '../collections/known-collections.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
+import type { QueryGuards } from '../query/wire/guards.ts';
 import type { LayerName } from './layer-name.ts';
 
 /**
@@ -609,6 +610,25 @@ export interface Config {
        */
       force?: boolean;
     };
+  };
+
+  /**
+   * Query settings.
+   */
+  query?: {
+    /**
+     * DoS ceilings for wire-driven queries, overriding the framework defaults per key.
+     * They gate the untrusted URL and POST-body paths; the fluent builder is trusted and never checked.
+     * A closer layer or the app overrides a ceiling by naming it; unnamed ceilings keep the default.
+     *
+     * @example
+     * ```ts
+     * query: {
+     *   limits: { maxInLength: 500, maxPerPage: 100 },
+     * }
+     * ```
+     */
+    guards?: Partial<QueryGuards>;
   };
 
   /**
