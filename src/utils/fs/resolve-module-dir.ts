@@ -21,6 +21,7 @@ import { exists } from './exists.ts';
  * ```ts
  * await resolveModuleDir('typescript', '/srv/app')
  * // -> '/srv/app/node_modules/typescript' | null
+ *
  * await resolveModuleDir('@scope/pkg', '/srv/app/src')
  * // -> '/srv/.pnpm/@scope/pkg/...' | null
  * ```

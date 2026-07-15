@@ -50,8 +50,10 @@ export interface FreePortOptions {
  * ```ts
  * await freePort(9000)
  * // -> 9000 when free, else the next free port up
+ *
  * await freePort(9000, { exclude: [9001] })
  * // -> 9000, or skips 9001 while scanning
+ *
  * await freePort()
  * // -> a random free port from the OS
  * ```
