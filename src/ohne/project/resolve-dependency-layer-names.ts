@@ -13,6 +13,7 @@ import { resolveOhneLayers } from './resolve-ohne-layers.ts';
  * ```ts
  * await resolveDependencyLayerNames()
  * // -> ['ohne', '@acme/base', '@acme/auth']
+ *
  * await resolveDependencyLayerNames('/srv/lib')
  * // -> ['ohne']
  * ```

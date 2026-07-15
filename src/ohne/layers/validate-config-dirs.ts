@@ -16,8 +16,10 @@ import { DIR_DEFAULTS } from './config.ts';
  * ```ts
  * validateConfigDirs({ api: 'src', messages: 'src/messages' }, file)
  * // `api` contains `messages`
+ *
  * validateConfigDirs({ api: 'messages' }, file)
  * // clashes with default `messages`
+ *
  * validateConfigDirs({ api: 'routes' }, file)
  * // ok
  * ```

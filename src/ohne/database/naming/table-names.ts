@@ -144,8 +144,10 @@ export function ownerTableName(owner: DerivedOwner): string {
  * ```ts
  * derivedParentName({ collection: 'Posts', path: ['sections'] })
  * // -> 'Posts'
+ *
  * derivedParentName({ collection: 'Posts', path: ['sections', 'items'] })
  * // -> 'Posts_sections'
+ *
  * derivedParentName({ block: 'Hero', path: ['links'] })
  * // -> 'block_Hero'
  * ```
