@@ -29,7 +29,7 @@ const GLOBAL_DIR = 'global';
  * @example
  * ```ts
  * await scanLayerMiddleware({ name: 'app', dir: '/app' }, 'middleware')
- * // -> [{ name: 'auth', isGlobal: false, file: '/app/middleware/auth.ts', layer: 'app' }]
+ * // -> [{ name: 'auth', isGlobal: false, file: '...', layer: 'app' }]
  * ```
  */
 export async function scanLayerMiddleware(

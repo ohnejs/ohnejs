@@ -78,7 +78,13 @@ export interface FieldBaseType {
  *
  * @example
  * ```ts
- * fieldBaseType({ fieldType: text, name: 'title', options: { nullable: true }, fieldDir, imports })
+ * fieldBaseType({
+ *   fieldType: text,
+ *   name: 'title',
+ *   options: { nullable: true },
+ *   fieldDir,
+ *   imports,
+ * })
  * // -> { base: 'string', nullable: true }
  * ```
  */
@@ -122,7 +128,13 @@ export function fieldBaseType<TOptions extends Record<string, AnyOptionDef>>(
  * fieldValueType({ fieldType: text, name: 'title', options: {}, fieldDir, imports })
  * // -> 'string'
  *
- * fieldValueType({ fieldType: text, name: 'title', options: { nullable: true }, fieldDir, imports })
+ * fieldValueType({
+ *   fieldType: text,
+ *   name: 'title',
+ *   options: { nullable: true },
+ *   fieldDir,
+ *   imports,
+ * })
  * // -> 'string | null'
  * ```
  */

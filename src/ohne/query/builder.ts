@@ -402,7 +402,10 @@ interface WhereMethods<F extends Record<string, QueryFieldMeta>, Target> {
    *
    * @example
    * ```ts
-   * query('Posts').whereAny((q) => [q.where('status', 'published'), q.where('featured', true)])
+   * query('Posts').whereAny((q) => [
+   *   q.where('status', 'published'),
+   *   q.where('featured', true),
+   * ])
    * ```
    */
   whereAny(build: (group: WhereGroup<F>) => WhereBranch<F>[]): Target;
@@ -720,7 +723,9 @@ interface WriteMutations<C extends CollectionName, S, P> {
    *
    * @example
    * ```ts
-   * const result = await query('Posts').where('status', 'draft').update({ status: 'published' })
+   * const result = await query('Posts')
+   *   .where('status', 'draft')
+   *   .update({ status: 'published' })
    * if (result.ok) result.records // every updated post
    * ```
    */
@@ -731,7 +736,9 @@ interface WriteMutations<C extends CollectionName, S, P> {
    *
    * @example
    * ```ts
-   * const posts = await query('Posts').where('status', 'draft').updateOrThrow({ status: 'published' })
+   * const posts = await query('Posts')
+   *   .where('status', 'draft')
+   *   .updateOrThrow({ status: 'published' })
    * ```
    */
   updateOrThrow(input: UpdateInputOf<C>): Promise<QueryRow<C, S, P>[]>;

@@ -45,8 +45,10 @@ const cache = new Map<string, MessageAST>();
  *
  * @example
  * ```ts
- * translate('api.http.notFound')                         // -> 'Not Found'
- * translate('api.messages.unknownGroup', { group: 'x' }) // -> 'Unknown message group `x`'
+ * translate('api.http.notFound')
+ * // -> 'Not Found'
+ * translate('api.messages.unknownGroup', { group: 'x' })
+ * // -> 'Unknown message group `x`'
  * ```
  */
 export function translate(key: string, params?: MessageParams): string {

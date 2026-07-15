@@ -142,9 +142,12 @@ export function ownerTableName(owner: DerivedOwner): string {
  *
  * @example
  * ```ts
- * derivedParentName({ collection: 'Posts', path: ['sections'] })          // -> 'Posts'
- * derivedParentName({ collection: 'Posts', path: ['sections', 'items'] }) // -> 'Posts_sections'
- * derivedParentName({ block: 'Hero', path: ['links'] })                   // -> 'block_Hero'
+ * derivedParentName({ collection: 'Posts', path: ['sections'] })
+ * // -> 'Posts'
+ * derivedParentName({ collection: 'Posts', path: ['sections', 'items'] })
+ * // -> 'Posts_sections'
+ * derivedParentName({ block: 'Hero', path: ['links'] })
+ * // -> 'block_Hero'
  * ```
  */
 export function derivedParentName(origin: DerivedOwnerPath): string {

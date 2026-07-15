@@ -148,7 +148,7 @@ const UPDATED_AT_COLUMN: ColumnSchema = { name: '_updatedAt', type: 'integer', n
  * @example
  * ```ts
  * buildDesiredSchema(useCollections(), useFields(), useBlocks())
- * // -> [{ name: 'Posts', columns: [...], ... }, { name: 'Posts_content', ... }, { name: 'block_Hero', ... }]
+ * // -> [{ name: 'Posts', ... }, { name: 'Posts_content', ... }, ...]
  * ```
  */
 export function buildDesiredSchema(

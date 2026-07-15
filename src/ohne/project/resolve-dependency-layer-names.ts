@@ -11,8 +11,10 @@ import { resolveOhneLayers } from './resolve-ohne-layers.ts';
  *
  * @example
  * ```ts
- * await resolveDependencyLayerNames()           // -> ['ohne', '@acme/base', '@acme/auth']
- * await resolveDependencyLayerNames('/srv/lib') // -> ['ohne']
+ * await resolveDependencyLayerNames()
+ * // -> ['ohne', '@acme/base', '@acme/auth']
+ * await resolveDependencyLayerNames('/srv/lib')
+ * // -> ['ohne']
  * ```
  */
 export async function resolveDependencyLayerNames(from: string = process.cwd()): Promise<string[]> {

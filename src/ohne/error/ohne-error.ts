@@ -56,7 +56,10 @@ const OHNE_ERROR = Symbol('ohne.error');
  * @example
  * ```ts
  * throw ohneError('Project has no routes')
- * throw ohneError({ title: 'Invalid `port`', body: ['`port` must be 0-65535.', 'You set `99999`.'] })
+ * throw ohneError({
+ *   title: 'Invalid `port`',
+ *   body: ['`port` must be 0-65535.', 'You set `99999`.'],
+ * })
  * ```
  */
 export function ohneError(input: string | OhneErrorInit): OhneError {

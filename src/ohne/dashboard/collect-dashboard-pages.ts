@@ -16,10 +16,13 @@ import { scanDashboardPages } from './scan-dashboard-pages.ts';
  *
  * @example
  * ```ts
- * await collectDashboardPages([{ name: 'auth', dir: '/dep' }, { name: 'app', dir: '/app' }])
+ * await collectDashboardPages([
+ *   { name: 'auth', dir: '/dep' },
+ *   { name: 'app', dir: '/app' },
+ * ])
  * // -> [
- * //      { pattern: '/', module: 'pages/index.ts', file: '...', layer: 'auth' },
- * //      { pattern: '/authors/[id]', module: 'pages/authors/[id].ts', file: '...', layer: 'app' },
+ * //      { pattern: '/', module: '...', file: '...', layer: 'auth' },
+ * //      { pattern: '/authors/[id]', module: '...', file: '...', layer: 'app' },
  * //    ]
  * ```
  */
