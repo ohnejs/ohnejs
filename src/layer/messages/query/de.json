@@ -1,0 +1,21 @@
+{
+  "unknownParam": "Unbekannter Abfrageparameter `{param}`",
+  "invalidField": "Unbekanntes oder unbrauchbares Feld `{field}`",
+  "invalidFieldSuggestion": "Unbekanntes oder unbrauchbares Feld `{field}`. Meintest du `{suggestion}`?",
+  "invalidShape": "Die `where`-Bedingung ist fehlerhaft",
+  "unknownOperator": "Unbekannter Operator `{operator}`",
+  "invalidValue": "Ungültiger Wert in der `where`-Bedingung",
+  "nullEquality": "`null` ist kein Wert; nutze `isNull`, um ein null-Feld zu vergleichen",
+  "tooDeep": "Die `where`-Bedingung ist zu tief verschachtelt",
+  "invalidNumber": "`{param}` muss eine ganze Zahl sein",
+  "invalidPagination": "Nutze `limit` und `offset` oder `page` und `perPage`, aber nicht beides",
+  "emptySelect": "`select` muss mindestens ein Feld nennen",
+  "duplicateOrderField": "Feld `{field}` wird mehrfach sortiert",
+  "tooManyConditions": "Die `where`-Bedingung hat zu viele Klauseln (max `{max}`)",
+  "hasTooDeep": "Die `where`-Bedingung verschachtelt `has` zu tief (max `{max}`)",
+  "listTooLong": "Eine Liste ist zu lang (max `{max}`)",
+  "tooManyFields": "`select` nennt zu viele Felder (max `{max}`)",
+  "tooManyOrderKeys": "`order` stapelt zu viele Schlüssel (max `{max}`)",
+  "valueTooLarge": "Ein Wert ist zu groß (max `{max}` Bytes)",
+  "patternTooLarge": "Ein Muster ist zu groß (max `{max}` Bytes)"
+}

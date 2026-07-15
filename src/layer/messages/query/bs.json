@@ -1,0 +1,21 @@
+{
+  "unknownParam": "Nepoznat parametar upita `{param}`",
+  "invalidField": "Nepoznato ili neupotrebljivo polje `{field}`",
+  "invalidFieldSuggestion": "Nepoznato ili neupotrebljivo polje `{field}`. Da li ste mislili `{suggestion}`?",
+  "invalidShape": "Uslov `where` je neispravan",
+  "unknownOperator": "Nepoznat operator `{operator}`",
+  "invalidValue": "Neispravna vrijednost u uslovu `where`",
+  "nullEquality": "`null` nije vrijednost; koristi `isNull` za poređenje null polja",
+  "tooDeep": "Uslov `where` je preduboko ugniježđen",
+  "invalidNumber": "`{param}` mora biti cijeli broj",
+  "invalidPagination": "Koristi `limit` i `offset`, ili `page` i `perPage`, ali ne oboje",
+  "emptySelect": "`select` mora navesti barem jedno polje",
+  "duplicateOrderField": "Polje `{field}` je sortirano više puta",
+  "tooManyConditions": "Uslov `where` ima previše klauzula (max `{max}`)",
+  "hasTooDeep": "Uslov `where` ugniježđuje `has` preduboko (max `{max}`)",
+  "listTooLong": "Lista je predugačka (max `{max}`)",
+  "tooManyFields": "`select` navodi previše polja (max `{max}`)",
+  "tooManyOrderKeys": "`order` slaže previše ključeva (max `{max}`)",
+  "valueTooLarge": "Vrijednost je prevelika (max `{max}` bajtova)",
+  "patternTooLarge": "Uzorak je prevelik (max `{max}` bajtova)"
+}

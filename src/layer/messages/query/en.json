@@ -1,0 +1,21 @@
+{
+  "unknownParam": "Unknown query parameter `{param}`",
+  "invalidField": "Unknown or unusable field `{field}`",
+  "invalidFieldSuggestion": "Unknown or unusable field `{field}`. Did you mean `{suggestion}`?",
+  "invalidShape": "The `where` condition is malformed",
+  "unknownOperator": "Unknown operator `{operator}`",
+  "invalidValue": "Invalid value in the `where` condition",
+  "nullEquality": "`null` is not a value; use `isNull` to match a null field",
+  "tooDeep": "The `where` condition nests too deep",
+  "invalidNumber": "`{param}` must be a whole number",
+  "invalidPagination": "Use `limit` and `offset`, or `page` and `perPage`, but not both",
+  "emptySelect": "`select` must name at least one field",
+  "duplicateOrderField": "Field `{field}` is ordered more than once",
+  "tooManyConditions": "The `where` condition has too many clauses (max `{max}`)",
+  "hasTooDeep": "The `where` condition nests `has` too deep (max `{max}`)",
+  "listTooLong": "A list is too long (max `{max}`)",
+  "tooManyFields": "`select` names too many fields (max `{max}`)",
+  "tooManyOrderKeys": "`order` stacks too many keys (max `{max}`)",
+  "valueTooLarge": "A value is too large (max `{max}` bytes)",
+  "patternTooLarge": "A pattern is too large (max `{max}` bytes)"
+}
