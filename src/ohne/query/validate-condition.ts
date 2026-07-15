@@ -7,6 +7,106 @@ import { queryMetadata } from './metadata.ts';
 import { allowedOperators, type QueryOperator } from './operators.ts';
 
 /**
+ * A single applicability failure a condition leaf carries, the shape both callers render.
+ *
+ * The fluent path throws it as an `ohneError` naming the field.
+ * The wire path collapses both kinds into one `invalidField`, so a URL cannot probe which fields exist.
+ */
+export interface ConditionProblem {
+  /**
+   * Whether the field is unknown, or is real but rejects the operator.
+   */
+  kind: 'unknownField' | 'inapplicable';
+
+  /**
+   * The offending field, as addressed: a single segment, or the joined path of a multi-segment one.
+   */
+  field: string;
+
+  /**
+   * The operator the leaf applied, `has`/`empty` included (they read as operators here).
+   */
+  operator: QueryOperator;
+
+  /**
+   * The scope the field was looked up in, carrying the collection name and the candidate fields.
+   */
+  scope: CollectionQueryMeta;
+
+  /**
+   * The path from the condition root to the leaf, `has` boundaries included, for the wire dot path.
+   */
+  path: readonly string[];
+
+  /**
+   * The closest real field when the name is a near miss, for a `did you mean` hint. Absent otherwise.
+   */
+  suggestion: string | undefined;
+}
+
+/**
+ * Walks a parsed condition against a collection's metadata, returning the first applicability failure.
+ *
+ * Every leaf must address a real field and apply an operator that field admits.
+ * A `has`'s nested condition re-scopes to the relation's target and is walked there in turn.
+ * Its field name pushes onto the returned `path`, so the failure locates itself from the root.
+ * A `where` path is a single segment in v1: an anchored or dotted path reads as an unknown field.
+ * Returns `null` when every leaf is sound.
+ */
+export function checkCondition(
+  node: ConditionNode,
+  meta: CollectionQueryMeta,
+  prefix: readonly string[] = [],
+): ConditionProblem | null {
+  if (node.kind === 'and' || node.kind === 'or') {
+    for (const child of node.nodes) {
+      const problem = checkCondition(child, meta, prefix);
+      if (!isNull(problem)) return problem;
+    }
+    return null;
+  }
+  const operator: QueryOperator = node.kind === 'compare' ? node.op : node.kind;
+  if (node.path.length !== 1) {
+    const field = node.path.join('.');
+    return {
+      kind: 'unknownField',
+      field,
+      operator,
+      scope: meta,
+      path: [...prefix, field],
+      suggestion: undefined,
+    };
+  }
+  const name = node.path[0];
+  const field = meta.fields[name];
+  if (isUndefined(field)) {
+    const suggestion = didYouMean(name, Object.keys(meta.fields));
+    return {
+      kind: 'unknownField',
+      field: name,
+      operator,
+      scope: meta,
+      path: [...prefix, name],
+      suggestion,
+    };
+  }
+  if (!allowedOperators(field).has(operator)) {
+    return {
+      kind: 'inapplicable',
+      field: name,
+      operator,
+      scope: meta,
+      path: [...prefix, name],
+      suggestion: undefined,
+    };
+  }
+  if (node.kind === 'has' && !isNull(node.condition)) {
+    return checkCondition(node.condition, targetScope(field, name, meta), [...prefix, name]);
+  }
+  return null;
+}
+
+/**
  * Gates a parsed condition against a collection's metadata, the runtime twin of the type-level narrowing.
  *
  * Every leaf must address a real field and apply an operator that field admits.
@@ -17,32 +117,22 @@ import { allowedOperators, type QueryOperator } from './operators.ts';
  * Untyped callers thus hit the same failures the typed surface prevents at compile time.
  */
 export function validateCondition(node: ConditionNode, meta: CollectionQueryMeta): void {
-  if (node.kind === 'and' || node.kind === 'or') {
-    for (const child of node.nodes) validateCondition(child, meta);
-    return;
-  }
-  const operator: QueryOperator = node.kind === 'compare' ? node.op : node.kind;
-  if (node.path.length !== 1) throw unknownFieldError(node.path.join('.'), meta);
-  const field = meta.fields[node.path[0]];
-  if (isUndefined(field)) throw unknownFieldError(node.path[0], meta);
-  if (!allowedOperators(field).has(operator)) {
-    throw ohneError({
-      title: `Operator \`${operator}\` does not apply to \`${node.path[0]}\``,
-      body: [
-        `Field \`${node.path[0]}\` on collection \`${meta.collection}\` does not support \`${operator}\`.`,
-      ],
-    });
-  }
-  if (node.kind === 'has' && !isNull(node.condition)) {
-    validateCondition(node.condition, targetScope(field, node.path[0], meta));
-  }
+  const problem = checkCondition(node, meta);
+  if (isNull(problem)) return;
+  if (problem.kind === 'unknownField') throw unknownFieldError(problem.field, problem.scope);
+  throw ohneError({
+    title: `Operator \`${problem.operator}\` does not apply to \`${problem.field}\``,
+    body: [
+      `Field \`${problem.field}\` on collection \`${problem.scope.collection}\` does not support \`${problem.operator}\`.`,
+    ],
+  });
 }
 
 /**
  * The metadata a `has`'s nested condition is gated against, resolved by the field's kind.
  * A relation names its target collection; a child kind gets a synthetic scope over its subfields.
  */
-function targetScope(
+export function targetScope(
   field: FieldQueryMeta,
   name: string,
   meta: CollectionQueryMeta,
