@@ -18,7 +18,7 @@ const ROUNDING_INCREMENTS: ReadonlySet<number> = new Set([
  * @example
  * ```ts
  * numberOptionsFromSkeleton('currency/EUR .00')
- * // -> { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }
+ * // -> { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, ... }
  *
  * numberOptionsFromSkeleton('percent group-off sign-always')
  * // -> { style: 'percent', useGrouping: false, signDisplay: 'always' }

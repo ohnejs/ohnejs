@@ -99,7 +99,7 @@ export function suggestMessageParams(
  *
  * @example
  * ```ts
- * const ast = parseMessage('{gender, select, female {she} male {he} other {they}} arrived')
+ * const ast = parseMessage('{gender, select, female {she} male {he} other {they}}')
  * suggestMessageParamsAST(ast)
  * // -> [
  * //      { params: { gender: 'female' }, label: 'default' },

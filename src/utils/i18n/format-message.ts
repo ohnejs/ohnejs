@@ -10,9 +10,11 @@ import { parseMessage } from './parse-message.ts';
  *
  * @example
  * ```ts
- * formatMessage('Hello {name}!', { name: 'World' }, 'en') // -> 'Hello World!'
+ * formatMessage('Hello {name}!', { name: 'World' }, 'en')
+ * // -> 'Hello World!'
  *
- * formatMessage('{n, plural, one {# item} other {# items}}', { n: 3 }, 'en') // -> '3 items'
+ * formatMessage('{n, plural, one {# item} other {# items}}', { n: 3 }, 'en')
+ * // -> '3 items'
  * ```
  */
 export function formatMessage(

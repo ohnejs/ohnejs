@@ -53,13 +53,13 @@ function entryOf(node: LeafNode): SearchParamValue {
  * @example
  * ```ts
  * serializeCondition({
- *   kind: 'and',
- *   nodes: [
- *     { kind: 'compare', path: ['status'], op: 'equalsTo', value: 'published', negated: false },
- *     { kind: 'compare', path: ['views'], op: 'atLeast', value: 100, negated: true },
- *   ],
+ *   kind: 'compare',
+ *   path: ['views'],
+ *   op: 'atLeast',
+ *   value: 100,
+ *   negated: true,
  * })
- * // -> { status: 'published', views: { not: { atLeast: 100 } } }
+ * // -> { views: { not: { atLeast: 100 } } }
  * ```
  */
 export function serializeCondition(node: ConditionNode): { [key: string]: SearchParamValue } {

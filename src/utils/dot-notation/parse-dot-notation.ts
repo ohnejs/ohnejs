@@ -45,7 +45,7 @@ export type DotNotationSegment =
  * @example
  * ```ts
  * parseDotNotation('foo.bar[0]')
- * // -> [{ kind: 'key', value: 'foo' }, { kind: 'key', value: 'bar' }, { kind: 'index', value: 0 }]
+ * // -> [{ kind: 'key', value: 'foo' }, ..., { kind: 'index', value: 0 }]
  *
  * parseDotNotation('[0][1]')
  * // -> [{ kind: 'index', value: 0 }, { kind: 'index', value: 1 }]

@@ -6,7 +6,10 @@
  *
  * @example
  * ```ts
- * const page: PageRoute = { pattern: '/authors/[id]', url: '/m/app/pages/authors/[id].ts' }
+ * const page: PageRoute = {
+ *   pattern: '/authors/[id]',
+ *   url: '/m/app/pages/authors/[id].ts',
+ * }
  * ```
  */
 export interface PageRoute {
