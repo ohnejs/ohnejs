@@ -61,6 +61,24 @@ export interface QueryGuards {
   maxOrder: number;
 
   /**
+   * The most nodes a `populate` tree may hold in total, bare names and specs alike.
+   *
+   * @default
+   * 20
+   */
+  maxPopulate: number;
+
+  /**
+   * The deepest a `populate` may nest; root relations are depth `1`.
+   * Depth past the default is new transitive reach across collections.
+   * Raising it is an explicit endpoint decision.
+   *
+   * @default
+   * 2
+   */
+  maxPopulateDepth: number;
+
+  /**
    * The most bytes a single bound string value may weigh, UTF-8.
    *
    * @default
@@ -95,6 +113,8 @@ export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
   maxBoundParams: 10000,
   maxSelect: 200,
   maxOrder: 10,
+  maxPopulate: 20,
+  maxPopulateDepth: 2,
   maxValueBytes: 4096,
   maxPatternBytes: 512,
   maxPerPage: 500,

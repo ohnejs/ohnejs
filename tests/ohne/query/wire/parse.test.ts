@@ -34,7 +34,9 @@ useBlocks().register('WLoose', { name: 'WLoose', block: { fields: { note: field(
 
 useCollections().register('WUsers', {
   name: 'WUsers',
-  collection: { fields: { name: field('text') } },
+  collection: {
+    fields: { name: field('text'), boss: field('record', { collection: 'WUsers' }) },
+  },
 });
 useCollections().register('WTags', {
   name: 'WTags',
@@ -352,6 +354,122 @@ describe('parseQueryParams enforces the blocks two-step', () => {
   });
 });
 
+describe('parseQueryParams reads populate specs', () => {
+  it('parses bare names and spec objects side by side', () => {
+    const parsed = parse('populate=[tags,{author:{select:[name]}}]');
+    deepStrictEqual(parsed.populate, ['tags', { author: { select: ['name'] } }]);
+  });
+
+  it('parses a nested populate to the default depth', () => {
+    const parsed = parse(
+      'populate=[{author:{select:[name,boss],populate:[{boss:{select:[name]}}]}}]',
+    );
+    deepStrictEqual(parsed.populate, [
+      { author: { select: ['name', 'boss'], populate: [{ boss: { select: ['name'] } }] } },
+    ]);
+  });
+
+  it('normalizes lone-string select and populate values to lists', () => {
+    deepStrictEqual(parse('populate=[{author:{select:name,populate:boss}}]').populate, [
+      { author: { select: ['name'], populate: ['boss'] } },
+    ]);
+  });
+
+  it('rejects an unknown relation in a spec key', () => {
+    deepStrictEqual(failure('populate=[{nope:{select:[name]}}]'), {
+      code: 'invalidField',
+      path: 'populate[0].nope',
+    });
+  });
+
+  it('rejects a non-relation spec key', () => {
+    deepStrictEqual(failure('populate=[{title:{select:[name]}}]'), {
+      code: 'invalidField',
+      path: 'populate[0].title',
+    });
+  });
+
+  it('rejects an unknown subselect name, scoped to the target', () => {
+    deepStrictEqual(failure('populate=[{author:{select:[nome]}}]'), {
+      code: 'invalidField',
+      path: 'populate[0].author.select[0]',
+    });
+  });
+
+  it('rejects an empty subselect at its own path', () => {
+    deepStrictEqual(failure('populate=[{author:{select:[]}}]'), {
+      code: 'emptySelect',
+      path: 'populate[0].author.select',
+    });
+  });
+
+  it('rejects a spec carrying keys other than select and populate', () => {
+    deepStrictEqual(failure('populate=[{author:{limit:5}}]'), {
+      code: 'invalidShape',
+      path: 'populate[0].author',
+    });
+  });
+
+  it('rejects a spec value that is not an object', () => {
+    deepStrictEqual(failure('populate=[{author:5}]'), {
+      code: 'invalidShape',
+      path: 'populate[0].author',
+    });
+  });
+
+  it('passes a bare repeat and rejects a repeat involving a spec', () => {
+    deepStrictEqual(parse('populate=[author,author]').populate, ['author', 'author']);
+    deepStrictEqual(failure('populate=[author,{author:{select:[name]}}]'), {
+      code: 'duplicatePopulateField',
+      path: 'populate[1].author',
+    });
+  });
+
+  it('rejects a populate nested past the depth ceiling', () => {
+    deepStrictEqual(failure('populate=[{author:{populate:[{boss:{populate:[boss]}}]}}]'), {
+      code: 'populateTooDeep',
+      path: 'populate[0].author.populate[0].boss.populate',
+    });
+  });
+
+  it('accepts the third level once the depth ceiling is raised', () => {
+    const parsed = parse('populate=[{author:{populate:[{boss:{populate:[boss]}}]}}]', {
+      ...DEFAULT_QUERY_GUARDS,
+      maxPopulateDepth: 3,
+    });
+    strictEqual(parsed.populate.length, 1);
+  });
+
+  it('rejects a tree with more nodes than the ceiling, nested nodes counted', () => {
+    deepStrictEqual(
+      failure('populate=[{author:{populate:[boss]}},tags]', {
+        ...DEFAULT_QUERY_GUARDS,
+        maxPopulate: 2,
+      }),
+      { code: 'tooManyPopulate', path: 'populate' },
+    );
+  });
+
+  it('rejects a subselect naming more fields than maxSelect', () => {
+    strictEqual(
+      failure('populate=[{author:{select:[UUID,name,boss]}}]', {
+        ...DEFAULT_QUERY_GUARDS,
+        maxSelect: 2,
+      }).code,
+      'tooManyFields',
+    );
+  });
+
+  it('dies as a clean 400 when the tree nests past the parser depth cap', () => {
+    const open = '{boss:{populate:[';
+    const bomb = `populate=[{author:{populate:[${open.repeat(11)}boss${']}}'.repeat(11)}]}}]`;
+    const generous = { ...DEFAULT_QUERY_GUARDS, maxPopulate: 1000, maxPopulateDepth: 1000 };
+    const error = failure(bomb, generous);
+    strictEqual(error.code, 'invalidShape');
+    ok(error.path.endsWith('.boss'));
+  });
+});
+
 describe('parseQueryParams reads the locale param', () => {
   it('leaves an absent locale null', () => {
     strictEqual(parseLocalized('').locale, null);
@@ -453,6 +571,14 @@ describe('the GET and POST transports converge on one parsed query', () => {
       { where: { views: { atLeast: 100 } }, order: ['-views'] },
     ],
     ['populate=[author]&page=2&perPage=10', { populate: ['author'], page: 2, perPage: 10 }],
+    [
+      'populate=[{author:{select:[name],populate:[boss]}}]',
+      { populate: [{ author: { select: ['name'], populate: ['boss'] } }] },
+    ],
+    [
+      'populate=[{author:{select:name,populate:boss}}]',
+      { populate: [{ author: { select: ['name'], populate: ['boss'] } }] },
+    ],
     [
       'where={content:{has:{block:WHero,title:{contains:x}}}}',
       { where: { content: { has: { block: 'WHero', title: { contains: 'x' } } } } },

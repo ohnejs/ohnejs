@@ -18,11 +18,22 @@ import { lowerField } from '../../../../src/ohne/query/where-field.ts';
 import { applyQuery } from '../../../../src/ohne/query/wire/apply.ts';
 import { DEFAULT_QUERY_GUARDS } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
-import { parseSearchParams } from '../../../../src/utils/index.ts';
+import {
+  parseSearchParams,
+  stringifySearchParams,
+  type SearchParamValue,
+} from '../../../../src/utils/index.ts';
 
 useLayers().add({
   path: '/mirror',
   input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
+
+useCollections().register('MAuthors', {
+  name: 'MAuthors',
+  collection: {
+    fields: { name: field('text'), boss: field('record', { collection: 'MAuthors' }) },
+  },
 });
 
 useCollections().register('MPosts', {
@@ -33,6 +44,7 @@ useCollections().register('MPosts', {
       views: field('integer'),
       featured: field('boolean'),
       summary: field('text', { nullable: true }),
+      author: field('record', { collection: 'MAuthors' }),
     },
   },
 });
@@ -67,24 +79,40 @@ await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
+const alan = '00000000-0000-7000-8000-00000000000a';
+const ada = '00000000-0000-7000-8000-00000000000b';
+await db.run('INSERT INTO "MAuthors" ("UUID","_updatedAt","name","boss") VALUES (?,?,?,?)', [
+  alan,
+  0,
+  'Alan',
+  null,
+]);
+await db.run('INSERT INTO "MAuthors" ("UUID","_updatedAt","name","boss") VALUES (?,?,?,?)', [
+  ada,
+  0,
+  'Ada',
+  alan,
+]);
+
 let seq = 0;
 async function insert(
   title: string,
   views: number,
   featured: boolean,
   summary: string | null,
+  author: string | null = null,
 ): Promise<void> {
   seq += 1;
   const uuid = `00000000-0000-7000-8000-${String(seq).padStart(12, '0')}`;
   await db.run(
-    'INSERT INTO "MPosts" ("UUID","_updatedAt","title","views","featured","summary") VALUES (?,?,?,?,?,?)',
-    [uuid, 0, title, views, featured ? 1 : 0, summary],
+    'INSERT INTO "MPosts" ("UUID","_updatedAt","title","views","featured","summary","author") VALUES (?,?,?,?,?,?,?)',
+    [uuid, 0, title, views, featured ? 1 : 0, summary, author],
   );
 }
 
-await insert('Alpha', 100, true, 'first');
-await insert('Beta', 50, false, null);
-await insert('Gamma', 100, true, 'third');
+await insert('Alpha', 100, true, 'first', ada);
+await insert('Beta', 50, false, null, alan);
+await insert('Gamma', 100, true, 'third', ada);
 await insert('Delta', 200, false, 'fourth');
 
 await queryUntyped('MPages').createOrThrow({
@@ -193,6 +221,74 @@ describe('the wire mirror returns the same rows as the fluent equivalent', () =>
     deepStrictEqual(
       await wire('order=[title]&limit=2&offset=1'),
       await fluent(queryUntyped('MPosts').orderBy('title').limit(2).offset(1)),
+    );
+  });
+});
+
+describe('the populate wire forms mirror their fluent equivalents', () => {
+  it('a bare name', async () => {
+    deepStrictEqual(
+      await wire('populate=[author]&order=[title]'),
+      await fluent(queryUntyped('MPosts').populate('author').orderBy('title')),
+    );
+  });
+
+  it('a subselecting spec against the callback form', async () => {
+    deepStrictEqual(
+      await wire('populate=[{author:{select:[name]}}]&order=[title]'),
+      await fluent(
+        queryUntyped('MPosts')
+          .populate('author', (a) => a.select('name'))
+          .orderBy('title'),
+      ),
+    );
+  });
+
+  it('a deep spec against the nested callback form', async () => {
+    deepStrictEqual(
+      await wire(
+        'populate=[{author:{select:[name,boss],populate:[{boss:{select:[name]}}]}}]&order=[title]',
+      ),
+      await fluent(
+        queryUntyped('MPosts')
+          .populate('author', (a) =>
+            a.select('name', 'boss').populate('boss', (b) => b.select('name')),
+          )
+          .orderBy('title'),
+      ),
+    );
+  });
+
+  it('a lone-string select and populate inside a spec replay cleanly', async () => {
+    deepStrictEqual(
+      await wire('populate=[{author:{select:name}}]&order=[title]'),
+      await fluent(
+        queryUntyped('MPosts')
+          .populate('author', (a) => a.select('name'))
+          .orderBy('title'),
+      ),
+    );
+    deepStrictEqual(
+      await wire('populate=[{author:{populate:boss}}]&order=[title]'),
+      await fluent(
+        queryUntyped('MPosts')
+          .populate('author', (a) => a.populate('boss'))
+          .orderBy('title'),
+      ),
+    );
+  });
+
+  it('a spec survives the stringify round-trip byte-exactly', async () => {
+    const populate: SearchParamValue = [
+      { author: { select: ['name', 'boss'], populate: [{ boss: { select: ['name'] } }] } },
+    ];
+    const url = stringifySearchParams({ populate, order: ['title'] });
+    deepStrictEqual(parseSearchParams(url).populate, populate);
+    deepStrictEqual(
+      await wire(url),
+      await wire(
+        'populate=[{author:{select:[name,boss],populate:[{boss:{select:[name]}}]}}]&order=[title]',
+      ),
     );
   });
 });

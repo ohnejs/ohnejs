@@ -2,7 +2,7 @@ import type { ConditionNode, SearchParamValue } from '../../../utils/index.ts';
 import type { HTTPError } from '../../http/http-error.ts';
 import type { OrderDirection, OrderEntry } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
-import type { ConditionInput } from '../untyped.ts';
+import type { ConditionInput, PopulateSpec, PopulateSubQuery } from '../untyped.ts';
 import type { QueryGuards } from './guards.ts';
 
 import {
@@ -12,6 +12,7 @@ import {
   isBoolean,
   isNull,
   isNumber,
+  isPlainObject,
   isString,
   isUndefined,
   parseCondition,
@@ -19,6 +20,7 @@ import {
   walkCondition,
 } from '../../../utils/index.ts';
 import { queryLocales } from '../locale.ts';
+import { queryMetadata } from '../metadata.ts';
 import {
   blockScope,
   checkCondition,
@@ -30,10 +32,12 @@ import {
   blockTypeRequiredError,
   conditionShapeError,
   duplicateOrderFieldError,
+  duplicatePopulateFieldError,
   emptySelectError,
   invalidFieldError,
   invalidLocaleError,
   invalidNumberError,
+  invalidSpecError,
   invalidValueError,
   limitError,
   localeNotApplicableError,
@@ -76,9 +80,15 @@ export interface ParsedQuery {
   order: OrderEntry[];
 
   /**
-   * The relation fields to hydrate; empty when the query names none.
+   * The relations to hydrate - bare names or recursive spec objects; empty when the query names none.
+   * Spec values arrive normalized: a lone-string `select` or `populate` is already a proper list.
+   *
+   * @example
+   * ```ts
+   * ['author', { comments: { select: ['text'], populate: ['author'] } }]
+   * ```
    */
-  populate: string[];
+  populate: (string | PopulateSpec)[];
 
   /**
    * The row cap, or `null` when unset.
@@ -153,7 +163,7 @@ export function parseQueryParams(
     where: parseWhere(params.where, meta, guards, windowBoundParams(window)),
     select: parseSelect(params.select, meta, guards),
     order: parseOrder(params.order, meta, guards),
-    populate: parsePopulate(params.populate, meta),
+    populate: parsePopulate(params.populate, meta, guards),
     ...window,
     locale: parseLocale(params.locale, meta),
   });
@@ -361,25 +371,152 @@ function parseOrder(
 }
 
 /**
- * Parses `populate` into relation fields to hydrate, rejecting an unknown field or a non-relation one.
+ * Parses `populate` into validated entries: bare relation names, or spec objects narrowing per relation.
+ *
+ * A spec object's keys are relations of its level's collection.
+ * A spec carries `select` and `populate` alone, recursing the same grammar one level down.
+ * Depth counts populate levels from `1` at the root and gates against `maxPopulateDepth`.
+ * The total node count gates against `maxPopulate`.
+ * A field repeated at one level passes for two bare names and fails otherwise.
+ * The entries return normalized: a lone-string `select` or `populate` value becomes a proper list.
  */
-function parsePopulate(value: SearchParamValue | undefined, meta: CollectionQueryMeta): string[] {
+function parsePopulate(
+  value: SearchParamValue | undefined,
+  meta: CollectionQueryMeta,
+  guards: QueryGuards,
+): (string | PopulateSpec)[] {
   if (isUndefined(value)) return [];
-  const fields = toStringList(value, 'populate');
-  fields.forEach((field, index) => {
-    const fieldMeta = meta.fields[field];
-    if (isUndefined(fieldMeta)) {
-      throw invalidFieldError(
-        field,
-        `populate[${index}]`,
-        didYouMean(field, Object.keys(meta.fields)),
-      );
+  return parsePopulateLevel(toArray(value), meta, 'populate', 1, guards, { nodes: 0 });
+}
+
+/**
+ * Validates one level of populate entries against its collection, counting depth and nodes.
+ * An unknown or non-relation name collapses to `invalidField`, whatever form carried it.
+ * Returns the level rebuilt in normalized form, so the parsed shape matches its declared type.
+ */
+function parsePopulateLevel(
+  entries: readonly unknown[],
+  meta: CollectionQueryMeta,
+  path: string,
+  depth: number,
+  guards: QueryGuards,
+  budget: { nodes: number },
+): (string | PopulateSpec)[] {
+  if (depth > guards.maxPopulateDepth) {
+    throw limitError('populateTooDeep', path, guards.maxPopulateDepth);
+  }
+  const bare = new Map<string, boolean>();
+  return entries.map((entry, index) => {
+    if (isString(entry)) {
+      countPopulateNode(budget, guards);
+      populatedRelation(entry, `${path}[${index}]`, meta);
+      registerPopulateField(bare, entry, true, `${path}[${index}]`);
+      return entry;
     }
-    if (fieldMeta.kind !== 'record' && fieldMeta.kind !== 'records') {
-      throw invalidFieldError(field, `populate[${index}]`, undefined);
+    if (!isPlainObject(entry)) {
+      throw invalidFieldError(String(entry), `${path}[${index}]`, undefined);
     }
+    const normalized: PopulateSpec = {};
+    for (const [field, spec] of Object.entries(entry)) {
+      countPopulateNode(budget, guards);
+      const specPath = `${path}[${index}].${field}`;
+      const fieldMeta = populatedRelation(field, specPath, meta);
+      registerPopulateField(bare, field, false, specPath);
+      normalized[field] = parsePopulateSpec(spec, fieldMeta, specPath, depth, guards, budget);
+    }
+    return normalized;
   });
-  return fields;
+}
+
+/**
+ * Validates one spec: `select`/`populate` keys alone, the subselect against the target, then descent.
+ * An empty subselect is `emptySelect` at its own path, mirroring the top-level rule.
+ * Returns the spec normalized, its `select` and `populate` values proper lists.
+ */
+function parsePopulateSpec(
+  spec: unknown,
+  fieldMeta: FieldQueryMeta,
+  path: string,
+  depth: number,
+  guards: QueryGuards,
+  budget: { nodes: number },
+): PopulateSubQuery {
+  if (!isPlainObject(spec)) throw invalidSpecError(path);
+  for (const key of Object.keys(spec)) {
+    if (key !== 'select' && key !== 'populate') throw invalidSpecError(path);
+  }
+  const target = queryMetadata(fieldMeta.target as string);
+  const normalized: PopulateSubQuery = {};
+  if (!isUndefined(spec.select)) {
+    const fields = toStringList(spec.select as SearchParamValue, `${path}.select`);
+    if (fields.length === 0) throw emptySelectError(`${path}.select`);
+    if (fields.length > guards.maxSelect) {
+      throw limitError('tooManyFields', `${path}.select`, guards.maxSelect);
+    }
+    fields.forEach((name, index) => {
+      if (isUndefined(target.fields[name])) {
+        throw invalidFieldError(
+          name,
+          `${path}.select[${index}]`,
+          didYouMean(name, Object.keys(target.fields)),
+        );
+      }
+    });
+    normalized.select = fields;
+  }
+  if (!isUndefined(spec.populate)) {
+    normalized.populate = parsePopulateLevel(
+      toArray(spec.populate),
+      target,
+      `${path}.populate`,
+      depth + 1,
+      guards,
+      budget,
+    );
+  }
+  return normalized;
+}
+
+/**
+ * Resolves a populated name to its relation metadata, collapsing every failure to `invalidField`.
+ */
+function populatedRelation(field: string, path: string, meta: CollectionQueryMeta): FieldQueryMeta {
+  const fieldMeta = meta.fields[field];
+  if (isUndefined(fieldMeta)) {
+    throw invalidFieldError(field, path, didYouMean(field, Object.keys(meta.fields)));
+  }
+  if (fieldMeta.kind !== 'record' && fieldMeta.kind !== 'records') {
+    throw invalidFieldError(field, path, undefined);
+  }
+  return fieldMeta;
+}
+
+/**
+ * Tracks the fields one level populates: bare repeats pass, any repeat involving a spec throws.
+ */
+function registerPopulateField(
+  bare: Map<string, boolean>,
+  field: string,
+  isBare: boolean,
+  path: string,
+): void {
+  const existing = bare.get(field);
+  if (isUndefined(existing)) {
+    bare.set(field, isBare);
+    return;
+  }
+  if (existing && isBare) return;
+  throw duplicatePopulateFieldError(field, path);
+}
+
+/**
+ * Counts one populate node toward the tree total, refusing past `maxPopulate`.
+ */
+function countPopulateNode(budget: { nodes: number }, guards: QueryGuards): void {
+  budget.nodes += 1;
+  if (budget.nodes > guards.maxPopulate) {
+    throw limitError('tooManyPopulate', 'populate', guards.maxPopulate);
+  }
 }
 
 /**

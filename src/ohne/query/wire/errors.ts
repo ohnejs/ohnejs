@@ -25,6 +25,7 @@ export type WireErrorCode =
   | 'invalidPagination'
   | 'emptySelect'
   | 'duplicateOrderField'
+  | 'duplicatePopulateField'
   | 'invalidLocale'
   | 'localeNotApplicable'
   | 'tooManyConditions'
@@ -33,6 +34,8 @@ export type WireErrorCode =
   | 'tooManyBoundParams'
   | 'tooManyFields'
   | 'tooManyOrderKeys'
+  | 'tooManyPopulate'
+  | 'populateTooDeep'
   | 'valueTooLarge'
   | 'patternTooLarge';
 
@@ -146,10 +149,11 @@ export function paginationError(): HTTPError {
 }
 
 /**
- * An explicit `select=[]`; a query that names zero fields is a mistake, not a way to read the id alone.
+ * An explicit empty `select`; a query that names zero fields is a mistake, not a way to read nothing.
+ * A populate spec's subselect fails the same way, its path locating the offending node.
  */
-export function emptySelectError(): HTTPError {
-  return wireError('emptySelect', 'select');
+export function emptySelectError(path = 'select'): HTTPError {
+  return wireError('emptySelect', path);
 }
 
 /**
@@ -157,6 +161,24 @@ export function emptySelectError(): HTTPError {
  */
 export function duplicateOrderFieldError(field: string, path: string): HTTPError {
   return wireError('duplicateOrderField', path, { field });
+}
+
+/**
+ * The same field populated more than once at one level, where at least one occurrence carries a spec.
+ * Two bare names dedup free; two specs would race the hydration, so the repeat is refused.
+ */
+export function duplicatePopulateFieldError(field: string, path: string): HTTPError {
+  return wireError('duplicatePopulateField', path, { field });
+}
+
+/**
+ * A populate spec that is not an object of `select`/`populate` alone; the code stays `invalidShape`.
+ */
+export function invalidSpecError(path: string): HTTPError {
+  return badRequest(translate('query.invalidPopulateSpec'), {
+    code: 'invalidShape',
+    path,
+  } satisfies WireErrorData);
 }
 
 /**
@@ -184,6 +206,8 @@ export function limitError(
     | 'tooManyBoundParams'
     | 'tooManyFields'
     | 'tooManyOrderKeys'
+    | 'tooManyPopulate'
+    | 'populateTooDeep'
     | 'valueTooLarge'
     | 'patternTooLarge',
   path: string,
