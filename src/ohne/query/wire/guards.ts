@@ -1,3 +1,5 @@
+import { isUndefined } from '../../../utils/index.ts';
+import { tryUseDialect } from '../../database/use-database.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { useConfig } from '../../layers/use-config.ts';
 
@@ -34,7 +36,8 @@ export interface QueryGuards {
   maxInLength: number;
 
   /**
-   * The most bound parameters one compiled statement may carry, the driver's variable limit's backstop.
+   * The most parameters an untrusted query may bind in total, across every value it filters on.
+   * Resolved against the dialect's own limit, so a config may lower it but never raise it past the driver.
    *
    * @default
    * 10000
@@ -102,22 +105,27 @@ export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
  *
  * The framework defaults are the base; `config.query.guards` overrides them app-wide.
  * A builder's own `.guards()` overrides win last, per key.
+ * `maxBoundParams` is then clamped to the dialect's own limit, so a config can lower it but not raise it.
+ * The wire always refuses before the read reaches the driver's wall.
  * Only the untrusted wire path resolves through this; the fluent path is trusted and never guard-checked.
  */
 export function resolveGuards(overrides: Partial<QueryGuards> = {}): QueryGuards {
-  return { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...overrides };
+  const resolved = { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...overrides };
+  const wall = tryUseDialect()?.maxParameters;
+  if (!isUndefined(wall)) resolved.maxBoundParams = Math.min(resolved.maxBoundParams, wall);
+  return resolved;
 }
 
 /**
- * Refuses a compiled statement carrying more bound parameters than the framework backstop allows.
- * The driver's own variable limit is the hard wall; this cap sits below it and names the count.
+ * Refuses a compiled statement carrying more bound parameters than the driver accepts, naming the count.
+ * The wire clamps its own ceiling to this same `limit`, so only a trusted fluent query can reach here.
  */
-export function assertBoundParams(count: number): void {
-  if (count <= DEFAULT_QUERY_GUARDS.maxBoundParams) return;
+export function assertBoundParams(count: number, limit: number): void {
+  if (count <= limit) return;
   throw ohneError({
-    title: 'Query exceeds the bound-parameter cap',
+    title: 'Query exceeds the driver parameter cap',
     body: [
-      `The compiled statement binds ${count} parameters, past the cap of ${DEFAULT_QUERY_GUARDS.maxBoundParams}.`,
+      `The compiled statement binds ${count} parameters, past the driver's cap of ${limit}.`,
       'Narrow the condition, or shrink an `in` list.',
     ],
   });

@@ -130,7 +130,7 @@ export function parseQueryParams(
   }
   const window = parseWindow(params, guards);
   return Object.freeze({
-    where: parseWhere(params.where, meta, guards),
+    where: parseWhere(params.where, meta, guards, windowBoundParams(window)),
     select: parseSelect(params.select, meta, guards),
     order: parseOrder(params.order, meta, guards),
     populate: parsePopulate(params.populate, meta),
@@ -141,11 +141,13 @@ export function parseQueryParams(
 /**
  * Parses the `where` condition through the shared grammar, then gates it against the collection.
  * Field applicability, the DoS ceilings, and value types are enforced in turn, each a distinct code.
+ * `reserved` is the bound parameters the row window already claims, folded into the bound-param ceiling.
  */
 function parseWhere(
   value: SearchParamValue | undefined,
   meta: CollectionQueryMeta,
   guards: QueryGuards,
+  reserved: number,
 ): ConditionInput | null {
   if (isUndefined(value)) return null;
   const parsed = parseCondition(value);
@@ -154,7 +156,7 @@ function parseWhere(
   if (!isNull(problem)) {
     throw invalidFieldError(problem.field, `where.${problem.path.join('.')}`, problem.suggestion);
   }
-  enforceGuards(parsed.node, guards);
+  enforceGuards(parsed.node, guards, reserved);
   checkValues(parsed.node, meta, []);
   return value as ConditionInput;
 }
@@ -162,9 +164,12 @@ function parseWhere(
 /**
  * Enforces the DoS ceilings over a condition: clause count, `has` nesting, list length, and value size.
  * None of these depend on the field scope, so one flat walk covers the whole tree.
+ * The bound-param ceiling is aggregate; the per-key ceilings never sum toward it.
+ * A fan of legal `in` lists is caught here, against a ceiling `resolveGuards` already clamped under the wall.
  */
-function enforceGuards(node: ConditionNode, guards: QueryGuards): void {
+function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: number): void {
   let conditions = 0;
+  let boundParams = reserved;
   walkCondition(node, (child, info) => {
     if (child.kind === 'compare' || child.kind === 'has' || child.kind === 'empty') {
       conditions += 1;
@@ -175,6 +180,10 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards): void {
     if (info.hasDepth > guards.maxHasDepth)
       throw limitError('hasTooDeep', 'where', guards.maxHasDepth);
     if (child.kind !== 'compare' || isUndefined(child.value)) return;
+    boundParams += isArray(child.value) ? child.value.length : 1;
+    if (boundParams > guards.maxBoundParams) {
+      throw limitError('tooManyBoundParams', 'where', guards.maxBoundParams);
+    }
     const isList = child.op === 'in' || child.op === 'includesAll' || child.op === 'includesAny';
     if (isList && isArray(child.value) && child.value.length > guards.maxInLength) {
       throw limitError('listTooLong', 'where', guards.maxInLength);
@@ -336,6 +345,22 @@ function parseWindow(
     throw paginationError();
   const perPage = isNull(perPageRaw) ? null : Math.min(perPageRaw, guards.maxPerPage);
   return { limit, offset, page, perPage };
+}
+
+/**
+ * The bound parameters the row window compiles to, reserved from the aggregate bound-param ceiling.
+ * `LIMIT ?` binds one, an `OFFSET` a second, and a paginated read binds its page size and offset.
+ */
+function windowBoundParams(window: {
+  limit: number | null;
+  offset: number | null;
+  page: number | null;
+  perPage: number | null;
+}): number {
+  if (!isNull(window.offset)) return 2;
+  if (!isNull(window.limit)) return 1;
+  if (!isNull(window.page) || !isNull(window.perPage)) return 2;
+  return 0;
 }
 
 /**

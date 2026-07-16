@@ -79,6 +79,12 @@ export abstract class Dialect {
   abstract readonly name: string;
 
   /**
+   * The most bound parameters the driver accepts in one statement, its hard variable-count wall.
+   * The wire's `maxBoundParams` guard clamps to this, so an untrusted query never reaches the wall.
+   */
+  abstract readonly maxParameters: number;
+
+  /**
    * Opens a connection to `url` and returns a tuned adapter.
    * The one place a driver is instantiated; the returned adapter already has the dialect's pragmas applied.
    *

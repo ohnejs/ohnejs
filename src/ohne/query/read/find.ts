@@ -60,7 +60,7 @@ export async function readRows(ir: QueryIR): Promise<QueryRecord[]> {
   const dialect = useDialect();
   const head = compileSelect(ir, meta, dialect);
   const tail = compileReadTail(ir, meta, dialect);
-  assertBoundParams(tail.params.length);
+  assertBoundParams(tail.params.length, dialect.maxParameters);
   const rows = await useDatabase().query<Record<string, SQLValue>>(
     `${head} ${tail.sql}`,
     tail.params,

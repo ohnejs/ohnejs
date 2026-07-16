@@ -43,6 +43,9 @@ const SQLITE_LOCKED = 6;
 export class SQLiteDialect extends Dialect {
   readonly name = 'sqlite';
 
+  // `SQLITE_MAX_VARIABLE_NUMBER`, the default since SQLite 3.32 and the value `node:sqlite` bundles.
+  readonly maxParameters = 32766;
+
   /**
    * Opens the database at `url` (a file path or `:memory:`) and applies the pragma set before returning.
    * A file path's parent directory is created on demand, since SQLite creates the file but not its folder.

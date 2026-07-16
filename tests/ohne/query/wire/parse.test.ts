@@ -228,6 +228,12 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
     strictEqual(failure('where={title:{contains:abcdef}}', tight).code, 'patternTooLarge');
   });
 
+  it('rejects a query that would bind more values than the driver backstop', () => {
+    const list = Array.from({ length: 2000 }, (_, i) => i).join(',');
+    const branches = Array.from({ length: 6 }, () => `{views:{in:[${list}]}}`).join(',');
+    strictEqual(failure(`where={and:[${branches}]}`).code, 'tooManyBoundParams');
+  });
+
   it('accepts a query that sits under every ceiling', () => {
     const parsed = parse('where={views:{in:[1,2]}}&select=[title,views]', tight);
     deepStrictEqual(parsed.select, ['title', 'views']);

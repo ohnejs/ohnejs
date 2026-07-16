@@ -20,7 +20,7 @@ export async function count(ir: QueryIR): Promise<number> {
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }
-  assertBoundParams(params.length);
+  assertBoundParams(params.length, dialect.maxParameters);
   const row = await useDatabase().queryOne<{ count: number }>(parts.join(' '), params);
   return Number(row?.count ?? 0);
 }
@@ -39,7 +39,7 @@ export async function exists(ir: QueryIR): Promise<boolean> {
     params.push(...where.params);
   }
   parts.push('LIMIT 1');
-  assertBoundParams(params.length);
+  assertBoundParams(params.length, dialect.maxParameters);
   const row = await useDatabase().queryOne<{ 1: number }>(parts.join(' '), params);
   return !isUndefined(row);
 }

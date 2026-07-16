@@ -1,6 +1,8 @@
 import { deepStrictEqual, doesNotThrow, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
+import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { clearDatabases, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import {
   assertBoundParams,
   DEFAULT_QUERY_GUARDS,
@@ -30,13 +32,26 @@ describe('resolveGuards', () => {
   });
 });
 
-describe('assertBoundParams', () => {
-  it('accepts a count at or below the cap', () => {
-    doesNotThrow(() => assertBoundParams(0));
-    doesNotThrow(() => assertBoundParams(DEFAULT_QUERY_GUARDS.maxBoundParams));
+describe('resolveGuards clamps maxBoundParams to the driver wall', () => {
+  before(() => registerDialect(new SQLiteDialect()));
+  after(() => clearDatabases());
+
+  it('leaves a config value under the wall unchanged', () => {
+    strictEqual(resolveGuards({ maxBoundParams: 5000 }).maxBoundParams, 5000);
   });
 
-  it('throws when the count exceeds the cap', () => {
-    throws(() => assertBoundParams(DEFAULT_QUERY_GUARDS.maxBoundParams + 1));
+  it('caps a config value at the wall, never raising past it', () => {
+    strictEqual(resolveGuards({ maxBoundParams: 100000 }).maxBoundParams, 32766);
+  });
+});
+
+describe('assertBoundParams', () => {
+  it('accepts a count at or below the limit', () => {
+    doesNotThrow(() => assertBoundParams(0, 100));
+    doesNotThrow(() => assertBoundParams(100, 100));
+  });
+
+  it('throws when the count exceeds the limit', () => {
+    throws(() => assertBoundParams(101, 100));
   });
 });

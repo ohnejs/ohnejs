@@ -84,3 +84,11 @@ export function useDialect(): Dialect {
   if (isUndefined(activeDialect)) throw ohneError('The database is not connected');
   return activeDialect;
 }
+
+/**
+ * Returns the active dialect, or `undefined` when the database is not connected.
+ * For code that runs both inside and outside a connection, like resolving guards before a request.
+ */
+export function tryUseDialect(): Dialect | undefined {
+  return activeDialect;
+}

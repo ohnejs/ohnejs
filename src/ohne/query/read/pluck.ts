@@ -26,7 +26,7 @@ export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
   }
   const dialect = useDialect();
   const tail = compileReadTail(ir, meta, dialect);
-  assertBoundParams(tail.params.length);
+  assertBoundParams(tail.params.length, dialect.maxParameters);
   const head = `SELECT ${dialect.quote(entry.column)} AS "value" FROM ${dialect.quote(meta.table)}`;
   const rows = await useDatabase().query<{ value: SQLValue }>(`${head} ${tail.sql}`, tail.params);
   return rows.map((row) => dialect.deserialize(entry.logicalType as LogicalType, row.value));
