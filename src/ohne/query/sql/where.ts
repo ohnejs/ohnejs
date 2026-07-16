@@ -5,7 +5,8 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { queryMetadata } from '../metadata.ts';
+import { blockQueryMetadata, queryMetadata } from '../metadata.ts';
+import { splitBlockHas } from '../validate-condition.ts';
 import { escapeLike } from './escape-like.ts';
 import { inFragment, joinFragments, rawFragment, type SQLFragment } from './fragment.ts';
 import { conditionUsesCompanion } from './from.ts';
@@ -152,6 +153,8 @@ function negateIf(negated: boolean, fragment: SQLFragment): SQLFragment {
 /**
  * Compiles `has` per relation kind: a record's non-null foreign key, or an `EXISTS` over the relation.
  * A bare `record` `has` is its foreign key being set; a conditioned one probes the target row.
+ * A conditioned `blocks` `has` pins the wrapper to its discriminated type.
+ * A bare one is wrapper existence, riding the child shape.
  */
 function compileHas(
   node: Extract<ConditionNode, { kind: 'has' }>,
@@ -167,6 +170,9 @@ function compileHas(
     return recordExists(field, scope, node.condition, dialect, ctx);
   }
   if (field.kind === 'records') return recordsExists(field, scope, node.condition, dialect, ctx);
+  if (field.kind === 'blocks' && !isNull(node.condition)) {
+    return blocksExists(field, scope, node.condition, dialect, ctx);
+  }
   return childExists(field, scope, node.condition, dialect, ctx);
 }
 
@@ -286,6 +292,53 @@ function childExists(
     qualified: true,
   };
   return existsFragment(from, correlation, condition, inner, dialect, ctx);
+}
+
+/**
+ * `EXISTS` over a blocks field's wrapper, correlated on `_parentUUID` with the type pinned.
+ * Validation guarantees the discriminator; it compiles alone into the wrapper's `_blockType` predicate.
+ * A scope addressing subfields joins the type's shared table on `_blockUUID` and compiles against it.
+ * A locale-scoped wrapper holds one block list per locale, so its correlation binds the locale too.
+ */
+function blocksExists(
+  field: FieldQueryMeta,
+  scope: WhereScope,
+  condition: ConditionNode,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment {
+  const split = splitBlockHas(condition);
+  if (!split.ok) {
+    throw ohneError('A blocks `has` reached the compiler without its `block` discriminator');
+  }
+  const wrapper = dialect.quote(nextAlias(ctx));
+  const correlation = scopedCorrelation(
+    `${wrapper}.${dialect.quote('_parentUUID')} = ${selfUUID(scope, dialect)}`,
+    field,
+    wrapper,
+    dialect,
+    ctx,
+  );
+  const typed = {
+    sql: `${correlation.sql} AND ${wrapper}.${dialect.quote('_blockType')} = ?`,
+    params: [...correlation.params, split.block],
+  };
+  const wrapperFrom = `${dialect.quote(field.table as string)} ${wrapper}`;
+  if (isNull(split.rest)) {
+    return existsFragment(rawFragment(wrapperFrom), typed, null, scope, dialect, ctx);
+  }
+  const alias = dialect.quote(nextAlias(ctx));
+  const block = blockQueryMetadata(split.block);
+  const join = `JOIN ${dialect.quote(block.table)} ${alias} ON ${alias}.${dialect.quote('UUID')} = ${wrapper}.${dialect.quote('_blockUUID')}`;
+  const inner: WhereScope = { fields: block.fields, self: alias, qualified: true };
+  return existsFragment(
+    { sql: `${wrapperFrom} ${join}`, params: [] },
+    typed,
+    split.rest,
+    inner,
+    dialect,
+    ctx,
+  );
 }
 
 /**

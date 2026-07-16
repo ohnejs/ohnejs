@@ -1,9 +1,13 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
+import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
+import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { compileWhere } from '../../../../src/ohne/query/sql/where.ts';
 import { parseCondition } from '../../../../src/utils/index.ts';
@@ -84,6 +88,38 @@ useCollections().register('WLPosts', {
         },
       }),
     },
+  },
+});
+
+useBlocks().register('WBQuote', {
+  name: 'WBQuote',
+  block: { fields: { words: field('text') } },
+});
+useBlocks().register('WBHero', {
+  name: 'WBHero',
+  block: {
+    fields: {
+      title: field('text'),
+      author: field('record', { collection: 'WAuthors' }),
+      items: field('repeater', { fields: { label: field('text') } }),
+      nested: field('blocks', { allow: ['WBQuote'] }),
+    },
+  },
+});
+useCollections().register('WBPages', {
+  name: 'WBPages',
+  collection: {
+    fields: {
+      title: field('text'),
+      tags: field('records', { collection: 'WTags' }),
+      content: field('blocks', { allow: ['WBHero', 'WBQuote'] }),
+    },
+  },
+});
+useCollections().register('WLBPages', {
+  name: 'WLBPages',
+  collection: {
+    fields: { content: field('blocks', { translatable: true, allow: ['WBHero'] }) },
   },
 });
 
@@ -411,5 +447,164 @@ describe('compileWhere locale-scoped tables', () => {
     const de = compileTranslatable({ tags: { has: { label: 'rot' } } }, 'de');
     strictEqual(de.sql, en.sql);
     deepStrictEqual(de.params, ['de', 'de', 'rot']);
+  });
+});
+
+describe('compileWhere blocks', () => {
+  it('a discriminator-only has pins the wrapper type without a per-type join', () => {
+    deepStrictEqual(compileOn('WBPages', { content: { has: { block: 'WBHero' } } }), {
+      sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ?)',
+      params: ['WBHero'],
+    });
+  });
+
+  it('a subfield condition joins the per-type table and compiles over the join alias', () => {
+    deepStrictEqual(compileOn('WBPages', { content: { has: { block: 'WBHero', title: 'x' } } }), {
+      sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND "_sub1"."title" = ?)',
+      params: ['WBHero', 'x'],
+    });
+  });
+
+  it('sibling subfield conditions AND inside the block scope', () => {
+    deepStrictEqual(
+      compileOn('WBPages', {
+        content: { has: { block: 'WBHero', title: 'x', author: { has: true } } },
+      }),
+      {
+        sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND ("_sub1"."title" = ? AND "_sub1"."author" IS NOT NULL))',
+        params: ['WBHero', 'x'],
+      },
+    );
+  });
+
+  it('a record subfield has re-scopes to its target collection with a fresh alias', () => {
+    deepStrictEqual(
+      compileOn('WBPages', {
+        content: { has: { block: 'WBHero', author: { has: { name: 'Ada' } } } },
+      }),
+      {
+        sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND EXISTS (SELECT 1 FROM "WAuthors" "_sub2" WHERE "_sub2"."UUID" = "_sub1"."author" AND "_sub2"."name" = ?))',
+        params: ['WBHero', 'Ada'],
+      },
+    );
+  });
+
+  it('a repeater subfield has correlates its child table on the block alias', () => {
+    deepStrictEqual(
+      compileOn('WBPages', {
+        content: { has: { block: 'WBHero', items: { has: { label: 'i1' } } } },
+      }),
+      {
+        sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND EXISTS (SELECT 1 FROM "block_WBHero_items" "_sub2" WHERE "_sub2"."_parentUUID" = "_sub1"."UUID" AND "_sub2"."label" = ?))',
+        params: ['WBHero', 'i1'],
+      },
+    );
+  });
+
+  it('blocks nest in blocks, each level drawing fresh aliases', () => {
+    deepStrictEqual(
+      compileOn('WBPages', {
+        content: { has: { block: 'WBHero', nested: { has: { block: 'WBQuote', words: 'w' } } } },
+      }),
+      {
+        sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND EXISTS (SELECT 1 FROM "block_WBHero_nested" "_sub2" JOIN "block_WBQuote" "_sub3" ON "_sub3"."UUID" = "_sub2"."_blockUUID" WHERE "_sub2"."_parentUUID" = "_sub1"."UUID" AND "_sub2"."_blockType" = ? AND "_sub3"."words" = ?))',
+        params: ['WBHero', 'WBQuote', 'w'],
+      },
+    );
+  });
+
+  it('negation wraps the blocks EXISTS', () => {
+    deepStrictEqual(compileOn('WBPages', { content: { not: { has: { block: 'WBHero' } } } }), {
+      sql: 'NOT (EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ?))',
+      params: ['WBHero'],
+    });
+  });
+
+  it('a bare has and empty probe the wrapper alone, no type predicate', () => {
+    deepStrictEqual(compileOn('WBPages', { content: { has: true } }), {
+      sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID")',
+      params: [],
+    });
+    deepStrictEqual(compileOn('WBPages', { content: { empty: true } }), {
+      sql: 'NOT EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID")',
+      params: [],
+    });
+  });
+
+  it('a locale-scoped wrapper binds the locale in bare, empty, and discriminated forms', () => {
+    deepStrictEqual(compileOn('WLBPages', { content: { has: true } }), {
+      sql: 'EXISTS (SELECT 1 FROM "WLBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WLBPages"."UUID" AND "_sub0"."_localeCode" = ?)',
+      params: ['en'],
+    });
+    deepStrictEqual(compileOn('WLBPages', { content: { empty: true } }), {
+      sql: 'NOT EXISTS (SELECT 1 FROM "WLBPages_content" "_sub0" WHERE "_sub0"."_parentUUID" = "WLBPages"."UUID" AND "_sub0"."_localeCode" = ?)',
+      params: ['en'],
+    });
+    deepStrictEqual(compileOn('WLBPages', { content: { has: { block: 'WBHero', title: 't' } } }), {
+      sql: 'EXISTS (SELECT 1 FROM "WLBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WLBPages"."UUID" AND "_sub0"."_localeCode" = ? AND "_sub0"."_blockType" = ? AND "_sub1"."title" = ?)',
+      params: ['en', 'WBHero', 't'],
+    });
+  });
+
+  it('the alias counter threads across a mixed relation and blocks condition', () => {
+    deepStrictEqual(
+      compileOn('WBPages', {
+        tags: { has: { label: 'red' } },
+        content: { has: { block: 'WBHero', title: 'x' } },
+      }),
+      {
+        sql: '(EXISTS (SELECT 1 FROM "WBPages_tags" "_sub0" JOIN "WTags" "_sub1" ON "_sub1"."UUID" = "_sub0"."_targetUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub1"."label" = ?) AND EXISTS (SELECT 1 FROM "WBPages_content" "_sub2" JOIN "block_WBHero" "_sub3" ON "_sub3"."UUID" = "_sub2"."_blockUUID" WHERE "_sub2"."_parentUUID" = "WBPages"."UUID" AND "_sub2"."_blockType" = ? AND "_sub3"."title" = ?))',
+        params: ['red', 'WBHero', 'x'],
+      },
+    );
+  });
+});
+
+const db = await dialect.connect(':memory:');
+await syncDatabase(db, dialect, {
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
+});
+await db.run(
+  'INSERT INTO "WBPages" ("UUID", "_updatedAt", "title") VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
+  ['p1', 0, 'Alpha', 'p2', 0, 'Beta', 'p3', 0, 'Gamma'],
+);
+await db.run('INSERT INTO "block_WBHero" ("UUID", "title") VALUES (?, ?), (?, ?)', [
+  'h1',
+  'Hi',
+  'h2',
+  'Yo',
+]);
+await db.run('INSERT INTO "block_WBQuote" ("UUID", "words") VALUES (?, ?)', ['q1', 'Sage']);
+await db.run(
+  'INSERT INTO "WBPages_content" ("UUID", "_parentUUID", "_parentPosition", "_blockType", "_blockUUID") ' +
+    'VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+  ['w1', 'p1', 0, 'WBHero', 'h1', 'w2', 'p2', 0, 'WBQuote', 'q1', 'w3', 'p3', 0, 'WBHero', 'h2'],
+);
+
+async function pageTitles(condition: Record<string, unknown>): Promise<string[]> {
+  const parsed = parseCondition(condition);
+  if (!parsed.ok) throw new Error(`parse failed: ${parsed.error.code}`);
+  const fragment = compileWhere(parsed.node, queryMetadata('WBPages'), dialect, 'en');
+  const rows = await db.query<{ title: string }>(
+    `SELECT "title" FROM "WBPages" WHERE ${fragment.sql} ORDER BY "title"`,
+    fragment.params,
+  );
+  return rows.map((row) => row.title);
+}
+
+describe('compileWhere blocks behavior', () => {
+  it('a discriminator-only has matches rows holding the named type', async () => {
+    deepStrictEqual(await pageTitles({ content: { has: { block: 'WBHero' } } }), [
+      'Alpha',
+      'Gamma',
+    ]);
+    deepStrictEqual(await pageTitles({ content: { has: { block: 'WBQuote' } } }), ['Beta']);
+  });
+
+  it('a subfield condition matches only rows whose instance satisfies it', async () => {
+    deepStrictEqual(await pageTitles({ content: { has: { block: 'WBHero', title: 'Hi' } } }), [
+      'Alpha',
+    ]);
+    deepStrictEqual(await pageTitles({ content: { has: { block: 'WBHero', title: 'Sage' } } }), []);
   });
 });
