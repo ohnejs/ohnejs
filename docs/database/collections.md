@@ -124,6 +124,11 @@ The subfields are ordinary `field(...)` instances, so a composite may nest furth
 relations to any depth. Every item carries its own `UUID`, stable across writes, so a read always
 tells you which item is which.
 
+## Blocks
+
+Where a repeater repeats one shape, a `blocks` field holds an ordered list of mixed, reusable
+shapes, each defined once under `blocks/`. See [blocks](./blocks.md).
+
 ## Translations
 
 Any top-level field takes `translatable: true` to hold one value per locale - a scalar per locale,

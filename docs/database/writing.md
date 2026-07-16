@@ -180,6 +180,9 @@ await query('Posts').where('UUID', id).update({
 
 A `UUID` that names no item on that record is an error, never a silent adoption from another record.
 
+A `blocks` field takes envelopes - `{ block: 'Hero', fields: { ... } }`, plus the item's `UUID` on
+update - and replaces its list the same way. See [blocks](./blocks.md#writing).
+
 An `object` upserts its single child: pass a value to set it, or `null` to clear it.
 
 ```ts

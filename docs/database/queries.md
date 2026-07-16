@@ -114,6 +114,19 @@ Population is one level deep. The populated records carry their own relations as
 deeper, run a follow-up query. The same rows are shared across parents that link them, so do not
 mutate a populated record.
 
+## Blocks
+
+A `blocks` field filters with the same `has`/`empty` pair, with one extra step: `has` names the
+block type before a callback probes its fields.
+
+```ts
+await query('Pages')
+  .where('content', (w) => w.has('Hero', (h) => h.where('title', 'Launch')))
+  .findMany();
+```
+
+The [blocks guide](./blocks.md#querying) covers the two-step and composing across types.
+
 ## Ordering
 
 `orderBy` sorts by a field. A leading direction is optional and defaults to ascending; call it

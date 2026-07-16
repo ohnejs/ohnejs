@@ -60,6 +60,17 @@ A relation filters with `has`, re-scoped to the target's fields, and `empty` for
 ?where={tags:{empty:true}}
 ```
 
+A [blocks](./blocks.md#querying) field takes the same pair; a conditioned `has` scope opens with a
+bare `block` equality naming the type its siblings probe:
+
+```
+?where={content:{has:{block:Hero,title:{contains:launch}}}}
+```
+
+A scope that names no type is a `400` with the code `blockTypeRequired` at `where.content`; a type
+the field does not allow is `unknownBlockType` at `where.content.block`, with a suggestion when one
+is close. Bare `has:true` and `empty:true` need no type.
+
 The operators and what each field type admits are the same as the fluent builder. See
 [reading records](./queries.md) for the full vocabulary.
 
