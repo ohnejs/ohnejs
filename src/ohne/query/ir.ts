@@ -23,6 +23,27 @@ export interface OrderEntry {
 }
 
 /**
+ * One node of the populate tree: a relation field, its subselect, and its own nested populates.
+ * A bare `populate('author')` is `{ field: 'author', select: null, children: [] }`.
+ */
+export interface PopulateNode {
+  /**
+   * The relation field this node hydrates.
+   */
+  field: string;
+
+  /**
+   * The target fields the hydrated records carry, exactly, or `null` for the whole record.
+   */
+  select: readonly string[] | null;
+
+  /**
+   * The target's own populated relations, one level further down.
+   */
+  children: readonly PopulateNode[];
+}
+
+/**
  * The immutable snapshot a terminal compiles and executes from.
  *
  * A builder accumulates plain state and freezes it into this shape when a terminal runs.
@@ -61,9 +82,9 @@ export interface QueryIR {
   offset: number | null;
 
   /**
-   * The relation fields to hydrate to full records.
+   * The populate tree: one root node per relation to hydrate, each carrying its own subtree.
    */
-  populate: readonly string[];
+  populate: readonly PopulateNode[];
 
   /**
    * The explicit `.locale()` choice, or `null` for the default locale.
@@ -83,7 +104,7 @@ export function freezeIR(state: {
   order: readonly OrderEntry[];
   limit: number | null;
   offset: number | null;
-  populate: readonly string[];
+  populate: readonly PopulateNode[];
   locale: string | null;
 }): QueryIR {
   const condition =
@@ -99,7 +120,18 @@ export function freezeIR(state: {
     order: Object.freeze([...state.order]),
     limit: state.limit,
     offset: state.offset,
-    populate: Object.freeze([...state.populate]),
+    populate: Object.freeze(state.populate.map(freezePopulateNode)),
     locale: state.locale,
+  });
+}
+
+/**
+ * Deep-freezes one populate node: its subselect, its children recursively, and the node itself.
+ */
+function freezePopulateNode(node: PopulateNode): PopulateNode {
+  return Object.freeze({
+    field: node.field,
+    select: isNull(node.select) ? null : Object.freeze([...node.select]),
+    children: Object.freeze(node.children.map(freezePopulateNode)),
   });
 }

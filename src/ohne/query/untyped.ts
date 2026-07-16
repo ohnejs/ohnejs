@@ -87,6 +87,91 @@ export interface UntypedWhereBranch {
 }
 
 /**
+ * One relation's populate sub-query: the query grammar scoped to its target, recursive.
+ * `select` narrows which target fields the hydrated records carry; `populate` descends one level further.
+ *
+ * @example
+ * ```ts
+ * { select: ['text', 'author'], populate: [{ author: { select: ['name'] } }] }
+ * ```
+ */
+export interface PopulateSubQuery {
+  /**
+   * The target fields the hydrated records carry, exactly; omitted reads the whole record.
+   * `UUID` and `_updatedAt` come back only when named.
+   */
+  select?: string[];
+
+  /**
+   * The target's own relations to hydrate, one level further down.
+   * A populated relation must also be named in `select` when one is set, or it silently drops.
+   */
+  populate?: (string | PopulateSpec)[];
+}
+
+/**
+ * A populate spec: relation names mapped to their sub-queries, the tree form the wire carries.
+ *
+ * @example
+ * ```ts
+ * { comments: { select: ['text', 'author'], populate: ['author'] } }
+ * ```
+ */
+export type PopulateSpec = Record<string, PopulateSubQuery>;
+
+/**
+ * The callback the populate sub-builder form runs: it narrows the target with `select` and `populate`.
+ *
+ * @example
+ * ```ts
+ * (c) => c.select('text', 'author').populate('author')
+ * ```
+ */
+export type PopulateBuild = (sub: UntypedPopulateBuilder) => UntypedPopulateBuilder;
+
+/**
+ * The sub-builder a populate callback receives, scoped to the relation's target collection.
+ * It carries only `select` and `populate`, so a spec can narrow and descend but never filter.
+ */
+export interface UntypedPopulateBuilder {
+  /**
+   * Narrows the hydrated records to the named target fields, accumulating across calls.
+   * A subselected record carries exactly the named fields - `UUID` and `_updatedAt` only when named.
+   *
+   * @example
+   * ```ts
+   * queryUntyped('Posts').populate('author', (a) => a.select('name'))
+   * ```
+   */
+  select(...fields: string[]): this;
+
+  /**
+   * Hydrates the target's own relations, one level further down; every populate form composes here.
+   * A populated relation must be named in this node's `select` when one is set, or it silently drops.
+   *
+   * @example
+   * ```ts
+   * queryUntyped('Posts').populate('comments', (c) =>
+   *   c.select('text', 'author').populate('author'),
+   * )
+   * ```
+   */
+  populate(...entries: (string | PopulateSpec)[]): this;
+
+  /**
+   * Hydrates one of the target's relations through its own callback, recursing the grammar.
+   *
+   * @example
+   * ```ts
+   * queryUntyped('Posts').populate('comments', (c) =>
+   *   c.populate('author', (a) => a.select('name')),
+   * )
+   * ```
+   */
+  populate(field: string, build: PopulateBuild): this;
+}
+
+/**
  * The runtime query surface every typed builder state is a view of.
  *
  * One class implements it; the typed states narrow its methods, so impl and views can never drift.
@@ -143,14 +228,33 @@ export interface UntypedQueryBuilder {
 
   /**
    * Marks `record`/`records` fields to hydrate to full target records, accumulating across calls.
+   * An entry is a field name (whole record) or a spec object narrowing and descending per relation.
    * A populated field must be one the read fetches; populating a non-relation field is rejected.
+   * Repeating a field at one level dedups two bare names and rejects any repeat involving a spec.
    *
    * @example
    * ```ts
    * queryUntyped('Posts').select('title', 'author').populate('author')
+   *
+   * queryUntyped('Posts').populate({
+   *   comments: { select: ['text'], populate: ['author'] },
+   * })
    * ```
    */
-  populate(...fields: string[]): this;
+  populate(...entries: (string | PopulateSpec)[]): this;
+
+  /**
+   * Hydrates one relation through a callback sub-builder scoped to its target collection.
+   * The callback's `select` and `populate` compose exactly as a spec object's keys do.
+   *
+   * @example
+   * ```ts
+   * queryUntyped('Posts').populate('comments', (c) =>
+   *   c.select('text', 'author').populate('author'),
+   * )
+   * ```
+   */
+  populate(field: string, build: PopulateBuild): this;
 
   /**
    * Adds a sort key, stacking after the keys already set; a repeated field keeps its first direction.

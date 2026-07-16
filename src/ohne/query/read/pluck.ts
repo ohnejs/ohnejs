@@ -22,7 +22,7 @@ import { compileReadTail, readRows } from './find.ts';
 export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
   const meta = queryMetadata(ir.collection);
   const entry = meta.fields[field];
-  if (isUndefined(entry.column) || ir.populate.includes(field)) {
+  if (isUndefined(entry.column) || ir.populate.some((node) => node.field === field)) {
     const rows = await readRows({ ...ir, select: [field] });
     return rows.map((row) => row[field]);
   }

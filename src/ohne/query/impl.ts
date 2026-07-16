@@ -1,11 +1,13 @@
 import type { ConditionNode } from '../../utils/index.ts';
 import type { Transaction } from '../database/adapter.ts';
-import type { OrderDirection, OrderEntry } from './ir.ts';
+import type { OrderDirection, OrderEntry, PopulateNode } from './ir.ts';
 import type { CollectionQueryMeta } from './metadata.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
 import type {
   ConditionInput,
+  PopulateBuild,
+  PopulateSpec,
   UntypedQueryBuilder,
   UntypedWhereBranch,
   UntypedWhereGroup,
@@ -18,6 +20,7 @@ import { isNull, isString, isUndefined, parseCondition } from '../../utils/index
 import { ohneError } from '../error/ohne-error.ts';
 import { freezeIR, type QueryIR } from './ir.ts';
 import { checkQueryLocale } from './locale.ts';
+import { addPopulateEntries } from './populate.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
 import { findFirst as readFirst, findMany as readMany } from './read/find.ts';
 import { paginate as readPage } from './read/paginate.ts';
@@ -39,7 +42,7 @@ import { runUpdate, type UpdateOutcome } from './write/update.ts';
 export class QueryBuilderImpl implements UntypedQueryBuilder {
   private readonly conditions: ConditionNode[] = [];
   private readonly orderKeys: OrderEntry[] = [];
-  private readonly populateFields: string[] = [];
+  private readonly populateNodes: PopulateNode[] = [];
   private selected: string[] | null = null;
   private limitValue: number | null = null;
   private offsetValue: number | null = null;
@@ -70,20 +73,10 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return this;
   }
 
-  populate(...fields: string[]): this {
-    for (const field of fields) {
-      const entry = this.meta.fields[field];
-      if (isUndefined(entry)) throw unknownFieldError(field, this.meta);
-      if (entry.kind !== 'record' && entry.kind !== 'records') {
-        throw ohneError({
-          title: `Cannot populate \`${field}\``,
-          body: [
-            `Field \`${field}\` on collection \`${this.meta.collection}\` is not a relation; only \`record\` and \`records\` fields populate.`,
-          ],
-        });
-      }
-      this.populateFields.push(field);
-    }
+  populate(...entries: (string | PopulateSpec)[]): this;
+  populate(field: string, build: PopulateBuild): this;
+  populate(...args: (string | PopulateSpec | PopulateBuild)[]): this {
+    addPopulateEntries(this.populateNodes, args, this.meta);
     return this;
   }
 
@@ -260,7 +253,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       order: this.orderKeys,
       limit: this.limitValue,
       offset: this.offsetValue,
-      populate: this.populateFields,
+      populate: this.populateNodes,
       locale: this.localeValue,
     });
   }
