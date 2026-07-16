@@ -5,6 +5,7 @@ import type { ConditionInput } from '../untyped.ts';
 import type { QueryGuards } from './guards.ts';
 
 import {
+  canonicalizeLanguage,
   didYouMean,
   isArray,
   isBoolean,
@@ -16,15 +17,18 @@ import {
   toArray,
   walkCondition,
 } from '../../../utils/index.ts';
+import { queryLocales } from '../locale.ts';
 import { checkCondition, targetScope } from '../validate-condition.ts';
 import {
   conditionShapeError,
   duplicateOrderFieldError,
   emptySelectError,
   invalidFieldError,
+  invalidLocaleError,
   invalidNumberError,
   invalidValueError,
   limitError,
+  localeNotApplicableError,
   paginationError,
   unknownParamError,
 } from './errors.ts';
@@ -86,6 +90,11 @@ export interface ParsedQuery {
    * The requested page size, clamped to `maxPerPage`, or `null` when unset.
    */
   perPage: number | null;
+
+  /**
+   * The validated content locale the query reads, or `null` for the default.
+   */
+  locale: string | null;
 }
 
 const KNOWN_PARAMS = new Set([
@@ -97,6 +106,7 @@ const KNOWN_PARAMS = new Set([
   'offset',
   'page',
   'perPage',
+  'locale',
 ]);
 
 /**
@@ -105,6 +115,7 @@ const KNOWN_PARAMS = new Set([
  * Every failure throws an `HTTPError(400)` carrying a stable `code` and the offending dot `path`.
  * The condition parses through the shared grammar, then gates applicability, DoS ceilings, and value types.
  * `select`, `order`, and `populate` gate against the same fields; the two windowing modes are exclusive.
+ * `locale` canonicalizes and must name a configured content locale on a translatable collection.
  * The untrusted path is the only one guard-checked; the fluent builder is not.
  *
  * @example
@@ -135,6 +146,7 @@ export function parseQueryParams(
     order: parseOrder(params.order, meta, guards),
     populate: parsePopulate(params.populate, meta),
     ...window,
+    locale: parseLocale(params.locale, meta),
   });
 }
 
@@ -165,11 +177,13 @@ function parseWhere(
  * Enforces the DoS ceilings over a condition: clause count, `has` nesting, list length, and value size.
  * None of these depend on the field scope, so one flat walk covers the whole tree.
  * The bound-param ceiling is aggregate; the per-key ceilings never sum toward it.
+ * It counts the worst-case locale binds too - one for the companion join, two per `has`/`empty` -
+ * so a translatable shape refuses here rather than dying at the driver's own wall.
  * A fan of legal `in` lists is caught here, against a ceiling `resolveGuards` already clamped under the wall.
  */
 function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: number): void {
   let conditions = 0;
-  let boundParams = reserved;
+  let boundParams = reserved + 1;
   walkCondition(node, (child, info) => {
     if (child.kind === 'compare' || child.kind === 'has' || child.kind === 'empty') {
       conditions += 1;
@@ -179,6 +193,13 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
     }
     if (info.hasDepth > guards.maxHasDepth)
       throw limitError('hasTooDeep', 'where', guards.maxHasDepth);
+    if (child.kind === 'has' || child.kind === 'empty') {
+      boundParams += 2;
+      if (boundParams > guards.maxBoundParams) {
+        throw limitError('tooManyBoundParams', 'where', guards.maxBoundParams);
+      }
+      return;
+    }
     if (child.kind !== 'compare' || isUndefined(child.value)) return;
     boundParams += isArray(child.value) ? child.value.length : 1;
     if (boundParams > guards.maxBoundParams) {
@@ -361,6 +382,24 @@ function windowBoundParams(window: {
   if (!isNull(window.limit)) return 1;
   if (!isNull(window.page) || !isNull(window.perPage)) return 2;
   return 0;
+}
+
+/**
+ * Parses `locale` into the canonical content locale a translatable collection reads.
+ * A locale on a non-translatable collection, a malformed tag, or one outside the configured set throws.
+ */
+function parseLocale(
+  value: SearchParamValue | undefined,
+  meta: CollectionQueryMeta,
+): string | null {
+  if (isUndefined(value)) return null;
+  if (meta.translatable !== true) throw localeNotApplicableError();
+  if (!isString(value)) throw invalidLocaleError(String(value));
+  const canonical = canonicalizeLanguage(value);
+  if (isNull(canonical) || !queryLocales().locales.includes(canonical)) {
+    throw invalidLocaleError(value);
+  }
+  return canonical;
 }
 
 /**

@@ -22,6 +22,8 @@ export type WireErrorCode =
   | 'invalidPagination'
   | 'emptySelect'
   | 'duplicateOrderField'
+  | 'invalidLocale'
+  | 'localeNotApplicable'
   | 'tooManyConditions'
   | 'hasTooDeep'
   | 'listTooLong'
@@ -131,6 +133,20 @@ export function emptySelectError(): HTTPError {
  */
 export function duplicateOrderFieldError(field: string, path: string): HTTPError {
   return wireError('duplicateOrderField', path, { field });
+}
+
+/**
+ * A `locale` value that is malformed or outside the configured `collections.locales` set.
+ */
+export function invalidLocaleError(locale: string): HTTPError {
+  return wireError('invalidLocale', 'locale', { locale });
+}
+
+/**
+ * A `locale` on a collection with no translatable fields; there is nothing for it to scope.
+ */
+export function localeNotApplicableError(): HTTPError {
+  return wireError('localeNotApplicable', 'locale');
 }
 
 /**

@@ -29,12 +29,18 @@ export interface QueryScope {
    * A row cap a request cannot exceed; the effective limit is the smaller of this and the request's.
    */
   limit?: number;
+
+  /**
+   * The locale the endpoint reads when the request names none; a request's `locale` param wins.
+   */
+  locale?: string;
 }
 
 /**
  * Replays a parsed wire query onto a builder, composing it under an optional endpoint scope.
  *
  * The parsed query drives the same untyped methods the fluent builder narrows, so both paths compile alike.
+ * The locale applies first, the request's choice over the scope's, then the filters replay.
  * The terminal stays with the caller, which pins `findMany`/`paginate`/... and runs it.
  * It reads `parsed.page`/`parsed.perPage` when it paginates.
  * Returns the builder for the terminal to run.
@@ -52,6 +58,8 @@ export function applyQuery(
   parsed: ParsedQuery,
   scope: QueryScope = {},
 ): UntypedQueryBuilder {
+  const locale = parsed.locale ?? scope.locale;
+  if (!isUndefined(locale)) builder.locale(locale);
   if (!isUndefined(scope.where)) builder.where(scope.where);
   if (!isNull(parsed.where)) builder.where(parsed.where);
   const select = composeSelect(scope.select, parsed.select);

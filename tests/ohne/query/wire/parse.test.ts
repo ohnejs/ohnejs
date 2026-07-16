@@ -6,10 +6,16 @@ import type { WireErrorData } from '../../../../src/ohne/query/wire/errors.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { DEFAULT_QUERY_GUARDS, type QueryGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
 import { parseSearchParams, type SearchParamValue } from '../../../../src/utils/index.ts';
+
+useLayers().add({
+  path: '/wire-parse',
+  input: { collections: { locales: ['en', 'de', 'de-AT'], defaultLocale: 'en' } },
+});
 
 useCollections().register('WUsers', {
   name: 'WUsers',
@@ -34,10 +40,20 @@ useCollections().register('WPosts', {
   },
 });
 
+useCollections().register('WArticles', {
+  name: 'WArticles',
+  collection: { fields: { title: field('text', { translatable: true }) } },
+});
+
 const meta = queryMetadata('WPosts');
+const translatableMeta = queryMetadata('WArticles');
 
 function parse(query: string, guards: QueryGuards = DEFAULT_QUERY_GUARDS) {
   return parseQueryParams(parseSearchParams(query), meta, guards);
+}
+
+function parseLocalized(query: string) {
+  return parseQueryParams(parseSearchParams(query), translatableMeta, DEFAULT_QUERY_GUARDS);
 }
 
 function caught(fn: () => unknown): HTTPError {
@@ -52,6 +68,12 @@ function caught(fn: () => unknown): HTTPError {
 
 function failure(query: string, guards: QueryGuards = DEFAULT_QUERY_GUARDS): WireErrorData {
   const error = caught(() => parse(query, guards));
+  strictEqual(error.status, 400);
+  return error.data as WireErrorData;
+}
+
+function localizedFailure(query: string): WireErrorData {
+  const error = caught(() => parseLocalized(query));
   strictEqual(error.status, 400);
   return error.data as WireErrorData;
 }
@@ -201,6 +223,33 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
   });
 });
 
+describe('parseQueryParams reads the locale param', () => {
+  it('leaves an absent locale null', () => {
+    strictEqual(parseLocalized('').locale, null);
+    strictEqual(parseLocalized('where={title:x}').locale, null);
+  });
+
+  it('stores a configured locale as parsed', () => {
+    strictEqual(parseLocalized('locale=de').locale, 'de');
+  });
+
+  it('canonicalizes the tag before the membership check', () => {
+    strictEqual(parseLocalized('locale=de-at').locale, 'de-AT');
+  });
+
+  it('rejects a locale outside the configured set', () => {
+    deepStrictEqual(localizedFailure('locale=fr'), { code: 'invalidLocale', path: 'locale' });
+  });
+
+  it('rejects a non-string locale value', () => {
+    deepStrictEqual(localizedFailure('locale=true'), { code: 'invalidLocale', path: 'locale' });
+  });
+
+  it('rejects a locale on a non-translatable collection, the param itself known', () => {
+    deepStrictEqual(failure('locale=de'), { code: 'localeNotApplicable', path: 'locale' });
+  });
+});
+
 describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () => {
   it('rejects too many clauses', () => {
     strictEqual(
@@ -232,6 +281,13 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
 
   it('rejects an oversized pattern', () => {
     strictEqual(failure('where={title:{contains:abcdef}}', tight).code, 'patternTooLarge');
+  });
+
+  it('counts the worst-case locale binds toward the bound-param ceiling', () => {
+    const capped: QueryGuards = { ...DEFAULT_QUERY_GUARDS, maxBoundParams: 3 };
+    deepStrictEqual(parse('where={views:{in:[1,2]}}', capped).where, { views: { in: [1, 2] } });
+    strictEqual(failure('where={views:{in:[1,2,3]}}', capped).code, 'tooManyBoundParams');
+    strictEqual(failure('where={author:{has:{name:x}}}', capped).code, 'tooManyBoundParams');
   });
 
   it('rejects a query that would bind more values than the driver backstop', () => {

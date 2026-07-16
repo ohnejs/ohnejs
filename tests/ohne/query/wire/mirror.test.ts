@@ -10,12 +10,18 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { applyQuery } from '../../../../src/ohne/query/wire/apply.ts';
 import { DEFAULT_QUERY_GUARDS } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
 import { parseSearchParams } from '../../../../src/utils/index.ts';
+
+useLayers().add({
+  path: '/mirror',
+  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
 
 useCollections().register('MPosts', {
   name: 'MPosts',
@@ -25,6 +31,16 @@ useCollections().register('MPosts', {
       views: field('integer'),
       featured: field('boolean'),
       summary: field('text', { nullable: true }),
+    },
+  },
+});
+
+useCollections().register('MNotes', {
+  name: 'MNotes',
+  collection: {
+    fields: {
+      label: field('text', { translatable: true }),
+      pinned: field('boolean'),
     },
   },
 });
@@ -146,6 +162,45 @@ describe('the wire mirror returns the same rows as the fluent equivalent', () =>
     deepStrictEqual(
       await wire('order=[title]&limit=2&offset=1'),
       await fluent(queryUntyped('MPosts').orderBy('title').limit(2).offset(1)),
+    );
+  });
+});
+
+describe('the locale param mirrors the fluent locale', () => {
+  const notesMeta = queryMetadata('MNotes');
+
+  async function wireNotes(url: string): Promise<unknown[]> {
+    const parsed = parseQueryParams(parseSearchParams(url), notesMeta, DEFAULT_QUERY_GUARDS);
+    return applyQuery(queryUntyped('MNotes'), parsed).findMany();
+  }
+
+  it('reads the same rows per locale, missing translations included', async () => {
+    const created = await queryUntyped('MNotes').createOrThrow({ label: 'Note', pinned: true });
+    await queryUntyped('MNotes')
+      .locale('de')
+      .where({ UUID: created.UUID as string })
+      .updateOrThrow({ label: 'Notiz' });
+    await queryUntyped('MNotes').createOrThrow({ label: 'Only English', pinned: false });
+
+    deepStrictEqual(
+      await wireNotes('locale=de&where={label:{contains:Notiz}}'),
+      await fluent(
+        queryUntyped('MNotes')
+          .locale('de')
+          .where({ label: { contains: 'Notiz' } }),
+      ),
+    );
+    deepStrictEqual(
+      await wireNotes('locale=de&where={label:{isNull:true}}'),
+      await fluent(
+        queryUntyped('MNotes')
+          .locale('de')
+          .where({ label: { isNull: true } }),
+      ),
+    );
+    deepStrictEqual(
+      await wireNotes('order=[label]'),
+      await fluent(queryUntyped('MNotes').orderBy('label')),
     );
   });
 });

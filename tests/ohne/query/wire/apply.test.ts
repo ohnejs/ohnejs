@@ -10,6 +10,7 @@ import { applyQuery, type QueryScope } from '../../../../src/ohne/query/wire/app
 function recorder(): { builder: UntypedQueryBuilder; calls: string[] } {
   const calls: string[] = [];
   const builder = {
+    locale: (code: string) => (calls.push(`locale:${code}`), builder),
     where: (condition: unknown) => (calls.push(`where:${JSON.stringify(condition)}`), builder),
     select: (...fields: string[]) => (calls.push(`select:${fields.join(',')}`), builder),
     orderBy: (f: string, d: OrderDirection) => (calls.push(`order:${f}:${d}`), builder),
@@ -30,6 +31,7 @@ function query(overrides: Partial<ParsedQuery> = {}): ParsedQuery {
     offset: null,
     page: null,
     perPage: null,
+    locale: null,
     ...overrides,
   };
 }
@@ -102,5 +104,25 @@ describe('applyQuery composes a request under a scope', () => {
     const over = recorder();
     applyQuery(over.builder, query({ limit: 500 }), { limit: 50 });
     deepStrictEqual(over.calls, ['limit:50']);
+  });
+});
+
+describe('applyQuery scopes the locale', () => {
+  it('replays the parsed locale before the filters', () => {
+    const { builder, calls } = recorder();
+    applyQuery(builder, query({ locale: 'de', where: { views: { atLeast: 10 } } }));
+    deepStrictEqual(calls, ['locale:de', 'where:{"views":{"atLeast":10}}']);
+  });
+
+  it('applies the scope locale when the param is absent', () => {
+    const { builder, calls } = recorder();
+    applyQuery(builder, query(), { locale: 'en' });
+    deepStrictEqual(calls, ['locale:en']);
+  });
+
+  it('lets the param win over the scope locale', () => {
+    const { builder, calls } = recorder();
+    applyQuery(builder, query({ locale: 'de' }), { locale: 'en' });
+    deepStrictEqual(calls, ['locale:de']);
   });
 });
