@@ -103,6 +103,7 @@ export * from './is/is-symbol.ts';
 export * from './is/is-undefined.ts';
 export * from './json/compose-codecs.ts';
 export * from './json/json-clone.ts';
+export * from './json/json-depth-within.ts';
 export * from './json/json-deserialize.ts';
 export * from './json/json-serialize.ts';
 export * from './keys/create-keymap.ts';
