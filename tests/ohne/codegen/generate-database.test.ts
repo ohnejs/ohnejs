@@ -227,6 +227,71 @@ describe('generateDatabase', () => {
     ok(shared.includes("discount: { scalar: number; nullable: true; when: { kind: 'sale' } };"));
   });
 
+  it('marks translatable fields for query typing, the read folding null, the inputs untouched', async () => {
+    const app = join(root, 'translations');
+    writePackage(app, 'translations');
+    write(
+      app,
+      'collections/Tags.ts',
+      'export default { fields: {\n' +
+        "  label: { type: 'text', options: {} },\n" +
+        "  posts: { type: 'records', options: { collection: 'Posts', inverse: 'tags' } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'collections/Posts.ts',
+      'export default { fields: {\n' +
+        "  title: { type: 'text', options: { translatable: true } },\n" +
+        "  teaser: { type: 'text', options: { nullable: true, translatable: true } },\n" +
+        "  tags: { type: 'records', options: { collection: 'Tags', translatable: true } },\n" +
+        "  sections: { type: 'repeater', options: { translatable: true, fields: { heading: { type: 'text', options: {} } } } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes('title: { scalar: string; companion: true };'));
+    ok(shared.includes('teaser: { scalar: string; nullable: true; companion: true };'));
+    ok(shared.includes("tags: { records: 'Tags'; localeScoped: true };"));
+    ok(
+      shared.includes(
+        "sections: { child: 'many'; fields: { UUID: { scalar: string; id: true }; heading: { scalar: string } }; localeScoped: true };",
+      ),
+    );
+    ok(shared.includes("posts: { records: 'Posts' };"));
+
+    ok(shared.includes('    title: string | null;'));
+    ok(shared.includes('    teaser: string | null;'));
+    ok(!shared.includes('| null | null'));
+
+    ok(shared.includes('    title: string;'));
+    ok(shared.includes('    teaser?: string | null;'));
+    ok(shared.includes('    title?: string;'));
+
+    ok(shared.includes('export interface GeneratedLocales {\n  en: true;\n}'));
+  });
+
+  it('emits one GeneratedLocales member per configured locale, canonicalized', async () => {
+    const app = join(root, 'locales');
+    writePackage(
+      app,
+      'locales',
+      undefined,
+      "export default { collections: { locales: ['en', 'de-at'], defaultLocale: 'en' } };\n",
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    ok(shared.includes("export interface GeneratedLocales {\n  en: true;\n  'de-AT': true;\n}"));
+    ok(node.includes('interface KnownLocales extends GeneratedLocales {}'));
+  });
+
   it('types block shapes into GeneratedBlocks, a blocks field unioning its allowed names', async () => {
     const app = join(root, 'blocks');
     writePackage(app, 'blocks');

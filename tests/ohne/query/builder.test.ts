@@ -98,7 +98,10 @@ describe('the typed builder narrows in a consumer app', () => {
     const app = join(root, 'app');
     mkdirSync(app, { recursive: true });
     writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'app', type: 'module' }));
-    writeFileSync(join(app, 'ohne.config.ts'), 'export default {};\n');
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      "export default { collections: { locales: ['en', 'de'], defaultLocale: 'en' } };\n",
+    );
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
     symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
     symlinkSync(
@@ -135,6 +138,7 @@ describe('the typed builder narrows in a consumer app', () => {
         "  views: field('integer'),\n" +
         "  featured: field('boolean'),\n" +
         "  summary: field('text', { nullable: true }),\n" +
+        "  teaser: field('text', { translatable: true, default: '' }),\n" +
         "  author: field('record', { collection: 'Users' }),\n" +
         "  tags: field('records', { collection: 'Tags' }),\n" +
         "  meta: field('object', { fields: { note: field('text') } }),\n" +
@@ -153,10 +157,12 @@ describe('the typed builder narrows in a consumer app', () => {
     ok(shared.includes('title: { scalar: string };'));
     ok(shared.includes('views: { scalar: number };'));
     ok(shared.includes('summary: { scalar: string; nullable: true };'));
+    ok(shared.includes('teaser: { scalar: string; companion: true };'));
     ok(shared.includes("author: { scalar: string; record: 'Users'; nullable: true };"));
     ok(shared.includes("tags: { records: 'Tags' };"));
     ok(shared.includes("meta: { child: 'one'; fields: {"));
     ok(shared.includes("sections: { child: 'many'; fields: {"));
+    ok(shared.includes('export interface GeneratedLocales {\n  en: true;\n  de: true;\n}'));
 
     execFileSync(
       process.execPath,
@@ -268,6 +274,30 @@ export async function writes(): Promise<void> {
   void d;
 }
 
+export async function locales(): Promise<void> {
+  const rows = await query('Posts').locale('de').findMany();
+  const localized = rows[0]!;
+  const lt: string | null = localized.teaser;
+  void lt;
+  // @ts-expect-error a missing translation reads null, so plain string cannot hold the value
+  const bare: string = localized.teaser;
+  void bare;
+
+  await query('Posts').where('teaser', (c) => c.isNull()).findMany();
+  await query('Posts').locale('de').where('title', 'x').update({ teaser: 'Anriss' });
+  await query('Posts').locale('de').where('title', 'x').deleteTranslation();
+}
+
+// @ts-expect-error the locale is outside the configured set
+query('Posts').locale('fr');
+// @ts-expect-error a chain scopes to one locale
+query('Posts').locale('de').locale('en');
+// @ts-expect-error a locale-scoped chain swaps delete for deleteTranslation
+query('Posts').locale('de').where('title', 'x').delete();
+// @ts-expect-error deleteTranslation exists only after locale
+query('Posts').where('title', 'x').deleteTranslation();
+// @ts-expect-error Users has no translatable field to scope
+query('Users').locale('de');
 // @ts-expect-error title is text, not a number
 query('Posts').where('title', 123);
 // @ts-expect-error null is never a value; use isNull

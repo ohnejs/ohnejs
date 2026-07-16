@@ -1,5 +1,6 @@
 import type { DeepPrettify } from '../../utils/index.ts';
 import type { CollectionName, KnownCollections } from '../collections/known-collections.ts';
+import type { LocaleCode } from '../collections/known-locales.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
 import type { InsertInputOf } from './known-inserts.ts';
@@ -227,11 +228,14 @@ type JsonOps<M extends QueryFieldMeta> = M extends { jsonList: true }
 
 /**
  * `isNull`, the only null test, admitted for a nullable column or a nullable `record`.
+ * A translatable (`companion`) field admits it too.
+ * A missing translation reads `null` whatever its option says.
  */
-type NullOps<M extends QueryFieldMeta> = M extends { nullable: true }
+type NullOps<M extends QueryFieldMeta> = M extends { nullable: true } | { companion: true }
   ? {
       /**
        * Matches rows whose value is `null`; the only null test, since `equalsTo(null)` is forbidden.
+       * A translatable field is `null` wherever the queried locale holds no translation.
        *
        * @example
        * ```ts
@@ -515,7 +519,7 @@ export interface PaginatedPage<C extends CollectionName, S = never, P = never> {
   perPage: number;
 
   /**
-   * The number of the last page, `0` when nothing matches.
+   * The number of the last page, at least `1` even when nothing matches.
    */
   lastPage: number;
 }
@@ -523,7 +527,7 @@ export interface PaginatedPage<C extends CollectionName, S = never, P = never> {
 /**
  * The refinements every state offers; each returns a read-only query for the rest of the chain.
  */
-interface Refinements<C extends CollectionName, S, P> {
+interface Refinements<C extends CollectionName, S, P, L extends boolean> {
   /**
    * Narrows the read to the named fields, accumulating across calls.
    * The returned rows carry only the selected fields.
@@ -533,7 +537,7 @@ interface Refinements<C extends CollectionName, S, P> {
    * const rows = await query('Posts').select('title', 'views').findMany()
    * ```
    */
-  select<F extends SelectableField<C>>(...fields: F[]): ReadOnlyQuery<C, S | F, P>;
+  select<F extends SelectableField<C>>(...fields: F[]): ReadOnlyQuery<C, S | F, P, L>;
 
   /**
    * Swaps a `record` or `records` field from its `UUID`s to the full target records, one level deep.
@@ -545,7 +549,7 @@ interface Refinements<C extends CollectionName, S, P> {
    * const author = rows[0].author // the full author record, or null
    * ```
    */
-  populate<F extends PopulatableField<C>>(...fields: F[]): ReadOnlyQuery<C, S, P | F>;
+  populate<F extends PopulatableField<C>>(...fields: F[]): ReadOnlyQuery<C, S, P | F, L>;
 
   /**
    * Adds a sort key, stacking after the keys already set; call it again for a tiebreaker.
@@ -556,7 +560,7 @@ interface Refinements<C extends CollectionName, S, P> {
    * query('Posts').orderBy('publishedAt', 'desc').orderBy('title')
    * ```
    */
-  orderBy(field: OrderableField<C>, direction?: OrderDirection): ReadOnlyQuery<C, S, P>;
+  orderBy(field: OrderableField<C>, direction?: OrderDirection): ReadOnlyQuery<C, S, P, L>;
 
   /**
    * Caps the number of rows read, replacing any previous cap.
@@ -566,7 +570,7 @@ interface Refinements<C extends CollectionName, S, P> {
    * query('Posts').orderBy('publishedAt', 'desc').limit(10)
    * ```
    */
-  limit(count: number): ReadOnlyQuery<C, S, P>;
+  limit(count: number): ReadOnlyQuery<C, S, P, L>;
 
   /**
    * Skips the given number of rows, replacing any previous offset.
@@ -576,7 +580,7 @@ interface Refinements<C extends CollectionName, S, P> {
    * query('Posts').orderBy('publishedAt', 'desc').limit(10).offset(20)
    * ```
    */
-  offset(count: number): ReadOnlyQuery<C, S, P>;
+  offset(count: number): ReadOnlyQuery<C, S, P, L>;
 }
 
 /**
@@ -714,12 +718,13 @@ interface WriteEntry<C extends CollectionName, S, P> {
 }
 
 /**
- * The update and delete terminals, available once a filter has narrowed the query to a set of rows.
+ * The update terminals, available once a filter has narrowed the query to a set of rows.
  */
-interface WriteMutations<C extends CollectionName, S, P> {
+interface UpdateMutations<C extends CollectionName, S, P> {
   /**
    * Updates every matching record, returning them re-read on success or the field failures on error.
    * Only provided fields change; the whole write runs in one transaction and persists nothing on failure.
+   * On a locale-scoped chain, translatable values land on that locale, materializing its row if missing.
    *
    * @example
    * ```ts
@@ -742,7 +747,12 @@ interface WriteMutations<C extends CollectionName, S, P> {
    * ```
    */
   updateOrThrow(input: UpdateInputOf<C>): Promise<QueryRow<C, S, P>[]>;
+}
 
+/**
+ * The `delete` terminal an unscoped filtered query offers: it removes whole records, every locale.
+ */
+interface DeleteMutation {
   /**
    * Deletes every matching record and reports how many were removed.
    *
@@ -755,40 +765,141 @@ interface WriteMutations<C extends CollectionName, S, P> {
 }
 
 /**
- * A query before any filter: reads, refinements, `create`, and the filters that move it to `ReadyQuery`.
+ * The `deleteTranslation` terminal a locale-scoped filtered query offers, where `delete` disappeared.
+ * A locale-scoped chain must not cascade-delete every locale, so the swap is structural.
  */
-export interface PendingQuery<C extends CollectionName, S = never, P = never>
-  extends
-    WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P>>,
-    Refinements<C, S, P>,
-    Terminals<C, S, P>,
-    WriteEntry<C, S, P>,
-    Guardable<PendingQuery<C, S, P>>,
-    Joinable<PendingQuery<C, S, P>> {}
+interface DeleteTranslationMutation {
+  /**
+   * Deletes every matching record's translation at the chain's locale, reporting how many held one.
+   * The records themselves and every other locale survive; each affected record's `_updatedAt` bumps.
+   *
+   * @example
+   * ```ts
+   * const { deleted } = await query('Posts')
+   *   .locale('de')
+   *   .where('status', 'archived')
+   *   .deleteTranslation()
+   * ```
+   */
+  deleteTranslation(): Promise<{ deleted: number }>;
+}
 
 /**
- * A query with a filter in place: reads, refinements, `update`/`delete`, and further filters that keep it here.
+ * Whether a collection carries any translatable field, read from the generated marker vocabulary.
+ * Permissive before codegen, exactly like the field tables themselves.
  */
-export interface ReadyQuery<C extends CollectionName, S = never, P = never>
+type IsTranslatable<C extends CollectionName> = string extends keyof FieldsOf<C>
+  ? true
+  : true extends {
+        [K in keyof FieldsOf<C>]: FieldsOf<C>[K] extends
+          | { companion: true }
+          | { localeScoped: true }
+          ? true
+          : never;
+      }[keyof FieldsOf<C>]
+    ? true
+    : false;
+
+/**
+ * The `locale` scope, moving a chain into its locale-scoped shape.
+ */
+interface LocaleMethod<Localed> {
+  /**
+   * Scopes the query to one content locale, once per chain.
+   * Reads take translatable values from that locale, `null` where no translation exists.
+   * Writes route translatable values to that locale's rows.
+   * The scoped chain swaps `delete` for `deleteTranslation` and cannot pick a second locale.
+   * Without `.locale()`, the default locale from `collections.defaultLocale` applies.
+   *
+   * @example
+   * ```ts
+   * const posts = await query('Posts').locale('de').findMany()
+   * ```
+   */
+  locale(code: LocaleCode): Localed;
+}
+
+/**
+ * The unconditional members of `PendingQuery`; an interface, so the self-references defer.
+ */
+interface PendingBase<C extends CollectionName, S, P, L extends boolean>
   extends
-    WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P>>,
-    Refinements<C, S, P>,
+    WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P, L>>,
+    Refinements<C, S, P, L>,
     Terminals<C, S, P>,
-    WriteMutations<C, S, P>,
-    Guardable<ReadyQuery<C, S, P>>,
-    Joinable<ReadyQuery<C, S, P>> {}
+    WriteEntry<C, S, P>,
+    Guardable<PendingQuery<C, S, P, L>>,
+    Joinable<PendingQuery<C, S, P, L>> {}
+
+/**
+ * A query before any filter: reads, refinements, `create`, and the filters that move it to `ReadyQuery`.
+ * `L` marks a locale-scoped chain; `.locale()` sets it and exists only while it is unset.
+ */
+export type PendingQuery<
+  C extends CollectionName,
+  S = never,
+  P = never,
+  L extends boolean = false,
+> = PendingBase<C, S, P, L> &
+  (L extends true
+    ? object
+    : IsTranslatable<C> extends true
+      ? LocaleMethod<PendingQuery<C, S, P, true>>
+      : object);
+
+/**
+ * The unconditional members of `ReadyQuery`; an interface, so the self-references defer.
+ */
+interface ReadyBase<C extends CollectionName, S, P, L extends boolean>
+  extends
+    WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P, L>>,
+    Refinements<C, S, P, L>,
+    Terminals<C, S, P>,
+    UpdateMutations<C, S, P>,
+    Guardable<ReadyQuery<C, S, P, L>>,
+    Joinable<ReadyQuery<C, S, P, L>> {}
+
+/**
+ * A query with a filter in place: reads, refinements, mutations, and further filters that keep it here.
+ * A locale-scoped chain (`L`) offers `deleteTranslation` where an unscoped one offers `delete`.
+ */
+export type ReadyQuery<
+  C extends CollectionName,
+  S = never,
+  P = never,
+  L extends boolean = false,
+> = ReadyBase<C, S, P, L> &
+  (L extends true
+    ? DeleteTranslationMutation
+    : DeleteMutation &
+        (IsTranslatable<C> extends true ? LocaleMethod<ReadyQuery<C, S, P, true>> : object));
+
+/**
+ * The unconditional members of `ReadOnlyQuery`; an interface, so the self-references defer.
+ */
+interface ReadOnlyBase<C extends CollectionName, S, P, L extends boolean>
+  extends
+    WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P, L>>,
+    Refinements<C, S, P, L>,
+    Terminals<C, S, P>,
+    Guardable<ReadOnlyQuery<C, S, P, L>>,
+    Joinable<ReadOnlyQuery<C, S, P, L>> {}
 
 /**
  * A read-only query: one refinement stripped the write terminals for the rest of the chain.
  * Filtering still composes, but it can never return to a writable state.
  */
-export interface ReadOnlyQuery<C extends CollectionName, S = never, P = never>
-  extends
-    WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P>>,
-    Refinements<C, S, P>,
-    Terminals<C, S, P>,
-    Guardable<ReadOnlyQuery<C, S, P>>,
-    Joinable<ReadOnlyQuery<C, S, P>> {}
+export type ReadOnlyQuery<
+  C extends CollectionName,
+  S = never,
+  P = never,
+  L extends boolean = false,
+> = ReadOnlyBase<C, S, P, L> &
+  (L extends true
+    ? object
+    : IsTranslatable<C> extends true
+      ? LocaleMethod<ReadOnlyQuery<C, S, P, true>>
+      : object);
 
 /**
  * The typed builder a `query(collection)` opens on.
@@ -814,4 +925,7 @@ export type QueryStateParity = [
   Assert<keyof PendingQuery<CollectionName>, keyof UntypedQueryBuilder>,
   Assert<keyof ReadyQuery<CollectionName>, keyof UntypedQueryBuilder>,
   Assert<keyof ReadOnlyQuery<CollectionName>, keyof UntypedQueryBuilder>,
+  Assert<keyof PendingQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
+  Assert<keyof ReadyQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
+  Assert<keyof ReadOnlyQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
 ];

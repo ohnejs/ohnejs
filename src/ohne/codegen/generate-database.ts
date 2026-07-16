@@ -37,13 +37,14 @@ import {
 } from '../../utils/index.ts';
 import { collectBlocks } from '../blocks/collect-blocks.ts';
 import { collectCollections } from '../collections/collect-collections.ts';
+import { resolveLocales } from '../collections/resolve-locales.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
 import { resolveFieldOptions } from '../fields/field.ts';
 import { resolveFieldStorage, type ResolvedFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
-import { fieldBaseType, fieldValueType } from '../fields/value-type.ts';
+import { fieldBaseType } from '../fields/value-type.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
@@ -133,6 +134,7 @@ export async function generateDatabase(
   const { fresh = false } = options;
   const disable = useConfig().disable;
   const helpers = Object.keys(useConfig().database?.helpers ?? {}).sort();
+  const locales = resolveLocales(useConfig().collections).locales;
   const [collections, fields, blocks, migrations] = await Promise.all([
     collectCollections(stackedLayers(), { disable: disable.collections, fresh }),
     collectFields(stackedLayers(), { disable: disable.fields, fresh }),
@@ -141,7 +143,15 @@ export async function generateDatabase(
   ]);
 
   return Promise.all([
-    writeShared(joinPath(dir, 'shared'), collections, fields, blocks, disable.fields, helpers),
+    writeShared(
+      joinPath(dir, 'shared'),
+      collections,
+      fields,
+      blocks,
+      disable.fields,
+      helpers,
+      locales,
+    ),
     writeNode(joinPath(dir, 'node'), collections, fields, blocks, migrations, disable.fields),
   ]);
 }
@@ -149,6 +159,7 @@ export async function generateDatabase(
 /**
  * Writes `shared/database.ts`, the pure type bucket.
  * It carries `GeneratedCollections`, `GeneratedRelations`, `GeneratedBlocks`, and `GeneratedDatabases`.
+ * `GeneratedLocales` closes the file with the configured locale set.
  * The traversals run before emission, so `importType` records its `import type` lines first.
  */
 async function writeShared(
@@ -158,6 +169,7 @@ async function writeShared(
   blocks: readonly CollectedBlock[],
   disabledFields: readonly string[],
   helpers: readonly string[],
+  locales: readonly string[],
 ): Promise<string> {
   const imports = createTypeImports(dir);
   const context: EmissionContext = {
@@ -302,6 +314,12 @@ async function writeShared(
     });
     code.line('}');
   }
+  code.line();
+  code.line('export interface GeneratedLocales {');
+  code.indent(() => {
+    for (const locale of locales) code.line(`${propertyKey(locale)}: true;`);
+  });
+  code.line('}');
   return write(dir, code);
 }
 
@@ -422,7 +440,7 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
+    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
@@ -434,6 +452,7 @@ async function writeNode(
     code.line('interface KnownUpdates extends GeneratedUpdates {}');
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
+    code.line('interface KnownLocales extends GeneratedLocales {}');
     if (augmented.length === 0) {
       code.line('interface KnownFields {}');
     } else {
@@ -520,6 +539,8 @@ function emittableFieldTypes(
  * Emits one field's TypeScript value type, resolving its type name against the emittable set.
  * A child hint assembles its shape from its subfields here, where the emittable set is at hand.
  * A blocks hint assembles its union from the collected blocks on the same terms.
+ * A translatable column-bearing field reads `null` where the queried locale holds no translation.
+ * Its read shape therefore folds `| null` in whatever its own nullability says.
  */
 function valueTypeOf(
   owner: EmissionOwner,
@@ -544,13 +565,15 @@ function valueTypeOf(
     if (hint.kind === 'child') return childValueType(owner, hint, context);
     if (hint.kind === 'blocks') return blocksValueType(owner, name, hint, context);
   }
-  return fieldValueType({
+  const { base, nullable } = fieldBaseType({
     fieldType,
     name,
     options: { ...instance.options },
     fieldDir: registered.dir,
     imports: context.imports,
   });
+  const perLocale = fieldType.columnType !== false && instance.options.translatable === true;
+  return nullable || perLocale ? `${base} | null` : base;
 }
 
 /**
@@ -650,12 +673,20 @@ function queryFieldType(
       path: owner.file,
     });
   }
-  const { hint, kind } = resolveFieldStorage(name, instance, registered.fieldType);
+  const resolved = resolveFieldStorage(name, instance, registered.fieldType);
+  const { hint, kind } = resolved;
+  const translatable = resolved.options.translatable === true;
   const when = hasKey(instance.options, 'when') ? conditionLiteral(instance.options.when) : null;
 
   if (kind === 'blocks') return null;
   if (kind === 'junction') {
-    return metaLiteral([`records: ${literalString((hint as JunctionHint).collection)}`], when);
+    return metaLiteral(
+      [
+        `records: ${literalString((hint as JunctionHint).collection)}`,
+        ...(translatable ? ['localeScoped: true'] : []),
+      ],
+      when,
+    );
   }
   if (kind === 'childOne' || kind === 'childMany') {
     const cardinality = kind === 'childOne' ? 'one' : 'many';
@@ -664,7 +695,14 @@ function queryFieldType(
       ...queryFieldsOf(owner, (hint as ChildHint).subfields, context),
     ];
     const body = subfields.map((field) => `${propertyKey(field.name)}: ${field.type}`).join('; ');
-    return metaLiteral([`child: ${literalString(cardinality)}`, `fields: { ${body} }`], when);
+    return metaLiteral(
+      [
+        `child: ${literalString(cardinality)}`,
+        `fields: { ${body} }`,
+        ...(translatable ? ['localeScoped: true'] : []),
+      ],
+      when,
+    );
   }
 
   const { base, nullable } = fieldBaseType({
@@ -679,6 +717,7 @@ function queryFieldType(
     parts.push(`record: ${literalString((hint as ForeignKeyHint).collection)}`);
   }
   if (nullable) parts.push('nullable: true');
+  if (translatable) parts.push('companion: true');
   return metaLiteral(parts, when);
 }
 
