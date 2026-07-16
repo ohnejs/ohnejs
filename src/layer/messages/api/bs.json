@@ -3,7 +3,8 @@
     "empty": "Tijelo zahtjeva je prazno",
     "invalidForm": "Tijelo zahtjeva nisu važeći podaci forme",
     "invalidJSON": "Tijelo zahtjeva nije važeći JSON",
-    "invalidUTF8": "Tijelo zahtjeva nije važeći UTF-8"
+    "invalidUTF8": "Tijelo zahtjeva nije važeći UTF-8",
+    "tooNested": "Tijelo zahtjeva je preduboko ugniježđeno"
   },
   "http": {
     "badRequest": "Neispravan zahtjev",

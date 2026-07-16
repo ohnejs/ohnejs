@@ -3,7 +3,8 @@
     "empty": "Request body is empty",
     "invalidForm": "Request body is not valid form data",
     "invalidJSON": "Request body is not valid JSON",
-    "invalidUTF8": "Request body is not valid UTF-8"
+    "invalidUTF8": "Request body is not valid UTF-8",
+    "tooNested": "Request body is nested too deep"
   },
   "http": {
     "badRequest": "Bad Request",

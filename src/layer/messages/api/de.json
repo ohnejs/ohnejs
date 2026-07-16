@@ -3,7 +3,8 @@
     "empty": "Anfragekörper ist leer",
     "invalidForm": "Anfragekörper sind keine gültigen Formulardaten",
     "invalidJSON": "Anfragekörper ist kein gültiges JSON",
-    "invalidUTF8": "Anfragekörper ist kein gültiges UTF-8"
+    "invalidUTF8": "Anfragekörper ist kein gültiges UTF-8",
+    "tooNested": "Anfragekörper ist zu tief verschachtelt"
   },
   "http": {
     "badRequest": "Ungültige Anfrage",
