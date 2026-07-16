@@ -9,7 +9,7 @@ import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { DEFAULT_QUERY_GUARDS, type QueryGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
-import { parseSearchParams } from '../../../../src/utils/index.ts';
+import { parseSearchParams, type SearchParamValue } from '../../../../src/utils/index.ts';
 
 useCollections().register('WUsers', {
   name: 'WUsers',
@@ -232,4 +232,26 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
     const parsed = parse('where={views:{in:[1,2]}}&select=[title,views]', tight);
     deepStrictEqual(parsed.select, ['title', 'views']);
   });
+});
+
+describe('the GET and POST transports converge on one parsed query', () => {
+  const cases: Array<[string, Record<string, SearchParamValue>]> = [
+    [
+      'where={featured:true}&select=[title]&limit=20',
+      { where: { featured: true }, select: ['title'], limit: 20 },
+    ],
+    [
+      'where={views:{atLeast:100}}&order=[-views]',
+      { where: { views: { atLeast: 100 } }, order: ['-views'] },
+    ],
+    ['populate=[author]&page=2&perPage=10', { populate: ['author'], page: 2, perPage: 10 }],
+  ];
+  for (const [query, body] of cases) {
+    it(`\`${query}\` parses the same from a URL and a JSON body`, () => {
+      deepStrictEqual(
+        parseQueryParams(parseSearchParams(query), meta, DEFAULT_QUERY_GUARDS),
+        parseQueryParams(body, meta, DEFAULT_QUERY_GUARDS),
+      );
+    });
+  }
 });
