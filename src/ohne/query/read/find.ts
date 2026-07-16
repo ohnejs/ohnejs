@@ -6,6 +6,7 @@ import type { SQLFragment } from '../sql/fragment.ts';
 
 import { isNull } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { compileLimit, compileOrder } from '../sql/order.ts';
 import { compileSelect } from '../sql/select.ts';
@@ -30,11 +31,12 @@ export function compileReadTail(
   ir: QueryIR,
   meta: CollectionQueryMeta,
   dialect: Dialect,
+  locale: string,
 ): SQLFragment {
   const parts: string[] = [];
   const params: SQLValue[] = [];
   if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect);
+    const where = compileWhere(ir.condition, meta, dialect, locale);
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }
@@ -58,14 +60,15 @@ export function compileReadTail(
 export async function readRows(ir: QueryIR): Promise<QueryRecord[]> {
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
-  const head = compileSelect(ir, meta, dialect);
-  const tail = compileReadTail(ir, meta, dialect);
-  assertBoundParams(tail.params.length, dialect.maxParameters);
-  const rows = await useDatabase().query<Record<string, SQLValue>>(
-    `${head} ${tail.sql}`,
-    tail.params,
-  );
-  const records = await hydrateScope(meta.fields, rows, ir.select, dialect);
+  const locale = effectiveLocale(ir.locale);
+  const head = compileSelect(ir, meta, dialect, locale);
+  const tail = compileReadTail(ir, meta, dialect, locale);
+  assertBoundParams(head.params.length + tail.params.length, dialect.maxParameters);
+  const rows = await useDatabase().query<Record<string, SQLValue>>(`${head.sql} ${tail.sql}`, [
+    ...head.params,
+    ...tail.params,
+  ]);
+  const records = await hydrateScope(meta.fields, rows, ir.select, dialect, locale);
   await applyPopulate(ir, meta, records, dialect);
   return records;
 }

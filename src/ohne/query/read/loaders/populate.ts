@@ -13,7 +13,9 @@ import {
   uniqueArray,
 } from '../../../../utils/index.ts';
 import { useDatabase } from '../../../database/use-database.ts';
+import { effectiveLocale } from '../../locale.ts';
 import { queryMetadata } from '../../metadata.ts';
+import { compileFrom } from '../../sql/from.ts';
 import { scopeColumns } from '../../sql/select.ts';
 import { hydrateScope } from '../hydrate.ts';
 
@@ -22,6 +24,7 @@ import { hydrateScope } from '../hydrate.ts';
  *
  * Only selected `record`/`records` fields populate: a field the read did not fetch has none to swap.
  * A `record`'s foreign key becomes the target record or `null`; a `records`' list becomes records.
+ * A translatable target reads at the query's locale, its untranslated fields `null`.
  * Populated fields load in parallel, each a batched read of its target.
  * The targets are shared references, so the contract holds: do not mutate a populated record.
  */
@@ -32,10 +35,11 @@ export async function applyPopulate(
   dialect: Dialect,
 ): Promise<void> {
   const { select } = ir;
+  const locale = effectiveLocale(ir.locale);
   const fields = uniqueArray(ir.populate).filter((name) => isNull(select) || select.includes(name));
   await Promise.all(
     fields.map((name) =>
-      populateField(meta.fields[name] as FieldQueryMeta, name, records, dialect),
+      populateField(meta.fields[name] as FieldQueryMeta, name, records, dialect, locale),
     ),
   );
 }
@@ -49,10 +53,11 @@ async function populateField(
   name: string,
   records: QueryRecord[],
   dialect: Dialect,
+  locale: string,
 ): Promise<void> {
   if (field.kind === 'record') {
     const uuids = records.map((record) => record[name]).filter(isString);
-    const targets = await loadTargets(field.target as string, uuids, dialect);
+    const targets = await loadTargets(field.target as string, uuids, dialect, locale);
     for (const record of records) {
       const uuid = record[name];
       record[name] = isString(uuid) ? (targets[uuid] ?? null) : null;
@@ -60,7 +65,7 @@ async function populateField(
     return;
   }
   const uuids = records.flatMap((record) => record[name] as string[]);
-  const targets = await loadTargets(field.target as string, uuids, dialect);
+  const targets = await loadTargets(field.target as string, uuids, dialect, locale);
   for (const record of records) {
     record[name] = (record[name] as string[])
       .map((uuid) => targets[uuid])
@@ -72,6 +77,7 @@ async function populateField(
  * Batch-reads full target records for a set of relation links, keyed by `UUID`.
  *
  * Distinct targets read once through `chunk(_, 900)`, each a complete record via the scope assembler.
+ * A translatable target joins its companion at the query's locale for the full projection.
  * Its own relations stay `UUID`s and its composites hydrate: population is depth one.
  * One row object is shared by every parent that links it, so populated targets are never cloned.
  */
@@ -79,10 +85,11 @@ async function loadTargets(
   collection: string,
   uuids: readonly string[],
   dialect: Dialect,
+  locale: string,
 ): Promise<Partial<Record<string, QueryRecord>>> {
   const meta = queryMetadata(collection);
-  const table = dialect.quote(meta.table);
-  const uuid = dialect.quote('UUID');
+  const uuid = `${dialect.quote(meta.table)}.${dialect.quote('UUID')}`;
+  const from = compileFrom(meta, { fields: null }, locale, dialect);
   const projection = scopeColumns(meta.fields)
     .map((entry) => dialect.quote(entry.column))
     .join(', ');
@@ -90,10 +97,10 @@ async function loadTargets(
   for (const batch of chunk(uniqueArray(uuids), 900)) {
     const marks = batch.map(() => '?').join(', ');
     const rows = await useDatabase().query<Record<string, SQLValue>>(
-      `SELECT ${projection} FROM ${table} WHERE ${uuid} IN (${marks})`,
-      batch,
+      `SELECT ${projection} ${from.sql} WHERE ${uuid} IN (${marks})`,
+      [...from.params, ...batch],
     );
-    targets.push(...(await hydrateScope(meta.fields, rows, null, dialect)));
+    targets.push(...(await hydrateScope(meta.fields, rows, null, dialect, locale)));
   }
   return keyBy(targets, (record) => record.UUID as string);
 }

@@ -3,7 +3,9 @@ import type { QueryIR } from '../ir.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import { assertBoundParams } from '../wire/guards.ts';
 
@@ -13,10 +15,12 @@ import { assertBoundParams } from '../wire/guards.ts';
 export async function count(ir: QueryIR): Promise<number> {
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
-  const parts = [`SELECT COUNT(*) AS "count" FROM ${dialect.quote(meta.table)}`];
-  const params: SQLValue[] = [];
+  const locale = effectiveLocale(ir.locale);
+  const from = compileFrom(meta, { condition: ir.condition }, locale, dialect);
+  const parts = [`SELECT COUNT(*) AS "count" ${from.sql}`];
+  const params: SQLValue[] = [...from.params];
   if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect);
+    const where = compileWhere(ir.condition, meta, dialect, locale);
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }
@@ -31,10 +35,12 @@ export async function count(ir: QueryIR): Promise<number> {
 export async function exists(ir: QueryIR): Promise<boolean> {
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
-  const parts = [`SELECT 1 FROM ${dialect.quote(meta.table)}`];
-  const params: SQLValue[] = [];
+  const locale = effectiveLocale(ir.locale);
+  const from = compileFrom(meta, { condition: ir.condition }, locale, dialect);
+  const parts = [`SELECT 1 ${from.sql}`];
+  const params: SQLValue[] = [...from.params];
   if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect);
+    const where = compileWhere(ir.condition, meta, dialect, locale);
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }

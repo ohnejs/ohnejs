@@ -1,8 +1,10 @@
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { QueryIR } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
+import type { SQLFragment } from './fragment.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
+import { compileFrom } from './from.ts';
 
 /**
  * One column read back from a row: its field name, its physical column, and its logical type.
@@ -46,11 +48,24 @@ export function scopeColumns(fields: Record<string, FieldQueryMeta>): SelectedCo
  * `UUID` is always fetched, since relation anchoring needs it, even when a `select` leaves it out.
  * A `select` narrows the projection to its named fields; the full column set is read when none was set.
  * A projection that names no other column still fetches `UUID` alone, never falling back to `SELECT *`.
+ * The `FROM` joins the companion at `locale` when the projection, condition, or order needs it.
+ * The head's params bind before any tail param.
  */
-export function compileSelect(ir: QueryIR, meta: CollectionQueryMeta, dialect: Dialect): string {
+export function compileSelect(
+  ir: QueryIR,
+  meta: CollectionQueryMeta,
+  dialect: Dialect,
+  locale: string,
+): SQLFragment {
   const fetched = scopeColumns(meta.fields).filter(
     (entry) => isNull(ir.select) || ir.select.includes(entry.name) || entry.name === 'UUID',
   );
   const columns = fetched.map((entry) => dialect.quote(entry.column)).join(', ');
-  return `SELECT ${columns} FROM ${dialect.quote(meta.table)}`;
+  const from = compileFrom(
+    meta,
+    { fields: fetched.map((entry) => entry.name), condition: ir.condition, order: ir.order },
+    locale,
+    dialect,
+  );
+  return { sql: `SELECT ${columns} ${from.sql}`, params: from.params };
 }

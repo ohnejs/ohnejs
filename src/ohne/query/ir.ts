@@ -64,6 +64,12 @@ export interface QueryIR {
    * The relation fields to hydrate to full records.
    */
   populate: readonly string[];
+
+  /**
+   * The explicit `.locale()` choice, or `null` for the default locale.
+   * Every locale-scoped table access resolves it through `effectiveLocale`.
+   */
+  locale: string | null;
 }
 
 /**
@@ -78,6 +84,7 @@ export function freezeIR(state: {
   limit: number | null;
   offset: number | null;
   populate: readonly string[];
+  locale: string | null;
 }): QueryIR {
   const condition =
     state.conditions.length === 0
@@ -93,5 +100,6 @@ export function freezeIR(state: {
     limit: state.limit,
     offset: state.offset,
     populate: Object.freeze([...state.populate]),
+    locale: state.locale,
   });
 }

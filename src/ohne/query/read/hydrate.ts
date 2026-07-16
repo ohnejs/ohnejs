@@ -19,6 +19,7 @@ type FieldResolver = (parent: string) => unknown;
  * `driverRows` are the rows read from that scope's table, each carrying its fetched columns and `UUID`.
  * Column-less fields - `records` relations and composites - load in parallel over the rowset, batched.
  * Composites recurse into their own subfields, so nesting hydrates to any depth.
+ * `locale` scopes the locale-scoped derived tables; nested tables scope through their parent chain.
  * Each field lands in declaration order; `select` narrows which assemble (`null` reads them all).
  * Populate is layered on by the caller: this never swaps a relation's `UUID`s for records.
  */
@@ -27,6 +28,7 @@ export async function hydrateScope(
   driverRows: readonly Record<string, SQLValue>[],
   select: readonly string[] | null,
   dialect: Dialect,
+  locale: string,
 ): Promise<QueryRecord[]> {
   const parents = driverRows.map((row) => row.UUID as string);
   const isSelected = (name: string): boolean => isNull(select) || select.includes(name);
@@ -36,7 +38,7 @@ export async function hydrateScope(
     Object.entries(fields)
       .filter(([name, field]) => isColumnless(field) && isSelected(name))
       .map(async ([name, field]) => {
-        resolvers.set(name, await resolveColumnless(field, parents, dialect));
+        resolvers.set(name, await resolveColumnless(field, parents, dialect, locale));
       }),
   );
 
@@ -84,17 +86,19 @@ async function resolveColumnless(
   field: FieldQueryMeta,
   parents: readonly string[],
   dialect: Dialect,
+  locale: string,
 ): Promise<FieldResolver> {
   if (field.kind === 'records') {
-    const links = await loadJunction(field, parents, dialect);
+    const links = await loadJunction(field, parents, dialect, locale);
     return (parent) => links[parent] ?? [];
   }
-  const rows = await loadChildRows(field, parents, dialect);
+  const rows = await loadChildRows(field, parents, dialect, locale);
   const items = await hydrateScope(
     field.subfields as Record<string, FieldQueryMeta>,
     rows,
     null,
     dialect,
+    locale,
   );
   const groups = groupBy(
     items,

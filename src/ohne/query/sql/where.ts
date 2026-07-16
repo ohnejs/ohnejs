@@ -3,32 +3,38 @@ import type { SQLValue } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
-import { isNull } from '../../../utils/index.ts';
+import { isNull, isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { queryMetadata } from '../metadata.ts';
 import { escapeLike } from './escape-like.ts';
 import { inFragment, joinFragments, rawFragment, type SQLFragment } from './fragment.ts';
+import { conditionUsesCompanion } from './from.ts';
 
 /**
  * A condition scope: the fields a leaf may address and how their columns are referenced.
  *
  * `self` is the quoted identifier a correlated child subquery references this scope's columns by.
  * It is the main table name at the top level, a `_subN` alias inside an `EXISTS`.
- * `qualified` is whether this scope's own leaves prefix their columns with `self`.
- * The top-level `WHERE` reads bare columns (one table in `FROM`); a subquery qualifies by its alias.
+ * `companionSelf` is the quoted alias or table the scope's companion columns reference through.
+ * `qualified` is whether this scope's own leaves prefix their columns.
+ * The top-level `WHERE` reads bare columns (main and companion columns are disjoint).
+ * A subquery qualifies by its aliases.
  */
 interface WhereScope {
   fields: Record<string, FieldQueryMeta>;
   self: string;
+  companionSelf?: string;
   qualified: boolean;
 }
 
 /**
- * The per-compile alias counter, handing every `EXISTS` subquery a fresh `_subN`.
+ * The per-compile state: the `_subN` alias counter and the effective locale.
+ * Every companion join and locale-scoped table binds the locale.
  * One counter threads the whole tree, so nested and self-referential relations never share an alias.
  */
-interface AliasCounter {
+interface CompileContext {
   n: number;
+  locale: string;
 }
 
 /**
@@ -38,6 +44,8 @@ interface AliasCounter {
  * An empty `and` matches all (`1 = 1`), an empty `or` matches nothing (`1 = 0`) - the one place both render.
  * A `compare` leaf renders its operator over the field's column.
  * `has`/`empty` render correlated `EXISTS` subqueries per kind, aliased `_subN` from one counter.
+ * A locale-scoped junction or child table adds its `_localeCode` predicate.
+ * An `EXISTS` target whose condition addresses companion columns joins its companion at the locale.
  * Negation wraps the positive fragment in `NOT (...)`; parsing already folded `not` groups by De Morgan.
  * Every value binds through a `?`, so nothing inlines into the SQL.
  */
@@ -45,35 +53,38 @@ export function compileWhere(
   node: ConditionNode,
   meta: CollectionQueryMeta,
   dialect: Dialect,
+  locale: string,
 ): SQLFragment {
   const scope: WhereScope = {
     fields: meta.fields,
     self: dialect.quote(meta.table),
+    ...(isUndefined(meta.companionTable)
+      ? {}
+      : { companionSelf: dialect.quote(meta.companionTable) }),
     qualified: false,
   };
-  return compileNode(node, scope, dialect, { n: 0 });
+  return compileNode(node, scope, dialect, { n: 0, locale });
 }
 
 /**
- * Compiles one AST node within `scope`, drawing subquery aliases from the shared `counter`.
+ * Compiles one AST node within `scope`, drawing aliases and the locale from the shared context.
  */
 function compileNode(
   node: ConditionNode,
   scope: WhereScope,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
   switch (node.kind) {
     case 'and':
-      return group(node.nodes, ' AND ', '1 = 1', scope, dialect, counter);
+      return group(node.nodes, ' AND ', '1 = 1', scope, dialect, ctx);
     case 'or':
-      return group(node.nodes, ' OR ', '1 = 0', scope, dialect, counter);
+      return group(node.nodes, ' OR ', '1 = 0', scope, dialect, ctx);
     case 'compare': {
       const field = scope.fields[node.path[0]];
-      const column = columnRef(scope, field.column as string, dialect);
       const fragment = compareFragment(
         node.op,
-        column,
+        fieldRef(scope, field, dialect),
         field.logicalType as LogicalType,
         node.value,
         dialect,
@@ -81,9 +92,9 @@ function compileNode(
       return negateIf(node.negated, fragment);
     }
     case 'has':
-      return negateIf(node.negated, compileHas(node, scope, dialect, counter));
+      return negateIf(node.negated, compileHas(node, scope, dialect, ctx));
     case 'empty':
-      return negateIf(node.negated, compileEmpty(node, scope, dialect, counter));
+      return negateIf(node.negated, compileEmpty(node, scope, dialect, ctx));
   }
 }
 
@@ -96,21 +107,32 @@ function group(
   constant: string,
   scope: WhereScope,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
   if (nodes.length === 0) return rawFragment(constant);
-  const fragments = nodes.map((child) => compileNode(child, scope, dialect, counter));
+  const fragments = nodes.map((child) => compileNode(child, scope, dialect, ctx));
   if (fragments.length === 1) return fragments[0];
   const joined = joinFragments(fragments, separator);
   return { sql: `(${joined.sql})`, params: joined.params };
 }
 
 /**
- * References a column of `scope`: bare at the top level, prefixed with the scope's alias inside a subquery.
+ * References a field's column: bare at the top level, prefixed inside a subquery.
+ * A companion-resident column qualifies through the scope's companion alias, never `self`.
  */
-function columnRef(scope: WhereScope, column: string, dialect: Dialect): string {
-  const quoted = dialect.quote(column);
-  return scope.qualified ? `${scope.self}.${quoted}` : quoted;
+function fieldRef(scope: WhereScope, field: FieldQueryMeta, dialect: Dialect): string {
+  if (!scope.qualified) return dialect.quote(field.column as string);
+  return qualifiedFieldRef(scope, field, dialect);
+}
+
+/**
+ * References a field's column always prefixed with its home table - the correlation form.
+ * A correlation predicate lives inside the subquery, whose `FROM` would capture a bare outer column.
+ * So it qualifies even from the top-level scope.
+ */
+function qualifiedFieldRef(scope: WhereScope, field: FieldQueryMeta, dialect: Dialect): string {
+  const table = field.companion === true ? (scope.companionSelf as string) : scope.self;
+  return `${table}.${dialect.quote(field.column as string)}`;
 }
 
 /**
@@ -135,18 +157,17 @@ function compileHas(
   node: Extract<ConditionNode, { kind: 'has' }>,
   scope: WhereScope,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
   const field = scope.fields[node.path[0]];
   if (field.kind === 'record') {
     if (isNull(node.condition)) {
-      return rawFragment(`${columnRef(scope, field.column as string, dialect)} IS NOT NULL`);
+      return rawFragment(`${fieldRef(scope, field, dialect)} IS NOT NULL`);
     }
-    return recordExists(field, scope, node.condition, dialect, counter);
+    return recordExists(field, scope, node.condition, dialect, ctx);
   }
-  if (field.kind === 'records')
-    return recordsExists(field, scope, node.condition, dialect, counter);
-  return childExists(field, scope, node.condition, dialect, counter);
+  if (field.kind === 'records') return recordsExists(field, scope, node.condition, dialect, ctx);
+  return childExists(field, scope, node.condition, dialect, ctx);
 }
 
 /**
@@ -156,16 +177,16 @@ function compileEmpty(
   node: Extract<ConditionNode, { kind: 'empty' }>,
   scope: WhereScope,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
   const field = scope.fields[node.path[0]];
   if (field.kind === 'record') {
-    return rawFragment(`${columnRef(scope, field.column as string, dialect)} IS NULL`);
+    return rawFragment(`${fieldRef(scope, field, dialect)} IS NULL`);
   }
   const existence =
     field.kind === 'records'
-      ? recordsExists(field, scope, null, dialect, counter)
-      : childExists(field, scope, null, dialect, counter);
+      ? recordsExists(field, scope, null, dialect, ctx)
+      : childExists(field, scope, null, dialect, ctx);
   return { sql: `NOT ${existence.sql}`, params: existence.params };
 }
 
@@ -177,66 +198,140 @@ function recordExists(
   scope: WhereScope,
   condition: ConditionNode,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
-  const alias = dialect.quote(nextAlias(counter));
+  const alias = dialect.quote(nextAlias(ctx));
   const target = queryMetadata(field.target as string);
-  const from = `${dialect.quote(target.table)} ${alias}`;
-  const correlation = `${alias}.${dialect.quote('UUID')} = ${scope.self}.${dialect.quote(field.column as string)}`;
-  const inner: WhereScope = { fields: target.fields, self: alias, qualified: true };
-  return existsFragment(from, correlation, condition, inner, dialect, counter);
+  const companion = companionJoin(target, alias, condition, dialect, ctx);
+  const from = {
+    sql: `${dialect.quote(target.table)} ${alias}${companion.sql}`,
+    params: companion.params,
+  };
+  const correlation = rawFragment(
+    `${alias}.${dialect.quote('UUID')} = ${qualifiedFieldRef(scope, field, dialect)}`,
+  );
+  const inner: WhereScope = {
+    fields: target.fields,
+    self: alias,
+    qualified: true,
+    ...(isUndefined(companion.companionSelf) ? {} : { companionSelf: companion.companionSelf }),
+  };
+  return existsFragment(from, correlation, condition, inner, dialect, ctx);
 }
 
 /**
  * `EXISTS` over a `records` junction, correlating the parent-side link to the parent's `UUID`.
  * A conditioned probe joins the target table so the nested condition can address it.
  * The inverse side swaps which junction column links the parent and which links the target.
+ * A locale-scoped junction holds one link list per locale, so its correlation binds the locale too.
  */
 function recordsExists(
   field: FieldQueryMeta,
   scope: WhereScope,
   condition: ConditionNode | null,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
-  const junction = dialect.quote(nextAlias(counter));
+  const junction = dialect.quote(nextAlias(ctx));
   const [parentLink, targetLink] =
     field.inverse === true ? ['_targetUUID', '_parentUUID'] : ['_parentUUID', '_targetUUID'];
-  const correlation = `${junction}.${dialect.quote(parentLink)} = ${selfUUID(scope, dialect)}`;
+  const correlation = scopedCorrelation(
+    `${junction}.${dialect.quote(parentLink)} = ${selfUUID(scope, dialect)}`,
+    field,
+    junction,
+    dialect,
+    ctx,
+  );
   const junctionFrom = `${dialect.quote(field.table as string)} ${junction}`;
   if (isNull(condition)) {
-    return rawFragment(`EXISTS (SELECT 1 FROM ${junctionFrom} WHERE ${correlation})`);
+    return existsFragment(rawFragment(junctionFrom), correlation, null, scope, dialect, ctx);
   }
-  const targetAlias = dialect.quote(nextAlias(counter));
+  const targetAlias = dialect.quote(nextAlias(ctx));
   const target = queryMetadata(field.target as string);
   const join = `JOIN ${dialect.quote(target.table)} ${targetAlias} ON ${targetAlias}.${dialect.quote('UUID')} = ${junction}.${dialect.quote(targetLink)}`;
-  const inner: WhereScope = { fields: target.fields, self: targetAlias, qualified: true };
-  const cond = compileNode(condition, inner, dialect, counter);
-  return {
-    sql: `EXISTS (SELECT 1 FROM ${junctionFrom} ${join} WHERE ${correlation} AND ${cond.sql})`,
-    params: cond.params,
+  const companion = companionJoin(target, targetAlias, condition, dialect, ctx);
+  const from = { sql: `${junctionFrom} ${join}${companion.sql}`, params: companion.params };
+  const inner: WhereScope = {
+    fields: target.fields,
+    self: targetAlias,
+    qualified: true,
+    ...(isUndefined(companion.companionSelf) ? {} : { companionSelf: companion.companionSelf }),
   };
+  return existsFragment(from, correlation, condition, inner, dialect, ctx);
 }
 
 /**
  * `EXISTS` over a composite's child table, correlating the child's `_parentUUID` to the parent's `UUID`.
+ * A locale-scoped child table holds one item set per locale, so its correlation binds the locale too.
  */
 function childExists(
   field: FieldQueryMeta,
   scope: WhereScope,
   condition: ConditionNode | null,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
-  const alias = dialect.quote(nextAlias(counter));
-  const from = `${dialect.quote(field.table as string)} ${alias}`;
-  const correlation = `${alias}.${dialect.quote('_parentUUID')} = ${selfUUID(scope, dialect)}`;
+  const alias = dialect.quote(nextAlias(ctx));
+  const from = rawFragment(`${dialect.quote(field.table as string)} ${alias}`);
+  const correlation = scopedCorrelation(
+    `${alias}.${dialect.quote('_parentUUID')} = ${selfUUID(scope, dialect)}`,
+    field,
+    alias,
+    dialect,
+    ctx,
+  );
   const inner: WhereScope = {
     fields: field.subfields as Record<string, FieldQueryMeta>,
     self: alias,
     qualified: true,
   };
-  return existsFragment(from, correlation, condition, inner, dialect, counter);
+  return existsFragment(from, correlation, condition, inner, dialect, ctx);
+}
+
+/**
+ * Appends the `_localeCode` predicate to a derived table's correlation when the field is locale-scoped.
+ */
+function scopedCorrelation(
+  correlation: string,
+  field: FieldQueryMeta,
+  alias: string,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment {
+  if (field.localeScoped !== true) return rawFragment(correlation);
+  return {
+    sql: `${correlation} AND ${alias}.${dialect.quote('_localeCode')} = ?`,
+    params: [ctx.locale],
+  };
+}
+
+/**
+ * The optional companion join of an `EXISTS` target, aliased fresh.
+ * Present when the nested condition addresses companion columns.
+ * `LEFT`, so an untranslated target still reads, its companion columns `NULL`.
+ */
+function companionJoin(
+  target: CollectionQueryMeta,
+  selfAlias: string,
+  condition: ConditionNode | null,
+  dialect: Dialect,
+  ctx: CompileContext,
+): { sql: string; params: SQLValue[]; companionSelf?: string } {
+  if (
+    isUndefined(target.companionTable) ||
+    isNull(condition) ||
+    !conditionUsesCompanion(condition, target.fields)
+  ) {
+    return { sql: '', params: [] };
+  }
+  const companion = dialect.quote(nextAlias(ctx));
+  const parent = `${companion}.${dialect.quote('_parentUUID')} = ${selfAlias}.${dialect.quote('UUID')}`;
+  const scoped = `${companion}.${dialect.quote('_localeCode')} = ?`;
+  return {
+    sql: ` LEFT JOIN ${dialect.quote(target.companionTable)} ${companion} ON ${parent} AND ${scoped}`,
+    params: [ctx.locale],
+    companionSelf: companion,
+  };
 }
 
 /**
@@ -244,28 +339,31 @@ function childExists(
  * A `null` condition tests bare existence; otherwise the condition compiles within `inner`.
  */
 function existsFragment(
-  from: string,
-  correlation: string,
+  from: SQLFragment,
+  correlation: SQLFragment,
   condition: ConditionNode | null,
   inner: WhereScope,
   dialect: Dialect,
-  counter: AliasCounter,
+  ctx: CompileContext,
 ): SQLFragment {
   if (isNull(condition)) {
-    return rawFragment(`EXISTS (SELECT 1 FROM ${from} WHERE ${correlation})`);
+    return {
+      sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql})`,
+      params: [...from.params, ...correlation.params],
+    };
   }
-  const cond = compileNode(condition, inner, dialect, counter);
+  const cond = compileNode(condition, inner, dialect, ctx);
   return {
-    sql: `EXISTS (SELECT 1 FROM ${from} WHERE ${correlation} AND ${cond.sql})`,
-    params: cond.params,
+    sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql} AND ${cond.sql})`,
+    params: [...from.params, ...correlation.params, ...cond.params],
   };
 }
 
 /**
  * Hands out the next `_subN` alias, bumping the shared counter.
  */
-function nextAlias(counter: AliasCounter): string {
-  return `_sub${counter.n++}`;
+function nextAlias(ctx: CompileContext): string {
+  return `_sub${ctx.n++}`;
 }
 
 /**

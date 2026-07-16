@@ -10,6 +10,8 @@ import { useDatabase } from '../../../database/use-database.ts';
  * The owner side reads the junction by `_parentUUID`, ordered by `_parentPosition`, listing targets.
  * The inverse side swaps the roles: it reads by `_targetUUID`, ordered by `_targetPosition`.
  * So both sides read their own authored order.
+ * A locale-scoped junction holds one link list per (owner, locale), so the read binds `locale`.
+ * Both sides bind it, since the owner's option scopes the one shared table.
  * Parents batch through `chunk(_, 900)`, so the junction is at most one read per chunk.
  * A parent with no links is absent from the result; the caller reads that as an empty list.
  */
@@ -17,20 +19,23 @@ export async function loadJunction(
   field: FieldQueryMeta,
   parents: readonly string[],
   dialect: Dialect,
+  locale: string,
 ): Promise<Partial<Record<string, string[]>>> {
   const inverse = field.inverse === true;
   const table = dialect.quote(field.table as string);
   const self = dialect.quote(inverse ? '_targetUUID' : '_parentUUID');
   const link = dialect.quote(inverse ? '_parentUUID' : '_targetUUID');
   const order = dialect.quote(inverse ? '_targetPosition' : '_parentPosition');
+  const scoped = field.localeScoped === true;
+  const filter = scoped ? ` AND ${dialect.quote('_localeCode')} = ?` : '';
 
   const rows: { self: string; link: string }[] = [];
   for (const batch of chunk(parents, 900)) {
     const marks = batch.map(() => '?').join(', ');
     const found = await useDatabase().query<{ self: string; link: string }>(
       `SELECT ${self} AS "self", ${link} AS "link" FROM ${table} ` +
-        `WHERE ${self} IN (${marks}) ORDER BY ${order}`,
-      batch,
+        `WHERE ${self} IN (${marks})${filter} ORDER BY ${order}`,
+      scoped ? [...batch, locale] : [...batch],
     );
     rows.push(...found);
   }

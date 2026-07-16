@@ -4,7 +4,9 @@ import type { QueryIR } from '../ir.ts';
 
 import { isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { compileFrom } from '../sql/from.ts';
 import { assertBoundParams } from '../wire/guards.ts';
 import { compileReadTail, readRows } from './find.ts';
 
@@ -25,9 +27,19 @@ export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
     return rows.map((row) => row[field]);
   }
   const dialect = useDialect();
-  const tail = compileReadTail(ir, meta, dialect);
-  assertBoundParams(tail.params.length, dialect.maxParameters);
-  const head = `SELECT ${dialect.quote(entry.column)} AS "value" FROM ${dialect.quote(meta.table)}`;
-  const rows = await useDatabase().query<{ value: SQLValue }>(`${head} ${tail.sql}`, tail.params);
+  const locale = effectiveLocale(ir.locale);
+  const tail = compileReadTail(ir, meta, dialect, locale);
+  const from = compileFrom(
+    meta,
+    { fields: [field], condition: ir.condition, order: ir.order },
+    locale,
+    dialect,
+  );
+  assertBoundParams(from.params.length + tail.params.length, dialect.maxParameters);
+  const head = `SELECT ${dialect.quote(entry.column)} AS "value" ${from.sql}`;
+  const rows = await useDatabase().query<{ value: SQLValue }>(`${head} ${tail.sql}`, [
+    ...from.params,
+    ...tail.params,
+  ]);
   return rows.map((row) => dialect.deserialize(entry.logicalType as LogicalType, row.value));
 }
