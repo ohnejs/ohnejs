@@ -3,11 +3,20 @@ import type { CollectionMeta } from '../collections/use-collections.ts';
 import type { LogicalType } from '../database/dialect.ts';
 import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
-import type { ChildHint, ForeignKeyHint, JunctionHint } from '../fields/storage-hint.ts';
+import type {
+  BlocksHint,
+  ChildHint,
+  ForeignKeyHint,
+  JunctionHint,
+} from '../fields/storage-hint.ts';
 
 import { hasKey, isUndefined, parseCondition } from '../../utils/index.ts';
+import { resolveAllowedBlocks } from '../blocks/resolve-allowed-blocks.ts';
+import { useBlocks } from '../blocks/use-blocks.ts';
 import { useCollections } from '../collections/use-collections.ts';
 import {
+  blockRootName,
+  blockTableName,
   collectionTableName,
   companionTableName,
   derivedTableName,
@@ -15,7 +24,7 @@ import {
 import { ohneError } from '../error/ohne-error.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
-import { validateWhen } from './validate-when.ts';
+import { validateBlockWhen, validateWhen } from './validate-when.ts';
 
 /**
  * The query-facing shape of one field: where its value lives and how a condition may address it.
@@ -25,10 +34,10 @@ import { validateWhen } from './validate-when.ts';
 export interface FieldQueryMeta {
   /**
    * How the field stores and reads.
-   * A plain column, a `record` reference, a `records` relation, or a child table.
+   * A plain column, a `record` reference, a `records` relation, a child table, or a blocks wrapper.
    * `childOne` holds one child row per parent, `childMany` many.
    */
-  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany';
+  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks';
 
   /**
    * The registered field type, carrying the pipeline hooks; absent on the system entries.
@@ -91,7 +100,8 @@ export interface FieldQueryMeta {
   inverse?: true;
 
   /**
-   * The derived table the values live in: a `records` junction, or a composite's child table.
+   * The derived table the values live in.
+   * A `records` junction, a composite's child table, or a `blocks` field's wrapper.
    */
   table?: string;
 
@@ -99,6 +109,12 @@ export interface FieldQueryMeta {
    * The child table's own fields, its item `UUID` included; child kinds only.
    */
   subfields?: Record<string, FieldQueryMeta>;
+
+  /**
+   * The resolved block types the field admits, sorted; `blocks` kind only.
+   * Each type's own table and subfields resolve through `blockQueryMetadata`.
+   */
+  allow?: readonly string[];
 
   /**
    * The field's parsed `when` condition, present when the instance declares one.
@@ -171,13 +187,66 @@ export function queryMetadata(collection: string): CollectionQueryMeta {
 }
 
 /**
- * Builds and caches every collection's query metadata, validating each declared `when` in the process.
+ * Builds and caches every collection's and every registered block's query metadata.
+ * Each declared `when` validates in the process.
  *
  * Run at boot so a malformed or misaddressed `when` fails before the server serves, not on a first write.
  * The build is memoized, so this warms the cache every later read and write then reuses.
  */
 export function warmQueryMetadata(): void {
   for (const meta of Object.values(useCollections().all())) queryMetadata(meta.name);
+  for (const name of useBlocks().keys()) blockQueryMetadata(name);
+}
+
+/**
+ * Everything the query layer knows about one block type.
+ * Blocks are global - wrapper fields reference them by name.
+ * The metadata therefore resolves once per block, never per use site.
+ */
+export interface BlockQueryMeta {
+  /**
+   * The block's name.
+   */
+  name: string;
+
+  /**
+   * The block's shared per-type table.
+   */
+  table: string;
+
+  /**
+   * Every addressable subfield in order: the item `UUID`, then the declared fields as authored.
+   */
+  fields: Record<string, FieldQueryMeta>;
+}
+
+/**
+ * The per-block memo, living and dying with the registries exactly as the collection cache does.
+ */
+const blockCache = new Map<string, BlockQueryMeta>();
+
+/**
+ * Returns the query metadata of one block type, built lazily and memoized per process.
+ *
+ * The runtime twin of a `blocks` field's per-type view.
+ * The compiler scopes a discriminated `has` through it and the loaders hydrate instances from it.
+ * The pipeline descends its fields.
+ * Building validates every declared `when` block-scoped: bare sibling paths only, anchors rejected.
+ * An unknown block throws.
+ */
+export function blockQueryMetadata(block: string): BlockQueryMeta {
+  const cached = blockCache.get(block);
+  if (!isUndefined(cached)) return cached;
+  const meta = useBlocks().get(block);
+  if (isUndefined(meta)) throw ohneError(`Unknown block \`${block}\``);
+  const fields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
+    UUID: uuidEntry(),
+  });
+  addFieldEntries(fields, meta.block.fields, blockRootName(block), `block \`${block}\``);
+  const built = { name: block, table: blockTableName(block), fields };
+  validateBlockWhen(block, fields);
+  blockCache.set(block, built);
+  return built;
 }
 
 /**
@@ -197,7 +266,7 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
     UUID: uuidEntry(),
     _updatedAt: { kind: 'column', nullable: false, logicalType: 'integer', column: '_updatedAt' },
   });
-  addFieldEntries(fields, meta.collection.fields, meta.name, meta.name);
+  addFieldEntries(fields, meta.collection.fields, meta.name, `collection \`${meta.name}\``);
   const entries = Object.values(fields);
   const companion = entries.some((field) => field.companion === true);
   const translatable =
@@ -214,17 +283,17 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
 /**
  * Walks one field map in declaration order and adds each field's entry.
  * `logical` is the untruncated name derived tables under this scope compose from.
- * `collection` names the owning collection, so a malformed `when` reads its home in the error.
+ * `home` is the owning scope's rendered phrase, `` collection `Posts` `` or `` block `Hero` ``.
+ * A malformed `when` reads its home in the error.
  */
 function addFieldEntries(
   into: Record<string, FieldQueryMeta>,
   fieldMap: Record<string, FieldInstance>,
   logical: string,
-  collection: string,
+  home: string,
 ): void {
   for (const [name, instance] of Object.entries(fieldMap)) {
-    const entry = fieldEntry(name, instance, logical, collection);
-    if (!isUndefined(entry)) into[name] = entry;
+    into[name] = fieldEntry(name, instance, logical, home);
   }
 }
 
@@ -237,19 +306,30 @@ function fieldEntry(
   name: string,
   instance: FieldInstance,
   logical: string,
-  collection: string,
-): FieldQueryMeta | undefined {
+  home: string,
+): FieldQueryMeta {
   const registered = useFields().get(instance.type);
   if (isUndefined(registered)) throw ohneError(`Unknown field type \`${instance.type}\``);
   const resolved = resolveFieldStorage(name, instance, registered.fieldType);
   const { fieldType, hint, kind } = resolved;
   const options = Object.freeze(resolved.options);
 
-  if (kind === 'blocks') return undefined;
-
-  const when = parseFieldWhen(options, name, collection);
+  const when = parseFieldWhen(options, name, home);
   const gate = isUndefined(when) ? {} : { when };
   const translatable = options.translatable === true;
+
+  if (kind === 'blocks') {
+    return {
+      kind,
+      fieldType,
+      options,
+      nullable: false,
+      table: derivedTableName(logical, name),
+      allow: fieldAllow((hint as BlocksHint).allow, name, home),
+      ...gate,
+      ...(translatable ? { localeScoped: true } : {}),
+    };
+  }
 
   if (kind === 'junction') {
     const { collection: target, inverse } = hint as JunctionHint;
@@ -272,7 +352,7 @@ function fieldEntry(
     const subfields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
       UUID: uuidEntry(),
     });
-    addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`, collection);
+    addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`, home);
     return {
       kind,
       fieldType,
@@ -299,6 +379,23 @@ function fieldEntry(
 }
 
 /**
+ * Resolves a blocks field's allow list against the block registry, frozen for sharing.
+ * The schema build already validated it, so a failure here means an unsynced or unregistered state.
+ */
+function fieldAllow(
+  allow: readonly string[] | undefined,
+  name: string,
+  home: string,
+): readonly string[] {
+  const result = resolveAllowedBlocks(allow, useBlocks().keys());
+  if (result.ok) return Object.freeze(result.allowed);
+  if (result.reason === 'empty') {
+    throw ohneError(`Field \`${name}\` on ${home} has no block types to hold`);
+  }
+  throw ohneError(`Field \`${name}\` on ${home} allows unknown block \`${result.block}\``);
+}
+
+/**
  * Whether the owning side of an inverse `records` relation is translatable.
  * An inverse field reads the owner's junction, so the owner's option decides its locale scoping.
  * Resolved straight from the registries - `queryMetadata` would recurse on a self-relation.
@@ -320,7 +417,7 @@ function ownerTranslatable(target: string, ownerField: string): boolean {
 function parseFieldWhen(
   options: Readonly<Record<string, unknown>>,
   name: string,
-  collection: string,
+  home: string,
 ): ConditionNode | undefined {
   if (!hasKey(options, 'when')) return undefined;
   const result = parseCondition(options.when);
@@ -329,7 +426,7 @@ function parseFieldWhen(
   throw ohneError({
     title: `Invalid \`when\` condition on \`${name}\``,
     body: [
-      `Field \`${name}\` on collection \`${collection}\` has a malformed \`when\` condition${at}.`,
+      `Field \`${name}\` on ${home} has a malformed \`when\` condition${at}.`,
       whenGrammarHint(result.error.code),
     ],
   });

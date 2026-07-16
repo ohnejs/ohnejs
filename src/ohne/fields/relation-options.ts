@@ -47,6 +47,15 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
            * false
            */
           translatable?: boolean;
+
+          /**
+           * Whether an empty list is a legal value.
+           * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+           *
+           * @default
+           * true
+           */
+          allowEmpty?: boolean;
         }
       | {
           /**
@@ -70,6 +79,15 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
            * Forbidden here: an inverse field follows the owning side's junction.
            */
           translatable?: never;
+
+          /**
+           * Whether an empty list is a legal value.
+           * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+           *
+           * @default
+           * true
+           */
+          allowEmpty?: boolean;
         }
   : {
       [C in keyof KnownCollections & string]:
@@ -101,6 +119,15 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
              * false
              */
             translatable?: boolean;
+
+            /**
+             * Whether an empty list is a legal value.
+             * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+             *
+             * @default
+             * true
+             */
+            allowEmpty?: boolean;
           }
         | {
             /**
@@ -124,5 +151,14 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
              * Forbidden here: an inverse field follows the owning side's junction.
              */
             translatable?: never;
+
+            /**
+             * Whether an empty list is a legal value.
+             * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+             *
+             * @default
+             * true
+             */
+            allowEmpty?: boolean;
           };
     }[keyof KnownCollections & string];

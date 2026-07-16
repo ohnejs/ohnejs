@@ -76,6 +76,7 @@ describe('resolveFieldStorage', () => {
       resolveFieldStorage('tags', field('records', { collection: 'Tags' }), records).options,
       {
         ...COMMON,
+        allowEmpty: true,
         collection: 'Tags',
       },
     );

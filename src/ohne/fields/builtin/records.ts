@@ -35,6 +35,16 @@ export const records = defineField({
      * 'cascade'
      */
     onDelete: option<'cascade' | 'restrict'>(),
+
+    /**
+     * Whether an empty list is a legal value.
+     * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+     * Absent input still defaults to `[]`; only a provided empty list is rejected.
+     *
+     * @default
+     * true
+     */
+    allowEmpty: option({ default: true }),
   },
   schema: (ctx) => ({
     kind: 'junction',

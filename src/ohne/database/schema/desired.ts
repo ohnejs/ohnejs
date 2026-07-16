@@ -20,6 +20,7 @@ import type {
 } from './table-schema.ts';
 
 import { createRegistry, isUndefined, naturalCompare } from '../../../utils/index.ts';
+import { resolveAllowedBlocks } from '../../blocks/resolve-allowed-blocks.ts';
 import { validateBlockDefinition } from '../../blocks/validate-block.ts';
 import { validateCollectionDefinition } from '../../collections/validate-collection.ts';
 import { ohneError } from '../../error/ohne-error.ts';
@@ -690,8 +691,7 @@ function buildWrapperTable(
 
 /**
  * Resolves a wrapper's allowed block types against the block registry.
- * An explicit list is validated name by name; an omitted one means every registered block.
- * The result sorts by name, so the schema hash never shifts with declaration order.
+ * The shared resolver sorts and validates; the failures render with the owner's context here.
  */
 function resolveAllow(
   parent: DerivedParent,
@@ -699,29 +699,23 @@ function resolveAllow(
   hint: BlocksHint,
   registries: SchemaRegistries,
 ): string[] {
-  if (isUndefined(hint.allow)) {
-    const registered = registries.blocks.keys();
-    if (registered.length === 0) {
-      throw ohneError({
-        title: `Field \`${label}\` has no block types to hold`,
-        body: [
-          `${ownerSubject(parent.owner)} declares a blocks field, but no block is registered.`,
-          'Define one under `dirs.blocks`, or drop the field.',
-        ],
-      });
-    }
-    return registered.sort(naturalCompare);
-  }
-  for (const block of hint.allow) {
-    if (registries.blocks.has(block)) continue;
+  const result = resolveAllowedBlocks(hint.allow, registries.blocks.keys());
+  if (result.ok) return result.allowed;
+  if (result.reason === 'empty') {
     throw ohneError({
-      title: `Unknown block \`${block}\``,
+      title: `Field \`${label}\` has no block types to hold`,
       body: [
-        `Field \`${label}\` in ${ownerLabel(parent.owner)} allows block \`${block}\`, which is not registered.`,
+        `${ownerSubject(parent.owner)} declares a blocks field, but no block is registered.`,
+        'Define one under `dirs.blocks`, or drop the field.',
       ],
     });
   }
-  return [...hint.allow].sort(naturalCompare);
+  throw ohneError({
+    title: `Unknown block \`${result.block}\``,
+    body: [
+      `Field \`${label}\` in ${ownerLabel(parent.owner)} allows block \`${result.block}\`, which is not registered.`,
+    ],
+  });
 }
 
 /**

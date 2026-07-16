@@ -19,6 +19,16 @@ export const blocks = defineField({
      * Inside a block, the open set includes the enclosing block itself, so nesting is unbounded.
      */
     allow: option<readonly BlockName[]>(),
+
+    /**
+     * Whether an empty list is a legal value.
+     * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one block.
+     * Absent input still defaults to `[]`; only a provided empty list is rejected.
+     *
+     * @default
+     * true
+     */
+    allowEmpty: option({ default: true }),
   },
   schema: (ctx) => ({
     kind: 'blocks',

@@ -16,23 +16,36 @@ type Scope = Record<string, FieldQueryMeta>;
  * A gated field must be nullable or defaulted, since an inactive create still writes a value.
  * A path resolves in scope: bare in the field's scope, `/` at the root, `../` one composite level up.
  * Dots descend into a composite, and each operator must apply to the field the path lands on.
- * A `has` on a `record`/`records` may only be the bare `true` form; a `UUID` cannot be walked in JS.
+ * A `has` on a `record`/`records`/`blocks` may only be the bare `true` form.
  * The grammar itself was already checked when the node parsed, so only scope and applicability remain.
  * A violation throws `ohneError`, naming the field and its collection.
  */
 export function validateWhen(meta: CollectionQueryMeta): void {
-  walkScope(meta.fields, [meta.fields], meta.collection);
+  walkScope(meta.fields, [meta.fields], `collection \`${meta.collection}\``, true);
+}
+
+/**
+ * Validates every `when` a block declares against the block's own field graph.
+ *
+ * The same rules as `validateWhen`, except paths are block-scoped: bare sibling segments only.
+ * `/` and `../` are rejected - a block cannot anchor into a host it does not know.
+ */
+export function validateBlockWhen(block: string, fields: Record<string, FieldQueryMeta>): void {
+  walkScope(fields, [fields], `block \`${block}\``, false);
 }
 
 /**
  * Walks one scope, validating each field's `when`, then recursing into every composite subfield scope.
  * The ancestry runs root-first, so a `../` climb pops its tail and a `/` anchor reads its head.
+ * `home` is the owning scope's rendered phrase; `anchors` admits `/` and `../` paths.
  */
-function walkScope(scope: Scope, ancestry: readonly Scope[], collection: string): void {
+function walkScope(scope: Scope, ancestry: readonly Scope[], home: string, anchors: boolean): void {
   for (const [name, field] of Object.entries(scope)) {
-    if (!isUndefined(field.when)) validateFieldWhen(name, field, field.when, ancestry, collection);
+    if (!isUndefined(field.when)) {
+      validateFieldWhen(name, field, field.when, ancestry, home, anchors);
+    }
     if (field.kind === 'childOne' || field.kind === 'childMany') {
-      walkScope(field.subfields as Scope, [...ancestry, field.subfields as Scope], collection);
+      walkScope(field.subfields as Scope, [...ancestry, field.subfields as Scope], home, anchors);
     }
   }
 }
@@ -45,10 +58,11 @@ function validateFieldWhen(
   field: FieldQueryMeta,
   when: ConditionNode,
   ancestry: readonly Scope[],
-  collection: string,
+  home: string,
+  anchors: boolean,
 ): void {
-  if (!satisfiesInactive(field)) throw whenNeedsDefault(name, collection);
-  checkNode(when, name, ancestry, collection, true);
+  if (!satisfiesInactive(field)) throw whenNeedsDefault(name, home);
+  checkNode(when, name, ancestry, home, true, anchors);
 }
 
 /**
@@ -57,7 +71,9 @@ function validateFieldWhen(
  */
 function satisfiesInactive(field: FieldQueryMeta): boolean {
   if (field.nullable) return true;
-  if (field.kind === 'records' || field.kind === 'childMany') return true;
+  if (field.kind === 'records' || field.kind === 'childMany' || field.kind === 'blocks') {
+    return true;
+  }
   if (!isUndefined(field.options) && hasKey(field.options, 'default')) return true;
   return !isUndefined(field.fieldType?.defaultValue);
 }
@@ -67,31 +83,36 @@ function satisfiesInactive(field: FieldQueryMeta): boolean {
  *
  * A leaf resolves its path, anchored against the ancestry at the top level, or by plain descent in a `has`.
  * That matches the runtime evaluator, which reads a nested `has` relative to the walked item alone.
- * The operator must apply to the field the path lands on; a nested `has` over a relation is rejected.
+ * The operator must apply to the field the path lands on.
+ * A nested `has` over a relation or a blocks field is rejected: neither value can be walked in JS.
  */
 function checkNode(
   node: ConditionNode,
   field: string,
   ancestry: readonly Scope[],
-  collection: string,
+  home: string,
   anchored: boolean,
+  anchors: boolean,
 ): void {
   if (node.kind === 'and' || node.kind === 'or') {
-    for (const child of node.nodes) checkNode(child, field, ancestry, collection, anchored);
+    for (const child of node.nodes) checkNode(child, field, ancestry, home, anchored, anchors);
     return;
+  }
+  if (!anchors && (node.path[0] === '/' || node.path[0] === '..')) {
+    throw anchoredBlockPath(node.path, field, home);
   }
   const scope = ancestry[ancestry.length - 1];
   const resolved = anchored ? resolveAnchored(node.path, ancestry) : descend(node.path, scope);
-  if (isUndefined(resolved)) throw unknownWhenPath(node.path, field, collection);
+  if (isUndefined(resolved)) throw unknownWhenPath(node.path, field, home);
   const operator = node.kind === 'compare' ? node.op : node.kind;
   if (!allowedOperators(resolved).has(operator)) {
-    throw inapplicableWhenOp(operator, node.path, field, collection);
+    throw inapplicableWhenOp(operator, node.path, field, home);
   }
   if (node.kind === 'has' && !isNull(node.condition)) {
-    if (resolved.kind === 'record' || resolved.kind === 'records') {
-      throw nestedHasOnRelation(node.path, field, collection);
+    if (resolved.kind === 'record' || resolved.kind === 'records' || resolved.kind === 'blocks') {
+      throw nestedHasOnWalkless(resolved.kind, node.path, field, home);
     }
-    checkNode(node.condition, field, [resolved.subfields as Scope], collection, false);
+    checkNode(node.condition, field, [resolved.subfields as Scope], home, false, anchors);
   }
 }
 
@@ -153,12 +174,30 @@ function whenPathText(segments: readonly string[]): string {
 /**
  * The failure a `when`-gated field raises when it can neither hold `null` nor fall back to a default.
  */
-function whenNeedsDefault(field: string, collection: string): ReturnType<typeof ohneError> {
+function whenNeedsDefault(field: string, home: string): ReturnType<typeof ohneError> {
   return ohneError({
     title: `\`when\`-gated field \`${field}\` must be nullable or have a default`,
     body: [
-      `Field \`${field}\` in collection \`${collection}\` is gated by \`when\` but is neither nullable nor defaulted.`,
+      `Field \`${field}\` in ${home} is gated by \`when\` but is neither nullable nor defaulted.`,
       'An inactive create still writes a value, so make the field `nullable` or give it a `default`.',
+    ],
+  });
+}
+
+/**
+ * The failure a block-owned `when` raises when a path anchors with `/` or `../`.
+ */
+function anchoredBlockPath(
+  segments: readonly string[],
+  field: string,
+  home: string,
+): ReturnType<typeof ohneError> {
+  const path = whenPathText(segments);
+  return ohneError({
+    title: `\`when\` path \`${path}\` anchors outside the block`,
+    body: [
+      `The \`when\` on field \`${field}\` in ${home} anchors \`${path}\` with \`/\` or \`../\`.`,
+      'A block resolves `when` paths in its own scope alone - use bare sibling names.',
     ],
   });
 }
@@ -169,13 +208,13 @@ function whenNeedsDefault(field: string, collection: string): ReturnType<typeof 
 function unknownWhenPath(
   segments: readonly string[],
   field: string,
-  collection: string,
+  home: string,
 ): ReturnType<typeof ohneError> {
   const path = whenPathText(segments);
   return ohneError({
     title: `Unknown \`when\` path \`${path}\` on \`${field}\``,
     body: [
-      `The \`when\` on field \`${field}\` in collection \`${collection}\` addresses \`${path}\`, which resolves to no field.`,
+      `The \`when\` on field \`${field}\` in ${home} addresses \`${path}\`, which resolves to no field.`,
       'Check the path, and that no `../` climbs past the record root.',
     ],
   });
@@ -188,31 +227,36 @@ function inapplicableWhenOp(
   operator: string,
   segments: readonly string[],
   field: string,
-  collection: string,
+  home: string,
 ): ReturnType<typeof ohneError> {
   const path = whenPathText(segments);
   return ohneError({
     title: `Operator \`${operator}\` does not apply in the \`when\` on \`${field}\``,
     body: [
-      `The \`when\` on field \`${field}\` in collection \`${collection}\` uses \`${operator}\` on \`${path}\`, which does not support it.`,
+      `The \`when\` on field \`${field}\` in ${home} uses \`${operator}\` on \`${path}\`, which does not support it.`,
     ],
   });
 }
 
 /**
- * The failure a `when` raises when a `has` walks into a relation with a nested condition.
+ * The failure a `when` raises when a `has` walks into a relation or a blocks field with a nested condition.
  */
-function nestedHasOnRelation(
+function nestedHasOnWalkless(
+  kind: FieldQueryMeta['kind'],
   segments: readonly string[],
   field: string,
-  collection: string,
+  home: string,
 ): ReturnType<typeof ohneError> {
   const path = whenPathText(segments);
+  const reason =
+    kind === 'blocks'
+      ? 'A blocks value is a discriminated list and cannot be walked in a `when`, so use `has: true`.'
+      : 'A `record`/`records` is a `UUID` at write time and cannot be walked, so use `has: true`.';
   return ohneError({
-    title: `\`has\` on relation \`${path}\` must be bare \`true\` in a \`when\``,
+    title: `\`has\` on \`${path}\` must be bare \`true\` in a \`when\``,
     body: [
-      `The \`when\` on field \`${field}\` in collection \`${collection}\` walks \`${path}\` with a nested condition.`,
-      'A `record`/`records` is a `UUID` at write time and cannot be walked, so use `has: true`.',
+      `The \`when\` on field \`${field}\` in ${home} walks \`${path}\` with a nested condition.`,
+      reason,
     ],
   });
 }

@@ -23,6 +23,11 @@ describe('defineBlock', () => {
     throws(() => defineBlock({ fields: { uuid: field('text') } }), /reserved/);
   });
 
+  it('rejects the reserved `block` field name, any casing', () => {
+    throws(() => defineBlock({ fields: { block: field('text') } }), /reserved/);
+    throws(() => defineBlock({ fields: { bLock: field('text') } }), /reserved/);
+  });
+
   it('rejects case-insensitively colliding field names', () => {
     throws(
       () => defineBlock({ fields: { subTitle: field('text'), subtitle: field('text') } }),

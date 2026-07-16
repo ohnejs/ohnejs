@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 
 import type { FieldInstance } from '../../../src/ohne/fields/field.ts';
 
+import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
+import { blocks } from '../../../src/ohne/fields/builtin/blocks.ts';
 import { boolean } from '../../../src/ohne/fields/builtin/boolean.ts';
 import { integer } from '../../../src/ohne/fields/builtin/integer.ts';
 import { object } from '../../../src/ohne/fields/builtin/object.ts';
@@ -13,7 +15,7 @@ import { records } from '../../../src/ohne/fields/builtin/records.ts';
 import { repeater } from '../../../src/ohne/fields/builtin/repeater.ts';
 import { text } from '../../../src/ohne/fields/builtin/text.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
-import { queryMetadata } from '../../../src/ohne/query/metadata.ts';
+import { blockQueryMetadata, queryMetadata } from '../../../src/ohne/query/metadata.ts';
 
 function plain(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(plain);
@@ -36,6 +38,8 @@ const COMMON = {
 
 const TEXT = { ...COMMON, allowEmpty: false };
 
+const LIST = { ...COMMON, allowEmpty: true };
+
 const UUID_ENTRY = {
   kind: 'column',
   nullable: false,
@@ -50,6 +54,14 @@ const metaFields = {
   links: field('repeater', { fields: linkFields }),
 };
 const sectionFields = { heading: field('text') };
+
+const heroFields = {
+  title: field('text'),
+  gallery: field('repeater', { fields: { caption: field('text') } }),
+};
+const quoteFields = { words: field('text'), cite: field('text', { nullable: true }) };
+useBlocks().register('QHero', { name: 'QHero', block: { fields: heroFields } });
+useBlocks().register('QQuote', { name: 'QQuote', block: { fields: quoteFields } });
 
 useCollections().register('QUsers', {
   name: 'QUsers',
@@ -117,7 +129,7 @@ describe('queryMetadata', () => {
     strictEqual(queryMetadata('QPosts').fields['__proto__' as string], undefined);
   });
 
-  it('builds the full per-field table, blocks omitted', () => {
+  it('builds the full per-field table', () => {
     deepStrictEqual(plain(queryMetadata('QPosts')), {
       collection: 'QPosts',
       table: 'QPosts',
@@ -173,7 +185,7 @@ describe('queryMetadata', () => {
         tags: {
           kind: 'records',
           fieldType: records,
-          options: { ...COMMON, collection: 'QTags' },
+          options: { ...LIST, collection: 'QTags' },
           nullable: false,
           target: 'QTags',
           table: 'QPosts_tags',
@@ -197,7 +209,7 @@ describe('queryMetadata', () => {
             links: {
               kind: 'childMany',
               fieldType: repeater,
-              options: { ...COMMON, fields: linkFields },
+              options: { ...LIST, fields: linkFields },
               nullable: false,
               table: 'QPosts_meta_links',
               subfields: {
@@ -217,7 +229,7 @@ describe('queryMetadata', () => {
         sections: {
           kind: 'childMany',
           fieldType: repeater,
-          options: { ...COMMON, fields: sectionFields },
+          options: { ...LIST, fields: sectionFields },
           nullable: false,
           table: 'QPosts_sections',
           subfields: {
@@ -231,6 +243,14 @@ describe('queryMetadata', () => {
               column: 'heading',
             },
           },
+        },
+        content: {
+          kind: 'blocks',
+          fieldType: blocks,
+          options: LIST,
+          nullable: false,
+          table: 'QPosts_content',
+          allow: ['QHero', 'QQuote'],
         },
       },
     });
@@ -248,6 +268,7 @@ describe('queryMetadata', () => {
       'tags',
       'meta',
       'sections',
+      'content',
     ]);
   });
 
@@ -255,7 +276,7 @@ describe('queryMetadata', () => {
     deepStrictEqual(queryMetadata('QTags').fields.posts, {
       kind: 'records',
       fieldType: records,
-      options: { ...COMMON, collection: 'QPosts', inverse: 'tags' },
+      options: { ...LIST, collection: 'QPosts', inverse: 'tags' },
       nullable: false,
       target: 'QPosts',
       inverse: true,
@@ -296,6 +317,125 @@ describe('queryMetadata', () => {
       (error: unknown) => {
         ok(isOhneError(error));
         match(error.message, /Unknown field type `mystery`/);
+        return true;
+      },
+    );
+  });
+});
+
+describe('queryMetadata blocks', () => {
+  it('resolves an explicit allow list, sorted and frozen', () => {
+    useCollections().register('QBanners', {
+      name: 'QBanners',
+      collection: { fields: { content: field('blocks', { allow: ['QQuote', 'QHero'] }) } },
+    });
+    const entry = queryMetadata('QBanners').fields.content!;
+    deepStrictEqual(entry.allow, ['QHero', 'QQuote']);
+    ok(Object.isFrozen(entry.allow));
+  });
+
+  it('throws for an allow naming an unregistered block', () => {
+    useCollections().register('QBadAllow', {
+      name: 'QBadAllow',
+      collection: { fields: { content: field('blocks', { allow: ['Ghost'] }) } },
+    });
+    throws(
+      () => queryMetadata('QBadAllow'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.message, /allows unknown block `Ghost`/);
+        return true;
+      },
+    );
+  });
+
+  it('marks a translatable blocks field `localeScoped` and raises `translatable`', () => {
+    useCollections().register('QLocPages', {
+      name: 'QLocPages',
+      collection: { fields: { content: field('blocks', { translatable: true }) } },
+    });
+    const meta = queryMetadata('QLocPages');
+    strictEqual(meta.fields.content!.localeScoped, true);
+    strictEqual(meta.translatable, true);
+    strictEqual(meta.companionTable, undefined);
+  });
+});
+
+describe('blockQueryMetadata', () => {
+  it('builds the per-type table and fields, the item `UUID` seeded first', () => {
+    const meta = blockQueryMetadata('QQuote');
+    strictEqual(meta.name, 'QQuote');
+    strictEqual(meta.table, 'block_QQuote');
+    deepStrictEqual(Object.keys(meta.fields), ['UUID', 'words', 'cite']);
+    deepStrictEqual(plain(meta.fields.UUID), UUID_ENTRY);
+    strictEqual(meta.fields.cite!.nullable, true);
+  });
+
+  it('recurses into composites, derived tables composed from the block root', () => {
+    const gallery = blockQueryMetadata('QHero').fields.gallery!;
+    strictEqual(gallery.kind, 'childMany');
+    strictEqual(gallery.table, 'block_QHero_gallery');
+    deepStrictEqual(Object.keys(gallery.subfields!), ['UUID', 'caption']);
+  });
+
+  it('carries `allow` alone for a nested blocks field, so self-nesting cannot recurse', () => {
+    useBlocks().register('QTower', {
+      name: 'QTower',
+      block: { fields: { parts: field('blocks', { allow: ['QTower', 'QHero'] }) } },
+    });
+    const parts = blockQueryMetadata('QTower').fields.parts!;
+    strictEqual(parts.kind, 'blocks');
+    strictEqual(parts.table, 'block_QTower_parts');
+    deepStrictEqual(parts.allow, ['QHero', 'QTower']);
+    strictEqual(parts.subfields, undefined);
+  });
+
+  it('memoizes per block', () => {
+    strictEqual(blockQueryMetadata('QHero'), blockQueryMetadata('QHero'));
+  });
+
+  it('throws for an unknown block, naming it', () => {
+    throws(
+      () => blockQueryMetadata('Nope'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.message, /Unknown block `Nope`/);
+        return true;
+      },
+    );
+  });
+
+  it('accepts a bare sibling `when` path and rejects an anchored one', () => {
+    useBlocks().register('QGated', {
+      name: 'QGated',
+      block: {
+        fields: {
+          kind: field('text'),
+          note: field('text', { nullable: true, when: { kind: 'special' } }),
+        },
+      },
+    });
+    deepStrictEqual(plain(blockQueryMetadata('QGated').fields.note!.when), {
+      kind: 'compare',
+      path: ['kind'],
+      op: 'equalsTo',
+      value: 'special',
+      negated: false,
+    });
+
+    useBlocks().register('QAnchored', {
+      name: 'QAnchored',
+      block: {
+        fields: {
+          note: field('text', { nullable: true, when: { '../kind': 'special' } }),
+        },
+      },
+    });
+    throws(
+      () => blockQueryMetadata('QAnchored'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.message, /anchors outside the block/);
         return true;
       },
     );

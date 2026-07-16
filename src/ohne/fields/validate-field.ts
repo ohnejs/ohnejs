@@ -319,14 +319,14 @@ export function validateField(args: ValidateFieldArgs): void {
       });
     }
     if (
-      (hint?.kind === 'junction' || hint?.kind === 'child') &&
+      (hint?.kind === 'junction' || hint?.kind === 'child' || hint?.kind === 'blocks') &&
       !isNull(value) &&
       !isFunction(value)
     ) {
       throw ohneError({
         title: `Field \`${name}\` needs a callback default`,
         body: [
-          `${where} is a relation or composite; a shared literal default would be shared mutable state.`,
+          `${where} is a relation, composite, or blocks list; a shared literal default would be shared mutable state.`,
           'Return it from a callback instead: `default: () => []`.',
         ],
       });

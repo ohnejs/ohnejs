@@ -25,6 +25,7 @@ const childMany: StorageHint = {
   cardinality: 'many',
   subfields: { title: { type: 'text', options: {} } },
 };
+const blocksHint: StorageHint = { kind: 'blocks' };
 
 const check = (options: Record<string, unknown>, fieldType = column, hint?: StorageHint) =>
   validateField({
@@ -57,6 +58,10 @@ describe('validateField default rules', () => {
     throws(() => check({ default: null }, columnLess, childMany), /default to `null`/);
   });
 
+  it('rejects a `null` default on a blocks field', () => {
+    throws(() => check({ default: null }, columnLess, blocksHint), /default to `null`/);
+  });
+
   it('accepts a `null` default on an object, which clears the child row', () => {
     doesNotThrow(() => check({ default: null }, columnLess, childOne));
   });
@@ -67,9 +72,17 @@ describe('validateField default rules', () => {
     throws(() => check({ default: [] }, columnLess, childMany), /callback default/);
   });
 
+  it('rejects a literal default on a blocks field', () => {
+    throws(() => check({ default: [] }, columnLess, blocksHint), /callback default/);
+  });
+
   it('accepts a callback default on a relation or composite', () => {
     doesNotThrow(() => check({ default: () => [] }, columnLess, junction));
     doesNotThrow(() => check({ default: () => ({}) }, columnLess, childOne));
+  });
+
+  it('accepts a callback default on a blocks field', () => {
+    doesNotThrow(() => check({ default: () => [] }, columnLess, blocksHint));
   });
 
   it('treats an explicit `undefined` default as absent, on a column and a relation alike', () => {

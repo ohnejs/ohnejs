@@ -17,6 +17,16 @@ export const repeater = defineField({
      * The fields of one item, each a regular `field(...)` instance.
      */
     fields: option<Record<string, FieldInstance>>({ required: true }),
+
+    /**
+     * Whether an empty list is a legal value.
+     * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one item.
+     * Absent input still defaults to `[]`; only a provided empty list is rejected.
+     *
+     * @default
+     * true
+     */
+    allowEmpty: option({ default: true }),
   },
   schema: (ctx) => ({
     kind: 'child',
