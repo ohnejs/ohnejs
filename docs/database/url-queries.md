@@ -108,6 +108,19 @@ fluent [`populate`](./queries.md) does:
 ?populate=[author,tags]
 ```
 
+## Locales
+
+On a collection with [translatable fields](./translations.md), `locale` scopes the query exactly as
+the fluent `.locale()` does:
+
+```
+?locale=de&where={title:{isNull:true}}
+```
+
+The tag must name a configured content locale - anything else is a `400` with the code
+`invalidLocale`. On a collection with nothing translatable the parameter itself is a `400`,
+`localeNotApplicable`. Without it, the endpoint's scope decides (below), then the default locale.
+
 ## Scoping an endpoint
 
 The URL is untrusted; your endpoint is not. `applyQuery` takes an optional scope that the request
@@ -124,6 +137,9 @@ applyQuery(queryUntyped('Posts'), parsed, {
 
 Now `GET /posts` only ever reads published posts, only the three named fields, and at most 100 rows,
 whatever the URL asks for.
+
+A scoped `locale` is a default, not a wall: it applies when the request names none, and a request's
+own `locale` wins. Locales select content, they do not protect it.
 
 ## Reading from a POST body
 

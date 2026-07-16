@@ -171,3 +171,12 @@ const titles = await query('Posts').pluck('title'); // string[]
 ```
 
 Plucking a populated relation field returns the hydrated records, exactly as a full read would.
+
+## Locales
+
+A collection with [translatable fields](./translations.md) reads one locale per query - `.locale()`
+picks it, the configured default applies without it:
+
+```ts
+const german = await query('Posts').locale('de').findMany();
+```

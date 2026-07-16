@@ -123,3 +123,9 @@ fields: {
 The subfields are ordinary `field(...)` instances, so a composite may nest further composites and
 relations to any depth. Every item carries its own `UUID`, stable across writes, so a read always
 tells you which item is which.
+
+## Translations
+
+Any top-level field takes `translatable: true` to hold one value per locale - a scalar per locale,
+or a whole item list per locale for composites and `records`. See [translations](./translations.md)
+for the locale set, reading, and writing per locale.

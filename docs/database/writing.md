@@ -201,6 +201,12 @@ an HTTP handler becomes a `409`.
 
 Like `update`, `delete` requires a `where`.
 
+## Locales
+
+On a collection with [translatable fields](./translations.md), a write lands on the chain's locale:
+`create` stores translatable values there, `update` upserts them, and a locale-scoped chain swaps
+`delete` for `deleteTranslation`. The guide covers each.
+
 ## Transactions
 
 Pass an open transaction with `use` to run the write inside it, rather than opening its own:
