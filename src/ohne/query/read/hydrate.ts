@@ -4,6 +4,7 @@ import type { FieldQueryMeta } from '../metadata.ts';
 import type { QueryRecord } from './find.ts';
 
 import { groupBy, isNull, isUndefined } from '../../../utils/index.ts';
+import { loadBlocks } from './loaders/blocks.ts';
 import { loadChildRows } from './loaders/child.ts';
 import { loadJunction } from './loaders/records.ts';
 
@@ -17,7 +18,7 @@ type FieldResolver = (parent: string) => unknown;
  *
  * `fields` is a collection's fields or a composite's subfields.
  * `driverRows` are the rows read from that scope's table, each carrying its fetched columns and `UUID`.
- * Column-less fields - `records` relations and composites - load in parallel over the rowset, batched.
+ * Column-less fields - `records` relations, composites, and `blocks` lists - load in parallel, batched.
  * Composites recurse into their own subfields, so nesting hydrates to any depth.
  * `locale` scopes the locale-scoped derived tables; nested tables scope through their parent chain.
  * Each field lands in declaration order; `select` narrows which assemble (`null` reads them all).
@@ -72,15 +73,22 @@ function deserializeColumn(
 }
 
 /**
- * Whether a field's value lives outside its scope's table: a `records` relation or a child composite.
+ * Whether a field's value lives outside its scope's table:
+ * a `records` relation, a child composite, or a `blocks` list.
  */
 function isColumnless(field: FieldQueryMeta): boolean {
-  return field.kind === 'records' || field.kind === 'childOne' || field.kind === 'childMany';
+  return (
+    field.kind === 'records' ||
+    field.kind === 'childOne' ||
+    field.kind === 'childMany' ||
+    field.kind === 'blocks'
+  );
 }
 
 /**
  * Loads one column-less field over the rowset, returning a resolver from parent `UUID` to its value.
- * A `records` resolves to an ordered `UUID[]`; a composite recurses, regrouping its rows by parent.
+ * A `records` resolves to an ordered `UUID[]`; a `blocks` to its ordered `{ block, UUID, fields }` items.
+ * A composite recurses, regrouping its rows by parent.
  */
 async function resolveColumnless(
   field: FieldQueryMeta,
@@ -91,6 +99,10 @@ async function resolveColumnless(
   if (field.kind === 'records') {
     const links = await loadJunction(field, parents, dialect, locale);
     return (parent) => links[parent] ?? [];
+  }
+  if (field.kind === 'blocks') {
+    const items = await loadBlocks(field, parents, dialect, locale);
+    return (parent) => items[parent] ?? [];
   }
   const rows = await loadChildRows(field, parents, dialect, locale);
   const items = await hydrateScope(
