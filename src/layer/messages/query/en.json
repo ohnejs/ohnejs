@@ -14,6 +14,7 @@
   "tooManyConditions": "The `where` condition has too many clauses (max `{max}`)",
   "hasTooDeep": "The `where` condition nests `has` too deep (max `{max}`)",
   "listTooLong": "A list is too long (max `{max}`)",
+  "tooManyBoundParams": "The `where` condition binds too many values (max `{max}`)",
   "tooManyFields": "`select` names too many fields (max `{max}`)",
   "tooManyOrderKeys": "`order` stacks too many keys (max `{max}`)",
   "valueTooLarge": "A value is too large (max `{max}` bytes)",
