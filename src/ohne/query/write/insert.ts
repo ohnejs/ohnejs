@@ -1,9 +1,10 @@
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
-import type { ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
+import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 
 import { chunk, isNull, isUndefined, uniqueArray, uuidv7 } from '../../../utils/index.ts';
+import { blockQueryMetadata } from '../metadata.ts';
 
 /**
  * The junction column roles of one `records` field, the owner side by default and swapped on the inverse.
@@ -182,8 +183,11 @@ export async function insertJunction(
 /**
  * Inserts one scope's main row, then its junction links and child items, recursing into each.
  *
- * A top-level row carries `_updatedAt`; a child row carries `_parentUUID` and, for a repeater, its position.
- * A locale-scoped child row stamps `_localeCode`; its own nested rows scope through the parent chain.
+ * Three row modes, keyed on `parent`. Omitted, the row is top-level and carries `_updatedAt`.
+ * Given, the row is a child: it carries `_parentUUID`, and `_localeCode` when locale-scoped.
+ * A repeater child carries its position too.
+ * `'block'` marks a block instance row: a per-type table has no parent link and no timestamp.
+ * The wrapper row the caller writes holds the placement.
  * Companion columns are not this insert's: the caller splits them out and writes the companion row.
  * Child items insert with fresh `uuidv7` keys, depth-first, so a nested tree writes in one pass.
  */
@@ -195,11 +199,14 @@ export async function insertScope(
   uuid: string,
   scope: ProcessedScope,
   locale: string,
-  parent?: { uuid: string; position?: number; scoped?: boolean },
+  parent?: { uuid: string; position?: number; scoped?: boolean } | 'block',
 ): Promise<void> {
   const columns: string[] = ['UUID'];
   const values: SQLValue[] = [uuid];
-  if (parent) {
+  if (isUndefined(parent)) {
+    columns.push('_updatedAt');
+    values.push(Date.now());
+  } else if (parent !== 'block') {
     columns.push('_parentUUID');
     values.push(parent.uuid);
     if (parent.scoped === true) {
@@ -210,9 +217,6 @@ export async function insertScope(
       columns.push('_parentPosition');
       values.push(parent.position);
     }
-  } else {
-    columns.push('_updatedAt');
-    values.push(Date.now());
   }
   const columnType = columnTypes(fields);
   for (const [column, value] of Object.entries(scope.columns)) {
@@ -228,6 +232,10 @@ export async function insertScope(
   }
 
   for (const child of scope.children) {
+    if (child.meta.kind === 'blocks') {
+      await insertBlocks(tx, dialect, child, uuid, locale);
+      continue;
+    }
     const position = child.meta.kind === 'childMany';
     const childTable = child.meta.table as string;
     const childFields = child.meta.subfields as Record<string, FieldQueryMeta>;
@@ -247,5 +255,64 @@ export async function insertScope(
         },
       );
     }
+  }
+}
+
+/**
+ * Inserts one blocks field's items: each instance row into its per-type table, then the wrapper rows.
+ *
+ * Every item gets a fresh instance `uuidv7`, inserted depth-first through `insertScope`'s block mode.
+ * Junctions, child tables, and further blocks hang off the instance.
+ * The wrapper rows then land in one multi-row `VALUES` per chunk, placing each instance under the owner.
+ * `_parentPosition` is the input index, `_blockUUID` the instance.
+ * `_localeCode` is stamped when the field is locale-scoped, exactly as a locale-scoped child row is.
+ */
+async function insertBlocks(
+  tx: Transaction,
+  dialect: Dialect,
+  child: ProcessedChild,
+  ownerUUID: string,
+  locale: string,
+): Promise<void> {
+  if (child.items.length === 0) return;
+  const instances: string[] = [];
+  for (const item of child.items) {
+    const instance = uuidv7();
+    const blockMeta = blockQueryMetadata(item.blockType as string);
+    await insertScope(
+      tx,
+      dialect,
+      blockMeta.table,
+      blockMeta.fields,
+      instance,
+      item,
+      locale,
+      'block',
+    );
+    instances.push(instance);
+  }
+
+  const scoped = child.meta.localeScoped === true;
+  const columns = ['UUID', '_parentUUID', '_parentPosition', '_blockType', '_blockUUID'];
+  if (scoped) columns.push('_localeCode');
+  const rows = child.items.map((item, index) => {
+    const row: SQLValue[] = [
+      uuidv7(),
+      ownerUUID,
+      index,
+      item.blockType as string,
+      instances[index],
+    ];
+    if (scoped) row.push(locale);
+    return row;
+  });
+  const quoted = columns.map((column) => dialect.quote(column)).join(', ');
+  const width = Math.floor(900 / columns.length);
+  for (const batch of chunk(rows, width)) {
+    const tuples = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+    await tx.run(
+      `INSERT INTO ${dialect.quote(child.meta.table as string)} (${quoted}) VALUES ${tuples}`,
+      batch.flat(),
+    );
   }
 }

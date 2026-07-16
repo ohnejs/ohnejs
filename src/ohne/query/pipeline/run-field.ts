@@ -75,7 +75,9 @@ export async function defaultPath(
   if (options && hasKey(options, 'default')) {
     return { value: await resolveDefaultValue(options.default, wctx) };
   }
-  if (meta.kind === 'records' || meta.kind === 'childMany') return { value: [] };
+  if (meta.kind === 'records' || meta.kind === 'childMany' || meta.kind === 'blocks') {
+    return { value: [] };
+  }
   if (meta.kind === 'childOne') return { value: null };
   if (!isUndefined(meta.fieldType?.defaultValue)) {
     return { value: await resolveDefaultValue(meta.fieldType.defaultValue, wctx) };

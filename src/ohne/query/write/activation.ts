@@ -5,6 +5,7 @@ import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipel
 import type { ScopeValues } from '../pipeline/when.ts';
 
 import { evaluateCondition, hasKey, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
+import { blockQueryMetadata } from '../metadata.ts';
 import { coerceColumn } from '../pipeline/preflight.ts';
 import { whenResolver } from '../pipeline/when.ts';
 
@@ -34,7 +35,7 @@ export interface WhenGate {
   relation?: ProcessedRelation;
 
   /**
-   * The composite write the field contributes; `object`/`repeater` kinds only.
+   * The composite write the field contributes; `object`/`repeater`/`blocks` kinds only.
    */
   child?: ProcessedChild;
 }
@@ -167,14 +168,36 @@ export function isEmptyScope(scope: ProcessedScope): boolean {
 
 /**
  * Whether any composite subfield, at any depth, declares a `when` - so an update must gate per matched record.
+ * A blocks item's subfields resolve through its block type, so only the named blocks count.
  */
 export function hasNestedGates(scope: ProcessedScope): boolean {
-  return scope.children.some(
-    (child) =>
+  return scope.children.some((child) => {
+    if (child.meta.kind === 'blocks') {
+      return child.items.some(
+        (item) =>
+          Object.values(itemSubfields(child, item)).some((field) => !isUndefined(field.when)) ||
+          hasNestedGates(item),
+      );
+    }
+    return (
       Object.values(child.meta.subfields as Record<string, FieldQueryMeta>).some(
         (field) => !isUndefined(field.when),
-      ) || child.items.some(hasNestedGates),
-  );
+      ) || child.items.some(hasNestedGates)
+    );
+  });
+}
+
+/**
+ * The subfields one nested item gates against.
+ * A child item gates against the child table's own; a blocks item against its named block's fields.
+ */
+function itemSubfields(
+  child: ProcessedChild,
+  item: ProcessedScope,
+): Record<string, FieldQueryMeta> {
+  return child.meta.kind === 'blocks'
+    ? blockQueryMetadata(item.blockType as string).fields
+    : (child.meta.subfields as Record<string, FieldQueryMeta>);
 }
 
 /**
@@ -233,9 +256,7 @@ export function gateSubtree(
     ...gated,
     children: gated.children.map((child) => ({
       ...child,
-      items: child.items.map((sub) =>
-        gateSubtree(sub, child.meta.subfields as Record<string, FieldQueryMeta>, childAncestry),
-      ),
+      items: child.items.map((sub) => gateSubtree(sub, itemSubfields(child, sub), childAncestry)),
     })),
   };
 }

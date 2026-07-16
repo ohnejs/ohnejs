@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { Transaction } from '../../../../src/ohne/database/adapter.ts';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
@@ -41,6 +42,42 @@ useCollections().register('PGlobal', {
   name: 'PGlobal',
   collection: {
     fields: { items: field('repeater', { fields: { code: field('text', { unique: true }) } }) },
+  },
+});
+
+useBlocks().register('PHero', { name: 'PHero', block: { fields: { title: field('text') } } });
+useBlocks().register('PBadge', {
+  name: 'PBadge',
+  block: { fields: { slug: field('text', { unique: true }) } },
+});
+
+useCollections().register('PBlocky', {
+  name: 'PBlocky',
+  collection: { fields: { content: field('blocks', { allow: ['PHero', 'PBadge'] }) } },
+});
+
+useCollections().register('PStrict', {
+  name: 'PStrict',
+  collection: {
+    fields: {
+      tags: field('records', { collection: 'PTag', allowEmpty: false }),
+      sections: field('repeater', { fields: sectionFields, allowEmpty: false }),
+      content: field('blocks', { allow: ['PHero'], allowEmpty: false }),
+    },
+  },
+});
+
+useCollections().register('PGatedList', {
+  name: 'PGatedList',
+  collection: {
+    fields: {
+      kind: field('text'),
+      items: field('repeater', {
+        fields: sectionFields,
+        allowEmpty: false,
+        when: { kind: 'full' },
+      }),
+    },
   },
 });
 
@@ -195,6 +232,124 @@ describe('runRecord (create)', () => {
     );
     ok(result.ok);
     deepStrictEqual(Object.keys(result.scope.columns), ['title']);
+  });
+});
+
+describe('runRecord list emptiness', () => {
+  it('accepts an empty list by default on records, repeater, and blocks', async () => {
+    const result = await create({ ...full, tags: [], sections: [] });
+    ok(result.ok);
+    const blocky = await runRecord(
+      queryMetadata('PBlocky'),
+      { content: [] },
+      { operation: 'create', tx },
+    );
+    ok(blocky.ok);
+  });
+
+  it('rejects a provided empty list when allowEmpty is false, per kind', async () => {
+    const result = await runRecord(
+      queryMetadata('PStrict'),
+      { tags: [], sections: [], content: [] },
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.tags, 'validation.emptyValue');
+    strictEqual(result.errors.sections, 'validation.emptyValue');
+    strictEqual(result.errors.content, 'validation.emptyValue');
+  });
+
+  it('lands the trusted empty default for an inactive allowEmpty: false list', async () => {
+    const result = await runRecord(
+      queryMetadata('PGatedList'),
+      { kind: 'lite' },
+      { operation: 'create', tx },
+    );
+    ok(result.ok);
+    deepStrictEqual(result.scope.children[0].items, []);
+  });
+
+  it('drops a provided empty list on an inactive field instead of rejecting it', async () => {
+    const result = await runRecord(
+      queryMetadata('PGatedList'),
+      { kind: 'lite', items: [] },
+      { operation: 'create', tx },
+    );
+    ok(result.ok);
+    deepStrictEqual(result.scope.children[0].items, []);
+  });
+
+  it('rejects an empty list on the same field once its gate activates', async () => {
+    const result = await runRecord(
+      queryMetadata('PGatedList'),
+      { kind: 'full', items: [] },
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.items, 'validation.emptyValue');
+  });
+});
+
+describe('runRecord (blocks)', () => {
+  async function createBlocky(input: Record<string, unknown>) {
+    return runRecord(queryMetadata('PBlocky'), input, { operation: 'create', tx });
+  }
+
+  it('processes blocks items into tagged child scopes, in input order', async () => {
+    const result = await createBlocky({
+      content: [
+        { block: 'PHero', fields: { title: 'A' } },
+        { block: 'PBadge', fields: { slug: 's' } },
+      ],
+    });
+    ok(result.ok);
+    const child = result.scope.children[0];
+    strictEqual(child.meta.kind, 'blocks');
+    strictEqual(child.path, 'content');
+    strictEqual(child.items[0].blockType, 'PHero');
+    strictEqual(child.items[0].columns.title, 'A');
+    strictEqual(child.items[1].blockType, 'PBadge');
+    strictEqual(child.items[1].columns.slug, 's');
+  });
+
+  it('aims a unique block subfield probe at the shared per-type table', async () => {
+    const result = await createBlocky({
+      content: [
+        { block: 'PHero', fields: { title: 'A' } },
+        { block: 'PBadge', fields: { slug: 's' } },
+      ],
+    });
+    ok(result.ok);
+    deepStrictEqual(
+      result.scope.uniqueProbes.map((p) => `${p.table}:${p.column}:${p.value}:${p.path}`),
+      ['block_PBadge:slug:s:content[1].fields.slug'],
+    );
+  });
+
+  it('rejects null and malformed blocks lists', async () => {
+    const nulled = await createBlocky({ content: null });
+    ok(!nulled.ok);
+    strictEqual(nulled.errors.content, 'validation.notNullable');
+    const scalar = await createBlocky({ content: 'x' });
+    ok(!scalar.ok);
+    strictEqual(scalar.errors.content, 'validation.invalidValue');
+    const nonObject = await createBlocky({ content: [1] });
+    ok(!nonObject.ok);
+    strictEqual(nonObject.errors.content, 'validation.invalidValue');
+  });
+
+  it('errors inside a block item at its fields dot-path', async () => {
+    const result = await createBlocky({ content: [{ block: 'PHero', fields: { title: '' } }] });
+    ok(!result.ok);
+    strictEqual(result.errors['content[0].fields.title'], 'validation.emptyValue');
+  });
+
+  it('rejects an unknown subfield inside a block item at its path', async () => {
+    const result = await createBlocky({
+      content: [{ block: 'PHero', fields: { title: 'A', bogus: 1 } }],
+    });
+    ok(!result.ok);
+    strictEqual(result.errors['content[0].fields.bogus'], 'validation.unknownField');
   });
 });
 

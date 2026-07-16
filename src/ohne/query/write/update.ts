@@ -10,6 +10,7 @@ import type { FieldErrors } from './errors.ts';
 import {
   chunk,
   first,
+  groupBy,
   hasKey,
   isEmpty,
   isNull,
@@ -19,7 +20,7 @@ import {
 } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
-import { queryMetadata } from '../metadata.ts';
+import { blockQueryMetadata, queryMetadata, type BlockQueryMeta } from '../metadata.ts';
 import { defaultPath, finishScalar, writeContext } from '../pipeline/run-field.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
@@ -36,6 +37,13 @@ import {
   whenGates,
   type WhenGate,
 } from './activation.ts';
+import {
+  blockInstancesUnder,
+  collectBlockSubtree,
+  deleteBlockInstances,
+  hasBlocksField,
+  ownedBlockInstances,
+} from './blocks.ts';
 import { busyError } from './busy.ts';
 import {
   appendPositions,
@@ -60,8 +68,8 @@ export type UpdateOutcome =
  * The pipeline runs once in `'update'` mode: only provided fields validate, and a field error stops the call.
  * The matched set resolves inside the transaction, then every derived write applies per matched record.
  * `locale` is the chain's explicit choice or `null`; translatable values land on the effective locale.
- * They upsert each matched record's companion row; a missing row materializes, its unwritten
- * companion columns filled through the default path.
+ * They upsert each matched record's companion row.
+ * A missing row materializes, its unwritten companion columns filled through the default path.
  * Uniqueness prechecks exclude the matched rows, so a kept value never collides with its own record.
  * The returned records are all matched rows, untouched empty inputs included, in their final state.
  */
@@ -202,8 +210,8 @@ interface CompanionPlan {
  *
  * A write touching no companion column plans nothing - records without a translation keep lacking one.
  * Defaults resolve through the default path and value tiers under the update's own context.
- * A required companion field with no default lands in `errors`; `materializeFailure` decides whether
- * they fail the call, since a gated write may end up materializing nothing.
+ * A required companion field with no default lands in `errors`.
+ * `materializeFailure` decides whether they fail the call, since a gated write may materialize nothing.
  * A field that is provided and ungated lands in every materialized row, so it never needs a default.
  */
 async function planCompanion(
@@ -325,6 +333,7 @@ async function upsertCompanion(
  * Proves every correlated composite item names an existing row on its parent, keyed at its exact path.
  * A repeater item's `UUID` must belong to the parent it sits under; a UUID matching nothing is an error.
  * Correlation recurses only into rows an update keeps: matched repeater items and an existing object row.
+ * A blocks field proves its items through `checkBlockCorrelation`, instance identity and type alike.
  */
 async function checkCorrelation(
   tx: Transaction,
@@ -335,6 +344,10 @@ async function checkCorrelation(
 ): Promise<FieldErrors> {
   const errors: FieldErrors = {};
   for (const child of children) {
+    if (child.meta.kind === 'blocks') {
+      Object.assign(errors, await checkBlockCorrelation(tx, dialect, parents, child, locale));
+      continue;
+    }
     const many = child.meta.kind === 'childMany';
     const correlatable = many
       ? child.items.some((item) => !isUndefined(item.itemUUID))
@@ -366,6 +379,50 @@ async function checkCorrelation(
           );
         }
       }
+    }
+  }
+  return errors;
+}
+
+/**
+ * Proves every correlated blocks item names one of the parent's own instances, its type unchanged.
+ *
+ * An item `UUID` outside the parent's (locale's) wrapper rows is an `invalidReference` at the item.
+ * Foreign, cross-parent, and cross-locale claims read the same way.
+ * A matched instance under a different `block` errors at the item's `UUID`.
+ * An instance's type is immutable, so changing type means a new instance.
+ * Matched items recurse into their nested children with the instance as parent.
+ */
+async function checkBlockCorrelation(
+  tx: Transaction,
+  dialect: Dialect,
+  parents: readonly string[],
+  child: ProcessedChild,
+  locale: string,
+): Promise<FieldErrors> {
+  const errors: FieldErrors = {};
+  if (!child.items.some((item) => !isUndefined(item.itemUUID))) return errors;
+  const table = child.meta.table as string;
+  const scoped = child.meta.localeScoped === true ? locale : null;
+  for (const parent of parents) {
+    const existing = await wrapperRows(tx, dialect, table, parent, scoped);
+    const types = new Map(existing.map((row) => [row.instance, row.type]));
+    for (let index = 0; index < child.items.length; index++) {
+      const item = child.items[index];
+      if (isUndefined(item.itemUUID)) continue;
+      const type = types.get(item.itemUUID);
+      if (isUndefined(type)) {
+        errors[`${child.path}[${index}]`] = 'validation.invalidReference';
+        continue;
+      }
+      if (type !== item.blockType) {
+        errors[`${child.path}[${index}].UUID`] = 'validation.invalidReference';
+        continue;
+      }
+      Object.assign(
+        errors,
+        await checkCorrelation(tx, dialect, [item.itemUUID], item.children, locale),
+      );
     }
   }
   return errors;
@@ -418,6 +475,10 @@ async function applyDerived(
 ): Promise<void> {
   for (const relation of scope.relations) await diffJunction(tx, dialect, relation, uuid, locale);
   for (const child of scope.children) {
+    if (child.meta.kind === 'blocks') {
+      await correlateBlocks(tx, dialect, child, uuid, ancestry, locale);
+      continue;
+    }
     await correlateChild(tx, dialect, child, uuid, ancestry, locale);
   }
 }
@@ -563,6 +624,7 @@ async function diffJunction(
  *
  * A repeater matches by item `UUID`: a match updates, an unmatched row deletes, a new item inserts.
  * An `object` upserts its single row by parent: an empty list clears it, a value sets it.
+ * A doomed row's nested block instances delete with it: the wrapper rows cascade, per-type rows do not.
  * A matched or existing row keeps its identity, so a nested repeater's own items correlate one level down.
  * When `ancestry` is set, each item gates per this parent, resolving its subfields' `when` against it.
  * A matched item narrows in place; a fresh item and its whole subtree pre-gate before the insert.
@@ -585,7 +647,9 @@ async function correlateChild(
     const objectUUID = first([...existing]);
     const item = first(child.items);
     if (isUndefined(item)) {
-      if (!isUndefined(objectUUID)) await deleteChildren(tx, dialect, table, [objectUUID]);
+      if (!isUndefined(objectUUID)) {
+        await deleteChildrenWithBlocks(tx, dialect, table, subfields, [objectUUID]);
+      }
       return;
     }
     if (isUndefined(objectUUID)) {
@@ -603,10 +667,11 @@ async function correlateChild(
   }
 
   const consumed = new Set(child.items.map((item) => item.itemUUID).filter(isString));
-  await deleteChildren(
+  await deleteChildrenWithBlocks(
     tx,
     dialect,
     table,
+    subfields,
     [...existing].filter((uuid) => !consumed.has(uuid)),
   );
   for (let index = 0; index < child.items.length; index++) {
@@ -634,6 +699,108 @@ function descend(
   item: ProcessedScope,
 ): readonly ScopeValues[] | null {
   return isNull(ancestry) ? null : [...ancestry, item.values];
+}
+
+/**
+ * Correlates one blocks field's items against the parent's wrapper rows by instance `UUID`.
+ *
+ * An unmatched wrapper row deletes with its whole instance subtree.
+ * The write path owns the polymorphic link's cleanup; instances are exclusively this parent's.
+ * A fresh item inserts a new instance and the wrapper row placing it at the item's index.
+ * A matched item updates its per-type row and renumbers the wrapper only when its position moved.
+ * It recurses into the instance's own nested structures.
+ * When `ancestry` is set, each item's subfields gate through its block type, exactly as child items do.
+ */
+async function correlateBlocks(
+  tx: Transaction,
+  dialect: Dialect,
+  child: ProcessedChild,
+  parentUUID: string,
+  ancestry: readonly ScopeValues[] | null,
+  locale: string,
+): Promise<void> {
+  const table = child.meta.table as string;
+  const scoped = child.meta.localeScoped === true;
+  const existing = await wrapperRows(tx, dialect, table, parentUUID, scoped ? locale : null);
+  const byInstance = new Map(existing.map((row) => [row.instance, row]));
+
+  const consumed = new Set(child.items.map((item) => item.itemUUID).filter(isString));
+  const removed = existing.filter((row) => !consumed.has(row.instance));
+  if (removed.length > 0) {
+    const doomed = await collectBlockSubtree(
+      tx,
+      dialect,
+      removed.map((row) => ({ type: row.type, uuid: row.instance })),
+    );
+    await deleteChildren(
+      tx,
+      dialect,
+      table,
+      removed.map((row) => row.uuid),
+    );
+    await deleteBlockInstances(tx, dialect, doomed);
+  }
+
+  for (let index = 0; index < child.items.length; index++) {
+    const item = child.items[index];
+    const blockMeta = blockQueryMetadata(item.blockType as string);
+    if (isUndefined(item.itemUUID)) {
+      const fresh = isNull(ancestry) ? item : gateSubtree(item, blockMeta.fields, ancestry);
+      await insertBlockItem(tx, dialect, child.meta, blockMeta, fresh, parentUUID, index, locale);
+      continue;
+    }
+    const gated = isNull(ancestry) ? item : gateNested(item, blockMeta.fields, ancestry);
+    await updateChildRow(tx, dialect, blockMeta.table, blockMeta.fields, gated, item.itemUUID);
+    const wrapper = byInstance.get(item.itemUUID) as WrapperRow;
+    if (wrapper.position !== index) {
+      await tx.run(
+        `UPDATE ${dialect.quote(table)} SET ${dialect.quote('_parentPosition')} = ? ` +
+          `WHERE ${dialect.quote('UUID')} = ?`,
+        [index, wrapper.uuid],
+      );
+    }
+    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item), locale);
+  }
+}
+
+/**
+ * Inserts one fresh blocks item: its instance row, subtree included, then the wrapper row placing it.
+ * The instance inserts through `insertScope`'s block mode, so its nested structures hang off it.
+ * The wrapper stamps `_localeCode` when the field is locale-scoped.
+ */
+async function insertBlockItem(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: FieldQueryMeta,
+  blockMeta: BlockQueryMeta,
+  item: ProcessedScope,
+  parentUUID: string,
+  position: number,
+  locale: string,
+): Promise<void> {
+  const instance = uuidv7();
+  await insertScope(
+    tx,
+    dialect,
+    blockMeta.table,
+    blockMeta.fields,
+    instance,
+    item,
+    locale,
+    'block',
+  );
+  const columns = ['UUID', '_parentUUID', '_parentPosition', '_blockType', '_blockUUID'];
+  const values: SQLValue[] = [uuidv7(), parentUUID, position, blockMeta.name, instance];
+  if (meta.localeScoped === true) {
+    columns.push('_localeCode');
+    values.push(locale);
+  }
+  const marks = columns.map(() => '?').join(', ');
+  const quoted = columns.map((column) => dialect.quote(column)).join(', ');
+  await tx.run(
+    `INSERT INTO ${dialect.quote(meta.table as string)} (${quoted}) VALUES (${marks})`,
+    values,
+  );
 }
 
 /**
@@ -689,10 +856,44 @@ async function childUUIDs(
 }
 
 /**
+ * One wrapper row of a blocks field: its own key, the placed instance, its type, and its position.
+ */
+interface WrapperRow {
+  uuid: string;
+  instance: string;
+  type: string;
+  position: number;
+}
+
+/**
+ * One parent's wrapper rows in a blocks field's table, for correlation, renumbering, and deletion.
+ * A locale-scoped wrapper passes the locale, so another locale's items never correlate or delete.
+ */
+async function wrapperRows(
+  tx: Transaction,
+  dialect: Dialect,
+  table: string,
+  parentUUID: string,
+  locale: string | null,
+): Promise<WrapperRow[]> {
+  const filter = isNull(locale) ? '' : ` AND ${dialect.quote('_localeCode')} = ?`;
+  return tx.query<WrapperRow>(
+    `SELECT ${dialect.quote('UUID')} AS ${dialect.quote('uuid')}, ` +
+      `${dialect.quote('_blockUUID')} AS ${dialect.quote('instance')}, ` +
+      `${dialect.quote('_blockType')} AS ${dialect.quote('type')}, ` +
+      `${dialect.quote('_parentPosition')} AS ${dialect.quote('position')} ` +
+      `FROM ${dialect.quote(table)} WHERE ${dialect.quote('_parentUUID')} = ?${filter}`,
+    isNull(locale) ? [parentUUID] : [parentUUID, locale],
+  );
+}
+
+/**
  * Every existing composite child row under the matched records, at every nesting depth.
  *
  * An update rewrites the whole subtree of a matched record, so the precheck excludes these rows.
  * A kept value then never collides with a row that is itself being rewritten.
+ * A blocks field contributes its instances by per-type row `UUID`, what its probes anchor on.
+ * It recurses into each instance's own children.
  * Resolved only when the write carries a table-wide-unique composite probe, so the common write pays nothing.
  */
 async function subtreeChildUUIDs(
@@ -704,6 +905,32 @@ async function subtreeChildUUIDs(
 ): Promise<string[]> {
   const all: string[] = [];
   for (const field of Object.values(fields)) {
+    if (field.kind === 'blocks') {
+      const scoped = field.localeScoped === true ? locale : null;
+      const instances = await blockInstancesUnder(
+        tx,
+        dialect,
+        field.table as string,
+        parents,
+        scoped,
+      );
+      if (instances.length === 0) continue;
+      all.push(...instances.map((instance) => instance.uuid));
+      const byType = groupBy(instances, (instance) => instance.type);
+      for (const [type, group] of Object.entries(byType)) {
+        if (isUndefined(group)) continue;
+        all.push(
+          ...(await subtreeChildUUIDs(
+            tx,
+            dialect,
+            blockQueryMetadata(type).fields,
+            group.map((instance) => instance.uuid),
+            locale,
+          )),
+        );
+      }
+      continue;
+    }
     if (field.kind !== 'childOne' && field.kind !== 'childMany') continue;
     const scoped = field.localeScoped === true ? locale : null;
     const rows = await childUUIDsUnder(tx, dialect, field.table as string, parents, scoped);
@@ -763,6 +990,31 @@ async function deleteChildren(
       [...batch],
     );
   }
+}
+
+/**
+ * Deletes the named child rows with the block instances their subtrees place.
+ *
+ * The rows' nested wrapper rows cascade; the polymorphic per-type rows do not, so they collect first.
+ * A subfield tree that cannot hold blocks pays nothing: the metadata walk gates the collection.
+ */
+async function deleteChildrenWithBlocks(
+  tx: Transaction,
+  dialect: Dialect,
+  table: string,
+  subfields: Record<string, FieldQueryMeta>,
+  uuids: readonly string[],
+): Promise<void> {
+  if (uuids.length === 0) return;
+  const doomed = hasBlocksField(subfields)
+    ? await collectBlockSubtree(
+        tx,
+        dialect,
+        await ownedBlockInstances(tx, dialect, subfields, uuids),
+      )
+    : [];
+  await deleteChildren(tx, dialect, table, uuids);
+  await deleteBlockInstances(tx, dialect, doomed);
 }
 
 /**

@@ -138,9 +138,15 @@ export interface ProcessedChild {
 export interface ProcessedScope {
   /**
    * A composite item's input `UUID`, correlating it to an existing child row on update; absent otherwise.
-   * Present only for a repeater item under an update, where it names the row to keep.
+   * Present only for a repeater or blocks item under an update, where it names the row to keep.
    */
   itemUUID?: string;
+
+  /**
+   * A blocks item's block type, resolving its per-type table and subfields through `blockQueryMetadata`.
+   * Present only on the item scopes of a `blocks` field's `ProcessedChild`.
+   */
+  blockType?: string;
 
   /**
    * The column values by column name, each field-serialized; the dialect codec applies at bind time.
