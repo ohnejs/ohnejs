@@ -194,6 +194,20 @@ export interface UntypedQueryBuilder {
   guards(overrides: Partial<QueryGuards>): this;
 
   /**
+   * Scopes the query to one content locale; translatable collections only, once per chain.
+   * Reads take translatable values from that locale, `null` where no translation exists.
+   * Writes route translatable values to that locale's rows.
+   * A locale-scoped chain refuses `delete` - `deleteTranslation` removes the locale instead.
+   * Without `.locale()`, the default locale from `collections.defaultLocale` applies.
+   *
+   * @example
+   * ```ts
+   * await queryUntyped('Posts').locale('de').findMany()
+   * ```
+   */
+  locale(code: string): this;
+
+  /**
    * Reads every matching record.
    *
    * @example
@@ -302,6 +316,7 @@ export interface UntypedQueryBuilder {
   /**
    * Deletes every matching record and reports how many were removed.
    * A `restrict` reference still pointing at a matched row throws a `referenceViolation`.
+   * Refused on a locale-scoped chain, which must not cascade-delete every locale.
    *
    * @example
    * ```ts
@@ -309,6 +324,18 @@ export interface UntypedQueryBuilder {
    * ```
    */
   delete(): Promise<DeleteOutcome>;
+
+  /**
+   * Deletes every matching record's translation at the chain's locale and reports how many held one.
+   * The main rows and every other locale survive; each affected record's `_updatedAt` bumps.
+   * Requires `.locale()` - the chain's locale names the translation to remove.
+   *
+   * @example
+   * ```ts
+   * await queryUntyped('Posts').locale('de').where({ status: 'archived' }).deleteTranslation()
+   * ```
+   */
+  deleteTranslation(): Promise<DeleteOutcome>;
 
   /**
    * Joins an open transaction, so a write terminal runs inside it rather than opening its own.

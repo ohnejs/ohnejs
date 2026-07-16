@@ -86,7 +86,7 @@ const base = {
  * Creates a fresh post with a unique title and returns its re-read record.
  */
 async function seedPost(over: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const result = await runCreate('UPost', { ...base, title: `P${counter++}`, ...over });
+  const result = await runCreate('UPost', { ...base, title: `P${counter++}`, ...over }, null);
   ok(result.ok);
   return result.record as Record<string, unknown>;
 }
@@ -117,7 +117,7 @@ describe('runUpdate columns', () => {
       'SELECT * FROM "UPost" WHERE "UUID" = ?',
       [post.UUID as string],
     );
-    const result = await runUpdate('UPost', { views: 99 }, uuidIs(post.UUID as string));
+    const result = await runUpdate('UPost', { views: 99 }, uuidIs(post.UUID as string), null);
     ok(result.ok);
     strictEqual(result.records.length, 1);
     strictEqual(result.records[0].views, 99);
@@ -138,6 +138,7 @@ describe('runUpdate columns', () => {
       'UPost',
       { views: 1 },
       { kind: 'compare', path: ['summary'], op: 'equalsTo', value: 'group-x', negated: false },
+      null,
     );
     ok(result.ok);
     const returned = new Set(result.records.map((row) => row.UUID));
@@ -146,7 +147,7 @@ describe('runUpdate columns', () => {
   });
 
   it('returns no records when nothing matches', async () => {
-    const result = await runUpdate('UPost', { views: 1 }, uuidIs('ghost'));
+    const result = await runUpdate('UPost', { views: 1 }, uuidIs('ghost'), null);
     ok(result.ok);
     deepStrictEqual(result.records, []);
   });
@@ -157,6 +158,7 @@ describe('runUpdate columns', () => {
       'UPost',
       { title: post.title, views: 3 },
       uuidIs(post.UUID as string),
+      null,
     );
     ok(result.ok);
     strictEqual(result.records[0].views, 3);
@@ -165,7 +167,12 @@ describe('runUpdate columns', () => {
   it('rejects a unique value another row already holds', async () => {
     const first = await seedPost();
     const second = await seedPost();
-    const result = await runUpdate('UPost', { title: first.title }, uuidIs(second.UUID as string));
+    const result = await runUpdate(
+      'UPost',
+      { title: first.title },
+      uuidIs(second.UUID as string),
+      null,
+    );
     ok(!result.ok);
     strictEqual(result.errors.title, 'validation.notUnique');
   });
@@ -174,7 +181,7 @@ describe('runUpdate columns', () => {
     const post = await seedPost();
     const before = await updatedAt(post.UUID as string);
     await sleep();
-    const result = await runUpdate('UPost', { tags: ['t3'] }, uuidIs(post.UUID as string));
+    const result = await runUpdate('UPost', { tags: ['t3'] }, uuidIs(post.UUID as string), null);
     ok(result.ok);
     ok((await updatedAt(post.UUID as string)) > before);
   });
@@ -204,6 +211,7 @@ describe('runUpdate matched set', () => {
         },
         negated: false,
       },
+      null,
     );
     ok(result.ok);
     strictEqual(result.records.length, 1);
@@ -215,7 +223,12 @@ describe('runUpdate matched set', () => {
 describe('runUpdate junction diff', () => {
   it('adds, removes, and reorders links to match the input', async () => {
     const post = await seedPost({ tags: ['t1', 't2'] });
-    const result = await runUpdate('UPost', { tags: ['t3', 't1'] }, uuidIs(post.UUID as string));
+    const result = await runUpdate(
+      'UPost',
+      { tags: ['t3', 't1'] },
+      uuidIs(post.UUID as string),
+      null,
+    );
     ok(result.ok);
     deepStrictEqual(result.records[0].tags, ['t3', 't1']);
   });
@@ -223,7 +236,12 @@ describe('runUpdate junction diff', () => {
   it('issues zero junction writes for a no-op update', async () => {
     const post = await seedPost({ tags: ['t1', 't2'] });
     const writes = await countWrites(/"UPost_tags"/, async () => {
-      const result = await runUpdate('UPost', { tags: ['t1', 't2'] }, uuidIs(post.UUID as string));
+      const result = await runUpdate(
+        'UPost',
+        { tags: ['t1', 't2'] },
+        uuidIs(post.UUID as string),
+        null,
+      );
       ok(result.ok);
     });
     strictEqual(writes, 0);
@@ -239,7 +257,12 @@ describe('runUpdate junction diff', () => {
     const p2 = await seedPost({ tags: ['tinv'] });
     deepStrictEqual(await inversePosts('tinv'), [p1.UUID, p2.UUID]);
 
-    const result = await runUpdate('UPost', { tags: ['t2', 'tinv'] }, uuidIs(p1.UUID as string));
+    const result = await runUpdate(
+      'UPost',
+      { tags: ['t2', 'tinv'] },
+      uuidIs(p1.UUID as string),
+      null,
+    );
     ok(result.ok);
     deepStrictEqual(await inversePosts('tinv'), [p1.UUID, p2.UUID]);
   });
@@ -256,6 +279,7 @@ describe('runUpdate repeater correlation', () => {
         sections: [{ heading: 'fresh' }, { UUID: created[0], heading: 'a2' }],
       },
       uuidIs(post.UUID as string),
+      null,
     );
     ok(result.ok);
     const sections = result.records[0].sections as { UUID: string; heading: string }[];
@@ -273,6 +297,7 @@ describe('runUpdate repeater correlation', () => {
       'UPost',
       { sections: [{ UUID: 'ghost', heading: 'x' }] },
       uuidIs(post.UUID as string),
+      null,
     );
     ok(!result.ok);
     strictEqual(result.errors['sections[0]'], 'validation.invalidReference');
@@ -291,6 +316,7 @@ describe('runUpdate object upsert', () => {
       'UPost',
       { meta: { note: 'second' } },
       uuidIs(post.UUID as string),
+      null,
     );
     ok(result.ok);
     strictEqual((result.records[0].meta as { note: string }).note, 'second');
@@ -299,7 +325,7 @@ describe('runUpdate object upsert', () => {
 
   it('clears the child row on null', async () => {
     const post = await seedPost({ meta: { note: 'gone' } });
-    const result = await runUpdate('UPost', { meta: null }, uuidIs(post.UUID as string));
+    const result = await runUpdate('UPost', { meta: null }, uuidIs(post.UUID as string), null);
     ok(result.ok);
     strictEqual(result.records[0].meta, null);
     strictEqual(await objectUUID(post.UUID as string), undefined);
@@ -308,7 +334,7 @@ describe('runUpdate object upsert', () => {
 
 describe('runUpdate nested child uniqueness', () => {
   it('keeps a deeply nested table-wide unique value across an update', async () => {
-    const created = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'deep-x' }] }] });
+    const created = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'deep-x' }] }] }, null);
     ok(created.ok);
     const record = created.record as {
       UUID: string;
@@ -321,6 +347,7 @@ describe('runUpdate nested child uniqueness', () => {
       'UDeep',
       { sections: [{ UUID: section.UUID, notes: [{ UUID: note.UUID, tag: 'deep-x' }] }] },
       uuidIs(record.UUID),
+      null,
     );
     ok(result.ok);
     const notes = (result.records[0].sections as { notes: { tag: string }[] }[])[0].notes;
@@ -328,8 +355,8 @@ describe('runUpdate nested child uniqueness', () => {
   });
 
   it('still rejects a nested unique value another record holds', async () => {
-    await runCreate('UDeep', { sections: [{ notes: [{ tag: 'taken' }] }] });
-    const other = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'free' }] }] });
+    await runCreate('UDeep', { sections: [{ notes: [{ tag: 'taken' }] }] }, null);
+    const other = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'free' }] }] }, null);
     ok(other.ok);
     const record = other.record as {
       UUID: string;
@@ -341,6 +368,7 @@ describe('runUpdate nested child uniqueness', () => {
       'UDeep',
       { sections: [{ UUID: section.UUID, notes: [{ UUID: note.UUID, tag: 'taken' }] }] },
       uuidIs(record.UUID),
+      null,
     );
     ok(!result.ok);
     strictEqual(result.errors['sections[0].notes[0].tag'], 'validation.notUnique');

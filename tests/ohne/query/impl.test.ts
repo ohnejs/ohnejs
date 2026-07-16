@@ -6,16 +6,28 @@ import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialec
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
-import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
+import { isOhneError, ohneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { builderGuards } from '../../../src/ohne/query/impl.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
+
+useLayers().add({
+  path: '/impl',
+  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
 
 useCollections().register('IPosts', {
   name: 'IPosts',
   collection: {
     fields: { title: field('text'), views: field('integer'), featured: field('boolean') },
+  },
+});
+useCollections().register('INotes', {
+  name: 'INotes',
+  collection: {
+    fields: { title: field('text', { translatable: true }), body: field('text') },
   },
 });
 
@@ -173,5 +185,78 @@ describe('QueryBuilderImpl limits', () => {
       .guards({ maxSelect: 5 })
       .guards({ maxSelect: 10, maxOrder: 3 });
     deepStrictEqual(builderGuards(builder), { maxSelect: 10, maxOrder: 3 });
+  });
+});
+
+describe('QueryBuilderImpl locale', () => {
+  it('returns the same builder for further chaining', () => {
+    const builder = queryUntyped('INotes');
+    strictEqual(builder.locale('de'), builder);
+  });
+
+  it('threads the locale into the executed read', async () => {
+    const created = await queryUntyped('INotes').create({ title: 'Hello', body: 'greeting' });
+    ok(created.ok);
+    const de = await queryUntyped('INotes').locale('de').where({ body: 'greeting' }).findFirst();
+    strictEqual(de?.title, null);
+    const en = await queryUntyped('INotes').where({ body: 'greeting' }).findFirst();
+    strictEqual(en?.title, 'Hello');
+  });
+
+  it('canonicalizes the tag and rejects a second locale', () => {
+    throws(
+      () => queryUntyped('INotes').locale('DE').locale('de'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /Locale already set/);
+        match([error.body].flat().join('\n'), /already reads `de`/);
+        return true;
+      },
+    );
+  });
+
+  it('rejects a locale on a collection without translatable fields', () => {
+    throws(
+      () => queryUntyped('IPosts').locale('de'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /Cannot set a locale on `IPosts`/);
+        return true;
+      },
+    );
+  });
+
+  it('rejects a locale outside the configured set', () => {
+    throws(
+      () => queryUntyped('INotes').locale('fr'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /Unknown locale `fr`/);
+        return true;
+      },
+    );
+  });
+
+  it('keeps guard overrides across locale', () => {
+    const builder = queryUntyped('INotes')
+      .guards({ maxSelect: 5 })
+      .locale('de')
+      .guards({ maxOrder: 3 });
+    deepStrictEqual(builderGuards(builder), { maxSelect: 5, maxOrder: 3 });
+  });
+
+  it('keeps a joined transaction across locale, rolling its write back with it', async () => {
+    const before = await queryUntyped('INotes').count();
+    await db
+      .transaction(async (tx) => {
+        const created = await queryUntyped('INotes')
+          .use(tx)
+          .locale('de')
+          .create({ title: 'Hallo', body: 'tx' });
+        ok(created.ok);
+        throw ohneError('roll back');
+      })
+      .catch(() => undefined);
+    strictEqual(await queryUntyped('INotes').count(), before);
   });
 });

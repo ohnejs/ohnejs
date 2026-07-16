@@ -162,7 +162,7 @@ async function created(
   collection: string,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const result = await runCreate(collection, input);
+  const result = await runCreate(collection, input, null);
   ok(result.ok);
   return result.record as Record<string, unknown>;
 }
@@ -261,7 +261,7 @@ describe('when gate on update', () => {
   it('writes an active field, leaves an inactive one untouched with no bump', async () => {
     await seed('u-s1', 'sale', 1);
     await seed('u-r1', 'regular', 2);
-    const result = await runUpdate('WUProduct', { discount: 50 }, inUUIDs(['u-s1', 'u-r1']));
+    const result = await runUpdate('WUProduct', { discount: 50 }, inUUIDs(['u-s1', 'u-r1']), null);
     ok(result.ok);
     strictEqual(result.records.length, 2);
     strictEqual(pick(result.records, 'sale').discount, 50);
@@ -277,6 +277,7 @@ describe('when gate on update', () => {
       'WUProduct',
       { discount: 50, title: 'X' },
       inUUIDs(['u-s2', 'u-r2']),
+      null,
     );
     ok(result.ok);
     strictEqual(pick(result.records, 'sale').discount, 50);
@@ -288,7 +289,12 @@ describe('when gate on update', () => {
 
   it('overlays the input, so setting the gate field activates in the same call', async () => {
     await seed('u-r3', 'regular', 2);
-    const result = await runUpdate('WUProduct', { kind: 'sale', discount: 50 }, inUUIDs(['u-r3']));
+    const result = await runUpdate(
+      'WUProduct',
+      { kind: 'sale', discount: 50 },
+      inUUIDs(['u-r3']),
+      null,
+    );
     ok(result.ok);
     const record = result.records[0] as Record<string, unknown>;
     strictEqual(record.kind, 'sale');
@@ -305,6 +311,7 @@ describe('when gate on update', () => {
         'WUProduct',
         { discount: 50, title: 'Y' },
         inUUIDs(['u-s4', 'u-s5', 'u-r4', 'u-r5']),
+        null,
       );
       ok(result.ok);
     });
@@ -319,19 +326,19 @@ describe('when gate on update over a relation', () => {
       1,
       'A',
     ]);
-    const created = await runCreate('WRHas', { tags: ['wrt1'], featured: null });
+    const created = await runCreate('WRHas', { tags: ['wrt1'], featured: null }, null);
     ok(created.ok);
     const uuid = (created.record as Record<string, unknown>).UUID as string;
-    const updated = await runUpdate('WRHas', { featured: true }, inUUIDs([uuid]));
+    const updated = await runUpdate('WRHas', { featured: true }, inUUIDs([uuid]), null);
     ok(updated.ok);
     strictEqual((updated.records[0] as Record<string, unknown>).featured, true);
   });
 
   it('leaves a gate inactive when the stored relation is empty', async () => {
-    const created = await runCreate('WRHas', { tags: [], featured: null });
+    const created = await runCreate('WRHas', { tags: [], featured: null }, null);
     ok(created.ok);
     const uuid = (created.record as Record<string, unknown>).UUID as string;
-    const updated = await runUpdate('WRHas', { featured: true }, inUUIDs([uuid]));
+    const updated = await runUpdate('WRHas', { featured: true }, inUUIDs([uuid]), null);
     ok(updated.ok);
     strictEqual((updated.records[0] as Record<string, unknown>).featured, null);
   });
@@ -339,10 +346,11 @@ describe('when gate on update over a relation', () => {
 
 describe('when gate on update in a nested item', () => {
   it('writes a provided nested value whose gate climbs to an unprovided field', async () => {
-    const created = await runCreate('WCClimb', {
-      kind: 'promo',
-      sections: [{ heading: 'a', badge: 'NEW' }],
-    });
+    const created = await runCreate(
+      'WCClimb',
+      { kind: 'promo', sections: [{ heading: 'a', badge: 'NEW' }] },
+      null,
+    );
     ok(created.ok);
     const record = created.record as Record<string, unknown>;
     const uuid = record.UUID as string;
@@ -351,6 +359,7 @@ describe('when gate on update in a nested item', () => {
       'WCClimb',
       { sections: [{ UUID: secUUID, heading: 'a', badge: 'CHANGED' }] },
       inUUIDs([uuid]),
+      null,
     );
     ok(updated.ok);
     const badge = (updated.records[0] as { sections: { badge: string | null }[] }).sections[0]
@@ -371,6 +380,7 @@ describe('when gate on update, nested subfield', () => {
       'WNRev',
       { revisions: [{ UUID: revUUID, note: 'hi' }] },
       inUUIDs([uuid]),
+      null,
     );
     ok(updated.ok);
     const rev = (
@@ -391,6 +401,7 @@ describe('when gate on update, nested subfield', () => {
       'WNRev',
       { kind: 'draft', revisions: [{ UUID: revUUID, note: 'hi' }] },
       inUUIDs([uuid]),
+      null,
     );
     ok(updated.ok);
     const rev = (
@@ -407,6 +418,7 @@ describe('when gate on update, nested subfield', () => {
       'WNTag',
       { items: [{ tag: 'T', code: 'C' }] },
       inUUIDs([a.UUID as string, b.UUID as string]),
+      null,
     );
     ok(updated.ok);
     const promo = pick(updated.records, 'promo').items as { tag: string | null; code: string }[];
@@ -429,6 +441,7 @@ describe('when gate on update, nested default matches create', () => {
       'WNSan',
       { kind: 'regular', items: [{ UUID: itemUUID, code: 'B' }] },
       inUUIDs([record.UUID as string]),
+      null,
     );
     ok(updated.ok);
     strictEqual(
@@ -444,6 +457,7 @@ describe('when gate on update, nested default matches create', () => {
       'WNCrash',
       { kind: 'regular', items: [{ UUID: itemUUID, epoch: 9 }] },
       inUUIDs([record.UUID as string]),
+      null,
     );
     ok(updated.ok);
     strictEqual((updated.records[0] as { items: { epoch: number | null }[] }).items[0].epoch, null);

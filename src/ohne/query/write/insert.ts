@@ -1,9 +1,9 @@
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
-import type { FieldQueryMeta } from '../metadata.ts';
+import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 
-import { chunk, isUndefined, uniqueArray, uuidv7 } from '../../../utils/index.ts';
+import { chunk, isNull, isUndefined, uniqueArray, uuidv7 } from '../../../utils/index.ts';
 
 /**
  * The junction column roles of one `records` field, the owner side by default and swapped on the inverse.
@@ -63,7 +63,52 @@ export function columnTypes(fields: Record<string, FieldQueryMeta>): Map<string,
 }
 
 /**
+ * Splits a processed scope's columns by home: the main table's, and the companion's per-locale ones.
+ * A collection with no translatable column puts everything in `main` and an empty `companion`.
+ */
+export function splitColumns(
+  fields: Record<string, FieldQueryMeta>,
+  columns: Record<string, unknown>,
+): { main: Record<string, unknown>; companion: Record<string, unknown> } {
+  const main: Record<string, unknown> = {};
+  const companion: Record<string, unknown> = {};
+  for (const [column, value] of Object.entries(columns)) {
+    const home = fields[column]?.companion === true ? companion : main;
+    home[column] = value;
+  }
+  return { main, companion };
+}
+
+/**
+ * Inserts one record's companion row at `locale`, carrying its translatable column values.
+ * The parent row and its `_updatedAt` are the caller's; the companion has no timestamp of its own.
+ */
+export async function insertCompanion(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: CollectionQueryMeta,
+  parentUUID: string,
+  columns: Record<string, unknown>,
+  locale: string,
+): Promise<void> {
+  const columnType = columnTypes(meta.fields);
+  const names: string[] = ['_parentUUID', '_localeCode'];
+  const values: SQLValue[] = [parentUUID, locale];
+  for (const [column, value] of Object.entries(columns)) {
+    names.push(column);
+    values.push(dialect.serialize(columnType.get(column) as LogicalType, value));
+  }
+  const marks = names.map(() => '?').join(', ');
+  const quoted = names.map((name) => dialect.quote(name)).join(', ');
+  await tx.run(
+    `INSERT INTO ${dialect.quote(meta.companionTable as string)} (${quoted}) VALUES (${marks})`,
+    values,
+  );
+}
+
+/**
  * The next position to append at, per target, one past that target's current maximum in the junction.
+ * A locale-scoped junction orders per (target, locale), so `locale` narrows the maximum it counts from.
  */
 export async function appendPositions(
   tx: Transaction,
@@ -72,15 +117,17 @@ export async function appendPositions(
   linkColumn: string,
   linkPosition: string,
   targets: readonly string[],
+  locale: string | null,
 ): Promise<Map<string, number>> {
   const next = new Map<string, number>();
   const column = dialect.quote(linkColumn);
+  const filter = isNull(locale) ? '' : ` AND ${dialect.quote('_localeCode')} = ?`;
   for (const batch of chunk(uniqueArray(targets), 900)) {
     const marks = batch.map(() => '?').join(', ');
     const rows = await tx.query<{ target: string; max: number | null }>(
       `SELECT ${column} AS "target", MAX(${dialect.quote(linkPosition)}) AS "max" ` +
-        `FROM ${dialect.quote(table)} WHERE ${column} IN (${marks}) GROUP BY ${column}`,
-      batch,
+        `FROM ${dialect.quote(table)} WHERE ${column} IN (${marks})${filter} GROUP BY ${column}`,
+      isNull(locale) ? batch : [...batch, locale],
     );
     for (const row of rows) next.set(row.target, (row.max ?? -1) + 1);
   }
@@ -90,15 +137,18 @@ export async function appendPositions(
 /**
  * Inserts one `records` field's junction rows, appending each target's position after its existing links.
  * The owner side writes `_parentPosition` in input order; the inverse side swaps every role.
+ * A locale-scoped junction stamps each row's `_localeCode`, so the links belong to one locale.
  */
 export async function insertJunction(
   tx: Transaction,
   dialect: Dialect,
   relation: ProcessedRelation,
   ownerUUID: string,
+  locale: string,
 ): Promise<void> {
   if (relation.uuids.length === 0) return;
   const cols = junctionColumns(relation.meta);
+  const scoped = relation.meta.localeScoped === true;
   const nextByTarget = await appendPositions(
     tx,
     dialect,
@@ -106,18 +156,22 @@ export async function insertJunction(
     cols.link,
     cols.linkPosition,
     relation.uuids,
+    scoped ? locale : null,
   );
   const rows = relation.uuids.map((target, index) => {
     const position = nextByTarget.get(target) ?? 0;
     nextByTarget.set(target, position + 1);
-    return [ownerUUID, target, index, position] as SQLValue[];
+    const row: SQLValue[] = [ownerUUID, target, index, position];
+    if (scoped) row.push(locale);
+    return row;
   });
 
-  const quoted = [cols.self, cols.link, cols.selfPosition, cols.linkPosition]
-    .map((column) => dialect.quote(column))
-    .join(', ');
-  for (const batch of chunk(rows, 225)) {
-    const tuples = batch.map(() => '(?, ?, ?, ?)').join(', ');
+  const columns = [cols.self, cols.link, cols.selfPosition, cols.linkPosition];
+  if (scoped) columns.push('_localeCode');
+  const quoted = columns.map((column) => dialect.quote(column)).join(', ');
+  const width = Math.floor(900 / columns.length);
+  for (const batch of chunk(rows, width)) {
+    const tuples = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
     await tx.run(
       `INSERT INTO ${dialect.quote(cols.table)} (${quoted}) VALUES ${tuples}`,
       batch.flat(),
@@ -129,6 +183,8 @@ export async function insertJunction(
  * Inserts one scope's main row, then its junction links and child items, recursing into each.
  *
  * A top-level row carries `_updatedAt`; a child row carries `_parentUUID` and, for a repeater, its position.
+ * A locale-scoped child row stamps `_localeCode`; its own nested rows scope through the parent chain.
+ * Companion columns are not this insert's: the caller splits them out and writes the companion row.
  * Child items insert with fresh `uuidv7` keys, depth-first, so a nested tree writes in one pass.
  */
 export async function insertScope(
@@ -138,13 +194,18 @@ export async function insertScope(
   fields: Record<string, FieldQueryMeta>,
   uuid: string,
   scope: ProcessedScope,
-  parent?: { uuid: string; position?: number },
+  locale: string,
+  parent?: { uuid: string; position?: number; scoped?: boolean },
 ): Promise<void> {
   const columns: string[] = ['UUID'];
   const values: SQLValue[] = [uuid];
   if (parent) {
     columns.push('_parentUUID');
     values.push(parent.uuid);
+    if (parent.scoped === true) {
+      columns.push('_localeCode');
+      values.push(locale);
+    }
     if (!isUndefined(parent.position)) {
       columns.push('_parentPosition');
       values.push(parent.position);
@@ -162,17 +223,29 @@ export async function insertScope(
   const quoted = columns.map((column) => dialect.quote(column)).join(', ');
   await tx.run(`INSERT INTO ${dialect.quote(table)} (${quoted}) VALUES (${marks})`, values);
 
-  for (const relation of scope.relations) await insertJunction(tx, dialect, relation, uuid);
+  for (const relation of scope.relations) {
+    await insertJunction(tx, dialect, relation, uuid, locale);
+  }
 
   for (const child of scope.children) {
     const position = child.meta.kind === 'childMany';
     const childTable = child.meta.table as string;
     const childFields = child.meta.subfields as Record<string, FieldQueryMeta>;
     for (let index = 0; index < child.items.length; index++) {
-      await insertScope(tx, dialect, childTable, childFields, uuidv7(), child.items[index], {
-        uuid,
-        position: position ? index : undefined,
-      });
+      await insertScope(
+        tx,
+        dialect,
+        childTable,
+        childFields,
+        uuidv7(),
+        child.items[index],
+        locale,
+        {
+          uuid,
+          position: position ? index : undefined,
+          scoped: child.meta.localeScoped === true,
+        },
+      );
     }
   }
 }

@@ -71,7 +71,7 @@ const base = {
 
 describe('runCreate', () => {
   it('inserts a full record and returns its read shape', async () => {
-    const result = await runCreate('CPost', { ...base, title: 'Hello' });
+    const result = await runCreate('CPost', { ...base, title: 'Hello' }, null);
     ok(result.ok);
     const record = result.record as Record<string, unknown>;
     strictEqual(record.title, 'Hello');
@@ -90,7 +90,7 @@ describe('runCreate', () => {
 
   it('reports a missing required field and writes nothing', async () => {
     const before = await db.query('SELECT "UUID" FROM "CPost"');
-    const result = await runCreate('CPost', { ...base });
+    const result = await runCreate('CPost', { ...base }, null);
     ok(!result.ok);
     strictEqual(result.errors.title, 'validation.required');
     const after = await db.query('SELECT "UUID" FROM "CPost"');
@@ -98,20 +98,24 @@ describe('runCreate', () => {
   });
 
   it('rejects a duplicate unique value at the precheck', async () => {
-    await runCreate('CPost', { ...base, title: 'Unique' });
-    const result = await runCreate('CPost', { ...base, title: 'Unique' });
+    await runCreate('CPost', { ...base, title: 'Unique' }, null);
+    const result = await runCreate('CPost', { ...base, title: 'Unique' }, null);
     ok(!result.ok);
     strictEqual(result.errors.title, 'validation.notUnique');
   });
 
   it('rejects a missing record reference at its field', async () => {
-    const result = await runCreate('CPost', { ...base, title: 'Ref1', author: 'ghost' });
+    const result = await runCreate('CPost', { ...base, title: 'Ref1', author: 'ghost' }, null);
     ok(!result.ok);
     strictEqual(result.errors.author, 'validation.invalidReference');
   });
 
   it('rejects a missing records reference at its indexed path', async () => {
-    const result = await runCreate('CPost', { ...base, title: 'Ref2', tags: ['t1', 'ghost'] });
+    const result = await runCreate(
+      'CPost',
+      { ...base, title: 'Ref2', tags: ['t1', 'ghost'] },
+      null,
+    );
     ok(!result.ok);
     strictEqual(result.errors['tags[1]'], 'validation.invalidReference');
   });
@@ -130,7 +134,7 @@ describe('runCreate', () => {
   });
 
   it('appends junction positions and preserves link order', async () => {
-    await runCreate('CPost', { ...base, title: 'Links', tags: ['t2', 't1'] });
+    await runCreate('CPost', { ...base, title: 'Links', tags: ['t2', 't1'] }, null);
     const links = await db.query<{ _targetUUID: string; _parentPosition: number }>(
       'SELECT "_targetUUID","_parentPosition" FROM "CPost_tags" ' +
         'WHERE "_parentUUID" = (SELECT "UUID" FROM "CPost" WHERE "title" = ?) ORDER BY "_parentPosition"',
@@ -143,23 +147,25 @@ describe('runCreate', () => {
   });
 
   it('rejects a table-wide unique child value colliding with an existing row, at its path', async () => {
-    const first = await runCreate('CUniq', { links: [{ slug: 'x' }] });
+    const first = await runCreate('CUniq', { links: [{ slug: 'x' }] }, null);
     ok(first.ok);
-    const second = await runCreate('CUniq', { links: [{ slug: 'x' }] });
+    const second = await runCreate('CUniq', { links: [{ slug: 'x' }] }, null);
     ok(!second.ok);
     strictEqual(second.errors['links[0].slug'], 'validation.notUnique');
   });
 
   it('rejects a table-wide unique child value repeated within one create, at the later path', async () => {
-    const result = await runCreate('CUniq', { links: [{ slug: 'y' }, { slug: 'y' }] });
+    const result = await runCreate('CUniq', { links: [{ slug: 'y' }, { slug: 'y' }] }, null);
     ok(!result.ok);
     strictEqual(result.errors['links[1].slug'], 'validation.notUnique');
   });
 
   it('rejects a table-wide unique child value repeated across sibling lists in one create', async () => {
-    const result = await runCreate('CNest', {
-      sections: [{ links: [{ slug: 'z' }] }, { links: [{ slug: 'z' }] }],
-    });
+    const result = await runCreate(
+      'CNest',
+      { sections: [{ links: [{ slug: 'z' }] }, { links: [{ slug: 'z' }] }] },
+      null,
+    );
     ok(!result.ok);
     strictEqual(result.errors['sections[1].links[0].slug'], 'validation.notUnique');
   });

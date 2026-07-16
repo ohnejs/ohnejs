@@ -49,13 +49,17 @@ let counter = 0;
  * Creates a fresh post and returns its `UUID`.
  */
 async function seedPost(over: Record<string, unknown> = {}): Promise<string> {
-  const result = await runCreate('DPost', {
-    title: `P${counter++}`,
-    author: 'a1',
-    tags: ['t1'],
-    sections: [{ heading: 'a' }],
-    ...over,
-  });
+  const result = await runCreate(
+    'DPost',
+    {
+      title: `P${counter++}`,
+      author: 'a1',
+      tags: ['t1'],
+      sections: [{ heading: 'a' }],
+      ...over,
+    },
+    null,
+  );
   ok(result.ok);
   return (result.record as { UUID: string }).UUID;
 }

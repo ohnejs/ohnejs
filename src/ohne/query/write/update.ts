@@ -10,6 +10,7 @@ import type { FieldErrors } from './errors.ts';
 import {
   chunk,
   first,
+  hasKey,
   isEmpty,
   isNull,
   isString,
@@ -17,9 +18,12 @@ import {
   uuidv7,
 } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { defaultPath, finishScalar, writeContext } from '../pipeline/run-field.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
+import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import {
   activeScope,
@@ -33,7 +37,13 @@ import {
   type WhenGate,
 } from './activation.ts';
 import { busyError } from './busy.ts';
-import { appendPositions, columnTypes, insertScope, junctionColumns } from './insert.ts';
+import {
+  appendPositions,
+  columnTypes,
+  insertScope,
+  junctionColumns,
+  splitColumns,
+} from './insert.ts';
 import { checkReferences } from './references.ts';
 import { checkChildUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
@@ -49,6 +59,9 @@ export type UpdateOutcome =
  *
  * The pipeline runs once in `'update'` mode: only provided fields validate, and a field error stops the call.
  * The matched set resolves inside the transaction, then every derived write applies per matched record.
+ * `locale` is the chain's explicit choice or `null`; translatable values land on the effective locale.
+ * They upsert each matched record's companion row; a missing row materializes, its unwritten
+ * companion columns filled through the default path.
  * Uniqueness prechecks exclude the matched rows, so a kept value never collides with its own record.
  * The returned records are all matched rows, untouched empty inputs included, in their final state.
  */
@@ -56,6 +69,7 @@ export async function runUpdate(
   collection: string,
   input: Record<string, unknown>,
   condition: ConditionNode,
+  locale: string | null,
   joinedTx?: Transaction,
 ): Promise<UpdateOutcome> {
   const meta = queryMetadata(collection);
@@ -63,10 +77,10 @@ export async function runUpdate(
   const run = isUndefined(joinedTx)
     ? () =>
         useDatabase().transaction(
-          (tx) => attemptUpdate(tx, meta, dialect, input, condition),
+          (tx) => attemptUpdate(tx, meta, dialect, input, condition, locale),
           'immediate',
         )
-    : () => attemptUpdate(joinedTx, meta, dialect, input, condition);
+    : () => attemptUpdate(joinedTx, meta, dialect, input, condition, locale);
   try {
     return await run();
   } catch (error) {
@@ -89,21 +103,23 @@ async function attemptUpdate(
   dialect: Dialect,
   input: Record<string, unknown>,
   condition: ConditionNode,
+  locale: string | null,
 ): Promise<UpdateOutcome> {
   const processed = await runRecord(meta, input, { operation: 'update', tx });
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
+  const code = effectiveLocale(locale);
 
-  const matched = await matchedUUIDs(tx, dialect, meta, condition);
+  const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
   if (matched.length === 0) return { ok: true, records: [] };
 
-  const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, matched);
+  const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code, matched);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
 
   const excludeChildUUIDs =
     scope.uniqueProbes.length === 0
       ? []
-      : await subtreeChildUUIDs(tx, dialect, meta.fields, matched);
+      : await subtreeChildUUIDs(tx, dialect, meta.fields, matched, code);
   const childUniqueErrors = await checkChildUnique(
     tx,
     dialect,
@@ -115,35 +131,194 @@ async function attemptUpdate(
   const referenceErrors = await checkReferences(tx, dialect, scope.refs);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
-  const correlationErrors = await checkCorrelation(tx, dialect, matched, scope.children);
+  const correlationErrors = await checkCorrelation(tx, dialect, matched, scope.children, code);
   if (!isEmpty(correlationErrors)) return { ok: false, errors: correlationErrors };
+
+  const plan = await planCompanion(tx, dialect, meta, scope, matched, code);
 
   const gates = whenGates(meta.fields, input, scope);
   if (gates.length === 0 && !hasNestedGates(scope)) {
-    await updateColumns(tx, dialect, meta.table, meta.fields, scope.columns, matched);
-    for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null);
+    const { main, companion } = splitColumns(meta.fields, scope.columns);
+    const failure = materializeFailure(plan, companion, matched);
+    if (!isNull(failure)) return { ok: false, errors: failure };
+    await updateColumns(tx, dialect, meta.table, meta.fields, main, matched);
+    if (!isEmpty(companion)) {
+      await upsertCompanion(tx, dialect, meta, companion, matched, code, plan);
+    }
+    for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null, code);
   } else {
-    await gatedUpdate(tx, dialect, meta, input, matched, scope, gates);
+    const failure = await gatedUpdate(
+      tx,
+      dialect,
+      meta,
+      input,
+      matched,
+      scope,
+      gates,
+      locale,
+      plan,
+    );
+    if (!isNull(failure)) return { ok: false, errors: failure };
   }
 
-  return { ok: true, records: await readMatched(meta.collection, matched) };
+  return { ok: true, records: await readMatched(meta.collection, matched, locale) };
 }
 
 /**
  * Resolves the `UUID`s a condition matches, compiling the same `WHERE` clause the read path does.
+ * A condition over translatable fields joins the companion at the effective locale, `LEFT`.
+ * A write therefore addresses main rows; a missing translation compares as `NULL`, never dropping the row.
  */
 async function matchedUUIDs(
   tx: Transaction,
   dialect: Dialect,
   meta: CollectionQueryMeta,
   condition: ConditionNode,
+  locale: string,
 ): Promise<string[]> {
-  const where = compileWhere(condition, meta, dialect);
+  const where = compileWhere(condition, meta, dialect, locale);
+  const from = compileFrom(meta, { condition }, locale, dialect);
+  const uuid = `${dialect.quote(meta.table)}.${dialect.quote('UUID')}`;
   const rows = await tx.query<{ UUID: string }>(
-    `SELECT ${dialect.quote('UUID')} FROM ${dialect.quote(meta.table)} WHERE ${where.sql}`,
-    where.params,
+    `SELECT ${uuid} AS ${dialect.quote('UUID')} ${from.sql} WHERE ${where.sql}`,
+    [...from.params, ...where.params],
   );
   return rows.map((row) => row.UUID);
+}
+
+/**
+ * How a write's companion columns land per matched record: update the existing row, or materialize one.
+ * `defaults` carries the values a materialized row fills its unwritten columns with.
+ * `errors` carries the default failures; they fail the call only when a row must actually materialize.
+ */
+interface CompanionPlan {
+  hasRow: ReadonlySet<string>;
+  defaults: Record<string, unknown>;
+  errors: FieldErrors;
+}
+
+/**
+ * Plans the companion upsert: which matched records hold a row at the locale, plus the defaults.
+ *
+ * A write touching no companion column plans nothing - records without a translation keep lacking one.
+ * Defaults resolve through the default path and value tiers under the update's own context.
+ * A required companion field with no default lands in `errors`; `materializeFailure` decides whether
+ * they fail the call, since a gated write may end up materializing nothing.
+ * A field that is provided and ungated lands in every materialized row, so it never needs a default.
+ */
+async function planCompanion(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: CollectionQueryMeta,
+  scope: ProcessedScope,
+  matched: readonly string[],
+  locale: string,
+): Promise<CompanionPlan> {
+  const none: CompanionPlan = { hasRow: new Set(), defaults: {}, errors: {} };
+  if (isUndefined(meta.companionTable)) return none;
+  if (isEmpty(splitColumns(meta.fields, scope.columns).companion)) return none;
+
+  const hasRow = new Set<string>();
+  const table = dialect.quote(meta.companionTable);
+  const parent = dialect.quote('_parentUUID');
+  for (const batch of chunk(matched, 900)) {
+    const marks = batch.map(() => '?').join(', ');
+    const rows = await tx.query<{ parent: string }>(
+      `SELECT ${parent} AS ${dialect.quote('parent')} FROM ${table} ` +
+        `WHERE ${parent} IN (${marks}) AND ${dialect.quote('_localeCode')} = ?`,
+      [...batch, locale],
+    );
+    for (const row of rows) hasRow.add(row.parent);
+  }
+  if (hasRow.size === matched.length) return { hasRow, defaults: {}, errors: {} };
+
+  const ctx = {
+    operation: 'update' as const,
+    collection: meta.collection,
+    tx,
+    path: '',
+    ancestors: [],
+  };
+  const errors: FieldErrors = {};
+  const defaults: Record<string, unknown> = {};
+  for (const [name, field] of Object.entries(meta.fields)) {
+    if (field.companion !== true) continue;
+    if (hasKey(scope.columns, field.column as string) && isUndefined(field.when)) continue;
+    const prepared = await defaultPath(name, field, writeContext(name, field, {}, ctx));
+    if ('errors' in prepared) {
+      Object.assign(errors, prepared.errors);
+      continue;
+    }
+    if (!('value' in prepared)) continue;
+    const finished = await finishScalar(name, field, prepared.value, {}, ctx);
+    if (!isUndefined(finished.errors)) Object.assign(errors, finished.errors);
+    else defaults[field.column as string] = finished.column?.value ?? null;
+  }
+  return { hasRow, defaults, errors };
+}
+
+/**
+ * The plan's errors when this write would materialize a companion row it cannot fill, else `null`.
+ * A write materializes only where it sets companion columns for a record lacking the locale's row.
+ */
+function materializeFailure(
+  plan: CompanionPlan,
+  companion: Record<string, unknown>,
+  uuids: readonly string[],
+): FieldErrors | null {
+  if (isEmpty(plan.errors) || isEmpty(companion)) return null;
+  return uuids.some((uuid) => !plan.hasRow.has(uuid)) ? plan.errors : null;
+}
+
+/**
+ * Applies one scope's companion columns across `uuids` at the locale, one row per (record, locale).
+ * Existing rows update; missing ones materialize as `defaults` overlaid with the written columns.
+ */
+async function upsertCompanion(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: CollectionQueryMeta,
+  columns: Record<string, unknown>,
+  uuids: readonly string[],
+  locale: string,
+  plan: CompanionPlan,
+): Promise<void> {
+  const columnType = columnTypes(meta.fields);
+  const table = dialect.quote(meta.companionTable as string);
+  const parent = dialect.quote('_parentUUID');
+  const updates = uuids.filter((uuid) => plan.hasRow.has(uuid));
+  const inserts = uuids.filter((uuid) => !plan.hasRow.has(uuid));
+
+  if (updates.length > 0) {
+    const sets: string[] = [];
+    const setParams: SQLValue[] = [];
+    for (const [column, value] of Object.entries(columns)) {
+      sets.push(`${dialect.quote(column)} = ?`);
+      setParams.push(dialect.serialize(columnType.get(column) as LogicalType, value));
+    }
+    for (const batch of chunk(updates, 900)) {
+      const marks = batch.map(() => '?').join(', ');
+      await tx.run(
+        `UPDATE ${table} SET ${sets.join(', ')} ` +
+          `WHERE ${parent} IN (${marks}) AND ${dialect.quote('_localeCode')} = ?`,
+        [...setParams, ...batch, locale],
+      );
+    }
+  }
+
+  if (inserts.length > 0) {
+    const values = { ...plan.defaults, ...columns };
+    const names = ['_parentUUID', '_localeCode', ...Object.keys(values)];
+    const quoted = names.map((name) => dialect.quote(name)).join(', ');
+    const serialized = Object.entries(values).map(([column, value]) =>
+      dialect.serialize(columnType.get(column) as LogicalType, value),
+    );
+    const rows = inserts.map((uuid) => [uuid, locale, ...serialized] as SQLValue[]);
+    for (const batch of chunk(rows, Math.max(1, Math.floor(900 / names.length)))) {
+      const tuples = batch.map(() => `(${names.map(() => '?').join(', ')})`).join(', ');
+      await tx.run(`INSERT INTO ${table} (${quoted}) VALUES ${tuples}`, batch.flat());
+    }
+  }
 }
 
 /**
@@ -156,6 +331,7 @@ async function checkCorrelation(
   dialect: Dialect,
   parents: readonly string[],
   children: readonly ProcessedChild[],
+  locale: string,
 ): Promise<FieldErrors> {
   const errors: FieldErrors = {};
   for (const child of children) {
@@ -165,8 +341,9 @@ async function checkCorrelation(
       : (child.items[0]?.children.length ?? 0) > 0;
     if (!correlatable) continue;
     const table = child.meta.table as string;
+    const scoped = child.meta.localeScoped === true ? locale : null;
     for (const parent of parents) {
-      const existing = await childUUIDs(tx, dialect, table, parent);
+      const existing = await childUUIDs(tx, dialect, table, parent, scoped);
       if (many) {
         for (let index = 0; index < child.items.length; index++) {
           const uuid = child.items[index].itemUUID;
@@ -177,7 +354,7 @@ async function checkCorrelation(
           }
           Object.assign(
             errors,
-            await checkCorrelation(tx, dialect, [uuid], child.items[index].children),
+            await checkCorrelation(tx, dialect, [uuid], child.items[index].children, locale),
           );
         }
       } else {
@@ -185,7 +362,7 @@ async function checkCorrelation(
         if (!isUndefined(objectUUID)) {
           Object.assign(
             errors,
-            await checkCorrelation(tx, dialect, [objectUUID], child.items[0].children),
+            await checkCorrelation(tx, dialect, [objectUUID], child.items[0].children, locale),
           );
         }
       }
@@ -237,9 +414,12 @@ async function applyDerived(
   uuid: string,
   scope: ProcessedScope,
   ancestry: readonly ScopeValues[] | null,
+  locale: string,
 ): Promise<void> {
-  for (const relation of scope.relations) await diffJunction(tx, dialect, relation, uuid);
-  for (const child of scope.children) await correlateChild(tx, dialect, child, uuid, ancestry);
+  for (const relation of scope.relations) await diffJunction(tx, dialect, relation, uuid, locale);
+  for (const child of scope.children) {
+    await correlateChild(tx, dialect, child, uuid, ancestry, locale);
+  }
 }
 
 /**
@@ -259,20 +439,39 @@ async function gatedUpdate(
   matched: readonly string[],
   scope: ProcessedScope,
   gates: readonly WhenGate[],
-): Promise<void> {
-  const records = await readMatched(meta.collection, matched);
+  locale: string | null,
+  plan: CompanionPlan,
+): Promise<FieldErrors | null> {
+  const code = effectiveLocale(locale);
+  const records = await readMatched(meta.collection, matched, locale);
   const provided = coercedOverlay(meta.fields, input);
   const overlays = new Map(
     records.map((record) => [record.UUID as string, { ...record, ...provided }]),
   );
+  const writes: {
+    groupScope: ProcessedScope;
+    uuids: readonly string[];
+    main: Record<string, unknown>;
+    companion: Record<string, unknown>;
+  }[] = [];
   for (const group of partitionActivation(records, gates, provided)) {
     const groupScope = activeScope(scope, gates, group.active);
     if (isEmptyScope(groupScope)) continue;
-    await updateColumns(tx, dialect, meta.table, meta.fields, groupScope.columns, group.uuids);
-    for (const uuid of group.uuids) {
-      await applyDerived(tx, dialect, uuid, groupScope, [overlays.get(uuid) as ScopeValues]);
+    const { main, companion } = splitColumns(meta.fields, groupScope.columns);
+    const failure = materializeFailure(plan, companion, group.uuids);
+    if (!isNull(failure)) return failure;
+    writes.push({ groupScope, uuids: group.uuids, main, companion });
+  }
+  for (const { groupScope, uuids, main, companion } of writes) {
+    await updateColumns(tx, dialect, meta.table, meta.fields, main, uuids);
+    if (!isEmpty(companion)) {
+      await upsertCompanion(tx, dialect, meta, companion, uuids, code, plan);
+    }
+    for (const uuid of uuids) {
+      await applyDerived(tx, dialect, uuid, groupScope, [overlays.get(uuid) as ScopeValues], code);
     }
   }
+  return null;
 }
 
 /**
@@ -280,6 +479,7 @@ async function gatedUpdate(
  *
  * Added links append their `linkPosition` per target, exactly as a create does.
  * Kept links keep their `linkPosition` - the target's own ordering - and only their `selfPosition` renumbers.
+ * A locale-scoped junction diffs one locale's links: every read, delete, insert, and renumber binds it.
  * An unchanged input issues no writes at all, since every removal, addition, and renumber is empty.
  */
 async function diffJunction(
@@ -287,16 +487,20 @@ async function diffJunction(
   dialect: Dialect,
   relation: ProcessedRelation,
   ownerUUID: string,
+  locale: string,
 ): Promise<void> {
   const cols = junctionColumns(relation.meta);
   const table = dialect.quote(cols.table);
   const self = dialect.quote(cols.self);
   const link = dialect.quote(cols.link);
   const selfPos = dialect.quote(cols.selfPosition);
+  const scoped = relation.meta.localeScoped === true;
+  const filter = scoped ? ` AND ${dialect.quote('_localeCode')} = ?` : '';
+  const scopeParams: SQLValue[] = scoped ? [locale] : [];
 
   const existing = await tx.query<{ target: string; pos: number }>(
-    `SELECT ${link} AS "target", ${selfPos} AS "pos" FROM ${table} WHERE ${self} = ?`,
-    [ownerUUID],
+    `SELECT ${link} AS "target", ${selfPos} AS "pos" FROM ${table} WHERE ${self} = ?${filter}`,
+    [ownerUUID, ...scopeParams],
   );
   const currentPos = new Map<string, number>(existing.map((row) => [row.target, row.pos]));
   const targets = relation.uuids;
@@ -305,9 +509,10 @@ async function diffJunction(
   const removed = existing.map((row) => row.target).filter((target) => !inputSet.has(target));
   for (const batch of chunk(removed, 900)) {
     const marks = batch.map(() => '?').join(', ');
-    await tx.run(`DELETE FROM ${table} WHERE ${self} = ? AND ${link} IN (${marks})`, [
+    await tx.run(`DELETE FROM ${table} WHERE ${self} = ? AND ${link} IN (${marks})${filter}`, [
       ownerUUID,
       ...batch,
+      ...scopeParams,
     ]);
   }
 
@@ -320,6 +525,7 @@ async function diffJunction(
       cols.link,
       cols.linkPosition,
       added,
+      scoped ? locale : null,
     );
     const rows: SQLValue[][] = [];
     for (let index = 0; index < targets.length; index++) {
@@ -327,13 +533,15 @@ async function diffJunction(
       if (currentPos.has(target)) continue;
       const linkPosition = nextByTarget.get(target) ?? 0;
       nextByTarget.set(target, linkPosition + 1);
-      rows.push([ownerUUID, target, index, linkPosition]);
+      const row: SQLValue[] = [ownerUUID, target, index, linkPosition];
+      if (scoped) row.push(locale);
+      rows.push(row);
     }
-    const quoted = [cols.self, cols.link, cols.selfPosition, cols.linkPosition]
-      .map((column) => dialect.quote(column))
-      .join(', ');
-    for (const batch of chunk(rows, 225)) {
-      const tuples = batch.map(() => '(?, ?, ?, ?)').join(', ');
+    const columns = [cols.self, cols.link, cols.selfPosition, cols.linkPosition];
+    if (scoped) columns.push('_localeCode');
+    const quoted = columns.map((column) => dialect.quote(column)).join(', ');
+    for (const batch of chunk(rows, Math.floor(900 / columns.length))) {
+      const tuples = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
       await tx.run(`INSERT INTO ${table} (${quoted}) VALUES ${tuples}`, batch.flat());
     }
   }
@@ -341,10 +549,11 @@ async function diffJunction(
   for (let index = 0; index < targets.length; index++) {
     const current = currentPos.get(targets[index]);
     if (isUndefined(current) || current === index) continue;
-    await tx.run(`UPDATE ${table} SET ${selfPos} = ? WHERE ${self} = ? AND ${link} = ?`, [
+    await tx.run(`UPDATE ${table} SET ${selfPos} = ? WHERE ${self} = ? AND ${link} = ?${filter}`, [
       index,
       ownerUUID,
       targets[index],
+      ...scopeParams,
     ]);
   }
 }
@@ -365,10 +574,12 @@ async function correlateChild(
   child: ProcessedChild,
   parentUUID: string,
   ancestry: readonly ScopeValues[] | null,
+  locale: string,
 ): Promise<void> {
   const table = child.meta.table as string;
   const subfields = child.meta.subfields as Record<string, FieldQueryMeta>;
-  const existing = await childUUIDs(tx, dialect, table, parentUUID);
+  const scoped = child.meta.localeScoped === true;
+  const existing = await childUUIDs(tx, dialect, table, parentUUID, scoped ? locale : null);
 
   if (child.meta.kind === 'childOne') {
     const objectUUID = first([...existing]);
@@ -379,12 +590,15 @@ async function correlateChild(
     }
     if (isUndefined(objectUUID)) {
       const fresh = isNull(ancestry) ? item : gateSubtree(item, subfields, ancestry);
-      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, { uuid: parentUUID });
+      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, locale, {
+        uuid: parentUUID,
+        scoped,
+      });
       return;
     }
     const gated = isNull(ancestry) ? item : gateNested(item, subfields, ancestry);
     await updateChildRow(tx, dialect, table, subfields, gated, objectUUID);
-    await applyDerived(tx, dialect, objectUUID, gated, descend(ancestry, item));
+    await applyDerived(tx, dialect, objectUUID, gated, descend(ancestry, item), locale);
     return;
   }
 
@@ -399,15 +613,16 @@ async function correlateChild(
     const item = child.items[index];
     if (isUndefined(item.itemUUID)) {
       const fresh = isNull(ancestry) ? item : gateSubtree(item, subfields, ancestry);
-      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, {
+      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, locale, {
         uuid: parentUUID,
         position: index,
+        scoped,
       });
       continue;
     }
     const gated = isNull(ancestry) ? item : gateNested(item, subfields, ancestry);
     await updateChildRow(tx, dialect, table, subfields, gated, item.itemUUID, index);
-    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item));
+    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item), locale);
   }
 }
 
@@ -455,16 +670,20 @@ async function updateChildRow(
 
 /**
  * The `UUID`s of one parent's child rows in a composite table, for correlation and deletion.
+ * A locale-scoped table passes the locale, so another locale's items never correlate or delete.
  */
 async function childUUIDs(
   tx: Transaction,
   dialect: Dialect,
   table: string,
   parentUUID: string,
+  locale: string | null,
 ): Promise<Set<string>> {
+  const filter = isNull(locale) ? '' : ` AND ${dialect.quote('_localeCode')} = ?`;
   const rows = await tx.query<{ UUID: string }>(
-    `SELECT ${dialect.quote('UUID')} FROM ${dialect.quote(table)} WHERE ${dialect.quote('_parentUUID')} = ?`,
-    [parentUUID],
+    `SELECT ${dialect.quote('UUID')} FROM ${dialect.quote(table)} ` +
+      `WHERE ${dialect.quote('_parentUUID')} = ?${filter}`,
+    isNull(locale) ? [parentUUID] : [parentUUID, locale],
   );
   return new Set(rows.map((row) => row.UUID));
 }
@@ -481,11 +700,13 @@ async function subtreeChildUUIDs(
   dialect: Dialect,
   fields: Record<string, FieldQueryMeta>,
   parents: readonly string[],
+  locale: string,
 ): Promise<string[]> {
   const all: string[] = [];
   for (const field of Object.values(fields)) {
     if (field.kind !== 'childOne' && field.kind !== 'childMany') continue;
-    const rows = await childUUIDsUnder(tx, dialect, field.table as string, parents);
+    const scoped = field.localeScoped === true ? locale : null;
+    const rows = await childUUIDsUnder(tx, dialect, field.table as string, parents, scoped);
     if (rows.length === 0) continue;
     all.push(...rows);
     all.push(
@@ -494,6 +715,7 @@ async function subtreeChildUUIDs(
         dialect,
         field.subfields as Record<string, FieldQueryMeta>,
         rows,
+        locale,
       )),
     );
   }
@@ -502,20 +724,23 @@ async function subtreeChildUUIDs(
 
 /**
  * The `UUID`s of one composite table's rows under any of `parents`, chunked for the driver's `IN` limit.
+ * A locale-scoped table passes the locale: an update rewrites one locale's rows, so only those exclude.
  */
 async function childUUIDsUnder(
   tx: Transaction,
   dialect: Dialect,
   table: string,
   parents: readonly string[],
+  locale: string | null,
 ): Promise<string[]> {
   const uuids: string[] = [];
+  const filter = isNull(locale) ? '' : ` AND ${dialect.quote('_localeCode')} = ?`;
   for (const batch of chunk(parents, 900)) {
     const marks = batch.map(() => '?').join(', ');
     const rows = await tx.query<{ UUID: string }>(
       `SELECT ${dialect.quote('UUID')} FROM ${dialect.quote(table)} ` +
-        `WHERE ${dialect.quote('_parentUUID')} IN (${marks})`,
-      [...batch],
+        `WHERE ${dialect.quote('_parentUUID')} IN (${marks})${filter}`,
+      isNull(locale) ? [...batch] : [...batch, locale],
     );
     uuids.push(...rows.map((row) => row.UUID));
   }
@@ -543,7 +768,11 @@ async function deleteChildren(
 /**
  * Re-reads the matched records in their final state, chunked so a large update stays under the param cap.
  */
-async function readMatched(collection: string, matched: readonly string[]): Promise<QueryRecord[]> {
+async function readMatched(
+  collection: string,
+  matched: readonly string[],
+  locale: string | null,
+): Promise<QueryRecord[]> {
   const records: QueryRecord[] = [];
   for (const batch of chunk(matched, 2000)) {
     const rows = await readRows({
@@ -554,6 +783,7 @@ async function readMatched(collection: string, matched: readonly string[]): Prom
       limit: null,
       offset: null,
       populate: [],
+      locale,
     });
     records.push(...rows);
   }

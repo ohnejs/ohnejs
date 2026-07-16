@@ -17,6 +17,7 @@ import type { CreateOutcome } from './write/create.ts';
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { freezeIR, type QueryIR } from './ir.ts';
+import { checkQueryLocale } from './locale.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
 import { findFirst as readFirst, findMany as readMany } from './read/find.ts';
 import { paginate as readPage } from './read/paginate.ts';
@@ -24,7 +25,7 @@ import { pluck as pluckRows } from './read/pluck.ts';
 import { unknownFieldError, validateCondition } from './validate-condition.ts';
 import { lowerField } from './where-field.ts';
 import { runCreate } from './write/create.ts';
-import { runDelete, type DeleteOutcome } from './write/delete.ts';
+import { runDelete, runDeleteTranslation, type DeleteOutcome } from './write/delete.ts';
 import { validationError } from './write/errors.ts';
 import { runUpdate, type UpdateOutcome } from './write/update.ts';
 
@@ -42,6 +43,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private selected: string[] | null = null;
   private limitValue: number | null = null;
   private offsetValue: number | null = null;
+  private localeValue: string | null = null;
   private joinedTx?: Transaction;
   readonly guardOverrides: Partial<QueryGuards> = {};
   private readonly meta: CollectionQueryMeta;
@@ -115,6 +117,28 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return this;
   }
 
+  locale(code: string): this {
+    if (this.meta.translatable !== true) {
+      throw ohneError({
+        title: `Cannot set a locale on \`${this.meta.collection}\``,
+        body: [
+          `Collection \`${this.meta.collection}\` has no translatable field, so a locale scopes nothing.`,
+        ],
+      });
+    }
+    if (!isNull(this.localeValue)) {
+      throw ohneError({
+        title: 'Locale already set',
+        body: [
+          `This query already reads \`${this.localeValue}\`; a chain scopes to one locale.`,
+          'Open a new query for another locale.',
+        ],
+      });
+    }
+    this.localeValue = checkQueryLocale(code);
+    return this;
+  }
+
   findMany(): Promise<QueryRecord[]> {
     return readMany(this.freeze());
   }
@@ -141,17 +165,23 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   create(input: Record<string, unknown>): Promise<CreateOutcome> {
-    return runCreate(this.meta.collection, input, this.joinedTx);
+    return runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
   }
 
   async createOrThrow(input: Record<string, unknown>): Promise<QueryRecord> {
-    const outcome = await runCreate(this.meta.collection, input, this.joinedTx);
+    const outcome = await runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.record;
   }
 
   update(input: Record<string, unknown>): Promise<UpdateOutcome> {
-    return runUpdate(this.meta.collection, input, this.requireCondition('update'), this.joinedTx);
+    return runUpdate(
+      this.meta.collection,
+      input,
+      this.requireCondition('update'),
+      this.localeValue,
+      this.joinedTx,
+    );
   }
 
   async updateOrThrow(input: Record<string, unknown>): Promise<QueryRecord[]> {
@@ -159,6 +189,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.meta.collection,
       input,
       this.requireCondition('update'),
+      this.localeValue,
       this.joinedTx,
     );
     if (!outcome.ok) throw validationError(outcome.errors);
@@ -166,7 +197,33 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   delete(): Promise<DeleteOutcome> {
+    if (!isNull(this.localeValue)) {
+      throw ohneError({
+        title: `Cannot \`delete\` a locale-scoped query`,
+        body: [
+          `This query is scoped to \`${this.localeValue}\`, but \`delete\` removes whole records - every locale at once.`,
+          'Use `deleteTranslation` to remove this locale, or drop `.locale()` to delete records.',
+        ],
+      });
+    }
     return runDelete(this.meta.collection, this.requireCondition('delete'), this.joinedTx);
+  }
+
+  deleteTranslation(): Promise<DeleteOutcome> {
+    if (isNull(this.localeValue)) {
+      throw ohneError({
+        title: 'Cannot `deleteTranslation` without a locale',
+        body: [
+          `Scope the query with \`.locale()\` first; the chain's locale names the translation to remove.`,
+        ],
+      });
+    }
+    return runDeleteTranslation(
+      this.meta.collection,
+      this.requireCondition('deleteTranslation'),
+      this.localeValue,
+      this.joinedTx,
+    );
   }
 
   use(tx: Transaction): this {
@@ -178,7 +235,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
    * Folds the accumulated conditions into one node, refusing a write that would touch every record.
    * The typed `ReadyQuery` state already gates this, so the throw catches only an untyped caller.
    */
-  private requireCondition(operation: 'update' | 'delete'): ConditionNode {
+  private requireCondition(operation: 'update' | 'delete' | 'deleteTranslation'): ConditionNode {
     const condition = this.freeze().condition;
     if (isNull(condition)) {
       throw ohneError({
@@ -204,6 +261,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       limit: this.limitValue,
       offset: this.offsetValue,
       populate: this.populateFields,
+      locale: this.localeValue,
     });
   }
 }

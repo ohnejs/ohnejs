@@ -7,12 +7,15 @@ import type { FieldErrors } from './errors.ts';
 import { chunk, groupBy, hasKey, isEmpty, isUndefined, uniqueArray } from '../../../utils/index.ts';
 
 /**
- * Prechecks every set unique field against the table, naming each collision in one round trip.
+ * Prechecks every set unique field against its table, naming each collision in one round trip.
  *
  * One compound `SELECT ? AS field ... UNION ALL ...` probes each uniquely-indexed column at once.
  * It binds the same serialized values the write will, so the probe and the write agree by construction.
+ * A translatable field probes the companion, where its column and unique index live.
+ * A plain `unique` there spans every locale; `uniquePerLocale` narrows the probe to the write's locale.
  * Only fields the write sets are probed, so an update leaves an untouched unique field alone.
- * `excludeUUIDs` drops the rows the write itself owns, so an update never collides a value with its own row.
+ * `excludeUUIDs` drops the rows the write itself owns, so a kept value never collides with its own row.
+ * The exclusion anchors by `UUID` on the main table and by `_parentUUID` on the companion.
  * A `null` value never collides: `col = NULL` is never true, matching SQLite's multi-null unique rule.
  * Returns a `notUnique` message keyed by each colliding field, or an empty map when the row is clear.
  */
@@ -21,6 +24,7 @@ export async function checkUnique(
   dialect: Dialect,
   meta: CollectionQueryMeta,
   columns: Record<string, unknown>,
+  locale: string,
   excludeUUIDs: readonly string[] = [],
 ): Promise<FieldErrors> {
   const uniques = Object.entries(meta.fields).filter(
@@ -31,22 +35,27 @@ export async function checkUnique(
   );
   if (uniques.length === 0) return {};
 
-  const table = dialect.quote(meta.table);
   const excludeMarks = excludeUUIDs.map(() => '?').join(', ');
-  const exclude =
-    excludeUUIDs.length === 0 ? '' : ` AND ${dialect.quote('UUID')} NOT IN (${excludeMarks})`;
   const selects: string[] = [];
   const params: SQLValue[] = [];
   for (const [name, field] of uniques) {
+    const companion = field.companion === true;
+    const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
+    const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
+    const exclude = excludeUUIDs.length === 0 ? '' : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const scoped = companion && field.options?.uniquePerLocale === true;
+    const scope = scoped ? ` AND ${dialect.quote('_localeCode')} = ?` : '';
     const value = dialect.serialize(
       field.logicalType as LogicalType,
       columns[field.column as string],
     );
     selects.push(
       `SELECT ? AS ${dialect.quote('field')} FROM ${table} ` +
-        `WHERE ${dialect.quote(field.column as string)} = ?${exclude}`,
+        `WHERE ${dialect.quote(field.column as string)} = ?${scope}${exclude}`,
     );
-    params.push(name, value, ...excludeUUIDs);
+    params.push(name, value);
+    if (scoped) params.push(locale);
+    params.push(...excludeUUIDs);
   }
 
   const rows = await tx.query<{ field: string }>(selects.join(' UNION ALL '), params);
