@@ -17,6 +17,7 @@ import { useCollections } from '../../../src/ohne/collections/use-collections.ts
 import { field } from '../../../src/ohne/fields/field.ts';
 import { generateDatabase, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { queryMetadata } from '../../../src/ohne/query/metadata.ts';
+import { query } from '../../../src/ohne/query/query.ts';
 import { lowerField } from '../../../src/ohne/query/where-field.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
@@ -43,6 +44,18 @@ useCollections().register('QPosts', {
     },
   },
 });
+
+/**
+ * Compile-only: the framework program never augments `KnownCollections`, so this checks the fallback.
+ * The callback populate degrades permissively pre-codegen - names uncheck, rows stay `unknown`.
+ */
+export async function populateDegradesPermissively(): Promise<void> {
+  const rows = await query('QPosts')
+    .populate('author', (a) => a.select('name').populate('anything'))
+    .findMany();
+  const author: unknown = rows[0]?.author;
+  void author;
+}
 
 describe('the generated query-field table mirrors the runtime metadata', () => {
   const fields = queryMetadata('QPosts').fields;
@@ -171,7 +184,10 @@ describe('the typed builder narrows in a consumer app', () => {
       app,
       'collections/Tags.ts',
       "import { defineCollection, field } from 'ohne';\n" +
-        "export default defineCollection({ fields: { label: field('text') } });\n",
+        'export default defineCollection({ fields: {\n' +
+        "  label: field('text'),\n" +
+        "  posts: field('records', { collection: 'Posts', inverse: 'tags' }),\n" +
+        '} });\n',
     );
     write(
       app,
@@ -312,6 +328,70 @@ export async function reads(): Promise<void> {
   await query('Posts').paginate(1, 20);
 }
 
+export async function populates(): Promise<void> {
+  const narrowed = await query('Posts').populate('author', (a) => a.select('name')).findMany();
+  const author = narrowed[0]!.author;
+  if (author) {
+    const name: string = author.name;
+    void name;
+    // @ts-expect-error UUID was not named in the subselect
+    void author.UUID;
+  }
+
+  const cyclic = await query('Posts')
+    .select('title', 'tags')
+    .populate('tags', (t) =>
+      t.select('label', 'posts').populate('posts', (p) =>
+        p.select('title', 'tags').populate('tags', (t2) => t2.select('label'))),
+    )
+    .findMany();
+  const tag = cyclic[0]!.tags[0];
+  if (tag) {
+    const label: string = tag.label;
+    void label;
+    const inner = tag.posts[0];
+    if (inner) {
+      const title: string = inner.title;
+      void title;
+      const deep = inner.tags[0];
+      if (deep) {
+        const dl: string = deep.label;
+        void dl;
+        // @ts-expect-error the third level named only label
+        void deep.posts;
+      }
+      // @ts-expect-error the second level named only title and tags
+      void inner.views;
+    }
+  }
+
+  const dropped = await query('Posts')
+    .populate('tags', (t) => t.select('label').populate('posts'))
+    .findMany();
+  const droppedTag = dropped[0]!.tags[0];
+  if (droppedTag) {
+    // @ts-expect-error posts was not named in the subselect, so it drops
+    void droppedTag.posts;
+  }
+
+  const plucked = await query('Posts').populate('tags', (t) => t.select('label')).pluck('tags');
+  const pluckedTag = plucked[0]![0];
+  if (pluckedTag) {
+    const pl: string = pluckedTag.label;
+    void pl;
+  }
+
+  const mixed = await query('Posts')
+    .populate('author')
+    .populate('tags', (t) => t.select('label'))
+    .findMany();
+  const whole = mixed[0]!.author;
+  if (whole) {
+    const wu: string = whole.UUID;
+    void wu;
+  }
+}
+
 export async function writes(): Promise<void> {
   const created = await query('Posts').create({ title: 'x', views: 1, featured: true });
   if (created.ok) {
@@ -424,6 +504,14 @@ query('Posts').select('nope');
 query('Posts').orderBy('tags');
 // @ts-expect-error only relation fields can be populated
 query('Posts').populate('title');
+// @ts-expect-error a populate subselect gates against the target's fields
+query('Posts').populate('author', (a) => a.select('nope'));
+// @ts-expect-error only the target's relations populate deeper
+query('Posts').populate('author', (a) => a.populate('name'));
+// @ts-expect-error the callback carries select and populate alone
+query('Posts').populate('author', (a) => a.limit(1));
+// @ts-expect-error a non-relation field has no callback form either
+query('Posts').populate('title', (a) => a);
 // @ts-expect-error unknown collection
 query('Nope');
 // @ts-expect-error update is not available before a filter narrows the query

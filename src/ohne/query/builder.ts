@@ -8,7 +8,7 @@ import type { BlockQueryFieldsOf } from './known-block-query-fields.ts';
 import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
 import type { UpdateInputOf } from './known-updates.ts';
-import type { UntypedQueryBuilder } from './untyped.ts';
+import type { UntypedPopulateBuilder, UntypedQueryBuilder } from './untyped.ts';
 import type { QueryGuards } from './wire/guards.ts';
 import type { FieldErrors } from './write/errors.ts';
 
@@ -520,10 +520,58 @@ type PopulateSwap<C extends CollectionName, K> =
       : never;
 
 /**
+ * The target collection a relation field populates, read from its generated `record`/`records` marker.
+ * Falls back to the whole collection union before codegen, so the callback stays writable untyped.
+ */
+type PopulateTarget<C extends CollectionName, F> =
+  FieldMetaOf<C, F> extends { record: infer T extends CollectionName }
+    ? T
+    : FieldMetaOf<C, F> extends { records: infer T extends CollectionName }
+      ? T
+      : CollectionName;
+
+/**
+ * One callback populate in `P`: the field it hydrates and the sub-select/sub-populate it carries.
+ * A phantom marker - `QueryRow` and `PluckValue` dispatch on it; no value ever has this type.
+ */
+export type PopulateEntry<F extends string, SubS, SubP> = { field: F; S: SubS; P: SubP };
+
+/**
+ * The `PopulateEntry` in `P` whose field is `K`, or `never` when `K` was not callback-populated.
+ * The probe runs `K extends F`, the same direction as the plain `K extends P` check.
+ * A permissive pre-codegen row (keys `string`) therefore degrades to `never` instead of matching.
+ */
+type EntryFor<P, K> = P extends { field: infer F extends string; S: unknown; P: unknown }
+  ? K extends F
+    ? P
+    : never
+  : never;
+
+/**
+ * A callback-populated field's value: its target's `QueryRow` under the entry's own `S` and `P`.
+ */
+type EntrySwap<C extends CollectionName, K, E> = E extends {
+  field: string;
+  S: infer SubS;
+  P: infer SubP;
+}
+  ? FieldMetaOf<C, K> extends { record: infer T extends CollectionName }
+    ? QueryRow<T, SubS, SubP> | null
+    : FieldMetaOf<C, K> extends { records: infer T extends CollectionName }
+      ? QueryRow<T, SubS, SubP>[]
+      : never
+  : never;
+
+/**
  * A row shape with its populated fields swapped from `UUID`s to the hydrated target records.
+ * A plain literal in `P` swaps to the whole target record; a `PopulateEntry` to its narrowed row.
  */
 type SwapPopulated<Row, C extends CollectionName, P> = {
-  [K in keyof Row]: K extends P ? PopulateSwap<C, K> : Row[K];
+  [K in keyof Row]: K extends P
+    ? PopulateSwap<C, K>
+    : [EntryFor<P, K>] extends [never]
+      ? Row[K]
+      : EntrySwap<C, K, EntryFor<P, K>>;
 };
 
 /**
@@ -538,12 +586,15 @@ export type QueryRow<C extends CollectionName, S = never, P = never> = [S] exten
 
 /**
  * One `pluck` value: the field's read type, swapped to the hydrated target when the field is populated.
+ * A callback-populated field plucks its node's narrowed rows, exactly as a full read would carry them.
  */
 export type PluckValue<C extends CollectionName, F, P> = F extends P
   ? PopulateSwap<C, F>
-  : F extends keyof RecordOf<C>
-    ? RecordOf<C>[F]
-    : unknown;
+  : [EntryFor<P, F>] extends [never]
+    ? F extends keyof RecordOf<C>
+      ? RecordOf<C>[F]
+      : unknown
+    : EntrySwap<C, F, EntryFor<P, F>>;
 
 /**
  * One page of read rows with its totals.
@@ -576,6 +627,54 @@ export interface PaginatedPage<C extends CollectionName, S = never, P = never> {
 }
 
 /**
+ * The slim sub-builder a populate callback receives, scoped to the relation's target collection.
+ * It carries `select` and `populate` alone, so a spec can narrow and descend but never filter.
+ * Type recursion is bounded by what the caller literally writes, so any written depth types.
+ */
+export interface PopulateQuery<C extends CollectionName, S = never, P = never> {
+  /**
+   * Narrows the hydrated records to the named target fields, accumulating across calls.
+   * The records carry exactly the named fields - `UUID` and `_updatedAt` only when named.
+   *
+   * @example
+   * ```ts
+   * query('Posts').populate('author', (a) => a.select('name'))
+   * ```
+   */
+  select<F extends SelectableField<C>>(...fields: F[]): PopulateQuery<C, S | F, P>;
+
+  /**
+   * Hydrates the target's own relations to whole records, one level further down.
+   * A populated relation must be named in this node's `select` when one is set, or it drops.
+   *
+   * @example
+   * ```ts
+   * query('Posts').populate('comments', (c) =>
+   *   c.select('text', 'author').populate('author'),
+   * )
+   * ```
+   */
+  populate<F extends PopulatableField<C>>(...fields: F[]): PopulateQuery<C, S, P | F>;
+
+  /**
+   * Hydrates one of the target's relations through its own callback, recursing the spec grammar.
+   *
+   * @example
+   * ```ts
+   * query('Posts').populate('comments', (c) =>
+   *   c.select('text', 'author').populate('author', (a) => a.select('name')),
+   * )
+   * ```
+   */
+  populate<F extends PopulatableField<C>, SubS = never, SubP = never>(
+    field: F,
+    build: (
+      sub: PopulateQuery<PopulateTarget<C, F>>,
+    ) => PopulateQuery<PopulateTarget<C, F>, SubS, SubP>,
+  ): PopulateQuery<C, S, P | PopulateEntry<F, SubS, SubP>>;
+}
+
+/**
  * The refinements every state offers; each returns a read-only query for the rest of the chain.
  */
 interface Refinements<C extends CollectionName, S, P, L extends boolean> {
@@ -601,6 +700,28 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * ```
    */
   populate<F extends PopulatableField<C>>(...fields: F[]): ReadOnlyQuery<C, S, P | F, L>;
+
+  /**
+   * Swaps one relation through a callback sub-builder scoped to its target collection.
+   * The callback's `select` narrows what the hydrated records carry; its `populate` descends further.
+   * The rows type exactly what the callback wrote, at every depth.
+   *
+   * @example
+   * ```ts
+   * const rows = await query('Posts')
+   *   .select('title', 'comments')
+   *   .populate('comments', (c) =>
+   *     c.select('text', 'author').populate('author', (a) => a.select('name')),
+   *   )
+   *   .findMany()
+   * ```
+   */
+  populate<F extends PopulatableField<C>, SubS = never, SubP = never>(
+    field: F,
+    build: (
+      sub: PopulateQuery<PopulateTarget<C, F>>,
+    ) => PopulateQuery<PopulateTarget<C, F>, SubS, SubP>,
+  ): ReadOnlyQuery<C, S, P | PopulateEntry<F, SubS, SubP>, L>;
 
   /**
    * Adds a sort key, stacking after the keys already set; call it again for a tiebreaker.
@@ -971,6 +1092,7 @@ type Assert<A extends B, B> = A;
  * The compile-time parity contract: a typed state's method names are all names of the untyped surface.
  * A typed view can therefore never name a method the one runtime class does not implement.
  * Each `Assert` checks its constraint where it is written, so a drift is a compile error here.
+ * The populate sub-state asserts against its own runtime twin, the callback's sub-builder.
  */
 export type QueryStateParity = [
   Assert<keyof PendingQuery<CollectionName>, keyof UntypedQueryBuilder>,
@@ -979,4 +1101,5 @@ export type QueryStateParity = [
   Assert<keyof PendingQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
   Assert<keyof ReadyQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
   Assert<keyof ReadOnlyQuery<CollectionName, never, never, true>, keyof UntypedQueryBuilder>,
+  Assert<keyof PopulateQuery<CollectionName>, keyof UntypedPopulateBuilder>,
 ];
