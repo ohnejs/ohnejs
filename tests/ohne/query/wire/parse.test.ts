@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { WireErrorData } from '../../../../src/ohne/query/wire/errors.ts';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
@@ -16,6 +17,20 @@ useLayers().add({
   path: '/wire-parse',
   input: { collections: { locales: ['en', 'de', 'de-AT'], defaultLocale: 'en' } },
 });
+
+useBlocks().register('WHero', {
+  name: 'WHero',
+  block: {
+    fields: {
+      title: field('text'),
+      rank: field('integer'),
+      author: field('record', { collection: 'WUsers' }),
+      parts: field('blocks', { allow: ['WQuote'] }),
+    },
+  },
+});
+useBlocks().register('WQuote', { name: 'WQuote', block: { fields: { words: field('text') } } });
+useBlocks().register('WLoose', { name: 'WLoose', block: { fields: { note: field('text') } } });
 
 useCollections().register('WUsers', {
   name: 'WUsers',
@@ -36,6 +51,7 @@ useCollections().register('WPosts', {
       author: field('record', { collection: 'WUsers' }),
       tags: field('records', { collection: 'WTags' }),
       meta: field('object', { fields: { note: field('text') } }),
+      content: field('blocks', { allow: ['WHero', 'WQuote'] }),
     },
   },
 });
@@ -43,6 +59,11 @@ useCollections().register('WPosts', {
 useCollections().register('WArticles', {
   name: 'WArticles',
   collection: { fields: { title: field('text', { translatable: true }) } },
+});
+
+useCollections().register('WSites', {
+  name: 'WSites',
+  collection: { fields: { content: field('blocks', { translatable: true, allow: ['WHero'] }) } },
 });
 
 const meta = queryMetadata('WPosts');
@@ -135,6 +156,52 @@ describe('parseQueryParams reads a query chain off a URL', () => {
   });
 });
 
+describe('parseQueryParams accepts the blocks grammar', () => {
+  it('accepts a bare has and an empty on a blocks field', () => {
+    deepStrictEqual(parse('where={content:{has:true}}').where, { content: { has: true } });
+    deepStrictEqual(parse('where={content:{empty:true}}').where, { content: { empty: true } });
+  });
+
+  it('accepts a discriminator-only has', () => {
+    deepStrictEqual(parse('where={content:{has:{block:WHero}}}').where, {
+      content: { has: { block: 'WHero' } },
+    });
+  });
+
+  it('accepts subfield conditions beside the discriminator', () => {
+    deepStrictEqual(parse('where={content:{has:{block:WHero,title:{contains:x}}}}').where, {
+      content: { has: { block: 'WHero', title: { contains: 'x' } } },
+    });
+  });
+
+  it('accepts a nested has on a record inside the block scope', () => {
+    deepStrictEqual(parse('where={content:{has:{block:WHero,author:{has:{name:Alice}}}}}').where, {
+      content: { has: { block: 'WHero', author: { has: { name: 'Alice' } } } },
+    });
+  });
+
+  it('accepts a blocks tower, each level discriminated', () => {
+    deepStrictEqual(
+      parse('where={content:{has:{block:WHero,parts:{has:{block:WQuote,words:y}}}}}').where,
+      { content: { has: { block: 'WHero', parts: { has: { block: 'WQuote', words: 'y' } } } } },
+    );
+  });
+
+  it('accepts selecting a blocks field', () => {
+    deepStrictEqual(parse('select=[content]').select, ['content']);
+  });
+
+  it('scopes a translatable blocks collection by locale, the blocks where intact', () => {
+    const parsed = parseQueryParams(
+      parseSearchParams('locale=de&where={content:{has:{block:WHero}}}'),
+      queryMetadata('WSites'),
+      DEFAULT_QUERY_GUARDS,
+    );
+    strictEqual(parsed.locale, 'de');
+    deepStrictEqual(parsed.where, { content: { has: { block: 'WHero' } } });
+  });
+});
+
 describe('parseQueryParams rejects with a stable code and dot path', () => {
   it('rejects an unknown top-level param', () => {
     deepStrictEqual(failure('sort=title'), { code: 'unknownParam', path: 'sort' });
@@ -223,6 +290,68 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
   });
 });
 
+describe('parseQueryParams enforces the blocks two-step', () => {
+  it('rejects a has scope naming no type', () => {
+    deepStrictEqual(failure('where={content:{has:{title:x}}}'), {
+      code: 'blockTypeRequired',
+      path: 'where.content',
+    });
+  });
+
+  it('rejects a negated, listed, or or-grouped discriminator', () => {
+    deepStrictEqual(failure('where={content:{has:{block:{not:{equalsTo:WHero}}}}}'), {
+      code: 'blockTypeRequired',
+      path: 'where.content',
+    });
+    deepStrictEqual(failure('where={content:{has:{block:{in:[WHero]}}}}'), {
+      code: 'blockTypeRequired',
+      path: 'where.content',
+    });
+    deepStrictEqual(failure('where={content:{has:{or:[{block:WHero},{block:WQuote}]}}}'), {
+      code: 'blockTypeRequired',
+      path: 'where.content',
+    });
+  });
+
+  it('rejects an unknown block type at the discriminator path', () => {
+    const error = caught(() => parse('where={content:{has:{block:Ghost}}}'));
+    deepStrictEqual(error.data, { code: 'unknownBlockType', path: 'where.content.block' });
+    strictEqual(error.message, 'query.unknownBlockType');
+  });
+
+  it('suggests the closest allowed type for a near miss', () => {
+    const error = caught(() => parse('where={content:{has:{block:WHeroo}}}'));
+    deepStrictEqual(error.data, { code: 'unknownBlockType', path: 'where.content.block' });
+    strictEqual(error.message, 'query.unknownBlockTypeSuggestion');
+  });
+
+  it('rejects a registered type outside the field allow set', () => {
+    deepStrictEqual(failure('where={content:{has:{block:WLoose}}}'), {
+      code: 'unknownBlockType',
+      path: 'where.content.block',
+    });
+  });
+
+  it('locates an unknown subfield inside the block scope', () => {
+    deepStrictEqual(failure('where={content:{has:{block:WHero,missing:1}}}'), {
+      code: 'invalidField',
+      path: 'where.content.missing',
+    });
+  });
+
+  it('rejects a wrong-typed value inside the block scope by its path', () => {
+    deepStrictEqual(failure('where={content:{has:{block:WHero,rank:{equalsTo:`007}}}}'), {
+      code: 'invalidValue',
+      path: 'where.content.rank',
+    });
+  });
+
+  it('rejects ordering or populating a blocks field', () => {
+    deepStrictEqual(failure('order=[content]'), { code: 'invalidField', path: 'order[0]' });
+    deepStrictEqual(failure('populate=[content]'), { code: 'invalidField', path: 'populate[0]' });
+  });
+});
+
 describe('parseQueryParams reads the locale param', () => {
   it('leaves an absent locale null', () => {
     strictEqual(parseLocalized('').locale, null);
@@ -261,6 +390,17 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
   it('rejects a has nested past the ceiling', () => {
     const error = failure('where={author:{has:{name:{has:{}}}}}', tight);
     ok(error.code === 'hasTooDeep' || error.code === 'invalidField');
+  });
+
+  it('counts a blocks has toward the has-depth ceiling', () => {
+    const shallow: QueryGuards = { ...DEFAULT_QUERY_GUARDS, maxHasDepth: 1 };
+    deepStrictEqual(parse('where={content:{has:{block:WHero}}}', shallow).where, {
+      content: { has: { block: 'WHero' } },
+    });
+    strictEqual(
+      failure('where={content:{has:{block:WHero,parts:{has:{block:WQuote}}}}}', shallow).code,
+      'hasTooDeep',
+    );
   });
 
   it('rejects an over-long in list', () => {
@@ -313,6 +453,10 @@ describe('the GET and POST transports converge on one parsed query', () => {
       { where: { views: { atLeast: 100 } }, order: ['-views'] },
     ],
     ['populate=[author]&page=2&perPage=10', { populate: ['author'], page: 2, perPage: 10 }],
+    [
+      'where={content:{has:{block:WHero,title:{contains:x}}}}',
+      { where: { content: { has: { block: 'WHero', title: { contains: 'x' } } } } },
+    ],
   ];
   for (const [query, body] of cases) {
     it(`\`${query}\` parses the same from a URL and a JSON body`, () => {

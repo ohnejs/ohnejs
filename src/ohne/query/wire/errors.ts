@@ -9,10 +9,13 @@ import { translate } from '../../http/translate.ts';
  *
  * A client switches on it; the human `message` is translated and may vary by language.
  * Field-level failures collapse to `invalidField` so a URL can never probe which fields exist.
+ * The blocks codes stand alone: reads print block types on every response, so they reveal nothing.
  */
 export type WireErrorCode =
   | 'unknownParam'
   | 'invalidField'
+  | 'blockTypeRequired'
+  | 'unknownBlockType'
   | 'invalidShape'
   | 'unknownOperator'
   | 'invalidValue'
@@ -77,6 +80,27 @@ export function invalidFieldError(
     ? translate('query.invalidField', { field })
     : translate('query.invalidFieldSuggestion', { field, suggestion });
   return badRequest(message, { code: 'invalidField', path } satisfies WireErrorData);
+}
+
+/**
+ * A blocks `has` scope that names no type; the scope must open with a bare `block` equality.
+ */
+export function blockTypeRequiredError(field: string, path: string): HTTPError {
+  return wireError('blockTypeRequired', path, { field });
+}
+
+/**
+ * A block type outside the field's allow set, with a `did you mean` hint when a near type exists.
+ */
+export function unknownBlockTypeError(
+  block: string,
+  path: string,
+  suggestion: string | undefined,
+): HTTPError {
+  const message = isUndefined(suggestion)
+    ? translate('query.unknownBlockType', { block })
+    : translate('query.unknownBlockTypeSuggestion', { block, suggestion });
+  return badRequest(message, { code: 'unknownBlockType', path } satisfies WireErrorData);
 }
 
 /**

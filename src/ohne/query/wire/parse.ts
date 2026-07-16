@@ -1,4 +1,5 @@
 import type { ConditionNode, SearchParamValue } from '../../../utils/index.ts';
+import type { HTTPError } from '../../http/http-error.ts';
 import type { OrderDirection, OrderEntry } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ConditionInput } from '../untyped.ts';
@@ -18,8 +19,15 @@ import {
   walkCondition,
 } from '../../../utils/index.ts';
 import { queryLocales } from '../locale.ts';
-import { checkCondition, targetScope } from '../validate-condition.ts';
 import {
+  blockScope,
+  checkCondition,
+  splitBlockHas,
+  targetScope,
+  type ConditionProblem,
+} from '../validate-condition.ts';
+import {
+  blockTypeRequiredError,
   conditionShapeError,
   duplicateOrderFieldError,
   emptySelectError,
@@ -30,6 +38,7 @@ import {
   limitError,
   localeNotApplicableError,
   paginationError,
+  unknownBlockTypeError,
   unknownParamError,
 } from './errors.ts';
 
@@ -165,20 +174,32 @@ function parseWhere(
   const parsed = parseCondition(value);
   if (!parsed.ok) throw conditionShapeError(parsed.error);
   const problem = checkCondition(parsed.node, meta);
-  if (!isNull(problem)) {
-    throw invalidFieldError(problem.field, `where.${problem.path.join('.')}`, problem.suggestion);
-  }
+  if (!isNull(problem)) throw problemError(problem);
   enforceGuards(parsed.node, guards, reserved);
   checkValues(parsed.node, meta, []);
   return value as ConditionInput;
 }
 
 /**
+ * Maps an applicability failure onto its wire error at its `where` dot path.
+ * The field kinds collapse to `invalidField`; the blocks kinds keep their own codes.
+ * The field already proved itself a blocks field, so there is no existence oracle to protect.
+ */
+function problemError(problem: ConditionProblem): HTTPError {
+  const path = `where.${problem.path.join('.')}`;
+  if (problem.kind === 'blockTypeRequired') return blockTypeRequiredError(problem.field, path);
+  if (problem.kind === 'unknownBlockType') {
+    return unknownBlockTypeError(problem.block as string, path, problem.suggestion);
+  }
+  return invalidFieldError(problem.field, path, problem.suggestion);
+}
+
+/**
  * Enforces the DoS ceilings over a condition: clause count, `has` nesting, list length, and value size.
  * None of these depend on the field scope, so one flat walk covers the whole tree.
  * The bound-param ceiling is aggregate; the per-key ceilings never sum toward it.
- * It counts the worst-case locale binds too - one for the companion join, two per `has`/`empty` -
- * so a translatable shape refuses here rather than dying at the driver's own wall.
+ * It counts the worst-case locale binds too: one for the companion join, two per `has`/`empty`.
+ * A translatable shape thus refuses here rather than dying at the driver's own wall.
  * A fan of legal `in` lists is caught here, against a ceiling `resolveGuards` already clamped under the wall.
  */
 function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: number): void {
@@ -230,6 +251,8 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
 /**
  * Checks each comparison value against its column's type, descending `has` scopes as the walk does.
  * Runs after applicability, so every leaf addresses a real field the current scope resolves.
+ * A blocks `has` walks only the remainder past its discriminator.
+ * The discriminator leaf is the already-validated type name, not a column.
  */
 function checkValues(
   node: ConditionNode,
@@ -245,7 +268,15 @@ function checkValues(
   const field = meta.fields[name];
   const path = [...prefix, name];
   if (node.kind === 'has') {
-    if (!isNull(node.condition)) checkValues(node.condition, targetScope(field, name, meta), path);
+    if (isNull(node.condition)) return;
+    if (field.kind === 'blocks') {
+      const split = splitBlockHas(node.condition);
+      if (split.ok && !isNull(split.rest)) {
+        checkValues(split.rest, blockScope(split.block, name, meta), path);
+      }
+      return;
+    }
+    checkValues(node.condition, targetScope(field, name, meta), path);
     return;
   }
   if (isUndefined(node.value)) return;
