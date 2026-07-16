@@ -14,6 +14,8 @@
   "invalidPagination": "Koristi `limit` i `offset`, ili `page` i `perPage`, ali ne oboje",
   "emptySelect": "`select` mora navesti barem jedno polje",
   "duplicateOrderField": "Polje `{field}` je sortirano više puta",
+  "duplicatePopulateField": "Polje `{field}` se u `populate` navodi više puta",
+  "invalidPopulateSpec": "`populate` specifikacija dozvoljava samo `select` i `populate`",
   "invalidLocale": "Nepoznat lokalitet `{locale}`",
   "localeNotApplicable": "Ova kolekcija nema prevodivog sadržaja",
   "tooManyConditions": "Uslov `where` ima previše klauzula (max `{max}`)",
@@ -22,6 +24,8 @@
   "tooManyBoundParams": "Uslov `where` veže previše vrijednosti (max `{max}`)",
   "tooManyFields": "`select` navodi previše polja (max `{max}`)",
   "tooManyOrderKeys": "`order` slaže previše ključeva (max `{max}`)",
+  "tooManyPopulate": "`populate` navodi previše relacija (max `{max}`)",
+  "populateTooDeep": "`populate` je preduboko ugniježđen (max `{max}`)",
   "valueTooLarge": "Vrijednost je prevelika (max `{max}` bajtova)",
   "patternTooLarge": "Uzorak je prevelik (max `{max}` bajtova)"
 }

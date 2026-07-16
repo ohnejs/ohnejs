@@ -14,6 +14,8 @@
   "invalidPagination": "Use `limit` and `offset`, or `page` and `perPage`, but not both",
   "emptySelect": "`select` must name at least one field",
   "duplicateOrderField": "Field `{field}` is ordered more than once",
+  "duplicatePopulateField": "Field `{field}` is populated more than once",
+  "invalidPopulateSpec": "A populate spec allows only `select` and `populate`",
   "invalidLocale": "Unknown locale `{locale}`",
   "localeNotApplicable": "This collection has no translatable content",
   "tooManyConditions": "The `where` condition has too many clauses (max `{max}`)",
@@ -22,6 +24,8 @@
   "tooManyBoundParams": "The `where` condition binds too many values (max `{max}`)",
   "tooManyFields": "`select` names too many fields (max `{max}`)",
   "tooManyOrderKeys": "`order` stacks too many keys (max `{max}`)",
+  "tooManyPopulate": "`populate` names too many relations (max `{max}`)",
+  "populateTooDeep": "`populate` nests too deep (max `{max}`)",
   "valueTooLarge": "A value is too large (max `{max}` bytes)",
   "patternTooLarge": "A pattern is too large (max `{max}` bytes)"
 }

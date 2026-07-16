@@ -14,6 +14,8 @@
   "invalidPagination": "Nutze `limit` und `offset` oder `page` und `perPage`, aber nicht beides",
   "emptySelect": "`select` muss mindestens ein Feld nennen",
   "duplicateOrderField": "Feld `{field}` wird mehrfach sortiert",
+  "duplicatePopulateField": "Feld `{field}` kommt in `populate` mehrfach vor",
+  "invalidPopulateSpec": "Eine `populate`-Spezifikation erlaubt nur `select` und `populate`",
   "invalidLocale": "Unbekannte Locale `{locale}`",
   "localeNotApplicable": "Diese Kollektion hat keine übersetzbaren Inhalte",
   "tooManyConditions": "Die `where`-Bedingung hat zu viele Klauseln (max `{max}`)",
@@ -22,6 +24,8 @@
   "tooManyBoundParams": "Die `where`-Bedingung bindet zu viele Werte (max `{max}`)",
   "tooManyFields": "`select` nennt zu viele Felder (max `{max}`)",
   "tooManyOrderKeys": "`order` stapelt zu viele Schlüssel (max `{max}`)",
+  "tooManyPopulate": "`populate` nennt zu viele Relationen (max `{max}`)",
+  "populateTooDeep": "`populate` ist zu tief verschachtelt (max `{max}`)",
   "valueTooLarge": "Ein Wert ist zu groß (max `{max}` Bytes)",
   "patternTooLarge": "Ein Muster ist zu groß (max `{max}` Bytes)"
 }
