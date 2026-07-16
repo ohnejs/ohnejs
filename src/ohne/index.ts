@@ -124,6 +124,7 @@ export * from './project/resolve-layer-stack.ts';
 export * from './project/resolve-ohne-layers.ts';
 export * from './query/builder.ts';
 export { builderGuards } from './query/impl.ts';
+export * from './query/known-block-query-fields.ts';
 export * from './query/known-inserts.ts';
 export * from './query/known-query-fields.ts';
 export * from './query/known-updates.ts';

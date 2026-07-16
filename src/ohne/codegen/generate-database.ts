@@ -33,9 +33,9 @@ import {
   isString,
   isUndefined,
   joinPath,
-  naturalCompare,
 } from '../../utils/index.ts';
 import { collectBlocks } from '../blocks/collect-blocks.ts';
+import { resolveAllowedBlocks } from '../blocks/resolve-allowed-blocks.ts';
 import { collectCollections } from '../collections/collect-collections.ts';
 import { resolveLocales } from '../collections/resolve-locales.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
@@ -210,6 +210,33 @@ async function writeShared(
       ),
     ],
   }));
+  const blockQueryMembers = blocks.map((block) => ({
+    name: block.name,
+    fields: [
+      { name: 'UUID', type: UUID_QUERY_ENTRY },
+      ...queryFieldsOf(
+        { subject: `Block \`${block.name}\``, file: block.file },
+        block.block.fields,
+        context,
+      ),
+    ],
+  }));
+  const blockInsertMembers = blocks.map((block) => ({
+    name: block.name,
+    fields: insertShapesOf(
+      { subject: `Block \`${block.name}\``, file: block.file },
+      block.block.fields,
+      context,
+    ),
+  }));
+  const blockUpdateMembers = blocks.map((block) => ({
+    name: block.name,
+    fields: updateShapesOf(
+      { subject: `Block \`${block.name}\``, file: block.file },
+      block.block.fields,
+      context,
+    ),
+  }));
   const insertMembers = collections.map((collection) => ({
     name: collection.name,
     fields: insertShapesOf(
@@ -285,6 +312,16 @@ async function writeShared(
     code.line('}');
   }
   code.line();
+  if (blockQueryMembers.length === 0) {
+    code.line('export interface GeneratedBlockQueryFields {}');
+  } else {
+    code.line('export interface GeneratedBlockQueryFields {');
+    code.indent(() => {
+      for (const member of blockQueryMembers) emitFieldShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
   if (insertMembers.length === 0) {
     code.line('export interface GeneratedInserts {}');
   } else {
@@ -295,12 +332,32 @@ async function writeShared(
     code.line('}');
   }
   code.line();
+  if (blockInsertMembers.length === 0) {
+    code.line('export interface GeneratedBlockInserts {}');
+  } else {
+    code.line('export interface GeneratedBlockInserts {');
+    code.indent(() => {
+      for (const member of blockInsertMembers) emitInsertShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
   if (updateMembers.length === 0) {
     code.line('export interface GeneratedUpdates {}');
   } else {
     code.line('export interface GeneratedUpdates {');
     code.indent(() => {
       for (const member of updateMembers) emitUpdateShapes(code, member.name, member.fields);
+    });
+    code.line('}');
+  }
+  code.line();
+  if (blockUpdateMembers.length === 0) {
+    code.line('export interface GeneratedBlockUpdates {}');
+  } else {
+    code.line('export interface GeneratedBlockUpdates {');
+    code.indent(() => {
+      for (const member of blockUpdateMembers) emitInsertShapes(code, member.name, member.fields);
     });
     code.line('}');
   }
@@ -359,8 +416,9 @@ function emitFieldShapes(
 }
 
 /**
- * Emits one create-input member: each field's name, an optional marker, and its input type.
+ * Emits one input member: each field's name, an optional marker, and its input type.
  * A nullable-or-defaulted field is optional; a required field is not.
+ * The block update table rides it too: a provided item is a full item, so create optionality holds.
  */
 function emitInsertShapes(
   code: CodeBuilder,
@@ -440,7 +498,7 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
+    "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
@@ -448,6 +506,7 @@ async function writeNode(
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');
     code.line('interface KnownQueryFields extends GeneratedQueryFields {}');
+    code.line('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}');
     code.line('interface KnownInserts extends GeneratedInserts {}');
     code.line('interface KnownUpdates extends GeneratedUpdates {}');
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
@@ -593,21 +652,21 @@ function childValueType(owner: EmissionOwner, hint: ChildHint, context: Emission
 }
 
 /**
- * Assembles a blocks field's value type: an array over the union of its allowed block shapes.
- * Each item names its block and carries that block's `GeneratedBlocks` member as `fields`.
- * Allowed names sort and resolve like the desired schema's, so the two never disagree.
+ * Resolves a blocks field's allowed type names through the shared resolver, sorted and validated.
+ * An empty set or an unregistered name throws, naming the owning definition.
  */
-function blocksValueType(
+function allowedBlocksOf(
   owner: EmissionOwner,
   name: string,
   hint: BlocksHint,
   context: EmissionContext,
-): string {
-  const collected = new Set(context.blocks.map((block) => block.name));
-  const allowed = isUndefined(hint.allow)
-    ? [...collected].sort(naturalCompare)
-    : [...hint.allow].sort(naturalCompare);
-  if (allowed.length === 0) {
+): string[] {
+  const result = resolveAllowedBlocks(
+    hint.allow,
+    context.blocks.map((block) => block.name),
+  );
+  if (result.ok) return result.allowed;
+  if (result.reason === 'empty') {
     throw ohneError({
       title: `Field \`${name}\` has no block types to hold`,
       body: [
@@ -617,44 +676,59 @@ function blocksValueType(
       path: owner.file,
     });
   }
-  for (const block of allowed) {
-    if (collected.has(block)) continue;
-    throw ohneError({
-      title: `Unknown block \`${block}\``,
-      body: [`${owner.subject} allows block \`${block}\`, which is not registered.`],
-      path: owner.file,
-    });
-  }
-  const items = allowed.map(
-    (block) =>
-      `{ block: ${literalString(block)}; fields: GeneratedBlocks[${literalString(block)}] }`,
-  );
+  throw ohneError({
+    title: `Unknown block \`${result.block}\``,
+    body: [`${owner.subject} allows block \`${result.block}\`, which is not registered.`],
+    path: owner.file,
+  });
+}
+
+/**
+ * Wraps blocks item shapes into their list type: a lone item stays bare, a union gains parens.
+ */
+function blocksListType(items: string[]): string {
   if (items.length === 1) return `${items[0] as string}[]`;
   return ['(', ...items.map((item) => indent(`| ${item}`)), ')[]'].join('\n');
 }
 
 /**
+ * Assembles a blocks field's value type: an array over the union of its allowed block shapes.
+ * Each item names its block and carries the instance `UUID`.
+ * That block's `GeneratedBlocks` member rides as `fields`.
+ * The shared resolver sorts and validates, so the desired schema and this shape never disagree.
+ */
+function blocksValueType(
+  owner: EmissionOwner,
+  name: string,
+  hint: BlocksHint,
+  context: EmissionContext,
+): string {
+  const items = allowedBlocksOf(owner, name, hint, context).map(
+    (block) =>
+      `{ block: ${literalString(block)}; UUID: string; fields: GeneratedBlocks[${literalString(block)}] }`,
+  );
+  return blocksListType(items);
+}
+
+/**
  * Resolves one collection or composite field map into named `QueryFieldMeta` type literals.
- * A blocks field is skipped, exactly as the runtime query metadata skips it.
  */
 function queryFieldsOf(
   owner: EmissionOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
 ): { name: string; type: string }[] {
-  const entries: { name: string; type: string }[] = [];
-  for (const [name, instance] of Object.entries(fields)) {
-    const type = queryFieldType(owner, name, instance, context);
-    if (!isNull(type)) entries.push({ name, type });
-  }
-  return entries;
+  return Object.entries(fields).map(([name, instance]) => ({
+    name,
+    type: queryFieldType(owner, name, instance, context),
+  }));
 }
 
 /**
  * Emits one field's `QueryFieldMeta` type literal: the markers it carries decide its operators.
  * A column carries `scalar` (and `nullable`); a `record` adds its target.
  * A `records` or composite field carries only its relation marker.
- * A blocks field has no query metadata and returns `null`.
+ * A blocks field carries its allowed type names as a `blocks` union.
  * The kind is read through the same `resolveFieldStorage` walk the runtime metadata uses.
  */
 function queryFieldType(
@@ -662,7 +736,7 @@ function queryFieldType(
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
-): string | null {
+): string {
   const registered = context.types.get(instance.type);
   if (isUndefined(registered)) {
     throw ohneError({
@@ -678,7 +752,16 @@ function queryFieldType(
   const translatable = resolved.options.translatable === true;
   const when = hasKey(instance.options, 'when') ? conditionLiteral(instance.options.when) : null;
 
-  if (kind === 'blocks') return null;
+  if (kind === 'blocks') {
+    const allowed = allowedBlocksOf(owner, name, hint as BlocksHint, context);
+    return metaLiteral(
+      [
+        `blocks: ${allowed.map((block) => literalString(block)).join(' | ')}`,
+        ...(translatable ? ['localeScoped: true'] : []),
+      ],
+      when,
+    );
+  }
   if (kind === 'junction') {
     return metaLiteral(
       [
@@ -745,19 +828,17 @@ function conditionLiteral(value: unknown): string {
 }
 
 /**
- * Resolves one field map into named create-input shapes, skipping system fields and blocks.
+ * Resolves one field map into named create-input shapes.
  */
 function insertShapesOf(
   owner: EmissionOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
 ): { name: string; type: string; optional: boolean }[] {
-  const entries: { name: string; type: string; optional: boolean }[] = [];
-  for (const [name, instance] of Object.entries(fields)) {
-    const shape = insertFieldType(owner, name, instance, context);
-    if (!isNull(shape)) entries.push({ name, ...shape });
-  }
-  return entries;
+  return Object.entries(fields).map(([name, instance]) => ({
+    name,
+    ...insertFieldType(owner, name, instance, context),
+  }));
 }
 
 /**
@@ -814,17 +895,24 @@ function inputScalarType(
  * A column or `record` takes its value type, optional when nullable or defaulted.
  * A `records` list is optional and defaults to `[]`; an `object` is optional and accepts `null`.
  * A `repeater` is an optional list of item shapes; a create item carries no `UUID`.
- * A blocks field returns `null`, so it is skipped, exactly as the read shape skips it.
+ * A blocks field is an optional list of `{ block; fields }` envelopes, defaulting to `[]`.
+ * `fields` references the type's `GeneratedBlockInserts` member, so self-nesting terminates.
  */
 function insertFieldType(
   owner: EmissionOwner,
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
-): { type: string; optional: boolean } | null {
+): { type: string; optional: boolean } {
   const resolved = resolveInputStorage(owner, name, instance, context);
   const { hint, kind, options } = resolved;
-  if (kind === 'blocks') return null;
+  if (kind === 'blocks') {
+    const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map(
+      (block) =>
+        `{ block: ${literalString(block)}; fields: GeneratedBlockInserts[${literalString(block)}] }`,
+    );
+    return { type: blocksListType(items), optional: true };
+  }
   if (kind === 'junction') return { type: 'string[]', optional: true };
   if (kind === 'childOne') {
     return {
@@ -854,19 +942,17 @@ function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: Emissi
 }
 
 /**
- * Resolves one field map into named update-input shapes, skipping system fields and blocks.
+ * Resolves one field map into named update-input shapes.
  */
 function updateShapesOf(
   owner: EmissionOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
 ): { name: string; type: string; optional: boolean }[] {
-  const entries: { name: string; type: string; optional: boolean }[] = [];
-  for (const [name, instance] of Object.entries(fields)) {
-    const shape = updateFieldType(owner, name, instance, context);
-    if (!isNull(shape)) entries.push({ name, ...shape });
-  }
-  return entries;
+  return Object.entries(fields).map(([name, instance]) => ({
+    name,
+    ...updateFieldType(owner, name, instance, context),
+  }));
 }
 
 /**
@@ -876,17 +962,24 @@ function updateShapesOf(
  * A provided composite item is a full item, so a subfield is optional exactly when create makes it so.
  * The top level relaxes every field to optional separately, for a partial update.
  * A repeater item carries an optional `UUID`, so a matched item keeps its identity.
- * A blocks field returns `null`, so it is skipped, exactly as the read shape skips it.
+ * A blocks item does the same: its `{ block; UUID?; fields }` envelope names the instance.
+ * `fields` references the type's `GeneratedBlockUpdates` member, so self-nesting terminates.
  */
 function updateFieldType(
   owner: EmissionOwner,
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
-): { type: string; optional: boolean } | null {
+): { type: string; optional: boolean } {
   const resolved = resolveInputStorage(owner, name, instance, context);
   const { hint, kind, options } = resolved;
-  if (kind === 'blocks') return null;
+  if (kind === 'blocks') {
+    const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map(
+      (block) =>
+        `{ block: ${literalString(block)}; UUID?: string; fields: GeneratedBlockUpdates[${literalString(block)}] }`,
+    );
+    return { type: blocksListType(items), optional: true };
+  }
   if (kind === 'junction') return { type: 'string[]', optional: true };
   if (kind === 'childOne') {
     return {

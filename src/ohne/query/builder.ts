@@ -1,8 +1,10 @@
 import type { DeepPrettify } from '../../utils/index.ts';
+import type { BlockName } from '../blocks/known-blocks.ts';
 import type { CollectionName, KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
+import type { BlockQueryFieldsOf } from './known-block-query-fields.ts';
 import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
 import type { UpdateInputOf } from './known-updates.ts';
@@ -285,7 +287,51 @@ type ChildFields<M extends QueryFieldMeta> = M extends {
   : Record<string, QueryFieldMeta>;
 
 /**
- * `has`/`empty`, admitted for the relation and composite kinds, re-scoped to the target's fields.
+ * The blocks two-step existence pair: `has` names the block type before a callback narrows to it.
+ * A bare `has()` tests any block exists; a named type tests for that type alone.
+ * The callback form does not exist without the type, so a scope naming no block cannot be written.
+ */
+type BlocksHasOps<B extends BlockName, M extends QueryFieldMeta> = {
+  /**
+   * Matches rows whose list holds any block at all.
+   *
+   * @example
+   * ```ts
+   * query('Pages').where('content', (w) => w.has())
+   * ```
+   */
+  has(): WhereFieldAfterOp<M>;
+
+  /**
+   * Matches rows whose list holds a block of the named type.
+   * A callback probes that block's own fields, re-scoped to the named type.
+   *
+   * @example
+   * ```ts
+   * query('Pages').where('content', (w) => w.has('Hero'))
+   *
+   * query('Pages').where('content', (w) => w.has('Hero', (h) => h.where('title', 'Launch')))
+   * ```
+   */
+  has<T extends B>(
+    block: T,
+    build?: (q: WhereBranch<BlockQueryFieldsOf<T>>) => WhereBranch<BlockQueryFieldsOf<T>>,
+  ): WhereFieldAfterOp<M>;
+
+  /**
+   * Matches rows whose list holds no blocks at all.
+   *
+   * @example
+   * ```ts
+   * query('Pages').where('content', (w) => w.empty())
+   * ```
+   */
+  empty(): WhereFieldAfterOp<M>;
+};
+
+/**
+ * `has`/`empty`, admitted for the relation, composite, and blocks kinds, re-scoped per kind.
+ * A relation or composite re-scopes to its target fields; blocks narrow through the two-step `has`.
  */
 type RelationalOps<M extends QueryFieldMeta> = M extends { record: infer T extends string }
   ? HasOps<FieldsOf<T>, M>
@@ -293,7 +339,9 @@ type RelationalOps<M extends QueryFieldMeta> = M extends { record: infer T exten
     ? HasOps<FieldsOf<T>, M>
     : M extends { child: 'one' | 'many' }
       ? HasOps<ChildFields<M>, M>
-      : object;
+      : M extends { blocks: infer B extends BlockName }
+        ? BlocksHasOps<B, M>
+        : object;
 
 /**
  * Every operator one field admits, composed by intersecting the applicable groups.
@@ -360,17 +408,20 @@ export type WhereBuild<M extends QueryFieldMeta> = (w: WhereFieldFresh<M>) => Wh
 
 /**
  * The equality shorthand's value type: the field's scalar, or `never` where a scalar cannot compare.
- * `records` and composite fields have no shorthand (use `has`); `null` is never a value (use `isNull`).
+ * `records`, composite, and blocks fields have no shorthand (use `has`).
+ * `null` is never a value (use `isNull`).
  */
 type EqValue<M extends QueryFieldMeta> = M extends { records: string }
   ? never
   : M extends { child: 'one' | 'many' }
     ? never
-    : [ScalarOf<M>] extends [never]
-      ? unknown
-      : ScalarOf<M> extends string | number | boolean
-        ? ScalarOf<M>
-        : never;
+    : M extends { blocks: string }
+      ? never
+      : [ScalarOf<M>] extends [never]
+        ? unknown
+        : ScalarOf<M> extends string | number | boolean
+          ? ScalarOf<M>
+          : never;
 
 /**
  * The `where` and `whereAny` filter methods over a field table `F`, each returning `Target`.

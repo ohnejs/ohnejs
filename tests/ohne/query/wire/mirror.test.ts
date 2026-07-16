@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { UntypedQueryBuilder } from '../../../../src/ohne/query/untyped.ts';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -13,6 +14,7 @@ import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { lowerField } from '../../../../src/ohne/query/where-field.ts';
 import { applyQuery } from '../../../../src/ohne/query/wire/apply.ts';
 import { DEFAULT_QUERY_GUARDS } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
@@ -45,12 +47,24 @@ useCollections().register('MNotes', {
   },
 });
 
+useBlocks().register('MHero', { name: 'MHero', block: { fields: { title: field('text') } } });
+useBlocks().register('MQuote', { name: 'MQuote', block: { fields: { words: field('text') } } });
+useCollections().register('MPages', {
+  name: 'MPages',
+  collection: {
+    fields: {
+      title: field('text'),
+      content: field('blocks', { allow: ['MHero', 'MQuote'] }),
+    },
+  },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
-  desired: buildDesiredSchema(useCollections(), useFields() as never),
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
 let seq = 0;
@@ -72,6 +86,23 @@ await insert('Alpha', 100, true, 'first');
 await insert('Beta', 50, false, null);
 await insert('Gamma', 100, true, 'third');
 await insert('Delta', 200, false, 'fourth');
+
+await queryUntyped('MPages').createOrThrow({
+  title: 'One',
+  content: [
+    { block: 'MHero', fields: { title: 'Launch' } },
+    { block: 'MQuote', fields: { words: 'Sage' } },
+  ],
+});
+await queryUntyped('MPages').createOrThrow({
+  title: 'Two',
+  content: [{ block: 'MHero', fields: { title: 'Docked' } }],
+});
+await queryUntyped('MPages').createOrThrow({
+  title: 'Three',
+  content: [{ block: 'MQuote', fields: { words: 'Calm' } }],
+});
+await queryUntyped('MPages').createOrThrow({ title: 'Four' });
 
 const meta = queryMetadata('MPosts');
 
@@ -201,6 +232,75 @@ describe('the locale param mirrors the fluent locale', () => {
     deepStrictEqual(
       await wireNotes('order=[label]'),
       await fluent(queryUntyped('MNotes').orderBy('label')),
+    );
+  });
+});
+
+interface BlockScope {
+  where(field: string, value: unknown): BlockScope;
+}
+interface BlockOps {
+  has(block: string, build: (q: BlockScope) => BlockScope): BlockOps;
+}
+
+describe('the blocks wire forms mirror their fluent equivalents', () => {
+  const pagesMeta = queryMetadata('MPages');
+
+  async function wirePages(url: string): Promise<unknown[]> {
+    const parsed = parseQueryParams(parseSearchParams(url), pagesMeta, DEFAULT_QUERY_GUARDS);
+    return applyQuery(queryUntyped('MPages'), parsed).findMany();
+  }
+
+  it('a bare has', async () => {
+    deepStrictEqual(
+      await wirePages('where={content:{has:true}}&order=[title]'),
+      await fluent(
+        queryUntyped('MPages')
+          .where({ content: { has: true } })
+          .orderBy('title'),
+      ),
+    );
+  });
+
+  it('an empty', async () => {
+    deepStrictEqual(
+      await wirePages('where={content:{empty:true}}'),
+      await fluent(queryUntyped('MPages').where({ content: { empty: true } })),
+    );
+  });
+
+  it('a discriminator-only has', async () => {
+    deepStrictEqual(
+      await wirePages('where={content:{has:{block:MHero}}}&order=[title]'),
+      await fluent(
+        queryUntyped('MPages')
+          .where({ content: { has: { block: 'MHero' } } })
+          .orderBy('title'),
+      ),
+    );
+  });
+
+  it('a subfield condition, the fluent side driving the two-step collector', async () => {
+    deepStrictEqual(
+      await wirePages('where={content:{has:{block:MHero,title:{contains:Lau}}}}'),
+      await fluent(
+        queryUntyped('MPages').where(
+          lowerField('content', (w: BlockOps) =>
+            w.has('MHero', (q) => q.where('title', { contains: 'Lau' })),
+          ),
+        ),
+      ),
+    );
+  });
+
+  it('a negated has', async () => {
+    deepStrictEqual(
+      await wirePages('where={content:{not:{has:{block:MHero}}}}&order=[title]'),
+      await fluent(
+        queryUntyped('MPages')
+          .where({ content: { not: { has: { block: 'MHero' } } } })
+          .orderBy('title'),
+      ),
     );
   });
 });

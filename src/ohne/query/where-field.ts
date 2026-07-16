@@ -1,4 +1,4 @@
-import { isArray, isFunction } from '../../utils/index.ts';
+import { isArray, isFunction, isString } from '../../utils/index.ts';
 
 /**
  * A comparison object one operator-callback builds: operator keys, plus optional `not`/`or`.
@@ -13,6 +13,8 @@ type WhereObject = Record<string, unknown>;
 /**
  * The runtime operator collector a `where(field, (w) => ...)` callback drives.
  * Every operator records its key on the current comparison and returns the collector to chain on.
+ * `has` takes a scope callback, or a block type name ahead of one.
+ * The name lowers to the scope's bare `block` equality, the discriminated form the blocks grammar requires.
  * `not` opens a negated comparison; `or` opens a fresh alternative folded into the comparison's `or`.
  * The type-level state machine in `builder.ts` gates which of these are reachable; the runtime is uniform.
  */
@@ -32,7 +34,7 @@ interface WhereFieldCollector {
   includesAny(values: unknown): WhereFieldCollector;
   isNull(): WhereFieldCollector;
   empty(): WhereFieldCollector;
-  has(build?: WhereScopeBuild): WhereFieldCollector;
+  has(blockOrBuild?: string | WhereScopeBuild, build?: WhereScopeBuild): WhereFieldCollector;
   readonly not: WhereFieldCollector;
   readonly or: WhereFieldCollector;
 }
@@ -122,7 +124,7 @@ function collector(target: Comparison, root: Comparison): WhereFieldCollector {
     includesAny: (values) => set('includesAny', values),
     isNull: () => set('isNull', true),
     empty: () => set('empty', true),
-    has: (build) => set('has', isFunction(build) ? runScope(build) : true),
+    has: (blockOrBuild, build) => set('has', lowerHas(blockOrBuild, build)),
     get not() {
       const negated: Comparison = {};
       target.not = negated;
@@ -137,6 +139,17 @@ function collector(target: Comparison, root: Comparison): WhereFieldCollector {
     },
   };
   return self;
+}
+
+/**
+ * Lowers a `has` call to its wire value: bare existence, a scope object, or a discriminated scope.
+ * A block type name becomes the scope's bare `block` equality, beside the callback's conditions.
+ */
+function lowerHas(blockOrBuild?: string | WhereScopeBuild, build?: WhereScopeBuild): unknown {
+  if (isString(blockOrBuild)) {
+    return { block: blockOrBuild, ...(isFunction(build) ? runScope(build) : {}) };
+  }
+  return isFunction(blockOrBuild) ? runScope(blockOrBuild) : true;
 }
 
 /**

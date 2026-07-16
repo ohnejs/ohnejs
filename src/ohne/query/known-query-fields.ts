@@ -6,7 +6,7 @@ import type { CollectionName } from '../collections/known-collections.ts';
  *
  * The type-level twin of `FieldQueryMeta`, read by the builder's operator narrowing.
  * A plain column carries `scalar`; a `record` FK carries `scalar` plus its target.
- * A `records` or composite field carries only its relation marker.
+ * A `records`, composite, or blocks field carries only its relation marker.
  * The markers a field carries decide its operators, exactly as `allowedOperators` does at runtime.
  */
 export interface QueryFieldMeta {
@@ -52,6 +52,12 @@ export interface QueryFieldMeta {
    * The target collection of a `records` relation, by name; the inverse side names it the same.
    */
   records?: string;
+
+  /**
+   * The union of block type names a blocks field admits.
+   * The two-step `has` narrows through `KnownBlockQueryFields` by the type it names.
+   */
+  blocks?: string;
 
   /**
    * The cardinality of a composite child field: one child row per parent, or many.

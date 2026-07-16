@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
@@ -17,6 +17,7 @@ import { useCollections } from '../../../src/ohne/collections/use-collections.ts
 import { field } from '../../../src/ohne/fields/field.ts';
 import { generateDatabase, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { queryMetadata } from '../../../src/ohne/query/metadata.ts';
+import { lowerField } from '../../../src/ohne/query/where-field.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 
@@ -76,6 +77,49 @@ describe('the generated query-field table mirrors the runtime metadata', () => {
   });
 });
 
+interface Sub {
+  where(field: string, value: unknown): Sub;
+}
+interface Ops {
+  has(blockOrBuild?: string | ((q: Sub) => Sub), build?: (q: Sub) => Sub): Ops;
+}
+
+describe('the collector lowers every blocks has form onto one grammar', () => {
+  it('lowers a discriminator-only has', () => {
+    deepStrictEqual(
+      lowerField('content', (w: Ops) => w.has('Hero')),
+      { content: { has: { block: 'Hero' } } },
+    );
+  });
+
+  it('merges the callback scope beside the discriminator', () => {
+    deepStrictEqual(
+      lowerField('content', (w: Ops) => w.has('Hero', (q) => q.where('title', 'x'))),
+      { content: { has: { block: 'Hero', title: 'x' } } },
+    );
+    deepStrictEqual(
+      lowerField('content', (w: Ops) =>
+        w.has('Hero', (q) => q.where('title', 'x').where('rank', 1)),
+      ),
+      { content: { has: { block: 'Hero', and: [{ title: 'x' }, { rank: 1 }] } } },
+    );
+  });
+
+  it('keeps the bare form', () => {
+    deepStrictEqual(
+      lowerField('content', (w: Ops) => w.has()),
+      { content: { has: true } },
+    );
+  });
+
+  it('keeps the callback-only form', () => {
+    deepStrictEqual(
+      lowerField('author', (w: Ops) => w.has((q) => q.where('name', 'Ada'))),
+      { author: { has: { name: 'Ada' } } },
+    );
+  });
+});
+
 describe('the typed builder narrows in a consumer app', () => {
   let root: string;
 
@@ -131,6 +175,18 @@ describe('the typed builder narrows in a consumer app', () => {
     );
     write(
       app,
+      'blocks/Hero.ts',
+      "import { defineBlock, field } from 'ohne';\n" +
+        "export default defineBlock({ fields: { title: field('text') } });\n",
+    );
+    write(
+      app,
+      'blocks/CTA.ts',
+      "import { defineBlock, field } from 'ohne';\n" +
+        "export default defineBlock({ fields: { label: field('text') } });\n",
+    );
+    write(
+      app,
       'collections/Posts.ts',
       "import { defineCollection, field } from 'ohne';\n" +
         'export default defineCollection({ fields: {\n' +
@@ -143,6 +199,7 @@ describe('the typed builder narrows in a consumer app', () => {
         "  tags: field('records', { collection: 'Tags' }),\n" +
         "  meta: field('object', { fields: { note: field('text') } }),\n" +
         "  sections: field('repeater', { fields: { heading: field('text') } }),\n" +
+        "  content: field('blocks'),\n" +
         '} });\n',
     );
 
@@ -162,6 +219,13 @@ describe('the typed builder narrows in a consumer app', () => {
     ok(shared.includes("tags: { records: 'Tags' };"));
     ok(shared.includes("meta: { child: 'one'; fields: {"));
     ok(shared.includes("sections: { child: 'many'; fields: {"));
+    ok(shared.includes("content: { blocks: 'CTA' | 'Hero' };"));
+    ok(shared.includes('export interface GeneratedBlockQueryFields {'));
+    ok(
+      shared.includes(
+        '  Hero: {\n    UUID: { scalar: string; id: true };\n    title: { scalar: string };\n  };',
+      ),
+    );
     ok(shared.includes('export interface GeneratedLocales {\n  en: true;\n  de: true;\n}'));
 
     execFileSync(
@@ -274,6 +338,44 @@ export async function writes(): Promise<void> {
   void d;
 }
 
+export async function blocks(): Promise<void> {
+  await query('Posts').where('content', (w) => w.has()).findMany();
+  await query('Posts').where('content', (w) => w.has('Hero')).findMany();
+  await query('Posts').where('content', (w) => w.not.has('Hero')).findMany();
+  await query('Posts').where('content', (w) => w.empty()).findMany();
+  await query('Posts')
+    .where('content', (w) => w.has('Hero', (h) => h.where('title', (t) => t.contains('Launch'))))
+    .findMany();
+  await query('Posts')
+    .where('content', (w) => w.has('CTA', (c) => c.where('label', 'Go')))
+    .findMany();
+
+  const rows = await query('Posts').select('content').findMany();
+  const item = rows[0]!.content[0]!;
+  const id: string = item.UUID;
+  void id;
+  if (item.block === 'Hero') {
+    const title: string = item.fields.title;
+    void title;
+  } else {
+    const label: string = item.fields.label;
+    void label;
+  }
+
+  await query('Posts').create({
+    title: 'x',
+    views: 1,
+    featured: true,
+    content: [{ block: 'Hero', fields: { title: 'Launch' } }],
+  });
+  await query('Posts').where('title', 'x').update({
+    content: [
+      { block: 'Hero', UUID: 'b1', fields: { title: 'Launch' } },
+      { block: 'CTA', fields: { label: 'Go' } },
+    ],
+  });
+}
+
 export async function locales(): Promise<void> {
   const rows = await query('Posts').locale('de').findMany();
   const localized = rows[0]!;
@@ -340,4 +442,20 @@ query('Posts').where('title', 'x').update({ views: 'lots' });
 query('Posts').create({ title: 'y', views: 1, featured: true, sections: [{ UUID: 's', heading: 'h' }] });
 // @ts-expect-error a provided repeater item still requires its non-optional subfields
 query('Posts').where('title', 'x').update({ sections: [{ UUID: 's' }] });
+// @ts-expect-error a blocks has callback requires the block type first
+query('Posts').where('content', (w) => w.has((h) => h.where('title', 'x')));
+// @ts-expect-error the named type must be one the field allows
+query('Posts').where('content', (w) => w.has('Banner'));
+// @ts-expect-error title lives on Hero, not on CTA
+query('Posts').where('content', (w) => w.has('CTA', (c) => c.where('title', 'x')));
+// @ts-expect-error a blocks field has no equality shorthand
+query('Posts').where('content', []);
+// @ts-expect-error a blocks field cannot be populated
+query('Posts').populate('content');
+// @ts-expect-error a blocks field cannot be ordered
+query('Posts').orderBy('content');
+// @ts-expect-error a blocks envelope carries only block and fields
+query('Posts').create({ title: 'y', views: 1, featured: true, content: [{ block: 'Hero', fields: { title: 't' }, extra: true }] });
+// @ts-expect-error a create envelope carries no UUID
+query('Posts').create({ title: 'y', views: 1, featured: true, content: [{ block: 'Hero', UUID: 'b', fields: { title: 't' } }] });
 `;

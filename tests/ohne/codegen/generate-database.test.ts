@@ -89,9 +89,13 @@ describe('generateDatabase', () => {
     const node = readFileSync(paths[1] ?? '', 'utf8');
     ok(shared.includes('export interface GeneratedCollections {}'));
     ok(shared.includes('export interface GeneratedBlocks {}'));
+    ok(shared.includes('export interface GeneratedBlockQueryFields {}'));
+    ok(shared.includes('export interface GeneratedBlockInserts {}'));
+    ok(shared.includes('export interface GeneratedBlockUpdates {}'));
     ok(shared.includes('export interface GeneratedDatabases {}'));
     ok(node.includes('interface KnownCollections extends GeneratedCollections {}'));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
+    ok(node.includes('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}'));
     ok(node.includes('interface KnownDatabases extends GeneratedDatabases {}'));
     ok(node.includes('interface KnownFields {}'));
     ok(!node.includes('useMigrations'));
@@ -325,15 +329,37 @@ describe('generateDatabase', () => {
     ok(shared.includes('export interface GeneratedBlocks {'));
     ok(shared.includes('  CTA: {\n    label: string;\n    url: string | null;\n  };'));
     ok(shared.includes('  Hero: {\n    title: string;\n  };'));
-    ok(shared.includes("    hero: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+    ok(
+      shared.includes(
+        "    hero: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+      ),
+    );
     ok(
       shared.includes(
         '    body: (\n' +
-          "      | { block: 'CTA'; fields: GeneratedBlocks['CTA'] }\n" +
-          "      | { block: 'Hero'; fields: GeneratedBlocks['Hero'] }\n" +
+          "      | { block: 'CTA'; UUID: string; fields: GeneratedBlocks['CTA'] }\n" +
+          "      | { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }\n" +
           '    )[];',
       ),
     );
+    ok(shared.includes("    body: { blocks: 'CTA' | 'Hero' };"));
+    ok(shared.includes("    hero: { blocks: 'Hero' };"));
+    ok(
+      shared.includes(
+        'export interface GeneratedBlockQueryFields {\n' +
+          '  CTA: {\n' +
+          '    UUID: { scalar: string; id: true };\n' +
+          '    label: { scalar: string };\n' +
+          '    url: { scalar: string; nullable: true };\n' +
+          '  };\n' +
+          '  Hero: {\n' +
+          '    UUID: { scalar: string; id: true };\n' +
+          '    title: { scalar: string };\n' +
+          '  };\n' +
+          '}',
+      ),
+    );
+    ok(node.includes('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}'));
     ok(node.includes("import { useCollections, useBlocks } from 'ohne';"));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes("import b0 from '../../blocks/CTA.ts';"));
@@ -362,8 +388,141 @@ describe('generateDatabase', () => {
     const paths = await generateDatabase(app);
     const shared = readFileSync(paths[0] ?? '', 'utf8');
 
-    ok(shared.includes("    cards: { block: 'CTA'; fields: GeneratedBlocks['CTA'] }[];"));
-    ok(shared.includes("    more: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+    ok(
+      shared.includes(
+        "    cards: { block: 'CTA'; UUID: string; fields: GeneratedBlocks['CTA'] }[];",
+      ),
+    );
+    ok(
+      shared.includes(
+        "    more: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+      ),
+    );
+    ok(
+      shared.includes(
+        '  Hero: {\n' +
+          '    UUID: { scalar: string; id: true };\n' +
+          "    cards: { blocks: 'CTA' };\n" +
+          "    more: { blocks: 'Hero' };\n" +
+          '  };',
+      ),
+    );
+  });
+
+  it('types blocks fields into the query, insert, and update vocabularies', async () => {
+    const app = join(root, 'blocks-vocabulary');
+    writePackage(app, 'blocks-vocabulary');
+    write(
+      app,
+      'collections/Users.ts',
+      "export default { fields: { name: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'blocks/CTA.ts',
+      'export default { fields: {\n' +
+        "  label: { type: 'text', options: {} },\n" +
+        "  note: { type: 'text', options: { nullable: true } },\n" +
+        "  author: { type: 'record', options: { collection: 'Users' } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'blocks/Hero.ts',
+      'export default { fields: {\n' +
+        "  title: { type: 'text', options: {} },\n" +
+        "  more: { type: 'blocks', options: { allow: ['Hero'] } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'collections/Pages.ts',
+      'export default { fields: {\n' +
+        "  body: { type: 'blocks', options: {} },\n" +
+        "  banner: { type: 'blocks', options: { allow: ['Hero'], translatable: true } },\n" +
+        "  kind: { type: 'text', options: {} },\n" +
+        "  promo: { type: 'blocks', options: { allow: ['CTA'], when: { kind: 'sale' } } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes("    body: { blocks: 'CTA' | 'Hero' };"));
+    ok(shared.includes("    banner: { blocks: 'Hero'; localeScoped: true };"));
+    ok(shared.includes("    promo: { blocks: 'CTA'; when: { kind: 'sale' } };"));
+    ok(
+      shared.includes(
+        'export interface GeneratedBlockQueryFields {\n' +
+          '  CTA: {\n' +
+          '    UUID: { scalar: string; id: true };\n' +
+          '    label: { scalar: string };\n' +
+          '    note: { scalar: string; nullable: true };\n' +
+          "    author: { scalar: string; record: 'Users'; nullable: true };\n" +
+          '  };\n' +
+          '  Hero: {\n' +
+          '    UUID: { scalar: string; id: true };\n' +
+          '    title: { scalar: string };\n' +
+          "    more: { blocks: 'Hero' };\n" +
+          '  };\n' +
+          '}',
+      ),
+    );
+
+    ok(
+      shared.includes(
+        '    body?: (\n' +
+          "      | { block: 'CTA'; fields: GeneratedBlockInserts['CTA'] }\n" +
+          "      | { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }\n" +
+          '    )[];',
+      ),
+    );
+    ok(shared.includes("    banner?: { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }[];"));
+    ok(
+      shared.includes(
+        'export interface GeneratedBlockInserts {\n' +
+          '  CTA: {\n' +
+          '    label: string;\n' +
+          '    note?: string | null;\n' +
+          '    author?: string | null;\n' +
+          '  };\n' +
+          '  Hero: {\n' +
+          '    title: string;\n' +
+          "    more?: { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }[];\n" +
+          '  };\n' +
+          '}',
+      ),
+    );
+
+    ok(
+      shared.includes(
+        '    body?: (\n' +
+          "      | { block: 'CTA'; UUID?: string; fields: GeneratedBlockUpdates['CTA'] }\n" +
+          "      | { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }\n" +
+          '    )[];',
+      ),
+    );
+    ok(
+      shared.includes(
+        "    banner?: { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }[];",
+      ),
+    );
+    ok(
+      shared.includes(
+        'export interface GeneratedBlockUpdates {\n' +
+          '  CTA: {\n' +
+          '    label: string;\n' +
+          '    note?: string | null;\n' +
+          '    author?: string | null;\n' +
+          '  };\n' +
+          '  Hero: {\n' +
+          '    title: string;\n' +
+          "    more?: { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }[];\n" +
+          '  };\n' +
+          '}',
+      ),
+    );
   });
 
   it('drops disabled collections and field types, deleting a disabled built-in', async () => {
@@ -420,7 +579,11 @@ describe('generateDatabase', () => {
     const shared = readFileSync(paths[0] ?? '', 'utf8');
     const node = readFileSync(paths[1] ?? '', 'utf8');
 
-    ok(shared.includes("    body: { block: 'Hero'; fields: GeneratedBlocks['Hero'] }[];"));
+    ok(
+      shared.includes(
+        "    body: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+      ),
+    );
     ok(!shared.includes('CTA'));
     ok(node.includes("blocks.register('Hero'"));
     ok(!node.includes('CTA'));
@@ -740,7 +903,11 @@ describe('generateDatabase', () => {
         '  const labels = page.body.map((item) =>\n' +
         "    item.block === 'Hero' ? item.fields.title : item.fields.label,\n" +
         '  );\n' +
-        "  return [...titles, ...labels].join(' ');\n" +
+        '  const ids = page.body.map((item) => {\n' +
+        '    const id: string = item.UUID;\n' +
+        '    return id;\n' +
+        '  });\n' +
+        "  return [...titles, ...ids, ...labels].join(' ');\n" +
         '}\n',
     );
 
