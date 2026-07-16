@@ -11,6 +11,8 @@
   "invalidPagination": "Koristi `limit` i `offset`, ili `page` i `perPage`, ali ne oboje",
   "emptySelect": "`select` mora navesti barem jedno polje",
   "duplicateOrderField": "Polje `{field}` je sortirano više puta",
+  "invalidLocale": "Nepoznat lokalitet `{locale}`",
+  "localeNotApplicable": "Ova kolekcija nema prevodivog sadržaja",
   "tooManyConditions": "Uslov `where` ima previše klauzula (max `{max}`)",
   "hasTooDeep": "Uslov `where` ugniježđuje `has` preduboko (max `{max}`)",
   "listTooLong": "Lista je predugačka (max `{max}`)",

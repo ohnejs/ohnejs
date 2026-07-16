@@ -11,6 +11,8 @@
   "invalidPagination": "Use `limit` and `offset`, or `page` and `perPage`, but not both",
   "emptySelect": "`select` must name at least one field",
   "duplicateOrderField": "Field `{field}` is ordered more than once",
+  "invalidLocale": "Unknown locale `{locale}`",
+  "localeNotApplicable": "This collection has no translatable content",
   "tooManyConditions": "The `where` condition has too many clauses (max `{max}`)",
   "hasTooDeep": "The `where` condition nests `has` too deep (max `{max}`)",
   "listTooLong": "A list is too long (max `{max}`)",
