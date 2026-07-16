@@ -197,3 +197,26 @@ describe('runRecord (create)', () => {
     deepStrictEqual(Object.keys(result.scope.columns), ['title']);
   });
 });
+
+describe('runRecord nested item identity', () => {
+  it('errors a nested non-string item `UUID` at its own path, never double-prefixed', async () => {
+    useCollections().register('PNested', {
+      name: 'PNested',
+      collection: {
+        fields: {
+          sections: field('repeater', {
+            fields: { items: field('repeater', { fields: { label: field('text') } }) },
+          }),
+        },
+      },
+    });
+    const result = await runRecord(
+      queryMetadata('PNested'),
+      { sections: [{ items: [{ label: 'x' }, { UUID: 5, label: 'y' }] }] },
+      { operation: 'update', tx },
+    );
+    ok(!result.ok);
+    deepStrictEqual(Object.keys(result.errors), ['sections[0].items[1].UUID']);
+    strictEqual(result.errors['sections[0].items[1].UUID'], 'validation.invalidValue');
+  });
+});

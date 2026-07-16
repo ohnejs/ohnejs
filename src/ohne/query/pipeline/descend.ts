@@ -114,7 +114,7 @@ export async function finishComposite(
   for (let index = 0; index < items.length; index++) {
     const correlated = liftItemUUID(items[index], ctx.operation);
     if ('error' in correlated) {
-      errors[`${path}[${index}].UUID`] = correlated.error;
+      errors[`${name}[${index}].UUID`] = correlated.error;
       continue;
     }
     const result = await processScope(subfields, correlated.input, {
