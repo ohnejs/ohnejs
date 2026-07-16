@@ -110,9 +110,30 @@ posts[0].author; // the full author record, or null
 posts[0].tags; // an array of full tag records
 ```
 
-Population is one level deep. The populated records carry their own relations as `UUID`s; to go
-deeper, run a follow-up query. The same rows are shared across parents that link them, so do not
-mutate a populated record.
+A callback narrows what the related records carry and populates their own relations. `select`
+names the fields to keep - the records then carry exactly those, `UUID` and `_updatedAt` only
+when named. `populate` descends one level further, with the same grammar at every depth:
+
+```ts
+const posts = await query('Posts')
+  .select('title', 'comments')
+  .populate('comments', (c) =>
+    c.select('text', 'author').populate('author', (a) => a.select('name')),
+  )
+  .findMany();
+
+posts[0].comments[0].author; // { name: '...' }, or null
+```
+
+The rows type exactly what the callback wrote, at every depth.
+
+Two rules to know. A populated relation must be named in its level's `select` when one is set,
+or it silently drops - populate narrows a read, it never widens one. And a field populates once
+per level: repeating a bare name is fine, repeating it with a callback or spec is an error.
+
+Each level loads in one batched read, so a deep populate costs one query per relation, not one
+per row. The same rows are shared across the parents that link them, so do not mutate a
+populated record.
 
 ## Blocks
 

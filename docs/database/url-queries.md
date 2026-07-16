@@ -112,12 +112,29 @@ Mixing the two modes is a `400`.
 
 ## Populating relations
 
-`populate` swaps a relation's ids for the full related records, one level deep, exactly as the
-fluent [`populate`](./queries.md) does:
+`populate` swaps a relation's ids for the full related records, exactly as the fluent
+[`populate`](./queries.md) does:
 
 ```
 ?populate=[author,tags]
 ```
+
+An entry can be a spec object instead of a bare name. Its keys are relation fields; each value
+carries `select` - which target fields come back, `UUID` only when named - and `populate` for
+the next level, the same grammar all the way down:
+
+```
+?populate=[{comments:{select:[text,author],populate:[{author:{select:[name]}}]}}]
+```
+
+A spec carrying any key other than `select` and `populate` is a `400` with the code
+`invalidShape`; an empty `select` is `emptySelect` at its path. A populated relation must be
+named in its level's `select` when one is set, or it silently drops.
+
+Depth and size are bounded by two [guards](#guards): `maxPopulateDepth` (default `2`, so
+`comments.author` works out of the box) and `maxPopulate` (default `20` nodes in total). Depth
+past the default is new transitive reach across collections, so raising it is an explicit
+endpoint decision.
 
 ## Locales
 
@@ -188,9 +205,9 @@ so a URL can never probe which fields your collection has.
 ## Guards
 
 The untrusted path is bounded so a hostile URL cannot exhaust the server: a cap on conditions, `has`
-nesting, `in` length, selected fields, order keys, value and pattern size, and page size. The
-defaults are generous, and a real query never approaches one. The fluent builder is trusted and
-never checked.
+nesting, `in` length, selected fields, order keys, populate nodes and depth, value and pattern
+size, and page size. The defaults are generous, and a real query never approaches one. The fluent
+builder is trusted and never checked.
 
 Override a ceiling app-wide in `ohne.config.ts`:
 
