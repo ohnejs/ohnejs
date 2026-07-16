@@ -26,6 +26,11 @@ const table: [name: string, meta: FieldQueryMeta, expected: QueryOperator[]][] =
     ['equalsTo', 'in', ...ORDERING, ...TEXT, 'isNull'],
   ],
   [
+    'non-nullable companion text column adds isNull, a missing translation reading null',
+    { kind: 'column', nullable: false, logicalType: 'text', column: 'title', companion: true },
+    ['equalsTo', 'in', ...ORDERING, ...TEXT, 'isNull'],
+  ],
+  [
     'integer column takes equality and ordering, never the text operators',
     { kind: 'column', nullable: false, logicalType: 'integer', column: 'views' },
     ['equalsTo', 'in', ...ORDERING],
@@ -64,6 +69,18 @@ const table: [name: string, meta: FieldQueryMeta, expected: QueryOperator[]][] =
     'non-nullable record drops isNull',
     { kind: 'record', nullable: false, logicalType: 'text', column: 'author', target: 'Users' },
     ['equalsTo', 'in', 'has', 'empty'],
+  ],
+  [
+    'non-nullable companion record adds isNull',
+    {
+      kind: 'record',
+      nullable: false,
+      logicalType: 'text',
+      column: 'author',
+      target: 'Users',
+      companion: true,
+    },
+    ['equalsTo', 'in', 'isNull', 'has', 'empty'],
   ],
   [
     'records takes the relation pair alone',

@@ -81,6 +81,36 @@ useCollections().register('QPosts', {
   },
 });
 
+useCollections().register('QLocTags', {
+  name: 'QLocTags',
+  collection: {
+    fields: {
+      label: field('text'),
+      articles: field('records', { collection: 'QLocArticles', inverse: 'tags' }),
+    },
+  },
+});
+useCollections().register('QLocArticles', {
+  name: 'QLocArticles',
+  collection: {
+    fields: {
+      title: field('text', { translatable: true }),
+      author: field('record', { collection: 'QUsers', translatable: true }),
+      tags: field('records', { collection: 'QLocTags', translatable: true }),
+      meta: field('object', { translatable: true, fields: { description: field('text') } }),
+      sections: field('repeater', { translatable: true, fields: { heading: field('text') } }),
+    },
+  },
+});
+useCollections().register('QLocGalleries', {
+  name: 'QLocGalleries',
+  collection: {
+    fields: {
+      slides: field('repeater', { translatable: true, fields: { caption: field('text') } }),
+    },
+  },
+});
+
 describe('queryMetadata', () => {
   it('builds the field table with a null prototype, so an inherited name reads as absent', () => {
     strictEqual(Object.getPrototypeOf(queryMetadata('QPosts').fields), null);
@@ -269,5 +299,51 @@ describe('queryMetadata', () => {
         return true;
       },
     );
+  });
+});
+
+describe('queryMetadata translations', () => {
+  it('marks a translatable text column and a translatable record `companion`', () => {
+    const { fields } = queryMetadata('QLocArticles');
+    strictEqual(fields.title!.companion, true);
+    strictEqual(fields.author!.companion, true);
+  });
+
+  it('marks translatable records, object, and repeater fields `localeScoped`, never `companion`', () => {
+    const { fields } = queryMetadata('QLocArticles');
+    for (const name of ['tags', 'meta', 'sections']) {
+      strictEqual(fields[name]!.localeScoped, true);
+      strictEqual(fields[name]!.companion, undefined);
+    }
+  });
+
+  it('marks the inverse of a translatable junction `localeScoped`', () => {
+    strictEqual(queryMetadata('QLocTags').fields.articles!.inverse, true);
+    strictEqual(queryMetadata('QLocTags').fields.articles!.localeScoped, true);
+  });
+
+  it('leaves the inverse side non-translatable when it owns no translatable field', () => {
+    strictEqual(queryMetadata('QLocTags').translatable, undefined);
+    strictEqual(queryMetadata('QLocTags').companionTable, undefined);
+  });
+
+  it('raises `translatable` and names the companion table when a companion field exists', () => {
+    strictEqual(queryMetadata('QLocArticles').translatable, true);
+    strictEqual(queryMetadata('QLocArticles').companionTable, 'QLocArticles__translations');
+  });
+
+  it('raises `translatable` without a companion table for a lone translatable composite', () => {
+    strictEqual(queryMetadata('QLocGalleries').translatable, true);
+    strictEqual(queryMetadata('QLocGalleries').companionTable, undefined);
+  });
+
+  it('carries none of the markers on a non-translatable collection', () => {
+    const posts = queryMetadata('QPosts');
+    strictEqual(posts.translatable, undefined);
+    strictEqual(posts.companionTable, undefined);
+    for (const entry of Object.values(posts.fields)) {
+      strictEqual(entry.companion, undefined);
+      strictEqual(entry.localeScoped, undefined);
+    }
   });
 });

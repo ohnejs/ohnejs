@@ -7,7 +7,11 @@ import type { ChildHint, ForeignKeyHint, JunctionHint } from '../fields/storage-
 
 import { hasKey, isUndefined, parseCondition } from '../../utils/index.ts';
 import { useCollections } from '../collections/use-collections.ts';
-import { collectionTableName, derivedTableName } from '../database/naming/table-names.ts';
+import {
+  collectionTableName,
+  companionTableName,
+  derivedTableName,
+} from '../database/naming/table-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
@@ -65,6 +69,18 @@ export interface FieldQueryMeta {
   jsonList?: true;
 
   /**
+   * Marks a translatable column-bearing field: its column lives on the collection's companion table.
+   * It holds one value per locale and reads `null` when the queried locale has no translation.
+   */
+  companion?: true;
+
+  /**
+   * Marks a translatable derived table: its rows carry `_localeCode`.
+   * Every read and write addresses one locale's rows.
+   */
+  localeScoped?: true;
+
+  /**
    * The target collection, by name; relation kinds (`record`, `records`) only.
    */
   target?: string;
@@ -109,6 +125,17 @@ export interface CollectionQueryMeta {
    * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
    */
   fields: Record<string, FieldQueryMeta>;
+
+  /**
+   * Marks a collection with at least one translatable field - the collections `.locale()` accepts.
+   */
+  translatable?: true;
+
+  /**
+   * The `<Owner>__translations` table holding the translatable columns, one row per
+   * (record, locale); present when at least one translatable field carries a column.
+   */
+  companionTable?: string;
 }
 
 /**
@@ -162,6 +189,8 @@ function uuidEntry(): FieldQueryMeta {
 
 /**
  * Builds one collection's metadata: the system entries, then the declared fields in order.
+ * A field marked `companion` raises the companion table; any owned locale marker raises `translatable`.
+ * An inverse view into a locale-scoped junction does not: the owner's option is not this collection's.
  */
 function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
   const fields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
@@ -169,7 +198,17 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
     _updatedAt: { kind: 'column', nullable: false, logicalType: 'integer', column: '_updatedAt' },
   });
   addFieldEntries(fields, meta.collection.fields, meta.name, meta.name);
-  return { collection: meta.name, table: collectionTableName(meta.name), fields };
+  const entries = Object.values(fields);
+  const companion = entries.some((field) => field.companion === true);
+  const translatable =
+    companion || entries.some((field) => field.localeScoped === true && field.inverse !== true);
+  return {
+    collection: meta.name,
+    table: collectionTableName(meta.name),
+    fields,
+    ...(translatable ? { translatable: true } : {}),
+    ...(companion ? { companionTable: companionTableName(meta.name) } : {}),
+  };
 }
 
 /**
@@ -210,9 +249,11 @@ function fieldEntry(
 
   const when = parseFieldWhen(options, name, collection);
   const gate = isUndefined(when) ? {} : { when };
+  const translatable = options.translatable === true;
 
   if (kind === 'junction') {
     const { collection: target, inverse } = hint as JunctionHint;
+    const scoped = isUndefined(inverse) ? translatable : ownerTranslatable(target, inverse);
     return {
       kind: 'records',
       fieldType,
@@ -220,6 +261,7 @@ function fieldEntry(
       nullable: false,
       target,
       ...gate,
+      ...(scoped ? { localeScoped: true } : {}),
       ...(isUndefined(inverse)
         ? { table: derivedTableName(logical, name) }
         : { inverse: true, table: derivedTableName(target, inverse) }),
@@ -239,6 +281,7 @@ function fieldEntry(
       table: derivedTableName(logical, name),
       subfields,
       ...gate,
+      ...(translatable ? { localeScoped: true } : {}),
     };
   }
 
@@ -250,8 +293,24 @@ function fieldEntry(
     logicalType: fieldType.columnType as LogicalType,
     column: name,
     ...gate,
+    ...(translatable ? { companion: true } : {}),
     ...(kind === 'foreignKey' ? { target: (hint as ForeignKeyHint).collection } : {}),
   };
+}
+
+/**
+ * Whether the owning side of an inverse `records` relation is translatable.
+ * An inverse field reads the owner's junction, so the owner's option decides its locale scoping.
+ * Resolved straight from the registries - `queryMetadata` would recurse on a self-relation.
+ */
+function ownerTranslatable(target: string, ownerField: string): boolean {
+  const owner = useCollections().get(target);
+  const instance = owner?.collection.fields[ownerField];
+  if (isUndefined(instance)) return false;
+  const registered = useFields().get(instance.type);
+  if (isUndefined(registered)) return false;
+  const resolved = resolveFieldStorage(ownerField, instance, registered.fieldType);
+  return resolved.options.translatable === true;
 }
 
 /**

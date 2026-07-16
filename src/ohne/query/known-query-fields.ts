@@ -33,6 +33,17 @@ export interface QueryFieldMeta {
   jsonList?: true;
 
   /**
+   * Marks a translatable column-bearing field: it holds one value per locale.
+   * It reads `null` where the queried locale holds no translation, so `isNull` always applies.
+   */
+  companion?: true;
+
+  /**
+   * Marks a translatable derived table: its rows live per locale.
+   */
+  localeScoped?: true;
+
+  /**
    * The target collection of a `record` foreign key, by name.
    */
   record?: string;

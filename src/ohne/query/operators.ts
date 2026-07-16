@@ -19,15 +19,18 @@ export type QueryOperator = CompareOperator | 'has' | 'empty';
  * Scalar groups gate on the column's logical type.
  * `equalsTo` admits `text`/`integer`/`boolean`; `in` and ordering admit `text`/`integer`.
  * The text trio and `like` admit `text` alone.
- * `isNull` requires nullability; `includes*` a column flagged `jsonList`.
+ * `isNull` requires nullability or a companion column.
+ * A missing translation reads `null` whatever the option says.
+ * `includes*` requires a column flagged `jsonList`.
  */
 export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
+  const nullable = meta.nullable || meta.companion === true;
   if (meta.id === true) return new Set<QueryOperator>(['equalsTo', 'in']);
   if (meta.kind === 'record') {
     return new Set<QueryOperator>([
       'equalsTo',
       'in',
-      ...(meta.nullable ? (['isNull'] as const) : []),
+      ...(nullable ? (['isNull'] as const) : []),
       'has',
       'empty',
     ]);
@@ -41,7 +44,7 @@ export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperato
     operators.push('in', 'greaterThan', 'atLeast', 'lessThan', 'atMost');
   }
   if (type === 'text') operators.push('contains', 'startsWith', 'endsWith', 'like');
-  if (meta.nullable) operators.push('isNull');
+  if (nullable) operators.push('isNull');
   if (meta.jsonList === true) operators.push('includes', 'includesAll', 'includesAny');
   return new Set(operators);
 }
