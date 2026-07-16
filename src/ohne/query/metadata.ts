@@ -61,7 +61,6 @@ export interface FieldQueryMeta {
 
   /**
    * Marks a `json` column holding a list, unlocking the `includes*` operators.
-   * No built-in field type sets it yet; a list-shaped `json` type opts in when it lands.
    */
   jsonList?: true;
 
@@ -165,10 +164,10 @@ function uuidEntry(): FieldQueryMeta {
  * Builds one collection's metadata: the system entries, then the declared fields in order.
  */
 function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
-  const fields: Record<string, FieldQueryMeta> = {
+  const fields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
     UUID: uuidEntry(),
     _updatedAt: { kind: 'column', nullable: false, logicalType: 'integer', column: '_updatedAt' },
-  };
+  });
   addFieldEntries(fields, meta.collection.fields, meta.name, meta.name);
   return { collection: meta.name, table: collectionTableName(meta.name), fields };
 }
@@ -228,7 +227,9 @@ function fieldEntry(
   }
 
   if (kind === 'childOne' || kind === 'childMany') {
-    const subfields: Record<string, FieldQueryMeta> = { UUID: uuidEntry() };
+    const subfields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
+      UUID: uuidEntry(),
+    });
     addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`, collection);
     return {
       kind,

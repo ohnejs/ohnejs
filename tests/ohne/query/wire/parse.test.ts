@@ -190,8 +190,14 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
     strictEqual(failure('offset=abc').code, 'invalidNumber');
   });
 
-  it('treats a `__proto__` field as an unknown field, never a pollution', () => {
+  it('treats an inherited property name as an unknown field, never a pollution', () => {
     strictEqual(failure('where={__proto__:1}').code, 'invalidField');
+    strictEqual(failure('where={__proto__:{has:{x:1}}}').code, 'invalidField');
+    strictEqual(failure('where={constructor:{equalsTo:1}}').code, 'invalidField');
+    strictEqual(failure('where={toString:{has:{x:1}}}').code, 'invalidField');
+    strictEqual(failure('select=[__proto__]').code, 'invalidField');
+    strictEqual(failure('order=[hasOwnProperty]').code, 'invalidField');
+    strictEqual(failure('populate=[constructor]').code, 'invalidField');
   });
 });
 

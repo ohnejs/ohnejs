@@ -15,6 +15,16 @@ import { text } from '../../../src/ohne/fields/builtin/text.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { queryMetadata } from '../../../src/ohne/query/metadata.ts';
 
+function plain(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(plain);
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) out[key] = plain((value as Record<string, unknown>)[key]);
+    return out;
+  }
+  return value;
+}
+
 const COMMON = {
   nullable: false,
   unique: false,
@@ -72,8 +82,13 @@ useCollections().register('QPosts', {
 });
 
 describe('queryMetadata', () => {
+  it('builds the field table with a null prototype, so an inherited name reads as absent', () => {
+    strictEqual(Object.getPrototypeOf(queryMetadata('QPosts').fields), null);
+    strictEqual(queryMetadata('QPosts').fields['__proto__' as string], undefined);
+  });
+
   it('builds the full per-field table, blocks omitted', () => {
-    deepStrictEqual(queryMetadata('QPosts'), {
+    deepStrictEqual(plain(queryMetadata('QPosts')), {
       collection: 'QPosts',
       table: 'QPosts',
       fields: {
