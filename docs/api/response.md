@@ -23,13 +23,13 @@ export default defineHandler(() => {
 `setResponseStatus` is the shorthand for the common case:
 
 ```ts
-// api/users.post.ts
+// api/subscribers.post.ts
 import { defineHandler, setResponseStatus } from 'ohne';
 
 export default defineHandler(async () => {
-  const user = await createUser();
+  const subscriber = await subscribe();
   setResponseStatus(201);
-  return user;
+  return subscriber;
 });
 ```
 
@@ -153,13 +153,13 @@ promise runs after it, and a graceful shutdown waits for the work to settle. A r
 isolated and logged, never touching the already-sent response:
 
 ```ts
-// api/users.post.ts
+// api/subscribers.post.ts
 import { defineHandler, waitUntil } from 'ohne';
 
 export default defineHandler(async () => {
-  const user = await createUser();
-  waitUntil(sendWelcomeEmail(user));
-  return user;
+  const subscriber = await subscribe();
+  waitUntil(sendWelcomeEmail(subscriber));
+  return subscriber;
 });
 ```
 
