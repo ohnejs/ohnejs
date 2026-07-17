@@ -73,8 +73,8 @@ export interface FieldOptions {
 }
 
 /**
- * The value-behaviour options every field instance accepts, whatever its storage kind.
- * They sit outside the column gate, so a column-less relation or composite carries them too.
+ * The value-behaviour options every field accepts, whatever its storage kind.
+ * Every kind carries them, including a relation or composite that stores no column of its own.
  * `TOptions` is the field type's own declared options, so an instance callback's `ctx.options` carries them.
  * `TValue` is the field's storage primitive, the type its `default` value must satisfy.
  */
@@ -145,8 +145,8 @@ export interface ValueOptions<
 }
 
 /**
- * The presentation metadata every field instance accepts, shown for the field in the dashboard.
- * They sit outside the column gate, so every field kind - relations and composites included - carries them.
+ * The presentation metadata every field accepts, shown for the field in the dashboard.
+ * Every field kind carries them, relations and composites included.
  */
 export interface PresentationOptions {
   /**

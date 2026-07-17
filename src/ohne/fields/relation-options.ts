@@ -50,7 +50,7 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
 
           /**
            * Whether an empty list is a legal value.
-           * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+           * With `false`, supplying `[]` is rejected, so the field requires at least one link.
            *
            * @default
            * true
@@ -82,7 +82,7 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
 
           /**
            * Whether an empty list is a legal value.
-           * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+           * With `false`, supplying `[]` is rejected, so the field requires at least one link.
            *
            * @default
            * true
@@ -122,7 +122,7 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
 
             /**
              * Whether an empty list is a legal value.
-             * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+             * With `false`, supplying `[]` is rejected, so the field requires at least one link.
              *
              * @default
              * true
@@ -154,7 +154,7 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
 
             /**
              * Whether an empty list is a legal value.
-             * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one link.
+             * With `false`, supplying `[]` is rejected, so the field requires at least one link.
              *
              * @default
              * true

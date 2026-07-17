@@ -387,7 +387,7 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       throw ohneError({
         title: `A field type's \`${member}\` must be an array of functions`,
         body: [
-          `\`${member}\` is a list of value functions the write pipeline runs in order.`,
+          `\`${member}\` is a list of functions, run in order.`,
           `Set \`${member}\` to an array.`,
         ],
       });

@@ -189,7 +189,16 @@ export interface FieldType<
  * // fields/slug.ts
  * import { defineField } from 'ohne'
  *
- * export default defineField({ columnType: 'text' })
+ * export default defineField({
+ *   columnType: 'text',
+ *   sanitizers: [(value) => value.trim().toLowerCase().replace(/\s+/g, '-')],
+ *   validators: [
+ *     (value) =>
+ *       /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
+ *         ? undefined
+ *         : 'Must be lowercase words joined by hyphens',
+ *   ],
+ * })
  * ```
  */
 export function defineField<

@@ -58,7 +58,7 @@ export interface EmitTypeContext<
 }
 
 /**
- * Whether a write pipeline is creating a record or updating one.
+ * Whether a record is being created or updated.
  */
 export type FieldOperation = 'create' | 'update';
 
@@ -109,7 +109,7 @@ export interface FieldValidateContext<
 > extends FieldWriteContext<TOptions> {
   /**
    * The field's error slice, keyed by dot-path, for a composite validator to record a subfield failure.
-   * Each value is a message: a key, a `[key, params]` tuple, or a plain string, resolved at the boundary.
+   * Each value is a message: a key, a `[key, params]` tuple, or a plain string.
    */
   errors: Record<string, Message>;
 }
@@ -117,7 +117,7 @@ export interface FieldValidateContext<
 /**
  * A field sanitizer: cleans a value of `TValue` and returns one, never reporting.
  * Runs in order within its tier - the type's sanitizers first, then the instance's.
- * It is type-preserving: the base-type gate runs first, so a sanitizer only ever cleans the primitive.
+ * It is type-preserving: the value it receives is already the field's primitive, so it only cleans that.
  *
  * A bivariant method call keeps a concrete field type assignable to the registry's wide `FieldType`.
  * This mirrors `schema` and `emitType`, which are declared as methods for the same reason.
@@ -149,7 +149,7 @@ export type FieldValidator<
 
 /**
  * The storage primitive a column of `TColumn` holds: the type a default value must satisfy.
- * A default enters the pipeline at the base-type gate, before the sanitizer bridge, so it is the primitive.
+ * A default is applied before any sanitizer runs, so it must already be that primitive.
  * A `json` or column-less type has no single primitive, so its default value stays `unknown`.
  */
 export type ColumnValue<TColumn extends LogicalType | false> = TColumn extends 'text'

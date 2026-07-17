@@ -13,6 +13,7 @@ export interface CompositeIndex<TField extends string = string> {
 
   /**
    * Make this a unique constraint instead of a plain index.
+   * No two rows may then share the same combination of these fields' values.
    *
    * @default
    * false

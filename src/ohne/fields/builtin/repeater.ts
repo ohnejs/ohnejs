@@ -20,7 +20,7 @@ export const repeater = defineField({
 
     /**
      * Whether an empty list is a legal value.
-     * The pipeline rejects a provided `[]` unless this is set, so `false` demands at least one item.
+     * With `false`, supplying `[]` is rejected, so the field requires at least one item.
      * Absent input still defaults to `[]`; only a provided empty list is rejected.
      *
      * @default
