@@ -36,6 +36,10 @@ describe('generateDatabase', () => {
     writeFileSync(file, content);
   }
 
+  function stripDocs(source: string): string {
+    return source.replace(/(?:^[ \t]*\n)?^[ \t]*\/\*\*[\s\S]*?\*\/\n/gm, '');
+  }
+
   function writeMigration(layerDir: string, relative: string): void {
     write(
       layerDir,
@@ -198,18 +202,90 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
 
     ok(
-      shared.includes(
+      bare.includes(
         '    address: {\n      UUID: string;\n      street: string;\n      city: string | null;\n    } | null;',
       ),
     );
     ok(
-      shared.includes(
+      bare.includes(
         '    sections: {\n      UUID: string;\n      title: string;\n      items: {\n        UUID: string;\n        label: string;\n      }[];\n    }[];',
       ),
     );
+  });
+
+  it('documents each field with a headline and resolved-config bullets', async () => {
+    const app = join(root, 'field-docs');
+    writePackage(app, 'field-docs');
+    write(app, 'messages/promo/en.json', JSON.stringify({ tag: 'Tagline!' }));
+    write(
+      app,
+      'blocks/Hero.ts',
+      "export default { fields: { headline: { type: 'text', options: {} } } };\n",
+    );
+    write(
+      app,
+      'collections/Pages.ts',
+      'export default { fields: {\n' +
+        "  title: { type: 'text', options: { unique: true, description: 'The page title.', validators: [(v) => undefined] } },\n" +
+        "  gallerySlider: { type: 'text', options: {} },\n" +
+        "  intro: { type: 'text', options: { label: 'The intro', translatable: true } },\n" +
+        "  tagline: { type: 'text', options: { label: 'promo.tag' } },\n" +
+        "  sections: { type: 'repeater', options: { fields: { heading: { type: 'text', options: {} } } } },\n" +
+        "  banner: { type: 'blocks', options: { allow: ['Hero'] } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    // Headline: description, else label, else the sentence-cased name; a message key resolves.
+    // It ends with a period, unless it already closes with sentence punctuation.
+    ok(shared.includes(' * The page title.'));
+    ok(!shared.includes('The page title..'));
+    ok(shared.includes(' * Gallery slider.'));
+    ok(shared.includes(' * The intro.'));
+    ok(shared.includes(' * Tagline!'));
+    ok(!shared.includes('Tagline!.'));
+
+    // The resolved-config bullets, in the agreed vocabulary.
+    ok(shared.includes(' * - Type: `text`'));
+    ok(shared.includes(' * - Unique'));
+    ok(shared.includes(' * - No index'));
+    ok(shared.includes(' * - Not translatable'));
+    ok(shared.includes(' * - Translatable'));
+    ok(shared.includes(' * - 1 validator'));
+    ok(shared.includes(' * - No condition'));
+    ok(shared.includes(' * - `allowEmpty` is `false`'));
+    ok(shared.includes(' * - `fields` has 1 entry'));
+
+    // The built-in UUID and _updatedAt carry fixed docs.
+    ok(shared.includes(" * This record's unique identifier."));
+    ok(
+      shared.includes(' * When this record was last updated, as a Unix timestamp in milliseconds.'),
+    );
+
+    // A nested subfield is documented too, but drops the top-level-only translatability line.
+    const headingDoc = shared.slice(0, shared.indexOf('heading: string;')).split('/**').pop() ?? '';
+    ok(headingDoc.includes(' * Heading'));
+    ok(headingDoc.includes(' * - No index'));
+    ok(!headingDoc.includes('translatable'));
+
+    // A blocks-union arm documents its structural members and the item UUID.
+    ok(shared.includes(' * The block type.'));
+    ok(shared.includes(" * This block instance's unique identifier."));
+    ok(shared.includes(" * The block's own fields."));
+    ok(shared.includes(" * This item's unique identifier."));
+
+    // Consecutive documented props are separated by a blank line.
+    ok(shared.includes(';\n\n    /**'));
+
+    // The docs reach the input shapes too, so a composite's subfields carry them in the insert shape.
+    const inserts = shared.slice(shared.indexOf('export interface GeneratedInserts'));
+    ok(inserts.includes(' * Heading'));
   });
 
   it('carries a field `when` into GeneratedQueryFields as a type literal', async () => {
@@ -323,29 +399,41 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const node = readFileSync(paths[1] ?? '', 'utf8');
 
-    ok(shared.includes('export interface GeneratedBlocks {'));
-    ok(shared.includes('  CTA: {\n    label: string;\n    url: string | null;\n  };'));
-    ok(shared.includes('  Hero: {\n    title: string;\n  };'));
+    ok(bare.includes('export interface GeneratedBlocks {'));
+    ok(bare.includes('  CTA: {\n    label: string;\n    url: string | null;\n  };'));
+    ok(bare.includes('  Hero: {\n    title: string;\n  };'));
     ok(
-      shared.includes(
-        "    hero: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+      bare.includes(
+        '    hero: {\n' +
+          "      block: 'Hero';\n" +
+          '      UUID: string;\n' +
+          "      fields: GeneratedBlocks['Hero'];\n" +
+          '    }[];',
       ),
     );
     ok(
-      shared.includes(
+      bare.includes(
         '    body: (\n' +
-          "      | { block: 'CTA'; UUID: string; fields: GeneratedBlocks['CTA'] }\n" +
-          "      | { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }\n" +
+          '      | {\n' +
+          "          block: 'CTA';\n" +
+          '          UUID: string;\n' +
+          "          fields: GeneratedBlocks['CTA'];\n" +
+          '        }\n' +
+          '      | {\n' +
+          "          block: 'Hero';\n" +
+          '          UUID: string;\n' +
+          "          fields: GeneratedBlocks['Hero'];\n" +
+          '        }\n' +
           '    )[];',
       ),
     );
-    ok(shared.includes("    body: { blocks: 'CTA' | 'Hero' };"));
-    ok(shared.includes("    hero: { blocks: 'Hero' };"));
+    ok(bare.includes("    body: { blocks: 'CTA' | 'Hero' };"));
+    ok(bare.includes("    hero: { blocks: 'Hero' };"));
     ok(
-      shared.includes(
+      bare.includes(
         'export interface GeneratedBlockQueryFields {\n' +
           '  CTA: {\n' +
           '    UUID: { scalar: string; id: true };\n' +
@@ -386,20 +474,28 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
 
     ok(
-      shared.includes(
-        "    cards: { block: 'CTA'; UUID: string; fields: GeneratedBlocks['CTA'] }[];",
+      bare.includes(
+        '    cards: {\n' +
+          "      block: 'CTA';\n" +
+          '      UUID: string;\n' +
+          "      fields: GeneratedBlocks['CTA'];\n" +
+          '    }[];',
       ),
     );
     ok(
-      shared.includes(
-        "    more: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+      bare.includes(
+        '    more: {\n' +
+          "      block: 'Hero';\n" +
+          '      UUID: string;\n' +
+          "      fields: GeneratedBlocks['Hero'];\n" +
+          '    }[];',
       ),
     );
     ok(
-      shared.includes(
+      bare.includes(
         '  Hero: {\n' +
           '    UUID: { scalar: string; id: true };\n' +
           "    cards: { blocks: 'CTA' };\n" +
@@ -447,7 +543,7 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const shared = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
 
     ok(shared.includes("    body: { blocks: 'CTA' | 'Hero' };"));
     ok(shared.includes("    banner: { blocks: 'Hero'; localeScoped: true };"));
@@ -473,12 +569,25 @@ describe('generateDatabase', () => {
     ok(
       shared.includes(
         '    body?: (\n' +
-          "      | { block: 'CTA'; fields: GeneratedBlockInserts['CTA'] }\n" +
-          "      | { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }\n" +
+          '      | {\n' +
+          "          block: 'CTA';\n" +
+          "          fields: GeneratedBlockInserts['CTA'];\n" +
+          '        }\n' +
+          '      | {\n' +
+          "          block: 'Hero';\n" +
+          "          fields: GeneratedBlockInserts['Hero'];\n" +
+          '        }\n' +
           '    )[];',
       ),
     );
-    ok(shared.includes("    banner?: { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }[];"));
+    ok(
+      shared.includes(
+        '    banner?: {\n' +
+          "      block: 'Hero';\n" +
+          "      fields: GeneratedBlockInserts['Hero'];\n" +
+          '    }[];',
+      ),
+    );
     ok(
       shared.includes(
         'export interface GeneratedBlockInserts {\n' +
@@ -489,7 +598,10 @@ describe('generateDatabase', () => {
           '  };\n' +
           '  Hero: {\n' +
           '    title: string;\n' +
-          "    more?: { block: 'Hero'; fields: GeneratedBlockInserts['Hero'] }[];\n" +
+          '    more?: {\n' +
+          "      block: 'Hero';\n" +
+          "      fields: GeneratedBlockInserts['Hero'];\n" +
+          '    }[];\n' +
           '  };\n' +
           '}',
       ),
@@ -498,14 +610,26 @@ describe('generateDatabase', () => {
     ok(
       shared.includes(
         '    body?: (\n' +
-          "      | { block: 'CTA'; UUID?: string; fields: GeneratedBlockUpdates['CTA'] }\n" +
-          "      | { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }\n" +
+          '      | {\n' +
+          "          block: 'CTA';\n" +
+          '          UUID?: string;\n' +
+          "          fields: GeneratedBlockUpdates['CTA'];\n" +
+          '        }\n' +
+          '      | {\n' +
+          "          block: 'Hero';\n" +
+          '          UUID?: string;\n' +
+          "          fields: GeneratedBlockUpdates['Hero'];\n" +
+          '        }\n' +
           '    )[];',
       ),
     );
     ok(
       shared.includes(
-        "    banner?: { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }[];",
+        '    banner?: {\n' +
+          "      block: 'Hero';\n" +
+          '      UUID?: string;\n' +
+          "      fields: GeneratedBlockUpdates['Hero'];\n" +
+          '    }[];',
       ),
     );
     ok(
@@ -518,7 +642,11 @@ describe('generateDatabase', () => {
           '  };\n' +
           '  Hero: {\n' +
           '    title: string;\n' +
-          "    more?: { block: 'Hero'; UUID?: string; fields: GeneratedBlockUpdates['Hero'] }[];\n" +
+          '    more?: {\n' +
+          "      block: 'Hero';\n" +
+          '      UUID?: string;\n' +
+          "      fields: GeneratedBlockUpdates['Hero'];\n" +
+          '    }[];\n' +
           '  };\n' +
           '}',
       ),
@@ -539,7 +667,7 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const shared = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const node = readFileSync(paths[1] ?? '', 'utf8');
 
     ok(node.includes("collections.register('Authors'"));
@@ -576,12 +704,16 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const shared = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const node = readFileSync(paths[1] ?? '', 'utf8');
 
     ok(
       shared.includes(
-        "    body: { block: 'Hero'; UUID: string; fields: GeneratedBlocks['Hero'] }[];",
+        '    body: {\n' +
+          "      block: 'Hero';\n" +
+          '      UUID: string;\n' +
+          "      fields: GeneratedBlocks['Hero'];\n" +
+          '    }[];',
       ),
     );
     ok(!shared.includes('CTA'));
@@ -755,7 +887,7 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const shared = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const node = readFileSync(paths[1] ?? '', 'utf8');
 
     ok(shared.includes('export interface GeneratedInserts {'));
@@ -763,12 +895,12 @@ describe('generateDatabase', () => {
     ok(shared.includes('rank?: number;'));
     ok(shared.includes('author?: string | null;'));
     ok(shared.includes('tags?: string[];'));
-    ok(shared.includes('items?: { label: string }[];'));
+    ok(shared.includes('    items?: {\n      label: string;\n    }[];'));
     ok(node.includes('interface KnownInserts extends GeneratedInserts {}'));
 
     ok(shared.includes('export interface GeneratedUpdates {'));
     ok(shared.includes('title?: string;'));
-    ok(shared.includes('items?: { UUID?: string; label: string }[];'));
+    ok(shared.includes('    items?: {\n      UUID?: string;\n      label: string;\n    }[];'));
     ok(node.includes('interface KnownUpdates extends GeneratedUpdates {}'));
   });
 
