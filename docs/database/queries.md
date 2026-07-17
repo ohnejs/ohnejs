@@ -18,7 +18,8 @@ const post = await query('Posts').findFirst();
 ```
 
 The collection is defined in a file under `collections/`; see [collections](./collections.md) for
-the field types and [schema sync](./sync.md) for how a collection becomes a table.
+the field types and [schema sync](./sync.md) for how a collection becomes a table. The same query
+grammar is available over HTTP too - see [querying over HTTP](../api/url-queries.md).
 
 ## Filtering
 
@@ -42,9 +43,10 @@ await query('Posts')
 ```
 
 Which operators appear depends on the field's type. A text column offers `contains`,
-`startsWith`, `endsWith`, and the raw `like`; a number offers the ordering pair
-`greaterThan`/`atLeast`/`lessThan`/`atMost`; both offer `equalsTo` and `in`. Asking for an operator
-the field does not admit - ordering on a boolean, `contains` on a number - does not compile.
+`startsWith`, `endsWith`, and the raw `like`; text and number columns alike admit the ordering
+comparisons `greaterThan`, `atLeast`, `lessThan`, and `atMost`; both offer `equalsTo` and `in`.
+Asking for an operator the field does not admit - ordering on a boolean, `contains` on a number -
+does not compile.
 
 Chained `where` calls AND together. Each returns the builder, so you keep filtering.
 
@@ -63,6 +65,15 @@ compile:
 
 ```ts
 await query('Posts').where('summary', (w) => w.isNull()).findMany();
+```
+
+### Or on one field
+
+After an operator, `or` starts an alternative on the same field - the record matches when either
+comparison does:
+
+```ts
+await query('Posts').where('views', (w) => w.atLeast(100).or.equalsTo(0)).findMany();
 ```
 
 ### Either-or
@@ -99,6 +110,9 @@ Bare `has()` tests that the relation is set at all; `empty()` is its opposite:
 await query('Posts').where('author', (w) => w.has()).findMany();
 await query('Posts').where('tags', (w) => w.empty()).findMany();
 ```
+
+An `object` or `repeater` field admits the same pair: bare `has()` tests it holds anything,
+`empty()` the opposite, and a callback probes the composite's subfields.
 
 By default a relation field reads back as `UUID`s - the id of the related row, or an array of them.
 `populate` swaps those ids for the full related records:
@@ -150,8 +164,8 @@ The [blocks guide](./blocks.md#querying) covers the two-step and composing acros
 
 ## Ordering
 
-`orderBy` sorts by a field. A leading direction is optional and defaults to ascending; call it
-again to add a tiebreaker:
+`orderBy` sorts by a field. An optional second argument gives the direction, defaulting to
+ascending; call it again to add a tiebreaker:
 
 ```ts
 await query('Posts').orderBy('publishedAt', 'desc').orderBy('title').findMany();
@@ -198,7 +212,8 @@ const total = await query('Posts').where('status', 'published').count();
 const any = await query('Posts').where('featured', true).exists();
 ```
 
-`pluck` reads one field's value from every matching record:
+`pluck` reads one field's value from each record a `findMany` would return - the query's order
+and window apply:
 
 ```ts
 const titles = await query('Posts').pluck('title'); // string[]

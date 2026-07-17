@@ -78,19 +78,20 @@ The sync never destroys data silently. It refuses to boot when a change would lo
 - dropping a table or column that still holds rows,
 - changing the type of a populated column,
 - adding a unique constraint over duplicate values,
-- adding `NOT NULL` where rows hold `NULL`.
+- adding `NOT NULL` where rows hold `NULL`,
+- adding a relation whose existing values point at no target row.
 
 The refusal names exactly what would be lost. Empty tables and all-`NULL` columns are dropped
 freely - there is nothing to lose.
 
-An intentional change is expressed as a migration: a file under `migrations/` built with
-`defineMigration`, moving, renaming, or discarding data. Migrations run inside the same sync
-transaction, before the diff, so a covered change passes the guard.
+An intentional change is expressed as a [migration](./migrations.md): a file under `migrations/`
+built with `defineMigration`, moving, renaming, or discarding data. Migrations run inside the
+same sync transaction, before the diff, so a covered change passes the guard.
 
 ## Force
 
-`FORCE_SYNC` (or its `--force-sync` flag, or `database.sync.force` in config) authorizes the guard's
-deletions for one boot:
+`FORCE_SYNC` (or its `--force-sync` flag) authorizes the guard's deletions for one boot;
+`database.sync.force` in config does the same for every boot until you remove it:
 
 ```sh
 FORCE_SYNC=1 pnpm serve:api
@@ -100,6 +101,10 @@ pnpm serve:api --force-sync
 Force does not skip the checks - it performs the deletions they warned about, and reports
 everything it deleted in one block. Reach for a migration first; force is for the cases where the
 data is truly disposable.
+
+Not everything can be forced. A unique over duplicate values, `NOT NULL` over rows holding
+`NULL`, and a retype into `NOT NULL` on a populated column refuse regardless - force cannot pick
+which rows win. Fix the data first, or rewrite it with a move migration.
 
 ## Rolling back
 
@@ -125,6 +130,15 @@ destructive changes, exactly like `FORCE_SYNC`:
 
 ```sh
 pnpm exec ohne sync --force
+```
+
+`--dry-run` rehearses the whole sync - migrations, diff, guard - against the live database, then
+rolls everything back, so nothing is written. A refusal still exits non-zero, exactly where a real
+sync would refuse, which makes it the deploy gate: run it before cutover, and a bad schema change
+fails the pipeline while the old build still serves:
+
+```sh
+pnpm exec ohne sync --dry-run
 ```
 
 A database already in shape makes the command a no-op, so it is always safe to run.

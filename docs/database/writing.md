@@ -22,13 +22,16 @@ const result = await query('Posts').create({ title: 'Hello' });
 if (result.ok) {
   result.record; // the new post, exactly as a read would return it
 } else {
-  result.errors; // { [field: string]: string }
+  result.errors; // { body: 'validation.required' }
 }
 ```
 
 On success, `record` is the full record read back after the insert: your fields, the generated
-`UUID`, and the `_updatedAt` timestamp. On failure, `errors` maps each failing field to a
-ready-to-show message. A nested failure is keyed by its path: `sections[2].title`, `author`.
+`UUID`, and the `_updatedAt` timestamp. On failure, `errors` maps each failing field to a message:
+an untranslated key like `validation.required`, a `[key, params]` tuple when the message carries
+values, or the string a custom validator returned. A nested failure is keyed by its path:
+`sections[2].title`, `author`. Outside a handler, resolve a key to display text yourself with
+`useT` - see [messages](../i18n/messages.md).
 
 When you would rather handle failures as exceptions, `createOrThrow` returns the record directly
 and throws a `validationError` carrying the same map:
@@ -38,7 +41,8 @@ const post = await query('Posts').createOrThrow({ title: 'Hello' });
 ```
 
 Inside an HTTP handler you rarely catch it yourself: a thrown `validationError` becomes a `422`
-whose body carries the errors, and a busy database becomes a `503` with a `Retry-After`.
+whose body carries the errors, each resolved to display text in the request's language, and a busy
+database becomes a `503` with a `Retry-After`.
 
 ## Input
 
@@ -56,8 +60,10 @@ await query('Posts').create({
 ```
 
 Relations take `UUID`s, never nested records: `author` is one `UUID`, `tags` a list of them. A
-`records` or `repeater` list defaults to `[]`, so you may omit it. An `object` defaults to no
-child row, and accepts `null` to say so explicitly.
+`records` or `repeater` list defaults to `[]`, so you may omit it. Passing `[]` explicitly is fine
+too, unless the field sets `allowEmpty: false`: that rejects the empty list with an `emptyValue`
+error, while omission still lands the default. An `object` defaults to no child row, and accepts
+`null` to say so explicitly.
 
 Unknown keys are rejected, not ignored. A typo in a field name fails the write with an
 `unknownField` error at that key, so a misspelled field never silently drops its value.
@@ -76,8 +82,9 @@ export default defineField({ columnType: 'integer', defaultValue: 0 });
 field('integer', { default: 10 });
 ```
 
-A default may be a value or a callback. A relation or composite default must be a callback, since a
-shared object or array literal would be shared mutable state across every created record.
+A default may be a value or a callback. A `records`, `object`, `repeater`, or `blocks` default must
+be a callback, since a shared object or array literal would be shared mutable state across every
+created record. A `record` default is a plain `UUID`, so it stays a value.
 
 ## Sanitizers and validators
 
@@ -102,8 +109,23 @@ field('text', {
 ```
 
 The tiers run in order - type sanitizers, type validators, instance sanitizers, instance
-validators - and the first message stops the field. A validator that returns a message keyed by a
-subfield path reports a failure deep inside a composite.
+validators - and the first message stops the field. A returned message always lands at the field's
+own name. To report a failure deep inside a composite value, write into `ctx.errors` keyed by the
+subfield path; the pipeline prefixes it under the field:
+
+```ts
+export default defineField({
+  columnType: 'json',
+  validators: [
+    (value, ctx) => {
+      const address = value as { city?: string };
+      if (!address.city) ctx.errors.city = 'This value must not be empty';
+    },
+  ],
+});
+```
+
+On a field named `address`, that failure lands at `address.city`.
 
 ## Uniqueness and references
 
@@ -128,7 +150,9 @@ const result = await query('Posts').where('status', 'draft').update({ status: 'p
 ```
 
 An update is partial. Only the fields you pass change; every other column is left exactly as it was.
-A field you omit is never defaulted or cleared.
+A field you omit is never defaulted or cleared. A [when-gated field](./conditional-fields.md) adds
+its own rule: create drops inactive input, and an update writes the field only to the records whose
+condition holds.
 
 It runs the same pipeline `create` does - validation, sanitizers, uniqueness, references - once for
 the whole call. A field error fails the call before anything is written.
@@ -141,7 +165,7 @@ const result = await query('Posts').where('status', 'draft').update({ status: 'p
 if (result.ok) {
   result.records; // every matched post, in its new state
 } else {
-  result.errors; // { [field: string]: string }
+  result.errors; // the same field-to-message map create returns
 }
 ```
 
@@ -212,10 +236,13 @@ On a collection with [translatable fields](./translations.md), a write lands on 
 
 ## Transactions
 
-Pass an open transaction with `use` to run the write inside it, rather than opening its own:
+Pass an open transaction with `use` to run the write inside it, rather than opening its own. Open
+one with `useDatabase().transaction`, covered in [the engine guide](./engine.md):
 
 ```ts
-await query('Posts').use(tx).create({ title: 'Hello' });
+await useDatabase().transaction(async (tx) => {
+  await query('Posts').use(tx).create({ title: 'Hello' });
+});
 ```
 
 Writes on one connection serialize, so two concurrent creates never collide mid-transaction; each

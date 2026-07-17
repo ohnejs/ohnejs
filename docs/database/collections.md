@@ -3,7 +3,10 @@
 A collection is a set of fields, declared in one file under `collections/`. Each field becomes a
 column, a relation, or a nested table. This guide covers the field types; see
 [schema sync](./sync.md) for how a collection file becomes a table, and
-[reading records](./queries.md) for querying them.
+[reading records](./queries.md) for querying them. Every field also takes per-value options:
+`default`, `sanitizers`, and `validators` act at write time, covered in
+[writing records](./writing.md); `when` activates a field per record, covered in
+[conditional fields](./conditional-fields.md).
 
 ```ts
 // collections/Posts.ts
@@ -31,6 +34,9 @@ fields: {
 }
 ```
 
+A `text` field additionally rejects the empty string - `''` is not a value by default. Pass
+`allowEmpty: true` to permit it.
+
 `unique` and `index` cover single-column constraints; multi-column ones live on the collection.
 Both are in [schema sync](./sync.md).
 
@@ -55,6 +61,9 @@ from under it. `onDelete` decides what happens then: `setNull` (the default) cle
 ```ts
 author: field('record', { collection: 'Users', onDelete: 'cascade' }),
 ```
+
+The column is indexed by default. `unique: true` upgrades that index to a one-to-one constraint -
+at most one row may reference each target.
 
 ### Many references
 
@@ -124,6 +133,9 @@ The subfields are ordinary `field(...)` instances, so a composite may nest furth
 relations to any depth. Every item carries its own `UUID`, stable across writes, so a read always
 tells you which item is which.
 
+Inside a repeater, a `unique` subfield spans every item of every record at once.
+`uniquePerParent: true` scopes it to each record's own list, so a value may repeat across records.
+
 ## Blocks
 
 Where a repeater repeats one shape, a `blocks` field holds an ordered list of mixed, reusable
@@ -132,5 +144,6 @@ shapes, each defined once under `blocks/`. See [blocks](./blocks.md).
 ## Translations
 
 Any top-level field takes `translatable: true` to hold one value per locale - a scalar per locale,
-or a whole item list per locale for composites and `records`. See [translations](./translations.md)
+or a whole item list per locale for composites and `records`. The one exception is an inverse
+`records` field: it follows the owning side's junction. See [translations](./translations.md)
 for the locale set, reading, and writing per locale.

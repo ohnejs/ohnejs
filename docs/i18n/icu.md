@@ -2,14 +2,16 @@
 
 ICU MessageFormat is a small grammar for writing translatable strings. One string carries every shape the sentence can take: singular and plural, masculine and feminine, short and long dates. The renderer picks the right shape at runtime from the inputs you pass.
 
-This page teaches the syntax from the ground up. Examples are run through `formatMessage` from `src/utils/i18n`, but the syntax is identical anywhere ICU is supported.
+This page teaches the syntax from the ground up. Examples are run through `formatMessage`, imported from `ohne/utils`, but the syntax is identical anywhere ICU is supported.
+
+It is also the syntax of ohne's [message catalogs](./messages.md) - every value in a catalog is one of these templates.
 
 ## Plain text
 
 The simplest message is a string. No special characters, nothing to render.
 
 ```ts
-import { formatMessage } from './src/utils/index.ts';
+import { formatMessage } from 'ohne/utils';
 
 formatMessage('Welcome back.', undefined, 'en');
 // -> 'Welcome back.'
@@ -87,8 +89,8 @@ formatMessage(msg, { n: 7 }, 'en'); // -> '7 new messages.'
 
 ```ts
 const msg = `You {n, plural, offset:1
-  =0 {are the only one here}
-  =1 {and one other are here}
+  =1 {are the only one here}
+  =2 {and one other are here}
   other {and # others are here}
 }`;
 
@@ -157,7 +159,7 @@ formatMessage(
   { amount: 19.5 },
   'de',
 );
-// -> '19,50 €'
+// -> '19,50 €'
 
 formatMessage(
   '{n, number, ::compact-short}',
@@ -174,14 +176,16 @@ formatMessage(
 // -> 'Pi is about 3.142'
 ```
 
+The gap in `19,50 €` is a no-break space, exactly as `Intl` emits it.
+
 Skeletons are their own small language. `.00` fixes two fraction digits. `currency/USD` sets currency. `group-off` disables thousands separators. You don't need to learn the whole grammar to start; just enough for the formats you reach for.
 
 ## Dates and times
 
-`{d, date}` and `{d, time}` accept a predefined style: `short`, `medium`, `long`, `full`. The default is `medium`.
+`{d, date}` and `{d, time}` accept a predefined style: `short`, `medium`, `long`, `full`. The default is `medium`. Dates format in the machine's local timezone.
 
 ```ts
-const d = new Date('2026-06-09T14:30:00Z');
+const d = new Date('2026-06-09T14:30:00');
 
 formatMessage('{d, date, short}', { d }, 'en'); // -> '6/9/26'
 formatMessage('{d, date, long}', { d }, 'en');  // -> 'June 9, 2026'
@@ -239,22 +243,34 @@ formatMessage("It's {n, number} o'clock.", { n: 5 }, 'en');
 
 An apostrophe only opens an escape when the next character would otherwise be special. Everyday apostrophes pass through.
 
+## Missing parameters
+
+Formatting never throws over a missing value. A plain placeholder (and `number`, `date`, `time`) renders as itself - `Hello, {name}.` stays `Hello, {name}.` - while `plural` formats the value as zero and `select` falls to `other`. To catch these instead, both `formatMessage` and `createMessageFormatter` take an options argument with an `onError` hook; it is called on every soft failure, and throwing from it makes formatting strict.
+
+```ts
+const strict = createMessageFormatter('en', {
+  onError: (error) => { throw error; },
+});
+
+strict('Hello, {name}.', {}); // throws: missing parameter `name`
+```
+
 ## Putting it together
 
 A realistic message uses several of these at once.
 
 ```ts
-import { createMessageFormatter } from './src/utils/index.ts';
+import { createMessageFormatter } from 'ohne/utils';
 
 const t = createMessageFormatter('en');
 
 const msg = `{user} {n, plural, offset:1
-  =0 {is here alone}
-  =1 {and one other person are here}
+  =1 {is here alone}
+  =2 {and one other person are here}
   other {and # others are here}
 }, last seen {seen, date, ::yMMMd}.`;
 
-t(msg, { user: 'Alex', n: 4, seen: new Date('2026-06-09') });
+t(msg, { user: 'Alex', n: 4, seen: new Date('2026-06-09T00:00:00') });
 // -> 'Alex and 3 others are here, last seen Jun 9, 2026.'
 ```
 

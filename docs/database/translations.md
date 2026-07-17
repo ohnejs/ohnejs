@@ -15,7 +15,7 @@ fields: {
 const german = await query('Posts').locale('de').findMany();
 ```
 
-Content locales are independent from the UI languages your [message catalogs](../i18n/icu.md)
+Content locales are independent from the UI languages your [message catalogs](../i18n/messages.md)
 translate. A site can render its interface in English while serving German records, or the other
 way around.
 
@@ -41,10 +41,14 @@ fields: {
 
 A column-bearing field - a scalar or a `record` reference - keeps one value per locale. A
 composite or `records` field keeps one item list per locale: the German query reads and writes the
-German sections, the English ones untouched beside them.
+German sections, the English ones untouched beside them. So does a [blocks](./blocks.md) field:
+one block list per locale.
 
 A composite translates as a whole. Marking one of its subfields is rejected when the collection
 loads - there is no half-translated repeater item.
+
+Flipping an existing field to translatable is safe: the next [sync](./sync.md) moves its stored
+values to the default locale, so nothing is lost.
 
 ## Configuring locales
 
@@ -68,7 +72,8 @@ compile error.
 ## Reading
 
 `.locale(code)` scopes the whole chain. It exists only on collections with a translatable field,
-and once per chain - a query reads one locale.
+and once per chain - a query reads one locale. There is no multi-locale read: fetching every
+translation of a record is one query per configured locale.
 
 ```ts
 const post = await query('Posts').locale('de').findFirst();
@@ -90,8 +95,9 @@ title when the German one is missing, read it and say so:
 post.title ?? fallback.title;
 ```
 
-Because a missing translation reads `null`, every translatable field admits `isNull`, whatever its
-own nullability. That is also how you find untranslated records:
+Because a missing translation reads `null`, a translatable scalar or `record` field admits `isNull`,
+whatever its own nullability. Translatable composites and lists read `[]` instead, so you probe them
+with `empty()`. That is also how you find untranslated records:
 
 ```ts
 const untranslated = await query('Posts')
@@ -163,4 +169,4 @@ German slugs at once.
 ## Over HTTP
 
 The wire mirror carries the locale as a query parameter; see
-[querying over HTTP](./url-queries.md#locales).
+[querying over HTTP](../api/url-queries.md#locales).

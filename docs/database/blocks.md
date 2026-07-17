@@ -33,9 +33,9 @@ A read returns `content` as a list of items, each naming its type.
 
 ## Defining a block
 
-A block lives in one file under `blocks/`, and the file names it: `blocks/Quote.ts` defines
-`Quote`. Its fields are ordinary `field(...)` instances - columns, relations, composites, to any
-depth.
+A block lives in one file under `blocks/` - each layer's `dirs.blocks` directory, set in
+[config](../project/config.md) - and the file names it: `blocks/Quote.ts` defines `Quote`. Its
+fields are ordinary `field(...)` instances - columns, relations, composites, to any depth.
 
 ```ts
 // blocks/Quote.ts
@@ -59,7 +59,8 @@ fields, everywhere a block appears.
 ## The blocks field
 
 `allow` names the types the field may hold. Omit it to accept every block the app defines - an
-open set, so a block a layer adds later joins it silently.
+open set, so a block a layer adds later joins it silently. Naming a block that no layer defines
+fails at codegen.
 
 ```ts
 fields: {
@@ -146,7 +147,7 @@ await query('Pages')
 ```
 
 Over HTTP the same probe is a condition object whose `has` scope opens with a `block` equality;
-see [querying over HTTP](./url-queries.md#filtering).
+see [querying over HTTP](../api/url-queries.md#filtering).
 
 ## Writing
 

@@ -1,12 +1,12 @@
 # Conditional fields
 
 A `when` makes a field active only when a condition holds. An inactive field is left out of the
-write: its input is dropped, and it falls back to its default. Reach for it when a field only makes
-sense in some states of a record - a discount that applies during a sale, a reason required only
-when something is rejected.
+write: its input is dropped, and on create it falls back to its default. Reach for it when a field
+only makes sense in some states of a record - a discount that applies during a sale, a reason
+required only when something is rejected.
 
 ```ts
-field('integer', { nullable: true, when: { kind: 'sale' } });
+discount: field('integer', { nullable: true, when: { kind: 'sale' } }),
 ```
 
 This `discount` is active only when the record's `kind` is `sale`. Write it on any other kind and
@@ -23,9 +23,10 @@ await query('Products').create({ kind: 'sale', discount: 20 }); // discount: 20
 await query('Products').create({ kind: 'gift', discount: 20 }); // discount: its default, not 20
 ```
 
-Because an inactive field always falls back to a default, a `when`-gated field must be **nullable or
-carry a default**. Otherwise an inactive create would have no value to store. This is checked when
-your collections load, so a gate that could strand a field fails fast.
+An inactive create still needs a value to store, so a gated field must have a fallback: make it
+**nullable or give it a default**. A list field - a `records`, `repeater`, or `blocks` - needs
+neither, since its inactive value is the empty list. This is checked when your collections load,
+so a gate that could strand a field fails fast.
 
 ## Paths
 
@@ -51,10 +52,24 @@ A dot descends into a composite (`address.city`). A relation cannot be walked - 
 field('text', { nullable: true, when: { author: { has: true } } });
 ```
 
-The condition uses the same object form as a [query `where`](./queries.md): sibling keys combine
-with AND, and `and`, `or`, and `not` group them. Every operator and path is checked against your
-schema when the collection loads, so a typo or an operator a field cannot support is caught before
-anything runs.
+A [blocks](./blocks.md) field cannot be walked either - its list mixes shapes - so it too takes
+only the bare `has: true`. A composite can be walked: a `has` on an `object` or `repeater` may
+nest a condition, which reads the item's own subfields.
+
+The condition uses the same object form as a `where` in
+[querying over HTTP](../api/url-queries.md#filtering): a bare `field: value` matches on equality,
+a `{ op: value }` object is a comparison, sibling keys combine with AND, and `and`, `or`, and
+`not` group them.
+
+```ts
+field('integer', {
+  nullable: true,
+  when: { published: true, views: { atLeast: 100 } },
+});
+```
+
+Every operator and path is checked against your schema when the collection loads, so a typo or an
+operator a field cannot support is caught before anything runs.
 
 ## On update
 
@@ -101,10 +116,27 @@ One difference from a top-level field: an update rewrites a whole item, so an in
 resets to its default - exactly like a subfield you left out of the item. It is not kept.
 
 ```ts
-// the record's kind is 'draft'; note is gated on '../kind' == 'published'
+// collections/Posts.ts
+fields: {
+  kind: field('text'),
+  revisions: field('repeater', {
+    fields: {
+      note: field('text', { nullable: true, when: { '../kind': 'published' } }),
+      label: field('text', { nullable: true }),
+    },
+  }),
+}
+```
+
+```ts
+// the record's kind is 'draft', so note is inactive
 await query('Posts').where('UUID', id).update({
   revisions: [{ UUID: r, note: 'hi' }], // label left out, note provided
 });
-// -> revision: { note: null, label: null }
+// -> revisions: [{ note: null, label: null }]
 //    note is inactive, label is omitted - both reset to their default
 ```
+
+A [block's](./blocks.md) own fields take `when` too, with one restriction: the paths stay inside
+the block. `/` and `../` are rejected - a block can sit in any collection, so it cannot anchor
+into a host it does not know.
