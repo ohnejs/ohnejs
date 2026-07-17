@@ -25,9 +25,12 @@ Put that in `api/posts.get.ts` and `GET /posts?where={featured:true}&order=[-vie
 the matching rows as JSON. The URL is untrusted, so every value is checked before it reaches the
 database; a bad query comes back a `400`, never a broken read.
 
-The URL grammar is the same one [`useSearchParams`](./collections.md) speaks everywhere: `1` is a
-number, `true` a boolean, `[a,b]` a list, `{k:v}` an object, and a leading backtick forces a string
-(`` `1 `` is the string `"1"`).
+The URL grammar is the same one [`useSearchParams`](./request.md#search-params) speaks everywhere:
+`1` is a number, `true` a boolean, `[a,b]` a list, `{k:v}` an object, and a leading backtick forces
+a string (`` `1 `` is the string `"1"`).
+
+`where`, `select`, `order`, `populate`, `limit`, `offset`, `page`, `perPage`, and `locale` are the
+whole surface. Any other top-level parameter is a `400` with the code `unknownParam`.
 
 ## Filtering
 
@@ -60,8 +63,8 @@ A relation filters with `has`, re-scoped to the target's fields, and `empty` for
 ?where={tags:{empty:true}}
 ```
 
-A [blocks](./blocks.md#querying) field takes the same pair; a conditioned `has` scope opens with a
-bare `block` equality naming the type its siblings probe:
+A [blocks](../database/blocks.md#querying) field takes the same pair; a conditioned `has` scope
+opens with a bare `block` equality naming the type its siblings probe:
 
 ```
 ?where={content:{has:{block:Hero,title:{contains:launch}}}}
@@ -72,7 +75,7 @@ the field does not allow is `unknownBlockType` at `where.content.block`, with a 
 is close. Bare `has:true` and `empty:true` need no type.
 
 The operators and what each field type admits are the same as the fluent builder. See
-[reading records](./queries.md) for the full vocabulary.
+[reading records](../database/queries.md) for the full vocabulary.
 
 ## Selecting fields
 
@@ -101,8 +104,7 @@ Two windowing modes, and a query uses one or the other. `limit` and `offset` tak
 ?limit=20&offset=40
 ```
 
-`page` and `perPage` read a page; the endpoint pins `paginate` as its terminal to serve the totals.
-`perPage` is clamped to the endpoint's ceiling:
+`page` and `perPage` read a page; `perPage` is clamped to the endpoint's ceiling:
 
 ```
 ?page=2&perPage=20
@@ -110,10 +112,25 @@ Two windowing modes, and a query uses one or the other. `limit` and `offset` tak
 
 Mixing the two modes is a `400`.
 
+`applyQuery` does not consume the pair - the endpoint pins the terminal, so it reads them off the
+parsed query and calls `paginate` itself:
+
+```ts
+export default defineHandler(async () => {
+  const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards());
+  const builder = applyQuery(queryUntyped('Posts'), parsed);
+  if (parsed.page === null) return builder.findMany();
+  return builder.paginate(parsed.page, parsed.perPage ?? 20);
+});
+```
+
+The paginated response carries `records` beside `total`, `page`, `perPage`, and `lastPage` -
+everything a pager needs to render its controls.
+
 ## Populating relations
 
 `populate` swaps a relation's ids for the full related records, exactly as the fluent
-[`populate`](./queries.md) does:
+[`populate`](../database/queries.md) does:
 
 ```
 ?populate=[author,tags]
@@ -138,8 +155,8 @@ endpoint decision.
 
 ## Locales
 
-On a collection with [translatable fields](./translations.md), `locale` scopes the query exactly as
-the fluent `.locale()` does:
+On a collection with [translatable fields](../database/translations.md), `locale` scopes the query
+exactly as the fluent `.locale()` does:
 
 ```
 ?locale=de&where={title:{isNull:true}}
@@ -175,7 +192,15 @@ A query long enough to strain a URL travels the same grammar as a JSON body. `re
 it, and the parsed object feeds the same `parseQueryParams`:
 
 ```ts
-import { parseQueryParams, queryMetadata, readQueryBody, resolveGuards } from 'ohne';
+import {
+  applyQuery,
+  defineHandler,
+  parseQueryParams,
+  queryMetadata,
+  queryUntyped,
+  readQueryBody,
+  resolveGuards,
+} from 'ohne';
 
 export default defineHandler(async () => {
   const parsed = parseQueryParams(await readQueryBody(), queryMetadata('Posts'), resolveGuards());
@@ -183,8 +208,10 @@ export default defineHandler(async () => {
 });
 ```
 
-The body must be a JSON object with `Content-Type: application/json`; the same top-level keys apply.
-The two transports parse to the same query, so a `GET` and its `POST` equivalent read the same rows.
+The body must be a JSON object sent as `application/json` - a `+json` suffix works too, anything
+else is a `415`. The same top-level keys apply, and a `maxDepth` option (default `32`) caps how
+deep the JSON may nest before it is refused. The two transports parse to the same query, so a
+`GET` and its `POST` equivalent read the same rows.
 
 ## Errors
 
@@ -200,14 +227,16 @@ A bad query throws a `400` that serializes to a small, stable shape:
 
 `data.code` is a stable machine string your client can switch on; `data.path` locates the problem in
 the query. An unknown field and an operator a field does not support both collapse to `invalidField`,
-so a URL can never probe which fields your collection has.
+so a URL can never probe which fields your collection has. The complete catalog is the
+`WireErrorCode` type, importable from `ohne`.
 
 ## Guards
 
 The untrusted path is bounded so a hostile URL cannot exhaust the server: a cap on conditions, `has`
-nesting, `in` length, selected fields, order keys, populate nodes and depth, value and pattern
-size, and page size. The defaults are generous, and a real query never approaches one. The fluent
-builder is trusted and never checked.
+nesting, `in` length, total bound parameters, selected fields, order keys, populate nodes and depth,
+value and pattern size, and page size. The full set is the `QueryGuards` interface, one ceiling per
+field, each with its default. The defaults are generous, and a real query never approaches one. The
+fluent builder is trusted and never checked.
 
 Override a ceiling app-wide in `ohne.config.ts`:
 
