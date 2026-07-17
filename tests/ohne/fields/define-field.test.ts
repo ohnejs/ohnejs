@@ -57,6 +57,15 @@ describe('defineField', () => {
     }
   });
 
+  it('rejects an option name that shadows a presentation option', () => {
+    for (const name of ['label', 'description']) {
+      throws(
+        () => defineField({ columnType: 'text', options: { [name]: option() } }),
+        new RegExp(`\`${name}\` is reserved`),
+      );
+    }
+  });
+
   it('rejects `sanitizers` or `validators` that are not arrays of functions', () => {
     throws(
       () => defineField({ columnType: 'text', sanitizers: 'nope' as never }),

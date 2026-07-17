@@ -1,4 +1,5 @@
 import type { ConditionObject } from '../../utils/index.ts';
+import type { Message } from '../messages/known-messages.ts';
 import type { ColumnValue, FieldDefault, FieldSanitizer, FieldValidator } from './context.ts';
 import type { FieldType } from './define-field.ts';
 import type { KnownFieldOptions } from './known-field-options.ts';
@@ -144,13 +145,37 @@ export interface ValueOptions<
 }
 
 /**
+ * The presentation metadata every field instance accepts, shown for the field in the dashboard.
+ * They sit outside the column gate, so every field kind - relations and composites included - carries them.
+ */
+export interface PresentationOptions {
+  /**
+   * A short label for this field, shown in the dashboard.
+   * Pass a message key to translate it per the viewer's language.
+   * A `[key, params]` tuple supplies a parameterized message; a plain string is shown as-is.
+   * Omitted, the field name is sentence-cased: `gallerySlider` becomes `Gallery slider`.
+   */
+  label?: Message;
+
+  /**
+   * A longer description for this field, shown in the dashboard beneath its label.
+   * Markdown is supported.
+   * Pass a message key to translate it per the viewer's language.
+   * A `[key, params]` tuple supplies a parameterized message; a plain string is shown as-is.
+   */
+  description?: Message;
+}
+
+/**
  * The common options after resolution: keys in `FIELD_OPTION_DEFAULTS` are required, the rest stay `?:`.
  * The framework fills those defaults, so a resolved field reads them directly, without a fallback.
  * The value options join here so a resolved field carries its `default`, `sanitizers`, and `validators`.
+ * The presentation options join too, so a resolved field carries its `label` and `description`.
  */
 export type ResolvedFieldOptions = Omit<FieldOptions, keyof typeof FIELD_OPTION_DEFAULTS> &
   Required<Pick<FieldOptions, keyof typeof FIELD_OPTION_DEFAULTS>> &
-  ValueOptions;
+  ValueOptions &
+  PresentationOptions;
 
 /**
  * The options field type `K` declares via `defineField({ options })`.
@@ -179,12 +204,10 @@ type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] exten
  * A `KnownFieldOptions` member is the complete shape.
  * Otherwise the type's declared options resolve homomorphically.
  * The common options then join per the column gate.
- * The value options join outside that gate, so every kind - relations and composites included - carries them.
+ * The value and presentation options join outside that gate, so every kind carries them.
  */
-type InstanceOptions<K extends FieldTypeName> = ValueOptions<
-  DeclaredOptions<K>,
-  ColumnValue<KnownFields[K]['columnType']>
-> &
+type InstanceOptions<K extends FieldTypeName> = PresentationOptions &
+  ValueOptions<DeclaredOptions<K>, ColumnValue<KnownFields[K]['columnType']>> &
   (K extends keyof KnownFieldOptions
     ? KnownFieldOptions[K]
     : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>);
