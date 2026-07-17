@@ -5,7 +5,7 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
 
 import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
-import { finishComposite, prepareComposite } from './descend.ts';
+import { finishComposite, prepareComposite, runCompositeTiers } from './descend.ts';
 import { defaultPath, finishScalar, prepareScalar, writeContext } from './run-field.ts';
 import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
 
@@ -43,8 +43,12 @@ export interface ScopeContext {
 
 /**
  * One field's phase-A outcome: skipped, failed, or carrying a coerced value into phase B.
+ * `provided` marks a caller-supplied composite value, so phase B runs its tiers; a default omits it.
  */
-export type Prepared = { skip: true } | { errors: FieldErrors } | { value: unknown };
+export type Prepared =
+  | { skip: true }
+  | { errors: FieldErrors }
+  | { value: unknown; provided?: true };
 
 /**
  * A reference a write must prove exists before it commits: a `record` FK or a `records`/nested link.
@@ -309,6 +313,8 @@ export async function processScope(
         entry = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
       }
       if ('skip' in entry) return;
+      if ('provided' in entry)
+        entry = await runCompositeTiers(name, meta, entry.value, input, descentCtx);
       if ('errors' in entry) {
         Object.assign(errors, entry.errors);
         return;

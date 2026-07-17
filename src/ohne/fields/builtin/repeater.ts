@@ -1,5 +1,6 @@
 import type { FieldInstance } from '../field.ts';
 
+import { isArray } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 
@@ -33,4 +34,10 @@ export const repeater = defineField({
     cardinality: 'many',
     subfields: ctx.options.fields,
   }),
+  validators: [
+    (value, ctx) =>
+      !ctx.options.allowEmpty && isArray(value) && value.length === 0
+        ? 'validation.emptyValue'
+        : undefined,
+  ],
 });

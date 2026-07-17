@@ -1,5 +1,6 @@
 import type { BlockName } from '../../blocks/known-blocks.ts';
 
+import { isArray } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 
@@ -34,4 +35,10 @@ export const blocks = defineField({
     kind: 'blocks',
     allow: ctx.options.allow,
   }),
+  validators: [
+    (value, ctx) =>
+      !ctx.options.allowEmpty && isArray(value) && value.length === 0
+        ? 'validation.emptyValue'
+        : undefined,
+  ],
 });

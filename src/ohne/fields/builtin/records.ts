@@ -1,5 +1,6 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
 
+import { isArray } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 
@@ -52,4 +53,10 @@ export const records = defineField({
     inverse: ctx.options.inverse,
     onDelete: ctx.options.onDelete,
   }),
+  validators: [
+    (value, ctx) =>
+      !ctx.options.allowEmpty && isArray(value) && value.length === 0
+        ? 'validation.emptyValue'
+        : undefined,
+  ],
 });

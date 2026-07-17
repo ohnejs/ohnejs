@@ -24,7 +24,7 @@ import {
 } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { prefixErrors, prefixPath } from './prefix-errors.ts';
-import { defaultPath, writeContext } from './run-field.ts';
+import { defaultPath, runTiers, validateContext, writeContext } from './run-field.ts';
 
 /**
  * The field's full path from the record root, the prefix its refs and nested scopes carry.
@@ -34,13 +34,35 @@ function fieldPath(name: string, ctx: ScopeContext): string {
 }
 
 /**
+ * Runs a composite field's own sanitizer and validator tiers over its provided value, in Phase B.
+ *
+ * Mirrors `finishScalar`'s tier run, so a composite validates and cleans exactly as a scalar does.
+ * A type or instance own-message keys at the field; a validator's sub-path failures lift out prefixed.
+ */
+export async function runCompositeTiers(
+  name: string,
+  meta: FieldQueryMeta,
+  value: unknown,
+  input: Readonly<Record<string, unknown>>,
+  ctx: ScopeContext,
+): Promise<{ errors: FieldErrors } | { value: unknown }> {
+  const wctx = writeContext(name, meta, input, ctx);
+  const errors: FieldErrors = {};
+  const vctx = validateContext(wctx, errors);
+  const tiered = await runTiers(value, meta, wctx, vctx);
+  if (tiered.error) return { errors: { [name]: tiered.error } };
+  if (!isEmpty(errors)) return { errors: prefixErrors(name, errors) };
+  return { value: tiered.value };
+}
+
+/**
  * Phase A for a `records`, `object`, `repeater`, or `blocks` field: default path, null gate, shape check.
  *
  * An absent field takes its empty default, except at the top level of an update, where it is skipped.
  * A nested composite item is always full, so its absent list or object subfield defaults even under an update.
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
- * A provided empty list is rejected when the field's `allowEmpty` option is `false`.
- * The default path bypasses that check: defaults are trusted, so an absent or inactive list lands `[]`.
+ * A provided value is marked `provided`, so Phase B runs the field's own sanitizers and validators over it.
+ * A default is trusted and unmarked: its tiers never run, so an absent or inactive list lands `[]` untiered.
  */
 export async function prepareComposite(
   name: string,
@@ -55,16 +77,14 @@ export async function prepareComposite(
   const value = input[name];
   if (meta.kind === 'childOne') {
     if (isNull(value)) return { value: null };
-    return isObject(value) ? { value } : { errors: { [name]: 'validation.invalidValue' } };
+    if (!isObject(value)) return { errors: { [name]: 'validation.invalidValue' } };
+    return { value, provided: true };
   }
   if (isNull(value)) return { errors: { [name]: 'validation.notNullable' } };
   if (!isArray(value)) return { errors: { [name]: 'validation.invalidValue' } };
   const wellShaped = meta.kind === 'records' ? value.every(isString) : value.every(isObject);
   if (!wellShaped) return { errors: { [name]: 'validation.invalidValue' } };
-  if (value.length === 0 && meta.options?.allowEmpty === false) {
-    return { errors: { [name]: 'validation.emptyValue' } };
-  }
-  return { value };
+  return { value, provided: true };
 }
 
 /**
