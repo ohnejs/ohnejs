@@ -36,12 +36,17 @@ export type ParamlessMessageKey = {
 /**
  * A message key that takes parameters, paired with them as a `[key, params]` tuple.
  * The parameter object is typed to exactly the keys the chosen message's template expects.
+ *
+ * Until codegen populates `KnownMessages`, the tuple loosens to `[key, params]` over a plain record.
+ * A parameterized message then reads and type-checks without a cast.
  */
-export type MessageTuple = {
-  [K in keyof KnownMessages]: [keyof KnownMessages[K]] extends [never]
-    ? never
-    : [K, KnownMessages[K]];
-}[keyof KnownMessages];
+export type MessageTuple = [keyof KnownMessages] extends [never]
+  ? [key: string, params: Record<string, unknown>]
+  : {
+      [K in keyof KnownMessages]: [keyof KnownMessages[K]] extends [never]
+        ? never
+        : [K, KnownMessages[K]];
+    }[keyof KnownMessages];
 
 /**
  * A message to translate or show: a param-free key, a `[key, params]` tuple, or a plain string.

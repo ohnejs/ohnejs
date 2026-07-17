@@ -245,8 +245,8 @@ function blockEnvelope(
 
 /**
  * The `unknownBlock` failure as its `[key, params]` message tuple.
- * Core compiles with `KnownMessages` empty, where `Message` has no tuple member.
- * The tuple therefore passes through `unknown`; the boundary resolves it like any other.
+ * The key lives in the framework's own catalog, resolved at the boundary, never in `KnownMessages`.
+ * Its tuple is therefore not a `Message` member here; the cast bridges it.
  */
 function unknownBlockMessage(block: unknown): Message {
   return ['validation.unknownBlock', { block: String(block) }] as unknown as Message;
