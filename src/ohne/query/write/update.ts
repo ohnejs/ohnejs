@@ -53,7 +53,7 @@ import {
   splitColumns,
 } from './insert.ts';
 import { checkReferences } from './references.ts';
-import { checkChildUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
+import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
 /**
  * The outcome of an update: every matched record re-read in its final state, or the field failures.
@@ -123,6 +123,15 @@ async function attemptUpdate(
 
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code, matched);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
+
+  const compositeUniqueErrors = await checkCompositeUnique(
+    tx,
+    dialect,
+    meta,
+    scope.columns,
+    matched,
+  );
+  if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
 
   const excludeChildUUIDs =
     scope.uniqueProbes.length === 0

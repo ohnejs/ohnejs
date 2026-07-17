@@ -14,7 +14,7 @@ import { readRows } from '../read/find.ts';
 import { busyError } from './busy.ts';
 import { insertCompanion, insertScope, splitColumns } from './insert.ts';
 import { checkReferences } from './references.ts';
-import { checkChildUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
+import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
 /**
  * The outcome of a create: the re-read record, or the field failures that stopped it.
@@ -76,6 +76,9 @@ async function attemptCreate(
 
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
+
+  const compositeUniqueErrors = await checkCompositeUnique(tx, dialect, meta, scope.columns);
+  if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
 
   const childUniqueErrors = await checkChildUnique(tx, dialect, scope.uniqueProbes);
   if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };

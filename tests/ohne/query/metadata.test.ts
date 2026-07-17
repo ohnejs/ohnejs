@@ -253,6 +253,7 @@ describe('queryMetadata', () => {
           allow: ['QHero', 'QQuote'],
         },
       },
+      compositeUniques: [],
     });
   });
 

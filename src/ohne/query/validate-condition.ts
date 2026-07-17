@@ -274,6 +274,7 @@ export function targetScope(
     collection: `${meta.collection}.${name}`,
     table: field.table as string,
     fields: field.subfields as Record<string, FieldQueryMeta>,
+    compositeUniques: [],
   };
 }
 
@@ -291,6 +292,7 @@ export function blockScope(
     collection: `${meta.collection}.${name}`,
     table: blockMeta.table,
     fields: blockMeta.fields,
+    compositeUniques: [],
   };
 }
 

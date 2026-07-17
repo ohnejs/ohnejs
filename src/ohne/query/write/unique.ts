@@ -65,6 +65,58 @@ export async function checkUnique(
 }
 
 /**
+ * Prechecks every collection-level `unique` composite, naming a collision at each field it covers.
+ *
+ * One `SELECT ... WHERE col = ? AND ...` per composite, `UNION ALL`-ed into a single read.
+ * A composite over translatable fields probes the companion; a plain one, the main table.
+ * Only a composite the write sets in full is probed; a partial update falls to the driver's constraint.
+ * `excludeUUIDs` drops the rows the write owns, anchored by `UUID` (main) or `_parentUUID` (companion).
+ * A `null` anywhere in the tuple never collides: `col = NULL` is never true, matching the multi-null rule.
+ * Returns `notUnique` at every field of each colliding composite, or an empty map when all are clear.
+ */
+export async function checkCompositeUnique(
+  tx: Transaction,
+  dialect: Dialect,
+  meta: CollectionQueryMeta,
+  columns: Record<string, unknown>,
+  excludeUUIDs: readonly string[] = [],
+): Promise<FieldErrors> {
+  const probes = meta.compositeUniques.filter((composite) =>
+    composite.fields.every((name) => hasKey(columns, meta.fields[name].column as string)),
+  );
+  if (probes.length === 0) return {};
+
+  const excludeMarks = excludeUUIDs.map(() => '?').join(', ');
+  const selects: string[] = [];
+  const params: SQLValue[] = [];
+  probes.forEach((composite, index) => {
+    const companion = composite.companion;
+    const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
+    const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
+    const exclude = excludeUUIDs.length === 0 ? '' : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const matches = composite.fields
+      .map((name) => `${dialect.quote(meta.fields[name].column as string)} = ?`)
+      .join(' AND ');
+    selects.push(`SELECT ? AS ${dialect.quote('which')} FROM ${table} WHERE ${matches}${exclude}`);
+    params.push(String(index));
+    for (const name of composite.fields) {
+      const field = meta.fields[name];
+      params.push(
+        dialect.serialize(field.logicalType as LogicalType, columns[field.column as string]),
+      );
+    }
+    params.push(...excludeUUIDs);
+  });
+
+  const rows = await tx.query<{ which: string }>(selects.join(' UNION ALL '), params);
+  const errors: FieldErrors = {};
+  for (const row of rows) {
+    for (const name of probes[Number(row.which)].fields) errors[name] = 'validation.notUnique';
+  }
+  return errors;
+}
+
+/**
  * Prechecks every table-wide `unique` child value: a same-write repeat first, then an existing table row.
  *
  * Probes group by table and column, so each unique child column costs one batched `IN` read.
@@ -116,13 +168,17 @@ export async function checkChildUnique(
 
 /**
  * The field-keyed error a caught unique violation falls back to when it escapes the precheck.
- * Best-effort: without parsing the driver message it names every top-level unique field.
+ * Best-effort: without parsing the driver message it names every field a unique constraint covers.
+ * Field-level and composite uniques both contribute their fields.
  * When none is unique the collision is a child-table constraint, so it falls back to a root error.
  */
 export function uniqueRaceErrors(meta: CollectionQueryMeta): FieldErrors {
   const errors: FieldErrors = {};
   for (const [name, field] of Object.entries(meta.fields)) {
     if (field.options?.unique === true) errors[name] = 'validation.notUnique';
+  }
+  for (const composite of meta.compositeUniques) {
+    for (const name of composite.fields) errors[name] = 'validation.notUnique';
   }
   if (isEmpty(errors)) errors[''] = 'validation.notUnique';
   return errors;

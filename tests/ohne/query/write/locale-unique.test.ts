@@ -83,7 +83,7 @@ describe('checkUnique under locales', () => {
     strictEqual(clash.errors.slug, 'validation.notUnique');
   });
 
-  it('names the unique field when a violation escapes the precheck', async () => {
+  it('prechecks a translatable composite on its companion, keying every covered field', async () => {
     await db.run('INSERT INTO "LURace" ("UUID","_updatedAt") VALUES (?,?)', ['r0', 1]);
     await db.run(
       'INSERT INTO "LURace__translations" ("_parentUUID","_localeCode","slug","title","subtitle") ' +
@@ -96,8 +96,24 @@ describe('checkUnique under locales', () => {
       subtitle: 'b',
     });
     ok(!result.ok);
-    deepStrictEqual(result.errors, { slug: 'validation.notUnique' });
+    deepStrictEqual(result.errors, {
+      title: 'validation.notUnique',
+      subtitle: 'validation.notUnique',
+    });
     const rows = await db.query('SELECT "UUID" FROM "LURace"');
     strictEqual(rows.length, 1);
+  });
+
+  it('spans locales: a translatable composite collides across the whole companion', async () => {
+    const en = await queryUntyped('LURace').create({ slug: 's1', title: 'x', subtitle: 'y' });
+    ok(en.ok);
+    const de = await queryUntyped('LURace')
+      .locale('de')
+      .create({ slug: 's2', title: 'x', subtitle: 'y' });
+    ok(!de.ok);
+    deepStrictEqual(de.errors, {
+      title: 'validation.notUnique',
+      subtitle: 'validation.notUnique',
+    });
   });
 });

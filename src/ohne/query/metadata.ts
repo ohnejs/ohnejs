@@ -124,6 +124,23 @@ export interface FieldQueryMeta {
 }
 
 /**
+ * A collection-level `unique` composite the write pipeline prechecks before a write.
+ * Resolved from each `compositeIndexes` entry whose `unique` is set.
+ * `fields` are the covered field names in order - each names its column and the path a collision keys.
+ * `companion` marks a composite over translatable fields, whose constraint lives on the companion table.
+ */
+export interface CompositeUnique {
+  /**
+   * The covered field names in declaration order; each is column-bearing, so its name is its column.
+   */
+  fields: readonly string[];
+  /**
+   * Whether the constraint lives on the companion table - `true` iff every covered field is translatable.
+   */
+  companion: boolean;
+}
+
+/**
  * Everything the query layer knows about one collection.
  */
 export interface CollectionQueryMeta {
@@ -141,6 +158,12 @@ export interface CollectionQueryMeta {
    * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
    */
   fields: Record<string, FieldQueryMeta>;
+
+  /**
+   * The collection's `unique` composites, resolved to their fields and home table; empty when none.
+   * The write pipeline prechecks each before it writes, keying a collision at every covered field.
+   */
+  compositeUniques: readonly CompositeUnique[];
 
   /**
    * Marks a collection with at least one translatable field - the collections `.locale()` accepts.
@@ -271,10 +294,17 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
   const companion = entries.some((field) => field.companion === true);
   const translatable =
     companion || entries.some((field) => field.localeScoped === true && field.inverse !== true);
+  const compositeUniques = (meta.collection.compositeIndexes ?? [])
+    .filter((entry) => entry.unique === true)
+    .map((entry) => ({
+      fields: entry.fields,
+      companion: entry.fields.every((name) => fields[name]?.companion === true),
+    }));
   return {
     collection: meta.name,
     table: collectionTableName(meta.name),
     fields,
+    compositeUniques,
     ...(translatable ? { translatable: true } : {}),
     ...(companion ? { companionTable: companionTableName(meta.name) } : {}),
   };
