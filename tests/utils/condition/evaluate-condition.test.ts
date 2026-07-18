@@ -90,6 +90,14 @@ describe('evaluateCondition', () => {
     }
   });
 
+  it('a compare over a nullish value is false even negated, as SQL drops the row', () => {
+    strictEqual(run({ v: { not: { equalsTo: 1 } } }, { v: null }), false);
+    strictEqual(run({ v: { not: { contains: 'x' } } }, {}), false);
+    strictEqual(run({ v: { not: { in: [1, 2] } } }, { v: null }), false);
+    strictEqual(run({ v: { not: { atLeast: 5 } } }, { v: null }), false);
+    strictEqual(run({ v: { not: { isNull: true } } }, { v: null }), false);
+  });
+
   it('isNull tests null exactly', () => {
     strictEqual(run({ v: { isNull: true } }, { v: null }), true);
     strictEqual(run({ v: { isNull: true } }, {}), false);

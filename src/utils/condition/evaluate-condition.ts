@@ -111,6 +111,8 @@ function hasMatch(condition: ConditionNode | null, value: unknown): boolean {
  * Scope rules stay outside: `resolve(path)` maps a field path to its value.
  * Misuse is inert: a comparison over mismatched types or wrong shapes is `false`, never a throw.
  * A leaf's `negated` flag flips its result; `and` over no nodes is `true`, `or` over none `false`.
+ * A compare over a nullish resolved value is `false` even negated, except `isNull`.
+ * That is SQL's three-valued `NOT`: `NOT (col = ?)` over `NULL` drops the row, and so does this.
  *
  * Text operators (`contains`, `startsWith`, `endsWith`, `like`) match case-insensitively.
  * `like` treats `%` as any run and `_` as one character.
@@ -140,7 +142,9 @@ export function evaluateCondition(
     case 'or':
       return node.nodes.some((child) => evaluateCondition(child, resolve));
     case 'compare': {
-      const result = compareValue(node.op, resolve(node.path), node.value);
+      const resolved = resolve(node.path);
+      if (isNullish(resolved) && node.op !== 'isNull') return false;
+      const result = compareValue(node.op, resolved, node.value);
       return node.negated ? !result : result;
     }
     case 'has': {
