@@ -67,6 +67,17 @@ describe('evaluateCondition', () => {
     strictEqual(run({ v: { like: '(x)%' } }, { v: '(x)!' }), true);
   });
 
+  it('like treats a pattern % as a wildcard even over a literal %', () => {
+    strictEqual(run({ v: { like: '%' } }, { v: '%x' }), true);
+    strictEqual(run({ v: { like: '%%%' } }, { v: 'a%b' }), true);
+    strictEqual(run({ v: { like: '100% d%' } }, { v: '100% done' }), true);
+  });
+
+  it('like folds case after splitting, so _ consumes one original code point', () => {
+    strictEqual(run({ v: { like: '_stanbul' } }, { v: 'İstanbul' }), true);
+    strictEqual(run({ v: { like: '_x' } }, { v: '😀x' }), true);
+  });
+
   it('like never flickers across repeated evaluations', () => {
     const parsed = parseCondition({ v: { like: 'a%' } });
     if (!parsed.ok) throw new Error('parse failed');

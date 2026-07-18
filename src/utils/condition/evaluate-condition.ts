@@ -20,24 +20,26 @@ function ordinal<T extends number | string>(op: OrderingOperator, left: T, right
 
 /**
  * Matches `text` against a SQL `LIKE` pattern, `%` spanning any run and `_` one character.
- * Case-insensitive, and compares by Unicode code point so `_` matches one astral character.
+ * A pattern `%` is always a wildcard - the grammar has no escape - so it never matches as a literal.
+ * Case-insensitive, splitting before folding so `_` consumes one original code point.
+ * Folding is Unicode-wide where SQLite's `LIKE` folds ASCII alone; that drift is accepted.
  * Uses a greedy two-pointer with `%` backtracking, not a regex.
  * A regex with alternating `%` runs could backtrack catastrophically on hostile input.
  */
 function likeMatch(text: string, pattern: string): boolean {
-  const chars = [...text.toLowerCase()];
-  const parts = [...pattern.toLowerCase()];
+  const chars = [...text].map((char) => char.toLowerCase());
+  const parts = [...pattern].map((char) => char.toLowerCase());
   let ti = 0;
   let pi = 0;
   let star = -1;
   let mark = 0;
   while (ti < chars.length) {
-    if (pi < parts.length && (parts[pi] === '_' || parts[pi] === chars[ti])) {
-      ti++;
-      pi++;
-    } else if (pi < parts.length && parts[pi] === '%') {
+    if (pi < parts.length && parts[pi] === '%') {
       star = pi++;
       mark = ti;
+    } else if (pi < parts.length && (parts[pi] === '_' || parts[pi] === chars[ti])) {
+      ti++;
+      pi++;
     } else if (star !== -1) {
       pi = star + 1;
       ti = ++mark;
