@@ -681,6 +681,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
   /**
    * Narrows the read to the named fields, accumulating across calls.
    * The returned rows carry only the selected fields.
+   * A call with no fields is a no-op, so the read stays whole-record - exactly what the type says.
    *
    * @example
    * ```ts

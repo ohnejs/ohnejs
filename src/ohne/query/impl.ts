@@ -66,6 +66,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   select(...fields: string[]): this {
+    if (fields.length === 0) return this;
     for (const field of fields) {
       if (isUndefined(this.meta.fields[field])) throw unknownFieldError(field, this.meta);
     }

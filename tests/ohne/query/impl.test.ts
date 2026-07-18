@@ -72,6 +72,19 @@ describe('QueryBuilderImpl accumulation', () => {
     deepStrictEqual(rows, [{ title: 'Alpha', views: 100 }]);
   });
 
+  it('treats a zero-arg select as a no-op, reading the whole record', async () => {
+    const rows = await queryUntyped('IPosts').select().where({ title: 'Alpha' }).findMany();
+    strictEqual(rows.length, 1);
+    strictEqual(rows[0].title, 'Alpha');
+    ok('UUID' in rows[0]);
+    const narrowed = await queryUntyped('IPosts')
+      .select('title')
+      .select()
+      .where({ title: 'Alpha' })
+      .findMany();
+    deepStrictEqual(narrowed, [{ title: 'Alpha' }]);
+  });
+
   it('stacks order keys in priority order', async () => {
     deepStrictEqual(
       await titles(queryUntyped('IPosts').orderBy('views', 'desc').orderBy('title')),
