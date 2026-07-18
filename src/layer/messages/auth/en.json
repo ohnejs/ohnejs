@@ -6,9 +6,9 @@
       "label": "Email",
       "description": "The address the user signs in with. Stored lowercased, so it stays unique across letter case."
     },
-    "passwordHash": {
-      "label": "Password hash",
-      "description": "The scrypt hash of the password. The password itself is never stored."
+    "password": {
+      "label": "Password",
+      "description": "Takes a plaintext password and stores only its scrypt hash. The password itself is never stored."
     }
   },
   "sessions": {

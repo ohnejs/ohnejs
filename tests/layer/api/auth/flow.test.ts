@@ -8,6 +8,7 @@ import logoutHandler from '../../../../src/layer/api/auth/logout.post.ts';
 import meHandler from '../../../../src/layer/api/auth/me.get.ts';
 import SessionsCollection from '../../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../../src/layer/collections/Users.ts';
+import passwordField from '../../../../src/layer/fields/password.ts';
 import requireAuthMiddleware from '../../../../src/layer/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -22,13 +23,13 @@ import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { defineHandler } from '../../../../src/ohne/routes/define-handler.ts';
-import { hashPassword } from '../../../../src/utils/crypto/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
-// A tiny scrypt cost keeps the login timing-equalizer (`dummyVerify`) fast on the unknown-email path.
+// A tiny scrypt cost keeps hashing and the login timing-equalizer (`dummyVerify`) fast.
 useLayers().add({ path: '/auth-flow-test', input: { auth: { password: { cost: 1024 } } } });
 
+useFields().register('password', { name: 'password', fieldType: passwordField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
@@ -86,10 +87,7 @@ function cookiePair(response: Response): string {
 
 // The framework leaves account creation to the app, so the tests insert users directly.
 async function createUser(email: string, password: string): Promise<void> {
-  await queryUntyped('Users').createOrThrow({
-    email,
-    passwordHash: await hashPassword(password, { cost: 1024 }),
-  });
+  await queryUntyped('Users').createOrThrow({ email, password });
 }
 
 async function login(email: string, password: string): Promise<Response> {
@@ -150,9 +148,9 @@ describe('auth flow', () => {
     await createUser('safe@example.com', 'battery staple');
     const stored = (await queryUntyped('Users')
       .where({ email: 'safe@example.com' })
-      .findFirst()) as { passwordHash: string };
-    match(stored.passwordHash, /^scrypt\$/);
-    ok(!stored.passwordHash.includes('battery staple'));
+      .findFirst()) as { password: string };
+    match(stored.password, /^scrypt\$/);
+    ok(!stored.password.includes('battery staple'));
 
     const token = cookiePair(await login('safe@example.com', 'battery staple')).slice(
       'session='.length,

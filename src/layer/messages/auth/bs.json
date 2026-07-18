@@ -6,9 +6,9 @@
       "label": "Email",
       "description": "Adresa kojom se korisnik prijavljuje. Pohranjuje se malim slovima, pa je jedinstvena bez obzira na velika i mala slova."
     },
-    "passwordHash": {
-      "label": "Hash lozinke",
-      "description": "scrypt hash lozinke. Sama lozinka se nikada ne pohranjuje."
+    "password": {
+      "label": "Lozinka",
+      "description": "Prima lozinku u čistom tekstu i pohranjuje samo njen scrypt hash. Sama lozinka se nikada ne pohranjuje."
     }
   },
   "sessions": {

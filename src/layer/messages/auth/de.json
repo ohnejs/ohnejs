@@ -6,9 +6,9 @@
       "label": "E-Mail",
       "description": "Die Adresse, mit der sich der Benutzer anmeldet. Wird kleingeschrieben gespeichert und ist daher unabhängig von der Groß- und Kleinschreibung eindeutig."
     },
-    "passwordHash": {
-      "label": "Passwort-Hash",
-      "description": "Der scrypt-Hash des Passworts. Das Passwort selbst wird nie gespeichert."
+    "password": {
+      "label": "Passwort",
+      "description": "Nimmt ein Klartext-Passwort entgegen und speichert nur dessen scrypt-Hash. Das Passwort selbst wird nie gespeichert."
     }
   },
   "sessions": {

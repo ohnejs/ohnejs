@@ -11,7 +11,7 @@ declare module 'ohne' {
 
 /**
  * The public shape of a user, as `useUser` and the auth routes return it.
- * The `passwordHash` never appears here, so it cannot leak through a helper's return value.
+ * The `password` hash never appears here, so it cannot leak through a helper's return value.
  */
 export interface User {
   /**

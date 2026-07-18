@@ -23,14 +23,14 @@ export default defineHandler(async (): Promise<User> => {
     throw badRequest(translate('auth.invalidCredentials'));
 
   const user = (await query('Users').where('email', normalizeEmail(email)).findFirst()) as
-    | { UUID: string; email: string; passwordHash: string }
+    | { UUID: string; email: string; password: string }
     | undefined;
 
   if (isUndefined(user)) {
     await dummyVerify(password);
     throw unauthorized(translate('auth.invalidCredentials'));
   }
-  if (!(await verifyPassword(password, user.passwordHash)))
+  if (!(await verifyPassword(password, user.password)))
     throw unauthorized(translate('auth.invalidCredentials'));
 
   await createSession(user.UUID);
