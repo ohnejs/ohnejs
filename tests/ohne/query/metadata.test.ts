@@ -395,6 +395,27 @@ describe('blockQueryMetadata', () => {
     strictEqual(blockQueryMetadata('QHero'), blockQueryMetadata('QHero'));
   });
 
+  it('rejects a cascade record field anywhere inside a block, naming its path', () => {
+    useBlocks().register('QCascade', {
+      name: 'QCascade',
+      block: {
+        fields: {
+          rows: field('repeater', {
+            fields: { person: field('record', { collection: 'QUsers', onDelete: 'cascade' }) },
+          }),
+        },
+      },
+    });
+    throws(
+      () => blockQueryMetadata('QCascade'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.message, /Block `QCascade` cascades `rows\.person` under its wrapper/);
+        return true;
+      },
+    );
+  });
+
   it('throws for an unknown block, naming it', () => {
     throws(
       () => blockQueryMetadata('Nope'),

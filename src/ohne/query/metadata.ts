@@ -267,9 +267,41 @@ export function blockQueryMetadata(block: string): BlockQueryMeta {
   });
   addFieldEntries(fields, meta.block.fields, blockRootName(block), `block \`${block}\``);
   const built = { name: block, table: blockTableName(block), fields };
+  assertNoCascadeInBlock(block, fields, '');
   validateBlockWhen(block, fields);
   blockCache.set(block, built);
   return built;
+}
+
+/**
+ * Rejects a `record` subfield with `onDelete: 'cascade'` anywhere inside a block's field tree.
+ *
+ * A block's per-type row hangs beneath a polymorphic wrapper that carries no foreign key.
+ * A cascade would doom rows only the write layer knows how to clean, leaving wrappers dangling.
+ * Every read of an owning collection would then throw on the dangling reference.
+ */
+function assertNoCascadeInBlock(
+  block: string,
+  fields: Record<string, FieldQueryMeta>,
+  prefix: string,
+): void {
+  for (const [name, field] of Object.entries(fields)) {
+    const path = prefix === '' ? name : `${prefix}.${name}`;
+    if (field.kind === 'record' && field.options?.onDelete === 'cascade') {
+      throw ohneError({
+        title: `Block \`${block}\` cascades \`${path}\` under its wrapper`,
+        body: [
+          `Field \`${path}\` in block \`${block}\` sets \`onDelete: 'cascade'\`.`,
+          'A cascade under a polymorphic wrapper dooms rows the write layer must clean itself.',
+          'A delete of the referenced record would leave dangling wrappers that break every read.',
+          'Use `setNull` or `restrict` instead.',
+        ],
+      });
+    }
+    if (field.kind === 'childOne' || field.kind === 'childMany') {
+      assertNoCascadeInBlock(block, field.subfields as Record<string, FieldQueryMeta>, path);
+    }
+  }
 }
 
 /**
