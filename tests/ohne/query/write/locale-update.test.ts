@@ -85,6 +85,20 @@ useCollections().register('LGatedCompanion', {
     },
   },
 });
+useCollections().register('LGatedDefault', {
+  name: 'LGatedDefault',
+  collection: {
+    fields: {
+      status: field('text'),
+      caption: field('text', {
+        translatable: true,
+        default: 'Bad',
+        validators: [(value: unknown) => (value === 'Bad' ? 'validation.invalidValue' : undefined)],
+        when: { status: 'live' },
+      }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -328,6 +342,26 @@ describe('runUpdate companion upsert', () => {
     deepStrictEqual(await mainRow('LPosts', 'cp3'), mainBefore);
     deepStrictEqual(await companionRow('cp3', 'en'), enBefore);
     strictEqual(await companionRow('cp3', 'de'), undefined);
+  });
+
+  it('materializes with a provided active gated field, its unused default never failing', async () => {
+    const created = await runCreate('LGatedDefault', { status: 'live', caption: 'x' }, null);
+    ok(created.ok);
+    const uuid = (created.record as { UUID: string }).UUID;
+    const result = await runUpdate(
+      'LGatedDefault',
+      { status: 'live', caption: 'y' },
+      uuidIs(uuid),
+      'de',
+    );
+    ok(result.ok);
+    strictEqual(result.records[0].caption, 'y');
+    const de = await db.queryOne<{ caption: string }>(
+      'SELECT "caption" FROM "LGatedDefault__translations" ' +
+        'WHERE "_parentUUID" = ? AND "_localeCode" = ?',
+      [uuid, 'de'],
+    );
+    strictEqual(de?.caption, 'y');
   });
 
   it('materializes nothing when the update touches only plain fields', async () => {

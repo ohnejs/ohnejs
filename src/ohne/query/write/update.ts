@@ -217,12 +217,13 @@ async function matchedUUIDs(
 /**
  * How a write's companion columns land per matched record: update the existing row, or materialize one.
  * `defaults` carries the values a materialized row fills its unwritten columns with.
- * `errors` carries the default failures; they fail the call only when a row must actually materialize.
+ * `errors` carries each failing default's errors by its column.
+ * They fail the call only when a row must actually materialize and the write leaves that column unfilled.
  */
 interface CompanionPlan {
   hasRow: ReadonlySet<string>;
   defaults: Record<string, unknown>;
-  errors: FieldErrors;
+  errors: Record<string, FieldErrors>;
 }
 
 /**
@@ -267,19 +268,19 @@ async function planCompanion(
     path: '',
     ancestors: [],
   };
-  const errors: FieldErrors = {};
+  const errors: Record<string, FieldErrors> = {};
   const defaults: Record<string, unknown> = {};
   for (const [name, field] of Object.entries(meta.fields)) {
     if (field.companion !== true) continue;
     if (hasKey(scope.columns, field.column as string) && isUndefined(field.when)) continue;
     const prepared = await defaultPath(name, field, writeContext(name, field, {}, ctx));
     if ('errors' in prepared) {
-      Object.assign(errors, prepared.errors);
+      errors[field.column as string] = prepared.errors;
       continue;
     }
     if (!('value' in prepared)) continue;
     const finished = await finishScalar(name, field, prepared.value, {}, ctx);
-    if (!isUndefined(finished.errors)) Object.assign(errors, finished.errors);
+    if (!isUndefined(finished.errors)) errors[field.column as string] = finished.errors;
     else defaults[field.column as string] = finished.column?.value ?? null;
   }
   return { hasRow, defaults, errors };
@@ -288,6 +289,8 @@ async function planCompanion(
 /**
  * The plan's errors when this write would materialize a companion row it cannot fill, else `null`.
  * A write materializes only where it sets companion columns for a record lacking the locale's row.
+ * Only columns the write leaves unfilled count: a column the write sets never needs its default.
+ * A provided-and-active gated field therefore cannot fail on a default no row would take.
  */
 function materializeFailure(
   plan: CompanionPlan,
@@ -295,7 +298,12 @@ function materializeFailure(
   uuids: readonly string[],
 ): FieldErrors | null {
   if (isEmpty(plan.errors) || isEmpty(companion)) return null;
-  return uuids.some((uuid) => !plan.hasRow.has(uuid)) ? plan.errors : null;
+  if (!uuids.some((uuid) => !plan.hasRow.has(uuid))) return null;
+  const errors: FieldErrors = {};
+  for (const [column, failure] of Object.entries(plan.errors)) {
+    if (!hasKey(companion, column)) Object.assign(errors, failure);
+  }
+  return isEmpty(errors) ? null : errors;
 }
 
 /**
