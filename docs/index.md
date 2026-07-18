@@ -59,6 +59,14 @@ Define endpoints as files. Handlers read the request and return a value ohne ser
 - [Hooks](./api/hooks.md) - react to framework lifecycle events.
 - [Querying over HTTP](./api/url-queries.md) - turn a URL query into a safe, filtered read.
 
+## Authentication
+
+Email and password accounts, sessions, and the helpers to gate a route. Shipped by the ohne layer,
+so an app opts out by not stacking it.
+
+- [Authentication](./auth/authentication.md) - the `Users` collection, the `/auth` endpoints, and
+  `useUser`.
+
 ## Internationalization
 
 Two independent systems: message catalogs for your UI strings, and content locales for your data
