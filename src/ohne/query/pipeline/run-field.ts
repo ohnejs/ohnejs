@@ -61,6 +61,15 @@ async function resolveDefaultValue(source: unknown, ctx: FieldWriteContext): Pro
 }
 
 /**
+ * Whether the input explicitly provides a field: the key present and its value not `undefined`.
+ * Explicit `undefined` reads as absent - a create defaults the field, an update skips it.
+ * This matches how `resolveFieldOptions` treats an explicit `default: undefined`.
+ */
+export function isProvided(input: Readonly<Record<string, unknown>>, name: string): boolean {
+  return hasKey(input, name) && !isUndefined(input[name]);
+}
+
+/**
  * The default path (step 0), keyed on the field's storage kind.
  *
  * An instance `default` wins; then a column's type `defaultValue`; then the kind's empty value.
@@ -90,6 +99,7 @@ export async function defaultPath(
  * Phase A for a column or `record` field: the default path, the null gate, and the soft coerce.
  *
  * An absent field takes its default, except at the top level of an update, where it is skipped.
+ * An explicit `undefined` counts as absent, so it can never slip past the null gate as a value.
  * A composite item is always a full item, so its absent subfields default even under an update.
  * A `null` on a non-nullable field is rejected; a nullable `null` carries through, skipping the coerce.
  */
@@ -99,7 +109,7 @@ export async function prepareScalar(
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
 ): Promise<Prepared> {
-  if (!hasKey(input, name)) {
+  if (!isProvided(input, name)) {
     if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }

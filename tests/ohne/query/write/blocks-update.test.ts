@@ -199,6 +199,24 @@ describe('runUpdate with blocks', () => {
     strictEqual(result.errors['content[0].UUID'], 'validation.invalidReference');
   });
 
+  it('rejects a duplicate instance UUID instead of collapsing items', async () => {
+    const post = await seedPost([{ block: 'BUHero', fields: { title: 'One' } }]);
+    const [item] = post.content;
+    const result = await runUpdate(
+      'BUPosts',
+      {
+        content: [
+          { block: 'BUHero', UUID: item.UUID, fields: { title: 'first' } },
+          { block: 'BUHero', UUID: item.UUID, fields: { title: 'second' } },
+        ],
+      },
+      uuidIs(post.uuid),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors['content[1].UUID'], 'validation.notUnique');
+  });
+
   it('rejects a foreign or cross-parent UUID at the item', async () => {
     const mine = await seedPost([{ block: 'BUHero', fields: { title: 'Mine' } }]);
     const other = await seedPost([{ block: 'BUHero', fields: { title: 'Other' } }]);

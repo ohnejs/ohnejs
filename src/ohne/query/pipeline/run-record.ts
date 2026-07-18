@@ -6,7 +6,7 @@ import type { FieldErrors } from '../write/errors.ts';
 
 import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { finishComposite, prepareComposite, runCompositeTiers } from './descend.ts';
-import { defaultPath, finishScalar, prepareScalar, writeContext } from './run-field.ts';
+import { defaultPath, finishScalar, isProvided, prepareScalar, writeContext } from './run-field.ts';
 import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
 
 /**
@@ -308,7 +308,8 @@ export async function processScope(
       if (
         !isUndefined(resolve) &&
         !isUndefined(meta.when) &&
-        !evaluateCondition(meta.when, resolve)
+        !evaluateCondition(meta.when, resolve) &&
+        isProvided(input, name)
       ) {
         entry = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
       }
@@ -374,6 +375,8 @@ function mergeOutput(scope: ProcessedScope, errors: FieldErrors, output: FieldOu
  *
  * Every failure value is a `Message`: a key, a `[key, params]` tuple, or a plain string.
  * The returned scope is write-ready: columns serialized, relations and children collected, refs gathered.
+ * The input is copied shallowly and frozen, so a field callback cannot poison a sibling's read.
+ * The caller's own object stays untouched.
  */
 export async function runRecord(
   collectionMeta: CollectionQueryMeta,
@@ -387,5 +390,5 @@ export async function runRecord(
     path: '',
     ancestors: [],
   };
-  return processScope(collectionMeta.fields, input, ctx);
+  return processScope(collectionMeta.fields, Object.freeze({ ...input }), ctx);
 }

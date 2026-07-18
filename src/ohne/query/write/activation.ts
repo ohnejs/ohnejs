@@ -4,9 +4,10 @@ import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 
-import { evaluateCondition, hasKey, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
+import { evaluateCondition, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { coerceColumn } from '../pipeline/preflight.ts';
+import { isProvided } from '../pipeline/run-field.ts';
 import { whenResolver } from '../pipeline/when.ts';
 
 /**
@@ -66,7 +67,7 @@ export function whenGates(
 ): WhenGate[] {
   const gates: WhenGate[] = [];
   for (const [name, meta] of Object.entries(fields)) {
-    if (isUndefined(meta.when) || !hasKey(input, name)) continue;
+    if (isUndefined(meta.when) || !isProvided(input, name)) continue;
     const gate: WhenGate = { name, when: meta.when };
     if (meta.kind === 'column' || meta.kind === 'record') gate.column = meta.column;
     else if (meta.kind === 'records') gate.relation = scope.relations.find((r) => r.meta === meta);
@@ -86,7 +87,7 @@ export function coercedOverlay(
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {};
   for (const [name, meta] of Object.entries(fields)) {
-    if (!hasKey(input, name)) continue;
+    if (!isProvided(input, name)) continue;
     const raw = input[name];
     values[name] =
       meta.kind === 'column' && !isNull(raw)

@@ -45,6 +45,19 @@ useCollections().register('PGlobal', {
   },
 });
 
+useCollections().register('PFrozen', {
+  name: 'PFrozen',
+  collection: {
+    fields: {
+      a: field('text', {
+        validators: [
+          (_value, ctx) => (Object.isFrozen(ctx.input) ? undefined : 'input not frozen'),
+        ],
+      }),
+    },
+  },
+});
+
 useBlocks().register('PHero', { name: 'PHero', block: { fields: { title: field('text') } } });
 useBlocks().register('PBadge', {
   name: 'PBadge',
@@ -131,6 +144,32 @@ describe('runRecord (create)', () => {
     const result = await create({ ...full, title: null });
     ok(!result.ok);
     strictEqual(result.errors.title, 'validation.notNullable');
+  });
+
+  it('treats an explicit undefined as absent, never as a value', async () => {
+    const created = await create({ ...full, summary: undefined });
+    ok(created.ok);
+    strictEqual(created.scope.columns.summary, null);
+    const missing = await create({ ...full, title: undefined });
+    ok(!missing.ok);
+    strictEqual(missing.errors.title, 'validation.required');
+    const updated = await runRecord(
+      queryMetadata('PPost'),
+      { title: undefined },
+      { operation: 'update', tx },
+    );
+    ok(updated.ok);
+    deepStrictEqual(updated.scope.columns, {});
+  });
+
+  it("freezes a copy of the input, leaving the caller's object untouched", async () => {
+    const input = { ...full };
+    const result = await create(input);
+    ok(result.ok);
+    ok(!Object.isFrozen(input));
+    strictEqual(input.title, 'Hello');
+    const seen = await runRecord(queryMetadata('PFrozen'), { a: 'x' }, { operation: 'create', tx });
+    ok(seen.ok);
   });
 
   it('rejects an empty string on a text field by default', async () => {

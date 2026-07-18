@@ -24,7 +24,7 @@ import {
 } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { prefixErrors, prefixPath } from './prefix-errors.ts';
-import { defaultPath, runTiers, validateContext, writeContext } from './run-field.ts';
+import { defaultPath, isProvided, runTiers, validateContext, writeContext } from './run-field.ts';
 
 /**
  * The field's full path from the record root, the prefix its refs and nested scopes carry.
@@ -59,6 +59,7 @@ export async function runCompositeTiers(
  * Phase A for a `records`, `object`, `repeater`, or `blocks` field: default path, null gate, shape check.
  *
  * An absent field takes its empty default, except at the top level of an update, where it is skipped.
+ * An explicit `undefined` counts as absent, exactly as `prepareScalar` reads it.
  * A nested composite item is always full, so its absent list or object subfield defaults even under an update.
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
  * A provided value is marked `provided`, so Phase B runs the field's own sanitizers and validators over it.
@@ -70,7 +71,7 @@ export async function prepareComposite(
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
 ): Promise<Prepared> {
-  if (!hasKey(input, name)) {
+  if (!isProvided(input, name)) {
     if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }
@@ -95,6 +96,7 @@ export async function prepareComposite(
  * A composite recurses through `processScope` per item, its errors and refs re-pathed under the field.
  * A blocks item validates its envelope first, then descends its `fields` under the named block's scope.
  * On update a repeater or blocks item's `UUID` is lifted off, so the write step can correlate it.
+ * A repeated item `UUID` is rejected as `notUnique` there: two items cannot keep one row.
  * A `null` object on update clears the existing child row instead of descending into it.
  */
 export async function finishComposite(
@@ -144,11 +146,19 @@ export async function finishComposite(
   const items = value as Record<string, unknown>[];
   const errors: FieldErrors = {};
   const scopes: ProcessedScope[] = [];
+  const claimed = new Set<string>();
   for (let index = 0; index < items.length; index++) {
     const correlated = liftItemUUID(items[index], ctx.operation);
     if ('error' in correlated) {
       errors[`${name}[${index}].UUID`] = correlated.error;
       continue;
+    }
+    if (!isUndefined(correlated.uuid)) {
+      if (claimed.has(correlated.uuid)) {
+        errors[`${name}[${index}].UUID`] = 'validation.notUnique';
+        continue;
+      }
+      claimed.add(correlated.uuid);
     }
     const result = await processScope(subfields, correlated.input, {
       ...ctx,
@@ -177,6 +187,7 @@ export async function finishComposite(
  * Phase B for a `blocks` field: per item, the envelope gate, then the descent into the named block.
  *
  * Each item's envelope is closed - `block`, `fields`, and on update `UUID` - and validated first.
+ * A repeated instance `UUID` is rejected as `notUnique`, exactly as a repeater item's is.
  * A valid item descends `processScope` over the block's own fields, errors under `<field>[<i>].fields`.
  * Its scope is tagged with the block type for the write step.
  * Unique subfield probes aim at the block's shared per-type table, never the field's wrapper.
@@ -193,11 +204,19 @@ async function finishBlocks(
   const errors: FieldErrors = {};
   const scopes: ProcessedScope[] = [];
   const probes: UniqueProbe[] = [];
+  const claimed = new Set<string>();
   for (let index = 0; index < items.length; index++) {
     const envelope = blockEnvelope(name, index, items[index], allow, ctx.operation);
     if ('errors' in envelope) {
       Object.assign(errors, envelope.errors);
       continue;
+    }
+    if (!isUndefined(envelope.uuid)) {
+      if (claimed.has(envelope.uuid)) {
+        errors[`${name}[${index}].UUID`] = 'validation.notUnique';
+        continue;
+      }
+      claimed.add(envelope.uuid);
     }
     const blockMeta = blockQueryMetadata(envelope.block);
     const itemPath = `${path}[${index}].fields`;

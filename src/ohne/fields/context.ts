@@ -91,6 +91,7 @@ export interface FieldWriteContext<
 
   /**
    * The record's raw input, frozen: sibling values as the caller passed them, never a sanitized read.
+   * The record root is a frozen shallow copy; a composite item's object is the caller's own, unfrozen.
    */
   input: Readonly<Record<string, unknown>>;
 
