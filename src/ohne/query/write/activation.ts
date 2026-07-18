@@ -109,17 +109,18 @@ export function partitionActivation(
 /**
  * Narrows a scope to one activation group: every inactive gate's column, relation, and child drops out.
  * Non-gated fields always survive, so they write to every group; only a gated inactive field is withheld.
+ * Refs and unique probes narrow to the kept fields, so a union precheck reads what the groups write.
  */
 export function activeScope(
   scope: ProcessedScope,
   gates: readonly WhenGate[],
   active: ReadonlySet<string>,
 ): ProcessedScope {
+  const dropped = gates.filter((gate) => !active.has(gate.name));
   const columns = new Set<string>();
   const relations = new Set<ProcessedRelation>();
   const children = new Set<ProcessedChild>();
-  for (const gate of gates) {
-    if (active.has(gate.name)) continue;
+  for (const gate of dropped) {
     if (!isUndefined(gate.column)) columns.add(gate.column);
     if (!isUndefined(gate.relation)) relations.add(gate.relation);
     if (!isUndefined(gate.child)) children.add(gate.child);
@@ -128,13 +129,17 @@ export function activeScope(
   for (const [column, value] of Object.entries(scope.columns)) {
     if (!columns.has(column)) kept[column] = value;
   }
+  const keeps = (path: string): boolean =>
+    !dropped.some(
+      ({ name }) => path === name || path.startsWith(`${name}.`) || path.startsWith(`${name}[`),
+    );
   return {
     columns: kept,
     values: scope.values,
     relations: scope.relations.filter((relation) => !relations.has(relation)),
     children: scope.children.filter((child) => !children.has(child)),
-    refs: [],
-    uniqueProbes: [],
+    refs: scope.refs.filter((ref) => keeps(ref.path)),
+    uniqueProbes: scope.uniqueProbes.filter((probe) => keeps(probe.path)),
   };
 }
 

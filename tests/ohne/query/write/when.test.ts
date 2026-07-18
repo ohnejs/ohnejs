@@ -201,6 +201,16 @@ useCollections().register('WNRich', {
   },
 });
 
+useCollections().register('WNUniqueGate', {
+  name: 'WNUniqueGate',
+  collection: {
+    fields: {
+      mode: field('text'),
+      slug: field('text', { nullable: true, unique: true, when: { mode: 'on' } }),
+    },
+  },
+});
+
 useCollections().register('WNFan', {
   name: 'WNFan',
   collection: {
@@ -620,6 +630,76 @@ describe('when gate over the coerced composite substrate', () => {
     const rows = record.rows as { serial: string; badge: string | null }[];
     strictEqual(rows[0].serial, 'row-1');
     strictEqual(rows[0].badge, 'B');
+  });
+});
+
+describe('when gates precheck only what the groups write', () => {
+  it('skips the unique probe of a fully-inactive gated field', async () => {
+    const holder = await created('WNUniqueGate', { mode: 'on', slug: 'wn-taken' });
+    strictEqual(holder.slug, 'wn-taken');
+    const record = await created('WNUniqueGate', { mode: 'off' });
+    const inactive = await runUpdate(
+      'WNUniqueGate',
+      { mode: 'off', slug: 'wn-taken' },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(inactive.ok);
+    strictEqual(inactive.records[0].slug, null);
+    const active = await runUpdate(
+      'WNUniqueGate',
+      { mode: 'on', slug: 'wn-taken' },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(!active.ok);
+    strictEqual(active.errors.slug, 'validation.notUnique');
+  });
+
+  it('probes a fresh child value against a gated-inactive record kept row', async () => {
+    const active = await created('WNFan', { mode: 'on', items: [{ code: 'b4-a' }] });
+    const inactive = await created('WNFan', { mode: 'on', items: [{ code: 'b4-held' }] });
+    const flipped = await runUpdate(
+      'WNFan',
+      { mode: 'off' },
+      inUUIDs([inactive.UUID as string]),
+      null,
+    );
+    ok(flipped.ok);
+    const result = await runUpdate(
+      'WNFan',
+      { items: [{ code: 'b4-held' }] },
+      inUUIDs([active.UUID as string, inactive.UUID as string]),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors['items[0].code'], 'validation.notUnique');
+    const kept = await db.query('SELECT "code" FROM "WNFan_items" WHERE "code" = ?', ['b4-held']);
+    strictEqual(kept.length, 1);
+  });
+
+  it('correlates a gated child only against the records that keep it', async () => {
+    const active = await created('WNFan', { mode: 'on', items: [{ code: 'co-a1' }] });
+    const inactive = await created('WNFan', { mode: 'off' });
+    const itemUUID = (active.items as { UUID: string }[])[0].UUID;
+    const result = await runUpdate(
+      'WNFan',
+      { items: [{ UUID: itemUUID, code: 'co-a2' }] },
+      inUUIDs([active.UUID as string, inactive.UUID as string]),
+      null,
+    );
+    ok(result.ok);
+    const byUUID = new Map(result.records.map((record) => [record.UUID, record]));
+    const items = (byUUID.get(active.UUID) as Record<string, unknown>).items as {
+      UUID: string;
+      code: string;
+    }[];
+    strictEqual(items[0].UUID, itemUUID);
+    strictEqual(items[0].code, 'co-a2');
+    strictEqual(
+      ((byUUID.get(inactive.UUID) as Record<string, unknown>).items as unknown[]).length,
+      0,
+    );
   });
 });
 

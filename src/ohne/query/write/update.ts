@@ -2,7 +2,12 @@ import type { ConditionNode } from '../../../utils/index.ts';
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
-import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
+import type {
+  ProcessedChild,
+  ProcessedRelation,
+  ProcessedScope,
+  UniqueProbe,
+} from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 import type { QueryRecord } from '../read/find.ts';
 import type { FieldErrors } from './errors.ts';
@@ -116,6 +121,7 @@ export async function runUpdate(
 /**
  * The update attempt inside the transaction: validate, resolve the matched set, precheck, then write.
  * Every precheck returns `{ ok: false }` before any write, so a failure leaves the database untouched.
+ * An ungated update writes the whole scope everywhere; a gated one partitions activation first.
  */
 async function attemptUpdate(
   tx: Transaction,
@@ -134,12 +140,26 @@ async function attemptUpdate(
   if (matched.length === 0) return { ok: true, records: [] };
 
   const gates = whenGates(meta.fields, input, scope);
-  const ungated = gates.length === 0 && !hasNestedGates(scope);
+  if (gates.length === 0 && !hasNestedGates(scope)) {
+    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale);
+  }
+  return attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale);
+}
 
-  if (ungated && matched.length > 1 && scope.uniqueProbes.length > 0) {
-    const fanned: FieldErrors = {};
-    for (const probe of scope.uniqueProbes) fanned[probe.path] = 'validation.notUnique';
-    return { ok: false, errors: fanned };
+/**
+ * The ungated path: every matched record takes the whole scope, so the scope is its own precheck union.
+ */
+async function attemptPlainUpdate(
+  tx: Transaction,
+  meta: CollectionQueryMeta,
+  dialect: Dialect,
+  scope: ProcessedScope,
+  matched: readonly string[],
+  code: string,
+  locale: string | null,
+): Promise<UpdateOutcome> {
+  if (matched.length > 1 && scope.uniqueProbes.length > 0) {
+    return { ok: false, errors: fannedErrors(scope.uniqueProbes) };
   }
 
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code, matched);
@@ -174,22 +194,170 @@ async function attemptUpdate(
   if (!isEmpty(correlationErrors)) return { ok: false, errors: correlationErrors };
 
   const plan = await planCompanion(tx, dialect, meta, scope, matched, code);
+  const { main, companion } = splitColumns(meta.fields, scope.columns);
+  const failure = materializeFailure(plan, companion, matched);
+  if (!isNull(failure)) return { ok: false, errors: failure };
+  await updateColumns(tx, dialect, meta.table, meta.fields, main, matched);
+  if (!isEmpty(companion)) {
+    await upsertCompanion(tx, dialect, meta, companion, matched, code, plan);
+  }
+  for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null, code);
 
-  if (ungated) {
-    const { main, companion } = splitColumns(meta.fields, scope.columns);
-    const failure = materializeFailure(plan, companion, matched);
-    if (!isNull(failure)) return { ok: false, errors: failure };
-    await updateColumns(tx, dialect, meta.table, meta.fields, main, matched);
-    if (!isEmpty(companion)) {
-      await upsertCompanion(tx, dialect, meta, companion, matched, code, plan);
+  return { ok: true, records: await readMatched(meta.collection, matched, locale) };
+}
+
+/**
+ * The gated path: partition activation first, then precheck the union of what the groups write.
+ *
+ * Top-level fields partition the matched records by signature, dropping each inactive gate's parts.
+ * A record whose whole top-level signature is inactive is untouched, with no `_updatedAt` bump.
+ * Each record's overlay is its stored shape under `scope.values`, the substrate a create's gates read.
+ * A nested `when` reaching the root therefore reads that record's stored state.
+ *
+ * A field inactive for every matched record is not written, so it is not prechecked either.
+ * A fully-inactive gated `unique` or `record` field can therefore never reject a valid update.
+ * Unique columns probe with rewriter-exact exclusions: only rows that rewrite a column free theirs.
+ * Child probes exclude only the rewriting records' subtrees.
+ * A kept row under an inactive gate therefore still collides cleanly in the precheck.
+ * Correlation scopes per child to the records whose groups keep it.
+ * The gated-reset pre-pass then rejects any deactivation needing a failing default, before writes.
+ */
+async function attemptGatedUpdate(
+  tx: Transaction,
+  meta: CollectionQueryMeta,
+  dialect: Dialect,
+  scope: ProcessedScope,
+  gates: readonly WhenGate[],
+  matched: readonly string[],
+  code: string,
+  locale: string | null,
+): Promise<UpdateOutcome> {
+  const records = await readMatched(meta.collection, matched, locale);
+  const overlays = new Map(
+    records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
+  );
+  const groups = partitionActivation(records, gates, scope.values);
+  const activeAnywhere = new Set(
+    gates
+      .filter((gate) => groups.some((group) => group.active.has(gate.name)))
+      .map((gate) => gate.name),
+  );
+  const union = activeScope(scope, gates, activeAnywhere);
+  const rewriters = (name: string | undefined): readonly string[] => {
+    if (isUndefined(name) || !gates.some((gate) => gate.name === name)) return matched;
+    return groups.filter((group) => group.active.has(name)).flatMap((group) => group.uuids);
+  };
+
+  const probeFields = groupBy(union.uniqueProbes, (probe) => headSegment(probe.path));
+  for (const [name, probes] of Object.entries(probeFields)) {
+    if (!isUndefined(probes) && rewriters(name).length > 1) {
+      return { ok: false, errors: fannedErrors(probes) };
     }
-    for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null, code);
-  } else {
-    const failure = await gatedUpdate(tx, dialect, meta, matched, scope, gates, locale, plan);
+  }
+
+  const exclusions = new Map<
+    string,
+    { columns: Record<string, unknown>; exclude: readonly string[] }
+  >();
+  for (const [column, value] of Object.entries(union.columns)) {
+    const gate = gates.find((candidate) => candidate.column === column);
+    const exclude = rewriters(gate?.name);
+    const entry = exclusions.get(exclude.join(' ')) ?? { columns: {}, exclude };
+    entry.columns[column] = value;
+    exclusions.set(exclude.join(' '), entry);
+  }
+  for (const { columns, exclude } of exclusions.values()) {
+    const uniqueErrors = await checkUnique(tx, dialect, meta, columns, code, exclude);
+    if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
+  }
+
+  const compositeUniqueErrors = await checkCompositeUnique(
+    tx,
+    dialect,
+    meta,
+    union.columns,
+    code,
+    matched,
+  );
+  if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
+
+  for (const [name, probes] of Object.entries(probeFields)) {
+    if (isUndefined(probes)) continue;
+    const exclude = await subtreeChildUUIDs(
+      tx,
+      dialect,
+      { [name]: meta.fields[name] },
+      rewriters(name),
+      code,
+    );
+    const childUniqueErrors = await checkChildUnique(tx, dialect, probes, exclude);
+    if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
+  }
+
+  const referenceErrors = await checkReferences(tx, dialect, union.refs);
+  if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
+
+  for (const child of union.children) {
+    const gate = gates.find((candidate) => candidate.child === child);
+    const correlationErrors = await checkCorrelation(
+      tx,
+      dialect,
+      rewriters(gate?.name),
+      [child],
+      code,
+    );
+    if (!isEmpty(correlationErrors)) return { ok: false, errors: correlationErrors };
+  }
+
+  const plan = await planCompanion(tx, dialect, meta, scope, matched, code);
+  for (const record of records) {
+    const ancestry = [overlays.get(record.UUID as string) as ScopeValues];
+    const failure = gatedResetErrors(scope.children, ancestry);
     if (!isNull(failure)) return { ok: false, errors: failure };
   }
 
+  const writes: {
+    groupScope: ProcessedScope;
+    uuids: readonly string[];
+    main: Record<string, unknown>;
+    companion: Record<string, unknown>;
+  }[] = [];
+  for (const group of groups) {
+    const groupScope = activeScope(scope, gates, group.active);
+    if (isEmptyScope(groupScope)) continue;
+    const { main, companion } = splitColumns(meta.fields, groupScope.columns);
+    const failure = materializeFailure(plan, companion, group.uuids);
+    if (!isNull(failure)) return { ok: false, errors: failure };
+    writes.push({ groupScope, uuids: group.uuids, main, companion });
+  }
+  for (const { groupScope, uuids, main, companion } of writes) {
+    await updateColumns(tx, dialect, meta.table, meta.fields, main, uuids);
+    if (!isEmpty(companion)) {
+      await upsertCompanion(tx, dialect, meta, companion, uuids, code, plan);
+    }
+    for (const uuid of uuids) {
+      await applyDerived(tx, dialect, uuid, groupScope, [overlays.get(uuid) as ScopeValues], code);
+    }
+  }
+
   return { ok: true, records: await readMatched(meta.collection, matched, locale) };
+}
+
+/**
+ * Every probe keyed `notUnique` at its path: the shape a guaranteed self-collision rejects with.
+ */
+function fannedErrors(probes: readonly UniqueProbe[]): FieldErrors {
+  const errors: FieldErrors = {};
+  for (const probe of probes) errors[probe.path] = 'validation.notUnique';
+  return errors;
+}
+
+/**
+ * The top-level field a dot-path belongs to: the segment before the first `.` or `[`.
+ */
+function headSegment(path: string): string {
+  const end = path.search(/[.[]/);
+  return end === -1 ? path : path.slice(0, end);
 }
 
 /**
@@ -509,62 +677,6 @@ async function applyDerived(
     }
     await correlateChild(tx, dialect, child, uuid, ancestry, locale);
   }
-}
-
-/**
- * Applies an update whose top-level fields or nested subfields gate, deciding activation per matched record.
- *
- * Top-level fields partition the matched records by signature, dropping each inactive gate's column and rows.
- * A record whose whole top-level signature is inactive is untouched, with no `_updatedAt` bump.
- * Each record's overlay is its stored shape under the pipeline's coerced provided values.
- * `scope.values` is the same substrate a create's gates read.
- * A nested `when` reaching the root therefore reads that record's stored state.
- * A `has`/`empty` gate over a relation or composite reads its persisted membership; validation ran call-wide.
- */
-async function gatedUpdate(
-  tx: Transaction,
-  dialect: Dialect,
-  meta: CollectionQueryMeta,
-  matched: readonly string[],
-  scope: ProcessedScope,
-  gates: readonly WhenGate[],
-  locale: string | null,
-  plan: CompanionPlan,
-): Promise<FieldErrors | null> {
-  const code = effectiveLocale(locale);
-  const records = await readMatched(meta.collection, matched, locale);
-  const overlays = new Map(
-    records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
-  );
-  for (const record of records) {
-    const ancestry = [overlays.get(record.UUID as string) as ScopeValues];
-    const failure = gatedResetErrors(scope.children, ancestry);
-    if (!isNull(failure)) return failure;
-  }
-  const writes: {
-    groupScope: ProcessedScope;
-    uuids: readonly string[];
-    main: Record<string, unknown>;
-    companion: Record<string, unknown>;
-  }[] = [];
-  for (const group of partitionActivation(records, gates, scope.values)) {
-    const groupScope = activeScope(scope, gates, group.active);
-    if (isEmptyScope(groupScope)) continue;
-    const { main, companion } = splitColumns(meta.fields, groupScope.columns);
-    const failure = materializeFailure(plan, companion, group.uuids);
-    if (!isNull(failure)) return failure;
-    writes.push({ groupScope, uuids: group.uuids, main, companion });
-  }
-  for (const { groupScope, uuids, main, companion } of writes) {
-    await updateColumns(tx, dialect, meta.table, meta.fields, main, uuids);
-    if (!isEmpty(companion)) {
-      await upsertCompanion(tx, dialect, meta, companion, uuids, code, plan);
-    }
-    for (const uuid of uuids) {
-      await applyDerived(tx, dialect, uuid, groupScope, [overlays.get(uuid) as ScopeValues], code);
-    }
-  }
-  return null;
 }
 
 /**
