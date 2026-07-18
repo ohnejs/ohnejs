@@ -18,7 +18,7 @@ useFields().register('KStamp', {
   name: 'KStamp' as FieldTypeName,
   fieldType: defineField({
     columnType: 'integer',
-    deserialize: (value) => `at-${value as number}`,
+    deserialize: async (value) => `at-${value as number}`,
   }),
 });
 const stampInstance = { type: 'KStamp', options: {} } as unknown as FieldInstance;

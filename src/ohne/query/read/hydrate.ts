@@ -43,30 +43,32 @@ export async function hydrateScope(
       }),
   );
 
-  return driverRows.map((row, index) => {
-    const record: QueryRecord = {};
-    for (const [name, field] of Object.entries(fields)) {
-      if (!isSelected(name)) continue;
-      const resolve = resolvers.get(name);
-      record[name] = isUndefined(resolve)
-        ? deserializeColumn(name, field, dialect, row[field.column as string])
-        : resolve(parents[index] as string);
-    }
-    return record;
-  });
+  return Promise.all(
+    driverRows.map(async (row, index) => {
+      const record: QueryRecord = {};
+      for (const [name, field] of Object.entries(fields)) {
+        if (!isSelected(name)) continue;
+        const resolve = resolvers.get(name);
+        record[name] = isUndefined(resolve)
+          ? await deserializeColumn(name, field, dialect, row[field.column as string])
+          : resolve(parents[index] as string);
+      }
+      return record;
+    }),
+  );
 }
 
 /**
  * Reads one column back to its domain value: the dialect codec, then the field type's `deserialize` hook.
- * The hook is optional and null-bypassed, so a `null` column never reaches it.
+ * The hook is optional, may be async, and is null-bypassed, so a `null` column never reaches it.
  * `pluck`'s column fast path routes through this too, so both reads return the same value.
  */
-export function deserializeColumn(
+export async function deserializeColumn(
   name: string,
   field: FieldQueryMeta,
   dialect: Dialect,
   stored: SQLValue,
-): unknown {
+): Promise<unknown> {
   const value = dialect.deserialize(field.logicalType as LogicalType, stored);
   const hook = field.fieldType?.deserialize;
   if (isUndefined(hook) || isNull(value)) return value;

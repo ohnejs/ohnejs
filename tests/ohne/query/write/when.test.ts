@@ -21,7 +21,7 @@ useFields().register('WNEpoch', {
   name: 'WNEpoch' as FieldTypeName,
   fieldType: defineField({
     columnType: 'integer',
-    serialize: (value) => {
+    serialize: async (value) => {
       if (value === null) throw new Error('serialize saw null');
       return value;
     },

@@ -157,7 +157,7 @@ export async function finishScalar(
   if (!isEmpty(errors)) return { errors: prefixErrors(name, errors) };
 
   const stored = meta.fieldType?.serialize
-    ? meta.fieldType.serialize(tiered.value, wctx)
+    ? await meta.fieldType.serialize(tiered.value, wctx)
     : tiered.value;
   const output: FieldOutput = { column: { name: column, value: stored } };
   if (meta.kind === 'record' && isString(tiered.value)) {

@@ -42,5 +42,5 @@ export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
     ...from.params,
     ...tail.params,
   ]);
-  return rows.map((row) => deserializeColumn(field, entry, dialect, row.value));
+  return Promise.all(rows.map((row) => deserializeColumn(field, entry, dialect, row.value)));
 }

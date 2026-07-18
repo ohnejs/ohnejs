@@ -153,6 +153,7 @@ export interface FieldType<
    * Pair it with `deserialize` to invert it on read; a `null` value skips both.
    * The value arriving here already passed the base-type gate, so it is the column's own primitive.
    * `serialize` therefore reshapes within that primitive; only a `json` column carries other shapes.
+   * May return a promise; the pipeline awaits it, so a hash or lookup can happen on the write path.
    *
    * @example
    * ```ts
@@ -168,6 +169,7 @@ export interface FieldType<
   /**
    * Decodes a stored value back into the value a read returns, run just after the driver's codec.
    * The generated record type reflects what this returns; a `null` value skips it.
+   * May return a promise; the read path awaits it.
    *
    * @example
    * ```ts
