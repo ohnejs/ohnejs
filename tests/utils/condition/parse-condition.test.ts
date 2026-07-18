@@ -245,6 +245,13 @@ describe('parseCondition', () => {
     strictEqual(error({ 'a.': 1 }).code, 'invalidShape');
   });
 
+  it('copies array operator values, so caller mutation never reaches the node', () => {
+    const values = [1, 2];
+    const parsed = node({ v: { in: values } });
+    values.push(3);
+    deepStrictEqual(parsed, compare(['v'], 'in', [1, 2]));
+  });
+
   it('treats a literal __proto__ key as a field name without polluting', () => {
     deepStrictEqual(
       node(JSON.parse('{"__proto__": {"equalsTo": 1}}')),

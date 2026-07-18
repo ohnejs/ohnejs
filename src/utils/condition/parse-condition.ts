@@ -123,7 +123,9 @@ function compareLeaf(
       if (op === 'in' && isNull(item)) fail('nullEquality', path, op);
       if (!isScalar(item)) fail('invalidValue', path, op);
     }
-  } else if (
+    return { kind: 'compare', path: field, op, value: [...value], negated: false };
+  }
+  if (
     (kind === 'scalar' && !isScalar(value)) ||
     (kind === 'ordinal' && !isString(value) && !isNumber(value)) ||
     (kind === 'string' && !isString(value))
@@ -227,6 +229,7 @@ function parseWhere(input: unknown, path: string, depth: number, maxDepth: numbe
  * ORs the AND of its sibling operators against each alternative.
  * Negation folds to the leaves: De Morgan over groups, double negation cancels, no `not` node.
  * Groups with one child collapse to that child; empty groups survive as `and([])` / `or([])`.
+ * An array operator value is copied, so mutating the caller's array never changes the parsed node.
  *
  * Untrusted input never throws: failures return a structured `ConditionError`.
  * A literal `__proto__` key is an ordinary field name.
