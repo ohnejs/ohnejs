@@ -106,6 +106,26 @@ useCollections().register('WHHasRel', {
   },
 });
 
+useCollections().register('WHListDescent', {
+  name: 'WHListDescent',
+  collection: {
+    fields: {
+      items: field('repeater', { fields: { x: field('text') } }),
+      discount: field('integer', { nullable: true, when: { 'items.x': 'go' } }),
+    },
+  },
+});
+
+useCollections().register('WHListHas', {
+  name: 'WHListHas',
+  collection: {
+    fields: {
+      items: field('repeater', { fields: { x: field('text') } }),
+      discount: field('integer', { nullable: true, when: { items: { has: { x: 'go' } } } }),
+    },
+  },
+});
+
 useCollections().register('WHIsNull', {
   name: 'WHIsNull',
   collection: {
@@ -166,6 +186,14 @@ describe('validateWhen', () => {
 
   it('rejects a nested condition on a relation `has`', () => {
     throwsOhne(() => queryMetadata('WHHasRel'), /must be bare `true`/);
+  });
+
+  it('rejects a dot path that descends through a repeater', () => {
+    throwsOhne(() => queryMetadata('WHListDescent'), /descends through the repeater `items`/);
+  });
+
+  it('accepts `has` over a repeater as the way to walk its items', () => {
+    ok(queryMetadata('WHListHas').fields.discount.when);
   });
 
   it('rejects `isNull: false` at parse time', () => {

@@ -15,7 +15,8 @@ type Scope = Record<string, FieldQueryMeta>;
  *
  * A gated field must be nullable or defaulted, since an inactive create still writes a value.
  * A path resolves in scope: bare in the field's scope, `/` at the root, `../` one composite level up.
- * Dots descend into a composite, and each operator must apply to the field the path lands on.
+ * Dots descend into an `object` composite, and each operator must apply to the field the path lands on.
+ * A dot path through a repeater is rejected: it holds many items, and `has` is how a `when` walks them.
  * A `has` on a `record`/`records`/`blocks` may only be the bare `true` form.
  * The grammar itself was already checked when the node parsed, so only scope and applicability remain.
  * A violation throws `ohneError`, naming the field and its collection.
@@ -104,17 +105,26 @@ function checkNode(
   const scope = ancestry[ancestry.length - 1];
   const resolved = anchored ? resolveAnchored(node.path, ancestry) : descend(node.path, scope);
   if (isUndefined(resolved)) throw unknownWhenPath(node.path, field, home);
+  if ('repeater' in resolved)
+    throw whenPathThroughRepeater(resolved.repeater, node.path, field, home);
+  const target = resolved.field;
   const operator = node.kind === 'compare' ? node.op : node.kind;
-  if (!allowedOperators(resolved).has(operator)) {
+  if (!allowedOperators(target).has(operator)) {
     throw inapplicableWhenOp(operator, node.path, field, home);
   }
   if (node.kind === 'has' && !isNull(node.condition)) {
-    if (resolved.kind === 'record' || resolved.kind === 'records' || resolved.kind === 'blocks') {
-      throw nestedHasOnWalkless(resolved.kind, node.path, field, home);
+    if (target.kind === 'record' || target.kind === 'records' || target.kind === 'blocks') {
+      throw nestedHasOnWalkless(target.kind, node.path, field, home);
     }
-    checkNode(node.condition, field, [resolved.subfields as Scope], home, false, anchors);
+    checkNode(node.condition, field, [target.subfields as Scope], home, false, anchors);
   }
 }
+
+/**
+ * A path resolution's outcome: the field it lands on, or the repeater segment a dot path cannot cross.
+ * The runtime resolver descends plain objects, and a repeater's value is an array - a dead lookup.
+ */
+type Resolution = { field: FieldQueryMeta } | { repeater: string };
 
 /**
  * Resolves an anchored path: `/` reads the root scope, each `..` climbs one level, then names descend.
@@ -123,7 +133,7 @@ function checkNode(
 function resolveAnchored(
   segments: readonly string[],
   ancestry: readonly Scope[],
-): FieldQueryMeta | undefined {
+): Resolution | undefined {
   let index = ancestry.length - 1;
   let cursor = 0;
   if (segments[cursor] === '/') {
@@ -139,19 +149,21 @@ function resolveAnchored(
 }
 
 /**
- * Descends a name path through a scope, stepping into a composite's subfields at each segment.
+ * Descends a name path through a scope, stepping into an `object` composite's subfields at each segment.
  * A segment naming a non-composite before the last, or an absent field, resolves to nothing.
+ * A repeater before the last segment stops the walk, naming itself.
  */
-function descend(names: readonly string[], scope: Scope): FieldQueryMeta | undefined {
+function descend(names: readonly string[], scope: Scope): Resolution | undefined {
   let field: FieldQueryMeta | undefined;
   let current: Scope | undefined = scope;
-  for (const name of names) {
+  for (const [index, name] of names.entries()) {
     if (isUndefined(current)) return undefined;
     field = current[name];
     if (isUndefined(field)) return undefined;
+    if (field.kind === 'childMany' && index < names.length - 1) return { repeater: name };
     current = field.kind === 'childOne' || field.kind === 'childMany' ? field.subfields : undefined;
   }
-  return field;
+  return isUndefined(field) ? undefined : { field };
 }
 
 /**
@@ -198,6 +210,25 @@ function anchoredBlockPath(
     body: [
       `The \`when\` on field \`${field}\` in ${home} anchors \`${path}\` with \`/\` or \`../\`.`,
       'A block resolves `when` paths in its own scope alone - use bare sibling names.',
+    ],
+  });
+}
+
+/**
+ * The failure a `when` raises when a dot path descends through a repeater, which holds many items.
+ */
+function whenPathThroughRepeater(
+  segment: string,
+  segments: readonly string[],
+  field: string,
+  home: string,
+): ReturnType<typeof ohneError> {
+  const path = whenPathText(segments);
+  return ohneError({
+    title: `\`when\` path \`${path}\` descends through the repeater \`${segment}\``,
+    body: [
+      `The \`when\` on field \`${field}\` in ${home} walks \`${path}\` through \`${segment}\`, which holds many items.`,
+      'A dot path cannot pick one item - use `has` on the repeater to match its items.',
     ],
   });
 }
