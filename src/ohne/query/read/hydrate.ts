@@ -59,8 +59,9 @@ export async function hydrateScope(
 /**
  * Reads one column back to its domain value: the dialect codec, then the field type's `deserialize` hook.
  * The hook is optional and null-bypassed, so a `null` column never reaches it.
+ * `pluck`'s column fast path routes through this too, so both reads return the same value.
  */
-function deserializeColumn(
+export function deserializeColumn(
   name: string,
   field: FieldQueryMeta,
   dialect: Dialect,

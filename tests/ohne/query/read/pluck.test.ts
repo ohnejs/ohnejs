@@ -1,18 +1,35 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
+import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
+
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 
+useFields().register('KStamp', {
+  name: 'KStamp' as FieldTypeName,
+  fieldType: defineField({
+    columnType: 'integer',
+    deserialize: (value) => `at-${value as number}`,
+  }),
+});
+const stampInstance = { type: 'KStamp', options: {} } as unknown as FieldInstance;
+
 useCollections().register('KAuthors', {
   name: 'KAuthors',
   collection: { fields: { name: field('text') } },
+});
+useCollections().register('KEvents', {
+  name: 'KEvents',
+  collection: { fields: { happenedAt: stampInstance } },
 });
 useCollections().register('KTags', {
   name: 'KTags',
@@ -86,6 +103,17 @@ describe('pluck', () => {
       'Beta',
     ]);
     deepStrictEqual(await queryUntyped('KPosts').orderBy('title').pluck('views'), [100, 50]);
+  });
+
+  it('fast-paths through the field type deserialize hook, matching the row read', async () => {
+    await db.run('INSERT INTO "KEvents" ("UUID","_updatedAt","happenedAt") VALUES (?,?,?)', [
+      id('e', 1),
+      0,
+      42,
+    ]);
+    deepStrictEqual(await queryUntyped('KEvents').pluck('happenedAt'), ['at-42']);
+    const rows = await queryUntyped('KEvents').findMany();
+    deepStrictEqual(rows[0].happenedAt, 'at-42');
   });
 
   it('respects the where, order, and window of the query', async () => {
