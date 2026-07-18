@@ -15,6 +15,7 @@
   "files": [
     "src",
     "ohne.config.ts",
+    "ohne.layer.ts",
     "tsconfig.browser.json",
     "tsconfig.node.json"
   ],
@@ -24,6 +25,10 @@
     ".": {
       "types": "./src/ohne/index.ts",
       "default": "./src/ohne/index.ts"
+    },
+    "./auth": {
+      "types": "./src/layer/auth/index.ts",
+      "default": "./src/layer/auth/index.ts"
     },
     "./dashboard": {
       "types": "./src/dashboard/index.ts",

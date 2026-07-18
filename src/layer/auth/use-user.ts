@@ -1,0 +1,42 @@
+import { type Event, query, useEvent } from 'ohne';
+import { isNull, isUndefined } from 'ohne/utils';
+
+import type { User } from './types.ts';
+
+import { useSession } from './use-session.ts';
+
+const cache = new WeakMap<Event, Promise<User | null>>();
+
+/**
+ * Returns the signed-in user, or `null` when the request has no live session, memoized per request.
+ * Valid only within a request.
+ *
+ * The result carries only `UUID` and `email`, never the password hash, so it is safe to return as-is.
+ * Reach for `requireUser` when a route must have a user and a missing one is a `401`.
+ *
+ * @example
+ * ```ts
+ * const user = await useUser()
+ * if (user) greet(user.email)
+ * ```
+ */
+export function useUser(): Promise<User | null> {
+  const event = useEvent();
+  const cached = cache.get(event);
+  if (!isUndefined(cached)) return cached;
+
+  const resolved = resolveUser();
+  cache.set(event, resolved);
+  return resolved;
+}
+
+async function resolveUser(): Promise<User | null> {
+  const session = await useSession();
+  if (isNull(session) || isNull(session.user)) return null;
+
+  const user = (await query('Users')
+    .where('UUID', session.user)
+    .select('UUID', 'email')
+    .findFirst()) as User | undefined;
+  return isUndefined(user) ? null : user;
+}

@@ -1,0 +1,28 @@
+{
+  "invalidEmail": "Gib eine gültige E-Mail-Adresse ein",
+  "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
+  "users": {
+    "email": {
+      "label": "E-Mail",
+      "description": "Die Adresse, mit der sich der Benutzer anmeldet. Wird kleingeschrieben gespeichert und ist daher unabhängig von der Groß- und Kleinschreibung eindeutig."
+    },
+    "passwordHash": {
+      "label": "Passwort-Hash",
+      "description": "Der scrypt-Hash des Passworts. Das Passwort selbst wird nie gespeichert."
+    }
+  },
+  "sessions": {
+    "user": {
+      "label": "Benutzer",
+      "description": "Das Konto, zu dem diese Sitzung gehört."
+    },
+    "tokenHash": {
+      "label": "Token-Hash",
+      "description": "Der Hash des Sitzungs-Cookie-Tokens. Das rohe Token wird nie gespeichert."
+    },
+    "expiresAt": {
+      "label": "Läuft ab am",
+      "description": "Wann die Sitzung ungültig wird, in Epoch-Millisekunden."
+    }
+  }
+}

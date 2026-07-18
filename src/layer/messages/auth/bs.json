@@ -1,0 +1,28 @@
+{
+  "invalidEmail": "Unesite ispravnu email adresu",
+  "invalidCredentials": "Netačna email adresa ili lozinka",
+  "users": {
+    "email": {
+      "label": "Email",
+      "description": "Adresa kojom se korisnik prijavljuje. Pohranjuje se malim slovima, pa je jedinstvena bez obzira na velika i mala slova."
+    },
+    "passwordHash": {
+      "label": "Hash lozinke",
+      "description": "scrypt hash lozinke. Sama lozinka se nikada ne pohranjuje."
+    }
+  },
+  "sessions": {
+    "user": {
+      "label": "Korisnik",
+      "description": "Račun kojem ova sesija pripada."
+    },
+    "tokenHash": {
+      "label": "Hash tokena",
+      "description": "Hash tokena iz kolačića sesije. Sirovi token se nikada ne pohranjuje."
+    },
+    "expiresAt": {
+      "label": "Ističe",
+      "description": "Kada sesija prestaje važiti, u milisekundama epohe."
+    }
+  }
+}

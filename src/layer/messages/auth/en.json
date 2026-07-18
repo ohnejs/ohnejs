@@ -1,0 +1,28 @@
+{
+  "invalidEmail": "Enter a valid email address",
+  "invalidCredentials": "Incorrect email or password",
+  "users": {
+    "email": {
+      "label": "Email",
+      "description": "The address the user signs in with. Stored lowercased, so it stays unique across letter case."
+    },
+    "passwordHash": {
+      "label": "Password hash",
+      "description": "The scrypt hash of the password. The password itself is never stored."
+    }
+  },
+  "sessions": {
+    "user": {
+      "label": "User",
+      "description": "The account this session belongs to."
+    },
+    "tokenHash": {
+      "label": "Token hash",
+      "description": "The hash of the session's cookie token. The raw token is never stored."
+    },
+    "expiresAt": {
+      "label": "Expires at",
+      "description": "When the session stops being valid, as epoch milliseconds."
+    }
+  }
+}
