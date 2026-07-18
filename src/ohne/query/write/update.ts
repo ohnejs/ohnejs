@@ -9,6 +9,7 @@ import type { FieldErrors } from './errors.ts';
 
 import {
   chunk,
+  evaluateCondition,
   first,
   groupBy,
   hasKey,
@@ -21,18 +22,20 @@ import {
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
 import { blockQueryMetadata, queryMetadata, type BlockQueryMeta } from '../metadata.ts';
+import { prefixPath } from '../pipeline/prefix-errors.ts';
 import { defaultPath, finishScalar, writeContext } from '../pipeline/run-field.ts';
 import { runRecord } from '../pipeline/run-record.ts';
+import { whenResolver } from '../pipeline/when.ts';
 import { readRows } from '../read/find.ts';
 import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import {
   activeScope,
-  coercedOverlay,
   gateNested,
   gateSubtree,
   hasNestedGates,
   isEmptyScope,
+  itemSubfields,
   partitionActivation,
   whenGates,
   type WhenGate,
@@ -175,17 +178,7 @@ async function attemptUpdate(
     }
     for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null, code);
   } else {
-    const failure = await gatedUpdate(
-      tx,
-      dialect,
-      meta,
-      input,
-      matched,
-      scope,
-      gates,
-      locale,
-      plan,
-    );
+    const failure = await gatedUpdate(tx, dialect, meta, matched, scope, gates, locale, plan);
     if (!isNull(failure)) return { ok: false, errors: failure };
   }
 
@@ -516,7 +509,8 @@ async function applyDerived(
  *
  * Top-level fields partition the matched records by signature, dropping each inactive gate's column and rows.
  * A record whose whole top-level signature is inactive is untouched, with no `_updatedAt` bump.
- * Each record carries its own overlay as the ancestry root - its stored shape under the provided input.
+ * Each record's overlay is its stored shape under the pipeline's coerced provided values.
+ * `scope.values` is the same substrate a create's gates read.
  * A nested `when` reaching the root therefore reads that record's stored state.
  * A `has`/`empty` gate over a relation or composite reads its persisted membership; validation ran call-wide.
  */
@@ -524,7 +518,6 @@ async function gatedUpdate(
   tx: Transaction,
   dialect: Dialect,
   meta: CollectionQueryMeta,
-  input: Record<string, unknown>,
   matched: readonly string[],
   scope: ProcessedScope,
   gates: readonly WhenGate[],
@@ -533,17 +526,21 @@ async function gatedUpdate(
 ): Promise<FieldErrors | null> {
   const code = effectiveLocale(locale);
   const records = await readMatched(meta.collection, matched, locale);
-  const provided = coercedOverlay(meta.fields, input);
   const overlays = new Map(
-    records.map((record) => [record.UUID as string, { ...record, ...provided }]),
+    records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
   );
+  for (const record of records) {
+    const ancestry = [overlays.get(record.UUID as string) as ScopeValues];
+    const failure = gatedResetErrors(scope.children, ancestry);
+    if (!isNull(failure)) return failure;
+  }
   const writes: {
     groupScope: ProcessedScope;
     uuids: readonly string[];
     main: Record<string, unknown>;
     companion: Record<string, unknown>;
   }[] = [];
-  for (const group of partitionActivation(records, gates, provided)) {
+  for (const group of partitionActivation(records, gates, scope.values)) {
     const groupScope = activeScope(scope, gates, group.active);
     if (isEmptyScope(groupScope)) continue;
     const { main, companion } = splitColumns(meta.fields, groupScope.columns);
@@ -561,6 +558,46 @@ async function gatedUpdate(
     }
   }
   return null;
+}
+
+/**
+ * The failures of gated defaults this walk's deactivations actually need, or `null` when none.
+ *
+ * Mirrors `gateNested`'s decision purely: each item's subfield `when` resolves over the same ancestry.
+ * An inactive subfield whose default failed contributes its errors at the item's absolute path.
+ * A create with that item's input fails identically, so the update rejects cleanly before any write.
+ * Runs per matched record, since a gate may deactivate for one record and hold for another.
+ */
+function gatedResetErrors(
+  children: readonly ProcessedChild[],
+  ancestry: readonly ScopeValues[],
+): FieldErrors | null {
+  let errors: FieldErrors | null = null;
+  for (const child of children) {
+    for (const [index, item] of child.items.entries()) {
+      const itemPath =
+        child.meta.kind === 'childOne'
+          ? child.path
+          : child.meta.kind === 'blocks'
+            ? `${child.path}[${index}].fields`
+            : `${child.path}[${index}]`;
+      const failures = item.gatedDefaultErrors;
+      if (!isUndefined(failures)) {
+        const resolve = whenResolver(item.values, ancestry);
+        for (const [name, meta] of Object.entries(itemSubfields(child, item))) {
+          if (isUndefined(meta.when) || evaluateCondition(meta.when, resolve)) continue;
+          for (const [key, message] of Object.entries(failures)) {
+            if (key !== name && !key.startsWith(`${name}.`) && !key.startsWith(`${name}[`))
+              continue;
+            (errors ??= {})[prefixPath(itemPath, key)] = message;
+          }
+        }
+      }
+      const nested = gatedResetErrors(item.children, [...ancestry, item.values]);
+      if (!isNull(nested)) Object.assign((errors ??= {}), nested);
+    }
+  }
+  return errors;
 }
 
 /**

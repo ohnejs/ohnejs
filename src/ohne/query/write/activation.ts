@@ -1,12 +1,10 @@
 import type { ConditionNode } from '../../../utils/index.ts';
-import type { LogicalType } from '../../database/dialect.ts';
 import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 
-import { evaluateCondition, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
+import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
-import { coerceColumn } from '../pipeline/preflight.ts';
 import { isProvided } from '../pipeline/run-field.ts';
 import { whenResolver } from '../pipeline/when.ts';
 
@@ -75,26 +73,6 @@ export function whenGates(
     gates.push(gate);
   }
   return gates;
-}
-
-/**
- * The coerced values of the update's provided top-level fields, the input side of the activation overlay.
- * A provided field's own value wins over the stored row, so a `when` sees what the update would write.
- */
-export function coercedOverlay(
-  fields: Record<string, FieldQueryMeta>,
-  input: Readonly<Record<string, unknown>>,
-): Record<string, unknown> {
-  const values: Record<string, unknown> = {};
-  for (const [name, meta] of Object.entries(fields)) {
-    if (!isProvided(input, name)) continue;
-    const raw = input[name];
-    values[name] =
-      meta.kind === 'column' && !isNull(raw)
-        ? coerceColumn(raw, meta.logicalType as LogicalType)
-        : raw;
-  }
-  return values;
 }
 
 /**
@@ -192,7 +170,7 @@ export function hasNestedGates(scope: ProcessedScope): boolean {
  * The subfields one nested item gates against.
  * A child item gates against the child table's own; a blocks item against its named block's fields.
  */
-function itemSubfields(
+export function itemSubfields(
   child: ProcessedChild,
   item: ProcessedScope,
 ): Record<string, FieldQueryMeta> {
@@ -206,7 +184,8 @@ function itemSubfields(
  *
  * Each gated subfield's `when` resolves against the item's coerced values over `ancestry`, root overlay first.
  * An inactive subfield takes its default, exactly as a create or an omitted subfield does.
- * A column takes its serialized `gatedDefaults` value; a relation or composite takes its empty form.
+ * A column takes its serialized `gatedDefaults` value; a relation its default `UUID`s.
+ * A composite takes its default items; with no default, each kind takes its empty form.
  * A matched row then SETs that default; a fresh row inserts it; an emptied relation deletes its rows.
  */
 export function gateNested(
@@ -223,12 +202,14 @@ export function gateNested(
     if (meta.kind === 'column' || meta.kind === 'record') {
       (columns ??= { ...item.columns })[meta.column as string] = item.gatedDefaults?.[name];
     } else if (meta.kind === 'records') {
+      const uuids = (item.gatedDefaults?.[name] as string[] | undefined) ?? [];
       relations = (relations ?? item.relations).map((relation) =>
-        relation.meta === meta ? { meta, uuids: [] } : relation,
+        relation.meta === meta ? { meta, uuids } : relation,
       );
     } else {
+      const items = (item.gatedDefaults?.[name] as ProcessedScope[] | undefined) ?? [];
       children = (children ?? item.children).map((child) =>
-        child.meta === meta ? { ...child, items: [] } : child,
+        child.meta === meta ? { ...child, items } : child,
       );
     }
   }

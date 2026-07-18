@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
@@ -133,6 +133,74 @@ useCollections().register('WNSan', {
     },
   },
 });
+useCollections().register('WNSubstrate', {
+  name: 'WNSubstrate',
+  collection: {
+    fields: {
+      meta: field('object', {
+        fields: { n: field('integer', { default: 5 }), tag: field('text', { nullable: true }) },
+      }),
+      items: field('repeater', { fields: { x: field('text', { default: 'go' }) } }),
+      flag: field('boolean', { nullable: true, when: { 'meta.n': 5 } }),
+      mark: field('boolean', { nullable: true, when: { items: { has: { x: 'go' } } } }),
+    },
+  },
+});
+
+let wnNestedCalls = 0;
+useCollections().register('WNNestedOnce', {
+  name: 'WNNestedOnce',
+  collection: {
+    fields: {
+      rows: field('repeater', {
+        fields: {
+          serial: field('text', { default: () => `row-${(wnNestedCalls += 1)}` }),
+          badge: field('text', { nullable: true, when: { serial: 'row-1' } }),
+        },
+      }),
+    },
+  },
+});
+
+useCollections().register('WNReset', {
+  name: 'WNReset',
+  collection: {
+    fields: {
+      items: field('repeater', {
+        fields: {
+          mode: field('text'),
+          code: field('text', {
+            nullable: true,
+            default: 'Bad',
+            validators: [
+              (value: unknown) => (value === 'Bad' ? 'validation.invalidValue' : undefined),
+            ],
+            when: { mode: 'full' },
+          }),
+        },
+      }),
+    },
+  },
+});
+
+useCollections().register('WNRich', {
+  name: 'WNRich',
+  collection: {
+    fields: {
+      items: field('repeater', {
+        fields: {
+          mode: field('text'),
+          notes: field('repeater', {
+            fields: { text: field('text') },
+            default: () => [{ text: 'starter' }],
+            when: { mode: 'full' },
+          }),
+        },
+      }),
+    },
+  },
+});
+
 useCollections().register('WNFan', {
   name: 'WNFan',
   collection: {
@@ -517,5 +585,85 @@ describe('when gate on update, nested default matches create', () => {
     );
     ok(updated.ok);
     strictEqual((updated.records[0] as { items: { epoch: number | null }[] }).items[0].epoch, null);
+  });
+});
+
+describe('when gate over the coerced composite substrate', () => {
+  it('activates off a coerced composite subfield on create and update alike', async () => {
+    const record = await created('WNSubstrate', { meta: { n: '5' }, flag: true });
+    strictEqual(record.flag, true);
+    const updated = await runUpdate(
+      'WNSubstrate',
+      { flag: true },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    strictEqual(updated.records[0].flag, true);
+  });
+
+  it('activates off a defaulted composite subfield the input omitted', async () => {
+    const record = await created('WNSubstrate', { meta: {}, flag: true });
+    strictEqual((record.meta as { n: number }).n, 5);
+    strictEqual(record.flag, true);
+  });
+
+  it('activates a has-walk over an item taking the walked subfield by default', async () => {
+    const record = await created('WNSubstrate', { items: [{}], mark: true });
+    strictEqual((record.items as { x: string }[])[0].x, 'go');
+    strictEqual(record.mark, true);
+  });
+
+  it('resolves a nested defaulted subfield once, gate and storage agreeing', async () => {
+    const record = await created('WNNestedOnce', { rows: [{ badge: 'B' }] });
+    strictEqual(wnNestedCalls, 1);
+    const rows = record.rows as { serial: string; badge: string | null }[];
+    strictEqual(rows[0].serial, 'row-1');
+    strictEqual(rows[0].badge, 'B');
+  });
+});
+
+describe('when gate deactivation takes the default', () => {
+  it('fails a deactivation whose default fails its validators, writing nothing', async () => {
+    const record = await created('WNReset', { items: [{ mode: 'full', code: 'OK' }] });
+    const itemUUID = (record.items as { UUID: string }[])[0].UUID;
+    const flipped = await runUpdate(
+      'WNReset',
+      { items: [{ UUID: itemUUID, mode: 'lite', code: 'OK' }] },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(!flipped.ok);
+    strictEqual(flipped.errors['items[0].code'], 'validation.invalidValue');
+    const row = await db.queryOne<{ mode: string }>(
+      'SELECT "mode" FROM "WNReset_items" WHERE "UUID" = ?',
+      [itemUUID],
+    );
+    strictEqual(row?.mode, 'full');
+  });
+
+  it('deactivates a gated nested composite to its non-empty default, as create does', async () => {
+    const inactive = await created('WNRich', { items: [{ mode: 'lite', notes: [{ text: 'x' }] }] });
+    const inactiveNotes = (inactive.items as { notes: { text: string }[] }[])[0].notes;
+    deepStrictEqual(
+      inactiveNotes.map((note) => note.text),
+      ['starter'],
+    );
+    const active = await created('WNRich', {
+      items: [{ mode: 'full', notes: [{ text: 'kept' }] }],
+    });
+    const itemUUID = (active.items as { UUID: string }[])[0].UUID;
+    const flipped = await runUpdate(
+      'WNRich',
+      { items: [{ UUID: itemUUID, mode: 'lite', notes: [{ text: 'smuggled' }] }] },
+      inUUIDs([active.UUID as string]),
+      null,
+    );
+    ok(flipped.ok);
+    const notes = (flipped.records[0] as { items: { notes: { text: string }[] }[] }).items[0].notes;
+    deepStrictEqual(
+      notes.map((note) => note.text),
+      ['starter'],
+    );
   });
 });

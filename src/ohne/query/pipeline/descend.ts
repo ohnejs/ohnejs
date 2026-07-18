@@ -24,6 +24,7 @@ import {
 } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { prefixErrors, prefixPath } from './prefix-errors.ts';
+import { coerceColumn } from './preflight.ts';
 import { defaultPath, isProvided, runTiers, validateContext, writeContext } from './run-field.ts';
 
 /**
@@ -64,6 +65,8 @@ export async function runCompositeTiers(
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
  * A provided value is marked `provided`, so Phase B runs the field's own sanitizers and validators over it.
  * A default is trusted and unmarked: its tiers never run, so an absent or inactive list lands `[]` untiered.
+ * A provided `object` or repeater also carries its coerced `snapshot`, the view a sibling `when` reads.
+ * A `records` or `blocks` value stays raw: a gate can only test its membership, never walk it.
  */
 export async function prepareComposite(
   name: string,
@@ -73,19 +76,82 @@ export async function prepareComposite(
 ): Promise<Prepared> {
   if (!isProvided(input, name)) {
     if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
+    if (!isUndefined(ctx.snapshot) && hasKey(ctx.snapshot, name)) {
+      return { value: ctx.snapshot[name] };
+    }
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }
   const value = input[name];
   if (meta.kind === 'childOne') {
     if (isNull(value)) return { value: null };
     if (!isObject(value)) return { errors: { [name]: 'validation.invalidValue' } };
-    return { value, provided: true };
+    return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
   }
   if (isNull(value)) return { errors: { [name]: 'validation.notNullable' } };
   if (!isArray(value)) return { errors: { [name]: 'validation.invalidValue' } };
   const wellShaped = meta.kind === 'records' ? value.every(isString) : value.every(isObject);
   if (!wellShaped) return { errors: { [name]: 'validation.invalidValue' } };
-  return { value, provided: true };
+  if (meta.kind !== 'childMany') return { value, provided: true };
+  return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
+}
+
+/**
+ * The coerced view of one provided composite value, reused from the enclosing snapshot or built fresh.
+ */
+async function fieldSnapshot(
+  name: string,
+  meta: FieldQueryMeta,
+  value: unknown,
+  ctx: ScopeContext,
+): Promise<unknown> {
+  if (!isUndefined(ctx.snapshot) && hasKey(ctx.snapshot, name)) return ctx.snapshot[name];
+  const subfields = meta.subfields as Record<string, FieldQueryMeta>;
+  const { snapshot: _outer, ...base } = ctx;
+  const path = fieldPath(name, ctx);
+  if (meta.kind === 'childOne') {
+    return itemSnapshot(subfields, value as Record<string, unknown>, { ...base, path });
+  }
+  const items = value as Record<string, unknown>[];
+  return Promise.all(
+    items.map((item, index) =>
+      itemSnapshot(subfields, item, { ...base, path: `${path}[${index}]` }),
+    ),
+  );
+}
+
+/**
+ * The coerced, defaulted view of one composite item, the substrate a `when` resolves against.
+ *
+ * A present column subfield coerces toward its primitive; a `null` or a `record` value stays raw.
+ * An absent subfield takes its resolved default's value, so a gate reads what phase B will store.
+ * A nested `object` or repeater recurses; `records` and `blocks` stay raw, since no gate walks them.
+ * Sanitizers and validators never run here - phase B still receives and checks the raw input.
+ * A default that fails contributes no key, matching a phase-A error's absent value.
+ */
+async function itemSnapshot(
+  subfields: Record<string, FieldQueryMeta>,
+  item: Record<string, unknown>,
+  ctx: ScopeContext,
+): Promise<Record<string, unknown>> {
+  const view: Record<string, unknown> = { ...item };
+  for (const [name, sub] of Object.entries(subfields)) {
+    if (isUndefined(sub.fieldType)) continue;
+    if (!isProvided(item, name)) {
+      const prepared = await defaultPath(name, sub, writeContext(name, sub, item, ctx));
+      if ('value' in prepared) view[name] = prepared.value;
+      continue;
+    }
+    const raw = item[name];
+    if (sub.kind === 'column' && !isNull(raw)) {
+      view[name] = coerceColumn(raw, sub.logicalType as LogicalType);
+    } else if (
+      (sub.kind === 'childOne' && isObject(raw)) ||
+      (sub.kind === 'childMany' && isArray(raw) && raw.every(isObject))
+    ) {
+      view[name] = await fieldSnapshot(name, sub, raw, ctx);
+    }
+  }
+  return view;
 }
 
 /**
@@ -98,6 +164,8 @@ export async function prepareComposite(
  * On update a repeater or blocks item's `UUID` is lifted off, so the write step can correlate it.
  * A repeated item `UUID` is rejected as `notUnique` there: two items cannot keep one row.
  * A `null` object on update clears the existing child row instead of descending into it.
+ * `snapshot` is the field's phase-A coerced view; each item descends carrying its slice.
+ * An absent subfield then reuses the already-resolved default instead of resolving its callback again.
  */
 export async function finishComposite(
   name: string,
@@ -105,6 +173,7 @@ export async function finishComposite(
   value: unknown,
   ctx: ScopeContext,
   processScope: ProcessScope,
+  snapshot?: unknown,
 ): Promise<FieldOutput> {
   const path = fieldPath(name, ctx);
 
@@ -131,6 +200,7 @@ export async function finishComposite(
     const result = await processScope(subfields, value as Record<string, unknown>, {
       ...ctx,
       path,
+      ...(isObject(snapshot) ? { snapshot: snapshot as Record<string, unknown> } : {}),
     });
     if (!result.ok) return { errors: prefixErrors(name, result.errors) };
     return {
@@ -160,9 +230,11 @@ export async function finishComposite(
       }
       claimed.add(correlated.uuid);
     }
+    const itemView = isArray(snapshot) ? snapshot[index] : undefined;
     const result = await processScope(subfields, correlated.input, {
       ...ctx,
       path: `${path}[${index}]`,
+      ...(isObject(itemView) ? { snapshot: itemView as Record<string, unknown> } : {}),
     });
     if (!result.ok) {
       Object.assign(errors, prefixErrors(name, prefixErrors(`[${index}]`, result.errors)));

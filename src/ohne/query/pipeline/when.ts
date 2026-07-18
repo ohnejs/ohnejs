@@ -9,6 +9,7 @@ export type ScopeValues = Record<string, unknown>;
 
 /**
  * Snapshots a scope's coerced values from its phase-A results, so `when` reads siblings, never raw input.
+ * A provided composite contributes its coerced `snapshot`, so a gate walking it reads defaulted items.
  * A field that skipped or failed phase A contributes no value; a `when` reading it resolves to `undefined`.
  */
 export function scopeValuesOf(
@@ -18,7 +19,8 @@ export function scopeValuesOf(
   const values: ScopeValues = {};
   for (const name of names) {
     const entry = prepared[name];
-    if (!isUndefined(entry) && 'value' in entry) values[name] = entry.value;
+    if (isUndefined(entry) || !('value' in entry)) continue;
+    values[name] = 'snapshot' in entry ? entry.snapshot : entry.value;
   }
   return values;
 }

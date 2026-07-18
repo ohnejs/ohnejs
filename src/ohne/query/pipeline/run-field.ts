@@ -101,6 +101,7 @@ export async function defaultPath(
  * An absent field takes its default, except at the top level of an update, where it is skipped.
  * An explicit `undefined` counts as absent, so it can never slip past the null gate as a value.
  * A composite item is always a full item, so its absent subfields default even under an update.
+ * A scope snapshot already resolved the absent field's default, so the value is reused, not re-run.
  * A `null` on a non-nullable field is rejected; a nullable `null` carries through, skipping the coerce.
  */
 export async function prepareScalar(
@@ -111,6 +112,9 @@ export async function prepareScalar(
 ): Promise<Prepared> {
   if (!isProvided(input, name)) {
     if (ctx.operation === 'update' && ctx.path === '') return { skip: true };
+    if (!isUndefined(ctx.snapshot) && hasKey(ctx.snapshot, name)) {
+      return { value: ctx.snapshot[name] };
+    }
     return defaultPath(name, meta, writeContext(name, meta, input, ctx));
   }
   const value = input[name];

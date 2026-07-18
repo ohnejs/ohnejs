@@ -4,7 +4,15 @@ import type { FieldOperation } from '../../fields/context.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
 
-import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
+import {
+  evaluateCondition,
+  isArray,
+  isEmpty,
+  isNull,
+  isObject,
+  isString,
+  isUndefined,
+} from '../../../utils/index.ts';
 import { finishComposite, prepareComposite, runCompositeTiers } from './descend.ts';
 import { defaultPath, finishScalar, isProvided, prepareScalar, writeContext } from './run-field.ts';
 import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
@@ -39,16 +47,25 @@ export interface ScopeContext {
    * Empty at the record root; each composite descent appends the parent scope's values.
    */
   ancestors: readonly ScopeValues[];
+
+  /**
+   * The scope's precomputed coerced view, set on a composite item descent; absent at the record root.
+   * An absent subfield's key holds its already-resolved default, so a callback default runs once.
+   * A nested composite's key holds its own precomputed view, reused instead of rebuilt.
+   */
+  snapshot?: Record<string, unknown>;
 }
 
 /**
  * One field's phase-A outcome: skipped, failed, or carrying a coerced value into phase B.
  * `provided` marks a caller-supplied composite value, so phase B runs its tiers; a default omits it.
+ * `snapshot` is a provided composite's coerced, defaulted view, the value a sibling `when` reads.
+ * The raw `value` still flows to phase B unchanged.
  */
 export type Prepared =
   | { skip: true }
   | { errors: FieldErrors }
-  | { value: unknown; provided?: true };
+  | { value: unknown; provided?: true; snapshot?: unknown };
 
 /**
  * A reference a write must prove exists before it commits: a `record` FK or a `records`/nested link.
@@ -164,10 +181,17 @@ export interface ProcessedScope {
   values: ScopeValues;
 
   /**
-   * The field-serialized default of each `when`-bearing column subfield; nested update items only.
+   * The default of each `when`-bearing subfield; nested update items only.
+   * A column holds its field-serialized value; a relation its `UUID`s; a composite its item scopes.
    * When a subfield gates inactive for a matched record, the write substitutes this default.
    */
   gatedDefaults?: Record<string, unknown>;
+
+  /**
+   * The failures of gated defaults that did not resolve, keyed relative to this scope.
+   * The executor fails the call with one only when a matched record actually needs that default.
+   */
+  gatedDefaultErrors?: FieldErrors;
 
   /**
    * The `records` writes this scope contributes.
@@ -287,7 +311,7 @@ export async function processScope(
     ctx.operation === 'create' && names.some((name) => !isUndefined(fields[name].when))
       ? whenResolver(scopeValues, ctx.ancestors)
       : undefined;
-  const gatedDefaults =
+  const gated =
     ctx.operation === 'update' && ctx.path !== ''
       ? await gatedDefaultsOf(names, fields, input, ctx)
       : undefined;
@@ -299,7 +323,8 @@ export async function processScope(
     children: [],
     refs: [],
     uniqueProbes: [],
-    ...(isUndefined(gatedDefaults) ? {} : { gatedDefaults }),
+    ...(isUndefined(gated) ? {} : { gatedDefaults: gated.defaults }),
+    ...(isUndefined(gated) || isEmpty(gated.errors) ? {} : { gatedDefaultErrors: gated.errors }),
   };
   await Promise.all(
     names.map(async (name) => {
@@ -314,15 +339,19 @@ export async function processScope(
         entry = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
       }
       if ('skip' in entry) return;
-      if ('provided' in entry)
+      let snapshot = 'snapshot' in entry ? entry.snapshot : undefined;
+      if ('provided' in entry) {
+        const raw = entry.value;
         entry = await runCompositeTiers(name, meta, entry.value, input, descentCtx);
+        if (!('value' in entry) || entry.value !== raw) snapshot = undefined;
+      }
       if ('errors' in entry) {
         Object.assign(errors, entry.errors);
         return;
       }
       const output = isScalarField(meta)
         ? await finishScalar(name, meta, entry.value, input, descentCtx)
-        : await finishComposite(name, meta, entry.value, descentCtx, processScope);
+        : await finishComposite(name, meta, entry.value, descentCtx, processScope, snapshot);
       mergeOutput(scope, errors, output);
     }),
   );
@@ -332,30 +361,58 @@ export async function processScope(
 }
 
 /**
- * The stored default of every `when`-bearing column subfield in a nested update item.
+ * The stored default of every `when`-bearing subfield in a nested update item, with its failures.
  *
  * A gated subfield that turns inactive for a matched record takes this default, exactly as a create would.
- * The default runs through the same `finishScalar` path a create does - null short-circuit, tiers, serialize.
- * The reset value therefore equals what a create or an omitted subfield stores.
- * The default is parent-independent, so it computes once here rather than per matched parent in the executor.
- * Relations and composites default structurally (empty), so only column and `record` kinds appear here.
+ * A column default runs the same `finishScalar` path a create does, landing its serialized value.
+ * A relation or composite default descends `finishComposite`, landing its `UUID`s or item scopes.
+ * A default the tiers reject lands its failure in `errors` instead, keyed relative to this scope.
+ * The executor fails the call with it only when some matched record actually needs that default.
+ * A composite default's references and unique probes are not prechecked.
+ * An escape classifies at its constraint.
+ * The default is parent-independent, so it computes once here rather than per matched parent.
  */
 async function gatedDefaultsOf(
   names: readonly string[],
   fields: Record<string, FieldQueryMeta>,
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
-): Promise<Record<string, unknown> | undefined> {
-  let defaults: Record<string, unknown> | undefined;
+): Promise<{ defaults: Record<string, unknown>; errors: FieldErrors } | undefined> {
+  let result: { defaults: Record<string, unknown>; errors: FieldErrors } | undefined;
   for (const name of names) {
     const meta = fields[name];
-    if (isUndefined(meta.when) || (meta.kind !== 'column' && meta.kind !== 'record')) continue;
+    if (isUndefined(meta.when)) continue;
+    const { defaults, errors } = (result ??= { defaults: {}, errors: {} });
     const prepared = await defaultPath(name, meta, writeContext(name, meta, input, ctx));
+    if ('errors' in prepared) {
+      Object.assign(errors, prepared.errors);
+      continue;
+    }
     if (!('value' in prepared)) continue;
-    const output = await finishScalar(name, meta, prepared.value, input, ctx);
-    if (!isUndefined(output.column)) (defaults ??= {})[name] = output.column.value;
+    if (meta.kind === 'column' || meta.kind === 'record') {
+      const output = await finishScalar(name, meta, prepared.value, input, ctx);
+      if (!isUndefined(output.errors)) Object.assign(errors, output.errors);
+      else if (!isUndefined(output.column)) defaults[name] = output.column.value;
+      continue;
+    }
+    if (!isDefaultShaped(meta, prepared.value)) {
+      errors[name] = 'validation.invalidValue';
+      continue;
+    }
+    const output = await finishComposite(name, meta, prepared.value, ctx, processScope);
+    if (!isUndefined(output.errors)) Object.assign(errors, output.errors);
+    else defaults[name] = output.relation?.uuids ?? output.child?.items ?? [];
   }
-  return defaults;
+  return result;
+}
+
+/**
+ * Whether a composite default holds the shape `finishComposite` descends: its list, object, or null form.
+ */
+function isDefaultShaped(meta: FieldQueryMeta, value: unknown): boolean {
+  if (meta.kind === 'childOne') return isNull(value) || isObject(value);
+  if (!isArray(value)) return false;
+  return meta.kind === 'records' ? value.every(isString) : value.every(isObject);
 }
 
 /**
