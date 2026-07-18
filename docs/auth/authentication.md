@@ -46,19 +46,22 @@ The framework ships no signup endpoint - account creation is where apps differ, 
 // api/signup.post.ts
 import { conflict, defineHandler, query, readJSONBody } from 'ohne';
 import { createSession } from 'ohne/auth';
-import { hashPassword } from 'ohne/utils/crypto';
 
 export default defineHandler(async () => {
   const { email, password } = await readJSONBody<{ email: string; password: string }>();
   // enforce whatever your app wants here: a length rule, an invite, a captcha...
 
-  const result = await query('Users').create({ email, passwordHash: await hashPassword(password) });
+  const result = await query('Users').create({ email, password });
   if (!result.ok) throw conflict(); // the email is taken
 
   await createSession(result.record.UUID);
   return { UUID: result.record.UUID, email: result.record.email };
 });
 ```
+
+You pass the password as plain text. The `password` field hashes it with scrypt just before it is
+stored, so the plaintext never lands anywhere - there is no hashing step to remember. The stored
+value is the hash, and that is what a read of the field returns.
 
 `create` runs the collection's own email validation and its unique constraint, so a bad or duplicate
 email comes back as `result.ok === false`. `createSession` writes the session cookie, exactly as
