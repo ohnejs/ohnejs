@@ -76,6 +76,33 @@ useCollections().register('BDLocDecks', {
     },
   },
 });
+useCollections().register('BDTarget', {
+  name: 'BDTarget',
+  collection: { fields: { name: field('text') } },
+});
+useCollections().register('BDOwner', {
+  name: 'BDOwner',
+  collection: {
+    fields: {
+      title: field('text'),
+      target: field('record', { collection: 'BDTarget', onDelete: 'cascade' }),
+      content: field('blocks', { allow: ['BDHero'] }),
+    },
+  },
+});
+useCollections().register('BDDeepOwner', {
+  name: 'BDDeepOwner',
+  collection: {
+    fields: {
+      items: field('repeater', {
+        fields: {
+          ref: field('record', { collection: 'BDTarget', onDelete: 'cascade' }),
+          widgets: field('blocks', { allow: ['BDHero'] }),
+        },
+      }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -232,6 +259,52 @@ describe('runDelete with blocks', () => {
     deepStrictEqual(result, { deleted: 1 });
     strictEqual(statements.length, 1);
     match(statements[0], /^DELETE FROM "BDPlain"/);
+  });
+});
+
+describe('runDelete cleans cascade-doomed instances', () => {
+  it('collects blocks of records a cascade edge dooms', async () => {
+    const target = await runCreate('BDTarget', { name: 'T' }, null);
+    ok(target.ok);
+    const targetUUID = (target.record as { UUID: string }).UUID;
+    const owner = await runCreate(
+      'BDOwner',
+      {
+        title: 'O',
+        target: targetUUID,
+        content: [{ block: 'BDHero', fields: { title: 'H' } }],
+      },
+      null,
+    );
+    ok(owner.ok);
+    const ownerUUID = (owner.record as { UUID: string }).UUID;
+    const instance = (owner.record as { content: Envelope[] }).content[0].UUID;
+    strictEqual(await countWhere('block_BDHero', 'UUID', instance), 1);
+
+    const result = await runDelete('BDTarget', uuidIs(targetUUID));
+    strictEqual(result.deleted, 1);
+    strictEqual(await countWhere('BDOwner', 'UUID', ownerUUID), 0);
+    strictEqual(await countWhere('block_BDHero', 'UUID', instance), 0);
+  });
+
+  it('collects blocks beneath child rows a cascade edge dooms', async () => {
+    const target = await runCreate('BDTarget', { name: 'T2' }, null);
+    ok(target.ok);
+    const targetUUID = (target.record as { UUID: string }).UUID;
+    const owner = await runCreate(
+      'BDDeepOwner',
+      { items: [{ ref: targetUUID, widgets: [{ block: 'BDHero', fields: { title: 'W' } }] }] },
+      null,
+    );
+    ok(owner.ok);
+    const items = (owner.record as { items: { UUID: string; widgets: Envelope[] }[] }).items;
+    const instance = items[0].widgets[0].UUID;
+    strictEqual(await countWhere('block_BDHero', 'UUID', instance), 1);
+
+    const result = await runDelete('BDTarget', uuidIs(targetUUID));
+    strictEqual(result.deleted, 1);
+    strictEqual(await countWhere('BDDeepOwner_items', 'UUID', items[0].UUID), 0);
+    strictEqual(await countWhere('block_BDHero', 'UUID', instance), 0);
   });
 });
 

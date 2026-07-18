@@ -4,6 +4,7 @@ import type { Dialect } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { chunk, isUndefined } from '../../../utils/index.ts';
+import { useCollections } from '../../collections/use-collections.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
@@ -39,6 +40,7 @@ export interface DeleteOutcome {
  * Child and junction rows follow through `ON DELETE CASCADE`.
  * Block instances do not - their link is polymorphic, with no foreign key.
  * A collection holding blocks anywhere therefore pre-collects the matched records' instance subtrees.
+ * Rows other collections lose through a cascade `record` edge pre-collect theirs the same way.
  * They delete in the same transaction, leaving the per-type tables no orphans.
  * A condition over translatable fields reads the default locale's values.
  * A locale-scoped chain has no `delete`, so this only ever runs unlocaled.
@@ -86,7 +88,7 @@ async function attemptDelete(
   condition: ConditionNode,
 ): Promise<DeleteOutcome> {
   const locale = effectiveLocale(null);
-  if (hasBlocksField(meta.fields)) {
+  if (hasBlocksField(meta.fields) || cascadeReachesBlocks(meta.collection)) {
     return deleteWithBlocks(tx, meta, dialect, condition, locale);
   }
   const where = compileWhere(condition, meta, dialect, locale);
@@ -106,9 +108,10 @@ async function attemptDelete(
 }
 
 /**
- * The delete attempt for a collection holding blocks anywhere in its composite tree.
+ * The delete attempt for a delete that dooms blocks - its own tree's, or a cascade edge's.
  *
  * It resolves the matched set, walks the tree for the wrapper rows' instances, and collects each subtree.
+ * Rows other collections lose through `ON DELETE CASCADE` contribute theirs through the edge walk.
  * All of it runs before the main `DELETE`, whose cascade takes the wrapper and child rows.
  * The per-type rows fall last: nothing references them anymore, and nothing cascades to them.
  */
@@ -122,7 +125,8 @@ async function deleteWithBlocks(
   const matched = await matchedUUIDs(tx, meta, dialect, condition, locale);
   if (matched.length === 0) return { deleted: 0 };
   const owned = await ownedBlockInstances(tx, dialect, meta.fields, matched);
-  const doomed = await collectBlockSubtree(tx, dialect, owned);
+  const cascaded = await cascadeDoomedInstances(tx, dialect, meta.collection, matched);
+  const doomed = await collectBlockSubtree(tx, dialect, [...owned, ...cascaded]);
   let deleted = 0;
   for (const batch of chunk(matched, 900)) {
     const marks = batch.map(() => '?').join(', ');
@@ -134,6 +138,161 @@ async function deleteWithBlocks(
   }
   await deleteBlockInstances(tx, dialect, doomed);
   return { deleted };
+}
+
+/**
+ * One declared cascade edge into a collection: deleting its rows deletes rows of `table` too.
+ * `fields` is the dying scope's field map, walked for the block instances those rows place.
+ * `collection` is set when `table` is a collection's main table, so the closure can recurse.
+ */
+interface CascadeEdge {
+  table: string;
+  column: string;
+  fields: Record<string, FieldQueryMeta>;
+  collection?: string;
+}
+
+/**
+ * The per-target cascade-edge memo, living and dying with the registries like the metadata cache.
+ */
+const edgeCache = new Map<string, CascadeEdge[]>();
+
+/**
+ * Every declared cascade edge into `target`, resolved once from the registries and memoized.
+ * A `record` field with `onDelete: 'cascade'` contributes its main or child table.
+ * Blocks never hold cascade `record` fields - the metadata build rejects them - so they add none.
+ */
+function cascadeEdgesInto(target: string): CascadeEdge[] {
+  const cached = edgeCache.get(target);
+  if (!isUndefined(cached)) return cached;
+  const edges: CascadeEdge[] = [];
+  for (const name of Object.keys(useCollections().all())) {
+    const meta = queryMetadata(name);
+    collectEdges(edges, target, meta.fields, meta.table, name);
+  }
+  edgeCache.set(target, edges);
+  return edges;
+}
+
+/**
+ * Collects one scope's cascade edges into `target`, recursing through its composite subfields.
+ */
+function collectEdges(
+  edges: CascadeEdge[],
+  target: string,
+  fields: Record<string, FieldQueryMeta>,
+  table: string,
+  collection?: string,
+): void {
+  for (const field of Object.values(fields)) {
+    if (
+      field.kind === 'record' &&
+      field.target === target &&
+      field.options?.onDelete === 'cascade'
+    ) {
+      edges.push({
+        table,
+        column: field.column as string,
+        fields,
+        ...(isUndefined(collection) ? {} : { collection }),
+      });
+    }
+    if (field.kind === 'childOne' || field.kind === 'childMany') {
+      collectEdges(
+        edges,
+        target,
+        field.subfields as Record<string, FieldQueryMeta>,
+        field.table as string,
+      );
+    }
+  }
+}
+
+/**
+ * Whether any cascade edge into `target`, transitively, dooms a scope holding blocks.
+ * Decides whether a delete of a blocks-free collection still needs the instance-cleanup path.
+ */
+function cascadeReachesBlocks(target: string, seen: Set<string> = new Set([target])): boolean {
+  return cascadeEdgesInto(target).some((edge) => {
+    if (hasBlocksField(edge.fields)) return true;
+    if (isUndefined(edge.collection) || seen.has(edge.collection)) return false;
+    seen.add(edge.collection);
+    return cascadeReachesBlocks(edge.collection, seen);
+  });
+}
+
+/**
+ * The block-instance seeds the database's cascade edges will doom beneath the matched rows.
+ *
+ * The main `DELETE` cascades referencing rows away at the constraint level, wrapper rows included.
+ * The polymorphic per-type rows stay, so the write layer collects and deletes them itself.
+ * Each edge reads its doomed rows and gathers the blocks their subtrees place.
+ * A doomed collection then recurses through its own in-edges.
+ * A visited set per collection keeps a cascade cycle from re-walking rows.
+ */
+async function cascadeDoomedInstances(
+  tx: Transaction,
+  dialect: Dialect,
+  collection: string,
+  matched: readonly string[],
+): Promise<BlockInstance[]> {
+  const doomed: BlockInstance[] = [];
+  const visited = new Map<string, Set<string>>([[collection, new Set(matched)]]);
+  await walkCascade(tx, dialect, collection, matched, doomed, visited);
+  return doomed;
+}
+
+/**
+ * One closure step: resolves each in-edge's doomed rows, collects their blocks, and recurses.
+ */
+async function walkCascade(
+  tx: Transaction,
+  dialect: Dialect,
+  collection: string,
+  uuids: readonly string[],
+  doomed: BlockInstance[],
+  visited: Map<string, Set<string>>,
+): Promise<void> {
+  for (const edge of cascadeEdgesInto(collection)) {
+    const wantsBlocks = hasBlocksField(edge.fields);
+    const recurses = !isUndefined(edge.collection) && cascadeEdgesInto(edge.collection).length > 0;
+    if (!wantsBlocks && !recurses) continue;
+    const rows = await rowsReferencing(tx, dialect, edge.table, edge.column, uuids);
+    if (rows.length === 0) continue;
+    if (wantsBlocks) {
+      doomed.push(...(await ownedBlockInstances(tx, dialect, edge.fields, rows)));
+    }
+    if (isUndefined(edge.collection)) continue;
+    const seen = visited.get(edge.collection) ?? new Set<string>();
+    visited.set(edge.collection, seen);
+    const fresh = rows.filter((uuid) => !seen.has(uuid));
+    if (fresh.length === 0) continue;
+    for (const uuid of fresh) seen.add(uuid);
+    await walkCascade(tx, dialect, edge.collection, fresh, doomed, visited);
+  }
+}
+
+/**
+ * The `UUID`s of one table's rows whose `column` references any of `uuids`, chunked for the driver.
+ */
+async function rowsReferencing(
+  tx: Transaction,
+  dialect: Dialect,
+  table: string,
+  column: string,
+  uuids: readonly string[],
+): Promise<string[]> {
+  const rows: string[] = [];
+  for (const batch of chunk(uuids, 900)) {
+    const marks = batch.map(() => '?').join(', ');
+    const found = await tx.query<{ UUID: string }>(
+      `SELECT ${dialect.quote('UUID')} FROM ${dialect.quote(table)} ` +
+        `WHERE ${dialect.quote(column)} IN (${marks})`,
+      [...batch],
+    );
+    rows.push(...found.map((row) => row.UUID));
+  }
+  return rows;
 }
 
 /**
