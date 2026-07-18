@@ -151,13 +151,15 @@ export interface FieldType<
   /**
    * Encodes the value into what the column stores, run just before the driver's own codec.
    * Pair it with `deserialize` to invert it on read; a `null` value skips both.
+   * The value arriving here already passed the base-type gate, so it is the column's own primitive.
+   * `serialize` therefore reshapes within that primitive; only a `json` column carries other shapes.
    *
    * @example
    * ```ts
-   * // store a Date as epoch milliseconds
+   * // Store text in one canonical Unicode form
    * defineField({
-   *   columnType: 'integer',
-   *   serialize: (value) => (value as Date).getTime(),
+   *   columnType: 'text',
+   *   serialize: (value) => (value as string).normalize('NFC'),
    * })
    * ```
    */
