@@ -56,6 +56,7 @@ import {
   splitColumns,
 } from './insert.ts';
 import { checkReferences } from './references.ts';
+import { orderBlockItemWrites, orderItemWrites } from './reorder.ts';
 import { withSavepoint } from './savepoint.ts';
 import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
@@ -700,6 +701,7 @@ async function diffJunction(
  * When `ancestry` is set, each item gates per this parent, resolving its subfields' `when` against it.
  * A matched item narrows in place; a fresh item and its whole subtree pre-gate before the insert.
  * The recursion extends the ancestry with the item's own values.
+ * Item writes run in `orderItemWrites` order, so swapped unique values never trip their own index.
  */
 async function correlateChild(
   tx: Transaction,
@@ -745,20 +747,32 @@ async function correlateChild(
     subfields,
     [...existing].filter((uuid) => !consumed.has(uuid)),
   );
-  for (let index = 0; index < child.items.length; index++) {
-    const item = child.items[index];
+  const effective = child.items.map((item) =>
+    isNull(ancestry)
+      ? item
+      : isUndefined(item.itemUUID)
+        ? gateSubtree(item, subfields, ancestry)
+        : gateNested(item, subfields, ancestry),
+  );
+  for (const index of await orderItemWrites(tx, dialect, table, subfields, effective)) {
+    const item = effective[index];
     if (isUndefined(item.itemUUID)) {
-      const fresh = isNull(ancestry) ? item : gateSubtree(item, subfields, ancestry);
-      await insertScope(tx, dialect, table, subfields, uuidv7(), fresh, locale, {
+      await insertScope(tx, dialect, table, subfields, uuidv7(), item, locale, {
         uuid: parentUUID,
         position: index,
         scoped,
       });
       continue;
     }
-    const gated = isNull(ancestry) ? item : gateNested(item, subfields, ancestry);
-    await updateChildRow(tx, dialect, table, subfields, gated, item.itemUUID, index);
-    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item), locale);
+    await updateChildRow(tx, dialect, table, subfields, item, item.itemUUID, index);
+    await applyDerived(
+      tx,
+      dialect,
+      item.itemUUID,
+      item,
+      descend(ancestry, child.items[index]),
+      locale,
+    );
   }
 }
 
@@ -781,6 +795,7 @@ function descend(
  * A matched item updates its per-type row and renumbers the wrapper only when its position moved.
  * It recurses into the instance's own nested structures.
  * When `ancestry` is set, each item's subfields gate through its block type, exactly as child items do.
+ * Item writes run in `orderBlockItemWrites` order, so swapped unique values never trip their own index.
  */
 async function correlateBlocks(
   tx: Transaction,
@@ -812,16 +827,21 @@ async function correlateBlocks(
     await deleteBlockInstances(tx, dialect, doomed);
   }
 
-  for (let index = 0; index < child.items.length; index++) {
-    const item = child.items[index];
+  const effective = child.items.map((item) => {
+    const fields = blockQueryMetadata(item.blockType as string).fields;
+    if (isNull(ancestry)) return item;
+    return isUndefined(item.itemUUID)
+      ? gateSubtree(item, fields, ancestry)
+      : gateNested(item, fields, ancestry);
+  });
+  for (const index of await orderBlockItemWrites(tx, dialect, effective)) {
+    const item = effective[index];
     const blockMeta = blockQueryMetadata(item.blockType as string);
     if (isUndefined(item.itemUUID)) {
-      const fresh = isNull(ancestry) ? item : gateSubtree(item, blockMeta.fields, ancestry);
-      await insertBlockItem(tx, dialect, child.meta, blockMeta, fresh, parentUUID, index, locale);
+      await insertBlockItem(tx, dialect, child.meta, blockMeta, item, parentUUID, index, locale);
       continue;
     }
-    const gated = isNull(ancestry) ? item : gateNested(item, blockMeta.fields, ancestry);
-    await updateChildRow(tx, dialect, blockMeta.table, blockMeta.fields, gated, item.itemUUID);
+    await updateChildRow(tx, dialect, blockMeta.table, blockMeta.fields, item, item.itemUUID);
     const wrapper = byInstance.get(item.itemUUID) as WrapperRow;
     if (wrapper.position !== index) {
       await tx.run(
@@ -830,7 +850,14 @@ async function correlateBlocks(
         [index, wrapper.uuid],
       );
     }
-    await applyDerived(tx, dialect, item.itemUUID, gated, descend(ancestry, item), locale);
+    await applyDerived(
+      tx,
+      dialect,
+      item.itemUUID,
+      item,
+      descend(ancestry, child.items[index]),
+      locale,
+    );
   }
 }
 

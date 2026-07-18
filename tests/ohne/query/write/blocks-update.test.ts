@@ -427,6 +427,29 @@ describe('runUpdate with blocks', () => {
     ok(!result.ok);
     strictEqual(result.errors['content[0].fields.slug'], 'validation.notUnique');
   });
+
+  it('swaps unique subfield values between kept instances', async () => {
+    const post = await seedPost([
+      { block: 'BUSlug', fields: { slug: 'swap-a' } },
+      { block: 'BUSlug', fields: { slug: 'swap-b' } },
+    ]);
+    const [first, second] = post.content;
+    const result = await runUpdate(
+      'BUPosts',
+      {
+        content: [
+          { block: 'BUSlug', UUID: first.UUID, fields: { slug: 'swap-b' } },
+          { block: 'BUSlug', UUID: second.UUID, fields: { slug: 'swap-a' } },
+        ],
+      },
+      uuidIs(post.uuid),
+      null,
+    );
+    ok(result.ok);
+    const content = result.records[0].content as Envelope[];
+    strictEqual((content[0].fields as { slug: string }).slug, 'swap-b');
+    strictEqual((content[1].fields as { slug: string }).slug, 'swap-a');
+  });
 });
 
 describe('runUpdate sweeps instances under doomed composite rows', () => {

@@ -55,6 +55,16 @@ useCollections().register('UDeep', {
     },
   },
 });
+useCollections().register('USwap', {
+  name: 'USwap',
+  collection: {
+    fields: {
+      items: field('repeater', {
+        fields: { slug: field('text', { unique: true, uniquePerParent: true }) },
+      }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -390,6 +400,54 @@ describe('runUpdate nested child uniqueness', () => {
     );
     ok(!result.ok);
     strictEqual(result.errors['sections[0].notes[0].tag'], 'validation.notUnique');
+  });
+
+  it('swaps unique values between kept items, per-parent index included', async () => {
+    const created = await runCreate('USwap', { items: [{ slug: 'sw-a' }, { slug: 'sw-b' }] }, null);
+    ok(created.ok);
+    const record = created.record as { UUID: string; items: { UUID: string }[] };
+    const result = await runUpdate(
+      'USwap',
+      {
+        items: [
+          { UUID: record.items[0].UUID, slug: 'sw-b' },
+          { UUID: record.items[1].UUID, slug: 'sw-a' },
+        ],
+      },
+      uuidIs(record.UUID),
+      null,
+    );
+    ok(result.ok);
+    const items = result.records[0].items as { UUID: string; slug: string }[];
+    deepStrictEqual(
+      items.map((item) => item.slug),
+      ['sw-b', 'sw-a'],
+    );
+    strictEqual(items[0].UUID, record.items[0].UUID);
+  });
+
+  it('shifts unique values along kept items and frees one for a fresh item', async () => {
+    const created = await runCreate('USwap', { items: [{ slug: 'p1' }, { slug: 'p2' }] }, null);
+    ok(created.ok);
+    const record = created.record as { UUID: string; items: { UUID: string }[] };
+    const result = await runUpdate(
+      'USwap',
+      {
+        items: [
+          { UUID: record.items[0].UUID, slug: 'p2' },
+          { UUID: record.items[1].UUID, slug: 'p3' },
+          { slug: 'p1' },
+        ],
+      },
+      uuidIs(record.UUID),
+      null,
+    );
+    ok(result.ok);
+    const items = result.records[0].items as { slug: string }[];
+    deepStrictEqual(
+      items.map((item) => item.slug),
+      ['p2', 'p3', 'p1'],
+    );
   });
 
   it('rejects fanning one table-wide unique child value across matched records', async () => {
