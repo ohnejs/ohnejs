@@ -14,6 +14,7 @@ import { readRows } from '../read/find.ts';
 import { busyError } from './busy.ts';
 import { insertCompanion, insertScope, splitColumns } from './insert.ts';
 import { checkReferences } from './references.ts';
+import { withSavepoint } from './savepoint.ts';
 import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
 /**
@@ -44,7 +45,12 @@ export async function runCreate(
           (tx) => attemptCreate(tx, meta, dialect, input, locale),
           'immediate',
         )
-    : () => attemptCreate(joinedTx, meta, dialect, input, locale);
+    : () =>
+        withSavepoint(
+          joinedTx,
+          (outcome) => !outcome.ok,
+          () => attemptCreate(joinedTx, meta, dialect, input, locale),
+        );
   try {
     return await run();
   } catch (error) {

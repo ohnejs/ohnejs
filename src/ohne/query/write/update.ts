@@ -56,6 +56,7 @@ import {
   splitColumns,
 } from './insert.ts';
 import { checkReferences } from './references.ts';
+import { withSavepoint } from './savepoint.ts';
 import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
 /**
@@ -91,7 +92,12 @@ export async function runUpdate(
           (tx) => attemptUpdate(tx, meta, dialect, input, condition, locale),
           'immediate',
         )
-    : () => attemptUpdate(joinedTx, meta, dialect, input, condition, locale);
+    : () =>
+        withSavepoint(
+          joinedTx,
+          (outcome) => !outcome.ok,
+          () => attemptUpdate(joinedTx, meta, dialect, input, condition, locale),
+        );
   try {
     return await run();
   } catch (error) {

@@ -854,6 +854,7 @@ export type UpdateResult<T> = { ok: true; records: T } | { ok: false; errors: Fi
 interface Joinable<Self> {
   /**
    * Joins an open transaction, so a write terminal runs inside it rather than opening its own.
+   * A failing write unwinds to a savepoint, so the transaction keeps only the caller's other work.
    *
    * @example
    * ```ts

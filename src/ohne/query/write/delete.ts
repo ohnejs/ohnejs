@@ -20,6 +20,7 @@ import {
 } from './blocks.ts';
 import { busyError } from './busy.ts';
 import { referenceViolation } from './errors.ts';
+import { withSavepoint } from './savepoint.ts';
 
 /**
  * The outcome of a delete: how many records the condition matched and removed.
@@ -56,7 +57,12 @@ export async function runDelete(
   const run = isUndefined(joinedTx)
     ? () =>
         useDatabase().transaction((tx) => attemptDelete(tx, meta, dialect, condition), 'immediate')
-    : () => attemptDelete(joinedTx, meta, dialect, condition);
+    : () =>
+        withSavepoint(
+          joinedTx,
+          () => false,
+          () => attemptDelete(joinedTx, meta, dialect, condition),
+        );
   try {
     return await run();
   } catch (error) {
@@ -175,7 +181,12 @@ export async function runDeleteTranslation(
           (tx) => attemptDeleteTranslation(tx, meta, dialect, condition, locale),
           'immediate',
         )
-    : () => attemptDeleteTranslation(joinedTx, meta, dialect, condition, locale);
+    : () =>
+        withSavepoint(
+          joinedTx,
+          () => false,
+          () => attemptDeleteTranslation(joinedTx, meta, dialect, condition, locale),
+        );
   try {
     return await run();
   } catch (error) {
