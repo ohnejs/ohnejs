@@ -306,6 +306,24 @@ describe('runUpdate repeater correlation', () => {
     ]);
     strictEqual(rows.length, 2);
   });
+
+  it('rejects a duplicate item UUID instead of collapsing items', async () => {
+    const post = await seedPost({ sections: [{ heading: 'a' }, { heading: 'b' }] });
+    const kept = (post.sections as { UUID: string }[])[0].UUID;
+    const result = await runUpdate(
+      'UPost',
+      {
+        sections: [
+          { UUID: kept, heading: 'first' },
+          { UUID: kept, heading: 'second' },
+        ],
+      },
+      uuidIs(post.UUID as string),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors['sections[1].UUID'], 'validation.notUnique');
+  });
 });
 
 describe('runUpdate object upsert', () => {
@@ -372,6 +390,35 @@ describe('runUpdate nested child uniqueness', () => {
     );
     ok(!result.ok);
     strictEqual(result.errors['sections[0].notes[0].tag'], 'validation.notUnique');
+  });
+
+  it('rejects fanning one table-wide unique child value across matched records', async () => {
+    const one = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'fan-a' }] }] }, null);
+    const two = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'fan-b' }] }] }, null);
+    ok(one.ok);
+    ok(two.ok);
+    const result = await runUpdate(
+      'UDeep',
+      { sections: [{ notes: [{ tag: 'fan-shared' }] }] },
+      {
+        kind: 'compare',
+        path: ['UUID'],
+        op: 'in',
+        value: [(one.record as { UUID: string }).UUID, (two.record as { UUID: string }).UUID],
+        negated: false,
+      },
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors['sections[0].notes[0].tag'], 'validation.notUnique');
+    const tags = await db.query(
+      'SELECT "tag" FROM "UDeep_sections_notes" WHERE "tag" LIKE ? ORDER BY "tag"',
+      ['fan-%'],
+    );
+    deepStrictEqual(
+      tags.map((row) => (row as { tag: string }).tag),
+      ['fan-a', 'fan-b'],
+    );
   });
 });
 

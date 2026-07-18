@@ -15,7 +15,12 @@ import {
   isObject,
   isUndefined,
 } from '../../../../utils/index.ts';
-import { Dialect, type LogicalType, type SchemaTransactionOptions } from '../../dialect.ts';
+import {
+  Dialect,
+  type LogicalType,
+  type SchemaTransactionOptions,
+  type UniqueViolationTarget,
+} from '../../dialect.ts';
 import { OHNE_REBUILD_PREFIX } from '../../naming/table-names.ts';
 import { describeTable, listTables } from './introspect.ts';
 import { applyPragmas } from './pragmas.ts';
@@ -226,6 +231,21 @@ export class SQLiteDialect extends Dialect {
   isUniqueViolation(error: unknown): boolean {
     const code = errcodeOf(error);
     return code === SQLITE_CONSTRAINT_UNIQUE || code === SQLITE_CONSTRAINT_PRIMARYKEY;
+  }
+
+  /**
+   * Parses `UNIQUE constraint failed: <table>.<column>[, ...]` into its target.
+   * The message shape has been stable in SQLite for years; anything else returns `null`.
+   */
+  uniqueViolationTarget(error: unknown): UniqueViolationTarget | null {
+    const detail = errorMessage(error).match(/UNIQUE constraint failed: (.+)$/)?.[1];
+    if (isUndefined(detail)) return null;
+    const parts = detail.split(', ').map((part) => part.split('.'));
+    const table = parts[0][0];
+    if (!parts.every((part) => part.length === 2 && part[0] === table && part[1] !== '')) {
+      return null;
+    }
+    return { table, columns: parts.map((part) => part[1]) };
   }
 
   /**

@@ -93,7 +93,9 @@ export async function runUpdate(
     return await run();
   } catch (error) {
     if (dialect.isBusy(error)) throw busyError(error);
-    if (dialect.isUniqueViolation(error)) return { ok: false, errors: uniqueRaceErrors(meta) };
+    if (dialect.isUniqueViolation(error)) {
+      return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
+    }
     if (dialect.isForeignKeyViolation(error)) {
       return { ok: false, errors: { '': 'validation.invalidReference' } };
     }
@@ -121,6 +123,15 @@ async function attemptUpdate(
   const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
   if (matched.length === 0) return { ok: true, records: [] };
 
+  const gates = whenGates(meta.fields, input, scope);
+  const ungated = gates.length === 0 && !hasNestedGates(scope);
+
+  if (ungated && matched.length > 1 && scope.uniqueProbes.length > 0) {
+    const fanned: FieldErrors = {};
+    for (const probe of scope.uniqueProbes) fanned[probe.path] = 'validation.notUnique';
+    return { ok: false, errors: fanned };
+  }
+
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code, matched);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
 
@@ -129,6 +140,7 @@ async function attemptUpdate(
     dialect,
     meta,
     scope.columns,
+    code,
     matched,
   );
   if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
@@ -153,8 +165,7 @@ async function attemptUpdate(
 
   const plan = await planCompanion(tx, dialect, meta, scope, matched, code);
 
-  const gates = whenGates(meta.fields, input, scope);
-  if (gates.length === 0 && !hasNestedGates(scope)) {
+  if (ungated) {
     const { main, companion } = splitColumns(meta.fields, scope.columns);
     const failure = materializeFailure(plan, companion, matched);
     if (!isNull(failure)) return { ok: false, errors: failure };

@@ -17,6 +17,21 @@ import { OHNE_LOCKS } from './naming/table-names.ts';
 export type LogicalType = 'text' | 'integer' | 'boolean' | 'json';
 
 /**
+ * The table and columns a unique-constraint violation names, parsed from the driver's error.
+ */
+export interface UniqueViolationTarget {
+  /**
+   * The table whose unique index failed.
+   */
+  table: string;
+
+  /**
+   * The violated index's columns, in the order the driver names them.
+   */
+  columns: readonly string[];
+}
+
+/**
  * A held cluster lock, returned by `acquireLock` and surrendered to `releaseLock`.
  */
 export interface LockHandle {
@@ -236,6 +251,18 @@ export abstract class Dialect {
    * ```
    */
   abstract isUniqueViolation(error: unknown): boolean;
+
+  /**
+   * The table and columns a unique violation names, or `null` when the message does not parse.
+   * Best-effort: the write layer maps the target back to a field, falling back to a blanket error.
+   *
+   * @example
+   * ```ts
+   * dialect.uniqueViolationTarget(caught)
+   * // -> { table: 'Posts', columns: ['slug'] }
+   * ```
+   */
+  abstract uniqueViolationTarget(error: unknown): UniqueViolationTarget | null;
 
   /**
    * Whether `error` thrown by the driver is a foreign-key-constraint violation.

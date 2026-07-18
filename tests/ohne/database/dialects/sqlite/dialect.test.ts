@@ -405,6 +405,20 @@ describe('SQLiteDialect', () => {
       await db.close();
     });
 
+    it('parses a unique violation into its table and columns', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY, a TEXT, b TEXT, UNIQUE (a, b))');
+      await db.run('INSERT INTO t (id, a, b) VALUES (?, ?, ?)', ['x', '1', '2']);
+      const single = await errorOf(db.run('INSERT INTO t (id, a) VALUES (?, ?)', ['x', '9']));
+      deepStrictEqual(dialect.uniqueViolationTarget(single), { table: 't', columns: ['id'] });
+      const pair = await errorOf(
+        db.run('INSERT INTO t (id, a, b) VALUES (?, ?, ?)', ['y', '1', '2']),
+      );
+      deepStrictEqual(dialect.uniqueViolationTarget(pair), { table: 't', columns: ['a', 'b'] });
+      strictEqual(dialect.uniqueViolationTarget(new Error('boom')), null);
+      await db.close();
+    });
+
     it('recognizes a foreign-key violation', async () => {
       const db = await open();
       await db.exec('CREATE TABLE parent (id TEXT PRIMARY KEY)');

@@ -21,20 +21,54 @@ useCollections().register('URComposite', {
     compositeIndexes: [{ fields: ['email', 'tenantId'], unique: true }],
   },
 });
+useCollections().register('URChild', {
+  name: 'URChild',
+  collection: {
+    fields: { items: field('repeater', { fields: { slug: field('text', { unique: true }) } }) },
+  },
+});
 
 describe('uniqueRaceErrors', () => {
   it('names every top-level unique field', () => {
-    deepStrictEqual(uniqueRaceErrors(queryMetadata('URUnique')), { slug: 'validation.notUnique' });
+    deepStrictEqual(uniqueRaceErrors(queryMetadata('URUnique'), null), {
+      slug: 'validation.notUnique',
+    });
   });
 
   it('names every field a unique composite covers', () => {
-    deepStrictEqual(uniqueRaceErrors(queryMetadata('URComposite')), {
+    deepStrictEqual(uniqueRaceErrors(queryMetadata('URComposite'), null), {
       email: 'validation.notUnique',
       tenantId: 'validation.notUnique',
     });
   });
 
   it('falls back to a root error when no field is unique', () => {
-    deepStrictEqual(uniqueRaceErrors(queryMetadata('URPlain')), { '': 'validation.notUnique' });
+    deepStrictEqual(uniqueRaceErrors(queryMetadata('URPlain'), null), {
+      '': 'validation.notUnique',
+    });
+  });
+
+  it('keys a parsed main-table target at its exact field', () => {
+    deepStrictEqual(
+      uniqueRaceErrors(queryMetadata('URComposite'), { table: 'URComposite', columns: ['email'] }),
+      { email: 'validation.notUnique' },
+    );
+  });
+
+  it('falls back when a target column maps to no field', () => {
+    deepStrictEqual(
+      uniqueRaceErrors(queryMetadata('URUnique'), { table: 'URUnique', columns: ['ghost'] }),
+      { slug: 'validation.notUnique' },
+    );
+  });
+
+  it('keys a child-table target at the subfield dot path, system columns skipped', () => {
+    deepStrictEqual(
+      uniqueRaceErrors(queryMetadata('URChild'), {
+        table: 'URChild_items',
+        columns: ['_parentUUID', 'slug'],
+      }),
+      { 'items.slug': 'validation.notUnique' },
+    );
   });
 });

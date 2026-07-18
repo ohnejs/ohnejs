@@ -1,6 +1,8 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
+
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -47,6 +49,26 @@ registerDatabase(db);
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
+
+/**
+ * Counts the write statements matching `pattern` while `fn` runs, restoring the adapter after.
+ * Zero writes proves a rejection came from the precheck, not from a rolled-back constraint hit.
+ */
+async function countWrites(pattern: RegExp, fn: () => Promise<void>): Promise<number> {
+  const adapter = db as DatabaseAdapter;
+  const original = adapter.run.bind(adapter);
+  let count = 0;
+  adapter.run = (sql, params) => {
+    if (pattern.test(sql)) count++;
+    return original(sql, params);
+  };
+  try {
+    await fn();
+  } finally {
+    adapter.run = original;
+  }
+  return count;
+}
 
 describe('checkUnique under locales', () => {
   it('collides a plain unique translatable value across locales', async () => {
@@ -115,5 +137,45 @@ describe('checkUnique under locales', () => {
       title: 'validation.notUnique',
       subtitle: 'validation.notUnique',
     });
+  });
+
+  it('rejects an own-record cross-locale write to a locale-spanning unique', async () => {
+    const created = await queryUntyped('LUSlugs').create({ slug: 'own-en' });
+    ok(created.ok);
+    const writes = await countWrites(/"LUSlugs__translations"/, async () => {
+      const clash = await queryUntyped('LUSlugs')
+        .locale('de')
+        .where({ UUID: created.record.UUID })
+        .update({ slug: 'own-en' });
+      ok(!clash.ok);
+      strictEqual(clash.errors.slug, 'validation.notUnique');
+    });
+    strictEqual(writes, 0);
+    const fresh = await queryUntyped('LUSlugs')
+      .locale('de')
+      .where({ UUID: created.record.UUID })
+      .update({ slug: 'own-de' });
+    ok(fresh.ok);
+  });
+
+  it('rejects an own-record cross-locale write matching its unique composite', async () => {
+    const created = await queryUntyped('LURace').create({
+      slug: 'own-c',
+      title: 'ct',
+      subtitle: 'cs',
+    });
+    ok(created.ok);
+    const writes = await countWrites(/"LURace__translations"/, async () => {
+      const clash = await queryUntyped('LURace')
+        .locale('de')
+        .where({ UUID: created.record.UUID })
+        .update({ slug: 'own-c-de', title: 'ct', subtitle: 'cs' });
+      ok(!clash.ok);
+      deepStrictEqual(clash.errors, {
+        title: 'validation.notUnique',
+        subtitle: 'validation.notUnique',
+      });
+    });
+    strictEqual(writes, 0);
   });
 });

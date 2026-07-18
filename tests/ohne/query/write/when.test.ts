@@ -133,6 +133,34 @@ useCollections().register('WNSan', {
     },
   },
 });
+useCollections().register('WNFan', {
+  name: 'WNFan',
+  collection: {
+    fields: {
+      mode: field('text'),
+      items: field('repeater', {
+        fields: { code: field('text', { unique: true }) },
+        when: { mode: 'on' },
+      }),
+    },
+  },
+});
+
+let wnDefaultCalls = 0;
+useCollections().register('WNOnce', {
+  name: 'WNOnce',
+  collection: {
+    fields: {
+      mode: field('text'),
+      serial: field('text', {
+        default: () => `tick-${(wnDefaultCalls += 1)}`,
+        when: { mode: 'on' },
+      }),
+      probe: field('text', { nullable: true, when: { serial: 'tick-1' } }),
+    },
+  },
+});
+
 useCollections().register('WNCrash', {
   name: 'WNCrash',
   collection: {
@@ -186,6 +214,13 @@ describe('when gate on create', () => {
 
   it('takes the default when an active field is absent', async () => {
     strictEqual((await created('WCProduct', { kind: 'sale' })).discount, 5);
+  });
+
+  it('resolves an absent inactive field default once, so gate and storage agree', async () => {
+    const record = await created('WNOnce', { mode: 'off', probe: 'P' });
+    strictEqual(wnDefaultCalls, 1);
+    strictEqual(record.serial, 'tick-1');
+    strictEqual(record.probe, 'P');
   });
 
   it('activates per repeater item off a sibling subfield', async () => {
@@ -285,6 +320,27 @@ describe('when gate on update', () => {
     strictEqual(pick(result.records, 'regular').discount, 2);
     strictEqual(pick(result.records, 'regular').title, 'X');
     ok((await updatedAt('u-r2')) > 100);
+  });
+
+  it('lets a unique fan-out through when a gate narrows it to one record', async () => {
+    const on = await created('WNFan', { mode: 'on', items: [{ code: 'fan-on' }] });
+    const off = await created('WNFan', { mode: 'off' });
+    const result = await runUpdate(
+      'WNFan',
+      { items: [{ code: 'fan-shared' }] },
+      inUUIDs([on.UUID as string, off.UUID as string]),
+      null,
+    );
+    ok(result.ok);
+    const byUUID = new Map(result.records.map((record) => [record.UUID, record]));
+    strictEqual(
+      ((byUUID.get(on.UUID) as Record<string, unknown>).items as { code: string }[])[0].code,
+      'fan-shared',
+    );
+    strictEqual(
+      ((byUUID.get(off.UUID) as Record<string, unknown>).items as { code: string }[]).length,
+      0,
+    );
   });
 
   it('overlays the input, so setting the gate field activates in the same call', async () => {

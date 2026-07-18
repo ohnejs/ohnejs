@@ -1,10 +1,19 @@
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
-import type { Dialect, LogicalType } from '../../database/dialect.ts';
-import type { CollectionQueryMeta } from '../metadata.ts';
+import type { Dialect, LogicalType, UniqueViolationTarget } from '../../database/dialect.ts';
+import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { UniqueProbe } from '../pipeline/run-record.ts';
 import type { FieldErrors } from './errors.ts';
 
-import { chunk, groupBy, hasKey, isEmpty, isUndefined, uniqueArray } from '../../../utils/index.ts';
+import {
+  chunk,
+  groupBy,
+  hasKey,
+  isEmpty,
+  isNull,
+  isUndefined,
+  uniqueArray,
+} from '../../../utils/index.ts';
+import { blockQueryMetadata } from '../metadata.ts';
 
 /**
  * Prechecks every set unique field against its table, naming each collision in one round trip.
@@ -16,6 +25,8 @@ import { chunk, groupBy, hasKey, isEmpty, isUndefined, uniqueArray } from '../..
  * Only fields the write sets are probed, so an update leaves an untouched unique field alone.
  * `excludeUUIDs` drops the rows the write itself owns, so a kept value never collides with its own row.
  * The exclusion anchors by `UUID` on the main table and by `_parentUUID` on the companion.
+ * On the companion it binds the write's locale too, since only that locale's rows rewrite.
+ * A record's own other-locale row therefore still probes against a locale-spanning `unique`.
  * A `null` value never collides: `col = NULL` is never true, matching SQLite's multi-null unique rule.
  * Returns a `notUnique` message keyed by each colliding field, or an empty map when the row is clear.
  */
@@ -42,7 +53,12 @@ export async function checkUnique(
     const companion = field.companion === true;
     const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
     const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
-    const exclude = excludeUUIDs.length === 0 ? '' : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const exclude =
+      excludeUUIDs.length === 0
+        ? ''
+        : companion
+          ? ` AND NOT (${anchor} IN (${excludeMarks}) AND ${dialect.quote('_localeCode')} = ?)`
+          : ` AND ${anchor} NOT IN (${excludeMarks})`;
     const scoped = companion && field.options?.uniquePerLocale === true;
     const scope = scoped ? ` AND ${dialect.quote('_localeCode')} = ?` : '';
     const value = dialect.serialize(
@@ -56,6 +72,7 @@ export async function checkUnique(
     params.push(name, value);
     if (scoped) params.push(locale);
     params.push(...excludeUUIDs);
+    if (companion && excludeUUIDs.length > 0) params.push(locale);
   }
 
   const rows = await tx.query<{ field: string }>(selects.join(' UNION ALL '), params);
@@ -71,6 +88,7 @@ export async function checkUnique(
  * A composite over translatable fields probes the companion; a plain one, the main table.
  * Only a composite the write sets in full is probed; a partial update falls to the driver's constraint.
  * `excludeUUIDs` drops the rows the write owns, anchored by `UUID` (main) or `_parentUUID` (companion).
+ * On the companion the exclusion binds the write's locale too, exactly as `checkUnique`'s does.
  * A `null` anywhere in the tuple never collides: `col = NULL` is never true, matching the multi-null rule.
  * Returns `notUnique` at every field of each colliding composite, or an empty map when all are clear.
  */
@@ -79,6 +97,7 @@ export async function checkCompositeUnique(
   dialect: Dialect,
   meta: CollectionQueryMeta,
   columns: Record<string, unknown>,
+  locale: string,
   excludeUUIDs: readonly string[] = [],
 ): Promise<FieldErrors> {
   const probes = meta.compositeUniques.filter((composite) =>
@@ -93,7 +112,12 @@ export async function checkCompositeUnique(
     const companion = composite.companion;
     const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
     const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
-    const exclude = excludeUUIDs.length === 0 ? '' : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const exclude =
+      excludeUUIDs.length === 0
+        ? ''
+        : companion
+          ? ` AND NOT (${anchor} IN (${excludeMarks}) AND ${dialect.quote('_localeCode')} = ?)`
+          : ` AND ${anchor} NOT IN (${excludeMarks})`;
     const matches = composite.fields
       .map((name) => `${dialect.quote(meta.fields[name].column as string)} = ?`)
       .join(' AND ');
@@ -106,6 +130,7 @@ export async function checkCompositeUnique(
       );
     }
     params.push(...excludeUUIDs);
+    if (companion && excludeUUIDs.length > 0) params.push(locale);
   });
 
   const rows = await tx.query<{ which: string }>(selects.join(' UNION ALL '), params);
@@ -168,11 +193,18 @@ export async function checkChildUnique(
 
 /**
  * The field-keyed error a caught unique violation falls back to when it escapes the precheck.
- * Best-effort: without parsing the driver message it names every field a unique constraint covers.
- * Field-level and composite uniques both contribute their fields.
- * When none is unique the collision is a child-table constraint, so it falls back to a root error.
+ *
+ * The dialect's parsed target maps back through metadata, so the failure blames the exact field:
+ * a main or companion column names its top-level field, a child or block column its dotted subfield path.
+ * The path is dotted - `items.slug` - since the constraint alone cannot name the item's index.
+ * When nothing maps, every unique field the collection declares is named, or the root when none is.
  */
-export function uniqueRaceErrors(meta: CollectionQueryMeta): FieldErrors {
+export function uniqueRaceErrors(
+  meta: CollectionQueryMeta,
+  target: UniqueViolationTarget | null,
+): FieldErrors {
+  const mapped = isNull(target) ? null : violationErrors(meta, target);
+  if (!isNull(mapped)) return mapped;
   const errors: FieldErrors = {};
   for (const [name, field] of Object.entries(meta.fields)) {
     if (field.options?.unique === true) errors[name] = 'validation.notUnique';
@@ -182,4 +214,89 @@ export function uniqueRaceErrors(meta: CollectionQueryMeta): FieldErrors {
   }
   if (isEmpty(errors)) errors[''] = 'validation.notUnique';
   return errors;
+}
+
+/**
+ * Maps a violation's table and columns to field-keyed errors, or `null` when nothing maps.
+ * The main and companion tables key at top-level field names; derived tables search the field tree.
+ * System columns (`_localeCode`, `_parentUUID`) are skipped - the field columns beside them decide.
+ */
+function violationErrors(
+  meta: CollectionQueryMeta,
+  target: UniqueViolationTarget,
+): FieldErrors | null {
+  if (target.table === meta.table || target.table === meta.companionTable) {
+    const companion = target.table === meta.companionTable;
+    const errors: FieldErrors = {};
+    for (const column of target.columns) {
+      if (column.startsWith('_')) continue;
+      const named = Object.entries(meta.fields).find(
+        ([, field]) => field.column === column && (field.companion === true) === companion,
+      );
+      if (isUndefined(named)) return null;
+      errors[named[0]] = 'validation.notUnique';
+    }
+    return isEmpty(errors) ? null : errors;
+  }
+  return derivedViolationErrors(meta.fields, '', target, new Set());
+}
+
+/**
+ * Searches relation, composite, and block subtrees for the violated table, keying under the field's path.
+ * A junction's constraint keys at the `records` field itself; a child or block table at its subfield.
+ * `seen` guards the block descent, since a block may nest itself.
+ */
+function derivedViolationErrors(
+  fields: Record<string, FieldQueryMeta>,
+  prefix: string,
+  target: UniqueViolationTarget,
+  seen: Set<string>,
+): FieldErrors | null {
+  for (const [name, field] of Object.entries(fields)) {
+    const path = prefix === '' ? name : `${prefix}.${name}`;
+    if (field.kind === 'records' && field.table === target.table) {
+      return { [path]: 'validation.notUnique' };
+    }
+    if (field.kind === 'childOne' || field.kind === 'childMany') {
+      const subfields = field.subfields as Record<string, FieldQueryMeta>;
+      if (field.table === target.table) {
+        const errors = subfieldErrors(subfields, path, target.columns);
+        if (!isNull(errors)) return errors;
+      }
+      const nested = derivedViolationErrors(subfields, path, target, seen);
+      if (!isNull(nested)) return nested;
+    }
+    if (field.kind === 'blocks') {
+      for (const type of field.allow ?? []) {
+        if (seen.has(type)) continue;
+        seen.add(type);
+        const block = blockQueryMetadata(type);
+        if (block.table === target.table) {
+          const errors = subfieldErrors(block.fields, path, target.columns);
+          if (!isNull(errors)) return errors;
+        }
+        const nested = derivedViolationErrors(block.fields, path, target, seen);
+        if (!isNull(nested)) return nested;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Keys a violated table's field columns under `prefix`, or `null` when none maps to a subfield.
+ */
+function subfieldErrors(
+  fields: Record<string, FieldQueryMeta>,
+  prefix: string,
+  columns: readonly string[],
+): FieldErrors | null {
+  const errors: FieldErrors = {};
+  for (const column of columns) {
+    if (column.startsWith('_')) continue;
+    const named = Object.entries(fields).find(([, field]) => field.column === column);
+    if (isUndefined(named)) return null;
+    errors[`${prefix}.${named[0]}`] = 'validation.notUnique';
+  }
+  return isEmpty(errors) ? null : errors;
 }

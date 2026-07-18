@@ -50,7 +50,7 @@ export async function runCreate(
   } catch (error) {
     if (dialect.isBusy(error)) throw busyError(error);
     if (dialect.isUniqueViolation(error)) {
-      return { ok: false, errors: uniqueRaceErrors(meta) };
+      return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
     }
     if (dialect.isForeignKeyViolation(error)) {
       return { ok: false, errors: { '': 'validation.invalidReference' } };
@@ -77,7 +77,7 @@ async function attemptCreate(
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
 
-  const compositeUniqueErrors = await checkCompositeUnique(tx, dialect, meta, scope.columns);
+  const compositeUniqueErrors = await checkCompositeUnique(tx, dialect, meta, scope.columns, code);
   if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
 
   const childUniqueErrors = await checkChildUnique(tx, dialect, scope.uniqueProbes);
