@@ -70,7 +70,7 @@ type EqualityOps<M extends QueryFieldMeta> = [ScalarOf<M>] extends [never]
     : object;
 
 /**
- * `in`, admitted for text and integer scalars, `record`, and the `UUID` entries.
+ * `in`, admitted for text and number scalars, `record`, and the `UUID` entries.
  */
 type InOps<M extends QueryFieldMeta> = [ScalarOf<M>] extends [never]
   ? object
@@ -89,7 +89,7 @@ type InOps<M extends QueryFieldMeta> = [ScalarOf<M>] extends [never]
     : object;
 
 /**
- * The ordering comparisons, admitted for text and integer columns alone (never a `record`/`UUID`).
+ * The ordering comparisons, admitted for text and number columns alone (never a `record`/`UUID`).
  */
 type OrderingOps<M extends QueryFieldMeta> = [PlainScalar<M>] extends [never]
   ? object

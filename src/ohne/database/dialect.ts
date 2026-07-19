@@ -8,13 +8,16 @@ import { OHNE_LOCKS } from './naming/table-names.ts';
 /**
  * The storage-primitive column types the schema model reconciles.
  * A dialect maps each to a native type with `columnType` and codes values with `serialize`/`deserialize`.
- * The set is closed: a new field type composes these primitives, it never adds a fifth.
+ * The set is closed over what engines natively hold: text, 64-bit integers, and IEEE 754 doubles.
+ * `boolean` and `json` are codings over those; a field type composes members, it never adds one.
  *
  * `integer` is 64-bit, so a dialect maps it to a wide column such as Postgres `bigint`, never `int4`.
  * Epoch-ms timestamps and large counts then fit without overflow; SQLite's `INTEGER` is already 64-bit.
- * No float primitive: money is `integer` minor units, a decimal is `text` coded by its field type.
+ * `real` is IEEE 754 binary64, the double a JS number already is; only finite values pass its gate.
+ * A real `-0` stores as `0`; every other accepted value round-trips bit-exact on SQLite and Postgres.
+ * No decimal primitive: money is `integer` minor units; an exact decimal stores as `text`, unordered.
  */
-export type LogicalType = 'text' | 'integer' | 'boolean' | 'json';
+export type LogicalType = 'text' | 'integer' | 'real' | 'boolean' | 'json';
 
 /**
  * The table and columns a unique-constraint violation names, parsed from the driver's error.

@@ -55,7 +55,8 @@ export async function listTables(db: Transaction): Promise<string[]> {
 
 /**
  * Describes a live table through SQLite's pragmas, normalized to a `TableSchema`.
- * Column types map by affinity: a declared type containing `INT` is `integer`, anything else `text`.
+ * Column types map by affinity: `INT` means `integer`, `REAL`/`FLOA`/`DOUB` mean `real`, else `text`.
+ * The `INT` test runs first, matching SQLite's own rule order - `FLOATING POINT` is INTEGER affinity.
  * The primary key's autoindex stays out of `uniques`; expression indexes carry no columns and are skipped.
  * Foreign keys come back structural, one entry per referencing column.
  * A `REFERENCES` clause without an explicit column resolves to `UUID`.
@@ -67,11 +68,18 @@ export async function describeTable(
 ): Promise<TableSchema> {
   const quoted = dialect.quote(table);
   const columnRows = await db.query<TableInfoRow>(`PRAGMA table_info(${quoted})`);
-  const columns: ColumnSchema[] = columnRows.map((row) => ({
-    name: row.name,
-    type: row.type.toUpperCase().includes('INT') ? 'integer' : 'text',
-    notNull: row.notnull === 1,
-  }));
+  const columns: ColumnSchema[] = columnRows.map((row) => {
+    const declared = row.type.toUpperCase();
+    return {
+      name: row.name,
+      type: declared.includes('INT')
+        ? 'integer'
+        : /REAL|FLOA|DOUB/.test(declared)
+          ? 'real'
+          : 'text',
+      notNull: row.notnull === 1,
+    };
+  });
   const primaryKey = columnRows
     .filter((row) => row.pk > 0)
     .sort((a, b) => a.pk - b.pk)

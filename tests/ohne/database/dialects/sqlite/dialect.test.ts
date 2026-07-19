@@ -130,6 +130,7 @@ describe('SQLiteDialect', () => {
       strictEqual(dialect.columnType('json'), 'TEXT');
       strictEqual(dialect.columnType('integer'), 'INTEGER');
       strictEqual(dialect.columnType('boolean'), 'INTEGER');
+      strictEqual(dialect.columnType('real'), 'REAL');
     });
   });
 
@@ -148,11 +149,13 @@ describe('SQLiteDialect', () => {
       deepStrictEqual(dialect.deserialize('json', stored as string), value);
     });
 
-    it('passes text and integer through unchanged', () => {
+    it('passes text, integer, and real through unchanged', () => {
       strictEqual(dialect.serialize('text', 'hi'), 'hi');
       strictEqual(dialect.serialize('integer', 42), 42);
+      strictEqual(dialect.serialize('real', 1.5), 1.5);
       strictEqual(dialect.deserialize('text', 'hi'), 'hi');
       strictEqual(dialect.deserialize('integer', 42), 42);
+      strictEqual(dialect.deserialize('real', 1.5), 1.5);
     });
 
     it('codes null and undefined to NULL, and NULL back to null', () => {

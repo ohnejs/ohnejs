@@ -1,6 +1,7 @@
 import type { blocks } from './builtin/blocks.ts';
 import type { boolean } from './builtin/boolean.ts';
 import type { integer } from './builtin/integer.ts';
+import type { number } from './builtin/number.ts';
 import type { object } from './builtin/object.ts';
 import type { record } from './builtin/record.ts';
 import type { records } from './builtin/records.ts';
@@ -33,6 +34,11 @@ export interface KnownFields {
    * A whole number, within JavaScript's safe integer range.
    */
   integer: typeof integer;
+
+  /**
+   * A finite floating-point number, the engine's own IEEE 754 double.
+   */
+  number: typeof number;
 
   /**
    * A true or false value.

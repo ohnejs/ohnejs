@@ -9,6 +9,7 @@ describe('useFields', () => {
       'blocks',
       'boolean',
       'integer',
+      'number',
       'object',
       'record',
       'records',
@@ -20,6 +21,7 @@ describe('useFields', () => {
   it('exposes each built-in column type', () => {
     strictEqual(useFields().get('text')?.fieldType.columnType, 'text');
     strictEqual(useFields().get('integer')?.fieldType.columnType, 'integer');
+    strictEqual(useFields().get('number')?.fieldType.columnType, 'real');
     strictEqual(useFields().get('boolean')?.fieldType.columnType, 'boolean');
     strictEqual(useFields().get('record')?.fieldType.columnType, 'text');
     strictEqual(useFields().get('records')?.fieldType.columnType, false);

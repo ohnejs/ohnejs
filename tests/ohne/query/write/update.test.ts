@@ -65,6 +65,16 @@ useCollections().register('USwap', {
     },
   },
 });
+useCollections().register('URealSwap', {
+  name: 'URealSwap',
+  collection: {
+    fields: {
+      items: field('repeater', {
+        fields: { score: field('number', { unique: true, uniquePerParent: true }) },
+      }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -424,6 +434,33 @@ describe('runUpdate nested child uniqueness', () => {
       ['sw-b', 'sw-a'],
     );
     strictEqual(items[0].UUID, record.items[0].UUID);
+  });
+
+  it('swaps unique reals whose maximum rounds `+ 1` away', async () => {
+    const created = await runCreate(
+      'URealSwap',
+      { items: [{ score: 1e300 }, { score: 2e300 }] },
+      null,
+    );
+    ok(created.ok);
+    const record = created.record as { UUID: string; items: { UUID: string }[] };
+    const result = await runUpdate(
+      'URealSwap',
+      {
+        items: [
+          { UUID: record.items[0].UUID, score: 2e300 },
+          { UUID: record.items[1].UUID, score: 1e300 },
+        ],
+      },
+      uuidIs(record.UUID),
+      null,
+    );
+    ok(result.ok);
+    const items = result.records[0].items as { score: number }[];
+    deepStrictEqual(
+      items.map((item) => item.score),
+      [2e300, 1e300],
+    );
   });
 
   it('shifts unique values along kept items and frees one for a fresh item', async () => {

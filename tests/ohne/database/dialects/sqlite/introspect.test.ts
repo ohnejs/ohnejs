@@ -47,12 +47,15 @@ describe('describeTable', () => {
     });
   });
 
-  it('maps declared types by affinity', async () => {
+  it('maps declared types by affinity, the INT test winning over the REAL one', async () => {
     const db = await open();
-    await db.exec('CREATE TABLE "T" ("big" BIGINT, "label" VARCHAR(20), "ratio" REAL)');
+    await db.exec(
+      'CREATE TABLE "T" ' +
+        '("big" BIGINT, "label" VARCHAR(20), "ratio" REAL, "score" DOUBLE, "wave" FLOATING POINT)',
+    );
     deepStrictEqual(
       (await dialect.describeTable(db, 'T')).columns.map((column) => column.type),
-      ['integer', 'text', 'text'],
+      ['integer', 'text', 'real', 'real', 'integer'],
     );
   });
 

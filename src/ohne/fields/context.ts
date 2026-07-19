@@ -155,7 +155,7 @@ export type FieldValidator<
  */
 export type ColumnValue<TColumn extends LogicalType | false> = TColumn extends 'text'
   ? string
-  : TColumn extends 'integer'
+  : TColumn extends 'integer' | 'real'
     ? number
     : TColumn extends 'boolean'
       ? boolean

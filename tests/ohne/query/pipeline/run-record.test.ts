@@ -19,6 +19,7 @@ useCollections().register('PPost', {
       title: field('text'),
       summary: field('text', { nullable: true }),
       views: field('integer'),
+      rating: field('number', { nullable: true }),
       author: field('record', { collection: 'PUser' }),
       tags: field('records', { collection: 'PTag' }),
       meta: field('object', { fields: metaFields }),
@@ -122,9 +123,19 @@ describe('runRecord (create)', () => {
   });
 
   it('coerces a column value toward its storage primitive', async () => {
-    const result = await create({ ...full, views: '42' });
+    const result = await create({ ...full, views: '42', rating: '4.5' });
     ok(result.ok);
     strictEqual(result.scope.columns.views, 42);
+    strictEqual(result.scope.columns.rating, 4.5);
+  });
+
+  it('stores a finite double as-is and rejects a non-finite one', async () => {
+    const stored = await create({ ...full, rating: 1.5 });
+    ok(stored.ok);
+    strictEqual(stored.scope.columns.rating, 1.5);
+    const rejected = await create({ ...full, rating: Infinity });
+    ok(!rejected.ok);
+    strictEqual(rejected.errors.rating, 'validation.invalidValue');
   });
 
   it('defaults an absent nullable column to null', async () => {

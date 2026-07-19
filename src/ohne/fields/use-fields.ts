@@ -5,6 +5,7 @@ import { createRegistry, type Registry } from '../../utils/index.ts';
 import { blocks } from './builtin/blocks.ts';
 import { boolean } from './builtin/boolean.ts';
 import { integer } from './builtin/integer.ts';
+import { number } from './builtin/number.ts';
 import { object } from './builtin/object.ts';
 import { record } from './builtin/record.ts';
 import { records } from './builtin/records.ts';
@@ -31,6 +32,7 @@ const registry: Registry<FieldTypeMeta> = createRegistry<FieldTypeMeta>();
 for (const [name, fieldType] of [
   ['text', text],
   ['integer', integer],
+  ['number', number],
   ['boolean', boolean],
   ['record', record],
   ['records', records],

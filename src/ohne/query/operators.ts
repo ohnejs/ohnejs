@@ -17,7 +17,7 @@ export type QueryOperator = CompareOperator | 'has' | 'empty';
  * `records` and the child kinds take `has`/`empty` only.
  * `childOne` gets nothing null-related, since `empty` covers it.
  * Scalar groups gate on the column's logical type.
- * `equalsTo` admits `text`/`integer`/`boolean`; `in` and ordering admit `text`/`integer`.
+ * `equalsTo` admits `text`/`integer`/`real`/`boolean`; `in` and ordering admit `text`/`integer`/`real`.
  * The text trio and `like` admit `text` alone.
  * `isNull` requires nullability or a companion column.
  * A missing translation reads `null` whatever the option says.
@@ -39,8 +39,10 @@ export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperato
 
   const operators: QueryOperator[] = [];
   const type = meta.logicalType;
-  if (type === 'text' || type === 'integer' || type === 'boolean') operators.push('equalsTo');
-  if (type === 'text' || type === 'integer') {
+  if (type === 'text' || type === 'integer' || type === 'real' || type === 'boolean') {
+    operators.push('equalsTo');
+  }
+  if (type === 'text' || type === 'integer' || type === 'real') {
     operators.push('in', 'greaterThan', 'atLeast', 'lessThan', 'atMost');
   }
   if (type === 'text') operators.push('contains', 'startsWith', 'endsWith', 'like');

@@ -89,6 +89,7 @@ export interface FieldType<
    * When omitted, the shape falls back from `columnType`:
    * - `text` -> `string`
    * - `integer` -> `number`
+   * - `real` -> `number`
    * - `boolean` -> `boolean`
    * - `json` -> `unknown`.
    *

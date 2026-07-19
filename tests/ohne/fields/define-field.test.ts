@@ -97,6 +97,7 @@ describe('defineField', () => {
   it('types defaultValue as the column storage primitive, callback ctx included', () => {
     defineField({ columnType: 'text', defaultValue: 'draft' });
     defineField({ columnType: 'integer', defaultValue: 0 });
+    defineField({ columnType: 'real', defaultValue: 0.5 });
     defineField({ columnType: 'boolean', defaultValue: false });
     defineField({ columnType: 'text', defaultValue: null });
     defineField({

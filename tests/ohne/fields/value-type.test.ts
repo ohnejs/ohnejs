@@ -29,6 +29,7 @@ describe('fieldValueType', () => {
   it('falls back to the JS type of the column when no emitType is declared', () => {
     strictEqual(emit(defineField({ columnType: 'text' })).type, 'string');
     strictEqual(emit(defineField({ columnType: 'integer' })).type, 'number');
+    strictEqual(emit(defineField({ columnType: 'real' })).type, 'number');
     strictEqual(emit(defineField({ columnType: 'boolean' })).type, 'boolean');
   });
 

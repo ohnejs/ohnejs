@@ -228,6 +228,23 @@ describe('syncDatabase', () => {
     await db.close();
   });
 
+  it('round-trips a real column through introspection, re-syncing as a no-op', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'rating', type: 'real', notNull: true }],
+    });
+    await syncDatabase(db, dialect, { desired: [posts] });
+    await db.run('INSERT INTO "Posts" ("UUID", "rating") VALUES (?, ?)', ['a', 1.5]);
+    await syncDatabase(db, dialect, { desired: [posts] });
+    deepStrictEqual(await dialect.describeTable(db, 'Posts'), posts);
+    strictEqual((await readSnapshot(db, dialect))?.generation, 1);
+    strictEqual(
+      (await db.queryOne<{ rating: number }>('SELECT "rating" FROM "Posts"'))?.rating,
+      1.5,
+    );
+    await db.close();
+  });
+
   describe('migrations', () => {
     it('runs a move inside the sync, constraints down and re-added after', async () => {
       const db = await open();

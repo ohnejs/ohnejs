@@ -80,6 +80,8 @@ export class SQLiteDialect extends Dialect {
       case 'integer':
       case 'boolean':
         return 'INTEGER';
+      case 'real':
+        return 'REAL';
     }
   }
 

@@ -48,6 +48,7 @@ useCollections().register('WPosts', {
     fields: {
       title: field('text'),
       views: field('integer'),
+      rating: field('number'),
       featured: field('boolean'),
       summary: field('text', { nullable: true }),
       author: field('record', { collection: 'WUsers' }),
@@ -233,6 +234,18 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
     deepStrictEqual(failure('where={views:{equalsTo:`007}}'), {
       code: 'invalidValue',
       path: 'where.views',
+    });
+  });
+
+  it('takes a decimal on a real column, never on an integer one', () => {
+    deepStrictEqual(parse('where={rating:{atLeast:4.5}}').where, { rating: { atLeast: 4.5 } });
+    deepStrictEqual(failure('where={views:{equalsTo:1.5}}'), {
+      code: 'invalidValue',
+      path: 'where.views',
+    });
+    deepStrictEqual(failure('where={rating:{atLeast:1e999}}'), {
+      code: 'invalidValue',
+      path: 'where.rating',
     });
   });
 

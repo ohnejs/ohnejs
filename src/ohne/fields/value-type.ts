@@ -44,6 +44,7 @@ export interface FieldValueTypeArgs<TOptions extends Record<string, AnyOptionDef
 const FALLBACK: Record<LogicalType, string> = {
   text: 'string',
   integer: 'number',
+  real: 'number',
   boolean: 'boolean',
   json: 'unknown',
 };

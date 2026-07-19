@@ -3,9 +3,11 @@ import type { LogicalType } from '../../database/dialect.ts';
 import {
   coerceToBoolean,
   coerceToInteger,
+  coerceToNumber,
   coerceToString,
   isBoolean,
   isInteger,
+  isRealNumber,
   isString,
 } from '../../../utils/index.ts';
 
@@ -14,6 +16,7 @@ import {
  *
  * A string that reads as an integer becomes one, `'true'`/`'1'` become booleans, and so on.
  * Coercion never fails: a value it cannot convert passes through for the base-type check to reject.
+ * A real `-0` becomes `0`, since SQLite drops the sign in storage; every other value stays bit-exact.
  * A `json` column takes any value as-is, since every value is a candidate for JSON storage.
  *
  * @example
@@ -28,6 +31,10 @@ export function coerceColumn(value: unknown, type: LogicalType): unknown {
       return coerceToString(value);
     case 'integer':
       return coerceToInteger(value);
+    case 'real': {
+      const coerced = coerceToNumber(value);
+      return Object.is(coerced, -0) ? 0 : coerced;
+    }
     case 'boolean':
       return coerceToBoolean(value);
     case 'json':
@@ -39,6 +46,7 @@ export function coerceColumn(value: unknown, type: LogicalType): unknown {
  * Whether a coerced value is a legal member of its storage primitive, the preflight's base-type gate.
  *
  * A non-safe integer is rejected, so a value outside `Number.MAX_SAFE_INTEGER` never silently truncates.
+ * A `real` must be finite: SQLite silently stores a bound `NaN` as SQL `NULL`, and JSON has no infinities.
  * A `json` column accepts any value; its storability is the dialect codec's concern.
  *
  * @example
@@ -53,6 +61,8 @@ export function isValidColumn(value: unknown, type: LogicalType): boolean {
       return isString(value);
     case 'integer':
       return isInteger(value);
+    case 'real':
+      return isRealNumber(value);
     case 'boolean':
       return isBoolean(value);
     case 'json':

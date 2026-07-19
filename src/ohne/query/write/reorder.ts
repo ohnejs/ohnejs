@@ -25,7 +25,7 @@ interface Edge {
  * Otherwise the kept rows' current unique values read once.
  * A write landing on a still-stored value orders after the write that moves it off; elimination resolves.
  * A true swap cycles; the lowest-index holder breaks it with a sentinel write on the held columns.
- * The sentinel is `NULL` on a nullable column, a fresh `uuidv7` on text, a probed free integer else.
+ * The sentinel is `NULL` on a nullable column, a fresh `uuidv7` on text, a probed free number else.
  * A non-nullable boolean has no third value, so its cycle stays and the constraint decides.
  * Returns the item indexes in write order; positions bind by index, so reordering changes no state.
  */
@@ -184,6 +184,7 @@ async function writeSentinel(
 
 /**
  * A value no row of the table holds: a fresh `uuidv7` for text shapes, one past the maximum else.
+ * A `real` column doubles a positive maximum instead: doubling stays exact where `+ 1` rounds away.
  */
 async function freeValue(
   tx: Transaction,
@@ -196,5 +197,7 @@ async function freeValue(
   const row = await tx.queryOne<{ max: number | null }>(
     `SELECT MAX(${dialect.quote(column)}) AS ${dialect.quote('max')} FROM ${dialect.quote(table)}`,
   );
-  return (row?.max ?? 0) + 1;
+  const max = row?.max ?? 0;
+  if (type !== 'real') return max + 1;
+  return max <= 0 ? 1 : max * 2;
 }

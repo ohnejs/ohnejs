@@ -10,9 +10,11 @@ import {
   didYouMean,
   isArray,
   isBoolean,
+  isInteger,
   isNull,
   isNumber,
   isPlainObject,
+  isRealNumber,
   isString,
   isUndefined,
   parseCondition,
@@ -296,13 +298,16 @@ function checkValues(
 }
 
 /**
- * Whether a wire value matches a field's storage type: a UUID is a string, an integer a safe number.
+ * Whether a wire value matches a field's storage type.
+ * A UUID is a string, an integer a safe number, a real a finite one.
  */
 function matchesLogical(value: unknown, field: FieldQueryMeta): boolean {
   if (field.kind === 'record' || field.id === true) return isString(value);
   switch (field.logicalType) {
     case 'integer':
-      return isNumber(value) && Number.isSafeInteger(value);
+      return isInteger(value);
+    case 'real':
+      return isRealNumber(value);
     case 'boolean':
       return isBoolean(value);
     case 'text':
@@ -579,8 +584,7 @@ function wholeNumber(
   min: number,
 ): number | null {
   if (isUndefined(value)) return null;
-  if (!isNumber(value) || !Number.isSafeInteger(value) || value < min)
-    throw invalidNumberError(param);
+  if (!isInteger(value) || value < min) throw invalidNumberError(param);
   return value;
 }
 

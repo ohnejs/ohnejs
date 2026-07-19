@@ -36,6 +36,11 @@ const table: [name: string, meta: FieldQueryMeta, expected: QueryOperator[]][] =
     ['equalsTo', 'in', ...ORDERING],
   ],
   [
+    'real column takes equality and ordering, never the text operators',
+    { kind: 'column', nullable: false, logicalType: 'real', column: 'rating' },
+    ['equalsTo', 'in', ...ORDERING],
+  ],
+  [
     'boolean column takes equalsTo alone',
     { kind: 'column', nullable: false, logicalType: 'boolean', column: 'featured' },
     ['equalsTo'],
