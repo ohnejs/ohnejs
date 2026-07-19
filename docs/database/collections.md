@@ -23,7 +23,14 @@ export default defineCollection({
 
 ## Column fields
 
-`text`, `integer`, and `boolean` are the column types. Each stores one value per row.
+`text`, `integer`, `number`, and `boolean` are the column types. Each stores one value per row.
+
+`integer` holds whole numbers within JavaScript's safe range. `number` holds finite decimals - an
+IEEE 754 double, exactly what a JavaScript number is, so every stored value reads back unchanged.
+`NaN` and the infinities are rejected.
+
+For money, use `integer` minor units (cents), not `number`. A double cannot represent a decimal
+tenth exactly, so float arithmetic drifts where currency must not.
 
 A field is required unless you pass `nullable: true`, which lets the column hold `null`:
 

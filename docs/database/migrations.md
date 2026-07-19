@@ -45,8 +45,8 @@ The path descends composites with dots; the last segment is the column. A `from`
 collection or field that no longer exists in your code - that is the point: the code has moved on,
 and the migration addresses the data left behind.
 
-An optional `type` asserts what the column holds live - `'text'`, `'integer'`, `'boolean'`, or
-`'json'`. A mismatch is a hard error naming the drift, never a silent skip.
+An optional `type` asserts what the column holds live - `'text'`, `'integer'`, `'real'`,
+`'boolean'`, or `'json'`. A mismatch is a hard error naming the drift, never a silent skip.
 
 The physical form names a raw table and column, for the corners the logical naming cannot reach:
 
