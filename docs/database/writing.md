@@ -193,6 +193,10 @@ item its `UUID` to keep it: that row survives with its identity, rewritten to th
 Omit the `UUID` to insert a fresh item. An item you leave out is deleted, and the positions renumber
 to your order.
 
+A kept item is a rewrite, not a merge. A subfield you leave off does not survive from the stored
+item - it takes its default, exactly as it would on create. Sending `{ UUID, heading }` to change
+one heading resets every other subfield of that item, so always send the complete item.
+
 ```ts
 await query('Posts').where('UUID', id).update({
   sections: [
@@ -203,6 +207,11 @@ await query('Posts').where('UUID', id).update({
 ```
 
 A `UUID` that names no item on that record is an error, never a silent adoption from another record.
+
+Item `UUID`s also tie the update to a single record. When the filter matches several, no `UUID` can
+say which record's item it means, so the write fails with a `singleRecord` error at the field -
+narrow the filter to one record first. A list without `UUID`s carries no such tie: fresh items write
+to every matched record.
 
 A `blocks` field takes envelopes - `{ block: 'Hero', fields: { ... } }`, plus the item's `UUID` on
 update - and replaces its list the same way. See [blocks](./blocks.md#writing).

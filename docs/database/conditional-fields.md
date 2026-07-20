@@ -95,6 +95,36 @@ condition instead. The intent is clearer, and every matched row is one you meant
 await query('Products').where('kind', 'sale').update({ discount: 30 });
 ```
 
+## Gating on a gated field
+
+On create, every gate reads the same view of the write: your input, coerced, with defaults filled
+in for what you left out. No gate sees another gate's outcome. So a gate that reads a sibling which
+is itself gated can skew: the sibling's input activates your field, then the sibling's own
+condition drops that input and stores the default.
+
+```ts
+// collections/Products.ts
+fields: {
+  kind: field('text'),
+  discount: field('integer', { nullable: true, when: { kind: 'sale' } }),
+  banner: field('text', { nullable: true, when: { discount: { atLeast: 10 } } }),
+}
+```
+
+```ts
+await query('Products').create({ kind: 'gift', discount: 20, banner: 'Save 20%' });
+// -> discount: null, banner: 'Save 20%'
+```
+
+`kind` is `gift`, so `discount` is inactive and stores `null`. But `banner`'s gate read the input,
+where `discount` was `20` - so `banner` activated and stored. The record now holds a `banner` its
+own condition does not justify, and an update, gating against the stored row, will treat `banner`
+as inactive.
+
+Keep a chain straight: gate on fields that are not themselves gated, or repeat the upstream
+condition in the downstream `when` - here `when: { kind: 'sale', discount: { atLeast: 10 } }` - so
+both gates turn off together.
+
 ## Inside a composite
 
 A `when` on a subfield of an `object` or `repeater` works the same way, and it can read past the

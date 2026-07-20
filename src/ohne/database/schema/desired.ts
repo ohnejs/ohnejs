@@ -139,6 +139,8 @@ const UPDATED_AT_COLUMN: ColumnSchema = { name: '_updatedAt', type: 'integer', n
  * Every block table is shared - wrappers reference it, so it is emitted once.
  * Block tables follow the collections, sorted by name.
  * A registered block no wrapper allows stays a type without a table.
+ * The `blocks` registry defaults to empty.
+ * A blocks-bearing project that omits `useBlocks()` silently plans no block tables.
  *
  * A field referencing an unregistered type, target collection, or allowed block throws.
  * The error names the reference and the collection or block it appears in.

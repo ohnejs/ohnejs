@@ -27,6 +27,7 @@ export interface QueryScope {
 
   /**
    * A row cap a request cannot exceed; the effective limit is the smaller of this and the request's.
+   * Caps only the `limit`/`offset` window; a paginated read sizes by `perPage` under `guards.maxPerPage`.
    */
   limit?: number;
 

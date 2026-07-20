@@ -86,6 +86,11 @@ export interface FieldType<
    * The framework wraps `| null` for a nullable field, and indents each line at the emission site.
    * `ctx` carries the resolved `options` and `importType`.
    *
+   * `emitType` narrows only the generated type.
+   * The runtime gates the value at the column primitive and the field's tiers, nothing else.
+   * A type that narrows further (a choices union, a shaped object) ships validators that enforce it.
+   * Without them the type is a promise the runtime does not keep.
+   *
    * When omitted, the shape falls back from `columnType`:
    * - `text` -> `string`
    * - `integer` -> `number`
