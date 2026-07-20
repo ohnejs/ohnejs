@@ -1,6 +1,8 @@
 import { deepStrictEqual, notStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { ConditionNode } from '../../../../src/utils/index.ts';
+
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -133,6 +135,13 @@ async function updatedAt(uuid: string): Promise<number> {
  */
 function uuidIs(uuid: string) {
   return { kind: 'compare', path: ['UUID'], op: 'equalsTo', value: uuid, negated: false } as const;
+}
+
+/**
+ * The condition matching every record whose `UUID` is in `uuids`.
+ */
+function inUUIDs(uuids: string[]): ConditionNode {
+  return { kind: 'compare', path: ['UUID'], op: 'in', value: uuids, negated: false };
 }
 
 describe('runUpdate with blocks', () => {
@@ -502,5 +511,48 @@ describe('runUpdate sweeps instances under doomed composite rows', () => {
     );
     ok(result.ok);
     strictEqual(await countWhere('block_BUHero', 'UUID', instance), 0);
+  });
+});
+
+describe('runUpdate blocks across matched records', () => {
+  it('writes fresh envelopes to every matched record', async () => {
+    const a = await seedPost([]);
+    const b = await seedPost([]);
+    const result = await runUpdate(
+      'BUPosts',
+      { content: [{ block: 'BUHero', fields: { title: 'Fan' } }] },
+      inUUIDs([a.uuid, b.uuid]),
+      null,
+    );
+    ok(result.ok);
+    strictEqual(result.records.length, 2);
+    for (const record of result.records) {
+      const content = record.content as Envelope[];
+      strictEqual(content.length, 1);
+      strictEqual(content[0].fields.title, 'Fan');
+    }
+    notStrictEqual(
+      (result.records[0].content as Envelope[])[0].UUID,
+      (result.records[1].content as Envelope[])[0].UUID,
+    );
+  });
+
+  it('rejects a kept envelope over several matched records', async () => {
+    const a = await seedPost([{ block: 'BUHero', fields: { title: 'Keep' } }]);
+    const b = await seedPost([]);
+    const [item] = a.content;
+    const result = await runUpdate(
+      'BUPosts',
+      { content: [{ block: 'BUHero', UUID: item.UUID, fields: { title: 'Edited' } }] },
+      inUUIDs([a.uuid, b.uuid]),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.content, 'validation.singleRecord');
+    const row = await db.queryOne<{ title: string }>(
+      'SELECT "title" FROM "block_BUHero" WHERE "UUID" = ?',
+      [item.UUID],
+    );
+    strictEqual(row?.title, 'Keep');
   });
 });

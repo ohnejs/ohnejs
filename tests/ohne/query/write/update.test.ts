@@ -2,6 +2,7 @@ import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
+import type { ConditionNode } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -71,6 +72,16 @@ useCollections().register('URealSwap', {
     fields: {
       items: field('repeater', {
         fields: { score: field('number', { unique: true, uniquePerParent: true }) },
+      }),
+    },
+  },
+});
+useCollections().register('UNest', {
+  name: 'UNest',
+  collection: {
+    fields: {
+      box: field('object', {
+        fields: { items: field('repeater', { fields: { label: field('text') } }) },
       }),
     },
   },
@@ -517,6 +528,95 @@ describe('runUpdate nested child uniqueness', () => {
   });
 });
 
+describe('runUpdate across matched records', () => {
+  it('diffs junctions on every matched record', async () => {
+    const a = await seedPost({ tags: ['t1'] });
+    const b = await seedPost({ tags: ['t2', 't3'] });
+    const result = await runUpdate(
+      'UPost',
+      { tags: ['t3', 't1'] },
+      inUUIDs([a.UUID as string, b.UUID as string]),
+      null,
+    );
+    ok(result.ok);
+    strictEqual(result.records.length, 2);
+    for (const record of result.records) deepStrictEqual(record.tags, ['t3', 't1']);
+  });
+
+  it('upserts the object on every matched record, each row in place', async () => {
+    const a = await seedPost({ meta: { note: 'a' } });
+    const b = await seedPost({ meta: { note: 'b' } });
+    const beforeA = await objectUUID(a.UUID as string);
+    const beforeB = await objectUUID(b.UUID as string);
+    const result = await runUpdate(
+      'UPost',
+      { meta: { note: 'both' } },
+      inUUIDs([a.UUID as string, b.UUID as string]),
+      null,
+    );
+    ok(result.ok);
+    for (const record of result.records) {
+      strictEqual((record.meta as { note: string }).note, 'both');
+    }
+    strictEqual(await objectUUID(a.UUID as string), beforeA);
+    strictEqual(await objectUUID(b.UUID as string), beforeB);
+  });
+
+  it('writes fresh repeater items to every matched record', async () => {
+    const a = await seedPost();
+    const b = await seedPost();
+    const result = await runUpdate(
+      'UPost',
+      { sections: [{ heading: 'fanned' }] },
+      inUUIDs([a.UUID as string, b.UUID as string]),
+      null,
+    );
+    ok(result.ok);
+    for (const record of result.records) {
+      const sections = record.sections as { heading: string }[];
+      strictEqual(sections.length, 1);
+      strictEqual(sections[0].heading, 'fanned');
+    }
+  });
+
+  it('rejects a kept item over several matched records', async () => {
+    const a = await seedPost({ sections: [{ heading: 'keep' }] });
+    const b = await seedPost();
+    const itemUUID = (a.sections as { UUID: string }[])[0].UUID;
+    const result = await runUpdate(
+      'UPost',
+      { sections: [{ UUID: itemUUID, heading: 'edited' }] },
+      inUUIDs([a.UUID as string, b.UUID as string]),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.sections, 'validation.singleRecord');
+    const kept = await db.query('SELECT "heading" FROM "UPost_sections" WHERE "_parentUUID" = ?', [
+      a.UUID as string,
+    ]);
+    deepStrictEqual(
+      kept.map((row) => (row as { heading: string }).heading),
+      ['keep'],
+    );
+  });
+
+  it('rejects a kept item nested inside an object over several matched records', async () => {
+    const one = await runCreate('UNest', { box: { items: [{ label: 'n1' }] } }, null);
+    const two = await runCreate('UNest', { box: { items: [] } }, null);
+    ok(one.ok);
+    ok(two.ok);
+    const itemUUID = (one.record.box as { items: { UUID: string }[] }).items[0].UUID;
+    const result = await runUpdate(
+      'UNest',
+      { box: { items: [{ UUID: itemUUID, label: 'n2' }] } },
+      inUUIDs([one.record.UUID as string, two.record.UUID as string]),
+      null,
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.box, 'validation.singleRecord');
+  });
+});
+
 describe('runUpdate guards', () => {
   it('throws without a filter through the untyped builder', () => {
     throws(() => queryUntyped('UPost').update({ views: 1 }), /without a filter/);
@@ -528,6 +628,12 @@ describe('runUpdate guards', () => {
  */
 function uuidIs(uuid: string) {
   return { kind: 'compare', path: ['UUID'], op: 'equalsTo', value: uuid, negated: false } as const;
+}
+/**
+ * The condition matching every record whose `UUID` is in `uuids`.
+ */
+function inUUIDs(uuids: string[]): ConditionNode {
+  return { kind: 'compare', path: ['UUID'], op: 'in', value: uuids, negated: false };
 }
 
 /**

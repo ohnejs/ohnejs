@@ -530,6 +530,9 @@ async function upsertCompanion(
  * A repeater item's `UUID` must belong to the parent it sits under; a UUID matching nothing is an error.
  * Correlation recurses only into rows an update keeps: matched repeater items and an existing object row.
  * A blocks field proves its items through `checkBlockCorrelation`, instance identity and type alike.
+ *
+ * A kept item addresses one record: no filter can say whose item a `UUID` means.
+ * Over several parents, each correlated child fails `singleRecord` at its field before any row is read.
  */
 async function checkCorrelation(
   tx: Transaction,
@@ -539,6 +542,12 @@ async function checkCorrelation(
   locale: string,
 ): Promise<FieldErrors> {
   const errors: FieldErrors = {};
+  if (parents.length > 1) {
+    for (const child of children) {
+      if (isCorrelated(child)) errors[child.path] = 'validation.singleRecord';
+    }
+    return errors;
+  }
   for (const child of children) {
     if (child.meta.kind === 'blocks') {
       Object.assign(errors, await checkBlockCorrelation(tx, dialect, parents, child, locale));
@@ -578,6 +587,18 @@ async function checkCorrelation(
     }
   }
   return errors;
+}
+
+/**
+ * Whether an update of this child correlates against existing rows: a kept item anywhere the write recurses.
+ * Repeater and blocks items correlate by their own `UUID`.
+ * An object correlates through its item's children; its single row is addressed by the parent alone.
+ */
+function isCorrelated(child: ProcessedChild): boolean {
+  if (child.meta.kind !== 'childOne') {
+    return child.items.some((item) => !isUndefined(item.itemUUID));
+  }
+  return (first(child.items)?.children ?? []).some(isCorrelated);
 }
 
 /**
