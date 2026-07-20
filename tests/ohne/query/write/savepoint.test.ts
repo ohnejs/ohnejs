@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert';
+import { ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
@@ -13,6 +13,8 @@ import {
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
+import { runDelete } from '../../../../src/ohne/query/write/delete.ts';
+import { isReferenceViolation } from '../../../../src/ohne/query/write/errors.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
 
 useCollections().register('SPDoc', {
@@ -33,6 +35,10 @@ useCollections().register('SPDoc', {
       }),
     },
   },
+});
+useCollections().register('SPHold', {
+  name: 'SPHold',
+  collection: { fields: { doc: field('record', { collection: 'SPDoc', onDelete: 'restrict' }) } },
 });
 
 const dialect = new SQLiteDialect();
@@ -110,5 +116,55 @@ describe('joined-transaction savepoint', () => {
       [uuid],
     );
     strictEqual(row?.title, 'sp-b');
+  });
+
+  it('commits a joined delete with the caller, and a caller rollback restores it', async () => {
+    const doomed = await runCreate('SPDoc', { title: 'sp-doomed', items: [] }, null);
+    ok(doomed.ok);
+    const uuid = (doomed.record as { UUID: string }).UUID;
+
+    await rejects(
+      useDatabase().transaction(async (tx) => {
+        strictEqual((await runDelete('SPDoc', uuidIs(uuid), tx)).deleted, 1);
+        throw new Error('caller rollback');
+      }, 'immediate'),
+      /caller rollback/,
+    );
+    const survivor = await db.queryOne<{ title: string }>(
+      'SELECT "title" FROM "SPDoc" WHERE "UUID" = ?',
+      [uuid],
+    );
+    strictEqual(survivor?.title, 'sp-doomed');
+
+    await useDatabase().transaction(async (tx) => {
+      strictEqual((await runDelete('SPDoc', uuidIs(uuid), tx)).deleted, 1);
+    }, 'immediate');
+    strictEqual(await db.queryOne('SELECT 1 FROM "SPDoc" WHERE "UUID" = ?', [uuid]), undefined);
+  });
+
+  it('unwinds a restrict-blocked joined delete, and the caller still commits', async () => {
+    const held = await runCreate('SPDoc', { title: 'sp-held', items: [] }, null);
+    ok(held.ok);
+    const uuid = (held.record as { UUID: string }).UUID;
+    const holder = await runCreate('SPHold', { doc: uuid }, null);
+    ok(holder.ok);
+
+    const kept = await useDatabase().transaction(async (tx) => {
+      const created = await runCreate('SPDoc', { title: 'sp-outlives', items: [] }, null, tx);
+      ok(created.ok);
+      await rejects(() => runDelete('SPDoc', uuidIs(uuid), tx), isReferenceViolation);
+      return created.record as { UUID: string };
+    }, 'immediate');
+
+    const heldRow = await db.queryOne<{ title: string }>(
+      'SELECT "title" FROM "SPDoc" WHERE "UUID" = ?',
+      [uuid],
+    );
+    strictEqual(heldRow?.title, 'sp-held');
+    const keptRow = await db.queryOne<{ title: string }>(
+      'SELECT "title" FROM "SPDoc" WHERE "UUID" = ?',
+      [kept.UUID],
+    );
+    strictEqual(keptRow?.title, 'sp-outlives');
   });
 });
