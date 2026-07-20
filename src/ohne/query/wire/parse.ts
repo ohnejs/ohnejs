@@ -21,12 +21,12 @@ import {
   toArray,
   walkCondition,
 } from '../../../utils/index.ts';
+import { splitBlockHas } from '../block-has.ts';
 import { queryLocales } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import {
   blockScope,
   checkCondition,
-  splitBlockHas,
   targetScope,
   type ConditionProblem,
 } from '../validate-condition.ts';

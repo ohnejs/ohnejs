@@ -5,8 +5,8 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { splitBlockHas } from '../block-has.ts';
 import { blockQueryMetadata, queryMetadata } from '../metadata.ts';
-import { splitBlockHas } from '../validate-condition.ts';
 import { escapeLike } from './escape-like.ts';
 import { inFragment, joinFragments, rawFragment, type SQLFragment } from './fragment.ts';
 import { conditionUsesCompanion } from './from.ts';
