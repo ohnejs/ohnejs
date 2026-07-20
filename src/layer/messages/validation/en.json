@@ -5,6 +5,7 @@
   "notNullable": "This field does not accept null",
   "notUnique": "This value is already taken",
   "required": "This field is required",
+  "singleRecord": "Item updates address a single record",
   "unknownBlock": "Unknown block `{block}`",
   "unknownField": "This field is not recognized"
 }

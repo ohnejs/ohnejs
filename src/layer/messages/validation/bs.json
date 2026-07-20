@@ -5,6 +5,7 @@
   "notNullable": "Ovo polje ne prihvata null",
   "notUnique": "Ova vrijednost je već zauzeta",
   "required": "Ovo polje je obavezno",
+  "singleRecord": "Ažuriranje stavki se odnosi na jedan zapis",
   "unknownBlock": "Nepoznat blok `{block}`",
   "unknownField": "Ovo polje nije prepoznato"
 }

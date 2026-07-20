@@ -5,6 +5,7 @@
   "notNullable": "Dieses Feld darf nicht null sein",
   "notUnique": "Dieser Wert ist bereits vergeben",
   "required": "Dieses Feld ist erforderlich",
+  "singleRecord": "Element-Updates betreffen einen einzelnen Datensatz",
   "unknownBlock": "Unbekannter Block `{block}`",
   "unknownField": "Dieses Feld wird nicht erkannt"
 }
