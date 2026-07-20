@@ -8,10 +8,10 @@ import { isNull } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { assertBoundParams } from '../sql/fragment.ts';
 import { compileLimit, compileOrder } from '../sql/order.ts';
 import { compileSelect } from '../sql/select.ts';
 import { compileWhere } from '../sql/where.ts';
-import { assertBoundParams } from '../wire/guards.ts';
 import { hydrateScope } from './hydrate.ts';
 import { applyPopulate } from './loaders/populate.ts';
 

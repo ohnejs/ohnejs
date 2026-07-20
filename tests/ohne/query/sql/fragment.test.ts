@@ -1,7 +1,12 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, doesNotThrow, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { inFragment, joinFragments, rawFragment } from '../../../../src/ohne/query/sql/fragment.ts';
+import {
+  assertBoundParams,
+  inFragment,
+  joinFragments,
+  rawFragment,
+} from '../../../../src/ohne/query/sql/fragment.ts';
 
 describe('rawFragment', () => {
   it('wraps SQL with its params', () => {
@@ -44,5 +49,16 @@ describe('inFragment', () => {
 
   it('compiles an empty list to match nothing', () => {
     deepStrictEqual(inFragment('"status"', []), { sql: '1 = 0', params: [] });
+  });
+});
+
+describe('assertBoundParams', () => {
+  it('accepts a count at or below the limit', () => {
+    doesNotThrow(() => assertBoundParams(0, 100));
+    doesNotThrow(() => assertBoundParams(100, 100));
+  });
+
+  it('throws when the count exceeds the limit', () => {
+    throws(() => assertBoundParams(101, 100));
   });
 });

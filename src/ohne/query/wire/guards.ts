@@ -1,6 +1,5 @@
 import { isUndefined } from '../../../utils/index.ts';
 import { tryUseDialect } from '../../database/use-database.ts';
-import { ohneError } from '../../error/ohne-error.ts';
 import { useConfig } from '../../layers/use-config.ts';
 
 /**
@@ -134,19 +133,4 @@ export function resolveGuards(overrides: Partial<QueryGuards> = {}): QueryGuards
   const wall = tryUseDialect()?.maxParameters;
   if (!isUndefined(wall)) resolved.maxBoundParams = Math.min(resolved.maxBoundParams, wall);
   return resolved;
-}
-
-/**
- * Refuses a compiled statement carrying more bound parameters than the driver accepts, naming the count.
- * The wire clamps its own ceiling to this same `limit`, so only a trusted fluent query can reach here.
- */
-export function assertBoundParams(count: number, limit: number): void {
-  if (count <= limit) return;
-  throw ohneError({
-    title: 'Query exceeds the driver parameter cap',
-    body: [
-      `The compiled statement binds ${count} parameters, past the driver's cap of ${limit}.`,
-      'Narrow the condition, or shrink an `in` list.',
-    ],
-  });
 }

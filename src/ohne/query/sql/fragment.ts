@@ -1,5 +1,7 @@
 import type { SQLValue } from '../../database/adapter.ts';
 
+import { ohneError } from '../../error/ohne-error.ts';
+
 /**
  * A piece of SQL paired with the values bound to its `?` placeholders.
  * Compilers build a statement by composing fragments; the adapter receives the joined result.
@@ -62,4 +64,19 @@ export function joinFragments(fragments: readonly SQLFragment[], separator: stri
 export function inFragment(quotedColumn: string, params: readonly SQLValue[]): SQLFragment {
   if (params.length === 0) return rawFragment('1 = 0');
   return { sql: `${quotedColumn} IN (${params.map(() => '?').join(', ')})`, params: [...params] };
+}
+
+/**
+ * Refuses a compiled statement carrying more bound parameters than the driver accepts, naming the count.
+ * The wire clamps its own ceiling to this same `limit`, so only a trusted fluent query can reach here.
+ */
+export function assertBoundParams(count: number, limit: number): void {
+  if (count <= limit) return;
+  throw ohneError({
+    title: 'Query exceeds the driver parameter cap',
+    body: [
+      `The compiled statement binds ${count} parameters, past the driver's cap of ${limit}.`,
+      'Narrow the condition, or shrink an `in` list.',
+    ],
+  });
 }

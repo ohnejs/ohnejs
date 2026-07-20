@@ -1,13 +1,9 @@
-import { deepStrictEqual, doesNotThrow, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { after, before, describe, it } from 'node:test';
 
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { clearDatabases, registerDialect } from '../../../../src/ohne/database/use-database.ts';
-import {
-  assertBoundParams,
-  DEFAULT_QUERY_GUARDS,
-  resolveGuards,
-} from '../../../../src/ohne/query/wire/guards.ts';
+import { DEFAULT_QUERY_GUARDS, resolveGuards } from '../../../../src/ohne/query/wire/guards.ts';
 
 describe('resolveGuards', () => {
   it('returns the framework defaults when nothing overrides', () => {
@@ -42,16 +38,5 @@ describe('resolveGuards clamps maxBoundParams to the driver wall', () => {
 
   it('caps a config value at the wall, never raising past it', () => {
     strictEqual(resolveGuards({ maxBoundParams: 100000 }).maxBoundParams, 32766);
-  });
-});
-
-describe('assertBoundParams', () => {
-  it('accepts a count at or below the limit', () => {
-    doesNotThrow(() => assertBoundParams(0, 100));
-    doesNotThrow(() => assertBoundParams(100, 100));
-  });
-
-  it('throws when the count exceeds the limit', () => {
-    throws(() => assertBoundParams(101, 100));
   });
 });

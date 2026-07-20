@@ -5,8 +5,8 @@ import { isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom } from '../sql/from.ts';
-import { assertBoundParams } from '../wire/guards.ts';
 import { compileReadTail, readRows } from './find.ts';
 import { deserializeColumn } from './hydrate.ts';
 
