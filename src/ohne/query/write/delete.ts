@@ -5,7 +5,7 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { chunk, isUndefined } from '../../../utils/index.ts';
 import { useCollections } from '../../collections/use-collections.ts';
-import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { useDialect } from '../../database/use-database.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { compileFrom, conditionUsesCompanion } from '../sql/from.ts';
@@ -19,9 +19,8 @@ import {
   ownedBlockInstances,
   type BlockInstance,
 } from './blocks.ts';
-import { busyError } from './busy.ts';
 import { referenceViolation } from './errors.ts';
-import { withSavepoint } from './savepoint.ts';
+import { runWrite } from './run-write.ts';
 
 /**
  * The outcome of a delete: how many records the condition matched and removed.
@@ -56,22 +55,16 @@ export async function runDelete(
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const run = isUndefined(joinedTx)
-    ? () =>
-        useDatabase().transaction((tx) => attemptDelete(tx, meta, dialect, condition), 'immediate')
-    : () =>
-        withSavepoint(
-          joinedTx,
-          () => false,
-          () => attemptDelete(joinedTx, meta, dialect, condition),
-        );
-  try {
-    return await run();
-  } catch (error) {
-    if (dialect.isBusy(error)) throw busyError(error);
-    if (dialect.isForeignKeyViolation(error)) throw referenceViolation(error);
-    throw error;
-  }
+  return runWrite(
+    dialect,
+    joinedTx,
+    () => false,
+    (tx) => attemptDelete(tx, meta, dialect, condition),
+    (error) => {
+      if (dialect.isForeignKeyViolation(error)) throw referenceViolation(error);
+      return undefined;
+    },
+  );
 }
 
 /**
@@ -325,6 +318,8 @@ async function matchedUUIDs(
  * Each record that lost a row bumps its `_updatedAt` - a translation write touches its record.
  * A record with nothing stored at the locale is matched but uncounted: nothing changed.
  * A busy database surfaces as a retryable `busyError`.
+ * It deletes only companion, locale-scoped, and instance rows, never a main record.
+ * No `restrict` reference into the collection can fire, so the terminal declares no foreign-key arm.
  */
 export async function runDeleteTranslation(
   collection: string,
@@ -334,24 +329,13 @@ export async function runDeleteTranslation(
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const run = isUndefined(joinedTx)
-    ? () =>
-        useDatabase().transaction(
-          (tx) => attemptDeleteTranslation(tx, meta, dialect, condition, locale),
-          'immediate',
-        )
-    : () =>
-        withSavepoint(
-          joinedTx,
-          () => false,
-          () => attemptDeleteTranslation(joinedTx, meta, dialect, condition, locale),
-        );
-  try {
-    return await run();
-  } catch (error) {
-    if (dialect.isBusy(error)) throw busyError(error);
-    throw error;
-  }
+  return runWrite(
+    dialect,
+    joinedTx,
+    () => false,
+    (tx) => attemptDeleteTranslation(tx, meta, dialect, condition, locale),
+    () => undefined,
+  );
 }
 
 /**

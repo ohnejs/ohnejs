@@ -5,16 +5,16 @@ import type { QueryRecord } from '../read/find.ts';
 import type { FieldErrors } from './errors.ts';
 
 import { isEmpty, isUndefined, uuidv7 } from '../../../utils/index.ts';
-import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { useDialect } from '../../database/use-database.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
-import { busyError } from './busy.ts';
-import { insertCompanion, insertScope, splitColumns } from './insert.ts';
+import { emptyCompanionPlan, splitColumns, upsertCompanion } from './companion.ts';
+import { insertScope } from './insert.ts';
 import { checkReferences } from './references.ts';
-import { withSavepoint } from './savepoint.ts';
+import { runWrite } from './run-write.ts';
 import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
 
 /**
@@ -39,30 +39,21 @@ export async function runCreate(
 ): Promise<CreateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const run = isUndefined(joinedTx)
-    ? () =>
-        useDatabase().transaction(
-          (tx) => attemptCreate(tx, meta, dialect, input, locale),
-          'immediate',
-        )
-    : () =>
-        withSavepoint(
-          joinedTx,
-          (outcome) => !outcome.ok,
-          () => attemptCreate(joinedTx, meta, dialect, input, locale),
-        );
-  try {
-    return await run();
-  } catch (error) {
-    if (dialect.isBusy(error)) throw busyError(error);
-    if (dialect.isUniqueViolation(error)) {
-      return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
-    }
-    if (dialect.isForeignKeyViolation(error)) {
-      return { ok: false, errors: { '': 'validation.invalidReference' } };
-    }
-    throw error;
-  }
+  return runWrite(
+    dialect,
+    joinedTx,
+    (outcome) => !outcome.ok,
+    (tx) => attemptCreate(tx, meta, dialect, input, locale),
+    (error) => {
+      if (dialect.isUniqueViolation(error)) {
+        return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
+      }
+      if (dialect.isForeignKeyViolation(error)) {
+        return { ok: false, errors: { '': 'validation.invalidReference' } };
+      }
+      return undefined;
+    },
+  );
 }
 
 /**
@@ -96,7 +87,7 @@ async function attemptCreate(
   const { main, companion } = splitColumns(meta.fields, scope.columns);
   await insertScope(tx, dialect, meta.table, meta.fields, uuid, { ...scope, columns: main }, code);
   if (!isUndefined(meta.companionTable)) {
-    await insertCompanion(tx, dialect, meta, uuid, companion, code);
+    await upsertCompanion(tx, dialect, meta, companion, [uuid], code, emptyCompanionPlan());
   }
 
   const rows = await readRows({

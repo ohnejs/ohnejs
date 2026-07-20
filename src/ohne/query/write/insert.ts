@@ -1,6 +1,6 @@
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
-import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
+import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 
 import { chunk, isNull, isUndefined, uniqueArray, uuidv7 } from '../../../utils/index.ts';
@@ -53,58 +53,28 @@ export function junctionColumns(meta: FieldQueryMeta): JunctionColumns {
 }
 
 /**
- * Maps each column name to its storage primitive, for the bind-time codec.
+ * The per-scope column-type memo, keyed on the field map itself.
+ * A scope's field map is boot-warmed and immutable, so its column-type map resolves once and lives with it.
  */
-export function columnTypes(fields: Record<string, FieldQueryMeta>): Map<string, LogicalType> {
+const columnTypeCache = new WeakMap<
+  Record<string, FieldQueryMeta>,
+  ReadonlyMap<string, LogicalType>
+>();
+
+/**
+ * Maps each column name to its storage primitive, for the bind-time codec, resolved once per scope.
+ */
+export function columnTypes(
+  fields: Record<string, FieldQueryMeta>,
+): ReadonlyMap<string, LogicalType> {
+  const cached = columnTypeCache.get(fields);
+  if (!isUndefined(cached)) return cached;
   const map = new Map<string, LogicalType>();
   for (const field of Object.values(fields)) {
     if (field.column && field.logicalType) map.set(field.column, field.logicalType);
   }
+  columnTypeCache.set(fields, map);
   return map;
-}
-
-/**
- * Splits a processed scope's columns by home: the main table's, and the companion's per-locale ones.
- * A collection with no translatable column puts everything in `main` and an empty `companion`.
- */
-export function splitColumns(
-  fields: Record<string, FieldQueryMeta>,
-  columns: Record<string, unknown>,
-): { main: Record<string, unknown>; companion: Record<string, unknown> } {
-  const main: Record<string, unknown> = {};
-  const companion: Record<string, unknown> = {};
-  for (const [column, value] of Object.entries(columns)) {
-    const home = fields[column]?.companion === true ? companion : main;
-    home[column] = value;
-  }
-  return { main, companion };
-}
-
-/**
- * Inserts one record's companion row at `locale`, carrying its translatable column values.
- * The parent row and its `_updatedAt` are the caller's; the companion has no timestamp of its own.
- */
-export async function insertCompanion(
-  tx: Transaction,
-  dialect: Dialect,
-  meta: CollectionQueryMeta,
-  parentUUID: string,
-  columns: Record<string, unknown>,
-  locale: string,
-): Promise<void> {
-  const columnType = columnTypes(meta.fields);
-  const names: string[] = ['_parentUUID', '_localeCode'];
-  const values: SQLValue[] = [parentUUID, locale];
-  for (const [column, value] of Object.entries(columns)) {
-    names.push(column);
-    values.push(dialect.serialize(columnType.get(column) as LogicalType, value));
-  }
-  const marks = names.map(() => '?').join(', ');
-  const quoted = names.map((name) => dialect.quote(name)).join(', ');
-  await tx.run(
-    `INSERT INTO ${dialect.quote(meta.companionTable as string)} (${quoted}) VALUES (${marks})`,
-    values,
-  );
 }
 
 /**
