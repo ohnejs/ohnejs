@@ -1,6 +1,8 @@
 import type { CompareOperator } from '../../utils/index.ts';
 import type { FieldQueryMeta } from './metadata.ts';
 
+import { isUndefined } from '../../utils/index.ts';
+
 /**
  * The closed operator vocabulary: wire spelling = method name = object key.
  * The compare operators come from the condition grammar; `has` and `empty` are its node kinds.
@@ -9,7 +11,13 @@ import type { FieldQueryMeta } from './metadata.ts';
 export type QueryOperator = CompareOperator | 'has' | 'empty';
 
 /**
- * The operators one field admits, read from its whole metadata entry.
+ * The per-field operator memo, keyed on the metadata entry itself.
+ * A field's metadata is boot-warmed and immutable, so its operator set resolves once and lives with it.
+ */
+const operatorCache = new WeakMap<FieldQueryMeta, ReadonlySet<QueryOperator>>();
+
+/**
+ * The operators one field admits, read from its whole metadata entry, resolved once per field.
  *
  * The `UUID` entries (`id` marker) take the identity tests alone.
  * A `record` takes identity tests, `isNull` when nullable, and the relation pair `has`/`empty`.
@@ -24,6 +32,17 @@ export type QueryOperator = CompareOperator | 'has' | 'empty';
  * `includes*` requires a column flagged `jsonList`.
  */
 export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
+  const cached = operatorCache.get(meta);
+  if (!isUndefined(cached)) return cached;
+  const operators = computeOperators(meta);
+  operatorCache.set(meta, operators);
+  return operators;
+}
+
+/**
+ * Derives a field's operator set from its metadata, before the memo caches it.
+ */
+function computeOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
   const nullable = meta.nullable || meta.companion === true;
   if (meta.id === true) return new Set<QueryOperator>(['equalsTo', 'in']);
   if (meta.kind === 'record') {
