@@ -1,5 +1,5 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
+import { afterEach, describe, it } from 'node:test';
 
 import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
 import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
@@ -12,6 +12,8 @@ import { registerDatabase, registerDialect } from '../../../../src/ohne/database
 import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 
 useFields().register('jsonBag', {
@@ -174,6 +176,53 @@ describe('findMany', () => {
       { title: 'Beta', views: 50 },
       { title: 'Gamma', views: 100 },
     ]);
+  });
+});
+
+describe('query:records', () => {
+  afterEach(() => useHooks().clear());
+
+  it('transforms every row of a record read, leaving the count untouched', async () => {
+    hook('query:records', (records) => records.map((record) => ({ ...record, computed: true })));
+    const rows = await queryUntyped('FPosts').findMany();
+    strictEqual(rows.length, 3);
+    ok(rows.every((row) => row.computed === true));
+  });
+
+  it('does not fire for a count', async () => {
+    let fired = 0;
+    hook('query:records', (records) => {
+      fired += 1;
+      return records;
+    });
+    await queryUntyped('FPosts').count();
+    strictEqual(fired, 0);
+  });
+});
+
+describe('query:complete', () => {
+  afterEach(() => useHooks().clear());
+
+  it('reports the collection, row count, and a non-negative duration', async () => {
+    const seen: { collection: string; rowCount: number; durationMs: number }[] = [];
+    hook('query:complete', (info) => {
+      seen.push(info);
+    });
+    await queryUntyped('FPosts').where({ featured: true }).findMany();
+    strictEqual(seen.length, 1);
+    strictEqual(seen[0]?.collection, 'FPosts');
+    strictEqual(seen[0]?.rowCount, 2);
+    strictEqual(typeof seen[0]?.durationMs, 'number');
+    ok(seen[0]!.durationMs >= 0);
+  });
+
+  it('does not fire for a count', async () => {
+    let fired = 0;
+    hook('query:complete', () => {
+      fired += 1;
+    });
+    await queryUntyped('FPosts').count();
+    strictEqual(fired, 0);
   });
 });
 

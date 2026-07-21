@@ -8,11 +8,13 @@ import { queryMetadata } from '../metadata.ts';
 import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
+import { resolveIR } from './resolve-ir.ts';
 
 /**
  * Counts every matching row, ignoring order and the row window, which a count never applies.
  */
 export async function count(ir: QueryIR): Promise<number> {
+  ir = await resolveIR(ir);
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
   const locale = effectiveLocale(ir.locale);
@@ -33,6 +35,7 @@ export async function count(ir: QueryIR): Promise<number> {
  * Whether any row matches, short-circuiting at the first one rather than counting the set.
  */
 export async function exists(ir: QueryIR): Promise<boolean> {
+  ir = await resolveIR(ir);
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
   const locale = effectiveLocale(ir.locale);

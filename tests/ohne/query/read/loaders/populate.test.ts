@@ -1,7 +1,8 @@
 import { deepStrictEqual, match, notStrictEqual, ok, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import type { DatabaseAdapter, SQLParams } from '../../../../../src/ohne/database/adapter.ts';
+import type { PopulateNode } from '../../../../../src/ohne/query/ir.ts';
 
 import { useCollections } from '../../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -14,6 +15,8 @@ import {
 import { isOhneError } from '../../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 
@@ -298,6 +301,30 @@ describe('validation at the populate call', () => {
         return true;
       },
     );
+  });
+});
+
+describe('populate:targets', () => {
+  afterEach(() => useHooks().clear());
+
+  it('nulls a record link to a hidden target and drops a hidden records element', async () => {
+    const seen = new Map<string, PopulateNode>();
+    hook('populate:targets', (targets, context) => {
+      seen.set(context.collection, context.node);
+      if (context.collection === 'PAuthors') return targets.filter((t) => t.UUID !== ada);
+      if (context.collection === 'PComments') return targets.filter((t) => t.UUID !== c2);
+      return targets;
+    });
+
+    const record = await first()
+      .populate('author', (a) => a.select('name'))
+      .populate('comments', (c) => c.select('text'))
+      .findFirst();
+
+    strictEqual(record?.author, null);
+    deepStrictEqual(record?.comments, [{ text: 'c1' }, { text: 'c3' }]);
+    strictEqual(seen.get('PAuthors')?.field, 'author');
+    strictEqual(seen.get('PComments')?.field, 'comments');
   });
 });
 

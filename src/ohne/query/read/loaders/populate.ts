@@ -1,3 +1,4 @@
+import type { CollectionName } from '../../../collections/known-collections.ts';
 import type { SQLValue } from '../../../database/adapter.ts';
 import type { Dialect } from '../../../database/dialect.ts';
 import type { PopulateNode, QueryIR } from '../../ir.ts';
@@ -13,11 +14,33 @@ import {
   uniqueArray,
 } from '../../../../utils/index.ts';
 import { useDatabase } from '../../../database/use-database.ts';
+import { applyHook } from '../../../hooks/apply-hook.ts';
+import { useHooks } from '../../../hooks/use-hooks.ts';
 import { effectiveLocale } from '../../locale.ts';
 import { queryMetadata } from '../../metadata.ts';
 import { compileFrom } from '../../sql/from.ts';
 import { scopeColumns } from '../../sql/select.ts';
 import { hydrateScope } from '../hydrate.ts';
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters a populate node's freshly batch-read target records before they key back onto their parents.
+     * Fires once per node's batched read, after the target rows assemble and before they are keyed by `UUID`.
+     * Drop a soft-deleted or unauthorized target here.
+     * A dropped target leaves a `record` link `null`, and removes a `records` element.
+     * The surviving set is what the node's children recurse over, so a filtered target hides its whole subtree.
+     * The `context` carries the populate `node` and its target `collection`.
+     * Return the filtered `QueryRecord[]`, or nothing to keep every target.
+     * It covers only `record` and `records` populates, not junction `UUID` lists, child composites, or blocks.
+     * Those load outside the populate path, so this hook never sees them.
+     */
+    'populate:targets': (
+      targets: QueryRecord[],
+      context: { node: PopulateNode; collection: CollectionName },
+    ) => void | QueryRecord[] | Promise<void | QueryRecord[]>;
+  }
+}
 
 /**
  * Swaps each populated relation's `UUID`(s) for hydrated target records, in place, down the tree.
@@ -125,11 +148,25 @@ async function loadTargets(
     );
     targets.push(...(await hydrateScope(meta.fields, rows, hydrated, dialect, locale)));
   }
-  const keyed = keyBy(targets, (record) => record.UUID as string);
+  const filtered = await resolveTargets(targets, node, collection);
+  const keyed = keyBy(filtered, (record) => record.UUID as string);
   const children = node.children.filter((child) => isNull(named) || named.includes(child.field));
-  await populateNodes(children, meta, targets, dialect, locale);
+  await populateNodes(children, meta, filtered, dialect, locale);
   if (!isNull(named) && !named.includes('UUID')) {
-    for (const target of targets) delete target.UUID;
+    for (const target of filtered) delete target.UUID;
   }
   return keyed;
+}
+
+async function resolveTargets(
+  targets: QueryRecord[],
+  node: PopulateNode,
+  collection: string,
+): Promise<QueryRecord[]> {
+  const callbacks = useHooks().get('populate:targets');
+  if (isUndefined(callbacks) || callbacks.length === 0) return targets;
+  return applyHook('populate:targets', targets, {
+    node,
+    collection: collection as CollectionName,
+  });
 }

@@ -9,6 +9,7 @@ import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom } from '../sql/from.ts';
 import { compileReadTail, readRows } from './find.ts';
 import { deserializeColumn } from './hydrate.ts';
+import { resolveIR } from './resolve-ir.ts';
 
 /**
  * Reads one field's value from every matching record, in the query's order.
@@ -27,6 +28,7 @@ export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
     const rows = await readRows({ ...ir, select: [field] });
     return rows.map((row) => row[field]);
   }
+  ir = await resolveIR(ir);
   const dialect = useDialect();
   const locale = effectiveLocale(ir.locale);
   const tail = compileReadTail(ir, meta, dialect, locale);
