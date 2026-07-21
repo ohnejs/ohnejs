@@ -467,6 +467,29 @@ describe('dispatch', () => {
     strictEqual(await response.text(), '/x');
   });
 
+  it('filters the handler result through handler:result', async () => {
+    hook('handler:result', (result) => ({ data: result }));
+    const { response } = await dispatch(
+      makeRoute('/', () => ({ id: 1 })),
+      req(),
+      url(),
+      {},
+    );
+    deepStrictEqual(await response.json(), { data: { id: 1 } });
+  });
+
+  it('filters a middleware short-circuit through handler:result', async () => {
+    hook('handler:result', (result) => ({ data: result }));
+    useMiddleware().registerGlobal('short', () => ({ blocked: true }));
+    const { response } = await dispatch(
+      makeRoute('/', () => 'unreached'),
+      req(),
+      url(),
+      {},
+    );
+    deepStrictEqual(await response.json(), { data: { blocked: true } });
+  });
+
   it('runs error:response on a thrown error, then response:send', async () => {
     const order: string[] = [];
     hook('error:response', (response, error) => {

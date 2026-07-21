@@ -4,6 +4,7 @@ import { createServer as createNodeServer } from 'node:http';
 
 import type { Gate, HTTPMethod } from '../../utils/index.ts';
 import type { Route } from '../routes/route.ts';
+import type { Event } from './event.ts';
 import type { RouteMatch, Router } from './router.ts';
 
 import {
@@ -17,6 +18,8 @@ import {
   stripBasePath,
 } from '../../utils/index.ts';
 import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
+import { applyHook } from '../hooks/apply-hook.ts';
+import { useHooks } from '../hooks/use-hooks.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
 import { dispatch } from './dispatch.ts';
@@ -25,6 +28,20 @@ import { routeLimits } from './route-limits.ts';
 import { toResponse } from './to-response.ts';
 import { translate } from './translate.ts';
 import { useResponse } from './use-response.ts';
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Fires once a dispatched request finishes: the response written and all `waitUntil` work drained.
+     * Receives the request `Event`, so a trace can read its params, context, and resolved IP after the fact.
+     * Reach for it when a span must cover background work, not close when the response is sent.
+     * It runs outside the request `AsyncLocalStorage`, so read the passed `event`, not the composables.
+     * A router miss, a refused host, and an off-prefix path never dispatch, so none of them fire it.
+     * It is an action: any return value is ignored.
+     */
+    'request:complete': (event: Event) => void | Promise<void>;
+  }
+}
 
 /**
  * A built HTTP server: the Node transport and the drain gate it admits requests through.
@@ -274,6 +291,7 @@ async function handle(
   }
 
   let drain: (() => Promise<void>) | undefined;
+  let event: Event | undefined;
   try {
     const url = toURL(req, trustProxy);
     if (allowedHosts && !allowedHosts(url.hostname)) {
@@ -312,6 +330,7 @@ async function handle(
         ip: clientIP(req, trustProxy),
       });
       drain = dispatched.drain;
+      event = dispatched.event;
       await sendResponse(res, dispatched.response);
     } else {
       await sendResponse(res, errorResponse(match));
@@ -328,8 +347,15 @@ async function handle(
     }
   } finally {
     if (drain) await drain();
+    if (event) await completeRequest(event);
     release();
   }
+}
+
+async function completeRequest(event: Event): Promise<void> {
+  const callbacks = useHooks().get('request:complete');
+  if (isUndefined(callbacks) || callbacks.length === 0) return;
+  await applyHook('request:complete', event);
 }
 
 function errorResponse(match: Exclude<RouteMatch, { type: 'matched' | 'options' }>): Response {

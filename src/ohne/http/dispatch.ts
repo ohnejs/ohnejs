@@ -19,6 +19,17 @@ import { runWithEvent } from './use-event.ts';
 declare module 'ohne' {
   interface Hooks {
     /**
+     * Filters a handler's raw return value before it serializes into a `Response`.
+     * Fires for a handler result and for a middleware short-circuit, each before `toResponse` runs.
+     * Return a replacement value - an envelope, a DTO, a redacted copy - or mutate it and return nothing.
+     * The replacement serializes by the handler-return rules: a `Response`, `HTTPError`, string, or JSON.
+     * Returning `undefined` leaves the value unchanged, so a callback cannot force a `204` from nothing.
+     * It runs inside the request context, so the passed `event` and the composables both reach the request.
+     * An error outcome never lands here; filter those through `error:response`.
+     */
+    'handler:result': (result: unknown, event: Event) => unknown;
+
+    /**
      * Filters the finished response of a dispatched request, just before it returns to the transport.
      * Fires for every outcome: a handler result, a middleware short-circuit, or a mapped `HTTPError`.
      * The generic `500` and the timed-out `503` run through it too.
@@ -58,6 +69,11 @@ export interface Dispatched {
    * The response to write back to the client.
    */
   response: Response;
+
+  /**
+   * The request `Event`, surfaced so the transport can fire `request:complete` once the request ends.
+   */
+  event: Event;
 
   /**
    * Awaits every `waitUntil` promise, isolating and logging rejections.
@@ -161,10 +177,11 @@ export async function dispatch(
       for (const name of await resolveMiddleware(base, event)) {
         event.appliedMiddleware.push(name as MiddlewareKey);
         const result = await registry.get(name)!(event);
-        if (!isUndefined(result)) return toResponse(result, event.response);
+        if (!isUndefined(result))
+          return toResponse(await resolveResult(result, event), event.response);
       }
       const result = await (route.handler as Handler)({ params });
-      return toResponse(result, event.response);
+      return toResponse(await resolveResult(result, event), event.response);
     } catch (error) {
       if (isValidationError(error)) {
         // A field path may be `__proto__`/`constructor`/`prototype`, which `mapValues` drops; keep them all.
@@ -205,7 +222,11 @@ export async function dispatch(
         }),
       );
 
-  return { response: await resolveResponse(response, event), drain: () => drain(background) };
+  return {
+    response: await resolveResponse(response, event),
+    event,
+    drain: () => drain(background),
+  };
 }
 
 async function resolveMiddleware(names: string[], event: Event): Promise<string[]> {
@@ -218,6 +239,12 @@ async function resolveResponse(response: Response, event: Event): Promise<Respon
   const callbacks = useHooks().get('response:send');
   if (isUndefined(callbacks) || callbacks.length === 0) return response;
   return applyHook('response:send', response, event);
+}
+
+async function resolveResult(result: unknown, event: Event): Promise<unknown> {
+  const callbacks = useHooks().get('handler:result');
+  if (isUndefined(callbacks) || callbacks.length === 0) return result;
+  return applyHook('handler:result', result, event);
 }
 
 async function resolveErrorResponse(

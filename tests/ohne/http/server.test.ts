@@ -14,7 +14,9 @@ import {
   createRouter,
   createServer,
   defineHandler,
+  hook,
   useEvent,
+  useHooks,
   useMiddleware,
   usePrinter,
   waitUntil,
@@ -96,6 +98,7 @@ before(() => {
 
 afterEach(() => {
   useMiddleware().clear();
+  useHooks().clear();
 });
 
 describe('createServer', () => {
@@ -187,6 +190,32 @@ describe('createServer', () => {
       resolveWork();
       await waitFor(() => gate.pending === 0);
       strictEqual(gate.pending, 0);
+    });
+  });
+
+  it('fires request:complete only after background work drains', async () => {
+    let resolveWork!: () => void;
+    const work = new Promise<void>((resolve) => (resolveWork = resolve));
+    let completed = false;
+    let path = '';
+    hook('request:complete', (event) => {
+      completed = true;
+      path = event.url.pathname;
+    });
+    const route = makeRoute('GET', '/bg', () => {
+      waitUntil(work);
+      return 'ok';
+    });
+
+    await withServer([route], async (base) => {
+      const res = await fetch(`${base}/bg`);
+      strictEqual(await res.text(), 'ok');
+      strictEqual(completed, false);
+
+      resolveWork();
+      await waitFor(() => completed);
+      strictEqual(completed, true);
+      strictEqual(path, '/bg');
     });
   });
 
