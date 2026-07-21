@@ -2,7 +2,8 @@
  * Typed hook table.
  * Add hooks by augmenting it from a layer with `declare module 'ohne'`.
  *
- * Name a hook `group:name` in kebab-case, then type it as its callback signature.
+ * Name a hook `group:name`, then type it as its callback signature.
+ * Both segments are kebab-case, never camelCase: a multi-word name is `record:before-change`.
  * A hook whose callbacks return nothing is an action, run for effect.
  * A hook whose callbacks return a value is a filter: each return feeds the next callback.
  *
@@ -10,8 +11,8 @@
  * ```ts
  * declare module 'ohne' {
  *   interface Hooks {
- *     'request:id': (id: string) => string
- *     'server:ready': () => void | Promise<void>
+ *     'query:filter': (ir: QueryIR) => void | QueryIR | Promise<void | QueryIR>
+ *     'server:ready': (info: { host: string; port: number }) => void | Promise<void>
  *   }
  * }
  * ```

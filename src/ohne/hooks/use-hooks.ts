@@ -17,8 +17,8 @@ const registry: Registry<AnyHookFn[]> = createRegistry<AnyHookFn[]>({
  *
  * @example
  * ```ts
- * useHooks().register('request:id', [(id) => id.trim()])
- * useHooks().get('request:id')?.length // -> 1
+ * useHooks().register('record:before-change', [(input) => input])
+ * useHooks().get('record:before-change')?.length // -> 1
  * ```
  */
 export function useHooks(): Registry<AnyHookFn[]> {

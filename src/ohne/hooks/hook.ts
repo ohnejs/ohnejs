@@ -13,7 +13,7 @@ import { useHooks } from './use-hooks.ts';
  *
  * @example
  * ```ts
- * hook('request:id', (id) => id.toUpperCase())
+ * hook('record:before-change', (input) => ({ ...input, updatedAt: Date.now() }))
  * hook('server:ready', async () => { await warmCache() })
  * ```
  */

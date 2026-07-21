@@ -22,15 +22,8 @@ import { useHooks } from './use-hooks.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
- *   interface Hooks {
- *     'request:id': (id: string) => string
- *     'server:ready': () => void
- *   }
- * }
- *
- * const id = await applyHook('request:id', 'req_8f2a') // filter
- * await applyHook('server:ready')                      // action
+ * const sent = await applyHook('response:send', response, event)
+ * await applyHook('server:ready', { host: 'localhost', port: 3000 })
  * ```
  */
 export async function applyHook<K extends HookName>(
