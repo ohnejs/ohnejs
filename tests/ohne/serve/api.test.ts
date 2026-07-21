@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import type { GuardReport } from '../../../src/ohne/database/schema/guard.ts';
+
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { ensureSchemaTable, writeSnapshot } from '../../../src/ohne/database/schema/snapshot.ts';
 import {
@@ -25,6 +27,7 @@ import {
 const scope = globalThis as typeof globalThis & {
   __ohneServeBoot: string[];
   __ohneServeReady?: { host: string; port: number };
+  __ohneSchemaSynced?: GuardReport;
 };
 
 function get(port: number, path: string): Promise<number> {
@@ -116,6 +119,7 @@ describe('serveAPI', () => {
     useHooks().clear();
     useCollections().clear();
     useEnv().unset('SKIP_CODEGEN');
+    scope.__ohneSchemaSynced = undefined;
   });
 
   after(() => {
@@ -293,6 +297,21 @@ describe('serveAPI', () => {
 
     strictEqual(scope.__ohneServeReady?.host, 'localhost');
     strictEqual(scope.__ohneServeReady?.port, port);
+  });
+
+  it('runs the schema:synced hook once with a clean first-sync report', async () => {
+    const dir = serveable('synced');
+    writeFileSync(
+      join(dir, 'boot', 'index.ts'),
+      "import { hook } from 'ohne';\n" +
+        "hook('schema:synced', (report) => {\n" +
+        '  globalThis.__ohneSchemaSynced = report;\n' +
+        '});\n',
+    );
+
+    http = await serveAPI(dir);
+
+    deepStrictEqual(scope.__ohneSchemaSynced, { deletions: [], warnings: [] });
   });
 
   it('rejects a port outside 0-65535', async () => {

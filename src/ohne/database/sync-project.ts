@@ -1,10 +1,13 @@
 import type { GuardReport } from './schema/guard.ts';
 
+import { isUndefined } from '../../utils/index.ts';
 import { useBlocks } from '../blocks/use-blocks.ts';
 import { resolveLocales } from '../collections/resolve-locales.ts';
 import { useCollections } from '../collections/use-collections.ts';
 import { useEnv } from '../env/use-env.ts';
 import { useFields } from '../fields/use-fields.ts';
+import { applyHook } from '../hooks/apply-hook.ts';
+import { useHooks } from '../hooks/use-hooks.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { warmQueryMetadata } from '../query/metadata.ts';
@@ -13,6 +16,22 @@ import { useMigrations } from './migrations/use-migrations.ts';
 import { buildDesiredSchema } from './schema/desired.ts';
 import { syncDatabase } from './schema/sync.ts';
 import { useDatabase } from './use-database.ts';
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Runs after the database schema reconcile commits, carrying the run's `GuardReport`.
+     * Register it from a boot file to rebuild a search index, refresh a cache, or write an audit trail.
+     * The report lists only destructive outcomes.
+     * `deletions` are rows purged under force or migration; `warnings` are orphan rows left in place.
+     * A clean sync that only creates or alters tables reports both empty, yet still fires.
+     * `serveAPI` and `ohne sync` share the reconcile, so it fires under both.
+     * A dry run commits nothing, so it does not fire there.
+     * An action: its return is ignored, and a throw aborts the caller through the error funnel.
+     */
+    'schema:synced': (report: GuardReport) => void | Promise<void>;
+  }
+}
 
 /**
  * Options for `syncProjectDatabase`.
@@ -80,6 +99,10 @@ export async function syncProjectDatabase(options: SyncProjectOptions = {}): Pro
         'Set `FORCE_SYNC` or `database.sync.force` to purge them.',
       ].join('\n'),
     });
+  }
+  const callbacks = useHooks().get('schema:synced');
+  if (!dryRun && !isUndefined(callbacks) && callbacks.length > 0) {
+    await applyHook('schema:synced', report);
   }
   return report;
 }
