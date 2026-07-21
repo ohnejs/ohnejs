@@ -1,4 +1,5 @@
 import type { ConditionNode } from '../../../utils/index.ts';
+import type { CollectionName } from '../../collections/known-collections.ts';
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
@@ -6,6 +7,8 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import { chunk, isUndefined } from '../../../utils/index.ts';
 import { useCollections } from '../../collections/use-collections.ts';
 import { useDialect } from '../../database/use-database.ts';
+import { applyHook } from '../../hooks/apply-hook.ts';
+import { useHooks } from '../../hooks/use-hooks.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { compileFrom, conditionUsesCompanion } from '../sql/from.ts';
@@ -19,8 +22,10 @@ import {
   ownedBlockInstances,
   type BlockInstance,
 } from './blocks.ts';
+import { commitEffects } from './committed.ts';
 import { referenceViolation } from './errors.ts';
 import { runWrite } from './run-write.ts';
+import { scopeCondition } from './update.ts';
 
 /**
  * The outcome of a delete: how many records the condition matched and removed.
@@ -30,6 +35,73 @@ export interface DeleteOutcome {
    * The number of records deleted.
    */
   deleted: number;
+}
+
+/**
+ * The context the pre-delete hook fires with, carrying the rows a delete is about to remove.
+ */
+export interface RecordDeleteContext {
+  /**
+   * The collection being deleted from, by name.
+   */
+  collection: CollectionName;
+
+  /**
+   * The `WHERE` condition the delete matched on, already scoped by `record:condition`.
+   */
+  condition: ConditionNode;
+
+  /**
+   * The `UUID`s of the records this delete will remove.
+   */
+  matched: readonly string[];
+
+  /**
+   * The open write transaction, so a callback cleans up dependent rows atomically.
+   */
+  tx: Transaction;
+}
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Runs just before a delete removes its rows, inside the transaction, carrying the doomed `UUID`s.
+     * Fires only when it or `record:committed` has a subscriber; else the fast delete never lists them.
+     * Use it to clean up rows outside the cascade - an external mirror, a derived table - on the same `tx`.
+     * An action: its return is ignored, and the delete proceeds once every callback settles.
+     * The `ctx` carries the `collection`, the scoped `condition`, the `matched` UUIDs, and the open `tx`.
+     */
+    'record:before-delete': (ctx: RecordDeleteContext) => void | Promise<void>;
+  }
+}
+
+/**
+ * The count a delete removed, plus the `UUID`s it touched when a pre-delete or commit effect needs them.
+ */
+interface DeleteResult {
+  deleted: number;
+  uuids: readonly string[];
+}
+
+/**
+ * Whether the delete must list its matched `UUID`s: only when a pre-delete or commit effect subscribes.
+ * The fast path issues one statement and materializes nothing otherwise.
+ */
+function wantsDeletedUUIDs(): boolean {
+  const before = useHooks().get('record:before-delete');
+  const committed = useHooks().get('record:committed');
+  return (
+    (!isUndefined(before) && before.length > 0) || (!isUndefined(committed) && committed.length > 0)
+  );
+}
+
+/**
+ * Runs the `record:before-delete` effects for the doomed rows, skipping when nothing subscribes.
+ */
+async function beforeDelete(ctx: RecordDeleteContext): Promise<void> {
+  const callbacks = useHooks().get('record:before-delete');
+  if (isUndefined(callbacks) || callbacks.length === 0) return;
+  await applyHook('record:before-delete', ctx);
 }
 
 /**
@@ -55,16 +127,25 @@ export async function runDelete(
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  return runWrite(
+  const scoped = await scopeCondition(collection, condition, 'delete');
+  const outcome = await runWrite<DeleteResult>(
     dialect,
     joinedTx,
     () => false,
-    (tx) => attemptDelete(tx, meta, dialect, condition),
+    (tx) => attemptDelete(tx, meta, dialect, scoped),
     (error) => {
       if (dialect.isForeignKeyViolation(error)) throw referenceViolation(error);
       return undefined;
     },
   );
+  if (isUndefined(joinedTx)) {
+    await commitEffects({
+      collection: collection as CollectionName,
+      operation: 'delete',
+      uuids: outcome.uuids,
+    });
+  }
+  return { deleted: outcome.deleted };
 }
 
 /**
@@ -79,16 +160,31 @@ async function attemptDelete(
   meta: CollectionQueryMeta,
   dialect: Dialect,
   condition: ConditionNode,
-): Promise<DeleteOutcome> {
+): Promise<DeleteResult> {
   const locale = effectiveLocale(null);
   if (hasBlocksField(meta.fields) || cascadeReachesBlocks(meta.collection)) {
     return deleteWithBlocks(tx, meta, dialect, condition, locale);
+  }
+  if (wantsDeletedUUIDs()) {
+    const matched = await matchedUUIDs(tx, meta, dialect, condition, locale);
+    if (matched.length === 0) return { deleted: 0, uuids: [] };
+    await beforeDelete({ collection: meta.collection as CollectionName, condition, matched, tx });
+    let deleted = 0;
+    for (const batch of chunk(matched, 900)) {
+      const marks = batch.map(() => '?').join(', ');
+      const { changes } = await tx.run(
+        `DELETE FROM ${dialect.quote(meta.table)} WHERE ${dialect.quote('UUID')} IN (${marks})`,
+        [...batch],
+      );
+      deleted += changes;
+    }
+    return { deleted, uuids: matched };
   }
   const where = compileWhere(condition, meta, dialect, locale);
   const table = dialect.quote(meta.table);
   if (isUndefined(meta.companionTable) || !conditionUsesCompanion(condition, meta.fields)) {
     const { changes } = await tx.run(`DELETE FROM ${table} WHERE ${where.sql}`, where.params);
-    return { deleted: changes };
+    return { deleted: changes, uuids: [] };
   }
   const from = compileFrom(meta, { condition }, locale, dialect);
   const uuid = `${table}.${dialect.quote('UUID')}`;
@@ -97,7 +193,7 @@ async function attemptDelete(
       `(SELECT ${uuid} ${from.sql} WHERE ${where.sql})`,
     [...from.params, ...where.params],
   );
-  return { deleted: changes };
+  return { deleted: changes, uuids: [] };
 }
 
 /**
@@ -114,12 +210,13 @@ async function deleteWithBlocks(
   dialect: Dialect,
   condition: ConditionNode,
   locale: string,
-): Promise<DeleteOutcome> {
+): Promise<DeleteResult> {
   const matched = await matchedUUIDs(tx, meta, dialect, condition, locale);
-  if (matched.length === 0) return { deleted: 0 };
+  if (matched.length === 0) return { deleted: 0, uuids: [] };
   const owned = await ownedBlockInstances(tx, dialect, meta.fields, matched);
   const cascaded = await cascadeDoomedInstances(tx, dialect, meta.collection, matched);
   const doomed = await collectBlockSubtree(tx, dialect, [...owned, ...cascaded]);
+  await beforeDelete({ collection: meta.collection as CollectionName, condition, matched, tx });
   let deleted = 0;
   for (const batch of chunk(matched, 900)) {
     const marks = batch.map(() => '?').join(', ');
@@ -130,7 +227,7 @@ async function deleteWithBlocks(
     deleted += changes;
   }
   await deleteBlockInstances(tx, dialect, doomed);
-  return { deleted };
+  return { deleted, uuids: matched };
 }
 
 /**
@@ -329,11 +426,12 @@ export async function runDeleteTranslation(
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
+  const scoped = await scopeCondition(collection, condition, 'delete');
   return runWrite(
     dialect,
     joinedTx,
     () => false,
-    (tx) => attemptDeleteTranslation(tx, meta, dialect, condition, locale),
+    (tx) => attemptDeleteTranslation(tx, meta, dialect, scoped, locale),
     () => undefined,
   );
 }

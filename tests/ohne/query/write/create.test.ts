@@ -1,5 +1,7 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
+
+import type { RecordCommitted } from '../../../../src/ohne/query/write/committed.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -8,6 +10,8 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { isValidationError } from '../../../../src/ohne/query/write/errors.ts';
@@ -168,5 +172,60 @@ describe('runCreate', () => {
     );
     ok(!result.ok);
     strictEqual(result.errors['sections[1].links[0].slug'], 'validation.notUnique');
+  });
+});
+
+describe('runCreate hooks', () => {
+  afterEach(() => useHooks().clear());
+
+  it('runs `record:before-change` before coercion', async () => {
+    hook('record:before-change', (input) => {
+      input.views = 99;
+    });
+    const result = await runCreate('CPost', { ...base, title: 'HookBefore', views: 10 }, null);
+    ok(result.ok);
+    strictEqual((result.record as { views: number }).views, 99);
+  });
+
+  it('aborts on a `record:validate` failure and writes nothing', async () => {
+    hook('record:validate', () => ({ title: 'validation.custom' }));
+    const before = await db.query('SELECT "UUID" FROM "CPost"');
+    const result = await runCreate('CPost', { ...base, title: 'HookValidate' }, null);
+    ok(!result.ok);
+    strictEqual(result.errors.title, 'validation.custom');
+    const after = await db.query('SELECT "UUID" FROM "CPost"');
+    strictEqual(after.length, before.length);
+  });
+
+  it('reshapes the returned record through `record:after-create`', async () => {
+    hook('record:after-create', (record) => ({ ...record, title: 'PATCHED' }));
+    const result = await runCreate('CPost', { ...base, title: 'HookAfter' }, null);
+    ok(result.ok);
+    strictEqual((result.record as { title: string }).title, 'PATCHED');
+  });
+
+  it('fires `record:committed` once for a self-owned create', async () => {
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+    const result = await runCreate('CPost', { ...base, title: 'HookCommit' }, null);
+    ok(result.ok);
+    strictEqual(events.length, 1);
+    strictEqual(events[0].operation, 'create');
+    strictEqual(events[0].collection, 'CPost');
+    deepStrictEqual(events[0].uuids, [(result.record as { UUID: string }).UUID]);
+  });
+
+  it('skips `record:committed` for a joined create', async () => {
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+    await db.transaction(async (tx) => {
+      const result = await runCreate('CPost', { ...base, title: 'HookJoined' }, null, tx);
+      ok(result.ok);
+    });
+    strictEqual(events.length, 0);
   });
 });

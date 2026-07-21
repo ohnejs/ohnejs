@@ -1,16 +1,22 @@
+import type { CollectionName } from '../../collections/known-collections.ts';
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { Transaction } from '../../database/adapter.ts';
 import type { Dialect } from '../../database/dialect.ts';
 import type { CollectionQueryMeta } from '../metadata.ts';
+import type { ProcessedScope, RecordWriteContext } from '../pipeline/run-record.ts';
 import type { QueryRecord } from '../read/find.ts';
 import type { FieldErrors } from './errors.ts';
 
 import { isEmpty, isUndefined, uuidv7 } from '../../../utils/index.ts';
 import { useDialect } from '../../database/use-database.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { applyHook } from '../../hooks/apply-hook.ts';
+import { useHooks } from '../../hooks/use-hooks.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
+import { commitEffects } from './committed.ts';
 import { emptyCompanionPlan, splitColumns, upsertCompanion } from './companion.ts';
 import { insertScope } from './insert.ts';
 import { checkReferences } from './references.ts';
@@ -21,6 +27,56 @@ import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors }
  * The outcome of a create: the re-read record, or the field failures that stopped it.
  */
 export type CreateOutcome = { ok: true; record: QueryRecord } | { ok: false; errors: FieldErrors };
+
+/**
+ * The context a mutation hook fires with once a record reaches its final, re-read state.
+ */
+export interface RecordMutateContext {
+  /**
+   * The collection that was written, by name.
+   */
+  collection: CollectionName;
+
+  /**
+   * The open write transaction, so a callback writes atomically with the change.
+   */
+  tx: Transaction;
+
+  /**
+   * The effective locale the record was read at.
+   */
+  locale: LocaleCode;
+}
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters the field errors of a create or update after coercion, before any precheck or write.
+     * Fires inside the transaction, for both operations, once the pipeline has a coerced `scope`.
+     * Add cross-field or cross-collection failures the per-field validator cannot express.
+     * The threaded value is the errors so far: spread it to add keys, or return your own to replace.
+     * A non-empty result aborts the write as `{ ok: false, errors }`, and nothing is written.
+     * Returning `undefined` or an empty map lets the write proceed.
+     * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
+     */
+    'record:validate': (
+      errors: FieldErrors,
+      scope: ProcessedScope,
+      ctx: RecordWriteContext,
+    ) => FieldErrors | void | Promise<FieldErrors | void>;
+
+    /**
+     * Filters a freshly created record, re-read in its final state, just before the create returns.
+     * Fires inside the transaction, so a search-index, revision, or audit write commits atomically with it.
+     * Return a replacement record to reshape what the caller receives, or return nothing to leave it.
+     * The `ctx` carries the `collection`, the open `tx`, and the effective `locale`.
+     */
+    'record:after-create': (
+      record: QueryRecord,
+      ctx: RecordMutateContext,
+    ) => QueryRecord | void | Promise<QueryRecord | void>;
+  }
+}
 
 /**
  * Creates one record and returns it, or the field failures.
@@ -39,10 +95,10 @@ export async function runCreate(
 ): Promise<CreateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  return runWrite(
+  const outcome = await runWrite<CreateOutcome>(
     dialect,
     joinedTx,
-    (outcome) => !outcome.ok,
+    (o) => !o.ok,
     (tx) => attemptCreate(tx, meta, dialect, input, locale),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
@@ -54,6 +110,14 @@ export async function runCreate(
       return undefined;
     },
   );
+  if (outcome.ok && isUndefined(joinedTx)) {
+    await commitEffects({
+      collection: collection as CollectionName,
+      operation: 'create',
+      uuids: [outcome.record.UUID as string],
+    });
+  }
+  return outcome;
 }
 
 /**
@@ -70,6 +134,16 @@ async function attemptCreate(
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
   const code = effectiveLocale(locale);
+
+  const validation = useHooks().get('record:validate');
+  if (!isUndefined(validation) && validation.length > 0) {
+    const errors = await applyHook('record:validate', {} as FieldErrors, scope, {
+      collection: meta.collection as CollectionName,
+      operation: 'create',
+      tx,
+    });
+    if (!isEmpty(errors)) return { ok: false, errors };
+  }
 
   const uniqueErrors = await checkUnique(tx, dialect, meta, scope.columns, code);
   if (!isEmpty(uniqueErrors)) return { ok: false, errors: uniqueErrors };
@@ -110,5 +184,14 @@ async function attemptCreate(
       ],
     });
   }
-  return { ok: true, record };
+  const finalize = useHooks().get('record:after-create');
+  if (isUndefined(finalize) || finalize.length === 0) return { ok: true, record };
+  return {
+    ok: true,
+    record: await applyHook('record:after-create', record, {
+      collection: meta.collection as CollectionName,
+      tx,
+      locale: code as LocaleCode,
+    }),
+  };
 }

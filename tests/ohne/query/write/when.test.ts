@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
@@ -14,6 +14,8 @@ import { registerDatabase, registerDialect } from '../../../../src/ohne/database
 import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
 
@@ -450,6 +452,24 @@ describe('when gate on update', () => {
       ok(result.ok);
     });
     strictEqual(count, 2);
+  });
+});
+
+describe('when gate on update fires hooks per matched record', () => {
+  afterEach(() => useHooks().clear());
+
+  it('fires `record:after-update` once per matched record on the gated path', async () => {
+    await seed('u-h1', 'sale', 1);
+    await seed('u-h2', 'regular', 2);
+    const seen: string[] = [];
+    hook('record:after-update', (record) => {
+      seen.push(record.UUID as string);
+    });
+    const result = await runUpdate('WUProduct', { discount: 50 }, inUUIDs(['u-h1', 'u-h2']), null);
+    ok(result.ok);
+    strictEqual(seen.length, 2);
+    ok(seen.includes('u-h1'));
+    ok(seen.includes('u-h2'));
   });
 });
 

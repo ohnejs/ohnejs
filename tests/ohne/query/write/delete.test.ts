@@ -1,5 +1,5 @@
-import { ok, rejects, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { deepStrictEqual, ok, rejects, strictEqual, throws } from 'node:assert';
+import { afterEach, describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -8,6 +8,8 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runDelete } from '../../../../src/ohne/query/write/delete.ts';
@@ -125,6 +127,33 @@ describe('runDelete', () => {
 
   it('throws without a filter through the untyped builder', () => {
     throws(() => queryUntyped('DPost').delete(), /without a filter/);
+  });
+});
+
+describe('runDelete hooks', () => {
+  afterEach(() => useHooks().clear());
+
+  it('sees the matched rows still present in `record:before-delete`', async () => {
+    const post = await seedPost();
+    let captured: readonly string[] = [];
+    let stillThere = 0;
+    hook('record:before-delete', async (ctx) => {
+      captured = ctx.matched;
+      const rows = await ctx.tx.query('SELECT "UUID" FROM "DPost" WHERE "UUID" = ?', [post]);
+      stillThere = rows.length;
+    });
+    const result = await runDelete('DPost', uuidIs(post));
+    strictEqual(result.deleted, 1);
+    deepStrictEqual(captured, [post]);
+    strictEqual(stillThere, 1);
+    strictEqual(await countWhere('DPost', 'UUID', post), 0);
+  });
+
+  it('deletes through the fast path with no subscriber', async () => {
+    const post = await seedPost();
+    const result = await runDelete('DPost', uuidIs(post));
+    strictEqual(result.deleted, 1);
+    strictEqual(await countWhere('DPost', 'UUID', post), 0);
   });
 });
 

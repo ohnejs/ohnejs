@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { ConditionNode } from '../../../../src/utils/index.ts';
@@ -11,6 +11,8 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
@@ -620,6 +622,44 @@ describe('runUpdate across matched records', () => {
 describe('runUpdate guards', () => {
   it('throws without a filter through the untyped builder', () => {
     throws(() => queryUntyped('UPost').update({ views: 1 }), /without a filter/);
+  });
+});
+
+describe('runUpdate hooks', () => {
+  afterEach(() => useHooks().clear());
+
+  it('fires `record:after-update` once per matched record', async () => {
+    const a = await seedPost({ summary: 'au-group' });
+    const b = await seedPost({ summary: 'au-group' });
+    const seen: string[] = [];
+    hook('record:after-update', (record) => {
+      seen.push(record.UUID as string);
+    });
+    const result = await runUpdate(
+      'UPost',
+      { views: 3 },
+      { kind: 'compare', path: ['summary'], op: 'equalsTo', value: 'au-group', negated: false },
+      null,
+    );
+    ok(result.ok);
+    strictEqual(seen.length, 2);
+    ok(seen.includes(a.UUID as string));
+    ok(seen.includes(b.UUID as string));
+  });
+
+  it('narrows the matched set through `record:condition`', async () => {
+    const a = await seedPost({ summary: 'cond-group', views: 10 });
+    const b = await seedPost({ summary: 'cond-group', views: 10 });
+    hook('record:condition', () => uuidIs(a.UUID as string));
+    const result = await runUpdate(
+      'UPost',
+      { views: 555 },
+      { kind: 'compare', path: ['summary'], op: 'equalsTo', value: 'cond-group', negated: false },
+      null,
+    );
+    ok(result.ok);
+    strictEqual(await views(a.UUID as string), 555);
+    strictEqual(await views(b.UUID as string), 10);
   });
 });
 

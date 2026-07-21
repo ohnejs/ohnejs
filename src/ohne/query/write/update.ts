@@ -1,4 +1,6 @@
 import type { ConditionNode } from '../../../utils/index.ts';
+import type { CollectionName } from '../../collections/known-collections.ts';
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
@@ -10,6 +12,7 @@ import type {
 } from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 import type { QueryRecord } from '../read/find.ts';
+import type { RecordMutateContext } from './create.ts';
 import type { FieldErrors } from './errors.ts';
 
 import {
@@ -24,6 +27,8 @@ import {
   uuidv7,
 } from '../../../utils/index.ts';
 import { useDialect } from '../../database/use-database.ts';
+import { applyHook } from '../../hooks/apply-hook.ts';
+import { useHooks } from '../../hooks/use-hooks.ts';
 import { effectiveLocale } from '../locale.ts';
 import { blockQueryMetadata, queryMetadata, type BlockQueryMeta } from '../metadata.ts';
 import { prefixPath } from '../pipeline/prefix-errors.ts';
@@ -50,6 +55,7 @@ import {
   hasBlocksField,
   ownedBlockInstances,
 } from './blocks.ts';
+import { commitEffects } from './committed.ts';
 import { materializeFailure, planCompanion, splitColumns, upsertCompanion } from './companion.ts';
 import { appendPositions, columnTypes, insertScope, junctionColumns } from './insert.ts';
 import { checkReferences } from './references.ts';
@@ -63,6 +69,85 @@ import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors }
 export type UpdateOutcome =
   | { ok: true; records: QueryRecord[] }
   | { ok: false; errors: FieldErrors };
+
+/**
+ * The context the row-condition filter fires with before a write resolves its matched set.
+ */
+export interface RecordConditionContext {
+  /**
+   * The collection being written, by name.
+   */
+  collection: CollectionName;
+
+  /**
+   * Whether the condition scopes an update or a delete.
+   */
+  operation: 'update' | 'delete';
+}
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Runs for each record an update touched, re-read in its final state, inside the transaction.
+     * Fires once per matched record, on both the plain and the gated path, so it is genuinely per-row.
+     * Use it for a per-record atomic effect - a search-index row, a revision - written on the same `tx`.
+     * An action: its return is ignored, and the record is passed through unchanged.
+     * The `ctx` carries the `collection`, the open `tx`, and the effective `locale`.
+     */
+    'record:after-update': (record: QueryRecord, ctx: RecordMutateContext) => void | Promise<void>;
+
+    /**
+     * Filters the `WHERE` condition of an update or delete before it resolves which rows are touched.
+     * Fires once at the terminal's top, outside the transaction, before the matched set compiles.
+     * Force-scope the write - a tenant filter, a soft-delete guard - by returning a narrowed condition.
+     * Return a replacement `ConditionNode`, or return nothing to leave the caller's condition as is.
+     * The `ctx` carries the `collection` and whether this is an `update` or a `delete`.
+     */
+    'record:condition': (
+      condition: ConditionNode,
+      ctx: RecordConditionContext,
+    ) => ConditionNode | void | Promise<ConditionNode | void>;
+  }
+}
+
+/**
+ * Applies the `record:condition` filter to a write's condition, scoping which rows it touches.
+ * Returns the condition unchanged when nothing subscribes, so the common write pays one lookup.
+ */
+export async function scopeCondition(
+  collection: string,
+  condition: ConditionNode,
+  operation: 'update' | 'delete',
+): Promise<ConditionNode> {
+  const callbacks = useHooks().get('record:condition');
+  if (isUndefined(callbacks) || callbacks.length === 0) return condition;
+  return applyHook('record:condition', condition, {
+    collection: collection as CollectionName,
+    operation,
+  });
+}
+
+/**
+ * Runs the per-record `record:after-update` effect for each matched record, skipping when unused.
+ * The subscriber check gates once, so an update with no subscriber pays a single lookup, not per row.
+ */
+async function afterUpdate(
+  collection: string,
+  records: QueryRecord[],
+  tx: Transaction,
+  locale: string,
+): Promise<QueryRecord[]> {
+  const callbacks = useHooks().get('record:after-update');
+  if (isUndefined(callbacks) || callbacks.length === 0) return records;
+  for (const record of records) {
+    await applyHook('record:after-update', record, {
+      collection: collection as CollectionName,
+      tx,
+      locale: locale as LocaleCode,
+    });
+  }
+  return records;
+}
 
 /**
  * Updates every record the condition matches and returns them re-read, or the field failures.
@@ -84,11 +169,12 @@ export async function runUpdate(
 ): Promise<UpdateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  return runWrite(
+  const scoped = await scopeCondition(collection, condition, 'update');
+  const outcome = await runWrite<UpdateOutcome>(
     dialect,
     joinedTx,
-    (outcome) => !outcome.ok,
-    (tx) => attemptUpdate(tx, meta, dialect, input, condition, locale),
+    (o) => !o.ok,
+    (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
@@ -99,6 +185,14 @@ export async function runUpdate(
       return undefined;
     },
   );
+  if (outcome.ok && isUndefined(joinedTx)) {
+    await commitEffects({
+      collection: collection as CollectionName,
+      operation: 'update',
+      uuids: outcome.records.map((record) => record.UUID as string),
+    });
+  }
+  return outcome;
 }
 
 /**
@@ -118,6 +212,16 @@ async function attemptUpdate(
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
   const code = effectiveLocale(locale);
+
+  const validation = useHooks().get('record:validate');
+  if (!isUndefined(validation) && validation.length > 0) {
+    const errors = await applyHook('record:validate', {} as FieldErrors, scope, {
+      collection: meta.collection as CollectionName,
+      operation: 'update',
+      tx,
+    });
+    if (!isEmpty(errors)) return { ok: false, errors };
+  }
 
   const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
   if (matched.length === 0) return { ok: true, records: [] };
@@ -186,7 +290,15 @@ async function attemptPlainUpdate(
   }
   for (const uuid of matched) await applyDerived(tx, dialect, uuid, scope, null, code);
 
-  return { ok: true, records: await readMatched(meta.collection, matched, locale) };
+  return {
+    ok: true,
+    records: await afterUpdate(
+      meta.collection,
+      await readMatched(meta.collection, matched, locale),
+      tx,
+      code,
+    ),
+  };
 }
 
 /**
@@ -323,7 +435,15 @@ async function attemptGatedUpdate(
     }
   }
 
-  return { ok: true, records: await readMatched(meta.collection, matched, locale) };
+  return {
+    ok: true,
+    records: await afterUpdate(
+      meta.collection,
+      await readMatched(meta.collection, matched, locale),
+      tx,
+      code,
+    ),
+  };
 }
 
 /**

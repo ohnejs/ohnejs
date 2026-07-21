@@ -1,3 +1,4 @@
+import type { CollectionName } from '../../collections/known-collections.ts';
 import type { Transaction } from '../../database/adapter.ts';
 import type { LogicalType } from '../../database/dialect.ts';
 import type { FieldOperation } from '../../fields/context.ts';
@@ -13,9 +14,48 @@ import {
   isString,
   isUndefined,
 } from '../../../utils/index.ts';
+import { applyHook } from '../../hooks/apply-hook.ts';
+import { useHooks } from '../../hooks/use-hooks.ts';
 import { finishComposite, prepareComposite, runCompositeTiers } from './descend.ts';
 import { defaultPath, finishScalar, isProvided, prepareScalar, writeContext } from './run-field.ts';
 import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
+
+/**
+ * The write pipeline's per-record context, shared by the input filter and the record validator.
+ */
+export interface RecordWriteContext {
+  /**
+   * The collection being written, by name.
+   */
+  collection: CollectionName;
+
+  /**
+   * Whether the record is being created or updated.
+   */
+  operation: FieldOperation;
+
+  /**
+   * The open write transaction, so a callback reads or writes in the same atomic bracket.
+   */
+  tx: Transaction;
+}
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters the raw input of a create or update before the pipeline coerces it, inside the transaction.
+     * Fires once per record at the tree root, for both operations, before the input is frozen.
+     * One site covers every caller, so a timestamps, tenant, or audit layer stamps input everywhere.
+     * Return a replacement record, or mutate the passed object in place and return nothing.
+     * Returning `undefined` leaves the input unchanged.
+     * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
+     */
+    'record:before-change': (
+      input: Record<string, unknown>,
+      ctx: RecordWriteContext,
+    ) => Record<string, unknown> | void | Promise<Record<string, unknown> | void>;
+  }
+}
 
 /**
  * The pipeline's per-scope threading: where in the record tree it runs, and against which transaction.
@@ -447,5 +487,15 @@ export async function runRecord(
     path: '',
     ancestors: [],
   };
-  return processScope(collectionMeta.fields, Object.freeze({ ...input }), ctx);
+  const changeCtx: RecordWriteContext = {
+    collection: collectionMeta.collection as CollectionName,
+    operation: options.operation,
+    tx: options.tx,
+  };
+  const callbacks = useHooks().get('record:before-change');
+  const base =
+    isUndefined(callbacks) || callbacks.length === 0
+      ? { ...input }
+      : await applyHook('record:before-change', { ...input }, changeCtx);
+  return processScope(collectionMeta.fields, Object.freeze(base), ctx);
 }
