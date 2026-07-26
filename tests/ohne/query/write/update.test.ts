@@ -405,6 +405,36 @@ describe('runUpdate nested child uniqueness', () => {
     strictEqual(notes[0].tag, 'deep-x');
   });
 
+  it('correlates nested lists under two kept sibling items independently', async () => {
+    const created = await runCreate(
+      'UDeep',
+      { sections: [{ notes: [{ tag: 'sib-a' }] }, { notes: [{ tag: 'sib-b' }] }] },
+      null,
+    );
+    ok(created.ok);
+    const record = created.record as {
+      UUID: string;
+      sections: { UUID: string; notes: { UUID: string; tag: string }[] }[];
+    };
+    const result = await runUpdate(
+      'UDeep',
+      {
+        sections: record.sections.map((section, index) => ({
+          UUID: section.UUID,
+          notes: [{ UUID: section.notes[0].UUID, tag: `sib-${index}` }],
+        })),
+      },
+      uuidIs(record.UUID),
+      null,
+    );
+    ok(result.ok);
+    const sections = result.records[0].sections as { notes: { tag: string }[] }[];
+    deepStrictEqual(
+      sections.map((section) => section.notes[0].tag),
+      ['sib-0', 'sib-1'],
+    );
+  });
+
   it('still rejects a nested unique value another record holds', async () => {
     await runCreate('UDeep', { sections: [{ notes: [{ tag: 'taken' }] }] }, null);
     const other = await runCreate('UDeep', { sections: [{ notes: [{ tag: 'free' }] }] }, null);

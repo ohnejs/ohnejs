@@ -74,6 +74,20 @@ useCollections().register('BUDecks', {
   },
 });
 
+useBlocks().register('BUNode', {
+  name: 'BUNode',
+  block: {
+    fields: {
+      slug: field('text', { unique: true }),
+      children: field('blocks', { allow: ['BUNode'] }),
+    },
+  },
+});
+useCollections().register('BUTrees', {
+  name: 'BUTrees',
+  collection: { fields: { nodes: field('blocks', { allow: ['BUNode'] }) } },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 registerDialect(dialect);
@@ -554,5 +568,101 @@ describe('runUpdate blocks across matched records', () => {
       [item.UUID],
     );
     strictEqual(row?.title, 'Keep');
+  });
+});
+
+describe('runUpdate cross-depth unique ordering', () => {
+  interface TreeNode {
+    UUID: string;
+    fields: { slug: string; children: TreeNode[] };
+  }
+
+  /**
+   * Creates a tree whose root holds `slug` over children with `childSlugs`, returning the hydrated nodes.
+   */
+  async function seedTree(
+    slug: string,
+    childSlugs: string[],
+  ): Promise<{ uuid: string; root: TreeNode }> {
+    const result = await runCreate(
+      'BUTrees',
+      {
+        nodes: [
+          {
+            block: 'BUNode',
+            fields: {
+              slug,
+              children: childSlugs.map((child) => ({
+                block: 'BUNode',
+                fields: { slug: child, children: [] },
+              })),
+            },
+          },
+        ],
+      },
+      null,
+    );
+    ok(result.ok);
+    const root = (result.record.nodes as TreeNode[])[0];
+    return { uuid: result.record.UUID as string, root };
+  }
+
+  it('lets a deep item claim the value a shallow rewrite vacates, beside a deep swap', async () => {
+    const { uuid, root } = await seedTree('cd-v', ['cd-x', 'cd-p', 'cd-q']);
+    const [m1, m2, m3] = root.fields.children;
+    const result = await runUpdate(
+      'BUTrees',
+      {
+        nodes: [
+          {
+            UUID: root.UUID,
+            block: 'BUNode',
+            fields: {
+              slug: 'cd-w',
+              children: [
+                { UUID: m1.UUID, block: 'BUNode', fields: { slug: 'cd-v' } },
+                { UUID: m2.UUID, block: 'BUNode', fields: { slug: 'cd-q' } },
+                { UUID: m3.UUID, block: 'BUNode', fields: { slug: 'cd-p' } },
+              ],
+            },
+          },
+        ],
+      },
+      uuidIs(uuid),
+      null,
+    );
+    ok(result.ok);
+    const nodes = (result.records[0].nodes as TreeNode[])[0];
+    strictEqual(nodes.fields.slug, 'cd-w');
+    deepStrictEqual(
+      nodes.fields.children.map((child) => child.fields.slug),
+      ['cd-v', 'cd-q', 'cd-p'],
+    );
+  });
+
+  it('lets a shallow rewrite claim the value a deep item vacates', async () => {
+    const { uuid, root } = await seedTree('sd-v', ['sd-x']);
+    const [m1] = root.fields.children;
+    const result = await runUpdate(
+      'BUTrees',
+      {
+        nodes: [
+          {
+            UUID: root.UUID,
+            block: 'BUNode',
+            fields: {
+              slug: 'sd-x',
+              children: [{ UUID: m1.UUID, block: 'BUNode', fields: { slug: 'sd-y' } }],
+            },
+          },
+        ],
+      },
+      uuidIs(uuid),
+      null,
+    );
+    ok(result.ok);
+    const nodes = (result.records[0].nodes as TreeNode[])[0];
+    strictEqual(nodes.fields.slug, 'sd-x');
+    strictEqual(nodes.fields.children[0].fields.slug, 'sd-y');
   });
 });

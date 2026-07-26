@@ -18,7 +18,7 @@ import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
 import { commitEffects } from './committed.ts';
 import { emptyCompanionPlan, splitColumns, upsertCompanion } from './companion.ts';
-import { insertScope } from './insert.ts';
+import { applyReconcile, createPlan } from './reconcile.ts';
 import { checkReferences } from './references.ts';
 import { runWrite } from './run-write.ts';
 import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
@@ -159,7 +159,15 @@ async function attemptCreate(
 
   const uuid = uuidv7();
   const { main, companion } = splitColumns(meta.fields, scope.columns);
-  await insertScope(tx, dialect, meta.table, meta.fields, uuid, { ...scope, columns: main }, code);
+  const plan = createPlan(
+    dialect,
+    meta.table,
+    meta.fields,
+    uuid,
+    { ...scope, columns: main },
+    code,
+  );
+  await applyReconcile(tx, dialect, plan);
   if (!isUndefined(meta.companionTable)) {
     await upsertCompanion(tx, dialect, meta, companion, [uuid], code, emptyCompanionPlan());
   }

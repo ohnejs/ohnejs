@@ -6,7 +6,7 @@ import type { FieldErrors } from './errors.ts';
 
 import { chunk, hasKey, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { defaultPath, finishScalar, writeContext } from '../pipeline/run-field.ts';
-import { columnTypes } from './insert.ts';
+import { columnTypes } from './reconcile.ts';
 
 /**
  * Splits a processed scope's columns by home: the main table's, and the companion's per-locale ones.
