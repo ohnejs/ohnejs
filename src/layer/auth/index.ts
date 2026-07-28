@@ -1,3 +1,5 @@
+export { usersDefinition } from '../collections/Users.ts';
+export * from './capabilities.ts';
 export * from './create-session.ts';
 export * from './destroy-session.ts';
 export * from './dummy-verify.ts';

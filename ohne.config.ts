@@ -7,5 +7,6 @@ export default defineConfig({
     fields: 'src/layer/fields',
     messages: 'src/layer/messages',
     middleware: 'src/layer/middleware',
+    roles: 'src/layer/roles',
   },
 });

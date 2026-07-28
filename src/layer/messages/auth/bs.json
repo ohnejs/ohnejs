@@ -1,6 +1,8 @@
 {
   "invalidEmail": "Unesite ispravnu email adresu",
   "invalidCredentials": "Netačna email adresa ili lozinka",
+  "invalidRoles": "Uloge moraju biti lista naziva uloga",
+  "unknownRole": "Nepoznata uloga `{role}`",
   "users": {
     "email": {
       "label": "Email",
@@ -9,6 +11,10 @@
     "password": {
       "label": "Lozinka",
       "description": "Prima lozinku u čistom tekstu i pohranjuje samo njen scrypt hash. Sama lozinka se nikada ne pohranjuje."
+    },
+    "roles": {
+      "label": "Uloge",
+      "description": "Nazivi uloga koje ovaj korisnik ima. Sposobnosti svih uloga se objedinjuju."
     }
   },
   "sessions": {

@@ -11,7 +11,8 @@ const cache = new WeakMap<Event, Promise<User | null>>();
  * Returns the signed-in user, or `null` when the request has no live session, memoized per request.
  * Valid only within a request.
  *
- * The result carries only `UUID` and `email`, never the password hash, so it is safe to return as-is.
+ * The result carries only `UUID`, `email`, and `roles`, never the password hash.
+ * It is therefore safe to return as-is.
  * Reach for `requireUser` when a route must have a user and a missing one is a `401`.
  *
  * @example
@@ -36,7 +37,7 @@ async function resolveUser(): Promise<User | null> {
 
   const user = (await query('Users')
     .where('UUID', session.user)
-    .select('UUID', 'email')
+    .select('UUID', 'email', 'roles')
     .findFirst()) as User | undefined;
   return isUndefined(user) ? null : user;
 }

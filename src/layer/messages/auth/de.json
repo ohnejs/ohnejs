@@ -1,6 +1,8 @@
 {
   "invalidEmail": "Gib eine gültige E-Mail-Adresse ein",
   "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
+  "invalidRoles": "Rollen müssen eine Liste von Rollennamen sein",
+  "unknownRole": "Unbekannte Rolle `{role}`",
   "users": {
     "email": {
       "label": "E-Mail",
@@ -9,6 +11,10 @@
     "password": {
       "label": "Passwort",
       "description": "Nimmt ein Klartext-Passwort entgegen und speichert nur dessen scrypt-Hash. Das Passwort selbst wird nie gespeichert."
+    },
+    "roles": {
+      "label": "Rollen",
+      "description": "Die Rollennamen dieses Benutzers. Die Berechtigungen aller Rollen werden vereinigt."
     }
   },
   "sessions": {

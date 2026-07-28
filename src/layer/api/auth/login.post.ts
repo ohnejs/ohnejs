@@ -12,7 +12,7 @@ import { dummyVerify } from '../../auth/dummy-verify.ts';
 /**
  * `POST /auth/login`
  *
- * Verifies `{ email, password }`, opens a session, and returns `{ UUID, email }`.
+ * Verifies `{ email, password }`, opens a session, and returns `{ UUID, email, roles }`.
  * An unknown email and a wrong password both answer `401` with the same message, by design.
  */
 export default defineHandler(async (): Promise<User> => {
@@ -23,9 +23,9 @@ export default defineHandler(async (): Promise<User> => {
     throw badRequest(translate('auth.invalidCredentials'));
 
   const user = (await queryUntyped('Users')
-    .select('UUID', 'email', 'password')
+    .select('UUID', 'email', 'password', 'roles')
     .where({ email: normalizeEmail(email) })
-    .findFirst()) as { UUID: string; email: string; password: string } | undefined;
+    .findFirst()) as (User & { password: string }) | undefined;
 
   if (isUndefined(user)) {
     await dummyVerify(password);
@@ -35,5 +35,5 @@ export default defineHandler(async (): Promise<User> => {
     throw unauthorized(translate('auth.invalidCredentials'));
 
   await createSession(user.UUID);
-  return { UUID: user.UUID, email: user.email };
+  return { UUID: user.UUID, email: user.email, roles: user.roles };
 });

@@ -31,7 +31,7 @@ useCollections().register('CrudAuthors', {
 useCollections().register('CrudPosts', {
   name: 'CrudPosts',
   collection: {
-    api: { read: true, create: true, update: true, delete: true },
+    api: { read: 'public', create: 'public', update: 'public', delete: 'public' },
     fields: {
       title: field('text'),
       secret: field('text', { readable: false, nullable: true }),
@@ -43,26 +43,35 @@ useCollections().register('CrudPosts', {
 });
 useCollections().register('CrudMany', {
   name: 'CrudMany',
-  collection: { api: { read: true }, fields: { n: field('integer') } },
+  collection: { api: { read: 'public' }, fields: { n: field('integer') } },
 });
 useCollections().register('CrudTwoWord', {
   name: 'CrudTwoWord',
-  collection: { api: true, fields: { title: field('text') } },
+  collection: {
+    api: { read: 'public', create: 'public', update: 'public', delete: 'public' },
+    fields: { title: field('text') },
+  },
 });
 useCollections().register('CrudClosed', {
   name: 'CrudClosed',
-  collection: { api: { read: true }, fields: { title: field('text') } },
+  collection: { api: { read: 'public' }, fields: { title: field('text') } },
 });
 useCollections().register('CrudGuarded', {
   name: 'CrudGuarded',
   collection: {
-    api: { read: { middleware: ['crud-note'] }, update: { middleware: ['crud-deny'] } },
+    api: {
+      read: { public: true, middleware: ['crud-note'] },
+      update: { public: true, middleware: ['crud-deny'] },
+    },
     fields: { title: field('text') },
   },
 });
 useCollections().register('CrudBroken', {
   name: 'CrudBroken',
-  collection: { api: { read: { middleware: ['crud-ghost'] } }, fields: { title: field('text') } },
+  collection: {
+    api: { read: { public: true, middleware: ['crud-ghost'] } },
+    fields: { title: field('text') },
+  },
 });
 
 useMiddleware().register('crud-deny', () => unauthorized());
@@ -326,7 +335,7 @@ describe('gate', () => {
     deepStrictEqual(closed.body, unknown.body);
   });
 
-  it('opens every operation under api: true, resolved by kebab-case name', async () => {
+  it('opens every public operation, resolved by kebab-case name', async () => {
     const p = { collection: 'crud-two-word' };
     strictEqual((await call(ROUTES.list, { collection: 'CrudTwoWord' })).status, 404);
 

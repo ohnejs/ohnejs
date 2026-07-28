@@ -1,4 +1,4 @@
-import { match, ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
@@ -9,6 +9,7 @@ import meHandler from '../../../../src/layer/api/auth/me.get.ts';
 import SessionsCollection from '../../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../../src/layer/collections/Users.ts';
 import passwordField from '../../../../src/layer/fields/password.ts';
+import rolesField from '../../../../src/layer/fields/roles.ts';
 import requireAuthMiddleware from '../../../../src/layer/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -30,6 +31,7 @@ usePrinter().configure({ stream: { write: () => true } });
 useLayers().add({ path: '/auth-flow-test', input: { auth: { password: { cost: 1024 } } } });
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
+useFields().register('roles', { name: 'roles', fieldType: rolesField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
@@ -99,9 +101,10 @@ describe('auth flow', () => {
     await createUser('Ada@Example.com', 'correct horse');
     const response = await login('ADA@example.com', 'correct horse');
     strictEqual(response.status, 200);
-    const user = (await response.json()) as { UUID: string; email: string };
+    const user = (await response.json()) as { UUID: string; email: string; roles: string[] };
     strictEqual(user.email, 'ada@example.com');
     match(user.UUID, /^[0-9a-f]{8}-[0-9a-f]{4}-/);
+    deepStrictEqual(user.roles, []);
 
     const setCookie = response.headers.getSetCookie()[0];
     match(setCookie, /HttpOnly/);

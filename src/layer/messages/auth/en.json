@@ -1,6 +1,8 @@
 {
   "invalidEmail": "Enter a valid email address",
   "invalidCredentials": "Incorrect email or password",
+  "invalidRoles": "Roles must be a list of role names",
+  "unknownRole": "Unknown role `{role}`",
   "users": {
     "email": {
       "label": "Email",
@@ -9,6 +11,10 @@
     "password": {
       "label": "Password",
       "description": "Takes a plaintext password and stores only its scrypt hash. The password itself is never stored."
+    },
+    "roles": {
+      "label": "Roles",
+      "description": "The role names this user holds. The capabilities of every held role union."
     }
   },
   "sessions": {

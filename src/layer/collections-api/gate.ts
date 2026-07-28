@@ -22,6 +22,7 @@ import { isBoolean, isNull, isUndefined, toKebabCase } from 'ohne/utils';
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
 import { unknownParamError } from '../../ohne/query/wire/errors.ts';
+import { requireCapability } from '../auth/capabilities.ts';
 
 /**
  * One collections-API operation, as the `api` exposure names it.
@@ -44,6 +45,8 @@ export const LIST_PER_PAGE = 20;
  * The segment is the collection's kebab-case name.
  * An unknown collection, an unexposed one, and a closed operation all answer the identical `404`.
  * The API therefore reveals nothing about what exists.
+ * Unless the operation is `public`, the guard then runs.
+ * It needs a signed-in user holding `collection.<Name>.<operation>`: no user `401`, no capability `403`.
  * The operation's named middleware then run in order, exactly as route middleware do.
  * Each records on the event; a returned value answers the request without the operation running.
  * An unknown middleware name throws - a misconfigured exposure is a `500`, never an open door.
@@ -55,6 +58,9 @@ export async function gateCollection(
   const meta = collectionBySegment(segment);
   const endpoint = isUndefined(meta) ? undefined : operationOf(meta.collection.api, operation);
   if (isUndefined(meta) || isUndefined(endpoint)) throw notFound();
+  if (endpoint.public !== true) {
+    await requireCapability(`collection.${meta.name}.${operation}`);
+  }
   const event = useEvent();
   for (const name of endpoint.middleware ?? []) {
     const middleware = useMiddleware().get(name);

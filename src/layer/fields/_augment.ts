@@ -12,6 +12,11 @@ declare module 'ohne' {
      * A plaintext password stored as its scrypt hash.
      */
     password: typeof import('./password.ts').default;
+
+    /**
+     * A list of role names, stored as a JSON list.
+     */
+    roles: typeof import('./roles.ts').default;
   }
 }
 

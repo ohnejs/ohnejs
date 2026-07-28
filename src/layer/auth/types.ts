@@ -1,3 +1,5 @@
+import type { RoleName } from 'ohne';
+
 declare module 'ohne' {
   interface EventContext {
     /**
@@ -23,6 +25,12 @@ export interface User {
    * The user's email, stored trimmed and lowercased.
    */
   email: string;
+
+  /**
+   * The role names the user holds.
+   * The capabilities of every held role union; resolve them with `userCapabilities`.
+   */
+  roles: RoleName[];
 }
 
 /**
