@@ -76,4 +76,91 @@ describe('defineCollection', () => {
       }),
     );
   });
+
+  it('accepts api as a boolean or omitted', () => {
+    doesNotThrow(() => defineCollection({ fields: { title: field('text') }, api: true }));
+    doesNotThrow(() => defineCollection({ fields: { title: field('text') }, api: false }));
+    doesNotThrow(() => defineCollection({ fields: { title: field('text') } }));
+  });
+
+  it('accepts a per-operation api table', () => {
+    doesNotThrow(() =>
+      defineCollection({
+        fields: { title: field('text') },
+        api: { read: true, create: { middleware: ['x'] } },
+      }),
+    );
+  });
+
+  it('rejects a non-boolean non-object api', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `api` is neither a boolean nor an object
+          api: 'yes',
+        }),
+      /Invalid `api` exposure/,
+    );
+  });
+
+  it('rejects an unknown api operation', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `publish` is not an operation
+          api: { publish: true },
+        }),
+      /Unknown `api` operation `publish`/,
+    );
+  });
+
+  it('rejects a middleware that is not an array', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `middleware` must be an array
+          api: { create: { middleware: 'x' } },
+        }),
+      /Invalid `api` operation `create`/,
+    );
+  });
+
+  it('rejects a middleware entry that is not a string', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `middleware` entries must be strings
+          api: { create: { middleware: [1] } },
+        }),
+      /Invalid `api` operation `create`/,
+    );
+  });
+
+  it('rejects an operation with an unknown key', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `other` is not an endpoint option
+          api: { create: { other: true } },
+        }),
+      /Invalid `api` operation `create`/,
+    );
+  });
+
+  it('rejects a null operation', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error an operation cannot be `null`
+          api: { create: null },
+        }),
+      /Invalid `api` operation `create`/,
+    );
+  });
 });
