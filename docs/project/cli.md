@@ -82,7 +82,8 @@ Node and browser type programs each include only theirs. Your `tsconfig.json` in
 buckets - that is what makes queries and messages fully typed in the editor.
 
 Files an earlier run left behind are pruned. Only files carrying the generated banner are ever
-deleted, so a file of your own inside `.ohne/` is never touched.
+deleted, so a file of your own inside `.ohne/` is never touched. The banner also stamps the ohne
+version that wrote the file.
 
 The scaffold wires it as the npm `prepare` script, so a fresh install generates the types before
 you open the editor. `dev` and `serve api` regenerate on boot anyway; `prepare` is for the times
@@ -99,7 +100,8 @@ pnpm exec ohne serve dashboard
 
 `serve api` boots the API: it runs the boot files, regenerates the types (skipped when
 `SKIP_CODEGEN` is set, as under `dev`), syncs the database schema, then listens. The sync runs
-before the port opens, so a failed sync never serves.
+before the port opens, so a failed sync never serves. With `SKIP_CODEGEN` set, it still reads the
+version stamp on the generated files and warns when a different ohne wrote them.
 
 `serve dashboard` serves the dashboard as a pure single-page app: a shell document plus the
 modules it imports, type-stripped to JavaScript per request - no build step, nothing to bundle.
