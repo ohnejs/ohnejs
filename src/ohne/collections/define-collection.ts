@@ -8,7 +8,16 @@ import { validateCollectionDefinition } from './validate-collection.ts';
  */
 export interface CollectionEndpoint {
   /**
-   * Named middleware run before the operation, in order, after the global middleware.
+   * Opens the operation to anonymous requests, skipping the capability guard.
+   * Pair it with `middleware: ['require-auth']` to require a signed-in user without a capability.
+   *
+   * @default
+   * false
+   */
+  public?: boolean;
+
+  /**
+   * Named middleware run before the operation, in order, after the guard and the global middleware.
    * A middleware returning a value answers the request; the operation never runs.
    *
    * @default
@@ -19,8 +28,9 @@ export interface CollectionEndpoint {
 
 /**
  * Per-operation exposure of one collection over the collections API.
- * Every operation is closed until named: `true` opens it to anyone, an object opens it with options.
- * Nothing attaches middleware for you - an open operation is public until `middleware` names a guard.
+ * Every operation is closed until named.
+ * `true` opens it guarded: the caller needs the `collection.<Name>.<operation>` capability.
+ * `'public'` opens it to anyone; an object opens it with options.
  */
 export interface CollectionAPI {
   /**
@@ -29,7 +39,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  read?: boolean | CollectionEndpoint;
+  read?: boolean | 'public' | CollectionEndpoint;
 
   /**
    * Opens `POST /collections/<name>` - creating a record.
@@ -37,7 +47,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  create?: boolean | CollectionEndpoint;
+  create?: boolean | 'public' | CollectionEndpoint;
 
   /**
    * Opens `PATCH /collections/<name>/<uuid>` - updating one record.
@@ -45,7 +55,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  update?: boolean | CollectionEndpoint;
+  update?: boolean | 'public' | CollectionEndpoint;
 
   /**
    * Opens `DELETE /collections/<name>/<uuid>` - deleting one record.
@@ -53,7 +63,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  delete?: boolean | CollectionEndpoint;
+  delete?: boolean | 'public' | CollectionEndpoint;
 }
 
 /**
@@ -114,8 +124,8 @@ export interface CollectionDefinition<
   /**
    * Exposure over the collections API (`/collections/<kebab-name>`).
    * Omitted or `false`, the collection has no HTTP endpoints.
-   * `true` opens every operation to anyone - the API never adds auth on its own.
-   * An object opens per operation, each `true` or `{ middleware }` naming its guards.
+   * An exposed operation is guarded: the caller needs the `collection.<Name>.<operation>` capability.
+   * `true` opens every operation guarded; `'public'` on an operation opens it to anyone instead.
    * An unexposed and an unknown collection answer the identical `404`, so the API reveals nothing.
    *
    * @default
@@ -124,8 +134,9 @@ export interface CollectionDefinition<
    * @example
    * ```ts
    * api: {
-   *   read: true,
-   *   create: { middleware: ['require-auth'] },
+   *   read: 'public',
+   *   create: true,
+   *   update: { middleware: ['audit'] },
    * }
    * ```
    */

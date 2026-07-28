@@ -92,6 +92,39 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts public operations in both spellings', () => {
+    doesNotThrow(() =>
+      defineCollection({
+        fields: { title: field('text') },
+        api: { read: 'public', create: { public: true, middleware: ['x'] } },
+      }),
+    );
+  });
+
+  it('rejects a non-boolean public flag', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `public` must be a boolean
+          api: { read: { public: 'yes' } },
+        }),
+      /Invalid `api` operation `read`/,
+    );
+  });
+
+  it('rejects a string operation other than `public`', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error only `'public'` is a legal string operation
+          api: { read: 'open' },
+        }),
+      /Invalid `api` operation `read`/,
+    );
+  });
+
   it('rejects a non-boolean non-object api', () => {
     throws(
       () =>

@@ -133,6 +133,7 @@ function collectionBySegment(segment: string): CollectionMeta | undefined {
 
 /**
  * Resolves one operation's endpoint options from the `api` exposure, or `undefined` when closed.
+ * The `'public'` shorthand resolves to `{ public: true }`, so the gate reads one shape.
  */
 function operationOf(
   api: boolean | CollectionAPI | undefined,
@@ -141,5 +142,5 @@ function operationOf(
   if (isBoolean(api) || isUndefined(api)) return api === true ? {} : undefined;
   const value = api[operation];
   if (isBoolean(value) || isUndefined(value)) return value === true ? {} : undefined;
-  return value;
+  return value === 'public' ? { public: true } : value;
 }

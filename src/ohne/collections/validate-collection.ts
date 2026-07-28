@@ -46,7 +46,7 @@ function validateAPI(api: unknown, collection?: string): void {
       title: 'Invalid `api` exposure',
       body: [
         `The \`api\` option${scope} must be a boolean or a per-operation object.`,
-        "Write `api: true`, or name operations: `api: { read: true, create: { middleware: ['require-auth'] } }`.",
+        "Write `api: true`, or name operations: `api: { read: 'public', create: true }`.",
       ],
     });
   }
@@ -60,19 +60,21 @@ function validateAPI(api: unknown, collection?: string): void {
         ],
       });
     }
-    if (isBoolean(value)) continue;
+    if (isBoolean(value) || value === 'public') continue;
     const endpoint = isPlainObject(value) ? value : null;
     const middleware = endpoint?.middleware;
+    const open = endpoint?.public;
     const clean =
       !isNull(endpoint) &&
-      Object.keys(endpoint).every((key) => key === 'middleware') &&
-      (isUndefined(middleware) || (isArray(middleware) && middleware.every(isString)));
+      Object.keys(endpoint).every((key) => key === 'middleware' || key === 'public') &&
+      (isUndefined(middleware) || (isArray(middleware) && middleware.every(isString))) &&
+      (isUndefined(open) || isBoolean(open));
     if (!clean) {
       throw ohneError({
         title: `Invalid \`api\` operation \`${operation}\``,
         body: [
-          `The \`${operation}\` operation${scope} must be a boolean or \`{ middleware: [...] }\`.`,
-          '`middleware` lists named middleware to run before it, in order.',
+          `The \`${operation}\` operation${scope} must be a boolean, \`'public'\`, or \`{ public, middleware }\`.`,
+          '`public` opens it to anyone; `middleware` lists named middleware to run before it, in order.',
         ],
       });
     }
