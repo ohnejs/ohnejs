@@ -42,6 +42,45 @@ export interface ReadQueryBodyOptions {
 export async function readQueryBody({ maxDepth = 32 }: ReadQueryBodyOptions = {}): Promise<
   Record<string, SearchParamValue>
 > {
+  return (await readBoundedObject(maxDepth)) as Record<string, SearchParamValue>;
+}
+
+/**
+ * Options for `readRecordBody`.
+ */
+export interface ReadRecordBodyOptions {
+  /**
+   * The deepest bracket nesting the JSON body may reach before it rejects `400`.
+   * Scanned before `JSON.parse`, so a depth bomb is refused before it overflows the parser's stack.
+   *
+   * @default
+   * 32
+   */
+  maxDepth?: number;
+}
+
+/**
+ * Reads a record write input from a JSON request body - the create and update endpoints' reader.
+ *
+ * The same gates as `readQueryBody`: `415` on a non-JSON `Content-Type`, `400` on a bad body.
+ * Empty, non-object, malformed, and too-nested all reject, the depth scanned before `JSON.parse`.
+ * The result is unverified; the write pipeline validates it.
+ *
+ * @example
+ * ```ts
+ * const outcome = await queryUntyped('Posts').create(await readRecordBody())
+ * ```
+ */
+export async function readRecordBody({ maxDepth = 32 }: ReadRecordBodyOptions = {}): Promise<
+  Record<string, unknown>
+> {
+  return readBoundedObject(maxDepth);
+}
+
+/**
+ * The shared read: the content-type gate, the depth scan, `JSON.parse`, and the plain-object check.
+ */
+async function readBoundedObject(maxDepth: number): Promise<Record<string, unknown>> {
   const { type } = parseMediaType(useRequest().headers.get('content-type') ?? '');
   if (type !== 'application/json' && !type.endsWith('+json')) throw unsupportedMediaType();
 
@@ -56,5 +95,5 @@ export async function readQueryBody({ maxDepth = 32 }: ReadQueryBodyOptions = {}
     throw badRequest(translate('api.body.invalidJSON'));
   }
   if (!isPlainObject(parsed)) throw badRequest(translate('api.body.invalidJSON'));
-  return parsed as Record<string, SearchParamValue>;
+  return parsed;
 }

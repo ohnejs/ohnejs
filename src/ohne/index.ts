@@ -137,6 +137,7 @@ export * from './query/wire/body.ts';
 export type { WireErrorCode, WireErrorData } from './query/wire/errors.ts';
 export * from './query/wire/guards.ts';
 export * from './query/wire/parse.ts';
+export * from './query/wire/write-input.ts';
 export * from './routes/collect-routes.ts';
 export * from './routes/define-handler.ts';
 export * from './routes/known-routes.ts';
