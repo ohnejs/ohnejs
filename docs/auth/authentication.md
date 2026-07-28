@@ -60,8 +60,8 @@ export default defineHandler(async () => {
 ```
 
 You pass the password as plain text. The `password` field hashes it with scrypt just before it is
-stored, so the plaintext never lands anywhere - there is no hashing step to remember. The stored
-value is the hash, and that is what a read of the field returns.
+stored, so the plaintext never lands anywhere - there is no hashing step to remember. The field is
+write-only (`readable: false`), so no read returns the hash - not even `result.record` here.
 
 `create` runs the collection's own email validation and its unique constraint, so a bad or duplicate
 email comes back as `result.ok === false`. `createSession` writes the session cookie, exactly as

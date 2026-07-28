@@ -47,6 +47,40 @@ A `text` field additionally rejects the empty string - `''` is not a value by de
 `unique` and `index` cover single-column constraints; multi-column ones live on the collection.
 Both are in [schema sync](./sync.md).
 
+## Write-only and locked fields
+
+Three options control who may see or change a field. Every field kind takes them - columns,
+relations, composites, and blocks alike.
+
+`readable: false` makes a field write-only. No read returns it: it is gone from every record a
+query or the [collections API](../api/collections.md) hands back, including the record a create or
+update returns. Over HTTP, naming it in a filter, select, or sort is indistinguishable from naming
+a field that does not exist - a client cannot even learn it is there. Trusted server code reads it
+by asking explicitly:
+
+```ts
+fields: {
+  password: field('password', { readable: false }),
+}
+```
+
+```ts
+const user = await query('Users').select('UUID', 'password').where('email', email).findFirst();
+```
+
+That explicit `select` is the one way back in. The framework's own `Users.password` works exactly
+like this.
+
+`writable: false` is the mirror: the field drops from the create and update inputs, so its stored
+value comes from its `default`. Use it for values the app computes, never the caller.
+
+`immutable: true` locks a field after create. Creates accept it; updates do not. It is a
+top-level option: an update rewrites composite items and block instances whole, so a nested value
+cannot lock.
+
+`writable` and `immutable` act through the generated input types on the server and through request
+validation on the HTTP wire - a locked field in a write body rejects exactly as an unknown one.
+
 ## Relations
 
 A relation points at another collection instead of storing a value.

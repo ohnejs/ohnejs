@@ -4,6 +4,9 @@ A URL can carry a query. `parseQueryParams` reads the query out of the request, 
 your collection, and hands you a plan you replay through the builder. It is how you turn `?where=...`
 into a filtered, ordered, paginated read without hand-parsing anything.
 
+The [collections API](./collections.md) ships endpoints built on exactly this pipeline - reach for
+this page when you build your own.
+
 ```ts
 import {
   applyQuery,

@@ -58,6 +58,7 @@ Define endpoints as files. Handlers read the request and return a value ohne ser
 - [Middleware](./api/middleware.md) - code that wraps every matching request.
 - [Hooks](./api/hooks.md) - react to framework lifecycle events.
 - [Querying over HTTP](./api/url-queries.md) - turn a URL query into a safe, filtered read.
+- [The collections API](./api/collections.md) - REST endpoints a collection opts into.
 
 ## Authentication
 

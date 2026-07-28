@@ -45,8 +45,10 @@ await query('Posts')
 Which operators appear depends on the field's type. A text column offers `contains`,
 `startsWith`, `endsWith`, and the raw `like`; text and number columns alike admit the ordering
 comparisons `greaterThan`, `atLeast`, `lessThan`, and `atMost`; both offer `equalsTo` and `in`.
-Asking for an operator the field does not admit - ordering on a boolean, `contains` on a number -
-does not compile.
+A field type that marks its JSON column a list (`jsonList` on `defineField`) adds `includes`,
+`includesAll`, and `includesAny` - membership over the stored list's elements. Asking for an
+operator the field does not admit - ordering on a boolean, `contains` on a number - does not
+compile.
 
 Chained `where` calls AND together. Each returns the builder, so you keep filtering.
 
@@ -185,6 +187,9 @@ rows[0].title; // string
 rows[0].views; // number
 rows[0].author; // compile error: not selected
 ```
+
+A [write-only field](./collections.md#write-only-and-locked-fields) inverts the default: no read
+returns it unless your `select` names it explicitly.
 
 `select` accumulates across calls.
 

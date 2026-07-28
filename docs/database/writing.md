@@ -68,6 +68,9 @@ error, while omission still lands the default. An `object` defaults to no child 
 Unknown keys are rejected, not ignored. A typo in a field name fails the write with an
 `unknownField` error at that key, so a misspelled field never silently drops its value.
 
+A `writable: false` field is absent from both inputs, an `immutable` one from the update input
+alone; see [write-only and locked fields](./collections.md#write-only-and-locked-fields).
+
 ## Defaults
 
 A field type may ship a default, and an instance may set its own. When create input omits the
