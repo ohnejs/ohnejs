@@ -1,11 +1,15 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
+import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
+
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
+import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
@@ -120,6 +124,17 @@ useCollections().register('WLBPages', {
   name: 'WLBPages',
   collection: {
     fields: { content: field('blocks', { translatable: true, allow: ['WBHero'] }) },
+  },
+});
+
+useFields().register('WJList', {
+  name: 'WJList' as FieldTypeName,
+  fieldType: defineField({ columnType: 'json', jsonList: true, forceNullable: true }),
+});
+useCollections().register('WJPosts', {
+  name: 'WJPosts',
+  collection: {
+    fields: { labels: { type: 'WJList', options: {} } as unknown as FieldInstance },
   },
 });
 
@@ -557,6 +572,64 @@ describe('compileWhere blocks', () => {
         params: ['red', 'WBHero', 'x'],
       },
     );
+  });
+});
+
+describe('compileWhere list membership', () => {
+  it('`includes` guards the column non-null and probes json_each', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includes: 'a' } }), {
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
+      params: ['a'],
+    });
+  });
+
+  it('a boolean element probes as `1`', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includes: true } }), {
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
+      params: [1],
+    });
+  });
+
+  it('`includesAll` counts distinct matches against the list length', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includesAll: ['a', 'b'] } }), {
+      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (?, ?)) = 2)',
+      params: ['a', 'b'],
+    });
+  });
+
+  it('`includesAll` dedups, binding a duplicate once', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includesAll: ['a', 'a'] } }), {
+      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (?)) = 1)',
+      params: ['a'],
+    });
+  });
+
+  it('an empty `includesAll` is vacuously true inside the guard', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includesAll: [] } }), {
+      sql: '("labels" IS NOT NULL AND 1 = 1)',
+      params: [],
+    });
+  });
+
+  it('`includesAny` exist-checks a placeholder per value', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includesAny: ['a', 'b'] } }), {
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?, ?)))',
+      params: ['a', 'b'],
+    });
+  });
+
+  it('an empty `includesAny` matches nothing inside the guard', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { includesAny: [] } }), {
+      sql: '("labels" IS NOT NULL AND 1 = 0)',
+      params: [],
+    });
+  });
+
+  it('negation wraps the probe, the null guard staying outside', () => {
+    deepStrictEqual(compileOn('WJPosts', { labels: { not: { includes: 'a' } } }), {
+      sql: '("labels" IS NOT NULL AND NOT (EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?))))',
+      params: ['a'],
+    });
   });
 });
 

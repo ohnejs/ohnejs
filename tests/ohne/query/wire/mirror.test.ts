@@ -1,6 +1,8 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
+import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 import type { UntypedQueryBuilder } from '../../../../src/ohne/query/untyped.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
@@ -9,8 +11,10 @@ import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dia
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
@@ -67,6 +71,21 @@ useCollections().register('MPages', {
     fields: {
       title: field('text'),
       content: field('blocks', { allow: ['MHero', 'MQuote'] }),
+    },
+  },
+});
+
+useFields().register('MTagList', {
+  name: 'MTagList' as FieldTypeName,
+  fieldType: defineField({ columnType: 'json', jsonList: true, forceNullable: true }),
+});
+useCollections().register('MTagged', {
+  name: 'MTagged',
+  collection: {
+    fields: {
+      title: field('text'),
+      secret: field('text', { readable: false }),
+      tags: { type: 'MTagList', options: {} } as unknown as FieldInstance,
     },
   },
 });
@@ -131,6 +150,25 @@ await queryUntyped('MPages').createOrThrow({
   content: [{ block: 'MQuote', fields: { words: 'Calm' } }],
 });
 await queryUntyped('MPages').createOrThrow({ title: 'Four' });
+
+let taggedSeq = 0;
+async function insertTagged(
+  title: string,
+  secret: string,
+  tags: readonly string[] | null,
+): Promise<void> {
+  taggedSeq += 1;
+  const uuid = `00000000-0000-7000-9000-${String(taggedSeq).padStart(12, '0')}`;
+  await db.run(
+    'INSERT INTO "MTagged" ("UUID","_updatedAt","title","secret","tags") VALUES (?,?,?,?,?)',
+    [uuid, 0, title, secret, tags === null ? null : JSON.stringify(tags)],
+  );
+}
+
+await insertTagged('Ash', 'shh', ['news', 'tech']);
+await insertTagged('Birch', 'shh', ['news']);
+await insertTagged('Cedar', 'plain', ['tech', 'life']);
+await insertTagged('Dune', 'shh', null);
 
 const meta = queryMetadata('MPosts');
 
@@ -397,6 +435,85 @@ describe('the blocks wire forms mirror their fluent equivalents', () => {
           .where({ content: { not: { has: { block: 'MHero' } } } })
           .orderBy('title'),
       ),
+    );
+  });
+});
+
+const taggedMeta = queryMetadata('MTagged');
+
+async function wireTagged(url: string): Promise<unknown[]> {
+  const parsed = parseQueryParams(parseSearchParams(url), taggedMeta, DEFAULT_QUERY_GUARDS);
+  return applyQuery(queryUntyped('MTagged'), parsed).findMany();
+}
+
+function titles(rows: unknown[]): string[] {
+  return (rows as { title: string }[]).map((row) => row.title);
+}
+
+describe('the list membership wire forms mirror their fluent equivalents', () => {
+  it('includes', async () => {
+    const rows = await wireTagged('where={tags:{includes:news}}&order=[title]');
+    deepStrictEqual(
+      rows,
+      await fluent(
+        queryUntyped('MTagged')
+          .where({ tags: { includes: 'news' } })
+          .orderBy('title'),
+      ),
+    );
+    deepStrictEqual(titles(rows), ['Ash', 'Birch']);
+  });
+
+  it('includesAll', async () => {
+    const rows = await wireTagged('where={tags:{includesAll:[news,tech]}}');
+    deepStrictEqual(
+      rows,
+      await fluent(queryUntyped('MTagged').where({ tags: { includesAll: ['news', 'tech'] } })),
+    );
+    deepStrictEqual(titles(rows), ['Ash']);
+  });
+
+  it('includesAny', async () => {
+    const rows = await wireTagged('where={tags:{includesAny:[life,news]}}&order=[title]');
+    deepStrictEqual(
+      rows,
+      await fluent(
+        queryUntyped('MTagged')
+          .where({ tags: { includesAny: ['life', 'news'] } })
+          .orderBy('title'),
+      ),
+    );
+    deepStrictEqual(titles(rows), ['Ash', 'Birch', 'Cedar']);
+  });
+
+  it('a negated includes leaves the null row out', async () => {
+    const rows = await wireTagged('where={tags:{not:{includes:news}}}&order=[title]');
+    deepStrictEqual(
+      rows,
+      await fluent(
+        queryUntyped('MTagged')
+          .where({ tags: { not: { includes: 'news' } } })
+          .orderBy('title'),
+      ),
+    );
+    deepStrictEqual(titles(rows), ['Cedar']);
+  });
+});
+
+describe('readable: false splits wire and fluent on purpose', () => {
+  it('the fluent where filters the hidden field; the identical wire where is invalidField', async () => {
+    const rows = await fluent(queryUntyped('MTagged').where({ secret: 'shh' }).orderBy('title'));
+    deepStrictEqual(titles(rows), ['Ash', 'Birch', 'Dune']);
+
+    throws(
+      () =>
+        parseQueryParams(parseSearchParams('where={secret:shh}'), taggedMeta, DEFAULT_QUERY_GUARDS),
+      (error: unknown) => {
+        ok(error instanceof HTTPError);
+        strictEqual(error.status, 400);
+        deepStrictEqual(error.data, { code: 'invalidField', path: 'where.secret' });
+        return true;
+      },
     );
   });
 });

@@ -1,16 +1,24 @@
 import { deepStrictEqual, ok } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
+import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
+
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { evaluateCondition, parseCondition } from '../../../../src/utils/index.ts';
 
+useFields().register('PARList', {
+  name: 'PARList' as FieldTypeName,
+  fieldType: defineField({ columnType: 'json', jsonList: true, forceNullable: true }),
+});
 useCollections().register('PARRows', {
   name: 'PARRows',
   collection: {
@@ -18,6 +26,7 @@ useCollections().register('PARRows', {
       title: field('text', { nullable: true }),
       views: field('integer', { nullable: true }),
       flag: field('boolean', { nullable: true }),
+      labels: { type: 'PARList', options: {} } as unknown as FieldInstance,
     },
   },
 });
@@ -30,17 +39,24 @@ await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
 
-const seeds: [string, string | null, number | null, boolean | null][] = [
-  ['p1', 'alpha', 10, true],
-  ['p2', 'Beta', 0, false],
-  ['p3', null, null, null],
-  ['p4', 'ÄPFEL', -5, true],
-  ['p5', '%wild_', 100, null],
+const seeds: [string, string | null, number | null, boolean | null, unknown[] | null][] = [
+  ['p1', 'alpha', 10, true, ['red', 'green']],
+  ['p2', 'Beta', 0, false, ['red', 10, true]],
+  ['p3', null, null, null, null],
+  ['p4', 'ÄPFEL', -5, true, []],
+  ['p5', '%wild_', 100, null, ['blue', false, -5]],
 ];
-for (const [uuid, title, views, flag] of seeds) {
+for (const [uuid, title, views, flag, labels] of seeds) {
   await db.run(
-    'INSERT INTO "PARRows" ("UUID","_updatedAt","title","views","flag") VALUES (?,?,?,?,?)',
-    [uuid, 0, title, views, flag === null ? null : flag ? 1 : 0],
+    'INSERT INTO "PARRows" ("UUID","_updatedAt","title","views","flag","labels") VALUES (?,?,?,?,?,?)',
+    [
+      uuid,
+      0,
+      title,
+      views,
+      flag === null ? null : flag ? 1 : 0,
+      labels === null ? null : JSON.stringify(labels),
+    ],
   );
 }
 
@@ -73,6 +89,16 @@ const CORPUS: Record<string, unknown>[] = [
   { or: [{ views: { atLeast: 100 } }, { title: { isNull: true } }] },
   { not: { or: [{ title: 'alpha' }, { views: { lessThan: 0 } }] } },
   { views: { atLeast: 100, or: [{ equalsTo: 0 }] } },
+  { labels: { includes: 'red' } },
+  { labels: { includes: true } },
+  { labels: { not: { includes: 'red' } } },
+  { labels: { includesAll: ['red', 'green'] } },
+  { labels: { includesAll: ['red', 'red'] } },
+  { labels: { includesAll: [] } },
+  { labels: { not: { includesAll: [] } } },
+  { labels: { includesAny: ['green', 10] } },
+  { labels: { includesAny: [] } },
+  { labels: { not: { includesAny: ['red', 'blue'] } } },
 ];
 
 describe('condition grammar parity', () => {

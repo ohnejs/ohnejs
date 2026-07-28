@@ -9,14 +9,18 @@ import {
   createMutex,
   dirname,
   errorMessage,
+  isBoolean,
   isNull,
   isNullish,
   isNumber,
   isObject,
   isUndefined,
+  uniqueArray,
 } from '../../../../utils/index.ts';
 import {
   Dialect,
+  type DialectFragment,
+  type ListMembershipOperator,
   type LogicalType,
   type SchemaTransactionOptions,
   type UniqueViolationTarget,
@@ -123,6 +127,36 @@ export class SQLiteDialect extends Dialect {
    */
   textMatch(quotedColumn: string): string {
     return `${quotedColumn} LIKE ? ESCAPE '\\'`;
+  }
+
+  /**
+   * List membership through `json_each` over the stored JSON text.
+   * One probe per distinct element: `includesAll` counts the distinct matches, the others exist-check.
+   * Boolean elements probe as `1`/`0`, exactly as SQLite's JSON functions surface them.
+   * Normalization runs before the dedup, so a boolean and its integer twin collapse to one probe.
+   * That is documented dialect drift: the in-memory evaluator keeps `true` and `1` apart.
+   */
+  listMembership(
+    quotedColumn: string,
+    op: ListMembershipOperator,
+    values: readonly unknown[],
+  ): DialectFragment {
+    const elements = uniqueArray(
+      values.map((value): SQLValue => (isBoolean(value) ? (value ? 1 : 0) : (value as SQLValue))),
+    );
+    if (elements.length === 0) return { sql: op === 'includesAll' ? '1 = 1' : '1 = 0', params: [] };
+    const marks = elements.map(() => '?').join(', ');
+    const each = `json_each(${quotedColumn})`;
+    if (op === 'includesAll') {
+      return {
+        sql: `(SELECT COUNT(DISTINCT json_each.value) FROM ${each} WHERE json_each.value IN (${marks})) = ${elements.length}`,
+        params: elements,
+      };
+    }
+    return {
+      sql: `EXISTS (SELECT 1 FROM ${each} WHERE json_each.value IN (${marks}))`,
+      params: elements,
+    };
   }
 
   /**

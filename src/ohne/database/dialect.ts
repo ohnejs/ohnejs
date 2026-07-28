@@ -20,6 +20,26 @@ import { OHNE_LOCKS } from './naming/table-names.ts';
 export type LogicalType = 'text' | 'integer' | 'real' | 'boolean' | 'json';
 
 /**
+ * A list-membership operator over a `json` list column: the `includes*` trio.
+ */
+export type ListMembershipOperator = 'includes' | 'includesAll' | 'includesAny';
+
+/**
+ * A SQL expression with its bound parameters, the shape a dialect hands the compiler.
+ */
+export interface DialectFragment {
+  /**
+   * The expression, one `?` per bound parameter.
+   */
+  sql: string;
+
+  /**
+   * The values bound in order.
+   */
+  params: SQLValue[];
+}
+
+/**
  * The table and columns a unique-constraint violation names, parsed from the driver's error.
  */
 export interface UniqueViolationTarget {
@@ -168,6 +188,26 @@ export abstract class Dialect {
    * ```
    */
   abstract textMatch(quotedColumn: string): string;
+
+  /**
+   * The dialect's list-membership match over an already-quoted `json` list column.
+   * Backs `includes`, `includesAll`, and `includesAny` on a `jsonList` field.
+   * Returns the positive probe; the compiler guards the column non-`NULL` and negates outside it.
+   * A `NULL` list therefore matches nothing, negated or not.
+   * Duplicate probe values may deduplicate, so the parameter count never exceeds one per element.
+   * An empty `includesAll` matches every row, an empty `includesAny` none.
+   *
+   * @example
+   * ```ts
+   * dialect.listMembership('"labels"', 'includes', ['urgent'])
+   * // -> { sql: 'EXISTS (SELECT 1 FROM json_each("labels") ...)', params: ['urgent'] } on SQLite
+   * ```
+   */
+  abstract listMembership(
+    quotedColumn: string,
+    op: ListMembershipOperator,
+    values: readonly unknown[],
+  ): DialectFragment;
 
   /**
    * Lists every table in the database, framework and app alike.

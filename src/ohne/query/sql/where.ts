@@ -1,6 +1,6 @@
 import type { CompareOperator, ConditionNode } from '../../../utils/index.ts';
 import type { SQLValue } from '../../database/adapter.ts';
-import type { Dialect, LogicalType } from '../../database/dialect.ts';
+import type { Dialect, ListMembershipOperator, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
@@ -48,6 +48,7 @@ interface CompileContext {
  * A locale-scoped junction or child table adds its `_localeCode` predicate.
  * An `EXISTS` target whose condition addresses companion columns joins its companion at the locale.
  * Negation wraps the positive fragment in `NOT (...)`; parsing already folded `not` groups by De Morgan.
+ * A list-membership leaf keeps its non-`NULL` column guard outside that `NOT`, per the evaluator's rule.
  * Every value binds through a `?`, so nothing inlines into the SQL.
  */
 export function compileWhere(
@@ -83,6 +84,9 @@ function compileNode(
       return group(node.nodes, ' OR ', '1 = 0', scope, dialect, ctx);
     case 'compare': {
       const field = scope.fields[node.path[0]];
+      if (node.op === 'includes' || node.op === 'includesAll' || node.op === 'includesAny') {
+        return membershipFragment(node, scope, field, dialect);
+      }
       const fragment = compareFragment(
         node.op,
         fieldRef(scope, field, dialect),
@@ -148,6 +152,24 @@ function selfUUID(scope: WhereScope, dialect: Dialect): string {
  */
 function negateIf(negated: boolean, fragment: SQLFragment): SQLFragment {
   return negated ? { sql: `NOT (${fragment.sql})`, params: fragment.params } : fragment;
+}
+
+/**
+ * Compiles a list-membership leaf through the dialect over its `json` list column.
+ * The non-`NULL` guard stays outside the negation: a `NULL` list matches nothing, negated or not.
+ * That mirrors the evaluator's rule for a nullish resolved value.
+ */
+function membershipFragment(
+  node: Extract<ConditionNode, { kind: 'compare' }>,
+  scope: WhereScope,
+  field: FieldQueryMeta,
+  dialect: Dialect,
+): SQLFragment {
+  const column = fieldRef(scope, field, dialect);
+  const values = node.op === 'includes' ? [node.value] : (node.value as unknown[]);
+  const match = dialect.listMembership(column, node.op as ListMembershipOperator, values);
+  const probe = node.negated ? `NOT (${match.sql})` : match.sql;
+  return { sql: `(${column} IS NOT NULL AND ${probe})`, params: match.params };
 }
 
 /**
