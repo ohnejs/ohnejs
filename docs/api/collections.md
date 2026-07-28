@@ -9,7 +9,7 @@ the same validation the query builder runs.
 import { defineCollection, field } from 'ohne';
 
 export default defineCollection({
-  api: true,
+  api: { read: 'public', create: true },
   fields: {
     title: field('text'),
     views: field('integer'),
@@ -18,7 +18,9 @@ export default defineCollection({
 ```
 
 `GET /collections/posts?where={views:{atLeast:100}}&order=[-views]` now returns the matching
-records as JSON. Nothing is exposed without `api` - a collection that does not opt in has no
+records as JSON, to anyone - `read` is `'public'`. Creating needs a signed-in user holding the
+`collection.Posts.create` [capability](../auth/roles.md), because an exposed operation is guarded
+unless marked public. Nothing is exposed without `api` - a collection that does not opt in has no
 endpoints at all.
 
 ## The routes
@@ -85,24 +87,29 @@ exist. An `immutable` or `writable: false` field in a write body rejects the sam
 
 ## Exposure
 
-`api: true` opens every operation to anyone - ohne never adds auth on its own. An object opens
-per operation, and anything unnamed stays closed:
+An exposed operation is guarded by default: the request needs a signed-in user whose
+[capabilities](../auth/roles.md) cover `collection.<Name>.<operation>`. No user answers `401`; a
+user without the capability `403`. `api: true` opens every operation guarded. An object opens per
+operation, and anything unnamed stays closed:
 
 ```ts
 export default defineCollection({
   api: {
-    read: true,
-    create: { middleware: ['require-auth'] },
-    update: { middleware: ['require-auth'] },
-    delete: { middleware: ['require-auth'] },
+    read: 'public',
+    create: true,
+    update: { middleware: ['audit'] },
   },
   fields: { ... },
 });
 ```
 
-An operation is `true`, or an object naming [middleware](./middleware.md) to run before it, in
-order, after the global ones. A middleware that returns a value answers the request - here,
-`require-auth`'s `401` - and the operation never runs.
+An operation is `true` (guarded), `'public'` (open to anyone), or an object with two options.
+`public: true` is the object spelling of `'public'`, and `middleware` names
+[middleware](./middleware.md) to run after the guard, in order, after the global ones. A
+middleware that returns a value answers the request, and the operation never runs.
+
+The two options compose: `{ public: true, middleware: ['require-auth'] }` skips the capability
+guard but still requires a signed-in user - any account, no role needed.
 
 `read` covers all three read endpoints. An unknown collection, an unexposed one, and a closed
 operation all answer the identical `404`, so the API never reveals what exists.

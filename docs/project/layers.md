@@ -1,8 +1,8 @@
 # Layers
 
 A layer is an installed ohne package your app builds on. It is a complete ohne project - routes,
-collections, blocks, field types, messages, middleware, boot files, migrations, dashboard pages,
-config - and your app stacks on top, keeping what fits and overriding the rest. ohne itself is a
+collections, blocks, field types, roles, messages, middleware, boot files, migrations, dashboard
+pages, config - and your app stacks on top, keeping what fits and overriding the rest. ohne itself is a
 layer: the scaffold lists it, and that one line is what gives every app the framework's built-in
 messages and API routes.
 
@@ -62,6 +62,7 @@ The pieces then merge by identity, and the closer layer wins:
   block names differing only by case are an error - SQLite matches identifiers case-insensitively.
 - **Middleware** - identity is the name, and the name must keep its tier: global in one layer and
   opt-in in another is an error.
+- **Roles** - identity is the name; the closer definition replaces the further one entirely.
 
 Two kinds of content never collide:
 

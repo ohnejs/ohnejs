@@ -37,6 +37,7 @@ overrides all. Defaults to `[]`. See [layers](./layers.md).
 - `collections: 'collections'` - collection definitions.
 - `fields: 'fields'` - custom field types.
 - `blocks: 'blocks'` - block definitions.
+- `roles: 'roles'` - role definitions.
 - `migrations: 'migrations'` - database migrations.
 - `dashboard: 'dashboard'` - dashboard pages and components.
 
@@ -61,10 +62,11 @@ disable: {
   (`'GET /admin/**'`) only that method.
 - `messages` - globs over the dot-separated key, so `dashboard.**` drops the whole group. A dropped
   key vanishes from the catalog endpoint, `useT`, and the generated `KnownMessages` type.
-- `collections`, `fields`, `blocks` - exact names. A dropped collection or block vanishes from the
-  schema and the generated types; a field still referencing a dropped field type fails at codegen.
+- `collections`, `fields`, `blocks`, `roles` - exact names. A dropped collection or block vanishes
+  from the schema and the generated types; a field still referencing a dropped field type fails at
+  codegen.
 
-All five lists accumulate across layers: every layer's entries combine, deduped, so a layer can
+All six lists accumulate across layers: every layer's entries combine, deduped, so a layer can
 drop components too and you can always add more.
 
 ## Content locales

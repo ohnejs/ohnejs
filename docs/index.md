@@ -67,6 +67,8 @@ so an app opts out by not stacking it.
 
 - [Authentication](./auth/authentication.md) - the `Users` collection, the `/auth` endpoints, and
   `useUser`.
+- [Roles and capabilities](./auth/roles.md) - code-defined roles, capability guards, and the
+  collections API's default protection.
 
 ## Internationalization
 

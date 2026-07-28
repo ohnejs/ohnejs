@@ -19,7 +19,7 @@ Three routes cover the sign-in flow. Each speaks JSON.
 ```bash
 # Sign in. Returns the user and sets the session cookie.
 POST /auth/login   { "email": "ada@example.com", "password": "correct horse" }
-# -> 200 { "UUID": "…", "email": "ada@example.com" }
+# -> 200 { "UUID": "…", "email": "ada@example.com", "roles": [] }
 
 # Sign out. Deletes the session and clears the cookie.
 POST /auth/logout
@@ -27,12 +27,12 @@ POST /auth/logout
 
 # The signed-in user, read from the session cookie.
 GET  /auth/me
-# -> 200 { "UUID": "…", "email": "ada@example.com" }, or 401 when signed out
+# -> 200 { "UUID": "…", "email": "ada@example.com", "roles": [] }, or 401 when signed out
 ```
 
 The email is stored trimmed and lowercased, so `Ada@Example.com` and `ada@example.com` are the same
-account, and `login` matches either. A response never carries the password hash - only `UUID` and
-`email` cross the wire.
+account, and `login` matches either. A response never carries the password hash - only `UUID`,
+`email`, and the [role names](./roles.md) cross the wire.
 
 `login` answers `401` for both a wrong password and an unknown email, with the same message, so a
 caller cannot probe which emails exist.
@@ -67,6 +67,9 @@ write-only (`readable: false`), so no read returns the hash - not even `result.r
 email comes back as `result.ok === false`. `createSession` writes the session cookie, exactly as
 `login` does.
 
+A new account holds no [roles](./roles.md) unless you assign some: pass `roles: ['admin']` on the
+create to bootstrap your first administrator.
+
 ## Reading the current user
 
 Inside your own [route handler](../api/routes.md), reach for the current user with `useUser`. It
@@ -96,8 +99,9 @@ export default defineHandler(async () => {
 });
 ```
 
-Both read the session once per request and carry only `UUID` and `email`, so their result is safe to
-return as-is.
+Both read the session once per request and carry only `UUID`, `email`, and `roles`, so their result
+is safe to return as-is. To ask what the user may do, not just who they are, see
+[roles and capabilities](./roles.md).
 
 ### Protecting routes with middleware
 
