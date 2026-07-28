@@ -12,6 +12,8 @@ export * from './authorization/parse-authorization.ts';
 export * from './bytes/format-bytes.ts';
 export * from './bytes/parse-bytes.ts';
 export * from './cache-control/cache-control.ts';
+export * from './capability/capability-covers.ts';
+export * from './capability/has-capability.ts';
 export * from './case/capitalize.ts';
 export * from './case/is-camel-case.ts';
 export * from './case/is-kebab-case.ts';
