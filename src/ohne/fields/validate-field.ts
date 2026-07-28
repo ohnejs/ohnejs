@@ -21,6 +21,9 @@ const RESERVED_OPTIONS = new Set([
   'translatable',
   'uniquePerLocale',
   'uniquePerParent',
+  'readable',
+  'writable',
+  'immutable',
   'default',
   'sanitizers',
   'validators',
@@ -113,6 +116,10 @@ export interface ValidateFieldArgs {
  * - An `inverse` field follows the owning side's junction, so it rejects `translatable` too.
  * - `uniquePerLocale` narrows a unique on a translatable field, so it requires both flags.
  * - `uniquePerParent` narrows a unique too, so it requires the flag; its placement is the schema's rule.
+ * - `writable: false` on a required column with no default, instance or type, would fail every create.
+ * - `immutable` on top of `writable: false` is redundant - the wider flag already locks updates.
+ * - `immutable` is top-level only: an update rewrites composite items and block instances whole,
+ *   so a nested value cannot lock.
  */
 export function validateField(args: ValidateFieldArgs): void {
   const { owner, name, nested, instance, fieldType, hint } = args;
@@ -303,6 +310,42 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
+  if (options.writable === false && options.immutable === true) {
+    throw ohneError({
+      title: `Field \`${name}\` sets \`immutable\` beside \`writable: false\``,
+      body: [
+        `${where} is never writable, which already locks creates and updates alike.`,
+        'Drop `immutable`.',
+      ],
+    });
+  }
+  if (options.immutable === true && (nested || owner.kind === 'block')) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be immutable`,
+      body: [
+        nested
+          ? `${where} is a subfield, and an update rewrites a composite item whole, so its value cannot lock.`
+          : `${where} belongs to a block, and an update rewrites a block instance whole, so its value cannot lock.`,
+        'Mark the top-level collection field `immutable` instead.',
+      ],
+    });
+  }
+  if (
+    options.writable === false &&
+    fieldType.columnType !== false &&
+    options.nullable !== true &&
+    fieldType.forceNullable !== true &&
+    (!hasKey(options, 'default') || isUndefined(options.default)) &&
+    isUndefined(fieldType.defaultValue)
+  ) {
+    throw ohneError({
+      title: `Field \`${name}\` could never take a value`,
+      body: [
+        `${where} is required, but \`writable: false\` removes it from every write input and it has no default.`,
+        'Give it a `default`, or make it nullable.',
+      ],
+    });
+  }
   if (hasKey(options, 'default') && !isUndefined(options.default)) {
     const value = options.default;
     const valueShapeNullable =
@@ -366,6 +409,7 @@ export function validateFieldTypeName(name: string, path?: string): void {
  *
  * - A column-less type (`columnType: false`) owns no column, so it cannot force `nullable` or an index.
  * - `emitType` and `schema` are mutually exclusive: the framework derives value types from the hint.
+ * - `jsonList` marks the stored value a JSON list, so it requires `columnType: 'json'`.
  * - `sanitizers` and `validators` are lists of functions, run in order by the write pipeline.
  * - Every declared option name must be camelCase and must not shadow a common option.
  */
@@ -378,6 +422,15 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       body: [
         '`forceNullable` and `forceIndex` configure a field type that owns a column.',
         'This type sets `columnType: false`, so drop them or give it a column type.',
+      ],
+    });
+  }
+  if (type.jsonList === true && type.columnType !== 'json') {
+    throw ohneError({
+      title: 'A `jsonList` field type needs a `json` column',
+      body: [
+        '`jsonList` marks the stored value a JSON list the `includes*` operators probe.',
+        `This type stores \`${type.columnType}\`, so set \`columnType: 'json'\` or drop the flag.`,
       ],
     });
   }

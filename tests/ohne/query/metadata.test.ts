@@ -2,6 +2,7 @@ import { deepStrictEqual, match, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { FieldInstance } from '../../../src/ohne/fields/field.ts';
+import type { FieldTypeName } from '../../../src/ohne/fields/known-fields.ts';
 
 import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
@@ -14,7 +15,9 @@ import { record } from '../../../src/ohne/fields/builtin/record.ts';
 import { records } from '../../../src/ohne/fields/builtin/records.ts';
 import { repeater } from '../../../src/ohne/fields/builtin/repeater.ts';
 import { text } from '../../../src/ohne/fields/builtin/text.ts';
+import { defineField } from '../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
+import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { blockQueryMetadata, queryMetadata } from '../../../src/ohne/query/metadata.ts';
 
 function plain(value: unknown): unknown {
@@ -34,6 +37,9 @@ const COMMON = {
   translatable: false,
   uniquePerLocale: false,
   uniquePerParent: false,
+  readable: true,
+  writable: true,
+  immutable: false,
 };
 
 const TEXT = { ...COMMON, allowEmpty: false };
@@ -119,6 +125,30 @@ useCollections().register('QLocGalleries', {
   collection: {
     fields: {
       slides: field('repeater', { translatable: true, fields: { caption: field('text') } }),
+    },
+  },
+});
+
+useFields().register('qTagList', {
+  name: 'qTagList' as FieldTypeName,
+  fieldType: defineField({ columnType: 'json', jsonList: true, forceNullable: true }),
+});
+useFields().register('qBag', {
+  name: 'qBag' as FieldTypeName,
+  fieldType: defineField({ columnType: 'json', forceNullable: true }),
+});
+
+useCollections().register('QFlags', {
+  name: 'QFlags',
+  collection: {
+    fields: {
+      secret: field('text', { readable: false }),
+      token: field('text', { writable: false, default: 'sealed' }),
+      slug: field('text', { immutable: true }),
+      members: field('records', { collection: 'QUsers', readable: false }),
+      steps: field('repeater', { fields: { label: field('text') }, readable: false }),
+      tags: { type: 'qTagList', options: {} } as unknown as FieldInstance,
+      blob: { type: 'qBag', options: {} } as unknown as FieldInstance,
     },
   },
 });
@@ -507,5 +537,44 @@ describe('queryMetadata translations', () => {
       strictEqual(entry.companion, undefined);
       strictEqual(entry.localeScoped, undefined);
     }
+  });
+});
+
+describe('queryMetadata field flags', () => {
+  it('marks a `readable: false` column, the resolved option matching', () => {
+    const entry = queryMetadata('QFlags').fields.secret!;
+    strictEqual(entry.readable, false);
+    strictEqual(entry.options!.readable, false);
+    strictEqual(entry.writable, undefined);
+    strictEqual(entry.immutable, undefined);
+  });
+
+  it('marks `writable: false` and `immutable: true` columns, each flag alone', () => {
+    const { fields } = queryMetadata('QFlags');
+    strictEqual(fields.token!.writable, false);
+    strictEqual(fields.token!.options!.writable, false);
+    strictEqual(fields.token!.readable, undefined);
+    strictEqual(fields.token!.immutable, undefined);
+    strictEqual(fields.slug!.immutable, true);
+    strictEqual(fields.slug!.options!.immutable, true);
+    strictEqual(fields.slug!.readable, undefined);
+    strictEqual(fields.slug!.writable, undefined);
+  });
+
+  it('carries `readable: false` on a records junction and a repeater child', () => {
+    const { fields } = queryMetadata('QFlags');
+    strictEqual(fields.members!.kind, 'records');
+    strictEqual(fields.members!.readable, false);
+    strictEqual(fields.steps!.kind, 'childMany');
+    strictEqual(fields.steps!.readable, false);
+  });
+
+  it('marks a `jsonList` field type column; a plain `json` one stays bare', () => {
+    const { fields } = queryMetadata('QFlags');
+    strictEqual(fields.tags!.kind, 'column');
+    strictEqual(fields.tags!.logicalType, 'json');
+    strictEqual(fields.tags!.jsonList, true);
+    strictEqual(fields.blob!.logicalType, 'json');
+    strictEqual(fields.blob!.jsonList, undefined);
   });
 });

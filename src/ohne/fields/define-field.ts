@@ -53,6 +53,16 @@ export interface FieldType<
   forceIndex?: TForceIndex;
 
   /**
+   * Marks the stored value a JSON list.
+   * The `includes`, `includesAll`, and `includesAny` operators then probe its elements.
+   * Requires `columnType: 'json'`; the field's own validators keep the value list-shaped.
+   *
+   * @default
+   * false
+   */
+  jsonList?: true;
+
+  /**
    * The options this field type accepts, each declared with `option()`.
    * Names are camelCase and may not shadow a common option (`nullable`, `unique`, `index`, etc.).
    *

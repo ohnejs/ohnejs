@@ -33,6 +33,11 @@ export interface QueryFieldMeta {
   jsonList?: true;
 
   /**
+   * Marks a write-only field: the default row shape omits it, an explicit `select` keeps it.
+   */
+  readable?: false;
+
+  /**
    * Marks a translatable column-bearing field: it holds one value per locale.
    * It reads `null` where the queried locale holds no translation, so `isNull` always applies.
    */

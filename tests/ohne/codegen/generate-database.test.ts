@@ -40,6 +40,12 @@ describe('generateDatabase', () => {
     return source.replace(/(?:^[ \t]*\n)?^[ \t]*\/\*\*[\s\S]*?\*\/\n/gm, '');
   }
 
+  function section(source: string, name: string): string {
+    const start = source.indexOf(`export interface ${name} {`);
+    const end = source.indexOf('export interface', start + 1);
+    return end === -1 ? source.slice(start) : source.slice(start, end);
+  }
+
   function writeMigration(layerDir: string, relative: string): void {
     write(
       layerDir,
@@ -789,6 +795,28 @@ describe('generateDatabase', () => {
     );
     write(
       app,
+      'fields/labels.ts',
+      "import { defineField } from 'ohne';\n" +
+        'export default defineField({\n' +
+        "  columnType: 'json',\n" +
+        '  jsonList: true,\n' +
+        '  forceNullable: true,\n' +
+        "  emitType: () => 'string[]',\n" +
+        '});\n',
+    );
+    write(
+      app,
+      'collections/People.ts',
+      "import { defineCollection, field } from 'ohne';\n" +
+        'export default defineCollection({\n' +
+        '  fields: {\n' +
+        "    name: field('text'),\n" +
+        "    apiKey: field('text', { readable: false, nullable: true }),\n" +
+        '  },\n' +
+        '});\n',
+    );
+    write(
+      app,
       'collections/Todos.ts',
       "import { defineCollection, field } from 'ohne';\n" +
         'export default defineCollection({\n' +
@@ -797,6 +825,11 @@ describe('generateDatabase', () => {
         "    status: field('status', { choices: ['open', 'done'] }),\n" +
         "    meta: field('object', { fields: { color: field('text', { nullable: true }) } }),\n" +
         "    checklist: field('repeater', { fields: { label: field('text'), done: field('boolean') } }),\n" +
+        "    labels: field('labels'),\n" +
+        "    owner: field('record', { collection: 'People' }),\n" +
+        "    secret: field('text', { readable: false }),\n" +
+        "    token: field('text', { writable: false, nullable: true }),\n" +
+        "    locked: field('text', { immutable: true }),\n" +
         '  },\n' +
         "  compositeIndexes: [{ fields: ['title', 'status'] }],\n" +
         '});\n',
@@ -804,15 +837,50 @@ describe('generateDatabase', () => {
     write(
       app,
       'typing.ts',
-      "import type { KnownCollections } from 'ohne';\n" +
+      "import type { KnownCollections, KnownInserts, KnownUpdates, PluckValue, QueryRow } from 'ohne';\n" +
+        '\n' +
+        "import { query } from 'ohne';\n" +
         '\n' +
         "export function shape(todo: KnownCollections['Todos']): string {\n" +
         '  const labels = todo.checklist.map((item) => (item.done ? item.label : item.label.toUpperCase()));\n' +
         "  const color = todo.meta === null ? 'none' : (todo.meta.color ?? 'unset');\n" +
-        "  return [todo.status, color, ...labels].join(' ');\n" +
+        "  return [todo.status, color, todo.secret, ...labels].join(' ');\n" +
         '}\n' +
         '// @ts-expect-error a repeater list is never null\n' +
-        "export const bad: KnownCollections['Todos']['checklist'] = null;\n",
+        "export const bad: KnownCollections['Todos']['checklist'] = null;\n" +
+        '\n' +
+        'export function flags(\n' +
+        "  row: QueryRow<'Todos'>,\n" +
+        "  picked: QueryRow<'Todos', 'secret' | 'title'>,\n" +
+        '): string {\n' +
+        '  // @ts-expect-error a write-only field is absent without an explicit select\n' +
+        '  const hidden: string = row.secret;\n' +
+        "  return [hidden, picked.secret, row.title].join(' ');\n" +
+        '}\n' +
+        "export function populated(row: QueryRow<'Todos', never, 'owner'>): string {\n" +
+        "  if (row.owner === null) return 'none';\n" +
+        '  // @ts-expect-error a write-only field is absent from a populated target\n' +
+        '  const leak: string = row.owner.apiKey;\n' +
+        "  return [row.owner.name, leak].join(' ');\n" +
+        '}\n' +
+        "export const plucked: PluckValue<'Todos', 'secret', never> = 'hash';\n" +
+        'export function fluent(): void {\n' +
+        "  query('Todos').where('labels', (w) => w.includes('a'));\n" +
+        "  query('Todos').where('labels', (w) => w.includesAll(['a', 'b']));\n" +
+        "  query('Todos').where('labels', (w) => w.includesAny(['a', 'b']));\n" +
+        '  // @ts-expect-error list membership needs a `jsonList` column\n' +
+        "  query('Todos').where('title', (w) => w.includes('a'));\n" +
+        "  query('Todos').where('secret', (w) => w.contains('x'));\n" +
+        "  query('Todos').orderBy('secret').select('secret', 'title');\n" +
+        '}\n' +
+        "export const insertLocked: KnownInserts['Todos']['locked'] = 'pin';\n" +
+        '// @ts-expect-error a writable: false field is absent from the insert input\n' +
+        "export const insertToken: KnownInserts['Todos']['token'] = null;\n" +
+        "export const updateTitle: KnownUpdates['Todos']['title'] = 'renamed';\n" +
+        '// @ts-expect-error an immutable field is absent from the update input\n' +
+        "export const updateLocked: KnownUpdates['Todos']['locked'] = 'moved';\n" +
+        '// @ts-expect-error a writable: false field is absent from the update input\n' +
+        "export const updateToken: KnownUpdates['Todos']['token'] = null;\n",
     );
 
     await loadLayers(app);
@@ -902,6 +970,133 @@ describe('generateDatabase', () => {
     ok(shared.includes('title?: string;'));
     ok(shared.includes('    items?: {\n      UUID?: string;\n      label: string;\n    }[];'));
     ok(node.includes('interface KnownUpdates extends GeneratedUpdates {}'));
+  });
+
+  it('keeps a write-only field in the record, marking its query entry', async () => {
+    const app = join(root, 'hidden-field');
+    writePackage(app, 'hidden-field');
+    write(
+      app,
+      'collections/Vault.ts',
+      'export default { fields: {\n' +
+        "  name: { type: 'text', options: {} },\n" +
+        "  secret: { type: 'text', options: { readable: false } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
+
+    ok(section(bare, 'GeneratedCollections').includes('    secret: string;'));
+    ok(bare.includes('secret: { scalar: string; readable: false };'));
+  });
+
+  it('drops a writable: false field from both write inputs, the record keeping it', async () => {
+    const app = join(root, 'unwritable');
+    writePackage(app, 'unwritable');
+    write(
+      app,
+      'collections/Sessions.ts',
+      'export default { fields: {\n' +
+        "  device: { type: 'text', options: {} },\n" +
+        "  token: { type: 'text', options: { writable: false, nullable: true } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
+    const inserts = section(bare, 'GeneratedInserts');
+    const updates = section(bare, 'GeneratedUpdates');
+
+    ok(section(bare, 'GeneratedCollections').includes('    token: string | null;'));
+    ok(inserts.includes('device: string;'));
+    ok(!inserts.includes('token'));
+    ok(updates.includes('device?: string;'));
+    ok(!updates.includes('token'));
+  });
+
+  it('keeps an immutable field in inserts, dropping it from updates', async () => {
+    const app = join(root, 'immutable-field');
+    writePackage(app, 'immutable-field');
+    write(
+      app,
+      'collections/Orders.ts',
+      'export default { fields: {\n' +
+        "  note: { type: 'text', options: {} },\n" +
+        "  reference: { type: 'text', options: { immutable: true } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
+    const updates = section(bare, 'GeneratedUpdates');
+
+    ok(section(bare, 'GeneratedInserts').includes('    reference: string;'));
+    ok(updates.includes('note?: string;'));
+    ok(!updates.includes('reference'));
+  });
+
+  it('drops hidden subfields from composite and block read shapes, the query markers kept', async () => {
+    const app = join(root, 'hidden-nested');
+    writePackage(app, 'hidden-nested');
+    write(
+      app,
+      'blocks/Teaser.ts',
+      'export default { fields: {\n' +
+        "  headline: { type: 'text', options: {} },\n" +
+        "  internal: { type: 'text', options: { readable: false } },\n" +
+        '} };\n',
+    );
+    write(
+      app,
+      'collections/Profiles.ts',
+      'export default { fields: {\n' +
+        "  profile: { type: 'object', options: { fields: {\n" +
+        "    bio: { type: 'text', options: {} },\n" +
+        "    pin: { type: 'text', options: { readable: false } },\n" +
+        '  } } },\n' +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
+    const blocks = section(bare, 'GeneratedBlocks');
+
+    ok(bare.includes('    profile: {\n      UUID: string;\n      bio: string;\n    } | null;'));
+    ok(!section(bare, 'GeneratedCollections').includes('pin'));
+    ok(bare.includes('pin: { scalar: string; readable: false }'));
+    ok(blocks.includes('  Teaser: {\n    headline: string;\n  };'));
+    ok(!blocks.includes('internal'));
+    ok(
+      section(bare, 'GeneratedBlockQueryFields').includes(
+        'internal: { scalar: string; readable: false };',
+      ),
+    );
+  });
+
+  it('marks a json-list field type in GeneratedQueryFields', async () => {
+    const app = join(root, 'json-list');
+    writePackage(app, 'json-list');
+    write(
+      app,
+      'fields/taglist.ts',
+      "export default { columnType: 'json', jsonList: true, forceNullable: true };\n",
+    );
+    write(
+      app,
+      'collections/Media.ts',
+      "export default { fields: { labels: { type: 'taglist', options: {} } } };\n",
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes('labels: { scalar: unknown; nullable: true; jsonList: true };'));
   });
 
   it('narrows relation options in a consumer app, rejecting the illegal shapes', async () => {

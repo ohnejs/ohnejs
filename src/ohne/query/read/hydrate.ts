@@ -21,7 +21,11 @@ type FieldResolver = (parent: string) => unknown;
  * Column-less fields - `records` relations, composites, and `blocks` lists - load in parallel, batched.
  * Composites recurse into their own subfields, so nesting hydrates to any depth.
  * `locale` scopes the locale-scoped derived tables; nested tables scope through their parent chain.
- * Each field lands in declaration order; `select` narrows which assemble (`null` reads them all).
+ * Each field lands in declaration order; `select` narrows which assemble.
+ * A `null` select reads every readable field.
+ * A `readable: false` field assembles only when `select` names it - the trusted fluent escape hatch.
+ * `keepHidden` lifts that skip at every depth.
+ * The write machinery's substrate reads set it: a gate may read what no caller-facing read returns.
  * Populate is layered on by the caller: this never swaps a relation's `UUID`s for records.
  */
 export async function hydrateScope(
@@ -30,16 +34,18 @@ export async function hydrateScope(
   select: readonly string[] | null,
   dialect: Dialect,
   locale: string,
+  keepHidden = false,
 ): Promise<QueryRecord[]> {
   const parents = driverRows.map((row) => row.UUID as string);
-  const isSelected = (name: string): boolean => isNull(select) || select.includes(name);
+  const isSelected = (name: string, field: FieldQueryMeta): boolean =>
+    isNull(select) ? keepHidden || field.readable !== false : select.includes(name);
 
   const resolvers = new Map<string, FieldResolver>();
   await Promise.all(
     Object.entries(fields)
-      .filter(([name, field]) => isColumnless(field) && isSelected(name))
+      .filter(([name, field]) => isColumnless(field) && isSelected(name, field))
       .map(async ([name, field]) => {
-        resolvers.set(name, await resolveColumnless(field, parents, dialect, locale));
+        resolvers.set(name, await resolveColumnless(field, parents, dialect, locale, keepHidden));
       }),
   );
 
@@ -47,7 +53,7 @@ export async function hydrateScope(
     driverRows.map(async (row, index) => {
       const record: QueryRecord = {};
       for (const [name, field] of Object.entries(fields)) {
-        if (!isSelected(name)) continue;
+        if (!isSelected(name, field)) continue;
         const resolve = resolvers.get(name);
         record[name] = isUndefined(resolve)
           ? await deserializeColumn(name, field, dialect, row[field.column as string])
@@ -98,13 +104,14 @@ async function resolveColumnless(
   parents: readonly string[],
   dialect: Dialect,
   locale: string,
+  keepHidden: boolean,
 ): Promise<FieldResolver> {
   if (field.kind === 'records') {
     const links = await loadJunction(field, parents, dialect, locale);
     return (parent) => links[parent] ?? [];
   }
   if (field.kind === 'blocks') {
-    const items = await loadBlocks(field, parents, dialect, locale);
+    const items = await loadBlocks(field, parents, dialect, locale, keepHidden);
     return (parent) => items[parent] ?? [];
   }
   const rows = await loadChildRows(field, parents, dialect, locale);
@@ -114,6 +121,7 @@ async function resolveColumnless(
     null,
     dialect,
     locale,
+    keepHidden,
   );
   const groups = groupBy(
     items,

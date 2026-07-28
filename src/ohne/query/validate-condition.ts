@@ -63,16 +63,19 @@ export interface ConditionProblem {
  * The remainder walks that type's fields.
  * Its field name pushes onto the returned `path`, so the failure locates itself from the root.
  * A `where` path is a single segment in v1: an anchored or dotted path reads as an unknown field.
+ * `untrusted` walks for the wire: a `readable: false` field reads as unknown at every depth.
+ * Its name stays out of the suggestion candidates; the trusted fluent walk stays flag-blind.
  * Returns `null` when every leaf is sound.
  */
 export function checkCondition(
   node: ConditionNode,
   meta: CollectionQueryMeta,
   prefix: readonly string[] = [],
+  untrusted = false,
 ): ConditionProblem | null {
   if (node.kind === 'and' || node.kind === 'or') {
     for (const child of node.nodes) {
-      const problem = checkCondition(child, meta, prefix);
+      const problem = checkCondition(child, meta, prefix, untrusted);
       if (!isNull(problem)) return problem;
     }
     return null;
@@ -91,8 +94,8 @@ export function checkCondition(
   }
   const name = node.path[0];
   const field = meta.fields[name];
-  if (isUndefined(field)) {
-    const suggestion = didYouMean(name, Object.keys(meta.fields));
+  if (isUndefined(field) || (untrusted && field.readable === false)) {
+    const suggestion = didYouMean(name, fieldCandidates(meta, untrusted));
     return {
       kind: 'unknownField',
       field: name,
@@ -113,10 +116,26 @@ export function checkCondition(
     };
   }
   if (node.kind === 'has' && !isNull(node.condition)) {
-    if (field.kind === 'blocks') return checkBlocksHas(node.condition, field, name, meta, prefix);
-    return checkCondition(node.condition, targetScope(field, name, meta), [...prefix, name]);
+    if (field.kind === 'blocks') {
+      return checkBlocksHas(node.condition, field, name, meta, prefix, untrusted);
+    }
+    return checkCondition(
+      node.condition,
+      targetScope(field, name, meta),
+      [...prefix, name],
+      untrusted,
+    );
   }
   return null;
+}
+
+/**
+ * The field names a failure may suggest.
+ * The untrusted walk keeps `readable: false` names out, so a near miss can never reveal one.
+ */
+function fieldCandidates(meta: CollectionQueryMeta, untrusted: boolean): string[] {
+  const names = Object.keys(meta.fields);
+  return untrusted ? names.filter((name) => meta.fields[name]?.readable !== false) : names;
 }
 
 /**
@@ -131,6 +150,7 @@ function checkBlocksHas(
   name: string,
   meta: CollectionQueryMeta,
   prefix: readonly string[],
+  untrusted: boolean,
 ): ConditionProblem | null {
   const split = splitBlockHas(condition);
   if (!split.ok) {
@@ -156,7 +176,12 @@ function checkBlocksHas(
     };
   }
   if (isNull(split.rest)) return null;
-  return checkCondition(split.rest, blockScope(split.block, name, meta), [...prefix, name]);
+  return checkCondition(
+    split.rest,
+    blockScope(split.block, name, meta),
+    [...prefix, name],
+    untrusted,
+  );
 }
 
 /**

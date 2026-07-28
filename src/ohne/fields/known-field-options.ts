@@ -1,3 +1,4 @@
+import type { FieldOptions } from './field.ts';
 import type { RecordsOptions } from './relation-options.ts';
 
 /**
@@ -10,6 +11,7 @@ import type { RecordsOptions } from './relation-options.ts';
 export interface KnownFieldOptions {
   /**
    * The `records` call-site options: `collection`, `inverse`, and `onDelete`, cross-narrowed.
+   * The visibility flags every kind carries join them.
    */
-  records: RecordsOptions;
+  records: RecordsOptions & Pick<FieldOptions, 'readable' | 'writable' | 'immutable'>;
 }

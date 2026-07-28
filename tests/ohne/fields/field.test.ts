@@ -32,6 +32,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
     });
   });
 
@@ -43,6 +46,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
     });
   });
 
@@ -54,6 +60,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
       max: 10,
     });
   });
@@ -66,6 +75,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
       max: 5,
       placeholder: 'name',
     });
@@ -79,6 +91,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
       max: 10,
     });
   });
@@ -92,6 +107,9 @@ describe('resolveFieldOptions', () => {
       translatable: false,
       uniquePerLocale: false,
       uniquePerParent: false,
+      readable: true,
+      writable: true,
+      immutable: false,
     });
   });
 

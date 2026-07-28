@@ -17,6 +17,9 @@ const COMMON = {
   translatable: false,
   uniquePerLocale: false,
   uniquePerParent: false,
+  readable: true,
+  writable: true,
+  immutable: false,
 };
 
 describe('resolveFieldStorage', () => {

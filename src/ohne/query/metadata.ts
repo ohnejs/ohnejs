@@ -78,6 +78,22 @@ export interface FieldQueryMeta {
   jsonList?: true;
 
   /**
+   * Marks a write-only field: reads skip it unless a select names it explicitly.
+   * The wire refuses it everywhere a read could address it.
+   */
+  readable?: false;
+
+  /**
+   * Marks a framework-written field the wire refuses in create and update bodies.
+   */
+  writable?: false;
+
+  /**
+   * Marks a field locked after create; the wire refuses it in update bodies.
+   */
+  immutable?: true;
+
+  /**
    * Marks a translatable column-bearing field: its column lives on the collection's companion table.
    * It holds one value per locale and reads `null` when the queried locale has no translation.
    */
@@ -171,8 +187,8 @@ export interface CollectionQueryMeta {
   translatable?: true;
 
   /**
-   * The `<Owner>__translations` table holding the translatable columns, one row per
-   * (record, locale); present when at least one translatable field carries a column.
+   * The `<Owner>__translations` table holding the translatable columns, one row per (record, locale).
+   * Present when at least one translatable field carries a column.
    */
   companionTable?: string;
 }
@@ -379,6 +395,11 @@ function fieldEntry(
   const when = parseFieldWhen(options, name, home);
   const gate = isUndefined(when) ? {} : { when };
   const translatable = options.translatable === true;
+  const flags = {
+    ...(options.readable === false ? { readable: false as const } : {}),
+    ...(options.writable === false ? { writable: false as const } : {}),
+    ...(options.immutable === true ? { immutable: true as const } : {}),
+  };
 
   if (kind === 'blocks') {
     return {
@@ -389,6 +410,7 @@ function fieldEntry(
       table: derivedTableName(logical, name),
       allow: fieldAllow((hint as BlocksHint).allow, name, home),
       ...gate,
+      ...flags,
       ...(translatable ? { localeScoped: true } : {}),
     };
   }
@@ -403,6 +425,7 @@ function fieldEntry(
       nullable: false,
       target,
       ...gate,
+      ...flags,
       ...(scoped ? { localeScoped: true } : {}),
       ...(isUndefined(inverse)
         ? { table: derivedTableName(logical, name) }
@@ -423,6 +446,7 @@ function fieldEntry(
       table: derivedTableName(logical, name),
       subfields,
       ...gate,
+      ...flags,
       ...(translatable ? { localeScoped: true } : {}),
     };
   }
@@ -435,6 +459,8 @@ function fieldEntry(
     logicalType: fieldType.columnType as LogicalType,
     column: name,
     ...gate,
+    ...flags,
+    ...(fieldType.jsonList === true ? { jsonList: true as const } : {}),
     ...(translatable ? { companion: true } : {}),
     ...(kind === 'foreignKey' ? { target: (hint as ForeignKeyHint).collection } : {}),
   };

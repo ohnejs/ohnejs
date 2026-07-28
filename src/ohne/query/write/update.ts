@@ -318,7 +318,7 @@ async function attemptGatedUpdate(
   code: string,
   locale: string | null,
 ): Promise<UpdateOutcome> {
-  const records = await readMatched(meta.collection, matched, locale);
+  const records = await readMatched(meta.collection, matched, locale, true);
   const overlays = new Map(
     records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
   );
@@ -636,24 +636,30 @@ async function childUUIDsUnder(
 
 /**
  * Re-reads the matched records in their final state, chunked so a large update stays under the param cap.
+ * `keepHidden` reads `readable: false` fields too: the gate substrate needs the full stored shape.
+ * The records an outcome returns take the default one.
  */
 async function readMatched(
   collection: string,
   matched: readonly string[],
   locale: string | null,
+  keepHidden = false,
 ): Promise<QueryRecord[]> {
   const records: QueryRecord[] = [];
   for (const batch of chunk(matched, 2000)) {
-    const rows = await readRows({
-      collection,
-      condition: { kind: 'compare', path: ['UUID'], op: 'in', value: batch, negated: false },
-      select: null,
-      order: [],
-      limit: null,
-      offset: null,
-      populate: [],
-      locale,
-    });
+    const rows = await readRows(
+      {
+        collection,
+        condition: { kind: 'compare', path: ['UUID'], op: 'in', value: batch, negated: false },
+        select: null,
+        order: [],
+        limit: null,
+        offset: null,
+        populate: [],
+        locale,
+      },
+      keepHidden,
+    );
     records.push(...rows);
   }
   return records;

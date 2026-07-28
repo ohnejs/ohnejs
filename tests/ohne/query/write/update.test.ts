@@ -88,6 +88,16 @@ useCollections().register('UNest', {
     },
   },
 });
+useCollections().register('UVault', {
+  name: 'UVault',
+  collection: {
+    fields: {
+      name: field('text'),
+      secret: field('text', { readable: false }),
+      bonus: field('text', { nullable: true, when: { secret: 'go' } }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -693,6 +703,47 @@ describe('runUpdate hooks', () => {
   });
 });
 
+describe('runUpdate hidden fields', () => {
+  it('omits a `readable: false` field from the outcome records', async () => {
+    const created = await runCreate('UVault', { name: 'v1', secret: 'stash' }, null);
+    ok(created.ok);
+    const uuid = created.record.UUID as string;
+    ok(!('secret' in created.record));
+    const result = await runUpdate('UVault', { name: 'v1b' }, uuidIs(uuid), null);
+    ok(result.ok);
+    strictEqual(result.records[0].name, 'v1b');
+    ok(!('secret' in result.records[0]));
+    strictEqual(await secretOf(uuid), 'stash');
+  });
+
+  it('activates a gate over a hidden sibling from its stored value', async () => {
+    const created = await runCreate('UVault', { name: 'v2', secret: 'go' }, null);
+    ok(created.ok);
+    const uuid = created.record.UUID as string;
+    const result = await runUpdate('UVault', { bonus: 'granted' }, uuidIs(uuid), null);
+    ok(result.ok);
+    strictEqual(result.records[0].bonus, 'granted');
+    ok(!('secret' in result.records[0]));
+  });
+
+  it('drops a gated write when the hidden sibling holds an inactive value', async () => {
+    const created = await runCreate('UVault', { name: 'v3', secret: 'stop' }, null);
+    ok(created.ok);
+    const uuid = created.record.UUID as string;
+    const result = await runUpdate('UVault', { bonus: 'granted' }, uuidIs(uuid), null);
+    ok(result.ok);
+    strictEqual(result.records[0].bonus, null);
+    strictEqual(await secretOf(uuid), 'stop');
+  });
+
+  it('omits a `readable: false` field from `createOrThrow`', async () => {
+    const record = await queryUntyped('UVault').createOrThrow({ name: 'v4', secret: 'go' });
+    ok(!('secret' in record));
+    strictEqual(record.name, 'v4');
+    strictEqual(await secretOf(record.UUID as string), 'go');
+  });
+});
+
 /**
  * The condition matching one record by `UUID`.
  */
@@ -736,6 +787,17 @@ async function objectUUID(parent: string): Promise<string | undefined> {
     [parent],
   );
   return row?.UUID;
+}
+
+/**
+ * Reads one vault's stored `secret` straight from the table.
+ */
+async function secretOf(uuid: string): Promise<string> {
+  const row = await db.queryOne<{ secret: string }>(
+    'SELECT "secret" FROM "UVault" WHERE "UUID" = ?',
+    [uuid],
+  );
+  return row!.secret;
 }
 
 /**

@@ -167,7 +167,7 @@ export function parseQueryParams(
     order: parseOrder(params.order, meta, guards),
     populate: parsePopulate(params.populate, meta, guards),
     ...window,
-    locale: parseLocale(params.locale, meta),
+    locale: parseLocaleParam(params.locale, meta),
   });
 }
 
@@ -185,7 +185,7 @@ function parseWhere(
   if (isUndefined(value)) return null;
   const parsed = parseCondition(value);
   if (!parsed.ok) throw conditionShapeError(parsed.error);
-  const problem = checkCondition(parsed.node, meta);
+  const problem = checkCondition(parsed.node, meta, [], true);
   if (!isNull(problem)) throw problemError(problem);
   enforceGuards(parsed.node, guards, reserved);
   checkValues(parsed.node, meta, []);
@@ -321,6 +321,7 @@ function matchesLogical(value: unknown, field: FieldQueryMeta): boolean {
 
 /**
  * Parses `select` into the fields to read, rejecting an empty list, an over-long one, or an unknown field.
+ * A `readable: false` field rejects exactly as an unknown one - the wire keeps no existence oracle.
  */
 function parseSelect(
   value: SearchParamValue | undefined,
@@ -333,15 +334,19 @@ function parseSelect(
   if (fields.length > guards.maxSelect)
     throw limitError('tooManyFields', 'select', guards.maxSelect);
   fields.forEach((field, index) => {
-    if (isUndefined(meta.fields[field])) {
-      throw invalidFieldError(
-        field,
-        `select[${index}]`,
-        didYouMean(field, Object.keys(meta.fields)),
-      );
+    if (isUndefined(meta.fields[field]) || meta.fields[field].readable === false) {
+      throw invalidFieldError(field, `select[${index}]`, didYouMean(field, readableNames(meta)));
     }
   });
   return fields;
+}
+
+/**
+ * The field names the wire may address: everything a read can return.
+ * A `readable: false` name stays out, so a `didYouMean` hint can never reveal one.
+ */
+function readableNames(meta: CollectionQueryMeta): string[] {
+  return Object.keys(meta.fields).filter((name) => meta.fields[name]?.readable !== false);
 }
 
 /**
@@ -361,12 +366,8 @@ function parseOrder(
     const direction: OrderDirection = entry.startsWith('-') ? 'desc' : 'asc';
     const field = direction === 'desc' ? entry.slice(1) : entry;
     const fieldMeta = meta.fields[field];
-    if (isUndefined(fieldMeta)) {
-      throw invalidFieldError(
-        field,
-        `order[${index}]`,
-        didYouMean(field, Object.keys(meta.fields)),
-      );
+    if (isUndefined(fieldMeta) || fieldMeta.readable === false) {
+      throw invalidFieldError(field, `order[${index}]`, didYouMean(field, readableNames(meta)));
     }
     if (isUndefined(fieldMeta.column)) throw invalidFieldError(field, `order[${index}]`, undefined);
     if (seen.has(field)) throw duplicateOrderFieldError(field, `order[${index}]`);
@@ -459,11 +460,11 @@ function parsePopulateSpec(
       throw limitError('tooManyFields', `${path}.select`, guards.maxSelect);
     }
     fields.forEach((name, index) => {
-      if (isUndefined(target.fields[name])) {
+      if (isUndefined(target.fields[name]) || target.fields[name].readable === false) {
         throw invalidFieldError(
           name,
           `${path}.select[${index}]`,
-          didYouMean(name, Object.keys(target.fields)),
+          didYouMean(name, readableNames(target)),
         );
       }
     });
@@ -484,11 +485,12 @@ function parsePopulateSpec(
 
 /**
  * Resolves a populated name to its relation metadata, collapsing every failure to `invalidField`.
+ * A `readable: false` relation collapses too, exactly as a name that does not exist.
  */
 function populatedRelation(field: string, path: string, meta: CollectionQueryMeta): FieldQueryMeta {
   const fieldMeta = meta.fields[field];
-  if (isUndefined(fieldMeta)) {
-    throw invalidFieldError(field, path, didYouMean(field, Object.keys(meta.fields)));
+  if (isUndefined(fieldMeta) || fieldMeta.readable === false) {
+    throw invalidFieldError(field, path, didYouMean(field, readableNames(meta)));
   }
   if (fieldMeta.kind !== 'record' && fieldMeta.kind !== 'records') {
     throw invalidFieldError(field, path, undefined);
@@ -558,10 +560,11 @@ function windowBoundParams(window: {
 }
 
 /**
- * Parses `locale` into the canonical content locale a translatable collection reads.
+ * Parses a `locale` param into the canonical content locale a translatable collection addresses.
  * A locale on a non-translatable collection, a malformed tag, or one outside the configured set throws.
+ * `parseQueryParams` runs it for reads; a write endpoint runs it alone, since writes take no query.
  */
-function parseLocale(
+export function parseLocaleParam(
   value: SearchParamValue | undefined,
   meta: CollectionQueryMeta,
 ): string | null {

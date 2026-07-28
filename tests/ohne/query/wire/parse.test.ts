@@ -69,8 +69,32 @@ useCollections().register('WSites', {
   collection: { fields: { content: field('blocks', { translatable: true, allow: ['WHero'] }) } },
 });
 
+useBlocks().register('WVault', {
+  name: 'WVault',
+  block: { fields: { caption: field('text'), token: field('text', { readable: false }) } },
+});
+
+useCollections().register('WProfiles', {
+  name: 'WProfiles',
+  collection: { fields: { bio: field('text'), secret: field('text', { readable: false }) } },
+});
+
+useCollections().register('WAccounts', {
+  name: 'WAccounts',
+  collection: {
+    fields: {
+      email: field('text'),
+      password: field('text', { readable: false }),
+      profile: field('record', { collection: 'WProfiles' }),
+      audit: field('record', { collection: 'WProfiles', readable: false }),
+      vault: field('blocks', { allow: ['WVault'] }),
+    },
+  },
+});
+
 const meta = queryMetadata('WPosts');
 const translatableMeta = queryMetadata('WArticles');
+const hiddenMeta = queryMetadata('WAccounts');
 
 function parse(query: string, guards: QueryGuards = DEFAULT_QUERY_GUARDS) {
   return parseQueryParams(parseSearchParams(query), meta, guards);
@@ -78,6 +102,10 @@ function parse(query: string, guards: QueryGuards = DEFAULT_QUERY_GUARDS) {
 
 function parseLocalized(query: string) {
   return parseQueryParams(parseSearchParams(query), translatableMeta, DEFAULT_QUERY_GUARDS);
+}
+
+function parseHidden(query: string) {
+  return parseQueryParams(parseSearchParams(query), hiddenMeta, DEFAULT_QUERY_GUARDS);
 }
 
 function caught(fn: () => unknown): HTTPError {
@@ -98,6 +126,12 @@ function failure(query: string, guards: QueryGuards = DEFAULT_QUERY_GUARDS): Wir
 
 function localizedFailure(query: string): WireErrorData {
   const error = caught(() => parseLocalized(query));
+  strictEqual(error.status, 400);
+  return error.data as WireErrorData;
+}
+
+function hiddenFailure(query: string): WireErrorData {
+  const error = caught(() => parseHidden(query));
   strictEqual(error.status, 400);
   return error.data as WireErrorData;
 }
@@ -480,6 +514,90 @@ describe('parseQueryParams reads populate specs', () => {
     const error = failure(bomb, generous);
     strictEqual(error.code, 'invalidShape');
     ok(error.path.endsWith('.boss'));
+  });
+});
+
+describe('parseQueryParams refuses a hidden field exactly as an unknown one', () => {
+  it('still reads the readable siblings', () => {
+    const parsed = parseHidden('select=[email]&populate=[profile]');
+    deepStrictEqual(parsed.select, ['email']);
+    deepStrictEqual(parsed.populate, ['profile']);
+  });
+
+  it('rejects a hidden field in select at its index', () => {
+    deepStrictEqual(hiddenFailure('select=[email,password]'), {
+      code: 'invalidField',
+      path: 'select[1]',
+    });
+  });
+
+  it('rejects ordering by a hidden field', () => {
+    deepStrictEqual(hiddenFailure('order=[-password]'), {
+      code: 'invalidField',
+      path: 'order[0]',
+    });
+  });
+
+  it('rejects a where over a hidden field', () => {
+    deepStrictEqual(hiddenFailure('where={password:x}'), {
+      code: 'invalidField',
+      path: 'where.password',
+    });
+  });
+
+  it('locates a hidden target field inside a has by its dotted path', () => {
+    deepStrictEqual(hiddenFailure('where={profile:{has:{secret:x}}}'), {
+      code: 'invalidField',
+      path: 'where.profile.secret',
+    });
+  });
+
+  it('rejects a hidden subfield inside a block scope', () => {
+    deepStrictEqual(hiddenFailure('where={vault:{has:{block:WVault,token:x}}}'), {
+      code: 'invalidField',
+      path: 'where.vault.token',
+    });
+  });
+
+  it('rejects populating a hidden relation, bare or spec', () => {
+    deepStrictEqual(hiddenFailure('populate=[audit]'), {
+      code: 'invalidField',
+      path: 'populate[0]',
+    });
+    deepStrictEqual(hiddenFailure('populate=[{audit:{select:[bio]}}]'), {
+      code: 'invalidField',
+      path: 'populate[0].audit',
+    });
+  });
+
+  it('rejects a subselect naming a hidden target field', () => {
+    deepStrictEqual(hiddenFailure('populate=[{profile:{select:[bio,secret]}}]'), {
+      code: 'invalidField',
+      path: 'populate[0].profile.select[1]',
+    });
+  });
+});
+
+describe('didYouMean never names a hidden field', () => {
+  it('a near miss of the hidden name gets no suggestion', () => {
+    const select = caught(() => parseHidden('select=[passwor]'));
+    strictEqual(select.message, 'query.invalidField');
+    deepStrictEqual(select.data, { code: 'invalidField', path: 'select[0]' });
+    const where = caught(() => parseHidden('where={passwor:x}'));
+    strictEqual(where.message, 'query.invalidField');
+    deepStrictEqual(where.data, { code: 'invalidField', path: 'where.passwor' });
+  });
+
+  it('a subselect near miss gets no suggestion either', () => {
+    const error = caught(() => parseHidden('populate=[{profile:{select:[secre]}}]'));
+    strictEqual(error.message, 'query.invalidField');
+    deepStrictEqual(error.data, { code: 'invalidField', path: 'populate[0].profile.select[0]' });
+  });
+
+  it('a near miss of a readable field still suggests it', () => {
+    const error = caught(() => parseHidden('where={emial:x}'));
+    strictEqual(error.message, 'query.invalidFieldSuggestion');
+    deepStrictEqual(error.data, { code: 'invalidField', path: 'where.emial' });
   });
 });
 

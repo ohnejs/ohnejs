@@ -70,6 +70,39 @@ export interface FieldOptions {
    * false
    */
   uniquePerParent?: boolean;
+
+  /**
+   * Whether reads return the field.
+   * Set `false` to make it write-only.
+   * The field drops from the default record shape and from create and update returns.
+   * The HTTP wire refuses it in `select`, `where`, `order`, and `populate`.
+   * Trusted server code still reads it by naming it in an explicit `select`.
+   *
+   * @default
+   * true
+   */
+  readable?: boolean;
+
+  /**
+   * Whether write inputs accept the field.
+   * Set `false` to make it framework-written only.
+   * The field drops from the generated write inputs; the HTTP wire refuses it in write bodies.
+   * The stored value then comes from the field's `default`.
+   *
+   * @default
+   * true
+   */
+  writable?: boolean;
+
+  /**
+   * Whether the field locks after create.
+   * Set `true` to drop it from the generated update input; the HTTP wire refuses it in update bodies.
+   * Creates accept it normally.
+   *
+   * @default
+   * false
+   */
+  immutable?: boolean;
 }
 
 /**
@@ -185,14 +218,16 @@ type DeclaredOptions<K extends FieldTypeName> =
 
 /**
  * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
- * A column-less type stores through its hint alone, so only `translatable` survives there.
+ * A column-less type stores through its hint alone.
+ * `translatable` and the visibility flags (`readable`, `writable`, `immutable`) survive there.
+ * Every kind can hide or lock itself.
  * Its derived table can still be locale-scoped.
  * The unique flags and `index` have no column to cover; `nullable` no cell to hold `NULL`.
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
  */
 type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] extends false
-  ? Pick<FieldOptions, 'translatable'>
+  ? Pick<FieldOptions, 'translatable' | 'readable' | 'writable' | 'immutable'>
   : Omit<
       FieldOptions,
       | (NonNullable<KnownFields[K]['forceNullable']> extends true ? 'nullable' : never)
@@ -237,6 +272,9 @@ const FIELD_OPTION_DEFAULTS = {
   translatable: false,
   uniquePerLocale: false,
   uniquePerParent: false,
+  readable: true,
+  writable: true,
+  immutable: false,
 } satisfies Partial<FieldOptions>;
 
 /**

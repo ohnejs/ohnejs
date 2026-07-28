@@ -2,7 +2,9 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter, SQLParams } from '../../../../src/ohne/database/adapter.ts';
+import type { QueryIR } from '../../../../src/ohne/query/ir.ts';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -11,6 +13,7 @@ import { registerDatabase, registerDialect } from '../../../../src/ohne/database
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { readRows } from '../../../../src/ohne/query/read/find.ts';
 
 useCollections().register('HAuthors', {
   name: 'HAuthors',
@@ -45,6 +48,24 @@ useCollections().register('HPosts', {
   },
 });
 
+useBlocks().register('HCard', {
+  name: 'HCard',
+  block: { fields: { shown: field('text'), token: field('text', { readable: false }) } },
+});
+useCollections().register('HVault', {
+  name: 'HVault',
+  collection: {
+    fields: {
+      name: field('text'),
+      secret: field('text', { readable: false }),
+      entries: field('repeater', {
+        fields: { label: field('text'), pin: field('text', { readable: false }) },
+      }),
+      cards: field('blocks', { allow: ['HCard'] }),
+    },
+  },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 
@@ -64,7 +85,7 @@ const counting: DatabaseAdapter = {
 registerDialect(dialect);
 registerDatabase(counting);
 await syncDatabase(db, dialect, {
-  desired: buildDesiredSchema(useCollections(), useFields() as never),
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
 const TS = 111;
@@ -76,6 +97,10 @@ const P = (n: number): string => id('c', n);
 const M = (n: number): string => id('d', n);
 const S = (n: number): string => id('e', n);
 const I = (n: number): string => id('f', n);
+const V = (n: number): string => id('1', n);
+const E = (n: number): string => id('2', n);
+const W = (n: number): string => id('3', n);
+const B = (n: number): string => id('4', n);
 
 async function author(uuid: string, name: string): Promise<void> {
   await db.run('INSERT INTO "HAuthors" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
@@ -130,6 +155,37 @@ async function item(uuid: string, parent: string, pos: number, label: string): P
     [uuid, parent, pos, label],
   );
 }
+async function vault(uuid: string, name: string, secret: string): Promise<void> {
+  await db.run('INSERT INTO "HVault" ("UUID","_updatedAt","name","secret") VALUES (?,?,?,?)', [
+    uuid,
+    TS,
+    name,
+    secret,
+  ]);
+}
+async function entry(uuid: string, parent: string, label: string, pin: string): Promise<void> {
+  await db.run(
+    'INSERT INTO "HVault_entries" ("UUID","_parentUUID","_parentPosition","label","pin") VALUES (?,?,?,?,?)',
+    [uuid, parent, 0, label, pin],
+  );
+}
+async function card(
+  wrapper: string,
+  parent: string,
+  instance: string,
+  shown: string,
+  token: string,
+): Promise<void> {
+  await db.run('INSERT INTO "block_HCard" ("UUID","shown","token") VALUES (?,?,?)', [
+    instance,
+    shown,
+    token,
+  ]);
+  await db.run(
+    'INSERT INTO "HVault_cards" ("UUID","_parentUUID","_parentPosition","_blockType","_blockUUID") VALUES (?,?,?,?,?)',
+    [wrapper, parent, 0, 'HCard', instance],
+  );
+}
 
 await author(A(1), 'Ada');
 await author(A(2), 'Alan');
@@ -159,6 +215,11 @@ await item(I(1), S(1), 0, 'i1');
 await item(I(2), S(1), 1, 'i2');
 await section(S(3), P(3), 0, 'S3');
 await item(I(3), S(3), 0, 'i3');
+
+await vault(V(1), 'v1', 'alpha');
+await vault(V(2), 'v2', 'beta');
+await entry(E(1), V(1), 'e1', '1111');
+await card(W(1), V(1), B(1), 'front', 'tok-1');
 
 const first = (): ReturnType<typeof queryUntyped> =>
   queryUntyped('HPosts').where({ title: 'First' });
@@ -259,5 +320,67 @@ describe('select gating', () => {
     queries = 0;
     await first().select('title', 'tags').findMany();
     strictEqual(queries, 2);
+  });
+});
+
+describe('readable: false', () => {
+  it('omits a hidden column from findMany and findFirst', async () => {
+    const rows = await queryUntyped('HVault').orderBy('name').findMany();
+    strictEqual(rows.length, 2);
+    ok(rows.every((row) => !('secret' in row)));
+
+    const record = await queryUntyped('HVault').where({ name: 'v1' }).findFirst();
+    ok(record);
+    ok(!('secret' in record));
+    strictEqual(record.name, 'v1');
+  });
+
+  it('returns a hidden field named in an explicit select', async () => {
+    const rows = await queryUntyped('HVault')
+      .where({ name: 'v1' })
+      .select('name', 'secret')
+      .findMany();
+    deepStrictEqual(rows, [{ name: 'v1', secret: 'alpha' }]);
+  });
+
+  it('plucks a hidden field by explicit name', async () => {
+    deepStrictEqual(await queryUntyped('HVault').orderBy('name').pluck('secret'), [
+      'alpha',
+      'beta',
+    ]);
+  });
+
+  it('drops a hidden subfield from repeater items on a full read', async () => {
+    const record = await queryUntyped('HVault').where({ name: 'v1' }).findFirst();
+    deepStrictEqual(record?.entries, [{ UUID: E(1), label: 'e1' }]);
+  });
+
+  it('drops a hidden field from hydrated block instances', async () => {
+    const record = await queryUntyped('HVault').where({ name: 'v1' }).findFirst();
+    deepStrictEqual(record?.cards, [{ block: 'HCard', UUID: B(1), fields: { shown: 'front' } }]);
+  });
+
+  it('readRows keepHidden returns hidden fields at every depth', async () => {
+    const ir: QueryIR = {
+      collection: 'HVault',
+      condition: null,
+      select: null,
+      order: [{ field: 'name', direction: 'asc' }],
+      limit: null,
+      offset: null,
+      populate: [],
+      locale: null,
+    };
+    const rows = await readRows(ir, true);
+    strictEqual(rows.length, 2);
+    deepStrictEqual(rows[0], {
+      UUID: V(1),
+      _updatedAt: TS,
+      name: 'v1',
+      secret: 'alpha',
+      entries: [{ UUID: E(1), label: 'e1', pin: '1111' }],
+      cards: [{ block: 'HCard', UUID: B(1), fields: { shown: 'front', token: 'tok-1' } }],
+    });
+    strictEqual(rows[1]?.secret, 'beta');
   });
 });

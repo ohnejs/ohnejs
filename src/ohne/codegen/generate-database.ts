@@ -274,6 +274,7 @@ async function writeShared(
       { subject: `Block \`${block.name}\``, file: block.file },
       block.block.fields,
       context,
+      true,
     ),
   }));
   const queryMembers = collections.map((collection) => ({
@@ -460,17 +461,27 @@ async function writeShared(
 
 /**
  * Resolves one definition's field map into named value types and docs, ready for interface emission.
+ * `nested` marks a shape a `select` cannot address - a block's fields.
+ * A `readable: false` field drops from such a shape entirely.
+ * A top-level one stays, addressable by an explicit `select`.
  */
 function fieldShapesOf(
   owner: EmissionOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
+  nested = false,
 ): { name: string; type: string; doc: string }[] {
-  return Object.entries(fields).map(([name, instance]) => ({
-    name,
-    type: valueTypeOf(owner, name, instance, context),
-    doc: fieldDocOf(owner, name, instance, context, false),
-  }));
+  return Object.entries(fields)
+    .filter(
+      ([name, instance]) =>
+        !nested ||
+        resolveEmissionStorage(owner, name, instance, context).options.readable !== false,
+    )
+    .map(([name, instance]) => ({
+      name,
+      type: valueTypeOf(owner, name, instance, context),
+      doc: fieldDocOf(owner, name, instance, context, false),
+    }));
 }
 
 /**
@@ -757,14 +768,20 @@ function documentedShape(
  * Assembles a composite's inline record shape from its subfields, recursively.
  * The item `UUID` leads the shape, matching the read: every child row exposes its stable identity.
  * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
+ * A `select` cannot address a subfield, so a `readable: false` one drops from the shape entirely.
  */
 function childValueType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
   const members = [
     { doc: jsdocBlock(ITEM_UUID_DOC), line: 'UUID: string;' },
-    ...Object.entries(hint.subfields).map(([name, instance]) => ({
-      doc: fieldDocOf(owner, name, instance, context, true),
-      line: `${propertyKey(name)}: ${valueTypeOf(owner, name, instance, context)};`,
-    })),
+    ...Object.entries(hint.subfields)
+      .filter(
+        ([name, instance]) =>
+          resolveEmissionStorage(owner, name, instance, context).options.readable !== false,
+      )
+      .map(([name, instance]) => ({
+        doc: fieldDocOf(owner, name, instance, context, true),
+        line: `${propertyKey(name)}: ${valueTypeOf(owner, name, instance, context)};`,
+      })),
   ];
   return documentedShape(members, hint.cardinality === 'one' ? '} | null' : '}[]');
 }
@@ -1024,6 +1041,7 @@ function queryFieldType(
   const resolved = resolveFieldStorage(name, instance, registered.fieldType);
   const { hint, kind } = resolved;
   const translatable = resolved.options.translatable === true;
+  const hidden = resolved.options.readable === false;
   const when = hasKey(instance.options, 'when') ? conditionLiteral(instance.options.when) : null;
 
   if (kind === 'blocks') {
@@ -1031,6 +1049,7 @@ function queryFieldType(
     return metaLiteral(
       [
         `blocks: ${allowed.map((block) => literalString(block)).join(' | ')}`,
+        ...(hidden ? ['readable: false'] : []),
         ...(translatable ? ['localeScoped: true'] : []),
       ],
       when,
@@ -1040,6 +1059,7 @@ function queryFieldType(
     return metaLiteral(
       [
         `records: ${literalString((hint as JunctionHint).collection)}`,
+        ...(hidden ? ['readable: false'] : []),
         ...(translatable ? ['localeScoped: true'] : []),
       ],
       when,
@@ -1056,6 +1076,7 @@ function queryFieldType(
       [
         `child: ${literalString(cardinality)}`,
         `fields: { ${body} }`,
+        ...(hidden ? ['readable: false'] : []),
         ...(translatable ? ['localeScoped: true'] : []),
       ],
       when,
@@ -1074,6 +1095,8 @@ function queryFieldType(
     parts.push(`record: ${literalString((hint as ForeignKeyHint).collection)}`);
   }
   if (nullable) parts.push('nullable: true');
+  if (registered.fieldType.jsonList === true) parts.push('jsonList: true');
+  if (hidden) parts.push('readable: false');
   if (translatable) parts.push('companion: true');
   return metaLiteral(parts, when);
 }
@@ -1104,6 +1127,7 @@ function conditionLiteral(value: unknown): string {
 /**
  * Resolves one field map into named create-input shapes.
  * `nested` is `true` for a composite's subfields, so their docs drop the top-level translatability line.
+ * A `writable: false` field never appears in a write input, so it drops from the shape.
  */
 function insertShapesOf(
   owner: EmissionOwner,
@@ -1111,17 +1135,22 @@ function insertShapesOf(
   context: EmissionContext,
   nested = false,
 ): { name: string; type: string; optional: boolean; doc: string }[] {
-  return Object.entries(fields).map(([name, instance]) => ({
-    name,
-    ...insertFieldType(owner, name, instance, context),
-    doc: fieldDocOf(owner, name, instance, context, nested),
-  }));
+  return Object.entries(fields)
+    .filter(
+      ([name, instance]) =>
+        resolveEmissionStorage(owner, name, instance, context).options.writable !== false,
+    )
+    .map(([name, instance]) => ({
+      name,
+      ...insertFieldType(owner, name, instance, context),
+      doc: fieldDocOf(owner, name, instance, context, nested),
+    }));
 }
 
 /**
- * Resolves one field's storage for input emission, throwing when its type is not registered.
+ * Resolves one field's storage for emission, throwing when its type is not registered.
  */
-function resolveInputStorage(
+function resolveEmissionStorage(
   owner: EmissionOwner,
   name: string,
   instance: FieldInstance,
@@ -1149,7 +1178,7 @@ function inputScalarType(
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
-  resolved: ReturnType<typeof resolveInputStorage>,
+  resolved: ReturnType<typeof resolveEmissionStorage>,
 ): { type: string; nullable: boolean } {
   const { registered, kind, options } = resolved;
   if (kind === 'foreignKey') {
@@ -1181,7 +1210,7 @@ function insertFieldType(
   instance: FieldInstance,
   context: EmissionContext,
 ): { type: string; optional: boolean } {
-  const resolved = resolveInputStorage(owner, name, instance, context);
+  const resolved = resolveEmissionStorage(owner, name, instance, context);
   const { hint, kind, options } = resolved;
   if (kind === 'blocks') {
     const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map((block) =>
@@ -1220,6 +1249,7 @@ function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: Emissi
 /**
  * Resolves one field map into named update-input shapes.
  * `nested` is `true` for a composite's subfields, so their docs drop the top-level translatability line.
+ * A `writable: false` or `immutable` field never appears in an update input, so it drops from the shape.
  */
 function updateShapesOf(
   owner: EmissionOwner,
@@ -1227,11 +1257,16 @@ function updateShapesOf(
   context: EmissionContext,
   nested = false,
 ): { name: string; type: string; optional: boolean; doc: string }[] {
-  return Object.entries(fields).map(([name, instance]) => ({
-    name,
-    ...updateFieldType(owner, name, instance, context),
-    doc: fieldDocOf(owner, name, instance, context, nested),
-  }));
+  return Object.entries(fields)
+    .filter(([name, instance]) => {
+      const { options } = resolveEmissionStorage(owner, name, instance, context);
+      return options.writable !== false && options.immutable !== true;
+    })
+    .map(([name, instance]) => ({
+      name,
+      ...updateFieldType(owner, name, instance, context),
+      doc: fieldDocOf(owner, name, instance, context, nested),
+    }));
 }
 
 /**
@@ -1250,7 +1285,7 @@ function updateFieldType(
   instance: FieldInstance,
   context: EmissionContext,
 ): { type: string; optional: boolean } {
-  const resolved = resolveInputStorage(owner, name, instance, context);
+  const resolved = resolveEmissionStorage(owner, name, instance, context);
   const { hint, kind, options } = resolved;
   if (kind === 'blocks') {
     const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map((block) =>

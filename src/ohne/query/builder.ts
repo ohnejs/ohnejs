@@ -28,6 +28,21 @@ type RecordOf<C extends string> = C extends keyof KnownCollections
   : Record<string, unknown>;
 
 /**
+ * The keys of a collection's write-only fields - the `readable: false` markers in the generated table.
+ */
+type HiddenKey<C extends string> = {
+  [K in keyof FieldsOf<C>]: FieldsOf<C>[K] extends { readable: false } ? K : never;
+}[keyof FieldsOf<C>];
+
+/**
+ * The default row shape: the record with its write-only fields omitted.
+ * An explicit `select` names fields directly, so only the unnarrowed reads flow through this.
+ */
+type ReadableRecordOf<C extends string> = [HiddenKey<C>] extends [never]
+  ? RecordOf<C>
+  : DeepPrettify<Omit<RecordOf<C>, HiddenKey<C> & keyof RecordOf<C>>>;
+
+/**
  * One field's metadata within a collection, or `never` when the name is not a field.
  */
 type FieldMetaOf<C extends CollectionName, K> = K extends keyof FieldsOf<C>
@@ -511,12 +526,13 @@ export type OrderableField<C extends CollectionName> = string extends keyof Fiel
 
 /**
  * A populated field's value: a `record` becomes its target row or `null`, `records` an array of them.
+ * The target row is its default shape, so a write-only target field stays unread.
  */
 type PopulateSwap<C extends CollectionName, K> =
   FieldMetaOf<C, K> extends { record: infer T extends string }
-    ? RecordOf<T> | null
+    ? ReadableRecordOf<T> | null
     : FieldMetaOf<C, K> extends { records: infer T extends string }
-      ? RecordOf<T>[]
+      ? ReadableRecordOf<T>[]
       : never;
 
 /**
@@ -577,11 +593,12 @@ type SwapPopulated<Row, C extends CollectionName, P> = {
 /**
  * One read row: the collection's record, narrowed by `select` (`S`) and swapped by `populate` (`P`).
  * With neither a select nor a populate it stays the named record, for clean hovers.
+ * A write-only field (`readable: false`) is absent unless `S` names it explicitly.
  */
 export type QueryRow<C extends CollectionName, S = never, P = never> = [S] extends [never]
   ? [P] extends [never]
-    ? RecordOf<C>
-    : DeepPrettify<SwapPopulated<RecordOf<C>, C, P>>
+    ? ReadableRecordOf<C>
+    : DeepPrettify<SwapPopulated<ReadableRecordOf<C>, C, P>>
   : DeepPrettify<SwapPopulated<Pick<RecordOf<C>, S & keyof RecordOf<C>>, C, P>>;
 
 /**

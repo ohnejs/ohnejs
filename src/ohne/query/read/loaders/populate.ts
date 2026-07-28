@@ -43,6 +43,26 @@ declare module 'ohne' {
 }
 
 /**
+ * The select a populated scope hydrates under.
+ * A `null` select stays `null` unless a node populates a `readable: false` relation.
+ * A populate is an explicit ask, exactly as a select naming the field is.
+ * The hidden relation's links must therefore assemble, or the swap would have nothing to work on.
+ */
+export function populatedSelect(
+  select: readonly string[] | null,
+  fields: Record<string, FieldQueryMeta>,
+  nodes: readonly PopulateNode[],
+): readonly string[] | null {
+  if (!isNull(select)) return select;
+  const hidden = nodes.filter((node) => fields[node.field]?.readable === false);
+  if (hidden.length === 0) return null;
+  return [
+    ...Object.keys(fields).filter((name) => fields[name].readable !== false),
+    ...hidden.map((node) => node.field),
+  ];
+}
+
+/**
  * Swaps each populated relation's `UUID`(s) for hydrated target records, in place, down the tree.
  *
  * Only selected `record`/`records` fields populate: a field the read did not fetch has none to swap.
@@ -138,7 +158,9 @@ async function loadTargets(
   const uuid = `${dialect.quote(meta.table)}.${dialect.quote('UUID')}`;
   const from = compileFrom(meta, { fields: fetched.map((entry) => entry.name) }, locale, dialect);
   const projection = fetched.map((entry) => dialect.quote(entry.column)).join(', ');
-  const hydrated = isNull(named) ? null : [...named, 'UUID'];
+  const hydrated = isNull(named)
+    ? populatedSelect(null, meta.fields, node.children)
+    : [...named, 'UUID'];
   const targets: QueryRecord[] = [];
   for (const batch of chunk(uniqueArray(uuids), 900)) {
     const marks = batch.map(() => '?').join(', ');

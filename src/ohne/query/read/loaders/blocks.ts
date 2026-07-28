@@ -41,6 +41,7 @@ interface WrapperRow {
  * Each carries the type, the instance id lifted out of the hydrated record, and the remaining fields.
  * Items assemble fresh per wrapper row - the `_blockUUID` unique bars sharing - never cross-parent.
  * A parent with no rows is absent from the result; the caller reads that as an empty list.
+ * `keepHidden` lifts the `readable: false` skip, for the write machinery's substrate reads.
  * A wrapper row referencing a missing instance throws.
  * A dangling link is corruption, never silently dropped content.
  */
@@ -49,6 +50,7 @@ export async function loadBlocks(
   parents: readonly string[],
   dialect: Dialect,
   locale: string,
+  keepHidden = false,
 ): Promise<Partial<Record<string, QueryRecord[]>>> {
   const wrappers = await loadWrapperRows(field, parents, dialect, locale);
   const byType = groupBy(wrappers, (row) => row._blockType);
@@ -56,7 +58,7 @@ export async function loadBlocks(
   await Promise.all(
     Object.entries(byType).map(async ([type, rows]) => {
       const ids = uniqueArray((rows ?? []).map((row) => row._blockUUID));
-      instances.set(type, await loadInstances(type, ids, dialect, locale));
+      instances.set(type, await loadInstances(type, ids, dialect, locale, keepHidden));
     }),
   );
   const grouped = groupBy(wrappers, (row) => row._parentUUID);
@@ -105,6 +107,7 @@ async function loadInstances(
   ids: readonly string[],
   dialect: Dialect,
   locale: string,
+  keepHidden: boolean,
 ): Promise<Partial<Record<string, QueryRecord>>> {
   const meta = blockQueryMetadata(type);
   const table = dialect.quote(meta.table);
@@ -119,7 +122,7 @@ async function loadInstances(
       `SELECT ${projection} FROM ${table} WHERE ${uuid} IN (${marks})`,
       [...batch],
     );
-    records.push(...(await hydrateScope(meta.fields, rows, null, dialect, locale)));
+    records.push(...(await hydrateScope(meta.fields, rows, null, dialect, locale, keepHidden)));
   }
   return keyBy(records, (record) => record.UUID as string);
 }

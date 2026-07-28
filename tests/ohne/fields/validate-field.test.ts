@@ -5,8 +5,9 @@ import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
 import type { FieldInstance } from '../../../src/ohne/fields/field.ts';
 import type { StorageHint } from '../../../src/ohne/fields/storage-hint.ts';
 
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
-import { validateField } from '../../../src/ohne/fields/validate-field.ts';
+import { validateField, validateFieldType } from '../../../src/ohne/fields/validate-field.ts';
 
 const column: FieldType = defineField({ columnType: 'text' });
 const columnLess: FieldType = defineField({
@@ -26,6 +27,9 @@ const childMany: StorageHint = {
   subfields: { title: { type: 'text', options: {} } },
 };
 const blocksHint: StorageHint = { kind: 'blocks' };
+
+const throwsTitled = (fn: () => void, title: string) =>
+  throws(fn, (error: unknown) => isOhneError(error) && error.title === title);
 
 const check = (options: Record<string, unknown>, fieldType = column, hint?: StorageHint) =>
   validateField({
@@ -89,5 +93,79 @@ describe('validateField default rules', () => {
     doesNotThrow(() => check({ default: undefined }));
     doesNotThrow(() => check({ default: undefined }, columnLess, junction));
     doesNotThrow(() => check({ default: undefined }, columnLess, childMany));
+  });
+});
+
+describe('validateField write flags', () => {
+  it('rejects `immutable` beside `writable: false`', () => {
+    throwsTitled(
+      () => check({ writable: false, immutable: true }),
+      'Field `field` sets `immutable` beside `writable: false`',
+    );
+  });
+
+  it('rejects `writable: false` on a required column with no default', () => {
+    throwsTitled(() => check({ writable: false }), 'Field `field` could never take a value');
+  });
+
+  it('accepts `writable: false` with a default', () => {
+    doesNotThrow(() => check({ writable: false, default: 'seed' }));
+  });
+
+  it('accepts `writable: false` on a nullable column', () => {
+    doesNotThrow(() => check({ writable: false, nullable: true }));
+  });
+
+  it('accepts `writable: false` on a column-less field with no default', () => {
+    doesNotThrow(() => check({ writable: false }, columnLess, junction));
+    doesNotThrow(() => check({ writable: false }, columnLess, childMany));
+  });
+
+  it('accepts `writable: false` when the field type carries a `defaultValue`', () => {
+    const stamped: FieldType = defineField({ columnType: 'integer', defaultValue: () => 1 });
+    doesNotThrow(() => check({ writable: false }, stamped));
+  });
+
+  it('rejects `immutable` on a subfield', () => {
+    throwsTitled(
+      () =>
+        validateField({
+          owner: { kind: 'collection', name: 'Posts' },
+          name: 'field',
+          nested: true,
+          instance: { type: 'x', options: { immutable: true } } as unknown as FieldInstance,
+          fieldType: column,
+          hint: undefined,
+        }),
+      'Field `field` cannot be immutable',
+    );
+  });
+
+  it('rejects `immutable` on a block field', () => {
+    throwsTitled(
+      () =>
+        validateField({
+          owner: { kind: 'block', name: 'Hero' },
+          name: 'field',
+          nested: false,
+          instance: { type: 'x', options: { immutable: true } } as unknown as FieldInstance,
+          fieldType: column,
+          hint: undefined,
+        }),
+      'Field `field` cannot be immutable',
+    );
+  });
+});
+
+describe('validateFieldType jsonList', () => {
+  it('rejects `jsonList` on a non-json column', () => {
+    throwsTitled(
+      () => validateFieldType({ columnType: 'text', jsonList: true }),
+      'A `jsonList` field type needs a `json` column',
+    );
+  });
+
+  it('accepts `jsonList` on a `json` column', () => {
+    doesNotThrow(() => validateFieldType({ columnType: 'json', jsonList: true }));
   });
 });

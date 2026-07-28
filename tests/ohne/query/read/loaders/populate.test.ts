@@ -54,6 +54,25 @@ useCollections().register('PPosts', {
     },
   },
 });
+useCollections().register('PVault', {
+  name: 'PVault',
+  collection: {
+    fields: {
+      label: field('text'),
+      owner: field('record', { collection: 'PAuthors', readable: false }),
+      links: field('records', { collection: 'PComments', readable: false }),
+    },
+  },
+});
+useCollections().register('PDeep', {
+  name: 'PDeep',
+  collection: {
+    fields: {
+      note: field('text'),
+      vault: field('record', { collection: 'PVault' }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -334,5 +353,35 @@ describe('pluck through a populate node', () => {
       .populate('comments', (c) => c.select('text'))
       .pluck('comments');
     deepStrictEqual(plucked, [[{ text: 'c1' }, { text: 'c2' }, { text: 'c3' }]]);
+  });
+});
+
+const vault = await create('PVault', { label: 'v1', owner: ada, links: [c1, c2] });
+await create('PDeep', { note: 'n1', vault });
+
+describe('populating a hidden relation', () => {
+  it('stays absent without a populate', async () => {
+    const record = await queryUntyped('PVault').findFirst();
+    strictEqual('owner' in (record ?? {}), false);
+    strictEqual('links' in (record ?? {}), false);
+  });
+
+  it('populates a hidden record and records relation on a full read', async () => {
+    const record = await queryUntyped('PVault')
+      .populate('owner')
+      .populate('links', (l) => l.select('text'))
+      .findFirst();
+    const owner = record?.owner as { email?: string } | undefined;
+    strictEqual(owner?.email, 'ada@ohne.dev');
+    deepStrictEqual(record?.links, [{ text: 'c1' }, { text: 'c2' }]);
+  });
+
+  it('populates a hidden relation one level down, under a null subselect', async () => {
+    const record = await queryUntyped('PDeep')
+      .populate('vault', (v) => v.populate('owner'))
+      .findFirst();
+    const nested = record?.vault as { owner?: { email?: string }; links?: unknown };
+    strictEqual(nested.owner?.email, 'ada@ohne.dev');
+    strictEqual('links' in nested, false);
   });
 });
