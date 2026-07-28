@@ -126,6 +126,11 @@ const UUID_QUERY_ENTRY = '{ scalar: string; id: true }';
 const UPDATED_AT_QUERY_ENTRY = '{ scalar: number }';
 
 /**
+ * The operations every collection contributes a `collection.<Name>.<operation>` capability for.
+ */
+const CAPABILITY_OPERATIONS = ['read', 'create', 'update', 'delete'] as const;
+
+/**
  * The doc a collection's read-shape `UUID` carries.
  */
 const RECORD_UUID_DOC =
@@ -158,7 +163,7 @@ const BLOCK_ARM_DOCS = {
  * `shared/database.ts` carries the pure types: `GeneratedCollections`, `GeneratedBlocks`, and friends.
  * `node/database.ts` imports every collection, block, field-type, and migration definition.
  * Importing it registers them all.
- * It also augments `KnownCollections`, `KnownBlocks`, `KnownFields`, and `KnownDatabases`.
+ * It also augments `KnownCollections`, `KnownBlocks`, `KnownFields`, `KnownDatabases`, and `KnownCapabilities`.
  * Migration registration order is the execution order: furthest layer first, name order within a layer.
  * Both files are written even when empty, so a stale one never imports deleted files.
  *
@@ -235,6 +240,7 @@ function messageResolver(messages: readonly MessageMeta[]): MessageResolver {
 /**
  * Writes `shared/database.ts`, the pure type bucket.
  * It carries `GeneratedCollections`, `GeneratedRelations`, `GeneratedBlocks`, and `GeneratedDatabases`.
+ * `GeneratedCapabilities` derives the capability names from the collection set.
  * `GeneratedLocales` closes the file with the configured locale set.
  * The traversals run before emission, so `importType` records its `import type` lines first.
  */
@@ -451,6 +457,19 @@ async function writeShared(
     code.line('}');
   }
   code.line();
+  code.line('export interface GeneratedCapabilities {');
+  code.indent(() => {
+    code.line("'*': true;");
+    code.line("'collection.*': true;");
+    for (const collection of collections) {
+      for (const operation of CAPABILITY_OPERATIONS) {
+        code.line(`'collection.${collection.name}.${operation}': true;`);
+      }
+      code.line(`'collection.${collection.name}.*': true;`);
+    }
+  });
+  code.line('}');
+  code.line();
   code.line('export interface GeneratedLocales {');
   code.indent(() => {
     for (const locale of locales) code.line(`${propertyKey(locale)}: true;`);
@@ -599,7 +618,7 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
+    "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCapabilities, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohne' {");
@@ -613,6 +632,7 @@ async function writeNode(
     code.line('interface KnownBlocks extends GeneratedBlocks {}');
     code.line('interface KnownDatabases extends GeneratedDatabases {}');
     code.line('interface KnownLocales extends GeneratedLocales {}');
+    code.line('interface KnownCapabilities extends GeneratedCapabilities {}');
     if (augmented.length === 0) {
       code.line('interface KnownFields {}');
     } else {

@@ -13,6 +13,7 @@ import { generateLayerName } from '../codegen/generate-layer-name.ts';
 import { generateMessages } from '../codegen/generate-messages.ts';
 import { generateMiddleware } from '../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../codegen/generate-resolved-config.ts';
+import { generateRoles } from '../codegen/generate-roles.ts';
 import { generateRoutes } from '../codegen/generate-routes.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { syncProjectDatabase } from '../database/sync-project.ts';
@@ -76,6 +77,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
         generateMiddleware(from),
         generateMessages(from),
         generateDatabase(from),
+        generateRoles(from),
       ])
     )
       .flat()
@@ -91,6 +93,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
       'node/middleware.ts',
       'node/messages.ts',
       'node/database.ts',
+      'node/roles.ts',
     ]) {
       const file = joinPath(dir, name);
       if (await exists(file)) await import(pathToFileURL(file).href);

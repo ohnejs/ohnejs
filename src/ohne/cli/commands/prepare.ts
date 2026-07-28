@@ -13,6 +13,7 @@ import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateMessages } from '../../codegen/generate-messages.ts';
 import { generateMiddleware } from '../../codegen/generate-middleware.ts';
 import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
+import { generateRoles } from '../../codegen/generate-roles.ts';
 import { generateRoutes } from '../../codegen/generate-routes.ts';
 import { pruneCodegen } from '../../codegen/prune-codegen.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
@@ -59,6 +60,7 @@ export const prepareCommand = defineCommand({
           generateMiddleware(cwd),
           generateMessages(cwd),
           generateDatabase(cwd),
+          generateRoles(cwd),
         ])
       )
         .flat()

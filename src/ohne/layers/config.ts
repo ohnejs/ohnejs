@@ -11,6 +11,7 @@ import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
+import type { KnownRoles } from '../roles/known-roles.ts';
 import type { LayerName } from './layer-name.ts';
 
 /**
@@ -134,6 +135,17 @@ export interface Config {
     blocks?: string;
 
     /**
+     * Directory each layer's roles are read from.
+     * Each `.ts` file default-exports one `defineRole` result; the file names the role in kebab-case.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'roles'
+     */
+    roles?: string;
+
+    /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
      * A `_`-prefixed file or directory is a helper and is skipped.
@@ -229,6 +241,15 @@ export interface Config {
      * []
      */
     blocks?: LiteralUnion<Extract<keyof KnownBlocks, string>>[];
+
+    /**
+     * Role names to drop, matched exactly.
+     * A dropped role vanishes from registration and the generated `KnownRoles` type.
+     *
+     * @default
+     * []
+     */
+    roles?: LiteralUnion<Extract<keyof KnownRoles, string>>[];
   };
 
   /**
@@ -702,7 +723,7 @@ export interface ConfigExtensions {}
  */
 export const DEFAULTS = {
   layers: [],
-  disable: { routes: [], messages: [], collections: [], fields: [], blocks: [] },
+  disable: { routes: [], messages: [], collections: [], fields: [], blocks: [], roles: [] },
   collections: { locales: ['en'], defaultLocale: 'en' },
   messages: { defaultLanguage: 'en' },
   api: {
@@ -736,6 +757,7 @@ export const DIR_DEFAULTS = {
   collections: 'collections',
   fields: 'fields',
   blocks: 'blocks',
+  roles: 'roles',
   migrations: 'migrations',
   dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
@@ -771,7 +793,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
  * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
- * - `disable.collections`, `disable.fields`, and `disable.blocks` accumulate and dedupe, like `disable.routes`.
+ * - `disable.collections`, `disable.fields`, `disable.blocks`, and `disable.roles` accumulate and dedupe too.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
@@ -786,6 +808,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'disable.collections': 'concat-unique',
   'disable.fields': 'concat-unique',
   'disable.blocks': 'concat-unique',
+  'disable.roles': 'concat-unique',
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',

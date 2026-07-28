@@ -16,6 +16,7 @@ import { createDatabaseTarget } from './targets/database.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRegistryTarget } from './targets/registry.ts';
+import { createRolesTarget } from './targets/roles.ts';
 import { createRoutesTarget } from './targets/routes.ts';
 import { watchLayers } from './watch-layers.ts';
 
@@ -83,8 +84,16 @@ export async function dev(
   const middleware = createMiddlewareTarget(from);
   const messages = createMessagesTarget(from);
   const database = createDatabaseTarget(from);
-  const config = createConfigTarget(from, [registry, routes, middleware, messages, database]);
-  const targets = [registry, routes, middleware, messages, database];
+  const roles = createRolesTarget(from);
+  const config = createConfigTarget(from, [
+    registry,
+    routes,
+    middleware,
+    messages,
+    database,
+    roles,
+  ]);
+  const targets = [registry, routes, middleware, messages, database, roles];
 
   const wantDashboard = options.dashboard ?? true;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(

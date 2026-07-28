@@ -378,6 +378,43 @@ describe('generateDatabase', () => {
     ok(node.includes('interface KnownLocales extends GeneratedLocales {}'));
   });
 
+  it('derives GeneratedCapabilities from the collection set, wildcards included', async () => {
+    const app = join(root, 'capabilities');
+    writePackage(app, 'capabilities');
+    write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
+    write(app, 'collections/Authors.ts', 'export default { fields: {} };\n');
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+    const node = readFileSync(paths[1] ?? '', 'utf8');
+
+    const capabilities = section(shared, 'GeneratedCapabilities');
+    ok(capabilities.includes("'*': true;"));
+    ok(capabilities.includes("'collection.*': true;"));
+    for (const operation of ['read', 'create', 'update', 'delete']) {
+      ok(capabilities.includes(`'collection.Posts.${operation}': true;`));
+      ok(capabilities.includes(`'collection.Authors.${operation}': true;`));
+    }
+    ok(capabilities.includes("'collection.Posts.*': true;"));
+    ok(capabilities.includes("'collection.Authors.*': true;"));
+    ok(node.includes('interface KnownCapabilities extends GeneratedCapabilities {}'));
+  });
+
+  it('emits only the wildcard capabilities when there are no collections', async () => {
+    const app = join(root, 'capabilities-empty');
+    writePackage(app, 'capabilities-empty');
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    const capabilities = section(shared, 'GeneratedCapabilities');
+    ok(capabilities.includes("'*': true;"));
+    ok(capabilities.includes("'collection.*': true;"));
+    ok(!capabilities.includes('collection.Posts'));
+  });
+
   it('types block shapes into GeneratedBlocks, a blocks field unioning its allowed names', async () => {
     const app = join(root, 'blocks');
     writePackage(app, 'blocks');
