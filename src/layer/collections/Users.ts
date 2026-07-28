@@ -8,6 +8,7 @@ import { normalizeEmail } from '../auth/_email.ts';
  *
  * The email is normalized to trimmed-lowercase before it is stored, so its uniqueness is case-insensitive.
  * `password` takes a plaintext password on write; the field type stores its scrypt hash, never the text.
+ * The hash is write-only: no read returns it unless a trusted `select` names it explicitly.
  */
 export default defineCollection({
   fields: {
@@ -20,6 +21,7 @@ export default defineCollection({
     }),
 
     password: field('password', {
+      readable: false,
       label: 'auth.users.password.label',
       description: 'auth.users.password.description',
     }),

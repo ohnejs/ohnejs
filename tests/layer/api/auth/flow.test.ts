@@ -147,6 +147,7 @@ describe('auth flow', () => {
   it('stores passwords and session tokens hashed, never in the clear', async () => {
     await createUser('safe@example.com', 'battery staple');
     const stored = (await queryUntyped('Users')
+      .select('password')
       .where({ email: 'safe@example.com' })
       .findFirst()) as { password: string };
     match(stored.password, /^scrypt\$/);

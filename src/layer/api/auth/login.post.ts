@@ -1,4 +1,4 @@
-import { badRequest, defineHandler, query, readJSONBody, unauthorized } from 'ohne';
+import { badRequest, defineHandler, queryUntyped, readJSONBody, unauthorized } from 'ohne';
 import { isString, isUndefined } from 'ohne/utils';
 import { verifyPassword } from 'ohne/utils/crypto';
 
@@ -22,9 +22,10 @@ export default defineHandler(async (): Promise<User> => {
   if (!isString(email) || !isString(password))
     throw badRequest(translate('auth.invalidCredentials'));
 
-  const user = (await query('Users').where('email', normalizeEmail(email)).findFirst()) as
-    | { UUID: string; email: string; password: string }
-    | undefined;
+  const user = (await queryUntyped('Users')
+    .select('UUID', 'email', 'password')
+    .where({ email: normalizeEmail(email) })
+    .findFirst()) as { UUID: string; email: string; password: string } | undefined;
 
   if (isUndefined(user)) {
     await dummyVerify(password);
