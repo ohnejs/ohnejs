@@ -77,6 +77,9 @@ export interface FieldBaseType {
  * A child hint is assembled from its subfields at codegen, where the registered types are at hand.
  * It therefore throws here, as does a column-less type without a hint.
  *
+ * An `importType` of a program entry (`'ohne'`, `'ohne/dashboard'`) is rejected.
+ * The emitted shapes land in the shared bucket, which both type programs load, so neither entry may leak in.
+ *
  * @example
  * ```ts
  * fieldBaseType({
@@ -110,7 +113,26 @@ export function fieldBaseType<TOptions extends Record<string, AnyOptionDef>>(
   const ctx: EmitTypeContext<TOptions> = {
     name,
     options: resolved,
-    importType: (path, exportName) => imports.reference({ fromDir: fieldDir, path, exportName }),
+    importType: (path, exportName) => {
+      if (path === 'ohne' || path === 'ohne/dashboard') {
+        throw ohneError({
+          title: 'Browser-unsafe type import in `emitType`',
+          body: [
+            'The emitted shapes land in the shared bucket, which both type programs load.',
+            `Importing \`${path}\` there pulls one program's entry into the other.`,
+            '',
+            'Import from a pure types module, or reference generated types with `importGenerated`.',
+          ],
+        });
+      }
+      return imports.reference({ fromDir: fieldDir, path, exportName });
+    },
+    importGenerated: (path, exportName) =>
+      imports.reference({
+        fromDir: imports.dir,
+        path: path.startsWith('.') ? path : `./${path}`,
+        exportName,
+      }),
   };
 
   const emitted = fieldType.emitType ? fieldType.emitType(ctx) : FALLBACK[fieldType.columnType];

@@ -26,9 +26,11 @@ export interface GenerateRolesOptions {
 }
 
 /**
- * Generates the role table from every layer's roles directory.
- * Emits `node/roles.ts` so importing it registers each role into `useRoles`.
- * It types `KnownRoles` with every name, so `RoleName` is the union of all of them.
+ * Generates the role tables from every layer's roles directory.
+ *
+ * Emits `shared/roles.ts`, the pure name table: `GeneratedRoles` and the `GeneratedRoleName` union.
+ * It is import-free, so both type programs load it; with no roles the union falls back to `string`.
+ * Emits `node/roles.ts`, which extends `KnownRoles` from it and registers each role into `useRoles`.
  * Each role is statically imported from its source file by relative path.
  *
  * Roles are read from each layer's `Config.dirs.roles` directory and combined.
@@ -37,17 +39,18 @@ export interface GenerateRolesOptions {
  * Names in `Config.disable.roles` drop before emission.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
- * Output lands in the `node` bucket of the app's `dirs.codegen` (default `.ohne`).
+ * Output lands in the `shared` and `node` buckets of the app's `dirs.codegen` (default `.ohne`).
  *
- * The file is rewritten only when its contents change.
- * Returns the absolute path written, or `null` when no `package.json` is found.
+ * A file is rewritten only when its contents change.
+ * Returns the absolute paths written, or `null` when no `package.json` is found.
  */
 export async function generateRoles(
   from: string = process.cwd(),
   options: GenerateRolesOptions = {},
-): Promise<string | null> {
-  const dir = await codegenBucket(from, 'node');
-  if (isNull(dir)) return null;
+): Promise<string[] | null> {
+  const sharedDir = await codegenBucket(from, 'shared');
+  const nodeDir = await codegenBucket(from, 'node');
+  if (isNull(sharedDir) || isNull(nodeDir)) return null;
 
   const { fresh = false } = options;
   const roles = await collectRoles(stackedLayers(), {
@@ -55,26 +58,32 @@ export async function generateRoles(
     fresh,
   });
 
-  const code = createCodeBuilder();
-  code.line(
-    roles.length === 0 ? "import type {} from 'ohne';" : "import { useRoles } from 'ohne';",
+  const shared = createCodeBuilder();
+  if (roles.length === 0) {
+    shared.line('export interface GeneratedRoles {}');
+  } else {
+    shared.line('export interface GeneratedRoles {');
+    shared.indent(() => {
+      roles.forEach((role) => shared.line(`${propertyKey(role.name)}: true;`));
+    });
+    shared.line('}');
+  }
+  shared.line();
+  shared.line(
+    'export type GeneratedRoleName = [keyof GeneratedRoles] extends [never] ? string : keyof GeneratedRoles;',
   );
+
+  const code = createCodeBuilder();
+  code.line("import type { GeneratedRoles } from '../shared/roles.ts';");
+  if (roles.length > 0) code.line("import { useRoles } from 'ohne';");
   roles.forEach((role, index) => {
-    code.line(`import r${index} from ${literalString(importSpecifier(dir, role.file))};`);
+    code.line(`import r${index} from ${literalString(importSpecifier(nodeDir, role.file))};`);
   });
   code.line();
 
   code.line("declare module 'ohne' {");
   code.indent(() => {
-    if (roles.length === 0) {
-      code.line('interface KnownRoles {}');
-      return;
-    }
-    code.line('interface KnownRoles {');
-    code.indent(() => {
-      roles.forEach((role) => code.line(`${propertyKey(role.name)}: true;`));
-    });
-    code.line('}');
+    code.line('interface KnownRoles extends GeneratedRoles {}');
   });
   code.line('}');
 
@@ -87,7 +96,9 @@ export async function generateRoles(
     });
   }
 
-  const gen = createCodeGenerator({ dir, banner: BANNER });
-  await gen.write('roles.ts', code.toString());
-  return gen.path('roles.ts');
+  const sharedGen = createCodeGenerator({ dir: sharedDir, banner: BANNER });
+  await sharedGen.write('roles.ts', shared.toString());
+  const nodeGen = createCodeGenerator({ dir: nodeDir, banner: BANNER });
+  await nodeGen.write('roles.ts', code.toString());
+  return [sharedGen.path('roles.ts'), nodeGen.path('roles.ts')];
 }

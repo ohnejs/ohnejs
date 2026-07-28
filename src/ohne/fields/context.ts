@@ -55,6 +55,24 @@ export interface EmitTypeContext<
    * ```
    */
   importType(path: string, exportName: string): string;
+
+  /**
+   * Brings a named type from a file ohne generates beside the emitted shapes into the generated file.
+   *
+   * The emitted shapes land in the shared codegen bucket, next to files other generators write there.
+   * `path` names such a file relative to that bucket (`'roles.ts'`); `exportName` is the export to use.
+   * Like `importType`, it adds the `import type` and returns the local name to drop into your string.
+   *
+   * Reach for it when the type only codegen knows, like the union of role names.
+   * The shared bucket loads in both type programs, so the reference stays browser-safe.
+   *
+   * @example
+   * ```ts
+   * // emit the generated role-name union
+   * emitType: (ctx) => `${ctx.importGenerated('roles.ts', 'GeneratedRoleName')}[]`
+   * ```
+   */
+  importGenerated(path: string, exportName: string): string;
 }
 
 /**

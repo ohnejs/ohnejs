@@ -66,6 +66,30 @@ describe('fieldValueType', () => {
     strictEqual(emit(flag).type, "'plain'");
   });
 
+  it('importGenerated references a file beside the generated output', () => {
+    const generated = defineField({
+      columnType: 'json',
+      emitType: (ctx) => `${ctx.importGenerated('roles.ts', 'GeneratedRoleName')}[]`,
+    });
+    const { type, imports } = emit(generated);
+    strictEqual(type, 'GeneratedRoleName[]');
+    deepStrictEqual(imports.statements(), ["import type { GeneratedRoleName } from './roles.ts';"]);
+  });
+
+  it('rejects an emitType import of a program entry', () => {
+    const node = defineField({
+      columnType: 'json',
+      emitType: (ctx) => ctx.importType('ohne', 'RoleName'),
+    });
+    throws(() => emit(node), /Browser-unsafe type import/);
+
+    const browser = defineField({
+      columnType: 'json',
+      emitType: (ctx) => ctx.importType('ohne/dashboard', 'KnownMessages'),
+    });
+    throws(() => emit(browser), /Browser-unsafe type import/);
+  });
+
   it('joins a multiline emitType returning string[] with newlines', () => {
     const point = defineField({
       columnType: 'text',

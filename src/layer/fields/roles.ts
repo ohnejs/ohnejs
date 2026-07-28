@@ -6,14 +6,14 @@ import { isArray, isString, isUndefined, uniqueArray } from 'ohne/utils';
  *
  * Each entry must name a registered role; an unknown name rejects with `auth.unknownRole`.
  * Duplicate entries collapse on write, keeping the first occurrence.
- * The generated value type is `RoleName[]`, so an assignment autocompletes and typechecks.
+ * The generated value type is `GeneratedRoleName[]`, so an assignment autocompletes and typechecks.
  * The `includes` operators probe the list, so a query can filter users by role.
  */
 export default defineField({
   columnType: 'json',
   jsonList: true,
   defaultValue: () => [],
-  emitType: (ctx) => `${ctx.importType('ohne', 'RoleName')}[]`,
+  emitType: (ctx) => `${ctx.importGenerated('roles.ts', 'GeneratedRoleName')}[]`,
   sanitizers: [(value) => (isArray<string[]>(value) ? uniqueArray(value) : value)],
   validators: [
     (value) => {
