@@ -28,6 +28,11 @@ export interface TypeImportRequest {
  */
 export interface TypeImports {
   /**
+   * The output directory relative references re-express against - the generated file's own directory.
+   */
+  readonly dir: string;
+
+  /**
    * Records a reference and returns the local name to use in the generated source.
    *
    * The same export from the same module always returns the same local name.
@@ -73,6 +78,8 @@ export function createTypeImports(outputDir: string): TypeImports {
     path.startsWith('.') ? importSpecifier(outputDir, resolvePath(path, fromDir)) : path;
 
   return {
+    dir: outputDir,
+
     reference({ fromDir, path, exportName }) {
       const specifier = specifierOf(fromDir, path);
       const existing = entries.find(
