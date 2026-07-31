@@ -24,8 +24,9 @@ import { blockQueryMetadata } from '../metadata.ts';
  * A plain `unique` there spans every locale; `uniquePerLocale` narrows the probe to the write's locale.
  * Only fields the write sets are probed, so an update leaves an untouched unique field alone.
  * `excludeUUIDs` drops the rows the write itself owns, so a kept value never collides with its own row.
- * The exclusion anchors by `UUID` on the main table and by `_parentUUID` on the companion.
- * On the companion it binds the write's locale too, since only that locale's rows rewrite.
+ * Each hit returns its anchor - `UUID` on the main table, `_parentUUID` on the companion.
+ * Owned rows filter out in memory, so the exclusion binds no parameters a bulk update could overrun.
+ * On the companion only the write's locale filters, since only that locale's rows rewrite.
  * A record's own other-locale row therefore still probes against a locale-spanning `unique`.
  * A `null` value never collides: `col = NULL` is never true, matching SQLite's multi-null unique rule.
  * Returns a `notUnique` message keyed by each colliding field, or an empty map when the row is clear.
@@ -44,21 +45,15 @@ export async function checkUnique(
       field.options?.unique === true &&
       hasKey(columns, field.column as string),
   );
-  if (uniques.length === 0) return {};
+  if (isEmpty(uniques)) return {};
 
-  const excludeMarks = excludeUUIDs.map(() => '?').join(', ');
   const selects: string[] = [];
   const params: SQLValue[] = [];
   for (const [name, field] of uniques) {
     const companion = field.companion === true;
     const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
     const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
-    const exclude =
-      excludeUUIDs.length === 0
-        ? ''
-        : companion
-          ? ` AND NOT (${anchor} IN (${excludeMarks}) AND ${dialect.quote('_localeCode')} = ?)`
-          : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const rowLocale = companion ? dialect.quote('_localeCode') : 'NULL';
     const scoped = companion && field.options?.uniquePerLocale === true;
     const scope = scoped ? ` AND ${dialect.quote('_localeCode')} = ?` : '';
     const value = dialect.serialize(
@@ -66,18 +61,23 @@ export async function checkUnique(
       columns[field.column as string],
     );
     selects.push(
-      `SELECT ? AS ${dialect.quote('field')} FROM ${table} ` +
-        `WHERE ${dialect.quote(field.column as string)} = ?${scope}${exclude}`,
+      `SELECT ? AS ${dialect.quote('field')}, ${anchor} AS ${dialect.quote('anchor')}, ` +
+        `${rowLocale} AS ${dialect.quote('locale')} FROM ${table} ` +
+        `WHERE ${dialect.quote(field.column as string)} = ?${scope}`,
     );
     params.push(name, value);
     if (scoped) params.push(locale);
-    params.push(...excludeUUIDs);
-    if (companion && excludeUUIDs.length > 0) params.push(locale);
   }
 
-  const rows = await tx.query<{ field: string }>(selects.join(' UNION ALL '), params);
+  const rows = await tx.query<{ field: string; anchor: string; locale: string | null }>(
+    selects.join(' UNION ALL '),
+    params,
+  );
+  const owned = new Set(excludeUUIDs);
   const errors: FieldErrors = {};
-  for (const row of rows) errors[row.field] = 'validation.notUnique';
+  for (const row of rows) {
+    if (!isOwnedRow(row, owned, locale)) errors[row.field] = 'validation.notUnique';
+  }
   return errors;
 }
 
@@ -88,7 +88,7 @@ export async function checkUnique(
  * A composite over translatable fields probes the companion; a plain one, the main table.
  * Only a composite the write sets in full is probed; a partial update falls to the driver's constraint.
  * `excludeUUIDs` drops the rows the write owns, anchored by `UUID` (main) or `_parentUUID` (companion).
- * On the companion the exclusion binds the write's locale too, exactly as `checkUnique`'s does.
+ * Owned rows filter out in memory at the write's locale, exactly as `checkUnique`'s exclusion does.
  * A `null` anywhere in the tuple never collides: `col = NULL` is never true, matching the multi-null rule.
  * Returns `notUnique` at every field of each colliding composite, or an empty map when all are clear.
  */
@@ -103,25 +103,22 @@ export async function checkCompositeUnique(
   const probes = meta.compositeUniques.filter((composite) =>
     composite.fields.every((name) => hasKey(columns, meta.fields[name].column as string)),
   );
-  if (probes.length === 0) return {};
+  if (isEmpty(probes)) return {};
 
-  const excludeMarks = excludeUUIDs.map(() => '?').join(', ');
   const selects: string[] = [];
   const params: SQLValue[] = [];
   probes.forEach((composite, index) => {
     const companion = composite.companion;
     const table = dialect.quote(companion ? (meta.companionTable as string) : meta.table);
     const anchor = dialect.quote(companion ? '_parentUUID' : 'UUID');
-    const exclude =
-      excludeUUIDs.length === 0
-        ? ''
-        : companion
-          ? ` AND NOT (${anchor} IN (${excludeMarks}) AND ${dialect.quote('_localeCode')} = ?)`
-          : ` AND ${anchor} NOT IN (${excludeMarks})`;
+    const rowLocale = companion ? dialect.quote('_localeCode') : 'NULL';
     const matches = composite.fields
       .map((name) => `${dialect.quote(meta.fields[name].column as string)} = ?`)
       .join(' AND ');
-    selects.push(`SELECT ? AS ${dialect.quote('which')} FROM ${table} WHERE ${matches}${exclude}`);
+    selects.push(
+      `SELECT ? AS ${dialect.quote('which')}, ${anchor} AS ${dialect.quote('anchor')}, ` +
+        `${rowLocale} AS ${dialect.quote('locale')} FROM ${table} WHERE ${matches}`,
+    );
     params.push(String(index));
     for (const name of composite.fields) {
       const field = meta.fields[name];
@@ -129,16 +126,32 @@ export async function checkCompositeUnique(
         dialect.serialize(field.logicalType as LogicalType, columns[field.column as string]),
       );
     }
-    params.push(...excludeUUIDs);
-    if (companion && excludeUUIDs.length > 0) params.push(locale);
   });
 
-  const rows = await tx.query<{ which: string }>(selects.join(' UNION ALL '), params);
+  const rows = await tx.query<{ which: string; anchor: string; locale: string | null }>(
+    selects.join(' UNION ALL '),
+    params,
+  );
+  const owned = new Set(excludeUUIDs);
   const errors: FieldErrors = {};
   for (const row of rows) {
+    if (isOwnedRow(row, owned, locale)) continue;
     for (const name of probes[Number(row.which)].fields) errors[name] = 'validation.notUnique';
   }
   return errors;
+}
+
+/**
+ * Whether a probe hit is a row the write itself owns, filtered in memory rather than as bound SQL.
+ * A main-table hit carries a `null` locale and excludes by anchor alone.
+ * A companion hit excludes only at the write's locale, so an owned other-locale row still collides.
+ */
+function isOwnedRow(
+  row: { anchor: string; locale: string | null },
+  owned: ReadonlySet<string>,
+  locale: string,
+): boolean {
+  return owned.has(row.anchor) && (isNull(row.locale) || row.locale === locale);
 }
 
 /**
@@ -148,6 +161,7 @@ export async function checkCompositeUnique(
  * A value already used earlier in this write, or found in the table, errors at its exact dot-path.
  * `excludeUUIDs` drops the child rows an update rewrites: the matched records' whole subtree, at every depth.
  * A kept value then never collides with a row that is itself being rewritten.
+ * Owned rows filter out in memory by `UUID`, so the subtree list never binds as parameters.
  * A `null` never reaches here; the descent skips it, matching the multi-null unique rule.
  */
 export async function checkChildUnique(
@@ -156,12 +170,10 @@ export async function checkChildUnique(
   probes: readonly UniqueProbe[],
   excludeUUIDs: readonly string[] = [],
 ): Promise<FieldErrors> {
-  if (probes.length === 0) return {};
+  if (isEmpty(probes)) return {};
 
   const errors: FieldErrors = {};
-  const excludeMarks = excludeUUIDs.map(() => '?').join(', ');
-  const exclude =
-    excludeUUIDs.length === 0 ? '' : ` AND ${dialect.quote('UUID')} NOT IN (${excludeMarks})`;
+  const owned = new Set(excludeUUIDs);
   const byColumn = groupBy(probes, (probe) => `${probe.table}.${probe.column}`);
   for (const group of Object.values(byColumn)) {
     if (isUndefined(group)) continue;
@@ -172,12 +184,13 @@ export async function checkChildUnique(
     const existing = new Set<SQLValue>();
     for (const batch of chunk(uniqueArray(values), 900)) {
       const marks = batch.map(() => '?').join(', ');
-      const rows = await tx.query<{ value: SQLValue }>(
-        `SELECT ${quotedColumn} AS ${dialect.quote('value')} FROM ${dialect.quote(table)} ` +
-          `WHERE ${quotedColumn} IN (${marks})${exclude}`,
-        [...batch, ...excludeUUIDs],
+      const rows = await tx.query<{ value: SQLValue; UUID: string }>(
+        `SELECT ${quotedColumn} AS ${dialect.quote('value')}, ` +
+          `${dialect.quote('UUID')} AS ${dialect.quote('UUID')} FROM ${dialect.quote(table)} ` +
+          `WHERE ${quotedColumn} IN (${marks})`,
+        [...batch],
       );
-      for (const row of rows) existing.add(row.value);
+      for (const row of rows) if (!owned.has(row.UUID)) existing.add(row.value);
     }
 
     const seen = new Set<SQLValue>();
