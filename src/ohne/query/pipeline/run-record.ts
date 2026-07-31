@@ -297,6 +297,14 @@ export type ProcessResult =
   | { ok: false; errors: FieldErrors };
 
 /**
+ * The result of the whole-record run: `processScope`'s outcome plus the effective input on success.
+ * The effective input is the frozen post-hook copy, the object the scope was actually built from.
+ */
+export type RunRecordResult =
+  | { ok: true; scope: ProcessedScope; input: Readonly<Record<string, unknown>> }
+  | { ok: false; errors: FieldErrors };
+
+/**
  * The scope processor, passed to the composite descent so it can recurse without a module cycle.
  */
 export type ProcessScope = (
@@ -474,12 +482,13 @@ function mergeOutput(scope: ProcessedScope, errors: FieldErrors, output: FieldOu
  * The returned scope is write-ready: columns serialized, relations and children collected, refs gathered.
  * The input is copied shallowly and frozen, so a field callback cannot poison a sibling's read.
  * The caller's own object stays untouched.
+ * A success carries that frozen copy as `input`, so the executor gates against what the scope read.
  */
 export async function runRecord(
   collectionMeta: CollectionQueryMeta,
   input: Readonly<Record<string, unknown>>,
   options: { operation: FieldOperation; tx: Transaction },
-): Promise<ProcessResult> {
+): Promise<RunRecordResult> {
   const ctx: ScopeContext = {
     operation: options.operation,
     collection: collectionMeta.collection,
@@ -494,8 +503,10 @@ export async function runRecord(
   };
   const callbacks = useHooks().get('record:before-change');
   const base =
-    isUndefined(callbacks) || callbacks.length === 0
+    isUndefined(callbacks) || isEmpty(callbacks)
       ? { ...input }
       : await applyHook('record:before-change', { ...input }, changeCtx);
-  return processScope(collectionMeta.fields, Object.freeze(base), ctx);
+  const effective = Object.freeze(base);
+  const result = await processScope(collectionMeta.fields, effective, ctx);
+  return result.ok ? { ok: true, scope: result.scope, input: effective } : result;
 }

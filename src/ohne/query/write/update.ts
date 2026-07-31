@@ -104,7 +104,7 @@ export async function scopeCondition(
   operation: 'update' | 'delete',
 ): Promise<ConditionNode> {
   const callbacks = useHooks().get('record:condition');
-  if (isUndefined(callbacks) || callbacks.length === 0) return condition;
+  if (isUndefined(callbacks) || isEmpty(callbacks)) return condition;
   return applyHook('record:condition', condition, {
     collection: collection as CollectionName,
     operation,
@@ -122,7 +122,7 @@ async function afterUpdate(
   locale: string,
 ): Promise<QueryRecord[]> {
   const callbacks = useHooks().get('record:after-update');
-  if (isUndefined(callbacks) || callbacks.length === 0) return records;
+  if (isUndefined(callbacks) || isEmpty(callbacks)) return records;
   for (const record of records) {
     await applyHook('record:after-update', record, {
       collection: collection as CollectionName,
@@ -208,10 +208,10 @@ async function attemptUpdate(
   }
 
   const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
-  if (matched.length === 0) return { ok: true, records: [] };
+  if (isEmpty(matched)) return { ok: true, records: [] };
 
-  const gates = whenGates(meta.fields, input, scope);
-  if (gates.length === 0 && !hasNestedGates(scope)) {
+  const gates = whenGates(meta.fields, processed.input, scope);
+  if (isEmpty(gates) && !hasNestedGates(scope)) {
     return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale);
   }
   return attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale);
@@ -247,10 +247,9 @@ async function attemptPlainUpdate(
   );
   if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
 
-  const excludeChildUUIDs =
-    scope.uniqueProbes.length === 0
-      ? []
-      : await subtreeChildUUIDs(tx, dialect, meta.fields, matched, code);
+  const excludeChildUUIDs = isEmpty(scope.uniqueProbes)
+    ? []
+    : await subtreeChildUUIDs(tx, dialect, meta.fields, matched, code);
   const childUniqueErrors = await checkChildUnique(
     tx,
     dialect,
@@ -574,7 +573,7 @@ async function subtreeChildUUIDs(
         parents,
         scoped,
       );
-      if (instances.length === 0) continue;
+      if (isEmpty(instances)) continue;
       all.push(...instances.map((instance) => instance.uuid));
       const byType = groupBy(instances, (instance) => instance.type);
       for (const [type, group] of Object.entries(byType)) {
@@ -594,7 +593,7 @@ async function subtreeChildUUIDs(
     if (field.kind !== 'childOne' && field.kind !== 'childMany') continue;
     const scoped = field.localeScoped === true ? locale : null;
     const rows = await childUUIDsUnder(tx, dialect, field.table as string, parents, scoped);
-    if (rows.length === 0) continue;
+    if (isEmpty(rows)) continue;
     all.push(...rows);
     all.push(
       ...(await subtreeChildUUIDs(

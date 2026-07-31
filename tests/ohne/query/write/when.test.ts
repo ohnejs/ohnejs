@@ -471,6 +471,18 @@ describe('when gate on update fires hooks per matched record', () => {
     ok(seen.includes('u-h1'));
     ok(seen.includes('u-h2'));
   });
+
+  it('gates a field stamped by `record:before-change` per matched record', async () => {
+    await seed('u-h3', 'sale', 1);
+    await seed('u-h4', 'regular', 2);
+    hook('record:before-change', (input) => {
+      input.discount = 50;
+    });
+    const result = await runUpdate('WUProduct', { title: 'T' }, inUUIDs(['u-h3', 'u-h4']), null);
+    ok(result.ok);
+    strictEqual(pick(result.records, 'sale').discount, 50);
+    strictEqual(pick(result.records, 'regular').discount, 2);
+  });
 });
 
 describe('when gate on update over a relation', () => {
