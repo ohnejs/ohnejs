@@ -1,6 +1,6 @@
 import type { ConditionNode } from '../../utils/index.ts';
 
-import { isNull } from '../../utils/index.ts';
+import { hasKey, isArray, isEmpty, isNull } from '../../utils/index.ts';
 
 /**
  * A sort direction: ascending or descending.
@@ -96,6 +96,7 @@ export interface QueryIR {
 /**
  * Freezes builder state into an immutable `QueryIR`, folding the accumulated conditions into one node.
  * Sibling conditions AND together; an empty set is `null`, a single condition stands alone.
+ * Every subtree freezes as a copy - condition, order, populate - so mutating the IR throws at any depth.
  */
 export function freezeIR(state: {
   collection: string;
@@ -107,22 +108,69 @@ export function freezeIR(state: {
   populate: readonly PopulateNode[];
   locale: string | null;
 }): QueryIR {
-  const condition =
-    state.conditions.length === 0
-      ? null
-      : state.conditions.length === 1
-        ? state.conditions[0]
-        : { kind: 'and' as const, nodes: [...state.conditions] };
+  const condition = isEmpty(state.conditions)
+    ? null
+    : state.conditions.length === 1
+      ? freezeConditionNode(state.conditions[0])
+      : Object.freeze({
+          kind: 'and' as const,
+          nodes: Object.freeze(state.conditions.map(freezeConditionNode)),
+        });
   return Object.freeze({
     collection: state.collection,
     condition,
     select: isNull(state.select) ? null : Object.freeze([...state.select]),
-    order: Object.freeze([...state.order]),
+    order: Object.freeze(state.order.map(freezeOrderEntry)),
     limit: state.limit,
     offset: state.offset,
     populate: Object.freeze(state.populate.map(freezePopulateNode)),
     locale: state.locale,
   });
+}
+
+/**
+ * Deep-freezes one condition node: its path, its value list, its children recursively, and the node itself.
+ * Copies rather than freezing in place, so the builder's own accumulated nodes stay untouched.
+ */
+function freezeConditionNode(node: ConditionNode): ConditionNode {
+  switch (node.kind) {
+    case 'and':
+    case 'or':
+      return Object.freeze({
+        kind: node.kind,
+        nodes: Object.freeze(node.nodes.map(freezeConditionNode)),
+      });
+    case 'has':
+      return Object.freeze({
+        kind: node.kind,
+        path: Object.freeze([...node.path]),
+        condition: isNull(node.condition) ? null : freezeConditionNode(node.condition),
+        negated: node.negated,
+      });
+    case 'empty':
+      return Object.freeze({
+        kind: node.kind,
+        path: Object.freeze([...node.path]),
+        negated: node.negated,
+      });
+    case 'compare':
+      return Object.freeze({
+        kind: node.kind,
+        path: Object.freeze([...node.path]),
+        op: node.op,
+        ...(hasKey(node, 'value')
+          ? { value: isArray(node.value) ? Object.freeze([...node.value]) : node.value }
+          : {}),
+        negated: node.negated,
+      });
+  }
+}
+
+/**
+ * Freezes one order entry as a copy, so the builder's own entry stays untouched.
+ */
+function freezeOrderEntry(entry: OrderEntry): OrderEntry {
+  return Object.freeze({ field: entry.field, direction: entry.direction });
 }
 
 /**
