@@ -3,7 +3,7 @@ import type { SQLValue } from '../../database/adapter.ts';
 import type { Dialect, ListMembershipOperator, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
-import { isNull, isUndefined } from '../../../utils/index.ts';
+import { isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
 import { blockQueryMetadata, queryMetadata } from '../metadata.ts';
@@ -87,6 +87,10 @@ function compileNode(
       if (node.op === 'includes' || node.op === 'includesAll' || node.op === 'includesAny') {
         return membershipFragment(node, scope, field, dialect);
       }
+      if (node.op === 'in' && node.negated && isEmpty(node.value)) {
+        // The empty-set probe is column-free, so a bare `NOT` over it would match `NULL` rows.
+        return rawFragment(`${fieldRef(scope, field, dialect)} IS NOT NULL`);
+      }
       const fragment = compareFragment(
         node.op,
         fieldRef(scope, field, dialect),
@@ -114,7 +118,7 @@ function group(
   dialect: Dialect,
   ctx: CompileContext,
 ): SQLFragment {
-  if (nodes.length === 0) return rawFragment(constant);
+  if (isEmpty(nodes)) return rawFragment(constant);
   const fragments = nodes.map((child) => compileNode(child, scope, dialect, ctx));
   if (fragments.length === 1) return fragments[0];
   const joined = joinFragments(fragments, separator);

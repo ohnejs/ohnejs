@@ -231,6 +231,17 @@ describe('compileWhere', () => {
     });
   });
 
+  it('a negated empty `in` keeps the null rule, compiling to `IS NOT NULL`', () => {
+    deepStrictEqual(compile({ views: { not: { in: [] } } }), {
+      sql: '"views" IS NOT NULL',
+      params: [],
+    });
+    deepStrictEqual(compile({ views: { not: { in: [50] } } }), {
+      sql: 'NOT ("views" IN (?))',
+      params: [50],
+    });
+  });
+
   it('a comparison `or` disjoins its own operators, parenthesized', () => {
     deepStrictEqual(compile({ views: { atLeast: 100, or: [{ equalsTo: 0 }] } }), {
       sql: '("views" >= ? OR "views" = ?)',
