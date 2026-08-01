@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -38,5 +38,16 @@ describe('scanLayerAugmentations', () => {
 
   it('returns [] for a directory that does not exist', async () => {
     strictEqual((await scanLayerAugmentations(join(root, 'nowhere'))).length, 0);
+  });
+
+  it('ignores an unimportable path when the file does not augment', async () => {
+    write('plain/notes#draft.ts', 'export const x = 1\n');
+    const hooks = write('plain/hooks.ts', "declare module 'ohne' {}\n");
+    deepStrictEqual(await scanLayerAugmentations(join(root, 'plain')), [hooks]);
+  });
+
+  it('throws for an augmenting file whose path holds an unimportable character', async () => {
+    write('bad/aug#weird.ts', "declare module 'ohne' {}\n");
+    await rejects(scanLayerAugmentations(join(root, 'bad')), /Unsupported character `#`/);
   });
 });
