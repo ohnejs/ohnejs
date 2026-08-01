@@ -2,6 +2,7 @@ import { formatSSE, type FormatSSEOptions } from '../../utils/sse/format-sse.ts'
 import { useResponse } from './use-response.ts';
 
 const OPEN = ': open\n\n';
+const MAX_QUEUED_FRAMES = 1024;
 
 /**
  * An open Server-Sent Events stream: the response body plus the controls to push and end it.
@@ -16,6 +17,7 @@ export interface EventStream {
   /**
    * Sends one event to the client.
    * A call after the stream has closed is a no-op.
+   * A stalled client is disconnected once `1024` frames sit unread, so it never buffers without bound.
    */
   send(data: string, options?: FormatSSEOptions): void;
 
@@ -88,7 +90,12 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
         controller.enqueue(encoder.encode(formatSSE(data, frameOptions)));
       } catch {
         finish();
+        return;
       }
+      // The transport stops pulling for a stalled client, so an uncapped queue grows with every send.
+      if ((controller.desiredSize ?? 1) > -MAX_QUEUED_FRAMES) return;
+      controller.close();
+      finish();
     },
     close() {
       if (!open) return;

@@ -64,4 +64,34 @@ describe('sendEvents', () => {
     strictEqual(closed, true);
     stream.send('after-cancel');
   });
+
+  it('disconnects a stalled client once the unread queue passes the frame bound', () => {
+    let closed = false;
+    const stream = runWithEvent(makeEvent(), () =>
+      sendEvents({ onClose: () => void (closed = true) }),
+    );
+    let sent = 0;
+    while (!closed && sent < 2000) {
+      stream.send(`m${sent}`);
+      sent++;
+    }
+    strictEqual(closed, true);
+    strictEqual(sent <= 1030, true);
+  });
+
+  it('keeps a draining client connected across many more sends than the bound', async () => {
+    let closed = false;
+    const stream = runWithEvent(makeEvent(), () =>
+      sendEvents({ onClose: () => void (closed = true) }),
+    );
+    const consumed = read(stream.body);
+    for (let batch = 0; batch < 30; batch++) {
+      for (let i = 0; i < 100; i++) stream.send('m');
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    strictEqual(closed, false);
+    stream.close();
+    const text = await consumed;
+    strictEqual(text.split('data: m\n\n').length - 1, 3000);
+  });
 });
