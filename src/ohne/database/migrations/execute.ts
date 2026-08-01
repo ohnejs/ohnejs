@@ -1544,6 +1544,7 @@ function readRows(engine: Engine, source: TableSchema): Promise<Record<string, S
  * A throwing transform and a `NULL` bound for a `NOT NULL` column refuse, naming the migration.
  * A parent moving onto its child-one table with no child row yet inserts a fresh one.
  * So nesting a column into a newly added object materializes the child rows instead of refusing.
+ * A translatable child-one stamps the fresh row at the default locale, as a composite flip does.
  * Any other cross-table row with no target row loses its value when `from` drops: refused unless force.
  * Force drops those values and reports them.
  */
@@ -1565,10 +1566,18 @@ async function writeValues(
   // A parent moving onto its child-one table can materialize the child row a plain move would miss.
   const insertsChild =
     target.derived?.kind === 'childOne' && targetKey.length === 1 && targetKey[0] === '_parentUUID';
+  const stampsLocale =
+    insertsChild && target.columns.some((column) => column.name === '_localeCode');
+  const insertColumns = [
+    'UUID',
+    '_parentUUID',
+    ...(stampsLocale ? ['_localeCode'] : []),
+    to.column,
+  ];
   const insert = insertsChild
     ? `INSERT INTO ${dialect.quote(to.table)} ` +
-      `(${dialect.quote('UUID')}, ${dialect.quote('_parentUUID')}, ${dialect.quote(to.column)}) ` +
-      `VALUES (?, ?, ?)`
+      `(${insertColumns.map((name) => dialect.quote(name)).join(', ')}) ` +
+      `VALUES (${insertColumns.map(() => '?').join(', ')})`
     : undefined;
   const localeKeyed = source.columns.some((column) => column.name === '_localeCode');
   let unmatched = 0;
@@ -1613,7 +1622,13 @@ async function writeValues(
     const { changes } = await db.run(update, params);
     if (changes > 0) continue;
     if (!isUndefined(insert)) {
-      await db.run(insert, [uuidv7(), row[sourceKey[0] as string] ?? null, serialized]);
+      const anchor = row[sourceKey[0] as string] ?? null;
+      await db.run(
+        insert,
+        stampsLocale
+          ? [uuidv7(), anchor, engine.defaultLocale, serialized]
+          : [uuidv7(), anchor, serialized],
+      );
       continue;
     }
     unmatched++;

@@ -1571,3 +1571,44 @@ describe('executeMigrations cascade over junctions', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations materializes translatable child rows', () => {
+  it('stamps a fresh locale-scoped child-one row at the default locale', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'subtitle', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "subtitle") VALUES (?, ?)', ['p1', 'hello']);
+    const postsMeta = table('Posts_meta', {
+      columns: [
+        UUID,
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        { name: 'subtitle', type: 'text', notNull: false },
+      ],
+      derived: { collection: 'Posts', path: ['meta'], kind: 'childOne' },
+    });
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-nest-subtitle', {
+          from: { collection: 'Posts', field: 'subtitle' },
+          to: { collection: 'Posts', field: 'meta.subtitle' },
+        }),
+      ],
+      desired: [table('Posts'), postsMeta],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-nest-subtitle', status: 'applied' }]);
+    const rows = await db.query<{ _parentUUID: string; _localeCode: string; subtitle: string }>(
+      'SELECT "_parentUUID", "_localeCode", "subtitle" FROM "Posts_meta"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._parentUUID, row._localeCode, row.subtitle]),
+      [['p1', 'en', 'hello']],
+    );
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID']);
+    await db.close();
+  });
+});
