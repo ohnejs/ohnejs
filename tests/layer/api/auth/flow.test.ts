@@ -174,3 +174,36 @@ describe('auth flow', () => {
     strictEqual(((await response.json()) as { email: string }).email, 'gate@example.com');
   });
 });
+
+describe('createSession sweeps expired rows', () => {
+  async function userUUID(email: string): Promise<string> {
+    const row = await db.queryOne<{ UUID: string }>(
+      'SELECT "UUID" FROM "Users" WHERE "email" = ?',
+      [email],
+    );
+    ok(row);
+    return row.UUID;
+  }
+
+  it('purges expired sessions on the next login, keeping live ones', async () => {
+    await createUser('sweeper@example.com', 'correct horse');
+    await createUser('bystander@example.com', 'correct horse');
+    strictEqual((await login('sweeper@example.com', 'correct horse')).status, 200);
+    strictEqual((await login('bystander@example.com', 'correct horse')).status, 200);
+
+    const sweeper = await userUUID('sweeper@example.com');
+    await db.run('UPDATE "Sessions" SET "expiresAt" = ? WHERE "user" = ?', [1, sweeper]);
+
+    strictEqual((await login('sweeper@example.com', 'correct horse')).status, 200);
+
+    const rows = await db.query<{ user: string; expiresAt: number }>(
+      'SELECT "user", "expiresAt" FROM "Sessions"',
+    );
+    strictEqual(rows.filter((row) => row.expiresAt <= Date.now()).length, 0);
+    strictEqual(rows.filter((row) => row.user === sweeper).length, 1);
+    strictEqual(
+      rows.filter((row) => row.user !== sweeper && row.expiresAt > Date.now()).length >= 1,
+      true,
+    );
+  });
+});

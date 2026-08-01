@@ -1,4 +1,4 @@
-import { query } from 'ohne';
+import { query, queryUntyped } from 'ohne';
 import { parseDuration } from 'ohne/utils';
 import { randomToken } from 'ohne/utils/crypto';
 
@@ -9,6 +9,7 @@ import { useAuthConfig } from './config.ts';
 /**
  * Opens a session for a user, storing its token hash and writing the session cookie.
  * The raw token exists only in the cookie; the row keeps its hash and an `expiresAt` from `sessionMaxAge`.
+ * Expired rows sweep out first, so abandoned sessions never accrete in the store.
  * Call it after a successful `register` or `login`.
  *
  * @example
@@ -18,11 +19,14 @@ import { useAuthConfig } from './config.ts';
  */
 export async function createSession(userUUID: string): Promise<void> {
   const token = randomToken(32);
-  const expiresAt = Date.now() + parseDuration(useAuthConfig().sessionMaxAge);
+  const now = Date.now();
+  await queryUntyped('Sessions')
+    .where({ expiresAt: { atMost: now } })
+    .delete();
   await query('Sessions').createOrThrow({
     user: userUUID,
     tokenHash: hashSessionToken(token),
-    expiresAt,
+    expiresAt: now + parseDuration(useAuthConfig().sessionMaxAge),
   });
   writeSessionCookie(token);
 }
