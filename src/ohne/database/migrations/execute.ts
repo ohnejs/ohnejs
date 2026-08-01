@@ -23,6 +23,7 @@ import {
   chunk,
   deepEqual,
   errorMessage,
+  isEmpty,
   isNull,
   isUndefined,
   jsonClone,
@@ -680,7 +681,7 @@ async function fanOutScalars(
       live.columns.some((item) => item.name === column.name) &&
       desiredMain?.columns.every((item) => item.name !== column.name) === true,
   );
-  if (flips.length === 0) return;
+  if (isEmpty(flips)) return;
   for (const column of flips) {
     const source = live.columns.find((item) => item.name === column.name) as ColumnSchema;
     if (dialect.columnType(source.type) !== dialect.columnType(column.type)) {
@@ -974,7 +975,7 @@ function switchOwner(lowered: LoweredSwitch): DerivedOwner | undefined {
  */
 function fieldPathTable(owner: DerivedOwner, segments: readonly string[] | undefined): string {
   const prefix = segments?.slice(0, -1) ?? [];
-  if (prefix.length === 0) return ownerTableName(owner);
+  if (isEmpty(prefix)) return ownerTableName(owner);
   return derivedTableName(derivedRootName(owner), prefix[0] as string, ...prefix.slice(1));
 }
 
@@ -1302,7 +1303,7 @@ async function runValuePass(
   const schema = await describe(engine, lowered.table);
   const columnDef = schema.columns.find((item) => item.name === column) as ColumnSchema;
   assertNotPrimaryKey(meta, schema, { table: lowered.table, column, type: columnDef.type });
-  if (schema.primaryKey.length === 0) {
+  if (isEmpty(schema.primaryKey)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot correlate rows`,
       body: [`\`${lowered.table}\` has no primary key to correlate rows by.`],
@@ -1346,20 +1347,18 @@ async function runValuePass(
  * Child tables, junctions, wrappers, and companions keyed to the deleted rows die next, recursively.
  * Rows of a per-type block table pull the wrapper rows referencing them along too:
  * the link is polymorphic, so no key would ever cascade it.
- * A junction row deletes by its link triple; every other table by its primary key.
+ * A junction row deletes by its link pair, plus `_localeCode` when the table carries it.
+ * Every other table deletes by its primary key.
  */
 async function deleteOwnedRows(
   engine: Engine,
   schema: TableSchema,
   doomed: readonly Record<string, SQLValue>[],
 ): Promise<void> {
-  if (doomed.length === 0) return;
+  if (isEmpty(doomed)) return;
   const { db, dialect } = engine;
   const claim = engine.claimed[schema.name];
-  const keyColumns =
-    schema.primaryKey.length > 0
-      ? schema.primaryKey
-      : ['_parentUUID', '_targetUUID', '_localeCode'];
+  const keyColumns = isEmpty(schema.primaryKey) ? junctionKeyColumns(schema) : schema.primaryKey;
   if (claim?.derived?.kind === 'blocksWrapper') {
     const universe: SweepTable[] = Object.entries(engine.claimed)
       .filter(([name]) => engine.names.has(name))
@@ -1379,7 +1378,7 @@ async function deleteOwnedRows(
     );
   }
   const parents = doomed.flatMap((row) => (isUndefined(row.UUID) ? [] : [row.UUID as SQLValue]));
-  if (parents.length === 0) return;
+  if (isEmpty(parents)) return;
   const block = claim?.block;
   if (!isUndefined(block)) {
     for (const [name, item] of Object.entries(engine.claimed)) {
@@ -1417,12 +1416,23 @@ async function deleteOwnedRows(
         )),
       );
     }
-    if (orphaned.length === 0) continue;
+    if (isEmpty(orphaned)) continue;
     engine.deletions.push(
       `- \`${orphaned.length}\` ${pluralize(orphaned.length, 'row')} of \`${name}\` deleted, following ${orphaned.length === 1 ? 'its deleted parent' : 'their deleted parents'}`,
     );
     await deleteOwnedRows(engine, childSchema, orphaned);
   }
+}
+
+/**
+ * The delete key for a keyless junction row: the link pair, with `_localeCode` only when the table has it.
+ * A plain junction carries no locale column; a translatable one scopes each link per locale.
+ */
+function junctionKeyColumns(schema: TableSchema): string[] {
+  const key = ['_parentUUID', '_targetUUID'];
+  return schema.columns.some((column) => column.name === '_localeCode')
+    ? [...key, '_localeCode']
+    : key;
 }
 
 /**
@@ -1548,7 +1558,7 @@ async function writeValues(
   const { db, dialect } = engine;
   const { from, to, transform } = form;
   const { sourceKey, targetKey } = resolveCorrelation(engine, meta, source, target);
-  if (rows.length === 0) return;
+  if (isEmpty(rows)) return;
   const notNull = target.columns.find((column) => column.name === to.column)?.notNull === true;
   const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
@@ -1652,7 +1662,7 @@ function resolveCorrelation(
       return { sourceKey: ['UUID'], targetKey: ['_parentUUID'] };
     }
   }
-  if (source.primaryKey.length === 0) {
+  if (isEmpty(source.primaryKey)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot correlate rows`,
       body: [`\`${source.name}\` has no primary key to correlate rows by.`],

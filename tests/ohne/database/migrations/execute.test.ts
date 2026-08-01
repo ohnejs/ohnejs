@@ -1507,3 +1507,67 @@ describe('executeMigrations with block addresses', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations cascade over junctions', () => {
+  it('cascades a `deleteRecord` through a plain junction with no locale column', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+    });
+    const users = table('Users');
+    const junction = table('Posts_authors', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_targetUUID', type: 'text', notNull: true },
+        { name: '_parentPosition', type: 'integer', notNull: true },
+      ],
+      primaryKey: [],
+      derived: { collection: 'Posts', path: ['authors'], kind: 'junction' },
+    });
+    await materialize(db, [posts, users, junction]);
+    await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?), (?, ?)', [
+      'p1',
+      'keep',
+      'p2',
+      null,
+    ]);
+    await db.run('INSERT INTO "Users" ("UUID") VALUES (?)', ['a1']);
+    await db.run(
+      'INSERT INTO "Posts_authors" ("_parentUUID", "_targetUUID", "_parentPosition") ' +
+        'VALUES (?, ?, ?), (?, ?, ?)',
+      ['p1', 'a1', 0, 'p2', 'a1', 0],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-title-required', {
+          from: { collection: 'Posts', field: 'title', nullable: true },
+          transform: (value, _row, ctx) => (value === null ? ctx.deleteRecord() : undefined),
+        }),
+      ],
+      desired: [
+        table('Posts', { columns: [UUID, { name: 'title', type: 'text', notNull: true }] }),
+      ],
+      claimed: classifySchema([posts, users, junction]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-title-required', status: 'applied' }]);
+    const kept = await db.query<{ UUID: string }>('SELECT "UUID" FROM "Posts"');
+    deepStrictEqual(
+      kept.map((row) => row.UUID),
+      ['p1'],
+    );
+    const links = await db.query<{ _parentUUID: string }>(
+      'SELECT "_parentUUID" FROM "Posts_authors"',
+    );
+    deepStrictEqual(
+      links.map((row) => row._parentUUID),
+      ['p1'],
+    );
+    ok(
+      outcome.deletions.some((line) =>
+        /row of `Posts_authors` deleted, following its deleted parent/.test(line),
+      ),
+    );
+    await db.close();
+  });
+});
