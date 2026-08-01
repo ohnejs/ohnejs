@@ -219,6 +219,18 @@ describe('createServer', () => {
     });
   });
 
+  it('releases the gate when a request:complete hook throws', async () => {
+    hook('request:complete', () => {
+      throw new Error('boom');
+    });
+    await withServer([makeRoute('GET', '/x', () => 'ok')], async (base, gate) => {
+      const res = await fetch(`${base}/x`);
+      strictEqual(await res.text(), 'ok');
+      await waitFor(() => gate.pending === 0);
+      strictEqual(gate.pending, 0);
+    });
+  });
+
   it('trusts X-Forwarded headers from a peer in the configured proxy CIDR', async () => {
     await withServer(
       [makeRoute('GET', '/p', () => useEvent().url.href)],

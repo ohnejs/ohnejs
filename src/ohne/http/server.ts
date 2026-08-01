@@ -10,6 +10,7 @@ import type { RouteMatch, Router } from './router.ts';
 import {
   createGate,
   errorMessage,
+  isEmpty,
   isNull,
   isUndefined,
   normalizeBasePath,
@@ -347,14 +348,18 @@ async function handle(
     }
   } finally {
     if (drain) await drain();
-    if (event) await completeRequest(event);
+    try {
+      if (event) await completeRequest(event);
+    } catch (error) {
+      usePrinter().error(`\`request:complete\` rejected: ${errorMessage(error)}`);
+    }
     release();
   }
 }
 
 async function completeRequest(event: Event): Promise<void> {
   const callbacks = useHooks().get('request:complete');
-  if (isUndefined(callbacks) || callbacks.length === 0) return;
+  if (isUndefined(callbacks) || isEmpty(callbacks)) return;
   await applyHook('request:complete', event);
 }
 
