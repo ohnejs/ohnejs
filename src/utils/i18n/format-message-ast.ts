@@ -49,7 +49,8 @@ const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium',
  *
  * Soft failures (missing param, uncoercible value) call `onError`.
  * Simple, `number`, `date`, `time` args render the `{name}` placeholder.
- * `plural` and `select` fall through to the `other` branch.
+ * `select` falls through to the `other` branch.
+ * `plural` renders the value `0`, so an `=0` exact or the locale's category case wins before `other`.
  *
  * Hard failures (unsupported skeleton stem, bare `currency` style) throw `MessageFormatError`.
  *
