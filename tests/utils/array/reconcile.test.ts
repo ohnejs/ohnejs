@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { longestIncreasingSubsequence, type Patch, reconcile } from '../../../src/utils/index.ts';
+import { type Patch, reconcile } from '../../../src/utils/index.ts';
 
 const apply = <K>(oldKeys: readonly K[], patches: readonly Patch<K>[]): K[] => {
   const arr = [...oldKeys];
@@ -14,9 +14,6 @@ const apply = <K>(oldKeys: readonly K[], patches: readonly Patch<K>[]): K[] => {
   }
   return arr;
 };
-
-const minMoves = (oldKeys: readonly string[], newKeys: readonly string[]): number =>
-  newKeys.length - longestIncreasingSubsequence(newKeys.map((key) => oldKeys.indexOf(key))).length;
 
 describe('reconcile', () => {
   it('emits nothing for identical lists', () => {
@@ -77,23 +74,14 @@ describe('reconcile', () => {
   });
 
   it('moves the minimal number of retained keys', () => {
-    const permutations: Array<[string[], string[]]> = [
-      [
-        ['a', 'b', 'c'],
-        ['b', 'c', 'a'],
-      ],
-      [
-        ['a', 'b', 'c'],
-        ['c', 'b', 'a'],
-      ],
-      [
-        ['a', 'b', 'c', 'd', 'e'],
-        ['c', 'a', 'e', 'b', 'd'],
-      ],
+    const permutations: Array<[string[], string[], number]> = [
+      [['a', 'b', 'c'], ['b', 'c', 'a'], 1],
+      [['a', 'b', 'c'], ['c', 'b', 'a'], 2],
+      [['a', 'b', 'c', 'd', 'e'], ['c', 'a', 'e', 'b', 'd'], 2],
     ];
-    for (const [oldKeys, newKeys] of permutations) {
+    for (const [oldKeys, newKeys, minimal] of permutations) {
       const moves = reconcile(oldKeys, newKeys).filter((patch) => patch.op === 'move').length;
-      strictEqual(moves, minMoves(oldKeys, newKeys));
+      strictEqual(moves, minimal);
     }
   });
 });
