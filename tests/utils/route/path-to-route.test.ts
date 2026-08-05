@@ -24,10 +24,10 @@ describe('pathToRoute', () => {
     }
   });
 
-  it('extracts a method from a colon-param file', () => {
+  it('extracts a method from a colon-param file, normalizing the param', () => {
     deepStrictEqual(pathToRoute('./users/:id.get.ts'), {
       method: 'GET',
-      pattern: '/users/:id',
+      pattern: '/users/[id]',
     });
   });
 

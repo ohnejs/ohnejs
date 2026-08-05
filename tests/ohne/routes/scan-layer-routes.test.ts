@@ -48,4 +48,11 @@ describe('scanLayerRoutes', () => {
     writeRoute(clashing.dir, 'users/index.get.ts');
     await rejects(scanLayerRoutes(clashing, 'api'), /Duplicate route `GET \/users`/);
   });
+
+  it('collides the `[id]` and `:id` spellings of the same param route', async () => {
+    const spelled: OhneLayer = { name: 'spelled', dir: join(root, 'spelled') };
+    writeRoute(spelled.dir, 'users/[id].get.ts');
+    writeRoute(spelled.dir, 'users/:id.get.ts');
+    await rejects(scanLayerRoutes(spelled, 'api'), /Duplicate route `GET \/users\/\[id\]`/);
+  });
 });

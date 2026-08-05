@@ -22,8 +22,8 @@ describe('pathToRoutePattern', () => {
     strictEqual(pathToRoutePattern('./files/[...path].ts'), '/files/[...path]');
   });
 
-  it('preserves colon params', () => {
-    strictEqual(pathToRoutePattern('./users/:id.ts'), '/users/:id');
+  it('normalizes colon params to bracket form', () => {
+    strictEqual(pathToRoutePattern('./users/:id.ts'), '/users/[id]');
   });
 
   it('accepts any file extension', () => {
