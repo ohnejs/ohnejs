@@ -5,6 +5,7 @@ import { listDir, readJSON } from '../../utils/fs/index.ts';
 import {
   canonicalizeLanguage,
   dirname,
+  hasKey,
   isNull,
   isPlainObject,
   isString,
@@ -25,6 +26,7 @@ import { ohneError } from '../error/ohne-error.ts';
  * Results are sorted by file path so the output is deterministic.
  * Returns `[]` when the layer has no messages directory.
  * Throws when two files in the layer define the same key for the same language.
+ * Throws too when one file lands on the same flattened key twice, nested and as a literal dotted key.
  *
  * @example
  * ```ts
@@ -75,7 +77,19 @@ export async function scanLayerMessages(
     const dir = dirname(entry.relativePath);
     const prefix = dir === '.' ? '' : dir.split('/').join('.');
 
-    for (const [rawKey, value] of Object.entries(flattenMessages(data))) {
+    const flat: Record<string, unknown> = {};
+    flattenMessages(data, '', flat, (key) => {
+      throw ohneError({
+        title: `Duplicate message \`${prefix === '' ? key : `${prefix}.${key}`}\` for \`${language}\``,
+        body: [
+          'The file defines the same flattened key twice, nested and as a literal dotted key.',
+          'Keep one definition.',
+        ],
+        path: entry.path,
+      });
+    });
+
+    for (const [rawKey, value] of Object.entries(flat)) {
       const key = prefix === '' ? rawKey : `${prefix}.${rawKey}`;
       if (!isString(value)) {
         throw ohneError({
@@ -106,12 +120,23 @@ export async function scanLayerMessages(
   return result;
 }
 
-function flattenMessages(value: Record<string, unknown>, prefix = ''): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+/**
+ * Flattens nested objects into dot-notation keys, calling `clash` when two entries land on one key.
+ * A nested object and a literal dotted key can collide; last-wins would silently drop a translation.
+ */
+function flattenMessages(
+  value: Record<string, unknown>,
+  prefix: string,
+  result: Record<string, unknown>,
+  clash: (key: string) => void,
+): void {
   for (const [key, child] of Object.entries(value)) {
     const path = prefix === '' ? key : `${prefix}.${key}`;
-    if (isPlainObject(child)) Object.assign(result, flattenMessages(child, path));
-    else result[path] = child;
+    if (isPlainObject(child)) {
+      flattenMessages(child, path, result, clash);
+      continue;
+    }
+    if (hasKey(result, path)) clash(path);
+    result[path] = child;
   }
-  return result;
 }

@@ -103,6 +103,13 @@ describe('scanLayerMessages', () => {
     await rejects(scanLayerMessages(l, 'messages'), /Duplicate message `group\.bar` for `en`/);
   });
 
+  it('throws when a nested key and a literal dotted key collide in one file', async () => {
+    const l = layer('dupfile', {
+      'en.json': { api: { notFound: 'nested value' }, 'api.notFound': 'literal value' },
+    });
+    await rejects(scanLayerMessages(l, 'messages'), /Duplicate message `api\.notFound` for `en`/);
+  });
+
   it('throws when a file is not named after a valid language tag', async () => {
     const l = layer('badlang', { 'en_US.json': { hi: 'Hi' } });
     await rejects(scanLayerMessages(l, 'messages'), /Invalid message language `en_US`/);
