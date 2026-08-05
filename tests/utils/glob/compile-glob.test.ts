@@ -23,6 +23,11 @@ describe('compileGlob', () => {
     strictEqual(m('/admin'), false);
   });
 
+  it('matches a line terminator under **, like any other character', () => {
+    strictEqual(compileGlob('**')('a\nb'), true);
+    strictEqual(compileGlob('/admin/**')('/admin/a\nb'), true);
+  });
+
   it('treats ? as a single character', () => {
     const m = compileGlob('/users/?');
     strictEqual(m('/users/1'), true);

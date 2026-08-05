@@ -62,7 +62,7 @@ export function compileGlob(glob: string): GlobMatcher {
     const char = glob[i];
     if (char === '*') {
       if (glob[i + 1] === '*') {
-        src += '.*';
+        src += '[^]*';
         i++;
       } else {
         src += '[^/]*';
