@@ -1,3 +1,4 @@
+import { toKebabCase } from '../../case/to-kebab-case.ts';
 import { isArray } from '../../is/is-array.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 
@@ -15,6 +16,8 @@ export interface ParseArgvOptions {
    * Long flag names (without the `--`) that never take a value.
    * A boolean flag does not consume the token after it, so `--force build` keeps `build` positional.
    * Without this hint, a bare flag followed by a non-flag token consumes that token as its value.
+   * A long flag matches a listed name in kebab too, so a `--forceSync` spelling honors `force-sync`.
+   * A short flag matches only verbatim, keeping `-P` and `-p` distinct.
    *
    * @default
    * []
@@ -74,6 +77,8 @@ export interface ParsedArgv {
  */
 export function parseArgv(argv: string[], options: ParseArgvOptions = {}): ParsedArgv {
   const booleans = new Set(options.booleans);
+  const listedBoolean = (name: string): boolean =>
+    booleans.has(name) || booleans.has(toKebabCase(name));
   const positionals: string[] = [];
   const flags: Record<string, FlagValue> = Object.create(null);
 
@@ -97,9 +102,9 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
       const eq = body.indexOf('=');
       if (eq !== -1) {
         assign(body.slice(0, eq), body.slice(eq + 1));
-      } else if (body.startsWith('no-') && !booleans.has(body)) {
+      } else if (body.startsWith('no-') && !listedBoolean(body)) {
         assign(body.slice(3), false);
-      } else if (consumesNext(body, argv[i + 1], booleans)) {
+      } else if (consumesNext(listedBoolean(body), argv[i + 1])) {
         assign(body, argv[++i]!);
       } else {
         assign(body, true);
@@ -121,7 +126,7 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
         } else {
           const last = body.at(-1)!;
           expandShort(body.slice(0, -1), assign);
-          if (consumesNext(last, argv[i + 1], booleans)) assign(last, argv[++i]!);
+          if (consumesNext(booleans.has(last), argv[i + 1])) assign(last, argv[++i]!);
           else assign(last, true);
         }
       }
@@ -134,8 +139,8 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
   return { positionals, flags };
 }
 
-function consumesNext(name: string, next: string | undefined, booleans: Set<string>): boolean {
-  return !booleans.has(name) && !isUndefined(next) && !isFlag(next);
+function consumesNext(listed: boolean, next: string | undefined): boolean {
+  return !listed && !isUndefined(next) && !isFlag(next);
 }
 
 function expandShort(chars: string, assign: (name: string, value: boolean) => void): void {

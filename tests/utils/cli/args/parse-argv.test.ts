@@ -53,6 +53,13 @@ describe('parseArgv', () => {
     });
   });
 
+  it('honors a declared boolean under any long-flag spelling', () => {
+    deepStrictEqual(parseArgv(['--forceSync', 'build'], { booleans: ['force-sync'] }), {
+      positionals: ['build'],
+      flags: flags({ forceSync: true }),
+    });
+  });
+
   it('does not consume a following flag', () => {
     deepStrictEqual(parseArgv(['--name', '--prod']), {
       positionals: [],
