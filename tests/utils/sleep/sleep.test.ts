@@ -60,4 +60,28 @@ describe('sleep', () => {
   it('rejects a negative duration', async () => {
     await rejects(() => sleep(-1), /Invalid duration/);
   });
+
+  it('waits a duration past the 32-bit timer wall in full', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      let resolved = false;
+      const promise = sleep('25d').then(() => {
+        resolved = true;
+      });
+
+      mock.timers.tick(2_147_483_647);
+      await Promise.resolve();
+      strictEqual(resolved, false);
+
+      mock.timers.tick(12_516_352);
+      await Promise.resolve();
+      strictEqual(resolved, false);
+
+      mock.timers.tick(1);
+      await promise;
+      strictEqual(resolved, true);
+    } finally {
+      mock.timers.reset();
+    }
+  });
 });

@@ -1,3 +1,5 @@
+import { longTimeout } from './long-timeout.ts';
+
 /**
  * Races a promise against a millisecond deadline.
  *
@@ -14,14 +16,14 @@
  */
 export function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => resolve(onTimeout()), ms);
+    const cancel = longTimeout(() => resolve(onTimeout()), ms);
     promise.then(
       (value) => {
-        clearTimeout(timer);
+        cancel();
         resolve(value);
       },
       (error: unknown) => {
-        clearTimeout(timer);
+        cancel();
         reject(error);
       },
     );

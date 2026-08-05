@@ -1,5 +1,6 @@
 import { parseDuration } from '../duration/parse-duration.ts';
 import { isUndefined } from '../is/is-undefined.ts';
+import { longTimeout } from '../timeout/long-timeout.ts';
 
 /**
  * Outcome of closing a `Gate`.
@@ -122,14 +123,14 @@ export function createGate(): Gate {
         return (closePromise = Promise.resolve({ drained: true, pending: 0 }));
       }
       return (closePromise = new Promise((resolve) => {
-        const timer = isUndefined(options?.timeout)
+        const cancel = isUndefined(options?.timeout)
           ? undefined
-          : setTimeout(() => {
+          : longTimeout(() => {
               state = 'closed';
               resolve({ drained: false, pending });
             }, parseDuration(options.timeout));
         onDrained = () => {
-          if (timer) clearTimeout(timer);
+          cancel?.();
           resolve({ drained: true, pending: 0 });
         };
       }));

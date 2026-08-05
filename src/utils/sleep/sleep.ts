@@ -1,4 +1,5 @@
 import { parseDuration } from '../duration/parse-duration.ts';
+import { longTimeout } from '../timeout/long-timeout.ts';
 
 /**
  * Returns a promise that resolves after the given delay.
@@ -12,5 +13,5 @@ import { parseDuration } from '../duration/parse-duration.ts';
  * ```
  */
 export function sleep(duration: number | string): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, parseDuration(duration)));
+  return new Promise((resolve) => longTimeout(resolve, parseDuration(duration)));
 }

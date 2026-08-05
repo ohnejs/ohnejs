@@ -88,6 +88,29 @@ describe('createGate', () => {
     }
   });
 
+  it('waits a timeout past the 32-bit timer wall in full', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const gate = createGate();
+      gate.enter();
+
+      let settled = false;
+      const closing = gate.close({ timeout: '30d' }).then((drain) => {
+        settled = true;
+        return drain;
+      });
+
+      mock.timers.tick(2_147_483_647);
+      await Promise.resolve();
+      strictEqual(settled, false);
+
+      mock.timers.tick(444_516_353);
+      deepStrictEqual(await closing, { drained: false, pending: 1 });
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
   it('a release after the timeout still decrements without throwing', async () => {
     mock.timers.enable({ apis: ['setTimeout'] });
     try {
