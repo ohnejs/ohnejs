@@ -242,6 +242,83 @@ describe('dev', () => {
     await waitFor(async () => (await get(dashPort, '/')) === -1);
   });
 
+  it('closes cleanly during a change cycle, spawning no child after close', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('close-cycle', port);
+    const slowConfig =
+      'await new Promise((resolve) => setTimeout(resolve, 700))\n' +
+      `export default { api: { port: ${port} }, printer: { silent: true } }\n`;
+    writeFileSync(join(app, 'ohne.config.ts'), slowConfig);
+    writeRoute(app, 'health.ts');
+
+    const server = await dev(app, { entry: BIN, dashboard: false });
+    servers.push(server);
+    await waitFor(async () => (await get(port, '/health')) === 200);
+
+    // A config change opens a slow regen; closing inside it must not respawn afterwards.
+    writeFileSync(join(app, 'ohne.config.ts'), `${slowConfig}// touched\n`);
+    await delay(300);
+    await server.close();
+
+    let bound = false;
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline && !bound) {
+      if ((await get(port, '/health')) === 200) bound = true;
+      else await delay(100);
+    }
+    strictEqual(bound, false);
+  });
+
+  it('prints one supervisor-owned line when the dashboard child fails boot', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('dashboard-boot-fail', 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, ` +
+        `messages: { defaultLanguage: 'not a tag!' }, printer: { silent: true } }\n`,
+    );
+    writeRoute(app, 'health.ts');
+
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    try {
+      const server = await dev(app, { entry: BIN });
+      servers.push(server);
+      const text = out.join('');
+      ok(text.includes('Dashboard failed to start.'));
+      ok(!text.includes('exited before ready'));
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
+  });
+
+  it(
+    'derives the dashboard API URL from the HOST override the api child binds',
+    TIMEOUT,
+    async () => {
+      const dashPort = await freePort();
+      const app = writeProject('dashboard-host', 0);
+      writeFileSync(
+        join(app, 'ohne.config.ts'),
+        `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+      );
+      writeRoute(app, 'health.ts');
+
+      useEnv().set('HOST', '127.0.0.1');
+      try {
+        const server = await dev(app, { entry: BIN });
+        servers.push(server);
+
+        await waitFor(async () => (await get(dashPort, '/')) === 200);
+        const apiURL = (await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)?.[1] ?? '';
+        ok(/^http:\/\/127\.0\.0\.1:\d+$/.test(apiURL));
+      } finally {
+        useEnv().unset('HOST');
+      }
+    },
+  );
+
   it('honors a configured `dashboard.apiURL` over the derived URL', TIMEOUT, async () => {
     const dashPort = await freePort();
     const app = writeProject('dashboard-apiurl', 0);

@@ -109,9 +109,11 @@ export async function dev(
   let api: ServeChild | null = null;
   let dashboard: ServeChild | null = null;
   let respawning: Promise<void> | undefined;
+  let ticking: Promise<void> | undefined;
   const pending = new Set<string>();
   let cycling = false;
   let rerun = false;
+  let closed = false;
 
   if (wantDashboard) await startDashboard();
 
@@ -130,7 +132,7 @@ export async function dev(
   park();
 
   // Watch only after the initial build, so no change can race the first spawn.
-  const schedule = debounce(() => void tick(), DEBOUNCE);
+  const schedule = debounce(() => void (ticking = tick()), DEBOUNCE);
   const watch = watchLayers((path) => {
     pending.add(path);
     schedule();
@@ -142,6 +144,7 @@ export async function dev(
   return { close };
 
   async function tick(): Promise<void> {
+    if (closed) return;
     if (cycling) {
       rerun = true;
       return;
@@ -154,7 +157,7 @@ export async function dev(
         pending.clear();
         if (batch.size === 0) break;
         await runCycle(batch);
-      } while (rerun || pending.size > 0);
+      } while (!closed && (rerun || pending.size > 0));
     } finally {
       cycling = false;
     }
@@ -168,6 +171,7 @@ export async function dev(
       park();
       return;
     }
+    if (closed) return;
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
     if (reloadable.length < batch.size) dashboard?.reload();
     if (!reloadable.some(isSource) && !reloadable.some((path) => messages.affectedBy(path))) return;
@@ -187,7 +191,7 @@ export async function dev(
     const paths = [...batch];
     if (paths.some((path) => config.affectedBy(path))) {
       await config.regen();
-      watch.resync();
+      if (!closed) watch.resync();
       return;
     }
     for (const target of targets) {
@@ -216,7 +220,8 @@ export async function dev(
   async function startDashboard(): Promise<void> {
     const config = useConfig();
     const api = config.api;
-    const derivedURL = `http://${api.host ?? 'localhost'}:${port}${normalizeBasePath(api.basePath)}`;
+    const host = useEnv().get('HOST') ?? api.host ?? 'localhost';
+    const derivedURL = `http://${host}:${port}${normalizeBasePath(api.basePath)}`;
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
         port: dashboardPort,
@@ -228,9 +233,9 @@ export async function dev(
         },
       });
       await dashboard.ready;
-    } catch (error) {
+    } catch {
       dashboard = null;
-      reportError(error);
+      printer.warn('Dashboard failed to start.');
     }
   }
 
@@ -253,8 +258,10 @@ export async function dev(
   }
 
   async function teardown(): Promise<void> {
+    closed = true;
     schedule.cancel();
     watch.close();
+    await ticking?.catch(() => {});
     await respawning?.catch(() => {});
     const running: ServeChild[] = [];
     if (api) running.push(api);

@@ -185,10 +185,11 @@ function liveReload(routes: Route[]): void {
 
 function resolveAPIURL(): string {
   const api = useConfig().api;
+  const host = useEnv().get('HOST') ?? api.host ?? 'localhost';
   return (
     useEnv().get('API_URL') ??
     useConfig().dashboard?.apiURL ??
-    `http://${api.host ?? 'localhost'}:${api.port ?? DEFAULT_API_PORT}${normalizeBasePath(api.basePath)}`
+    `http://${host}:${api.port ?? DEFAULT_API_PORT}${normalizeBasePath(api.basePath)}`
   );
 }
 
