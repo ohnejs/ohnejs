@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import { isUndefined } from '../../utils/index.ts';
+import { ohneError } from '../error/ohne-error.ts';
 
 /**
  * Which backend a serve child runs, as the `ohne serve <backend>` subcommand.
@@ -148,7 +149,11 @@ export function spawnServeChild(
     if (commanded) return;
     if (readied) onExit?.({ code, signal });
     else
-      failBoot(new Error(`${backend} child exited before ready (code ${code}, signal ${signal})`));
+      failBoot(
+        ohneError(
+          `\`${backend}\` child exited before ready (code \`${code}\`, signal \`${signal}\`)`,
+        ),
+      );
   });
 
   let stopping: Promise<void> | undefined;
