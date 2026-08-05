@@ -101,6 +101,14 @@ describe('resolveArgs', () => {
     deepStrictEqual(resolveArgs(schema, ['--fullFlag', 'x']), expected);
   });
 
+  it('matches an acronym schema key from every spelling', () => {
+    const schema = { apiURL: { type: 'string' } } as const;
+    const expected = { ok: true, values: { apiURL: 'x' }, positionals: [] };
+    deepStrictEqual(resolveArgs(schema, ['--api-url', 'x']), expected);
+    deepStrictEqual(resolveArgs(schema, ['--apiURL', 'x']), expected);
+    deepStrictEqual(resolveArgs(schema, ['--apiUrl', 'x']), expected);
+  });
+
   it('does not consume a positional after a kebab-spelled boolean flag', () => {
     const schema = { dryRun: { type: 'boolean' } } as const;
     deepStrictEqual(resolveArgs(schema, ['--dry-run', 'build']), {

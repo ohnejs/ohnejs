@@ -59,6 +59,7 @@ export type ResolveArgsResult<S extends ArgsSchema> =
  * Parses `argv` against a schema and resolves typed option values.
  * Applies aliases, coercion, defaults, and required checks, and reports unknown flags with a hint.
  * A long flag matches its schema key in camelCase or kebab-case, so `--full-flag` resolves `fullFlag`.
+ * Forms compare in kebab, so an acronym key resolves from every spelling: `--api-url` finds `apiURL`.
  * A boolean key whose kebab form starts with `no-` wins over negation, so `--no-cache` sets `noCache`.
  * A `no`-prefixed key of any other type must be passed as `--no-foo=value`; the bare form negates `foo`.
  * A scalar flag repeated under one name takes its last value.
@@ -89,7 +90,7 @@ export function resolveArgs<const S extends ArgsSchema>(
 
   const register = (defs: ArgsSchema): void => {
     for (const name of Object.keys(defs)) {
-      canonByForm.set(toCamelCase(name), name);
+      canonByForm.set(toKebabCase(name), name);
       const def = defs[name]!;
       const aliases = toArray(def.alias ?? []);
       for (const alias of aliases) aliasToName.set(alias, name);
@@ -105,7 +106,7 @@ export function resolveArgs<const S extends ArgsSchema>(
   const values: Record<string, string | number | boolean> = {};
 
   for (const flag of Object.keys(parsed.flags)) {
-    if (aliasToName.has(flag) || canonByForm.has(toCamelCase(flag))) continue;
+    if (aliasToName.has(flag) || canonByForm.has(toKebabCase(flag))) continue;
     const suggestion = didYouMean(toCamelCase(flag), known);
     errors.push({
       kind: 'unknown',
@@ -142,9 +143,9 @@ function pickRaw(
   name: string,
   alias: string | string[] | undefined,
 ): string | boolean | undefined {
-  const target = toCamelCase(name);
+  const target = toKebabCase(name);
   for (const key of Object.keys(flags)) {
-    if (toCamelCase(key) !== target) continue;
+    if (toKebabCase(key) !== target) continue;
     const value = flags[key];
     return isArray(value) ? last(value) : value;
   }
