@@ -1,4 +1,4 @@
-import { deepStrictEqual, match, ok, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, match, ok, rejects, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
@@ -260,16 +260,17 @@ describe('QueryBuilderImpl locale', () => {
 
   it('keeps a joined transaction across locale, rolling its write back with it', async () => {
     const before = await queryUntyped('INotes').count();
-    await db
-      .transaction(async (tx) => {
+    await rejects(
+      db.transaction(async (tx) => {
         const created = await queryUntyped('INotes')
           .use(tx)
           .locale('de')
           .create({ title: 'Hallo', body: 'tx' });
         ok(created.ok);
         throw ohneError('roll back');
-      })
-      .catch(() => undefined);
+      }),
+      /roll back/,
+    );
     strictEqual(await queryUntyped('INotes').count(), before);
   });
 });
