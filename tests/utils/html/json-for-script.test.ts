@@ -13,4 +13,13 @@ describe('jsonForScript', () => {
     strictEqual(out.includes('<'), false);
     deepStrictEqual(JSON.parse(out), { html: '</script><!--' });
   });
+
+  it('serializes a value JSON cannot represent as null', () => {
+    strictEqual(jsonForScript(undefined), 'null');
+    strictEqual(
+      jsonForScript(() => 1),
+      'null',
+    );
+    strictEqual(jsonForScript(Symbol('s')), 'null');
+  });
 });
