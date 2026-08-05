@@ -28,6 +28,14 @@ describe('env flags', () => {
       strictEqual(useEnv().get('FORCE_SYNC'), false);
     });
 
+    it('applies a flag typed in a non-kebab spelling', () => {
+      applyEnvFlags(['sync', '--forceSync', 'build']);
+      strictEqual(useEnv().get('FORCE_SYNC'), true);
+      useEnv().unset('FORCE_SYNC');
+      applyEnvFlags(['serve', 'api', '--Host', '0.0.0.0']);
+      strictEqual(useEnv().get('HOST'), '0.0.0.0');
+    });
+
     it('leaves a var untouched when its flag is absent', () => {
       applyEnvFlags(['sync']);
       strictEqual(useEnv().has('FORCE_SYNC'), false);

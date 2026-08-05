@@ -1,4 +1,4 @@
-import type { ArgsSchema } from '../../utils/cli/index.ts';
+import type { ArgsSchema, FlagValue } from '../../utils/cli/index.ts';
 import type { Env } from './env.ts';
 
 import { parseArgv } from '../../utils/cli/index.ts';
@@ -64,6 +64,7 @@ export function envGlobals(): ArgsSchema {
  * Applies the env-var flags found in `argv` as overrides on the env registry, highest priority.
  *
  * Only flags actually present are applied, so an absent flag never clobbers env or config.
+ * A flag matches its env var's kebab name in any spelling, exactly as `resolveArgs` recognizes it.
  * A boolean flag sets the value directly.
  * A value flag routes its raw string through the env parser, so `--port 99999` fails like `PORT=99999`.
  * Meant to run once, before dispatch.
@@ -77,10 +78,12 @@ export function applyEnvFlags(argv: string[]): void {
   const flags = envFlags();
   const booleans = flags.filter((flag) => flag.kind === 'boolean').map((flag) => flag.kebab);
   const { flags: parsed } = parseArgv(argv, { booleans });
+  const byKebab: Record<string, FlagValue> = Object.create(null);
+  for (const [key, value] of Object.entries(parsed)) byKebab[toKebabCase(key)] = value;
   const env = useEnv();
 
   for (const { env: name, kebab, kind } of flags) {
-    const raw = parsed[kebab];
+    const raw = byKebab[kebab];
     if (isUndefined(raw)) continue;
     const value = isArray(raw) ? last(raw) : raw;
 
