@@ -146,6 +146,10 @@ multi-line payload survives intact - each line becomes its own `data:` line.
 the client's disconnect - runs `onClose` exactly once, the place to stop timers or drop the stream
 from a broadcast set.
 
+A client that stops reading does not buffer forever. Once 1024 frames sit unread, the stream closes
+and `onClose` runs, exactly as if the client had disconnected - a stalled socket never grows the
+server's memory.
+
 ## After the response
 
 `waitUntil` keeps background work alive past the response. The response is sent immediately; the
