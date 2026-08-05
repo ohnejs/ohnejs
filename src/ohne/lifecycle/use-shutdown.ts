@@ -1,4 +1,4 @@
-import { errorMessage, isUndefined, parseDuration } from '../../utils/index.ts';
+import { errorMessage, isUndefined, parseDuration, withTimeout } from '../../utils/index.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 
 /**
@@ -160,13 +160,11 @@ async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
     return { completed: true };
   }
 
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<ShutdownOutcome>((resolve) => {
-    timer = setTimeout(() => resolve({ completed: false }), parseDuration(deadline));
-  });
-  const outcome = await Promise.race([all.then(() => ({ completed: true })), timeout]);
-  clearTimeout(timer!);
-  return outcome;
+  return withTimeout<ShutdownOutcome>(
+    all.then(() => ({ completed: true })),
+    parseDuration(deadline),
+    () => ({ completed: false }),
+  );
 }
 
 async function exit(options?: ShutdownRunOptions): Promise<void> {

@@ -1,6 +1,6 @@
 import type { Target } from './target.ts';
 
-import { isArray, isNull, isPathInside, joinPath } from '../../../utils/index.ts';
+import { isNull, isPathInside, joinPath, toArray } from '../../../utils/index.ts';
 import { DIR_DEFAULTS } from '../../layers/config.ts';
 import { useLayers } from '../../layers/use-layers.ts';
 
@@ -51,7 +51,7 @@ export function createSetTarget(
       if (!isNull(snapshot) && sameSet(snapshot, current)) return [];
       snapshot = current;
       const written = await generate(from);
-      return isNull(written) ? [] : isArray(written) ? written : [written];
+      return isNull(written) ? [] : toArray(written);
     },
     invalidate() {
       snapshot = null;
