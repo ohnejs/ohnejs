@@ -1,4 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["**/dist/"]
+  "ignorePatterns": ["**/dist/"],
+  "rules": {
+    "no-unused-expressions": ["warn", { "allowTaggedTemplates": true }]
+  }
 }
