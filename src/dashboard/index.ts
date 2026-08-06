@@ -1,3 +1,9 @@
+import './fields/builtin/index.ts';
+
+export { cellEditor } from './fields/cell-editor.ts';
+export type { CellEditorOptions } from './fields/cell-editor.ts';
+export { dimMark, fieldCellFor, registerFieldCell } from './fields/field-cell.ts';
+export type { FieldCell, FieldCellContext, FieldEditorContext } from './fields/field-cell.ts';
 export { css } from './render/css.ts';
 export { each } from './render/each.ts';
 export { h } from './render/h.ts';

@@ -17,6 +17,11 @@ export interface ButtonOptions {
   kind?: 'solid' | 'ghost';
 
   /**
+   * Extra class names appended to the button's own.
+   */
+  class?: string;
+
+  /**
    * The button's form role.
    *
    * @default
@@ -82,7 +87,7 @@ export function button(label: Child | (() => Child), options: ButtonOptions = {}
   return h(
     'button',
     {
-      class: `ohne-button ${options.kind ?? 'solid'}`,
+      class: `ohne-button ${options.kind ?? 'solid'}${options.class ? ` ${options.class}` : ''}`,
       type: options.type ?? 'button',
       disabled: options.disabled,
       onClick: options.onClick,
