@@ -62,6 +62,23 @@ export function navigate(path: string): void {
   void render();
 }
 
+/**
+ * Reads the active route; `null` before the first render and on an unmatched URL.
+ * The read is reactive: a binding reading it re-renders on every navigation.
+ * Components outside the page tree, like a sidebar, use it to follow the location.
+ *
+ * @example
+ * ```ts
+ * h('a', {
+ *   href: '/posts',
+ *   'aria-current': () => (useRoute()?.path === '/posts' ? 'page' : false),
+ * })
+ * ```
+ */
+export function useRoute(): RouteContext | null {
+  return active.value;
+}
+
 function view(): Child {
   const route = active.value;
   return isNull(route) ? notFound() : route.component(route);
