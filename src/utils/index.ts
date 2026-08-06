@@ -159,6 +159,7 @@ export * from './reactive/batched-effect.ts';
 export * from './reactive/computed.ts';
 export * from './reactive/effect-scope.ts';
 export * from './reactive/effect.ts';
+export * from './reactive/next-tick.ts';
 export * from './reactive/ref.ts';
 export * from './reactive/untracked.ts';
 export * from './registry/create-layer-registry.ts';
