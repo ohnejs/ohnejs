@@ -1,0 +1,10 @@
+{
+  "fields": {
+    "uuid": {
+      "label": "UUID"
+    },
+    "updatedAt": {
+      "label": "Ažurirano"
+    }
+  }
+}
