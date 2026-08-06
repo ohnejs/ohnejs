@@ -210,11 +210,21 @@ export async function dev(
         port,
         entry: options.entry,
         onExit: onCrash,
+        env: apiChildEnv(),
       });
       await next.ready;
       api = next;
     })();
     return respawning;
+  }
+
+  function apiChildEnv(): Record<string, string> {
+    if (!wantDashboard) return {};
+    const origin =
+      useEnv().get('DASHBOARD_URL') ??
+      useConfig().dashboard?.origin ??
+      `http://localhost:${dashboardPort}`;
+    return { DASHBOARD_URL: origin };
   }
 
   async function startDashboard(): Promise<void> {

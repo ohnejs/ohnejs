@@ -9,6 +9,7 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  * - `PORT` - overrides `Config.api.port` and `Config.dashboard.port` when set.
  * - `HOST` - overrides `Config.api.host` and `Config.dashboard.host` when set.
  * - `API_URL` - the dashboard's API base URL; overrides `Config.dashboard.apiURL` and the derived default.
+ * - `DASHBOARD_URL` - the dashboard's origin; overrides `Config.dashboard.origin` and the derived default.
  * - `COOKIE_SECRET` - signs cookies set with `setSignedCookie`; required to use signed cookies.
  * - `SILENT` - truthy disables every printer call.
  * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
@@ -67,6 +68,15 @@ export interface Env {
    * undefined
    */
   API_URL: string | undefined;
+
+  /**
+   * Origin the browser reaches the dashboard at, allowed by the API's `cors` middleware.
+   * Takes precedence over `Config.dashboard.origin` and the URL derived from `Config.dashboard.port`.
+   *
+   * @default
+   * undefined
+   */
+  DASHBOARD_URL: string | undefined;
 
   /**
    * Secret that signs cookies set with `setSignedCookie` and verifies them on the way back in.

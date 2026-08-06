@@ -43,6 +43,7 @@ registry.define('PORT', {
 });
 registry.define('HOST', { default: undefined, parse: (raw) => raw, flag: 'value' });
 registry.define('API_URL', { default: undefined, parse: (raw) => raw, flag: 'value' });
+registry.define('DASHBOARD_URL', { default: undefined, parse: (raw) => raw, flag: 'value' });
 registry.define('COOKIE_SECRET', { default: undefined, flag: 'value' });
 registry.define('SILENT', { default: false, parse: boolEnv, flag: 'boolean' });
 registry.define('DEBUG', {

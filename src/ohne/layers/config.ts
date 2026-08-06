@@ -576,6 +576,33 @@ export interface Config {
      * Set it when the API is reached at a different origin, such as behind a reverse proxy.
      */
     apiURL?: string;
+
+    /**
+     * Absolute origin the browser reaches the dashboard at, such as `https://admin.example.com`.
+     * The API's `cors` middleware allows it for credentialed requests, so the session cookie flows.
+     * The `DASHBOARD_URL` env var overrides it; omitted, it is derived from `dashboard.port`.
+     * Set it when the dashboard is reached at a different origin, such as behind a reverse proxy.
+     */
+    origin?: string;
+
+    /**
+     * Menu groups for the dashboard sidebar, in order.
+     * Each group names the collections it holds; a group whose collections are all inaccessible drops.
+     * Accessible collections in no group land in a trailing unlabeled group.
+     * Omitted, the menu lists every accessible collection in one unlabeled group.
+     */
+    menu?: {
+      /**
+       * The group's heading, as a message key or plain text.
+       * Omitted renders the group without a heading.
+       */
+      label?: string;
+
+      /**
+       * The registered collection names the group holds, in order.
+       */
+      collections: string[];
+    }[];
   };
 
   /**
@@ -797,6 +824,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
  * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
+ * - `dashboard.origin` and `dashboard.menu` stay each layer's own too.
  * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
  * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
  * - `database.helpers` is unlisted on purpose: the default per-key merge already lets any layer add one.
@@ -815,6 +843,8 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.port': 'own',
   'dashboard.host': 'own',
   'dashboard.apiURL': 'own',
+  'dashboard.origin': 'own',
+  'dashboard.menu': 'own',
   'database.dialect': 'own',
   'database.url': 'own',
   'database.sync.force': 'own',
