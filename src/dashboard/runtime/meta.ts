@@ -63,6 +63,11 @@ export interface DashboardField {
   kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks';
 
   /**
+   * The storage primitive of the field's column; column-bearing kinds (`column`, `record`) only.
+   */
+  logicalType?: 'text' | 'integer' | 'real' | 'boolean' | 'json';
+
+  /**
    * The display label, resolved in the request's language.
    */
   label: string;
