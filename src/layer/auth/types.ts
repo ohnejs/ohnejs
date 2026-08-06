@@ -35,7 +35,8 @@ export interface User {
 
 /**
  * One session row, as `useSession` returns it.
- * The token itself lives only in the cookie; the row carries its hash and expiry.
+ * The token itself lives only in the cookie.
+ * The row stores its hash under a `readable: false` field, so no read returns it.
  */
 export interface Session {
   /**
@@ -47,11 +48,6 @@ export interface Session {
    * The `UUID` of the user the session belongs to, or `null` if the user was removed.
    */
   user: string | null;
-
-  /**
-   * The sha256 of the session's cookie token, base64url-encoded.
-   */
-  tokenHash: string;
 
   /**
    * When the session expires, in epoch milliseconds.

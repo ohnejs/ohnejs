@@ -159,7 +159,9 @@ describe('auth flow', () => {
     const token = cookiePair(await login('safe@example.com', 'battery staple')).slice(
       'session='.length,
     );
-    const sessions = (await queryUntyped('Sessions').findMany()) as { tokenHash: string }[];
+    const sessions = (await queryUntyped('Sessions').select('tokenHash').findMany()) as {
+      tokenHash: string;
+    }[];
     ok(sessions.length > 0);
     ok(sessions.every((s) => s.tokenHash.length === 43 && s.tokenHash !== token));
   });
