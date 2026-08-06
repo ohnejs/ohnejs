@@ -1,5 +1,7 @@
 {
   "collections": "Collections",
+  "confirmDelete": "Confirm",
+  "delete": "Delete",
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -16,6 +18,9 @@
   },
   "notFound": "Not found",
   "records": "{count, plural, one {# record} other {# records}}",
+  "selected": "{count, plural, one {# selected} other {# selected}}",
   "selectCollection": "Select a collection",
-  "signOut": "Sign out"
+  "signOut": "Sign out",
+  "unreachable": "The server cannot be reached",
+  "writeFailed": "The write failed"
 }

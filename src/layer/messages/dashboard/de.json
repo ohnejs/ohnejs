@@ -1,5 +1,7 @@
 {
   "collections": "Sammlungen",
+  "confirmDelete": "Bestätigen",
+  "delete": "Löschen",
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -16,6 +18,9 @@
   },
   "notFound": "Nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
+  "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
   "selectCollection": "Sammlung wählen",
-  "signOut": "Abmelden"
+  "signOut": "Abmelden",
+  "unreachable": "Der Server ist nicht erreichbar",
+  "writeFailed": "Das Schreiben ist fehlgeschlagen"
 }

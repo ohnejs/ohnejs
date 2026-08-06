@@ -1,5 +1,7 @@
 {
   "collections": "Kolekcije",
+  "confirmDelete": "Potvrdi",
+  "delete": "Obriši",
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -16,6 +18,9 @@
   },
   "notFound": "Nije pronađeno",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+  "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "selectCollection": "Odaberite kolekciju",
-  "signOut": "Odjava"
+  "signOut": "Odjava",
+  "unreachable": "Server nije dostupan",
+  "writeFailed": "Upis nije uspio"
 }
