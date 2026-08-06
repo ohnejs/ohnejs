@@ -1,6 +1,7 @@
 {
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
+  "create": "Kreiraj",
   "delete": "Obriši",
   "fields": {
     "uuid": {
@@ -10,16 +11,20 @@
       "label": "Ažurirano"
     }
   },
+  "invalidInteger": "Unesite cijeli broj",
+  "invalidNumber": "Unesite broj",
   "login": {
     "email": "E-mail",
     "password": "Lozinka",
     "submit": "Prijava",
     "unreachable": "Server nije dostupan"
   },
+  "new": "Novo",
+  "newRecord": "Novi zapis",
   "notFound": "Nije pronađeno",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
-  "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "selectCollection": "Odaberite kolekciju",
+  "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "signOut": "Odjava",
   "unreachable": "Server nije dostupan",
   "writeFailed": "Upis nije uspio"

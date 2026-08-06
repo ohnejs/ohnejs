@@ -20,6 +20,7 @@ import { button } from 'ohne/dashboard';
 import { effect, isNull, isNumber, isString, isUndefined, ref, sleep } from 'ohne/utils';
 
 import './cells.ts';
+import { createRecord } from './create-record.ts';
 
 /**
  * One record row, as the collections API answers it.
@@ -65,6 +66,7 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
   const reload = ref(0);
   const cellErrors = ref<Readonly<Record<string, string>>>(emptyErrors());
   const armed = ref(false);
+  const creating = ref(false);
   const deleting = ref(false);
   let generation = 0;
 
@@ -226,6 +228,16 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
         return isUndefined(current) ? '' : t('dashboard.records', { count: current.total });
       }),
       when(
+        () => entry()?.operations.create?.allowed === true,
+        () =>
+          button(() => t('dashboard.new'), {
+            kind: 'ghost',
+            onClick: () => {
+              creating.value = true;
+            },
+          }),
+      ),
+      when(
         () => selectedUUIDs().length > 0,
         () => [
           h('span', { class: 'ohne-caps sheet-toolbar-selected' }, () =>
@@ -251,6 +263,17 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
       ),
     ),
     sheet(model, selection),
+    when(
+      () => creating.value,
+      () => {
+        const current = entry();
+        if (isUndefined(current)) return null;
+        return createRecord(current, (created) => {
+          creating.value = false;
+          if (created) reload.value += 1;
+        });
+      },
+    ),
   );
 }
 

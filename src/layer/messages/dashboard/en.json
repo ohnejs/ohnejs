@@ -1,6 +1,7 @@
 {
   "collections": "Collections",
   "confirmDelete": "Confirm",
+  "create": "Create",
   "delete": "Delete",
   "fields": {
     "uuid": {
@@ -10,16 +11,20 @@
       "label": "Updated"
     }
   },
+  "invalidInteger": "Enter a whole number",
+  "invalidNumber": "Enter a number",
   "login": {
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
     "unreachable": "The server cannot be reached"
   },
+  "new": "New",
+  "newRecord": "New record",
   "notFound": "Not found",
   "records": "{count, plural, one {# record} other {# records}}",
-  "selected": "{count, plural, one {# selected} other {# selected}}",
   "selectCollection": "Select a collection",
+  "selected": "{count, plural, one {# selected} other {# selected}}",
   "signOut": "Sign out",
   "unreachable": "The server cannot be reached",
   "writeFailed": "The write failed"
