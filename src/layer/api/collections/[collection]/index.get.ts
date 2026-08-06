@@ -14,6 +14,7 @@ import { gateCollection, listRecords } from '../../../collections-api/gate.ts';
  * Lists an exposed collection's records through the wire query grammar.
  * `where`, `select`, `order`, `populate`, the row window, and `locale` ride the URL.
  * A `page`/`perPage` request answers the paginated envelope; anything else a plain array.
+ * The operation's `access` scope narrows the rows and fields the request may reach.
  * An unknown or unexposed collection is a `404`; a bad query a `400` with its code and path.
  */
 export default defineHandler(async ({ params }) => {
@@ -24,5 +25,5 @@ export default defineHandler(async ({ params }) => {
     queryMetadata(gate.collection),
     resolveGuards(),
   );
-  return listRecords(gate.collection, parsed);
+  return listRecords(gate.collection, parsed, gate.scope);
 });

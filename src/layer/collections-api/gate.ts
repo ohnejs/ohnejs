@@ -5,6 +5,7 @@ import type {
   CollectionQueryMeta,
   MiddlewareKey,
   ParsedQuery,
+  QueryScope,
 } from 'ohne';
 import type { SearchParamValue } from 'ohne/utils';
 
@@ -17,7 +18,7 @@ import {
   useMiddleware,
   useSearchParams,
 } from 'ohne';
-import { isBoolean, isNull, isUndefined, toKebabCase } from 'ohne/utils';
+import { isBoolean, isNull, isUndefined, pick, toKebabCase } from 'ohne/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
@@ -30,9 +31,11 @@ import { requireCapability } from '../auth/capabilities.ts';
 export type CollectionOperation = 'read' | 'create' | 'update' | 'delete';
 
 /**
- * A passed gate carries the resolved collection name; a failed one the middleware's answer.
+ * A passed gate carries the resolved collection name and access scope; a failed one the middleware's answer.
  */
-export type CollectionGate = { ok: true; collection: string } | { ok: false; response: unknown };
+export type CollectionGate =
+  | { ok: true; collection: string; scope: QueryScope }
+  | { ok: false; response: unknown };
 
 /**
  * The page size a paginated list read takes when the request names `page` without `perPage`.
@@ -50,6 +53,8 @@ export const LIST_PER_PAGE = 20;
  * The operation's named middleware then run in order, exactly as route middleware do.
  * Each records on the event; a returned value answers the request without the operation running.
  * An unknown middleware name throws - a misconfigured exposure is a `500`, never an open door.
+ * Last, the operation's `access` resolver runs: `false` answers the identical `404`.
+ * The resolved scope rides the gate for the handlers to compose into their queries.
  */
 export async function gateCollection(
   segment: string,
@@ -73,17 +78,33 @@ export async function gateCollection(
     const result = await middleware(event);
     if (!isUndefined(result)) return { ok: false, response: result };
   }
-  return { ok: true, collection: meta.name };
+  return { ok: true, collection: meta.name, scope: await resolveScope(endpoint.access) };
 }
 
 /**
  * Pins a list read's terminal: `paginate` when the request names a page, `findMany` otherwise.
  * Shared by the `GET` list and the `POST` body-query endpoint, so both transports read identically.
+ * The gate's access scope composes in, narrowing the rows and fields the request may reach.
  */
-export function listRecords(collection: string, parsed: ParsedQuery): Promise<unknown> {
-  const builder = applyQuery(queryUntyped(collection), parsed);
+export function listRecords(
+  collection: string,
+  parsed: ParsedQuery,
+  scope: QueryScope,
+): Promise<unknown> {
+  const builder = applyQuery(queryUntyped(collection), parsed, scope);
   if (isNull(parsed.page) && isNull(parsed.perPage)) return builder.findMany();
   return builder.paginate(parsed.page ?? 1, parsed.perPage ?? LIST_PER_PAGE);
+}
+
+/**
+ * Narrows a write's answered record to the operation's `select` scope, matching what a read returns.
+ * An unselective scope answers the record whole.
+ */
+export function scopedRecord(
+  record: Record<string, unknown>,
+  scope: QueryScope,
+): Record<string, unknown> {
+  return isUndefined(scope.select) ? record : pick(record, scope.select);
 }
 
 /**
@@ -135,6 +156,24 @@ function collectionBySegment(segment: string): CollectionMeta | undefined {
     }
   }
   return segments.get(segment);
+}
+
+/**
+ * Resolves an operation's `access` verdict into the scope the handlers compose.
+ * `false` refuses as the identical `404`; `true`, like an omitted resolver, runs unscoped.
+ * An empty `select` throws: the read path cannot express a zero-field record, so it would widen.
+ * A misconfigured scope is a `500`, never an open door.
+ */
+async function resolveScope(access: CollectionEndpoint['access']): Promise<QueryScope> {
+  const verdict = isUndefined(access) ? true : await access();
+  if (verdict === false) throw notFound();
+  if (verdict === true) return {};
+  if (!isUndefined(verdict.select) && verdict.select.length === 0) {
+    throw ohneError(
+      'An `access` scope resolved an empty `select`; return `false` to refuse the operation instead',
+    );
+  }
+  return verdict;
 }
 
 /**

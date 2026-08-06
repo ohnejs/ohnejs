@@ -8,13 +8,15 @@ import {
 } from 'ohne';
 import { isNull } from 'ohne/utils';
 
-import { gateCollection, writeLocale } from '../../../collections-api/gate.ts';
+import { gateCollection, scopedRecord, writeLocale } from '../../../collections-api/gate.ts';
 
 /**
  * `POST /collections/[collection]`
  *
  * Creates one record from the JSON body and answers `201` with it.
  * `?locale=` writes a translatable collection at that locale.
+ * The operation's `access` scope has no rows to filter here, so only its verdict gates.
+ * The answered record narrows to the scope's `select`.
  * A validation failure is a `422` with per-field messages; a busy database a `503`.
  */
 export default defineHandler(async ({ params }) => {
@@ -27,5 +29,5 @@ export default defineHandler(async ({ params }) => {
   const builder = queryUntyped(gate.collection);
   const record = await (isNull(locale) ? builder : builder.locale(locale)).createOrThrow(input);
   setResponseStatus(201);
-  return record;
+  return scopedRecord(record, gate.scope);
 });

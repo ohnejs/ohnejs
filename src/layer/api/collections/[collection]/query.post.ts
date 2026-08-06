@@ -18,5 +18,5 @@ export default defineHandler(async ({ params }) => {
     queryMetadata(gate.collection),
     resolveGuards(),
   );
-  return listRecords(gate.collection, parsed);
+  return listRecords(gate.collection, parsed, gate.scope);
 });
