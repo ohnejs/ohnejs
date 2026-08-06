@@ -4,6 +4,7 @@ import type { CollectionDefinition, CompositeIndex } from './define-collection.t
 import {
   isArray,
   isBoolean,
+  isFunction,
   isNull,
   isPlainObject,
   isString,
@@ -64,17 +65,22 @@ function validateAPI(api: unknown, collection?: string): void {
     const endpoint = isPlainObject(value) ? value : null;
     const middleware = endpoint?.middleware;
     const open = endpoint?.public;
+    const access = endpoint?.access;
     const clean =
       !isNull(endpoint) &&
-      Object.keys(endpoint).every((key) => key === 'middleware' || key === 'public') &&
+      Object.keys(endpoint).every(
+        (key) => key === 'middleware' || key === 'public' || key === 'access',
+      ) &&
       (isUndefined(middleware) || (isArray(middleware) && middleware.every(isString))) &&
-      (isUndefined(open) || isBoolean(open));
+      (isUndefined(open) || isBoolean(open)) &&
+      (isUndefined(access) || isFunction(access));
     if (!clean) {
       throw ohneError({
         title: `Invalid \`api\` operation \`${operation}\``,
         body: [
-          `The \`${operation}\` operation${scope} must be a boolean, \`'public'\`, or \`{ public, middleware }\`.`,
-          '`public` opens it to anyone; `middleware` lists named middleware to run before it, in order.',
+          `The \`${operation}\` operation${scope} must be a boolean, \`'public'\`, or \`{ public, middleware, access }\`.`,
+          '`public` opens it to anyone; `middleware` lists named middleware to run before it, in order;',
+          '`access` is a function resolving the per-request scope.',
         ],
       });
     }

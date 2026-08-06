@@ -1,12 +1,41 @@
 import type { FieldInstance } from '../fields/field.ts';
 import type { NamedMiddlewareKey } from '../middleware/known-middleware.ts';
+import type { QueryScope } from '../query/wire/apply.ts';
 
 import { validateCollectionDefinition } from './validate-collection.ts';
 
 /**
+ * The condition form an `access` scope's `where` takes, keyed to the collection's declared fields.
+ * Keys complete to the field names; values follow the condition-object grammar every `where` reads.
+ * `and` and `or` group, and their nested conditions stay open-keyed.
+ * A dot path into a composite's subfields therefore rides under `and`.
+ */
+export type AccessCondition<TField extends string = string> = {
+  [K in TField | 'UUID' | '_updatedAt' | 'and' | 'or']?: unknown;
+};
+
+/**
+ * The scope an `access` resolver returns: a `QueryScope` typed to the collection's declared fields.
+ */
+export interface AccessScope<TField extends string = string> extends Omit<
+  QueryScope,
+  'where' | 'select'
+> {
+  /**
+   * A filter every request is ANDed under, so no request escapes the scope's rows.
+   */
+  where?: AccessCondition<TField>;
+
+  /**
+   * The fields a request may read; a request's own `select` intersects with these, never widening.
+   */
+  select?: (TField | 'UUID' | '_updatedAt')[];
+}
+
+/**
  * Options of one exposed collection-API operation.
  */
-export interface CollectionEndpoint {
+export interface CollectionEndpoint<TField extends string = string> {
   /**
    * Opens the operation to anonymous requests, skipping the capability guard.
    * Pair it with `middleware: ['require-auth']` to require a signed-in user without a capability.
@@ -24,6 +53,31 @@ export interface CollectionEndpoint {
    * []
    */
   middleware?: NamedMiddlewareKey[];
+
+  /**
+   * Resolves the operation's per-request scope, once the guard and the middleware have passed.
+   * A returned scope composes into every query the operation runs.
+   * Its `where` ANDs in, so an out-of-scope record answers the same `404` a missing one does.
+   * `select` narrows what a read returns, what an update accepts, and what a write's answered record carries.
+   * `true` runs the operation unscoped; `false` refuses it as that identical `404`.
+   * Omitted means unscoped.
+   * Identity is ambient: the resolver reads the caller through the auth helpers (`useUser`).
+   * A create has no rows to filter, so only the verdict applies.
+   * Create-time ownership belongs to a `writable: false` field whose `default` reads the ambient user.
+   *
+   * @example
+   * ```ts
+   * api: {
+   *   read: {
+   *     access: async () => {
+   *       const user = await useUser()
+   *       return user ? { where: { owner: user.UUID } } : false
+   *     },
+   *   },
+   * }
+   * ```
+   */
+  access?: () => AccessScope<TField> | boolean | Promise<AccessScope<TField> | boolean>;
 }
 
 /**
@@ -32,14 +86,14 @@ export interface CollectionEndpoint {
  * `true` opens it guarded: the caller needs the `collection.<Name>.<operation>` capability.
  * `'public'` opens it to anyone; an object opens it with options.
  */
-export interface CollectionAPI {
+export interface CollectionAPI<TField extends string = string> {
   /**
    * Opens the read endpoints: the list, the by-`UUID` read, and the body-query `POST`.
    *
    * @default
    * false
    */
-  read?: boolean | 'public' | CollectionEndpoint;
+  read?: boolean | 'public' | CollectionEndpoint<TField>;
 
   /**
    * Opens `POST /collections/<name>` - creating a record.
@@ -47,7 +101,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  create?: boolean | 'public' | CollectionEndpoint;
+  create?: boolean | 'public' | CollectionEndpoint<TField>;
 
   /**
    * Opens `PATCH /collections/<name>/<uuid>` - updating one record.
@@ -55,7 +109,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  update?: boolean | 'public' | CollectionEndpoint;
+  update?: boolean | 'public' | CollectionEndpoint<TField>;
 
   /**
    * Opens `DELETE /collections/<name>/<uuid>` - deleting one record.
@@ -63,7 +117,7 @@ export interface CollectionAPI {
    * @default
    * false
    */
-  delete?: boolean | 'public' | CollectionEndpoint;
+  delete?: boolean | 'public' | CollectionEndpoint<TField>;
 }
 
 /**
@@ -140,7 +194,7 @@ export interface CollectionDefinition<
    * }
    * ```
    */
-  api?: boolean | CollectionAPI;
+  api?: boolean | CollectionAPI<keyof TFields & string>;
 }
 
 /**

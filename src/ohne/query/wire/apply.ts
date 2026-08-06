@@ -6,12 +6,14 @@ import { intersection, isNull, isUndefined } from '../../../utils/index.ts';
 /**
  * The endpoint-installed scope a wire query composes onto, narrowing what a request may read.
  *
- * The scope is trusted; the wire params are not. Filters AND together, so a request can only narrow.
+ * The scope is trusted; the wire params are not.
+ * Filters AND together, so a request can only narrow.
  * Selected fields intersect, so a request never widens past the scope; the row cap takes the smaller.
  */
 export interface QueryScope {
   /**
    * A filter every request is ANDed under, so no request escapes the scope's rows.
+   * A condition over translatable fields reads at the request's chosen locale.
    *
    * @example
    * ```ts
