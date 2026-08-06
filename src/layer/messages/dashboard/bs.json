@@ -15,6 +15,7 @@
     "unreachable": "Server nije dostupan"
   },
   "notFound": "Nije pronađeno",
+  "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
   "selectCollection": "Odaberite kolekciju",
   "signOut": "Odjava"
 }

@@ -10,6 +10,7 @@ import {
 } from 'ohne/dashboard';
 import { isUndefined } from 'ohne/utils';
 
+import { collectionSheet } from '../../components/collection-sheet.ts';
 import { shell } from '../../components/shell.ts';
 
 css`
@@ -35,7 +36,7 @@ css`
 `;
 
 /**
- * One collection's pane: the sheet's future home, today its titled frame.
+ * One collection's pane: its title over the records sheet.
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
 export default defineDashboardPage((route) =>
@@ -43,7 +44,7 @@ export default defineDashboardPage((route) =>
 );
 
 /**
- * Renders the collection's title once the discovery read answers, or the not-found line.
+ * Renders the collection's title and sheet once the discovery read answers, or the not-found line.
  */
 function pane(segment: () => string): Child {
   const t = useT();
@@ -57,6 +58,7 @@ function pane(segment: () => string): Child {
         () => [
           h('h1', { class: 'pane-title' }, () => entry()?.label),
           h('hr', { class: 'pane-rule' }),
+          collectionSheet(entry),
         ],
         () => h('div', { class: 'pane-missing' }, () => t('dashboard.notFound')),
       ),

@@ -15,6 +15,7 @@
     "unreachable": "The server cannot be reached"
   },
   "notFound": "Not found",
+  "records": "{count, plural, one {# record} other {# records}}",
   "selectCollection": "Select a collection",
   "signOut": "Sign out"
 }

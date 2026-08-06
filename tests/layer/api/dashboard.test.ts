@@ -261,6 +261,8 @@ describe('fields', () => {
     const fields = keyBy(collection(body, 'DashNotes').fields, (entry) => entry.name);
     strictEqual(fields.title?.type, 'text');
     strictEqual(fields.title?.kind, 'column');
+    strictEqual(fields.title?.logicalType, 'text');
+    strictEqual(fields.owner?.logicalType, 'text');
     strictEqual(fields.title?.allowEmpty, false);
     strictEqual(fields.owner?.kind, 'record');
     strictEqual(fields.owner?.target, 'DashOwners');

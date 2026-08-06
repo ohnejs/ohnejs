@@ -15,6 +15,7 @@
     "unreachable": "Der Server ist nicht erreichbar"
   },
   "notFound": "Nicht gefunden",
+  "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
   "selectCollection": "Sammlung wählen",
   "signOut": "Abmelden"
 }

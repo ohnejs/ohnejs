@@ -5,6 +5,7 @@ import {
   defineHandler,
   type FieldInstance,
   type FieldQueryMeta,
+  type LogicalType,
   type Message,
   queryMetadata,
   useCollections,
@@ -85,6 +86,11 @@ export interface DashboardField {
    * How the field stores and reads: a column, a relation, a child table, or a blocks wrapper.
    */
   kind: FieldQueryMeta['kind'];
+
+  /**
+   * The storage primitive of the field's column; column-bearing kinds (`column`, `record`) only.
+   */
+  logicalType?: LogicalType;
 
   /**
    * The display label, resolved in the request's language.
@@ -340,6 +346,7 @@ function describeField(
     writable: !isUndefined(meta.fieldType) && meta.writable !== false,
     immutable: meta.immutable === true,
   };
+  if (!isUndefined(meta.logicalType)) field.logicalType = meta.logicalType;
   if (!isUndefined(options.description)) {
     field.description = resolveMessage(options.description as Message);
   }
