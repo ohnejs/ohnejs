@@ -1,4 +1,5 @@
 {
+  "collections": "Collections",
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -6,5 +7,14 @@
     "updatedAt": {
       "label": "Updated"
     }
-  }
+  },
+  "login": {
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "unreachable": "The server cannot be reached"
+  },
+  "notFound": "Not found",
+  "selectCollection": "Select a collection",
+  "signOut": "Sign out"
 }

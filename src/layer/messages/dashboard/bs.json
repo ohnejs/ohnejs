@@ -1,4 +1,5 @@
 {
+  "collections": "Kolekcije",
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -6,5 +7,14 @@
     "updatedAt": {
       "label": "Ažurirano"
     }
-  }
+  },
+  "login": {
+    "email": "E-mail",
+    "password": "Lozinka",
+    "submit": "Prijava",
+    "unreachable": "Server nije dostupan"
+  },
+  "notFound": "Nije pronađeno",
+  "selectCollection": "Odaberite kolekciju",
+  "signOut": "Odjava"
 }
