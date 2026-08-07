@@ -15,8 +15,8 @@ export const booleanCell: FieldCell = {
     };
   },
   editor({ value, commit, cancel }) {
-    void commit(value() !== true).then((landed) => {
-      if (!landed) cancel();
+    void commit(value() !== true).then((landing) => {
+      if (!landing.landed) cancel();
     });
     return null;
   },

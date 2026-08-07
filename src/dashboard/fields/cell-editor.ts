@@ -1,3 +1,5 @@
+import type { CommitLanding } from './field-cell.ts';
+
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 
@@ -29,9 +31,9 @@ export interface CellEditorOptions {
   /**
    * Takes the entered text on Enter or blur.
    * Return `false` to reject it as invalid: the editor stays open and marks itself.
-   * Return the write's promise to re-arm Enter and blur when the write fails and the editor stays.
+   * Return the write's landing promise to re-arm Enter and blur when the write fails.
    */
-  commit(text: string): boolean | void | Promise<boolean>;
+  commit(text: string): boolean | void | Promise<CommitLanding>;
 
   /**
    * Called on Escape; the editor closes without writing.
@@ -88,8 +90,8 @@ export function cellEditor(options: CellEditorOptions): HTMLInputElement {
       settled = false;
       input.classList.add('invalid');
     } else if (outcome instanceof Promise) {
-      void outcome.then((landed) => {
-        if (!landed) settled = false;
+      void outcome.then((landing) => {
+        if (!landing.landed) settled = false;
       });
     }
   };

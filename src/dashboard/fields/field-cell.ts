@@ -30,15 +30,31 @@ export interface FieldCellContext {
 }
 
 /**
+ * How a requested write ended, as the editor's `commit` resolves it.
+ */
+export interface CommitLanding {
+  /**
+   * Whether the write landed and the editor closed.
+   * A vanished row also lands: the editor closes and the sheet reloads.
+   */
+  landed: boolean;
+
+  /**
+   * The server's per-path validation messages when the write answered `422`.
+   * Paths are dot-and-bracket from the record root, like `sections[2].heading`.
+   */
+  errors?: Readonly<Record<string, string>>;
+}
+
+/**
  * What a cell's editor receives on top of the display context.
  */
 export interface FieldEditorContext extends FieldCellContext {
   /**
-   * Requests the write, resolving `true` once it lands and the editor closes.
-   * A rejected or failed write resolves `false`: the editor stays open with the cell marked.
-   * A vanished row also resolves `true` - the editor closes and the sheet reloads.
+   * Requests the write, resolving how it landed.
+   * A rejected or failed write keeps the editor open with the cell marked.
    */
-  commit(value: unknown): Promise<boolean>;
+  commit(value: unknown): Promise<CommitLanding>;
 
   /**
    * Closes the editor without writing and clears the cell's pending error mark.

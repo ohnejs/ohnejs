@@ -3,7 +3,14 @@ import './fields/builtin/index.ts';
 export { cellEditor } from './fields/cell-editor.ts';
 export type { CellEditorOptions } from './fields/cell-editor.ts';
 export { dimMark, fieldCellFor, registerFieldCell } from './fields/field-cell.ts';
-export type { FieldCell, FieldCellContext, FieldEditorContext } from './fields/field-cell.ts';
+export type {
+  CommitLanding,
+  FieldCell,
+  FieldCellContext,
+  FieldEditorContext,
+} from './fields/field-cell.ts';
+export { createItemForm, scopedErrors } from './fields/item-form.ts';
+export type { ItemForm } from './fields/item-form.ts';
 export { recordPicker } from './fields/record-picker.ts';
 export { css } from './render/css.ts';
 export { each } from './render/each.ts';

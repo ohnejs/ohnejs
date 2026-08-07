@@ -5,6 +5,7 @@ import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { strokeFromKeyboardEvent } from '../../../utils/keys/stroke-from-keyboard-event.ts';
 import { clamp } from '../../../utils/number/clamp.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { untracked } from '../../../utils/reactive/untracked.ts';
 import { css } from '../../render/css.ts';
 import { each } from '../../render/each.ts';
 import { h } from '../../render/h.ts';
@@ -105,6 +106,7 @@ export interface SheetModel<TRow> {
   /**
    * Renders the cell's inline editor; `close` ends the edit and restores the grid's focus.
    * Returning nothing leaves the cell displaying, so a model refuses per cell by yielding `undefined`.
+   * The build runs untracked: a row update never rebuilds an open editor over the user's input.
    * Omitted, the sheet is read-only.
    */
   editor?(row: () => TRow, column: SheetColumn, close: () => void): Child;
@@ -264,6 +266,7 @@ export function sheet<TRow>(model: SheetModel<TRow>, selection?: SheetSelection)
 
   const onKeydown = (event: KeyboardEvent): void => {
     if (interactive(event)) return;
+    if (!isNull(editing.value)) return;
     if (match(strokeFromKeyboardEvent(event))) event.preventDefault();
   };
 
@@ -353,7 +356,9 @@ export function sheet<TRow>(model: SheetModel<TRow>, selection?: SheetSelection)
                         active.row === index() &&
                         active.column === columnIndex();
                       if (here && !isUndefined(model.editor)) {
-                        const child = model.editor(row, column(), () => closeEditor(active));
+                        const child = untracked(() =>
+                          model.editor?.(row, column(), () => closeEditor(active)),
+                        );
                         if (!isUndefined(child)) return child;
                       }
                       return model.cell(row, column());
