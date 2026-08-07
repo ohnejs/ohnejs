@@ -1,4 +1,6 @@
 {
+  "addItem": "Eintrag hinzufügen",
+  "clear": "Leeren",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
   "create": "Erstellen",
@@ -23,6 +25,7 @@
   "newRecord": "Neuer Datensatz",
   "notFound": "Nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
+  "save": "Speichern",
   "selectCollection": "Sammlung wählen",
   "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
   "signOut": "Abmelden",

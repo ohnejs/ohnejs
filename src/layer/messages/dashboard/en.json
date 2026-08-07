@@ -1,4 +1,6 @@
 {
+  "addItem": "Add item",
+  "clear": "Clear",
   "collections": "Collections",
   "confirmDelete": "Confirm",
   "create": "Create",
@@ -23,6 +25,7 @@
   "newRecord": "New record",
   "notFound": "Not found",
   "records": "{count, plural, one {# record} other {# records}}",
+  "save": "Save",
   "selectCollection": "Select a collection",
   "selected": "{count, plural, one {# selected} other {# selected}}",
   "signOut": "Sign out",

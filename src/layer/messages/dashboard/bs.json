@@ -1,4 +1,6 @@
 {
+  "addItem": "Dodaj stavku",
+  "clear": "Očisti",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
   "create": "Kreiraj",
@@ -23,6 +25,7 @@
   "newRecord": "Novi zapis",
   "notFound": "Nije pronađeno",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+  "save": "Sačuvaj",
   "selectCollection": "Odaberite kolekciju",
   "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "signOut": "Odjava",

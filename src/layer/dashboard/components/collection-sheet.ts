@@ -124,7 +124,7 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
     uuid: string,
     name: string,
     value: unknown,
-  ): Promise<{ close: boolean; record?: SheetRecord }> => {
+  ): Promise<{ close: boolean; record?: SheetRecord; errors?: Record<string, string> }> => {
     const key = `${uuid}:${name}`;
     const response = await writeField(segment, uuid, name, value);
     if (isUndefined(response)) {
@@ -137,10 +137,10 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
     }
     if (response.status === 422) {
       const body = (await response.json()) as { data?: { errors?: Record<string, string> } };
-      const errors = body.data?.errors ?? {};
+      const errors = Object.assign(emptyErrors(), body.data?.errors ?? {});
       const message = errors[name] ?? Object.values(errors)[0] ?? '';
       cellErrors.value = withError(cellErrors.value, key, message);
-      return { close: false };
+      return { close: false, errors };
     }
     if (response.status === 404) {
       reload.value += 1;
@@ -206,7 +206,7 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
           commitEdit(collection.segment, uuid, field.name, value).then((outcome) => {
             if (outcome.close) close();
             if (!isUndefined(outcome.record)) replaceRow(uuid, outcome.record);
-            return outcome.close;
+            return { landed: outcome.close, errors: outcome.errors };
           }),
         cancel: () => {
           cellErrors.value = withoutError(cellErrors.value, key);
