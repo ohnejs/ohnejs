@@ -14,19 +14,6 @@ import { collectionSheet } from '../../components/collection-sheet.ts';
 import { shell } from '../../components/shell.ts';
 
 css`
-  .pane-title {
-    margin: 0;
-    font-size: 21px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  .pane-rule {
-    border: none;
-    border-top: 1px solid var(--hairline);
-    margin: 14px 0 20px;
-  }
-
   .pane-missing {
     height: 100%;
     display: grid;
@@ -55,11 +42,7 @@ function pane(segment: () => string): Child {
     () =>
       when(
         () => !isUndefined(entry()),
-        () => [
-          h('h1', { class: 'pane-title' }, () => entry()?.label),
-          h('hr', { class: 'pane-rule' }),
-          collectionSheet(entry),
-        ],
+        () => collectionSheet(entry),
         () => h('div', { class: 'pane-missing' }, () => t('dashboard.notFound')),
       ),
   );

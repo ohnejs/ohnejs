@@ -22,8 +22,9 @@ css`
   .sidebar {
     display: flex;
     flex-direction: column;
-    width: 232px;
+    width: 220px;
     box-sizing: border-box;
+    background: color-mix(in srgb, var(--ink) 2%, var(--paper));
     border-right: 1px solid var(--hairline);
     transition: width var(--pace);
   }
@@ -34,9 +35,9 @@ css`
 
   .sidebar-top {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    padding: 20px 16px 16px;
+    padding: 16px 16px 18px;
   }
 
   .sidebar.collapsed .sidebar-top {
@@ -45,7 +46,7 @@ css`
   }
 
   .sidebar-word {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -71,18 +72,25 @@ css`
 
   .sidebar-link {
     display: block;
-    padding: 3px 0;
+    margin: 0 -16px;
+    padding: 4px 16px 4px 14px;
+    border-left: 2px solid transparent;
     color: var(--dim);
-    transition: color var(--pace);
+    transition:
+      color var(--pace),
+      background var(--pace);
   }
 
   .sidebar-link:hover {
     color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 
   .sidebar-link.active {
     color: var(--ink);
     font-weight: 500;
+    border-left-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
   }
 
   .sidebar-foot {
@@ -93,8 +101,8 @@ css`
   .sidebar-user {
     display: block;
     color: var(--dim);
-    font-size: 12px;
-    margin-bottom: 4px;
+    font-size: 11px;
+    margin-bottom: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

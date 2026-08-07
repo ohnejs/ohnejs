@@ -4,7 +4,7 @@ import { shell } from '../components/shell.ts';
 
 css`
   .home-empty {
-    height: 100%;
+    flex: 1;
     display: grid;
     place-items: center;
     color: var(--dim);

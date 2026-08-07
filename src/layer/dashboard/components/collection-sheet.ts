@@ -32,15 +32,36 @@ const PER_PAGE = 50;
 const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
 css`
-  .sheet-toolbar {
+  .collection-sheet {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .collection-sheet > .ohne-sheet {
+    flex: 1;
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .sheet-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .sheet-actions {
+    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 14px;
-    margin-bottom: 10px;
-  }
-
-  .sheet-toolbar-selected {
-    margin-left: auto;
   }
 
   .ohne-button.ghost.sheet-toolbar-delete,
@@ -53,8 +74,8 @@ css`
  * A collection's records in the sheet: paged reads, inline editing, and batch deletion.
  *
  * Reads page through the body-query endpoint, newest change first.
- * A cell edit writes only its field; the answered record replaces the row, so the sheet shows
- * the write's final state.
+ * A cell edit writes only its field; the answered record replaces the row.
+ * The sheet therefore shows every write's final state.
  * A `422` lands on the cell as a danger ring with the message as its tooltip.
  * Selecting rows arms the toolbar's two-step delete, which runs row by row and then reloads.
  * The `entry` accessor is reactive: a different collection or refreshed discovery data reloads.
@@ -169,6 +190,8 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
           key: field.name,
           label: field.label,
           numeric: numericColumn(field),
+          center: centerColumn(field),
+          width: columnWidth(field),
         }),
       ),
     page: () => page.value,
@@ -219,47 +242,51 @@ export function collectionSheet(entry: () => DashboardCollection | undefined): C
 
   return h(
     'div',
-    null,
+    { class: 'collection-sheet' },
     h(
       'div',
-      { class: 'sheet-toolbar' },
+      { class: 'sheet-head' },
+      h('h1', { class: 'sheet-title' }, () => entry()?.label),
       h('span', { class: 'ohne-caps' }, () => {
         const current = page.value;
         return isUndefined(current) ? '' : t('dashboard.records', { count: current.total });
       }),
-      when(
-        () => entry()?.operations.create?.allowed === true,
-        () =>
-          button(() => t('dashboard.new'), {
-            kind: 'ghost',
-            onClick: () => {
-              creating.value = true;
-            },
-          }),
-      ),
-      when(
-        () => selectedUUIDs().length > 0,
-        () => [
-          h('span', { class: 'ohne-caps sheet-toolbar-selected' }, () =>
-            t('dashboard.selected', { count: selectedUUIDs().length }),
-          ),
-          when(
-            () => entry()?.operations.delete?.allowed === true,
-            () =>
-              button(() => (armed.value ? t('dashboard.confirmDelete') : t('dashboard.delete')), {
-                kind: 'ghost',
-                class: 'sheet-toolbar-delete',
-                disabled: () => deleting.value,
-                onClick: () => {
-                  if (!armed.value) {
-                    armed.value = true;
-                    return;
-                  }
-                  void runDelete();
-                },
-              }),
-          ),
-        ],
+      h(
+        'div',
+        { class: 'sheet-actions' },
+        when(
+          () => selectedUUIDs().length > 0,
+          () => [
+            h('span', { class: 'ohne-caps' }, () =>
+              t('dashboard.selected', { count: selectedUUIDs().length }),
+            ),
+            when(
+              () => entry()?.operations.delete?.allowed === true,
+              () =>
+                button(() => (armed.value ? t('dashboard.confirmDelete') : t('dashboard.delete')), {
+                  kind: 'ghost',
+                  class: 'sheet-toolbar-delete',
+                  disabled: () => deleting.value,
+                  onClick: () => {
+                    if (!armed.value) {
+                      armed.value = true;
+                      return;
+                    }
+                    void runDelete();
+                  },
+                }),
+            ),
+          ],
+        ),
+        when(
+          () => entry()?.operations.create?.allowed === true,
+          () =>
+            button(() => t('dashboard.new'), {
+              onClick: () => {
+                creating.value = true;
+              },
+            }),
+        ),
       ),
     ),
     sheet(model, selection),
@@ -351,7 +378,8 @@ function displayFor(field: DashboardField, row: () => SheetRecord): Child {
   if (field.name === 'UUID') {
     return () => {
       const value = row()['UUID'];
-      return isString(value) ? h('span', { class: 'cell-mono' }, value) : dimMark('·');
+      if (!isString(value)) return dimMark('·');
+      return h('span', { class: 'cell-mono cell-dim', title: value }, value.slice(0, 8));
     };
   }
   return fieldCellFor(field).display({
@@ -367,6 +395,32 @@ function displayFor(field: DashboardField, row: () => SheetRecord): Child {
 function numericColumn(field: DashboardField): boolean {
   if (field.name === '_updatedAt') return false;
   return field.logicalType === 'integer' || field.logicalType === 'real';
+}
+
+/**
+ * Whether the column centers: boolean checks and the composite kinds' count marks.
+ */
+function centerColumn(field: DashboardField): boolean {
+  if (field.logicalType === 'boolean') return true;
+  return (
+    field.kind === 'records' ||
+    field.kind === 'childOne' ||
+    field.kind === 'childMany' ||
+    field.kind === 'blocks'
+  );
+}
+
+/**
+ * The column's fixed width by what it shows; text columns share the remaining room.
+ */
+function columnWidth(field: DashboardField): number | undefined {
+  if (field.name === 'UUID') return 104;
+  if (field.name === '_updatedAt') return 150;
+  if (field.logicalType === 'boolean') return 64;
+  if (field.logicalType === 'integer' || field.logicalType === 'real') return 96;
+  if (field.kind === 'record') return 128;
+  if (field.kind !== 'column') return 72;
+  return undefined;
 }
 
 /**
@@ -407,7 +461,7 @@ function withoutError(
 function dateFormat(language: string): Intl.DateTimeFormat {
   let format = dateFormats.get(language);
   if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
+    format = new Intl.DateTimeFormat(language, { dateStyle: 'short', timeStyle: 'short' });
     dateFormats.set(language, format);
   }
   return format;

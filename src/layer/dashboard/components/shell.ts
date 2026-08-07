@@ -11,8 +11,15 @@ css`
 
   .shell-main {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
     overflow: auto;
-    padding: 28px 32px;
+    padding: 22px 26px;
+  }
+
+  .shell-main > .collection-sheet {
+    flex: 1;
   }
 `;
 
