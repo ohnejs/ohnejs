@@ -35,6 +35,20 @@ export interface SheetColumn {
    * false
    */
   numeric?: boolean;
+
+  /**
+   * Centers the column, for marks like a boolean check or a list count.
+   *
+   * @default
+   * false
+   */
+  center?: boolean;
+
+  /**
+   * A fixed column width in pixels.
+   * Omitted, the column sizes to its content and shares the remaining room.
+   */
+  width?: number;
 }
 
 /**
@@ -119,10 +133,18 @@ export interface SheetModel<TRow> {
 
 css`
   .ohne-sheet {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     border: 1px solid var(--hairline);
-    overflow: auto;
     outline: none;
     user-select: none;
+  }
+
+  .ohne-sheet-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 
   .ohne-sheet table {
@@ -136,23 +158,26 @@ css`
     position: sticky;
     top: 0;
     z-index: 1;
-    background: var(--paper);
+    background: color-mix(in srgb, var(--ink) 3%, var(--paper));
     text-align: left;
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--dim);
-    padding: 7px 10px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--hairline);
+    white-space: nowrap;
   }
 
   .ohne-sheet td {
-    padding: 5px 10px;
+    height: 34px;
+    box-sizing: border-box;
+    padding: 0 12px;
     border-bottom: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
     white-space: nowrap;
-    max-width: 340px;
+    max-width: 360px;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: default;
@@ -162,13 +187,23 @@ css`
     border-right: none;
   }
 
+  .ohne-sheet tbody tr:hover td {
+    background: color-mix(in srgb, var(--ink) 2.5%, transparent);
+  }
+
   .ohne-sheet th.numeric,
   .ohne-sheet td.numeric {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
 
-  .ohne-sheet td.selected {
+  .ohne-sheet th.center,
+  .ohne-sheet td.center {
+    text-align: center;
+  }
+
+  .ohne-sheet td.selected,
+  .ohne-sheet tbody tr:hover td.selected {
     background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
 
@@ -188,14 +223,15 @@ css`
   .ohne-sheet-foot {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: flex-end;
+    gap: 8px;
     border-top: 1px solid var(--hairline);
-    margin-top: -1px;
-    padding: 4px 10px;
+    padding: 3px 8px;
   }
 
   .ohne-sheet-pageinfo {
     color: var(--dim);
+    font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
 `;
@@ -299,73 +335,81 @@ export function sheet<TRow>(model: SheetModel<TRow>, selection?: SheetSelection)
     'div',
     { class: 'ohne-sheet', tabindex: '0', onKeydown },
     h(
-      'table',
-      null,
+      'div',
+      { class: 'ohne-sheet-scroll' },
       h(
-        'thead',
+        'table',
         null,
         h(
-          'tr',
+          'thead',
           null,
-          each(
-            () => model.columns(),
-            (column) => column.key,
-            (column) =>
-              h(
-                'th',
-                { class: () => (column().numeric ? 'numeric' : false) },
-                () => column().label,
-              ),
+          h(
+            'tr',
+            null,
+            each(
+              () => model.columns(),
+              (column) => column.key,
+              (column) =>
+                h(
+                  'th',
+                  {
+                    class: () => alignClass(column()),
+                    style: () => widthStyle(column()),
+                  },
+                  () => column().label,
+                ),
+            ),
           ),
         ),
-      ),
-      h(
-        'tbody',
-        { onClick: onCellClick, onDblClick: onCellDblClick },
-        each(
-          () => model.page()?.records ?? [],
-          (row, index) => model.rowKey(row, index),
-          (row, index) =>
-            h(
-              'tr',
-              null,
-              each(
-                () => model.columns(),
-                (column) => column.key,
-                (column, columnIndex) =>
-                  h(
-                    'td',
-                    {
-                      'data-row': () => String(index()),
-                      'data-column': () => String(columnIndex()),
-                      class: () =>
-                        cellClass(
-                          model,
-                          column(),
-                          owned,
-                          editing.value,
-                          row(),
-                          index(),
-                          columnIndex(),
-                        ),
-                    },
-                    () => {
-                      const active = editing.value;
-                      const here =
-                        !isNull(active) &&
-                        active.row === index() &&
-                        active.column === columnIndex();
-                      if (here && !isUndefined(model.editor)) {
-                        const child = untracked(() =>
-                          model.editor?.(row, column(), () => closeEditor(active)),
-                        );
-                        if (!isUndefined(child)) return child;
-                      }
-                      return model.cell(row, column());
-                    },
-                  ),
+        h(
+          'tbody',
+          { onClick: onCellClick, onDblClick: onCellDblClick },
+          each(
+            () => model.page()?.records ?? [],
+            (row, index) => model.rowKey(row, index),
+            (row, index) =>
+              h(
+                'tr',
+                null,
+                each(
+                  () => model.columns(),
+                  (column) => column.key,
+                  (column, columnIndex) =>
+                    h(
+                      'td',
+                      {
+                        'data-row': () => String(index()),
+                        'data-column': () => String(columnIndex()),
+                        style: () => widthStyle(column()),
+                        class: () =>
+                          cellClass(
+                            model,
+                            column(),
+                            owned,
+                            editing.value,
+                            row(),
+                            index(),
+                            columnIndex(),
+                          ),
+                      },
+                      () => {
+                        const active = editing.value;
+                        const here =
+                          !isNull(active) &&
+                          active.row === index() &&
+                          active.column === columnIndex();
+                        if (here && !isUndefined(model.editor)) {
+                          const child = untracked(() =>
+                            model.editor?.(row, column(), () => closeEditor(active)),
+                          );
+                          if (!isUndefined(child)) return child;
+                        }
+                        return model.cell(row, column());
+                      },
+                    ),
+                ),
               ),
-            ),
+          ),
         ),
       ),
     ),
@@ -406,7 +450,7 @@ function cellClass<TRow>(
   rowIndex: number,
   columnIndex: number,
 ): string {
-  let classes = column.numeric ? 'numeric' : '';
+  let classes = column.numeric ? 'numeric' : column.center ? 'center' : '';
   if (selection.isSelected(rowIndex, columnIndex)) classes += ' selected';
   if (selection.isFocus(rowIndex, columnIndex)) classes += ' focused';
   if (!isNull(editing) && editing.row === rowIndex && editing.column === columnIndex) {
@@ -414,4 +458,21 @@ function cellClass<TRow>(
   }
   if (model.invalid?.(row, column) === true) classes += ' invalid';
   return classes;
+}
+
+/**
+ * The header cell's alignment class, mirroring the body's.
+ */
+function alignClass(column: SheetColumn): string | false {
+  if (column.numeric) return 'numeric';
+  if (column.center) return 'center';
+  return false;
+}
+
+/**
+ * The fixed-width style for a sized column; unsized columns share the remaining room.
+ */
+function widthStyle(column: SheetColumn): string | false {
+  if (isUndefined(column.width)) return false;
+  return `width:${column.width}px;min-width:${column.width}px;max-width:${column.width}px`;
 }
