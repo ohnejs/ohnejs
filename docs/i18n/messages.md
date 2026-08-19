@@ -134,19 +134,20 @@ and the generated types.
 
 ## Validation messages
 
-A field validator rejects a value by returning a `Message`: a message key, a `[key, params]`
-tuple when the message carries values, or a plain string. With a catalog entry
+A field validator rejects a value by returning a `Message`: a message key, a `{ key, params }`
+object when the message carries values, or a plain string. With a catalog entry
 `"handleTooLong": "Keep it under {max} characters"` in a `profile` group:
 
 ```ts
 field('text', {
   validators: [
-    (value) => (value.length > 30 ? ['profile.handleTooLong', { max: 30 }] : undefined),
+    (value) =>
+      value.length > 30 ? { key: 'profile.handleTooLong', params: { max: 30 } } : undefined,
   ],
 });
 ```
 
-The tuple is typed against `KnownMessages`, so the key must exist and the parameters must match
+The object is typed against `KnownMessages`, so the key must exist and the parameters must match
 its template. Inside a handler you rarely resolve these yourself: a thrown validation failure
 becomes a `422` whose body carries each message already resolved in the request's language - see
 [writing records](../database/writing.md). When you shape the failure yourself, the result's

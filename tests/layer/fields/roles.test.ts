@@ -62,7 +62,7 @@ describe('roles field', () => {
     });
     strictEqual(result.ok, false);
     ok(!result.ok);
-    deepStrictEqual(result.errors.roles, ['auth.unknownRole', { role: 'ghost' }]);
+    deepStrictEqual(result.errors.roles, { key: 'auth.unknownRole', params: { role: 'ghost' } });
   });
 
   it('rejects a non-list and a non-string entry', async () => {

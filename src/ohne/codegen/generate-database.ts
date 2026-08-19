@@ -105,7 +105,7 @@ interface EmissionContext {
 
 /**
  * Renders a field's `label` or `description` to concrete text for a static doc comment.
- * A plain string passes through; a message key or `[key, params]` tuple renders in the default language.
+ * A plain string passes through; a message key or `{ key, params }` object renders in the default language.
  * Returns `undefined` when the message resolves to nothing, so the headline can fall back.
  */
 type MessageResolver = (message: Message | undefined) => string | undefined;
@@ -231,7 +231,7 @@ function messageResolver(messages: readonly MessageMeta[]): MessageResolver {
       const template = templates.get(message);
       return isUndefined(template) ? message : formatMessage(template, undefined, language);
     }
-    const [key, params] = message;
+    const { key, params } = message;
     const template = templates.get(key);
     return isUndefined(template) ? undefined : formatMessage(template, params, language);
   };

@@ -5,7 +5,7 @@ import { hasKey } from '../../../utils/index.ts';
 /**
  * A write's field failures, keyed by dot-path.
  *
- * Every value is a `Message`: a param-free key, a `[key, params]` tuple, or a plain string.
+ * Every value is a `Message`: a param-free key, a `{ key, params }` object, or a plain string.
  * Translation is deferred, so a consumer resolves each message in its own language at the boundary.
  * A key is the field's path from the record root: `title`, `sections[2].heading`, `author`.
  */

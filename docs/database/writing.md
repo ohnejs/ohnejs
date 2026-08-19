@@ -28,7 +28,7 @@ if (result.ok) {
 
 On success, `record` is the full record read back after the insert: your fields, the generated
 `UUID`, and the `_updatedAt` timestamp. On failure, `errors` maps each failing field to a message:
-an untranslated key like `validation.required`, a `[key, params]` tuple when the message carries
+an untranslated key like `validation.required`, a `{ key, params }` object when the message carries
 values, or the string a custom validator returned. A nested failure is keyed by its path:
 `sections[2].title`, `author`. Outside a handler, resolve a key to display text yourself with
 `useT` - see [messages](../i18n/messages.md).

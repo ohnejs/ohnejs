@@ -59,7 +59,8 @@ export function translate(key: string, params?: MessageParams): string {
 /**
  * Resolves a `Message` to a display string in the request's active language.
  *
- * A `[key, params]` tuple resolves with its parameters; a key or plain string resolves through `translate`.
+ * A `{ key, params }` object resolves with its parameters.
+ * A key or plain string resolves through `translate`.
  * A string matching no catalog key returns unchanged, so an already-resolved message passes through.
  *
  * @example
@@ -67,14 +68,14 @@ export function translate(key: string, params?: MessageParams): string {
  * resolveMessage('validation.required')
  * // -> 'This field is required'
  *
- * resolveMessage(['api.messages.unknownGroup', { group: 'x' }])
+ * resolveMessage({ key: 'api.messages.unknownGroup', params: { group: 'x' } })
  * // -> 'Unknown message group `x`'
  * ```
  */
 export function resolveMessage(message: Message): string {
   return isString(message)
     ? translate(message)
-    : translate(message[0], message[1] as MessageParams);
+    : translate(message.key, message.params as MessageParams);
 }
 
 /**

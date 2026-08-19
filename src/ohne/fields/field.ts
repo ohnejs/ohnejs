@@ -142,14 +142,14 @@ export interface ValueOptions<
   /**
    * Functions that reject this field's value, run in order.
    * Return a message to reject, or nothing to accept; the first message wins.
-   * A message is a plain string, a message key, or a `[key, params]` tuple for a parameterized message.
+   * A message is a plain string, a message key, or a `{ key, params }` object for a parameterized message.
    *
    * @example
    * ```ts
    * field('text', {
    *   validators: [
    *     (value) => (value === '' ? 'This field is required' : undefined),
-   *     (value) => (value.length > 10 ? ['field.max', { max: 10 }] : undefined),
+   *     (value) => (value.length > 10 ? { key: 'field.max', params: { max: 10 } } : undefined),
    *   ],
    * })
    * ```
@@ -185,7 +185,7 @@ export interface PresentationOptions {
   /**
    * A short label for this field, shown in the dashboard.
    * Pass a message key to translate it per the viewer's language.
-   * A `[key, params]` tuple supplies a parameterized message; a plain string is shown as-is.
+   * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
    * Omitted, the field name is sentence-cased: `gallerySlider` becomes `Gallery slider`.
    */
   label?: Message;
@@ -194,7 +194,7 @@ export interface PresentationOptions {
    * A longer description for this field, shown in the dashboard beneath its label.
    * Markdown is supported.
    * Pass a message key to translate it per the viewer's language.
-   * A `[key, params]` tuple supplies a parameterized message; a plain string is shown as-is.
+   * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
    */
   description?: Message;
 }

@@ -128,7 +128,7 @@ export interface FieldValidateContext<
 > extends FieldWriteContext<TOptions> {
   /**
    * The field's error slice, keyed by dot-path, for a composite validator to record a subfield failure.
-   * Each value is a message: a key, a `[key, params]` tuple, or a plain string.
+   * Each value is a message: a key, a `{ key, params }` object, or a plain string.
    */
   errors: Record<string, Message>;
 }
@@ -150,7 +150,7 @@ export type FieldSanitizer<
 
 /**
  * A field validator: returns a message to reject its value, or `undefined` to accept it.
- * A message is a param-free key, a `[key, params]` tuple, or a plain string (`Message`).
+ * A message is a param-free key, a `{ key, params }` object, or a plain string (`Message`).
  * The first own-message stops its tier.
  * A composite validator may instead write sub-path errors into `ctx.errors`.
  *

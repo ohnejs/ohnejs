@@ -26,10 +26,10 @@ export default defineField({
 });
 
 /**
- * The `unknownRole` failure as its `[key, params]` message tuple.
+ * The `unknownRole` failure as its `{ key, params }` message object.
  * The key lives in the layer's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Its tuple is therefore not a `Message` member here; the cast bridges it.
+ * Its object is therefore not a `Message` member here; the cast bridges it.
  */
 function unknownRoleMessage(role: string): Message {
-  return ['auth.unknownRole', { role }] as unknown as Message;
+  return { key: 'auth.unknownRole', params: { role } } as unknown as Message;
 }

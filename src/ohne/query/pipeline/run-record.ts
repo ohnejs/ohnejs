@@ -478,7 +478,7 @@ function mergeOutput(scope: ProcessedScope, errors: FieldErrors, output: FieldOu
 /**
  * Runs the whole write pipeline for one record, returning its failures unresolved for the boundary.
  *
- * Every failure value is a `Message`: a key, a `[key, params]` tuple, or a plain string.
+ * Every failure value is a `Message`: a key, a `{ key, params }` object, or a plain string.
  * The returned scope is write-ready: columns serialized, relations and children collected, refs gathered.
  * The input is copied shallowly and frozen, so a field callback cannot poison a sibling's read.
  * The caller's own object stays untouched.

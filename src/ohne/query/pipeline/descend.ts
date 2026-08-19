@@ -355,12 +355,12 @@ function blockEnvelope(
 }
 
 /**
- * The `unknownBlock` failure as its `[key, params]` message tuple.
+ * The `unknownBlock` failure as its `{ key, params }` message object.
  * The key lives in the framework's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Its tuple is therefore not a `Message` member here; the cast bridges it.
+ * Its object is therefore not a `Message` member here; the cast bridges it.
  */
 function unknownBlockMessage(block: unknown): Message {
-  return ['validation.unknownBlock', { block: String(block) }] as unknown as Message;
+  return { key: 'validation.unknownBlock', params: { block: String(block) } } as unknown as Message;
 }
 
 /**

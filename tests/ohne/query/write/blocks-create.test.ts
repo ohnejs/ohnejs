@@ -270,10 +270,10 @@ describe('runCreate with blocks', () => {
       null,
     );
     ok(!result.ok);
-    deepStrictEqual(result.errors['content[0].block'], [
-      'validation.unknownBlock',
-      { block: 'BCNope' },
-    ]);
+    deepStrictEqual(result.errors['content[0].block'], {
+      key: 'validation.unknownBlock',
+      params: { block: 'BCNope' },
+    });
   });
 
   it('rejects a registered but disallowed block type the same way', async () => {
@@ -283,10 +283,10 @@ describe('runCreate with blocks', () => {
       null,
     );
     ok(!result.ok);
-    deepStrictEqual(result.errors['content[0].block'], [
-      'validation.unknownBlock',
-      { block: 'BCLoose' },
-    ]);
+    deepStrictEqual(result.errors['content[0].block'], {
+      key: 'validation.unknownBlock',
+      params: { block: 'BCLoose' },
+    });
   });
 
   it('requires the block and fields envelope keys, each at its path', async () => {

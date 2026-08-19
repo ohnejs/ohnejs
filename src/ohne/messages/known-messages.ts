@@ -34,25 +34,27 @@ export type ParamlessMessageKey = {
 }[keyof KnownMessages];
 
 /**
- * A message key that takes parameters, paired with them as a `[key, params]` tuple.
- * The parameter object is typed to exactly the keys the chosen message's template expects.
+ * A message key paired with its parameters as a `{ key, params }` object.
+ * The `key` discriminates the union, so `params` is typed to exactly what the chosen template expects.
+ * A param-free key carries no `params`: `{ key: 'validation.required' }` alone is valid.
  *
- * Until codegen populates `KnownMessages`, the tuple loosens to `[key, params]` over a plain record.
+ * Until codegen populates `KnownMessages`, the object loosens to a plain `string` key and record.
  * A parameterized message then reads and type-checks without a cast.
  */
-export type MessageTuple = [keyof KnownMessages] extends [never]
-  ? [key: string, params: Record<string, unknown>]
+export type MessageObject = [keyof KnownMessages] extends [never]
+  ? { key: string; params?: Record<string, unknown> }
   : {
       [K in keyof KnownMessages]: [keyof KnownMessages[K]] extends [never]
-        ? never
-        : [K, KnownMessages[K]];
+        ? { key: K; params?: never }
+        : { key: K; params: KnownMessages[K] };
     }[keyof KnownMessages];
 
 /**
- * A message to translate or show: a param-free key, a `[key, params]` tuple, or a plain string.
+ * A message to translate or show: a param-free key, a `{ key, params }` object, or a plain string.
  *
  * A param-free key is suggested for autocomplete, and any string is still allowed.
- * A `[key, params]` tuple names a parameterized message and its interpolation values, both exactly typed.
+ * A `{ key, params }` object names any known key.
+ * Its `params` member is required exactly when the key's template interpolates.
  * A plain string is shown as-is, or resolved when it matches a message key.
  */
-export type Message = LiteralUnion<ParamlessMessageKey & string> | MessageTuple;
+export type Message = LiteralUnion<ParamlessMessageKey & string> | MessageObject;

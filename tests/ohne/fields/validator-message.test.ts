@@ -31,35 +31,39 @@ describe('validator message typing', () => {
     ok(typeof paramFree === 'string' && typeof paramFul === 'string');
   });
 
-  it('accepts a param-free key, any plain string, or a [key, params] tuple', () => {
+  it('accepts a param-free key, any plain string, or a { key, params } object', () => {
     const paramlessKey: Message = 'validatorTest.plain';
     const plain: Message = 'this field is invalid';
-    const tuple: Message = ['validatorTest.ranged', { max: 10 }];
-    ok([paramlessKey, plain, tuple].length === 3);
+    const withParams: Message = { key: 'validatorTest.ranged', params: { max: 10 } };
+    const paramlessObject: Message = { key: 'validatorTest.plain' };
+    ok([paramlessKey, plain, withParams, paramlessObject].length === 4);
   });
 
-  it('rejects wrong tuple params and a param-free key as a tuple', () => {
+  it('rejects wrong params, missing params, and params on a param-free key', () => {
     // @ts-expect-error `validatorTest.ranged` expects { max: number }, not { min: number }
-    const wrongParams: Message = ['validatorTest.ranged', { min: 10 }];
-    // @ts-expect-error a param-free key takes no parameters, so it cannot form a tuple
-    const paramlessTuple: Message = ['validatorTest.plain', {}];
-    ok(Array.isArray(wrongParams) && Array.isArray(paramlessTuple));
+    const wrongParams: Message = { key: 'validatorTest.ranged', params: { min: 10 } };
+    // @ts-expect-error `validatorTest.ranged` requires its `params`
+    const missingParams: Message = { key: 'validatorTest.ranged' };
+    // @ts-expect-error a param-free key takes no `params`
+    const paramlessParams: Message = { key: 'validatorTest.plain', params: {} };
+    ok([wrongParams, missingParams, paramlessParams].every((m) => typeof m === 'object'));
   });
 
   it('accepts every form on a field() validator', () => {
     field('text', {
       validators: [
         (value) => (value === '' ? 'validatorTest.plain' : undefined),
-        (value) => (value.length > 10 ? ['validatorTest.ranged', { max: 10 }] : undefined),
+        (value) =>
+          value.length > 10 ? { key: 'validatorTest.ranged', params: { max: 10 } } : undefined,
       ],
     });
   });
 
-  it('enforces the strict tuple contract on a field() validator too', () => {
+  it('enforces the strict object contract on a field() validator too', () => {
     field('text', {
       validators: [
         // @ts-expect-error `validatorTest.ranged` expects { max: number }, not { min: number }
-        (value) => (value ? ['validatorTest.ranged', { min: 1 }] : undefined),
+        (value) => (value ? { key: 'validatorTest.ranged', params: { min: 1 } } : undefined),
       ],
     });
   });
@@ -67,7 +71,9 @@ describe('validator message typing', () => {
 
 const ranged = defineField({
   columnType: 'text',
-  validators: [(value) => (value === 'bad' ? ['validatorTest.ranged', { max: 5 }] : undefined)],
+  validators: [
+    (value) => (value === 'bad' ? { key: 'validatorTest.ranged', params: { max: 5 } } : undefined),
+  ],
 });
 useFields().register('rangedText', { name: 'rangedText' as FieldTypeName, fieldType: ranged });
 useCollections().register('VMPost', {
@@ -81,8 +87,8 @@ useMessages().register('en', {
   'validatorTest.ranged': 'Max is {max}',
 });
 
-describe('validator tuple at runtime', () => {
-  it('carries a [key, params] tuple unresolved, then resolves it at the boundary', async () => {
+describe('validator message at runtime', () => {
+  it('carries a { key, params } object unresolved, then resolves it at the boundary', async () => {
     const result = await runRecord(
       queryMetadata('VMPost'),
       { title: 'bad' },
@@ -92,7 +98,7 @@ describe('validator tuple at runtime', () => {
       },
     );
     ok(!result.ok);
-    deepStrictEqual(result.errors.title, ['validatorTest.ranged', { max: 5 }]);
+    deepStrictEqual(result.errors.title, { key: 'validatorTest.ranged', params: { max: 5 } });
     strictEqual(resolveMessage(result.errors.title), 'Max is 5');
   });
 });
