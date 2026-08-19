@@ -51,6 +51,27 @@ export default defineBlock({
 
 A block with no fields is legal - a divider is all type, no data.
 
+## Naming a block
+
+The dashboard names a block by sentence-casing it, so `PricingCard` reads as `Pricing card`. Give
+it a `label` to say it differently, or to say it in every language you ship:
+
+```ts
+// blocks/PricingCard.ts
+import { defineBlock, field } from 'ohne';
+
+export default defineBlock({
+  label: 'blocks.pricingCard.label',
+  fields: {
+    heading: field('text'),
+    price: field('integer'),
+  },
+});
+```
+
+A plain string shows as written. A message key resolves per the viewer's language, so the label
+lives in your catalogs with the rest of your UI strings - see [messages](../i18n/messages.md).
+
 Blocks are global. Every `Quote` instance, whichever collection holds it, lives in one shared
 table - so a `unique` field inside a block is unique across every instance in the database. And
 `block` is a reserved field name inside a block: it is the key that names the type beside the
