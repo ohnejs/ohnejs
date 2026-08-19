@@ -403,6 +403,10 @@ export function sheet<TRow>(model: SheetModel<TRow>, selection?: SheetSelection)
                             model.editor?.(row, column(), () => closeEditor(active)),
                           );
                           if (!isUndefined(child)) return child;
+                          // A model that refuses this cell would otherwise stay `editing`, and the
+                          // grid swallows every key while it is. Closing here is safe: `trigger`
+                          // skips the running effect, so this pass's own display content stands.
+                          closeEditor(active);
                         }
                         return model.cell(row, column());
                       },
