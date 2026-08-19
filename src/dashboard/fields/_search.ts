@@ -1,5 +1,5 @@
 import type { Child } from '../render/insert.ts';
-import type { DashboardCollection, DashboardField } from '../runtime/meta.ts';
+import type { DashboardCollection, DashboardField } from '../runtime/meta-types.ts';
 
 import { debounce } from '../../utils/debounce/debounce.ts';
 import { isString } from '../../utils/is/is-string.ts';

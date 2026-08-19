@@ -1,5 +1,5 @@
 import type { Child } from '../render/insert.ts';
-import type { DashboardField } from '../runtime/meta.ts';
+import type { DashboardField } from '../runtime/meta-types.ts';
 
 import { isArray } from '../../utils/is/is-array.ts';
 import { isNull } from '../../utils/is/is-null.ts';

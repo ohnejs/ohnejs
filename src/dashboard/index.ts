@@ -28,6 +28,7 @@ export type { DashboardConfig } from './runtime/config.ts';
 export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
 export { dashboardMeta, invalidateDashboardMeta } from './runtime/meta.ts';
 export type {
+  DashboardBlock,
   DashboardCollection,
   DashboardField,
   DashboardMenuGroup,
@@ -43,6 +44,8 @@ export { checkbox } from './ui/checkbox.ts';
 export { drawer } from './ui/drawer.ts';
 export type { DrawerOptions } from './ui/drawer.ts';
 export { labeledField } from './ui/labeled-field.ts';
+export { select } from './ui/select.ts';
+export type { SelectOption } from './ui/select.ts';
 export { createSheetSelection } from './ui/sheet/selection.ts';
 export type { CellAddress, CellRange, SheetSelection } from './ui/sheet/selection.ts';
 export { sheetKeymap } from './ui/sheet/sheet-keys.ts';
