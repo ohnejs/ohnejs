@@ -1,3 +1,4 @@
+import { first } from '../../../utils/array/first.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -7,8 +8,10 @@ import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
 import { drawer } from '../../ui/drawer.ts';
+import { blocksOf } from '../_blocks.ts';
+import { itemFormSupports } from '../_items.ts';
 import { dimMark, type FieldCell, registerFieldCell } from '../field-cell.ts';
-import { createItemForm, type ItemForm, itemFormSupports, scopedErrors } from '../item-form.ts';
+import { createItemForm, type ItemForm, scopedErrors } from '../item-form.ts';
 
 /**
  * One drawer row: a stable local key and the item's form.
@@ -32,7 +35,7 @@ export const repeaterCell: FieldCell = {
   },
   editor(context) {
     const subfields = context.field.subfields ?? [];
-    if (subfields.length === 0 || !itemFormSupports(subfields)) return undefined;
+    if (subfields.length === 0 || !itemFormSupports(subfields, blocksOf())) return undefined;
     const t = useT();
     let nextKey = 0;
     const initial = isArray(context.value()) ? (context.value() as unknown[]) : [];
@@ -98,7 +101,11 @@ export const repeaterCell: FieldCell = {
           if (leftover === '' && unplaced !== '') leftover = unplaced;
         });
         failure.value =
-          leftover !== '' ? leftover : placed === 0 ? (Object.values(landing.errors)[0] ?? '') : '';
+          leftover !== ''
+            ? leftover
+            : placed === 0
+              ? (first(Object.values(landing.errors)) ?? '')
+              : '';
       });
     };
 

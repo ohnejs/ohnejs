@@ -1,11 +1,10 @@
 import type { Child } from '../render/insert.ts';
-import type { DashboardField } from '../runtime/meta.ts';
+import type { DashboardField } from '../runtime/meta-types.ts';
 
-import { isArray } from '../../utils/is/is-array.ts';
 import { isDecimalString } from '../../utils/is/is-decimal-string.ts';
+import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isInteger } from '../../utils/is/is-integer.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
-import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -15,13 +14,15 @@ import { useT } from '../runtime/use-t.ts';
 import { checkbox } from '../ui/checkbox.ts';
 import { labeledField } from '../ui/labeled-field.ts';
 import { textInput } from '../ui/text-input.ts';
+import { blocksOf } from './_blocks.ts';
+import { carriedField, carryValue } from './_items.ts';
 
 /**
  * One composite item's form over its subfields: inputs in, a wire-legal full item out.
  *
  * Scalar and single-relation subfields render as inputs.
- * Deeper composite subfields carry their initial values through, sanitized to what the wire
- * accepts, since an item write is always whole and omitting them would reset them.
+ * Deeper composite subfields carry their initial values through, sanitized to what the wire accepts.
+ * An item write is always whole, so omitting them would reset them.
  */
 export interface ItemForm {
   /**
@@ -41,6 +42,12 @@ export interface ItemForm {
    * Returns the first message that matched no rendered row, or `''` when every message placed.
    */
   setErrors(errors: Readonly<Record<string, string>>): string;
+
+  /**
+   * Whether the form currently holds messages on its rows, from a parse failure or a routed `422`.
+   * Reads reactively, so a flag rendered from it updates as errors land and clear.
+   */
+  errored(): boolean;
 }
 
 /**
@@ -87,21 +94,6 @@ css`
 `;
 
 /**
- * Whether an `ItemForm` can round-trip items over `fields` without losing or corrupting data.
- * `blocks` subfields have no served metadata to sanitize by, and a write-only subfield's value
- * can neither render nor carry - both refuse, at any nesting depth.
- */
-export function itemFormSupports(fields: readonly DashboardField[]): boolean {
-  return fields.every((field) => {
-    if (field.name === 'UUID') return true;
-    if (field.kind === 'blocks') return false;
-    if (!field.readable) return false;
-    if (isUndefined(field.subfields)) return true;
-    return itemFormSupports(field.subfields);
-  });
-}
-
-/**
  * Builds an `ItemForm` over `fields` seeded from `initial`, an existing item or `undefined`.
  * Check `itemFormSupports` first; unsupported subfields make the round trip lossy.
  */
@@ -111,6 +103,7 @@ export function createItemForm(
   options: ItemFormOptions,
 ): ItemForm {
   const t = useT();
+  const blocks = blocksOf();
   const rendered = fields.filter(formField);
   const texts = new Map<string, Ref<string>>();
   const bools = new Map<string, Ref<boolean>>();
@@ -137,7 +130,7 @@ export function createItemForm(
       const invalid = blank();
       for (const field of fields) {
         if (formField(field) || !carriedField(field)) continue;
-        const carried = carryValue(field, initial?.[field.name]);
+        const carried = carryValue(field, initial?.[field.name], blocks);
         if (!isUndefined(carried)) item[field.name] = carried;
       }
       for (const field of rendered) {
@@ -152,7 +145,7 @@ export function createItemForm(
         else if (!isUndefined(outcome.value)) item[field.name] = outcome.value;
       }
       errors.value = invalid;
-      if (Object.keys(invalid).length > 0) return undefined;
+      if (!isEmpty(invalid)) return undefined;
       const uuid = initial?.UUID;
       if (options.attachUUID && isString(uuid)) item.UUID = uuid;
       return item;
@@ -165,6 +158,9 @@ export function createItemForm(
       }
       return '';
     },
+    errored() {
+      return !isEmpty(errors.value);
+    },
   };
 }
 
@@ -175,50 +171,6 @@ function formField(field: DashboardField): boolean {
   if (!field.writable || field.immutable || field.name === 'UUID') return false;
   if (field.kind === 'record') return true;
   return field.kind === 'column' && field.logicalType !== 'json';
-}
-
-/**
- * Whether the subfield's initial value carries into the write: writable, mutable, not rendered.
- */
-function carriedField(field: DashboardField): boolean {
-  return field.writable && !field.immutable && field.name !== 'UUID';
-}
-
-/**
- * The carried value, sanitized to what the wire accepts at the subfield's kind.
- * Child items shed rejected keys recursively; only `childMany` items keep their `UUID`s.
- */
-function carryValue(field: DashboardField, value: unknown): unknown {
-  if (isUndefined(value)) return undefined;
-  if (field.kind === 'childOne') {
-    if (!isPlainObject<Record<string, unknown>>(value)) return null;
-    return sanitizeItem(field.subfields ?? [], value, false);
-  }
-  if (field.kind === 'childMany') {
-    if (!isArray(value)) return [];
-    return value
-      .filter((item) => isPlainObject<Record<string, unknown>>(item))
-      .map((item) => sanitizeItem(field.subfields ?? [], item, true));
-  }
-  return value;
-}
-
-/**
- * One carried item, rebuilt from its metadata so only wire-accepted keys survive.
- */
-function sanitizeItem(
-  fields: readonly DashboardField[],
-  item: Readonly<Record<string, unknown>>,
-  attachUUID: boolean,
-): Record<string, unknown> {
-  const clean: Record<string, unknown> = {};
-  for (const field of fields) {
-    if (!carriedField(field)) continue;
-    const carried = carryValue(field, item[field.name]);
-    if (!isUndefined(carried)) clean[field.name] = carried;
-  }
-  if (attachUUID && isString(item.UUID)) clean.UUID = item.UUID;
-  return clean;
 }
 
 /**
