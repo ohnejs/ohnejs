@@ -1,4 +1,5 @@
 import {
+  blockQueryMetadata,
   type Capability,
   type CollectionAPI,
   type CollectionEndpoint,
@@ -8,6 +9,7 @@ import {
   type LogicalType,
   type Message,
   queryMetadata,
+  useBlocks,
   useCollections,
   useConfig,
 } from 'ohne';
@@ -16,6 +18,7 @@ import {
   isNull,
   isPlainObject,
   isUndefined,
+  naturalCompare,
   toKebabCase,
   toSentenceCase,
 } from 'ohne/utils';
@@ -195,6 +198,32 @@ export interface DashboardCollection {
 }
 
 /**
+ * One block type a `blocks` field may hold, described for the dashboard's editors.
+ *
+ * Block types are named, never inlined.
+ * A block may hold a `blocks` field allowing its own type, so the graph has cycles.
+ * Only a flat registry keyed by name closes.
+ * A field's `allow` names its members; every name it lists is described here.
+ */
+export interface DashboardBlock {
+  /**
+   * The registered block name, in PascalCase; a block item's `block` key carries it.
+   */
+  name: string;
+
+  /**
+   * The display label, resolved in the request's language.
+   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   */
+  label: string;
+
+  /**
+   * The block's own fields, its instance `UUID` included; a block carries no `_updatedAt`.
+   */
+  fields: DashboardField[];
+}
+
+/**
  * One sidebar menu group: a heading and the collections it holds.
  */
 export interface DashboardMenuGroup {
@@ -222,6 +251,12 @@ export interface DashboardMeta {
    * The collections the user may work with, in registry order.
    */
   collections: DashboardCollection[];
+
+  /**
+   * Every block type the listed collections can reach, sorted by name.
+   * A `blocks` field's `allow` resolves against this registry, nested fields included.
+   */
+  blocks: DashboardBlock[];
 
   /**
    * The content locales the app declares.
@@ -260,8 +295,52 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     });
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
-  return { menu: resolveMenu(collections), collections, locales, defaultLocale };
+  return {
+    menu: resolveMenu(collections),
+    collections,
+    blocks: describeBlocks(collections),
+    locales,
+    defaultLocale,
+  };
 });
+
+/**
+ * Describes every block type the listed collections can reach, following `allow` to closure.
+ * A block's own fields may admit further blocks, and a block may admit itself.
+ * The walk is therefore a worklist over names already described, not a recursion into field trees.
+ */
+function describeBlocks(collections: readonly DashboardCollection[]): DashboardBlock[] {
+  const described = new Map<string, DashboardBlock>();
+  const pending: string[] = [];
+  for (const collection of collections) collectAllowed(collection.fields, pending);
+  while (pending.length > 0) {
+    const name = pending.pop() as string;
+    if (described.has(name)) continue;
+    const meta = useBlocks().get(name);
+    if (isUndefined(meta)) continue;
+    const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
+    described.set(name, { name, label: blockLabelOf(name, meta.block.label), fields });
+    collectAllowed(fields, pending);
+  }
+  return [...described.values()].sort((left, right) => naturalCompare(left.name, right.name));
+}
+
+/**
+ * Collects the block types the fields admit, walking a composite's subfields for nested ones.
+ */
+function collectAllowed(fields: readonly DashboardField[], into: string[]): void {
+  for (const field of fields) {
+    if (!isUndefined(field.allow)) into.push(...field.allow);
+    if (!isUndefined(field.subfields)) collectAllowed(field.subfields, into);
+  }
+}
+
+/**
+ * The block's display label: its declared `label`, or the name sentence-cased.
+ */
+function blockLabelOf(name: string, label: Message | undefined): string {
+  return isUndefined(label) ? toSentenceCase(name) : resolveMessage(label);
+}
 
 /**
  * Resolves a collection's four operations for `user`, or `null` when none is usable.

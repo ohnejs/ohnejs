@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import dashboardGet, {
+  type DashboardBlock,
   type DashboardCollection,
   type DashboardMeta,
 } from '../../../src/layer/api/dashboard.get.ts';
@@ -12,6 +13,7 @@ import SessionsCollection from '../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../src/layer/collections/Users.ts';
 import passwordField from '../../../src/layer/fields/password.ts';
 import rolesField from '../../../src/layer/fields/roles.ts';
+import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
@@ -54,6 +56,7 @@ useMessages().register('en', {
   'dashboard.fields.uuid.label': 'UUID',
   'dashboard.fields.updatedAt.label': 'Updated',
   'dash.owners.name.label': 'Owner name',
+  'dash.blocks.hero.label': 'Hero section',
 });
 
 useCollections().register('DashNotes', {
@@ -111,12 +114,46 @@ useCollections().register('DashLabels', {
   },
 });
 
+useBlocks().register('DashHero', {
+  name: 'DashHero',
+  block: {
+    label: 'dash.blocks.hero.label',
+    fields: {
+      heading: field('text'),
+      nested: field('blocks', { allow: ['DashAside'] }),
+    },
+  },
+});
+useBlocks().register('DashAside', {
+  name: 'DashAside',
+  block: { fields: { words: field('text') } },
+});
+useBlocks().register('DashSecret', {
+  name: 'DashSecret',
+  block: { fields: { code: field('text') } },
+});
+
+useCollections().register('DashPages', {
+  name: 'DashPages',
+  collection: {
+    api: { read: 'public' },
+    fields: {
+      title: field('text'),
+      content: field('blocks', { allow: ['DashHero'] }),
+    },
+  },
+});
+useCollections().register('DashVault', {
+  name: 'DashVault',
+  collection: { fields: { body: field('blocks', { allow: ['DashSecret'] }) } },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
-  desired: buildDesiredSchema(useCollections(), useFields() as never),
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
 async function userWith(email: string, roles: string[]): Promise<string> {
@@ -175,6 +212,7 @@ describe('access', () => {
       'DashPublic',
       'DashArticles',
       'DashLabels',
+      'DashPages',
     ]);
   });
 
@@ -188,6 +226,7 @@ describe('access', () => {
       'DashDenied',
       'DashArticles',
       'DashLabels',
+      'DashPages',
     ]);
   });
 });
@@ -289,7 +328,14 @@ describe('menu', () => {
       { label: 'Content', collections: ['DashNotes'] },
       {
         label: '',
-        collections: ['Sessions', 'DashOwners', 'DashPublic', 'DashArticles', 'DashLabels'],
+        collections: [
+          'Sessions',
+          'DashOwners',
+          'DashPublic',
+          'DashArticles',
+          'DashLabels',
+          'DashPages',
+        ],
       },
     ]);
   });
@@ -307,6 +353,7 @@ describe('menu', () => {
           'DashDenied',
           'DashArticles',
           'DashLabels',
+          'DashPages',
         ],
       },
     ]);
@@ -330,5 +377,46 @@ describe('locales', () => {
     const { body } = await call(user);
     deepStrictEqual(body.locales, ['en', 'de']);
     strictEqual(body.defaultLocale, 'en');
+  });
+});
+
+describe('blocks', () => {
+  function block(body: DashboardMeta, name: string): DashboardBlock {
+    const found = body.blocks.find((entry) => entry.name === name);
+    if (!found) throw new Error(`block ${name} missing from the response`);
+    return found;
+  }
+
+  it('serves the types the visible collections reach, sorted, and nothing else', async () => {
+    deepStrictEqual(
+      (await call(user)).body.blocks.map((entry) => entry.name),
+      ['DashAside', 'DashHero'],
+    );
+  });
+
+  it('resolves a declared label and sentence-cases an omitted one', async () => {
+    const { body } = await call(user);
+    strictEqual(block(body, 'DashHero').label, 'Hero section');
+    strictEqual(block(body, 'DashAside').label, 'Dash aside');
+  });
+
+  it("describes a block's own fields, led by `UUID` and without `_updatedAt`", async () => {
+    const fields = block((await call(user)).body, 'DashHero').fields;
+    deepStrictEqual(
+      fields.map((entry) => entry.name),
+      ['UUID', 'heading', 'nested'],
+    );
+    strictEqual(fields[1]?.type, 'text');
+    strictEqual(fields[1]?.required, true);
+  });
+
+  it('resolves `allow` on a field and on a block subfield alike', async () => {
+    const { body } = await call(user);
+    const content = keyBy(collection(body, 'DashPages').fields, (entry) => entry.name).content;
+    strictEqual(content?.kind, 'blocks');
+    deepStrictEqual(content?.allow, ['DashHero']);
+    const nested = keyBy(block(body, 'DashHero').fields, (entry) => entry.name).nested;
+    strictEqual(nested?.kind, 'blocks');
+    deepStrictEqual(nested?.allow, ['DashAside']);
   });
 });

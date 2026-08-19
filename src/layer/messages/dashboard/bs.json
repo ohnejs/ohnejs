@@ -1,5 +1,7 @@
 {
+  "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
+  "blocksLocked": "Ova lista sadrži tip bloka koji ovaj editor ne može urediti",
   "clear": "Očisti",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",

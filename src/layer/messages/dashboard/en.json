@@ -1,5 +1,7 @@
 {
+  "addBlock": "Add block",
   "addItem": "Add item",
+  "blocksLocked": "This list holds a block type this editor cannot edit",
   "clear": "Clear",
   "collections": "Collections",
   "confirmDelete": "Confirm",

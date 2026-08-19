@@ -1,5 +1,7 @@
 {
+  "addBlock": "Block hinzufügen",
   "addItem": "Eintrag hinzufügen",
+  "blocksLocked": "Diese Liste enthält einen Blocktyp, den dieser Editor nicht bearbeiten kann",
   "clear": "Leeren",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
