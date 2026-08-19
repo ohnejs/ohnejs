@@ -1,5 +1,6 @@
 import type { Child } from '../render/insert.ts';
 
+import { last } from '../../utils/array/last.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -19,6 +20,8 @@ export interface DrawerOptions {
    */
   onClose(): void;
 }
+
+const stack: symbol[] = [];
 
 css`
   .ohne-drawer-catcher {
@@ -67,13 +70,22 @@ css`
  * ```
  */
 export function drawer(options: DrawerOptions, ...content: Child[]): Child {
+  const token = Symbol('drawer');
+  stack.push(token);
   const onEscape = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
+    // Every open drawer listens on `document`, and `stopPropagation` does not silence a sibling
+    // listener on the same node. Only the topmost may answer, or one Escape closes them all.
+    if (last(stack) !== token) return;
     event.stopPropagation();
     options.onClose();
   };
   document.addEventListener('keydown', onEscape, { capture: true });
-  onCleanup(() => document.removeEventListener('keydown', onEscape, { capture: true }));
+  onCleanup(() => {
+    document.removeEventListener('keydown', onEscape, { capture: true });
+    const at = stack.indexOf(token);
+    if (at !== -1) stack.splice(at, 1);
+  });
   return [
     h('div', { class: 'ohne-drawer-catcher', onClick: () => options.onClose() }),
     h(
