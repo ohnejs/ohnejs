@@ -150,6 +150,11 @@ export interface DashboardCollection {
   label: string;
 
   /**
+   * The Tabler icon name the sidebar menu shows, as declared; absent when the collection declares none.
+   */
+  icon?: string;
+
+  /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.
    */
   translatable: boolean;

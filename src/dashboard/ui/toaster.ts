@@ -10,8 +10,8 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { useRoute } from '../router/router.ts';
-import { renderProse } from './dialog.ts';
 import { icon, type IconName } from './icon.ts';
+import { renderProse } from './prose.ts';
 import './tokens.ts';
 
 /**
@@ -35,8 +35,8 @@ export interface ToastAction {
 export interface ToastOptions {
   /**
    * The visual style of the toast, by message importance.
-   * Every type except `'default'` leads with its icon; `'error'` and `'warning'` recolor
-   * to the destructive palette.
+   * Every type except `'default'` leads with its icon.
+   * `'error'` and `'warning'` recolor to the destructive palette.
    *
    * @default
    * 'default'
@@ -718,8 +718,8 @@ export function toast(message: string, options: ToastOptions = {}): string | num
 
 /**
  * Queues a toast notification for the `toaster` to drain.
- * Use it when the toaster is not mounted yet, or with `showAfterRouteChange` for a toast that
- * must survive an imminent navigation - the queue flushes on mount and on every route change.
+ * Use it when the toaster is not mounted yet, or when a toast must survive an imminent navigation.
+ * The queue flushes on mount and on every route change; `showAfterRouteChange` holds until the latter.
  *
  * @example
  * ```ts
@@ -732,10 +732,10 @@ export function queueToast(message: string, options?: ToastOptions): void {
 }
 
 /**
- * The global toast outlet, a zero-dependency reimplementation of the vue-sonner runtime with
- * Pruvious v4's exact configuration: a top-center stack of at most 3 visible toasts laid out
- * expanded with an 8px gap, 336px wide, 4000ms timers that pause while hovered or held,
- * swipe-up to dismiss (20px or 0.11 px/ms), a 200ms exit window, and Alt+T focusing the stack.
+ * The global toast outlet, a zero-dependency reimplementation of the vue-sonner runtime.
+ * It carries Pruvious v4's exact configuration: a top-center stack of at most 3 visible toasts, expanded.
+ * The toasts sit 336px wide with an 8px gap, on 4000ms timers that pause while hovered or held.
+ * Swipe-up dismisses (20px or 0.11 px/ms), exits get a 200ms window, and Alt+T focuses the stack.
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.
  *
  * @example

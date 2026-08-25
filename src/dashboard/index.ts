@@ -35,6 +35,7 @@ export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
 export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
 export { dashboardMeta, invalidateDashboardMeta } from './runtime/meta.ts';
+export { setDocumentTitle } from './runtime/title.ts';
 export type {
   DashboardBlock,
   DashboardCollection,
@@ -91,7 +92,7 @@ export { container, structureDraggable } from './ui/container.ts';
 export type { ContainerOptions, StructureDraggable } from './ui/container.ts';
 export { contextMenu } from './ui/context-menu.ts';
 export type { ContextMenu, ContextMenuOptions } from './ui/context-menu.ts';
-export { dialogHost, openDialog, renderProse } from './ui/dialog.ts';
+export { dialogHost, openDialog } from './ui/dialog.ts';
 export type { DialogAction, DialogOptions } from './ui/dialog.ts';
 export { dropdownItem } from './ui/dropdown-item.ts';
 export type { DropdownItemOptions } from './ui/dropdown-item.ts';
@@ -140,7 +141,7 @@ export { pagination } from './ui/pagination.ts';
 export type { PaginationOptions } from './ui/pagination.ts';
 export { popup } from './ui/popup-overlay.ts';
 export type { Popup, PopupClose, PopupOptions } from './ui/popup-overlay.ts';
-export { prose } from './ui/prose.ts';
+export { prose, renderProse } from './ui/prose.ts';
 export type { ProseOptions } from './ui/prose.ts';
 export { resizer } from './ui/resizer.ts';
 export type { ResizerOptions } from './ui/resizer.ts';

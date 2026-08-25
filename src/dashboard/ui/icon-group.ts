@@ -3,6 +3,7 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { clamp } from '../../utils/number/clamp.ts';
+import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
@@ -10,6 +11,7 @@ import { h } from '../render/h.ts';
 import { bubble } from './bubble.ts';
 import { type Primitive } from './button-group.ts';
 import { icon, type IconName } from './icon.ts';
+import { attachTooltip } from './tooltip.ts';
 import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
@@ -30,6 +32,7 @@ export interface IconGroupChoice {
 
   /**
    * Text set as the `title` HTML attribute of the choice element.
+   * With `showTooltips` enabled, it appears as a styled tooltip on hover instead.
    */
   title?: string;
 
@@ -87,7 +90,6 @@ export interface IconGroupOptions {
 
   /**
    * Shows each choice's `title` as a styled tooltip on hover instead of the `title` attribute.
-   * Until the tooltip engine lands, the native `title` attribute serves both modes.
    *
    * @default
    * false
@@ -217,8 +219,8 @@ css`
  * A `buttonGroup` variant with square icon cells and an optional per-choice corner bubble.
  * Arrow keys step through the choices and clamp at the edges; Space cycles with wraparound.
  * A trailing hidden input carries `id` and `name`, so label linkage and form serialization work.
- * A `focus:<id>` trigger focuses the group and shows the ring, since `:focus-visible` cannot
- * match a programmatic focus.
+ * A `focus:<id>` trigger focuses the group and shows the ring.
+ * `:focus-visible` cannot match a programmatic focus.
  *
  * @example
  * ```ts
@@ -276,11 +278,11 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
     each(
       () => options.choices(),
       (choice) => choice.value,
-      (choice) =>
-        h(
+      (choice) => {
+        const item = h(
           'span',
           {
-            title: () => choice().title,
+            title: options.showTooltips ? undefined : () => choice().title,
             class: () =>
               'ohne-icon-group-item' +
               (choice().value === model.value ? ' ohne-icon-group-item-active' : ''),
@@ -290,7 +292,10 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
           },
           () => choiceIcon(choice().icon),
           () => choiceBubble(choice().bubble),
-        ),
+        );
+        if (options.showTooltips) onCleanup(attachTooltip(item, () => choice().title ?? null));
+        return item;
+      },
     ),
     h('input', {
       id: options.id,
@@ -322,6 +327,6 @@ function choiceIcon(shape: IconName | Node | undefined): Node | null {
 function choiceBubble(model: IconGroupBubble | undefined): Node | null {
   if (model === undefined) return null;
   const pill = bubble(model.content, { variant: model.variant });
-  if (model.tooltip !== undefined) pill.title = model.tooltip;
+  if (model.tooltip !== undefined) onCleanup(attachTooltip(pill, model.tooltip));
   return pill;
 }

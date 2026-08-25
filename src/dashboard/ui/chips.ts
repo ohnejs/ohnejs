@@ -1,4 +1,3 @@
-import { clamp } from '../../utils/number/clamp.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -10,8 +9,9 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { type DropdownHandle, dropdown } from './dropdown.ts';
 import { icon } from './icon.ts';
-import { type ScrollableHandle, scrollable } from './scrollable.ts';
+import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
 
 /**
@@ -148,46 +148,6 @@ export interface ChipsOptions {
    */
   scrollContainer?: HTMLElement;
 }
-
-/* The dropdown chrome the source borrows from PUIDropdown, scoped under the chips dropdown so
-   nothing leaks into the dropdown component's own port when it lands. Adopted before the chips
-   sheet, so the chips ring override below wins the box-shadow, as it does in the source through
-   specificity. */
-css`
-  .ohne-chips-dropdown {
-    position: fixed;
-    z-index: 99997;
-    display: flex;
-    flex-direction: column;
-    outline: none;
-    font-size: calc(1rem + var(--ohne-size) * 0.125rem);
-  }
-
-  .ohne-chips-dropdown .ohne-dropdown-scrollable {
-    background-color: hsl(var(--ohne-background));
-    border-radius: calc(var(--ohne-radius) - 0.125rem);
-    box-shadow: var(--ohne-shadow);
-    color: hsl(var(--ohne-foreground));
-  }
-
-  .ohne-chips-dropdown-mounted .ohne-dropdown-scrollable {
-    transition: var(--ohne-transition);
-    transition-property: opacity, transform;
-  }
-
-  .ohne-chips-dropdown:not(.ohne-chips-dropdown-mounted) .ohne-dropdown-scrollable {
-    opacity: 0;
-    transform: translate3d(0, -0.5rem, 0) scale(0.95);
-  }
-
-  .ohne-chips-dropdown-top:not(.ohne-chips-dropdown-mounted) .ohne-dropdown-scrollable {
-    transform: translate3d(0, 0.5rem, 0) scale(0.95);
-  }
-
-  .ohne-chips-dropdown .ohne-dropdown-inner {
-    padding: 0.25rem;
-  }
-`;
 
 css`
   .ohne-chips {
@@ -401,18 +361,12 @@ css`
   }
 `;
 
-interface DropdownHandle {
-  panel: HTMLElement;
-  update(): void;
-  scrollable: ScrollableHandle | null;
-}
-
 /**
  * A tag input: free text, or choice-restricted with a filtering dropdown when `choices` is given.
- * Chips reorder by mouse drag or touch long-press; Backspace deletes in two steps, previewing the
- * last chip destructively before removing it.
- * In select mode the dropdown filters by keywords, carries the focus ring on the field's behalf,
- * and locks the window and `scrollContainer` scroll while open; a window resize closes it.
+ * Chips reorder by mouse drag or touch long-press.
+ * Backspace deletes in two steps: the first press previews the last chip destructively, the second removes.
+ * In select mode the dropdown filters by keywords and carries the focus ring on the field's behalf.
+ * It locks the window and `scrollContainer` scroll while open; a window resize closes it.
  * A trailing hidden input carries `id` and `name` for label linkage and form serialization.
  *
  * @example
@@ -437,7 +391,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   const dragStops: (() => void)[] = [];
 
   let root: HTMLElement | null = null;
-  let dropdown: DropdownHandle | null = null;
+  let dropdownHandle: DropdownHandle | null = null;
   let touchTimeout: ReturnType<typeof setTimeout> | undefined;
   let releaseOpen: (() => void) | null = null;
 
@@ -445,6 +399,12 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     const map: Record<string, string> = {};
     if (choicesOf)
       for (const choice of choicesOf()) map[choice.value] = choice.label ?? choice.value;
+    return map;
+  });
+
+  const tooltips = computed<Record<string, string | undefined>>(() => {
+    const map: Record<string, string | undefined> = {};
+    if (choicesOf) for (const choice of choicesOf()) map[choice.value] = choice.tooltip;
     return map;
   });
 
@@ -464,7 +424,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
       filteredChoices.value.length - 1,
       highlightedIndex.value > -1 ? highlightedIndex.value : 0,
     );
-    dropdown?.update();
+    dropdownHandle?.update();
   };
 
   const processInputValue = (): void => {
@@ -508,19 +468,11 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     scrollToHighlightedChoice();
   };
 
-  const calcItemSizes = (): { em: number; itemHeight: number } => {
-    const baseFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const measured = dropdown?.panel ?? root;
-    const sizeVar = measured ? getComputedStyle(measured).getPropertyValue('--ohne-size') : '';
-    const size = sizeVar ? Number(sizeVar) : 0;
-    const em = baseFontSize + size * 0.125 * baseFontSize;
-    return { em, itemHeight: 2 * em };
-  };
-
   const scrollToHighlightedChoice = (): void => {
-    const scroll = dropdown?.scrollable;
-    if (highlightedIndex.value > -1 && scroll) {
-      const { itemHeight, em } = calcItemSizes();
+    const handle = dropdownHandle;
+    if (highlightedIndex.value > -1 && handle) {
+      const { itemHeight, em } = handle.calcItemSizes();
+      const scroll = handle.scrollable;
       let top = itemHeight * highlightedIndex.value;
       if (top > 0 && (!scroll.arrivedTop.value || !scroll.arrivedBottom.value)) top -= em;
       // The programmatic scroll fires a synthetic mousemove that would steal the highlight.
@@ -664,101 +616,67 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     });
 
   const openDropdown = (): HTMLElement => {
-    let scroll: ScrollableHandle | null = null;
-
-    const inner = h(
-      'div',
-      { class: 'ohne-dropdown-inner' },
-      each(
-        () => filteredChoices.value,
-        (choice) => choice.value,
-        (choice, index) =>
-          h(
-            'button',
-            {
-              title: () => choice().label || choice().value,
-              class: () =>
-                'ohne-chips-dropdown-item ohne-raw' +
-                (highlightedIndex.value === index() ? ' ohne-chips-dropdown-item-highlighted' : ''),
-              onClick: (event: MouseEvent) => event.preventDefault(),
-              // Mousedown, so the text input never loses focus.
-              onMousedown: (event: MouseEvent) => {
-                event.preventDefault();
-                model.value = [...model.value, choice().value];
-                filterChoices();
+    const handle = dropdown(
+      [
+        each(
+          () => filteredChoices.value,
+          (choice) => choice.value,
+          (choice, index) =>
+            h(
+              'button',
+              {
+                title: () => choice().label || choice().value,
+                class: () =>
+                  'ohne-chips-dropdown-item ohne-raw' +
+                  (highlightedIndex.value === index()
+                    ? ' ohne-chips-dropdown-item-highlighted'
+                    : ''),
+                onClick: (event: MouseEvent) => event.preventDefault(),
+                // Mousedown, so the text input never loses focus.
+                onMousedown: (event: MouseEvent) => {
+                  event.preventDefault();
+                  model.value = [...model.value, choice().value];
+                  filterChoices();
+                },
+                onMouseenter: () => {
+                  if (pointerEvents.value) highlightedIndex.value = index();
+                },
+                onMousemove: () => {
+                  if (pointerEvents.value) highlightedIndex.value = index();
+                },
               },
-              onMouseenter: () => {
-                if (pointerEvents.value) highlightedIndex.value = index();
-              },
-              onMousemove: () => {
-                if (pointerEvents.value) highlightedIndex.value = index();
-              },
-            },
-            () => choice().label || choice().value,
-          ),
-      ),
-      when(
-        () => filteredChoices.value.length === 0,
-        () =>
-          h(
-            'span',
-            { class: 'ohne-chips-dropdown-no-results' },
-            h('span', null, options.noResultsLabel ?? 'No results found'),
-          ),
-      ),
-    );
-
-    const { itemHeight } = calcItemSizes();
-    const panel = h(
-      'div',
-      { class: 'ohne-chips-dropdown' },
-      scrollable(inner, {
-        autoScroll: itemHeight,
-        class: 'ohne-dropdown-scrollable',
-        expose: (handle) => {
-          scroll = handle;
+              () => choice().label || choice().value,
+            ),
+        ),
+        when(
+          () => filteredChoices.value.length === 0,
+          () =>
+            h(
+              'span',
+              { class: 'ohne-chips-dropdown-no-results' },
+              h('span', null, options.noResultsLabel ?? 'No results found'),
+            ),
+        ),
+      ],
+      {
+        reference: root ?? undefined,
+        offset: 7,
+        handleControls: false,
+        restoreFocus: false,
+        inheritColors: true,
+        class: 'ohne-chips-dropdown',
+        onClose: () => {
+          isDropdownVisible.value = false;
         },
-      }),
+      },
     );
 
-    const place = (): void => {
-      if (!root) return;
-      const rect = root.getBoundingClientRect();
-      const below = window.innerHeight - rect.bottom - 7 - 8;
-      const above = rect.top - 7 - 8;
-      const needed = inner.offsetHeight;
-      const up = needed > below && above > below;
-      const space = up ? above : below;
-      if (needed > space) panel.style.height = `${Math.max(0, space)}px`;
-      else panel.style.removeProperty('height');
-      if (up) {
-        panel.classList.add('ohne-chips-dropdown-top');
-        panel.style.removeProperty('top');
-        panel.style.bottom = `${window.innerHeight - rect.top + 7}px`;
-      } else {
-        panel.classList.remove('ohne-chips-dropdown-top');
-        panel.style.removeProperty('bottom');
-        panel.style.top = `${rect.bottom + 7}px`;
-      }
-      panel.style.left = `${clamp(rect.left, 8, Math.max(8, window.innerWidth - panel.offsetWidth - 8))}px`;
-    };
-
-    dropdown = {
-      panel,
-      update: place,
-      get scrollable() {
-        return scroll;
-      },
-    };
+    dropdownHandle = handle;
     onCleanup(() => {
-      dropdown = null;
+      dropdownHandle = null;
     });
 
-    // Placed once attached; the open state animates in a timeout later, as the source does.
-    queueMicrotask(place);
-    setTimeout(() => panel.classList.add('ohne-chips-dropdown-mounted'));
-
-    return panel;
+    return handle.root;
   };
 
   root = h(
@@ -790,68 +708,74 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
       each(
         () => model.value,
         (_, index) => index,
-        (item, index) => [
-          when(
-            () => draggingIndex.value !== null,
-            () => dropzone(() => index()),
-          ),
-          h(
-            'li',
-            {
-              class: () =>
-                'ohne-chips-item' +
-                (draggingIndex.value === index() ? ' ohne-chips-item-dragging' : '') +
-                (erroredItemsMap.value[index()] || removeIndex.value === index()
-                  ? ' ohne-chips-item-destructive'
-                  : ''),
-              onMousedown: (event: MouseEvent) => handleDrag(index(), event),
-              onTouchstart: (event: TouchEvent) => {
-                event.preventDefault();
-                onTouchStart(index());
+        (item, index) => {
+          const label = h(
+            'span',
+            { class: 'ohne-chips-label', title: () => displayLabel(item()) },
+            () => displayLabel(item()),
+          );
+          if (choicesOf) onCleanup(attachTooltip(label, () => tooltips.value[item()] ?? null));
+          return [
+            when(
+              () => draggingIndex.value !== null,
+              () => dropzone(() => index()),
+            ),
+            h(
+              'li',
+              {
+                class: () =>
+                  'ohne-chips-item' +
+                  (draggingIndex.value === index() ? ' ohne-chips-item-dragging' : '') +
+                  (erroredItemsMap.value[index()] || removeIndex.value === index()
+                    ? ' ohne-chips-item-destructive'
+                    : ''),
+                onMousedown: (event: MouseEvent) => handleDrag(index(), event),
+                onTouchstart: (event: TouchEvent) => {
+                  event.preventDefault();
+                  onTouchStart(index());
+                },
               },
-            },
-            h('span', { class: 'ohne-chips-label', title: () => displayLabel(item()) }, () =>
-              displayLabel(item()),
+              label,
+              when(
+                () => !options.disabled?.(),
+                () =>
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      class: 'ohne-chips-remove ohne-raw',
+                      disabled: () => draggingIndex.value !== null,
+                      title: options.removeItemLabel ?? 'Remove',
+                      onClick: () => {
+                        const at = index();
+                        model.value = model.value.filter((_, i) => i !== at);
+                        filterChoices();
+                        removeIndex.value = null;
+                      },
+                      onFocus: () => {
+                        removeIndex.value = index();
+                      },
+                      onMouseenter: () => {
+                        removeIndex.value = index();
+                      },
+                      onBlur: () => {
+                        removeIndex.value = null;
+                      },
+                      onMouseleave: () => {
+                        removeIndex.value = null;
+                      },
+                      onTouchstart: (event: TouchEvent) => event.stopPropagation(),
+                    },
+                    icon('x'),
+                  ),
+              ),
             ),
             when(
-              () => !options.disabled?.(),
-              () =>
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'ohne-chips-remove ohne-raw',
-                    disabled: () => draggingIndex.value !== null,
-                    title: options.removeItemLabel ?? 'Remove',
-                    onClick: () => {
-                      const at = index();
-                      model.value = model.value.filter((_, i) => i !== at);
-                      filterChoices();
-                      removeIndex.value = null;
-                    },
-                    onFocus: () => {
-                      removeIndex.value = index();
-                    },
-                    onMouseenter: () => {
-                      removeIndex.value = index();
-                    },
-                    onBlur: () => {
-                      removeIndex.value = null;
-                    },
-                    onMouseleave: () => {
-                      removeIndex.value = null;
-                    },
-                    onTouchstart: (event: TouchEvent) => event.stopPropagation(),
-                  },
-                  icon('x'),
-                ),
+              () => draggingIndex.value !== null,
+              () => dropzone(() => index() + 1),
             ),
-          ),
-          when(
-            () => draggingIndex.value !== null,
-            () => dropzone(() => index() + 1),
-          ),
-        ],
+          ];
+        },
       ),
       input,
     ),
