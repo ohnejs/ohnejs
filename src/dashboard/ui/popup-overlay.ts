@@ -11,7 +11,7 @@ import { sleep } from '../../utils/sleep/sleep.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { isEditingText } from './hotkeys.ts';
-import { acquireOverlay, type OverlayHandle } from './overlay.ts';
+import { acquireOverlay, FOCUSABLE, type OverlayHandle } from './overlay.ts';
 import './tokens.ts';
 
 /**
@@ -116,14 +116,10 @@ export interface Popup {
 
   /**
    * Focuses the popup root, now and again after the overlay transition.
-   * The source accidentally exposed the global `window.focus` here; this exposes the intended
-   * root focus instead.
+   * The source accidentally exposed the global `window.focus` here; this exposes the intended root focus.
    */
   focus(): void;
 }
-
-const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 const trapStack: HTMLElement[] = [];
 
@@ -288,17 +284,17 @@ function container(classNames: string, ...children: Child[]): HTMLElement {
 }
 
 /**
- * The modal layer, ported 1-to-1 from Pruvious v4's `PUIPopup`: a dimmed backdrop and a centered
- * card appended to `document.body`, the base of dialogs and every dashboard popup.
+ * The modal layer, ported 1-to-1 from Pruvious v4's `PUIPopup`.
+ * A dimmed backdrop and a centered card appended to `document.body`, the base of every popup.
  *
- * Mounting claims an overlay depth a timeout later, so hotkey instances created in the same cycle
- * pin themselves above it, then autofocuses the first `[autofocus]`/`[data-autofocus]` descendant
- * (falling back to the root) and traps Tab inside.
- * Escape defers a timeout so inner widgets can `preventDefault` first, never closes while typing,
- * and, like the overlay click, only ever CALLS `onClose` - the popup unmounts nothing itself.
+ * Mounting claims an overlay depth a timeout later, so same-cycle hotkey instances pin above it.
+ * It then autofocuses the first `[autofocus]`/`[data-autofocus]` descendant, falling back to the root.
+ * Tab is trapped inside.
+ * Escape defers a timeout so inner widgets can `preventDefault` first, and never closes while typing.
+ * Like the overlay click, it only ever CALLS `onClose` - the popup unmounts nothing itself.
  * Focus re-anchors to the root whenever it falls to `body` while the popup is topmost.
- * Create it inside a reactive region and dispose that region after `close()` resolves; the
- * cleanup removes the root and releases the overlay depth.
+ * Create it inside a reactive region and dispose that region after `close()` resolves.
+ * The cleanup removes the root and releases the overlay depth.
  *
  * @example
  * ```ts

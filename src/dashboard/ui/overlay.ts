@@ -1,6 +1,13 @@
 let count = 0;
 
 /**
+ * The selector every focus trap walks: anything reachable with Tab inside a floating surface.
+ * One definition, so the traps in the floater and the popup agree on what counts as focusable.
+ */
+export const FOCUSABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
  * A claim on one overlay depth, held from mount to unmount of a modal surface.
  */
 export interface OverlayHandle {

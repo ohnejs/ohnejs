@@ -13,7 +13,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
-import { lockScroll, listenClickOutside } from './overlay.ts';
+import { FOCUSABLE, lockScroll, listenClickOutside } from './overlay.ts';
 import './tokens.ts';
 
 /**
@@ -55,8 +55,8 @@ export interface FloaterOptions {
 
   /**
    * The CSS position of the floating element.
-   * `'fixed'` is right for most cases; `'absolute'` positions relative to the offset parent,
-   * useful when the picker lives inside a scrolling container.
+   * `'fixed'` is right for most cases.
+   * `'absolute'` positions relative to the offset parent, useful inside a scrolling container.
    *
    * @default
    * 'fixed'
@@ -146,9 +146,6 @@ export interface Floater {
 
 const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-start', 'top-end'];
 
-const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
-
 css`
   .ohne-floater {
     display: flex;
@@ -234,11 +231,11 @@ css`
 /**
  * The picker overlay engine, ported 1-to-1 from Pruvious v4's `PUIFloater`.
  *
- * A full-width handle button toggles a panel positioned by `placeFloating`: bottom-start
- * preferred, the roomiest corner wins, 7px gap, 8px viewport padding, size-clamped to fit.
- * While open, the window and an optional container are scroll-locked, Escape closes in the
- * capture phase ahead of everything else, clicks outside close, resizing closes, and after the
- * overlay transition a focus trap cycles Tab inside the panel.
+ * A full-width handle button toggles a panel positioned by `placeFloating`.
+ * Bottom-start is preferred, the roomiest corner wins, 7px gap, 8px viewport padding, clamped to fit.
+ * While open, the window and an optional container are scroll-locked.
+ * Escape closes in the capture phase ahead of everything else; clicks outside and resizes close too.
+ * After the overlay transition a focus trap cycles Tab inside the panel.
  * Keyboard closes refocus the handle; mouse closes leave focus where the click put it.
  * The panel content mounts fresh per open and repositions on scroll and element resize.
  *

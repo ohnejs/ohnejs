@@ -16,9 +16,9 @@ import { when } from '../../render/when.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
 import { icon } from '../../ui/icon.ts';
-import { popover } from '../../ui/popover.ts';
 import { blocksOf } from '../_blocks.ts';
 import { blockNamed, itemFormSupports } from '../_items.ts';
+import { openBlockPicker } from '../block-picker-popup.ts';
 import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
@@ -101,27 +101,6 @@ css`
 
   .ohne-blocks-add {
     margin-top: var(--s2);
-  }
-
-  .ohne-blocks-menu-row {
-    display: flex;
-    align-items: center;
-    gap: var(--s3);
-    height: 28px;
-    padding: 0 10px;
-    white-space: nowrap;
-    cursor: default;
-  }
-
-  .ohne-blocks-menu-row:hover {
-    background: var(--accent-wash);
-  }
-
-  .ohne-blocks-menu-name {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: var(--fs-micro);
-    color: var(--faint);
   }
 `;
 
@@ -240,7 +219,7 @@ export const blocksType: FieldType = {
         (node) => node.key,
         (node, index) => blockRow(node, index, nodes, move, change, flagged, t, blocks),
       ),
-      offered.length > 0 ? adder(offered, blocks, add, t) : null,
+      offered.length > 0 ? adder(offered, add, t) : null,
     );
 
     return {
@@ -436,59 +415,25 @@ function blockRow(
 }
 
 /**
- * The add affordance: one admitted type adds directly, several open a picker menu.
+ * The add affordance: one admitted type adds directly, several open the block picker popup.
  */
 function adder(
   offered: readonly string[],
-  blocks: readonly DashboardBlock[],
   add: (name: string) => void,
   t: (key: 'dashboard.addBlock') => string,
 ): Child {
-  if (offered.length === 1) {
-    const only = offered[0] as string;
-    return h(
-      'div',
-      { class: 'ohne-blocks-add' },
-      button(() => `+ ${t('dashboard.addBlock')}`, { variant: 'ghost', onClick: () => add(only) }),
-    );
-  }
-  const open = ref(false);
-  const trigger = button(() => `+ ${t('dashboard.addBlock')}`, {
-    variant: 'ghost',
-    onClick: () => {
-      open.value = !open.value;
-    },
-  });
+  const onClick =
+    offered.length === 1
+      ? () => add(offered[0] as string)
+      : () => {
+          void openBlockPicker(offered).then((name) => {
+            if (!isNull(name)) add(name);
+          });
+        };
   return h(
     'div',
     { class: 'ohne-blocks-add' },
-    trigger,
-    when(
-      () => open.value,
-      () =>
-        popover(
-          {
-            anchor: trigger,
-            onClose: () => {
-              open.value = false;
-            },
-          },
-          offered.map((name) =>
-            h(
-              'div',
-              {
-                class: 'ohne-blocks-menu-row',
-                onClick: () => {
-                  open.value = false;
-                  add(name);
-                },
-              },
-              labelOf(name, blocks),
-              h('span', { class: 'ohne-blocks-menu-name' }, name),
-            ),
-          ),
-        ),
-    ),
+    button(() => `+ ${t('dashboard.addBlock')}`, { variant: 'ghost', onClick }),
   );
 }
 
