@@ -1,12 +1,26 @@
 {
   "addBlock": "Add block",
   "addItem": "Add item",
-  "blocksLocked": "This list holds a block type this editor cannot edit",
   "clear": "Clear",
+  "clearSearch": "Clear search",
   "collections": "Collections",
   "confirmDelete": "Confirm",
-  "create": "Create",
+  "confirmDeleteCount": "Confirm ({count})",
   "delete": "Delete",
+  "deleted": "{count, plural, one {# record deleted} other {# records deleted}}",
+  "deletedPartial": "{count} deleted, {failed} failed",
+  "empty": {
+    "title": "No records",
+    "body": "This collection is empty."
+  },
+  "field": {
+    "i18n": "i18n",
+    "locked": "locked",
+    "reveal": "Reveal",
+    "revert": "Revert",
+    "unchanged": "unchanged",
+    "unique": "unique"
+  },
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -15,22 +29,71 @@
       "label": "Updated"
     }
   },
+  "header": {
+    "contentLanguage": "Content language",
+    "darkMode": "Dark mode",
+    "goBackHome": "Go back home",
+    "lightMode": "Light mode",
+    "openUserMenu": "Open user menu",
+    "switchedContentLanguage": "Switched content language to `{language}`",
+    "toggleSidebar": "Toggle sidebar"
+  },
+  "hints": {
+    "check": "check",
+    "clear": "clear",
+    "edit": "edit",
+    "move": "move",
+    "open": "open",
+    "search": "search"
+  },
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
+  "linkRecord": "Link a record",
   "login": {
     "email": "Email",
+    "forgotPassword": "Forgot password?",
+    "hidePassword": "Hide password",
     "password": "Password",
+    "rememberMe": "Remember me",
+    "showPassword": "Show password",
     "submit": "Sign in",
     "unreachable": "The server cannot be reached"
   },
+  "menu": {
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
   "new": "New",
   "newRecord": "New record",
+  "noMatches": "No matches",
   "notFound": "Not found",
+  "notLinked": "Not linked",
+  "open": "Open",
+  "record": {
+    "copied": "UUID copied",
+    "discard": "Discard",
+    "gone": "This record no longer exists",
+    "keepEditing": "Keep editing",
+    "revert": "Revert",
+    "unsaved": "Unsaved changes"
+  },
   "records": "{count, plural, one {# record} other {# records}}",
+  "removeItem": "Remove",
+  "retry": "Retry",
   "save": "Save",
+  "saved": "Saved",
+  "search": "Search",
   "selectCollection": "Select a collection",
   "selected": "{count, plural, one {# selected} other {# selected}}",
+  "session": {
+    "expired": "Session expired",
+    "expiredBody": "Your session has timed out due to inactivity. Please log in again to continue.",
+    "leave": "Leave"
+  },
+  "set": "Set",
   "signOut": "Sign out",
+  "typeToNarrow": "Type to narrow",
+  "unlink": "Unlink",
   "unreachable": "The server cannot be reached",
   "writeFailed": "The write failed"
 }

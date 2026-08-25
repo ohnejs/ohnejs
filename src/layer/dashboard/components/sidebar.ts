@@ -1,200 +1,74 @@
 import {
-  button,
   type Child,
   css,
-  type DashboardCollection,
+  type DashboardMenuGroup,
   dashboardMeta,
   each,
   h,
-  logout,
-  sessionUser,
+  type Translate,
   useRoute,
   useT,
+  type VerticalMenuItemModel,
+  verticalMenu,
   when,
 } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
-
-const COLLAPSED_KEY = 'ohne:sidebar';
-
-const collapsed = ref(localStorage.getItem(COLLAPSED_KEY) === '1');
+import { isUndefined, withTrailingSlash } from 'ohne/utils';
 
 css`
-  .sidebar {
-    display: flex;
-    flex-direction: column;
-    width: 220px;
-    box-sizing: border-box;
-    background: color-mix(in srgb, var(--ink) 2%, var(--paper));
-    border-right: 1px solid var(--hairline);
-    transition: width var(--pace);
-  }
-
-  .sidebar.collapsed {
-    width: 44px;
-  }
-
-  .sidebar-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 16px 18px;
-  }
-
-  .sidebar.collapsed .sidebar-top {
-    padding: 20px 0 16px;
-    justify-content: center;
-  }
-
-  .sidebar-word {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .sidebar-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 16px;
-  }
-
-  .sidebar-scroll > .ohne-caps {
-    margin-bottom: 10px;
-  }
-
-  .sidebar-group {
-    margin-bottom: 20px;
-  }
-
-  .sidebar-group .ohne-caps {
-    display: block;
-    margin-bottom: 6px;
-  }
-
-  .sidebar-link {
-    display: block;
-    margin: 0 -16px;
-    padding: 4px 16px 4px 14px;
-    border-left: 2px solid transparent;
-    color: var(--dim);
-    transition:
-      color var(--pace),
-      background var(--pace);
-  }
-
-  .sidebar-link:hover {
-    color: var(--ink);
-    background: color-mix(in srgb, var(--ink) 4%, transparent);
-  }
-
-  .sidebar-link.active {
-    color: var(--ink);
-    font-weight: 500;
-    border-left-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 5%, transparent);
-  }
-
-  .sidebar-foot {
-    border-top: 1px solid var(--hairline);
-    padding: 12px 16px;
-  }
-
-  .sidebar-user {
-    display: block;
-    color: var(--dim);
-    font-size: 11px;
-    margin-bottom: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .o-menu-wrapper > * + * {
+    margin-top: 1.5em;
   }
 `;
 
 /**
- * The collapsible Ledger sidebar: wordmark, menu groups from the discovery read, session foot.
- * The collapse preference persists per browser.
+ * The sidebar menu column, ported from Pruvious v4's `MenuWrapper` and menu sections.
+ * Each discovery menu group renders one `verticalMenu`: the group label as its uppercase title,
+ * an empty label rendering the list without one, and one link row per collection.
+ * A link is active while the route sits under its collection, so record pages highlight it too.
+ * The discovery data carries neither icons nor submenus, so rows render label-only and flat.
  */
-export function sidebar(): Child {
+export function sidebar(): HTMLElement {
   const t = useT();
   return h(
-    'aside',
-    { class: () => `sidebar${collapsed.value ? ' collapsed' : ''}` },
-    h(
-      'div',
-      { class: 'sidebar-top' },
-      when(
-        () => !collapsed.value,
-        () => h('a', { class: 'sidebar-word', href: '/' }, 'ohne'),
-      ),
-      button(() => (collapsed.value ? '›' : '‹'), {
-        kind: 'ghost',
-        onClick: toggle,
+    'div',
+    { class: 'o-menu-wrapper' },
+    each(
+      () => dashboardMeta()?.menu ?? [],
+      (_, index) => index,
+      (group) => menuSection(group, t),
+    ),
+  );
+}
+
+/**
+ * One menu group, rendered only while it resolves at least one link.
+ */
+function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
+  return when(
+    () => itemsOf(group()).length > 0,
+    () =>
+      verticalMenu({
+        title: group().label === '' ? undefined : group().label,
+        items: () => itemsOf(group()),
+        ariaCollapseLabel: t('dashboard.menu.collapse'),
+        ariaExpandLabel: t('dashboard.menu.expand'),
       }),
-    ),
-    when(
-      () => !collapsed.value,
-      () => [
-        h(
-          'nav',
-          { class: 'sidebar-scroll' },
-          h('span', { class: 'ohne-caps' }, () => t('dashboard.collections')),
-          each(
-            () => dashboardMeta()?.menu ?? [],
-            (group, index) => index,
-            (group) =>
-              h(
-                'div',
-                { class: 'sidebar-group' },
-                when(
-                  () => group().label !== '',
-                  () => h('span', { class: 'ohne-caps' }, () => group().label),
-                ),
-                each(
-                  () => group().collections,
-                  (name) => name,
-                  (name) => collectionLink(name),
-                ),
-              ),
-          ),
-        ),
-        h(
-          'div',
-          { class: 'sidebar-foot' },
-          h('span', { class: 'sidebar-user' }, () => sessionUser()?.email),
-          button(() => t('dashboard.signOut'), { kind: 'ghost', onClick: signOut }),
-        ),
-      ],
-    ),
   );
 }
 
 /**
- * One collection link, labeled from the discovery read and highlighted on its route.
+ * The group's link rows: each collection name resolved against the discovery store.
+ * Active mirrors P4's `prepareDashboardMenu`: a trailing-slash-normalized prefix match.
  */
-function collectionLink(name: () => string): Child {
-  const entry = (): DashboardCollection | undefined =>
-    dashboardMeta()?.collections.find((candidate) => candidate.name === name());
-  const href = (): string => `/collections/${entry()?.segment ?? ''}`;
-  return h(
-    'a',
-    {
-      class: () => `sidebar-link${useRoute()?.path === href() ? ' active' : ''}`,
-      href: () => href(),
-    },
-    () => entry()?.label,
-  );
-}
-
-/**
- * Flips the collapse state and persists it.
- */
-function toggle(): void {
-  collapsed.value = !collapsed.value;
-  localStorage.setItem(COLLAPSED_KEY, collapsed.value ? '1' : '0');
-}
-
-/**
- * Ends the session; the shell's guard then redirects to the login page in one navigation.
- */
-function signOut(): void {
-  void logout();
+function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
+  const collections = dashboardMeta()?.collections ?? [];
+  const path = withTrailingSlash(useRoute()?.path ?? '/');
+  const items: VerticalMenuItemModel[] = [];
+  for (const name of group.collections) {
+    const entry = collections.find((candidate) => candidate.name === name);
+    if (isUndefined(entry)) continue;
+    const to = `/collections/${entry.segment}`;
+    items.push({ to, label: entry.label, active: path.startsWith(withTrailingSlash(to)) });
+  }
+  return items;
 }

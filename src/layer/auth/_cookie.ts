@@ -17,16 +17,17 @@ export function readSessionToken(): string | null {
 
 /**
  * Writes the session cookie with the safe session profile: `HttpOnly`, `Secure`, `SameSite=Lax`, root path.
- * The `Max-Age` follows `auth.sessionMaxAge`, so the cookie expires with the session it names.
+ * A persistent cookie carries a `Max-Age` from `auth.sessionMaxAge`, so it expires with the session it names.
+ * A non-persistent one omits `Max-Age` and ends with the browser session, for a login without remember me.
  */
-export function writeSessionCookie(token: string): void {
+export function writeSessionCookie(token: string, persistent = true): void {
   const { cookieName, sessionMaxAge } = useAuthConfig();
   setCookie(cookieName, token, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: Math.floor(parseDuration(sessionMaxAge) / 1000),
+    maxAge: persistent ? Math.floor(parseDuration(sessionMaxAge) / 1000) : undefined,
   });
 }
 

@@ -18,7 +18,8 @@ css`
     height: 100%;
     display: grid;
     place-items: center;
-    color: var(--dim);
+    color: var(--faint);
+    font-size: var(--fs-body);
   }
 `;
 
@@ -27,7 +28,10 @@ css`
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
 export default defineDashboardPage((route) =>
-  shell(() => pane(() => route.params.collection ?? '')),
+  shell(() => pane(() => route.params.collection ?? ''), {
+    noMainPadding: true,
+    noMainScroll: true,
+  }),
 );
 
 /**

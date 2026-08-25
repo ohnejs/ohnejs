@@ -19,9 +19,14 @@ import { dummyVerify } from '../../auth/dummy-verify.ts';
  * Stored costs so converge to the cost `dummyVerify` equalizes at, keeping sign-in timing uniform.
  */
 export default defineHandler(async (): Promise<User> => {
-  const body = await readJSONBody<{ email?: unknown; password?: unknown } | null>();
+  const body = await readJSONBody<{
+    email?: unknown;
+    password?: unknown;
+    remember?: unknown;
+  } | null>();
   const email = body?.email;
   const password = body?.password;
+  const remember = body?.remember === true;
   if (!isString(email) || !isString(password))
     throw badRequest(translate('auth.invalidCredentials'));
 
@@ -41,6 +46,6 @@ export default defineHandler(async (): Promise<User> => {
     await queryUntyped('Users').where({ UUID: user.UUID }).update({ password });
   }
 
-  await createSession(user.UUID);
+  await createSession(user.UUID, remember);
   return { UUID: user.UUID, email: user.email, roles: user.roles };
 });

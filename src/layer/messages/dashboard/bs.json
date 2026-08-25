@@ -1,12 +1,26 @@
 {
   "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
-  "blocksLocked": "Ova lista sadrži tip bloka koji ovaj editor ne može urediti",
   "clear": "Očisti",
+  "clearSearch": "Očisti pretragu",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
-  "create": "Kreiraj",
+  "confirmDeleteCount": "Potvrdi ({count})",
   "delete": "Obriši",
+  "deleted": "{count, plural, one {# zapis obrisan} few {# zapisa obrisana} other {# zapisa obrisano}}",
+  "deletedPartial": "{count} obrisano, {failed} neuspješno",
+  "empty": {
+    "title": "Nema zapisa",
+    "body": "Ova kolekcija je prazna."
+  },
+  "field": {
+    "i18n": "i18n",
+    "locked": "zaključano",
+    "reveal": "Prikaži",
+    "revert": "Vrati",
+    "unchanged": "nepromijenjeno",
+    "unique": "jedinstveno"
+  },
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -15,22 +29,71 @@
       "label": "Ažurirano"
     }
   },
+  "header": {
+    "contentLanguage": "Jezik sadržaja",
+    "darkMode": "Tamni režim",
+    "goBackHome": "Nazad na početnu",
+    "lightMode": "Svijetli režim",
+    "openUserMenu": "Otvori korisnički meni",
+    "switchedContentLanguage": "Jezik sadržaja promijenjen na `{language}`",
+    "toggleSidebar": "Prikaži ili sakrij bočnu traku"
+  },
+  "hints": {
+    "check": "označi",
+    "clear": "poništi",
+    "edit": "izmjena",
+    "move": "kretanje",
+    "open": "otvori",
+    "search": "traži"
+  },
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
+  "linkRecord": "Poveži zapis",
   "login": {
     "email": "E-mail",
+    "forgotPassword": "Zaboravili ste lozinku?",
+    "hidePassword": "Sakrij lozinku",
     "password": "Lozinka",
+    "rememberMe": "Zapamti me",
+    "showPassword": "Prikaži lozinku",
     "submit": "Prijava",
     "unreachable": "Server nije dostupan"
   },
+  "menu": {
+    "collapse": "Skupi",
+    "expand": "Proširi"
+  },
   "new": "Novo",
   "newRecord": "Novi zapis",
+  "noMatches": "Nema rezultata",
   "notFound": "Nije pronađeno",
+  "notLinked": "Nije povezano",
+  "open": "Otvori",
+  "record": {
+    "copied": "UUID kopiran",
+    "discard": "Odbaci",
+    "gone": "Ovaj zapis više ne postoji",
+    "keepEditing": "Nastavi uređivanje",
+    "revert": "Vrati",
+    "unsaved": "Nesačuvane izmjene"
+  },
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+  "removeItem": "Ukloni",
+  "retry": "Pokušaj ponovo",
   "save": "Sačuvaj",
+  "saved": "Sačuvano",
+  "search": "Pretraga",
   "selectCollection": "Odaberite kolekciju",
   "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
+  "session": {
+    "expired": "Sesija je istekla",
+    "expiredBody": "Sesija je istekla zbog neaktivnosti. Prijavite se ponovo da nastavite.",
+    "leave": "Napusti"
+  },
+  "set": "Postavi",
   "signOut": "Odjava",
+  "typeToNarrow": "Kucajte za sužavanje",
+  "unlink": "Ukloni vezu",
   "unreachable": "Server nije dostupan",
   "writeFailed": "Upis nije uspio"
 }

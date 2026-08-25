@@ -4,10 +4,10 @@ import { shell } from '../components/shell.ts';
 
 css`
   .home-empty {
-    flex: 1;
+    height: 100%;
     display: grid;
     place-items: center;
-    color: var(--dim);
+    color: hsl(var(--ohne-muted-foreground));
   }
 `;
 

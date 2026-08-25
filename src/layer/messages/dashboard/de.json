@@ -1,12 +1,26 @@
 {
   "addBlock": "Block hinzufügen",
   "addItem": "Eintrag hinzufügen",
-  "blocksLocked": "Diese Liste enthält einen Blocktyp, den dieser Editor nicht bearbeiten kann",
   "clear": "Leeren",
+  "clearSearch": "Suche leeren",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
-  "create": "Erstellen",
+  "confirmDeleteCount": "Bestätigen ({count})",
   "delete": "Löschen",
+  "deleted": "{count, plural, one {# Datensatz gelöscht} other {# Datensätze gelöscht}}",
+  "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
+  "empty": {
+    "title": "Keine Datensätze",
+    "body": "Diese Sammlung ist leer."
+  },
+  "field": {
+    "i18n": "i18n",
+    "locked": "gesperrt",
+    "reveal": "Anzeigen",
+    "revert": "Zurücksetzen",
+    "unchanged": "unverändert",
+    "unique": "eindeutig"
+  },
   "fields": {
     "uuid": {
       "label": "UUID"
@@ -15,22 +29,71 @@
       "label": "Aktualisiert"
     }
   },
+  "header": {
+    "contentLanguage": "Inhaltssprache",
+    "darkMode": "Dunkler Modus",
+    "goBackHome": "Zur Startseite",
+    "lightMode": "Heller Modus",
+    "openUserMenu": "Benutzermenü öffnen",
+    "switchedContentLanguage": "Inhaltssprache auf `{language}` umgestellt",
+    "toggleSidebar": "Seitenleiste umschalten"
+  },
+  "hints": {
+    "check": "markieren",
+    "clear": "aufheben",
+    "edit": "ändern",
+    "move": "bewegen",
+    "open": "öffnen",
+    "search": "suchen"
+  },
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
+  "linkRecord": "Datensatz verknüpfen",
   "login": {
     "email": "E-Mail",
+    "forgotPassword": "Passwort vergessen?",
+    "hidePassword": "Passwort verbergen",
     "password": "Passwort",
+    "rememberMe": "Angemeldet bleiben",
+    "showPassword": "Passwort anzeigen",
     "submit": "Anmelden",
     "unreachable": "Der Server ist nicht erreichbar"
   },
+  "menu": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen"
+  },
   "new": "Neu",
   "newRecord": "Neuer Datensatz",
+  "noMatches": "Keine Treffer",
   "notFound": "Nicht gefunden",
+  "notLinked": "Nicht verknüpft",
+  "open": "Öffnen",
+  "record": {
+    "copied": "UUID kopiert",
+    "discard": "Verwerfen",
+    "gone": "Dieser Datensatz existiert nicht mehr",
+    "keepEditing": "Weiter bearbeiten",
+    "revert": "Zurücksetzen",
+    "unsaved": "Ungespeicherte Änderungen"
+  },
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
+  "removeItem": "Entfernen",
+  "retry": "Erneut versuchen",
   "save": "Speichern",
+  "saved": "Gespeichert",
+  "search": "Suchen",
   "selectCollection": "Sammlung wählen",
   "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
+  "session": {
+    "expired": "Sitzung abgelaufen",
+    "expiredBody": "Die Sitzung ist wegen Inaktivität abgelaufen. Bitte erneut anmelden, um fortzufahren.",
+    "leave": "Verlassen"
+  },
+  "set": "Setzen",
   "signOut": "Abmelden",
+  "typeToNarrow": "Tippen zum Eingrenzen",
+  "unlink": "Verknüpfung lösen",
   "unreachable": "Der Server ist nicht erreichbar",
   "writeFailed": "Das Schreiben ist fehlgeschlagen"
 }
