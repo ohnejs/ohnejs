@@ -195,6 +195,17 @@ export interface CollectionDefinition<
    * ```
    */
   api?: boolean | CollectionAPI<keyof TFields & string>;
+
+  /**
+   * The Tabler icon name the dashboard menu shows for this collection.
+   * Omitted, the menu row renders no icon.
+   *
+   * @example
+   * ```ts
+   * icon: 'note'
+   * ```
+   */
+  icon?: string;
 }
 
 /**
@@ -225,6 +236,11 @@ export interface AnyCollectionDefinition {
    * false
    */
   api?: boolean | CollectionAPI;
+
+  /**
+   * The Tabler icon name the dashboard menu shows; omitted, the menu row renders no icon.
+   */
+  icon?: string;
 }
 
 /**

@@ -71,6 +71,12 @@ const IMPORTMAP = jsonForScript({
 });
 
 /**
+ * The favicon: the dashboard logo's lowercase `o` mark as an inline SVG data URI.
+ * The fills are the foundation's foreground colours, light and dark, so the tab icon matches the UI.
+ */
+const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><style>text{font:600 40px system-ui;fill:%23260d1c}@media(prefers-color-scheme:dark){text{fill:%23fafafa}}</style><text x='16' y='27' text-anchor='middle'>o</text></svg>`;
+
+/**
  * The framework `src` directory, the root the client modules are served from.
  * Resolved from this file's location: `src/ohne/serve` up two is `src`.
  */
@@ -240,6 +246,7 @@ function shellDocument(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ohne</title>
+    <link rel="icon" type="image/svg+xml" href="${FAVICON}" />
     <script>
       try {
         var mode = localStorage.getItem('ohne-color-mode');
