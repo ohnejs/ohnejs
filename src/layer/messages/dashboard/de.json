@@ -6,6 +6,7 @@
   "cancel": "Abbrechen",
   "clear": "Leeren",
   "clearSearch": "Suche leeren",
+  "clearSelection": "Auswahl aufheben",
   "close": "Schließen",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
@@ -91,7 +92,6 @@
   },
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
-  "linkRecord": "Datensatz verknüpfen",
   "login": {
     "email": "E-Mail",
     "forgotPassword": "Passwort vergessen?",
@@ -107,9 +107,11 @@
     "expand": "Ausklappen"
   },
   "new": "Neu",
+  "noBlocksAllowed": "Hier können keine Blöcke hinzugefügt werden",
+  "noBlocksMatchSearch": "Keine Blöcke entsprechen der Suche",
   "noMatches": "Keine Treffer",
+  "noResultsFound": "Keine Ergebnisse gefunden",
   "notFound": "Nicht gefunden",
-  "notLinked": "Nicht verknüpft",
   "ok": "OK",
   "open": "Öffnen",
   "pageNotFound": "Seite nicht gefunden",
@@ -126,6 +128,7 @@
     "gone": "Dieser Datensatz existiert nicht mehr",
     "moreActions": "Weitere Aktionen"
   },
+  "recordNotFound": "Datensatz nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
   "redirected": "Weitergeleitet",
   "removeItem": "Entfernen",
@@ -133,7 +136,9 @@
   "save": "Speichern",
   "saved": "Gespeichert",
   "search": "Suchen",
+  "searchPlaceholder": "Suchen...",
   "select": "Auswählen",
+  "selectBlock": "Block auswählen",
   "selectCollection": "Sammlung wählen",
   "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
   "session": {
@@ -164,8 +169,6 @@
     "selectedCount": "{count, plural, one {# Datensatz} other {# Datensätze}} ausgewählt",
     "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt"
   },
-  "typeToNarrow": "Tippen zum Eingrenzen",
-  "unlink": "Verknüpfung lösen",
   "unreachable": "Der Server ist nicht erreichbar",
   "unsavedChanges": {
     "body": "Vorgenommene Änderungen werden möglicherweise nicht gespeichert."

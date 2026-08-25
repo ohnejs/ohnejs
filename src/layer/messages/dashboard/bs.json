@@ -6,6 +6,7 @@
   "cancel": "Otkaži",
   "clear": "Očisti",
   "clearSearch": "Očisti pretragu",
+  "clearSelection": "Poništi odabir",
   "close": "Zatvori",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
@@ -91,7 +92,6 @@
   },
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
-  "linkRecord": "Poveži zapis",
   "login": {
     "email": "E-mail",
     "forgotPassword": "Zaboravili ste lozinku?",
@@ -107,9 +107,11 @@
     "expand": "Proširi"
   },
   "new": "Novo",
+  "noBlocksAllowed": "Ovdje se ne mogu dodati blokovi",
+  "noBlocksMatchSearch": "Nijedan blok ne odgovara pretrazi",
   "noMatches": "Nema rezultata",
+  "noResultsFound": "Nema pronađenih rezultata",
   "notFound": "Nije pronađeno",
-  "notLinked": "Nije povezano",
   "ok": "OK",
   "open": "Otvori",
   "pageNotFound": "Stranica nije pronađena",
@@ -126,6 +128,7 @@
     "gone": "Ovaj zapis više ne postoji",
     "moreActions": "Više radnji"
   },
+  "recordNotFound": "Zapis nije pronađen",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
   "redirected": "Preusmjereno",
   "removeItem": "Ukloni",
@@ -133,7 +136,9 @@
   "save": "Sačuvaj",
   "saved": "Sačuvano",
   "search": "Pretraga",
+  "searchPlaceholder": "Pretraži...",
   "select": "Odaberi",
+  "selectBlock": "Odaberi blok",
   "selectCollection": "Odaberite kolekciju",
   "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "session": {
@@ -164,8 +169,6 @@
     "selectedCount": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
     "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
   },
-  "typeToNarrow": "Kucajte za sužavanje",
-  "unlink": "Ukloni vezu",
   "unreachable": "Server nije dostupan",
   "unsavedChanges": {
     "body": "Izmjene koje ste napravili možda neće biti sačuvane."

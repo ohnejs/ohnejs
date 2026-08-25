@@ -6,6 +6,7 @@
   "cancel": "Cancel",
   "clear": "Clear",
   "clearSearch": "Clear search",
+  "clearSelection": "Clear selection",
   "close": "Close",
   "collections": "Collections",
   "confirmDelete": "Confirm",
@@ -91,7 +92,6 @@
   },
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
-  "linkRecord": "Link a record",
   "login": {
     "email": "Email",
     "forgotPassword": "Forgot password?",
@@ -107,9 +107,11 @@
     "expand": "Expand"
   },
   "new": "New",
+  "noBlocksAllowed": "No blocks can be added here",
+  "noBlocksMatchSearch": "No blocks match your search criteria",
   "noMatches": "No matches",
+  "noResultsFound": "No results found",
   "notFound": "Not found",
-  "notLinked": "Not linked",
   "ok": "OK",
   "open": "Open",
   "pageNotFound": "Page not found",
@@ -126,6 +128,7 @@
     "gone": "This record no longer exists",
     "moreActions": "More actions"
   },
+  "recordNotFound": "Record not found",
   "records": "{count, plural, one {# record} other {# records}}",
   "redirected": "Redirected",
   "removeItem": "Remove",
@@ -133,7 +136,9 @@
   "save": "Save",
   "saved": "Saved",
   "search": "Search",
+  "searchPlaceholder": "Search...",
   "select": "Select",
+  "selectBlock": "Select block",
   "selectCollection": "Select a collection",
   "selected": "{count, plural, one {# selected} other {# selected}}",
   "session": {
@@ -164,8 +169,6 @@
     "selectedCount": "Selected {count, plural, one {# record} other {# records}}",
     "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page"
   },
-  "typeToNarrow": "Type to narrow",
-  "unlink": "Unlink",
   "unreachable": "The server cannot be reached",
   "unsavedChanges": {
     "body": "Changes that you made may not be saved."
