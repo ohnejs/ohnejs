@@ -5,6 +5,7 @@ import { effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { nextTick } from '../../utils/reactive/next-tick.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
@@ -152,7 +153,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
       });
 
       const filteredBlocks = computed<readonly PickerBlock[]>(() =>
-        searchBlocksByKeywords(blocks.value, searchValue.value),
+        searchByKeywords(blocks.value, searchValue.value, 'search'),
       );
 
       const getFirstFilteredBlock = (): string | null => filteredBlocks.value[0]?.name ?? null;
@@ -371,38 +372,4 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
       });
     });
   });
-}
-
-/* The source's `searchByKeywords` from `@pruvious/utils`, specialized to the picker: every
-   keyword must match the lowercased search text, scored by `keyword.length / (index + 1)`,
-   sorted by relevance. */
-function searchBlocksByKeywords(
-  blocks: readonly PickerBlock[],
-  query: string,
-): readonly PickerBlock[] {
-  const keywords = query
-    .toLowerCase()
-    .split(' ')
-    .map((keyword) => keyword.trim())
-    .filter(Boolean);
-  return blocks
-    .map((block) => {
-      const haystack = block.search.toLowerCase();
-      let score = 0.1;
-      if (keywords.length) {
-        score = 0;
-        for (const keyword of keywords) {
-          const index = haystack.indexOf(keyword);
-          if (index === -1) {
-            score = 0;
-            break;
-          }
-          score += keyword.length / (index + 1);
-        }
-      }
-      return { block, score };
-    })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(({ block }) => block);
 }

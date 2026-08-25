@@ -57,6 +57,27 @@ export { buttonGroup } from './ui/button-group.ts';
 export type { ButtonGroupChoice, ButtonGroupOptions, Primitive } from './ui/button-group.ts';
 export { button } from './ui/button.ts';
 export type { ButtonOptions } from './ui/button.ts';
+export {
+  addZonedMonths,
+  addZonedYears,
+  clampZoned,
+  daysInMonth,
+  parseDateInput,
+  parseDateTime,
+  parseTimeSpan,
+  resolveTimezone,
+  startOfZonedDay,
+  timezones,
+  zonedFromTimestamp,
+  zonedFromWallClock,
+} from './ui/calendar-date.ts';
+export type { Timezone, ZonedDate } from './ui/calendar-date.ts';
+export { calendarMonth } from './ui/calendar-month.ts';
+export type { CalendarMonthOptions } from './ui/calendar-month.ts';
+export { calendarRange } from './ui/calendar-range.ts';
+export type { CalendarRangeOptions } from './ui/calendar-range.ts';
+export { calendar } from './ui/calendar.ts';
+export type { CalendarLabels, CalendarOptions } from './ui/calendar.ts';
 export { card } from './ui/card.ts';
 export type { CardOptions } from './ui/card.ts';
 export { checkbox } from './ui/checkbox.ts';
@@ -118,12 +139,20 @@ export { pagination } from './ui/pagination.ts';
 export type { PaginationOptions } from './ui/pagination.ts';
 export { popup } from './ui/popup-overlay.ts';
 export type { Popup, PopupClose, PopupOptions } from './ui/popup-overlay.ts';
+export { prose } from './ui/prose.ts';
+export type { ProseOptions } from './ui/prose.ts';
 export { resizer } from './ui/resizer.ts';
 export type { ResizerOptions } from './ui/resizer.ts';
 export { scrollable } from './ui/scrollable.ts';
 export type { ScrollableHandle, ScrollableOptions } from './ui/scrollable.ts';
 export { select } from './ui/select.ts';
 export type { SelectChoice, SelectChoiceGroup, SelectOptions } from './ui/select.ts';
+export { structureItem } from './ui/structure-item.ts';
+export type { StructureItemOptions } from './ui/structure-item.ts';
+export { structureAccepts, structureDropIndex } from './ui/structure-model.ts';
+export type { StructureDragSource } from './ui/structure-model.ts';
+export { structure } from './ui/structure.ts';
+export type { StructureHandle, StructureOptions } from './ui/structure.ts';
 export { switchInput } from './ui/switch.ts';
 export type { SwitchOptions } from './ui/switch.ts';
 export { rangeSelect, tableColumn, toggleSort } from './ui/table-model.ts';
@@ -142,10 +171,52 @@ export { textArea } from './ui/text-area.ts';
 export type { TextAreaOptions } from './ui/text-area.ts';
 export { textInput } from './ui/text-input.ts';
 export type { TextInputOptions } from './ui/text-input.ts';
+export { composeTime, parseTime, timeRangeBounds, timeSegmentBounds } from './ui/time-model.ts';
+export type {
+  TimeRangeBounds,
+  TimeSegmentBounds,
+  TimeSpanValue,
+  TimeValue,
+} from './ui/time-model.ts';
+export { timeRange } from './ui/time-range.ts';
+export type { TimeRangeOptions } from './ui/time-range.ts';
+export { time } from './ui/time.ts';
+export type { TimeLabels, TimeOptions } from './ui/time.ts';
 export { queueToast, toast, toaster } from './ui/toaster.ts';
 export type { ToastAction, ToastOptions } from './ui/toaster.ts';
 export { attachTooltip } from './ui/tooltip.ts';
 export type { TooltipOptions } from './ui/tooltip.ts';
+export { treeItem } from './ui/tree-item.ts';
+export type { TreeItemOptions } from './ui/tree-item.ts';
+export {
+  activeTreeItems,
+  addTreeItemsAfter,
+  addTreeItemsBefore,
+  cloneTreeItem,
+  deleteTreeItems,
+  dropTreeItems,
+  flatTreeItems,
+  flatTreeItemsWithLevel,
+  getChildTreeItems,
+  getParentTreeItems,
+  moveTreeItems,
+  normalizeTreeSelection,
+  sortTreeItems,
+  useTree,
+} from './ui/tree-model.ts';
+export type {
+  Tree,
+  TreeDropTarget,
+  TreeExtendedItemModel,
+  TreeExtendedParentItemModel,
+  TreeItemModel,
+  TreeMapper,
+  TreeModel,
+  TreeSource,
+  TreeSourceItem,
+} from './ui/tree-model.ts';
+export { tree } from './ui/tree.ts';
+export type { TreeHandle, TreeItemSizes, TreeOptions } from './ui/tree.ts';
 export { dispatchTrigger, listenTrigger } from './ui/trigger.ts';
 export { verticalMenu, verticalMenuItem } from './ui/vertical-menu.ts';
 export type {

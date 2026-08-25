@@ -5,6 +5,7 @@ import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
+import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
@@ -452,11 +453,12 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   const filterChoices = (): void => {
     if (!choicesOf) return;
     const pool = choicesOf();
-    filteredChoices.value = searchChoicesByKeywords(
+    filteredChoices.value = searchByKeywords(
       (options.enforceUniqueItems ?? true)
         ? pool.filter(({ value }) => !model.value.includes(value))
         : pool,
       inputValue.value,
+      ['label', 'value'],
     );
     highlightedIndex.value = Math.min(
       filteredChoices.value.length - 1,
@@ -931,34 +933,4 @@ function lockScroll(element: HTMLElement): () => void {
     if (previous) element.style.overflow = previous;
     else element.style.removeProperty('overflow');
   };
-}
-
-/* The source's `searchByKeywords` from `@pruvious/utils`, specialized to choices: every keyword
-   must match, scored by `keyword.length / (index + 1)`, sorted by relevance. */
-function searchChoicesByKeywords(choices: ChipsChoice[], query: string): ChipsChoice[] {
-  const keywords = query
-    .toLowerCase()
-    .split(' ')
-    .map((keyword) => keyword.trim())
-    .filter(Boolean);
-  return choices
-    .map((choice) => {
-      const haystack = [choice.label, choice.value].join(' ').toLowerCase();
-      let score = 0.1;
-      if (keywords.length) {
-        score = 0;
-        for (const keyword of keywords) {
-          const index = haystack.indexOf(keyword);
-          if (index === -1) {
-            score = 0;
-            break;
-          }
-          score += keyword.length / (index + 1);
-        }
-      }
-      return { choice, score };
-    })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(({ choice }) => choice);
 }

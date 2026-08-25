@@ -1,6 +1,8 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { last } from '../../utils/array/last.ts';
+import { next } from '../../utils/array/next.ts';
+import { prev } from '../../utils/array/prev.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -8,6 +10,7 @@ import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
@@ -285,49 +288,6 @@ function toDisplay(value: Primitive): string {
   return isNullish(value) ? '' : String(value);
 }
 
-function prevByValue(current: SelectChoice, pool: SelectChoice[]): SelectChoice | undefined {
-  const index = pool.findIndex((choice) => choice.value === current.value);
-  if (index === -1) return undefined;
-  return pool[index - 1] ?? pool[0];
-}
-
-function nextByValue(current: SelectChoice, pool: SelectChoice[]): SelectChoice | undefined {
-  const index = pool.findIndex((choice) => choice.value === current.value);
-  if (index === -1) return undefined;
-  return pool[index + 1] ?? last(pool);
-}
-
-/* The source's `searchByKeywords` from `@pruvious/utils`, specialized to choices: every keyword
-   must match the lowercased `label value` join, scored by `keyword.length / (index + 1)`,
-   sorted by relevance. */
-function searchChoicesByKeywords(choices: SelectChoice[], query: string): SelectChoice[] {
-  const keywords = query
-    .toLowerCase()
-    .split(' ')
-    .map((keyword) => keyword.trim())
-    .filter(Boolean);
-  return choices
-    .map((choice) => {
-      const haystack = [choice.label, choice.value].join(' ').toLowerCase();
-      let score = 0.1;
-      if (keywords.length) {
-        score = 0;
-        for (const keyword of keywords) {
-          const index = haystack.indexOf(keyword);
-          if (index === -1) {
-            score = 0;
-            break;
-          }
-          score += keyword.length / (index + 1);
-        }
-      }
-      return { choice, score };
-    })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(({ choice }) => choice);
-}
-
 /**
  * The static single-select combobox, ported 1-to-1 from Pruvious v4's `PUISelect`.
  *
@@ -476,7 +436,7 @@ export function select(
     open(event);
     const pool = enabledChoices();
     highlightedChoice.value = highlightedChoice.value
-      ? prevByValue(highlightedChoice.value, pool)
+      ? prev(highlightedChoice.value, pool, { prop: 'value' })
       : last(pool);
     mousePaused.value = true;
     scrollToHighlighted();
@@ -486,7 +446,7 @@ export function select(
     open(event);
     const pool = enabledChoices();
     highlightedChoice.value = highlightedChoice.value
-      ? nextByValue(highlightedChoice.value, pool)
+      ? next(highlightedChoice.value, pool, { prop: 'value' })
       : pool[0];
     mousePaused.value = true;
     scrollToHighlighted();
@@ -569,7 +529,7 @@ export function select(
     }
     if (!event.ctrlKey && !event.metaKey && /^[\p{L}\p{N}]$/u.test(event.key)) {
       keyword += event.key;
-      const found = searchChoicesByKeywords(enabledChoices(), keyword)[0];
+      const found = searchByKeywords(enabledChoices(), keyword, ['label', 'value'])[0];
       if (found) {
         highlightedChoice.value = found;
         const keywordIndex = (found.label ?? (isString(found.value) ? found.value : ''))

@@ -333,7 +333,9 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   };
 
   const buildFloating = (): Child => {
-    const container = h('div', { class: 'ohne-floater-container' }, content);
+    // tabindex -1 lets openers park focus on the container (the calendar does after month steps),
+    // exactly as the source's focusable scroll pane.
+    const container = h('div', { class: 'ohne-floater-container', tabindex: '-1' }, content);
     const floating = h(
       'div',
       {

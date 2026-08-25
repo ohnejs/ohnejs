@@ -1,6 +1,8 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { last } from '../../utils/array/last.ts';
+import { next } from '../../utils/array/next.ts';
+import { prev } from '../../utils/array/prev.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
@@ -400,24 +402,6 @@ function labelOrDash(choice: DynamicSelectChoice): string {
   return String((choice.label ?? choice.value) || '-');
 }
 
-function prevByValue(
-  current: DynamicSelectChoice,
-  pool: DynamicSelectChoice[],
-): DynamicSelectChoice | undefined {
-  const index = pool.findIndex((choice) => choice.value === current.value);
-  if (index === -1) return undefined;
-  return pool[index - 1] ?? pool[0];
-}
-
-function nextByValue(
-  current: DynamicSelectChoice,
-  pool: DynamicSelectChoice[],
-): DynamicSelectChoice | undefined {
-  const index = pool.findIndex((choice) => choice.value === current.value);
-  if (index === -1) return undefined;
-  return pool[index + 1] ?? last(pool);
-}
-
 /**
  * The async single-select combobox, ported 1-to-1 from Pruvious v4's `PUIDynamicSelect`.
  *
@@ -554,7 +538,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     if (isExpanded.value) {
       const pool = enabledChoices();
       highlightedChoice.value = highlightedChoice.value
-        ? prevByValue(highlightedChoice.value, pool)
+        ? prev(highlightedChoice.value, pool, { prop: 'value' })
         : last(pool);
       mousePaused.value = true;
       scrollToHighlighted();
@@ -565,7 +549,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     if (isExpanded.value) {
       const pool = enabledChoices();
       highlightedChoice.value = highlightedChoice.value
-        ? nextByValue(highlightedChoice.value, pool)
+        ? next(highlightedChoice.value, pool, { prop: 'value' })
         : pool[0];
       mousePaused.value = true;
       scrollToHighlighted();
