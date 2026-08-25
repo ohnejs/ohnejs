@@ -4,11 +4,11 @@ import { after, describe, it } from 'node:test';
 
 import { freePort } from '../../../src/utils/net/index.ts';
 
-function occupy(port: number): Promise<Server> {
+function occupy(port: number, host?: string): Promise<Server> {
   return new Promise((resolve, reject) => {
     const server = createServer();
     server.once('error', reject);
-    server.listen(port, () => resolve(server));
+    server.listen(port, host, () => resolve(server));
   });
 }
 
@@ -68,6 +68,13 @@ describe('freePort', () => {
   it('asks the OS for any free port when preferred is 0', async () => {
     const got = await freePort(0);
     ok(got > 0);
+  });
+
+  it('skips a port whose loopback another bind half-holds', async () => {
+    const base = await freeRun();
+    servers.push(await occupy(base, '127.0.0.1'));
+    const got = await freePort(base);
+    strictEqual(got, base + 1);
   });
 
   it('rejects when the scan window is exhausted', async () => {

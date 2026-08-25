@@ -2,6 +2,7 @@ import { createServer } from 'node:net';
 
 import { isNull } from '../is/is-null.ts';
 import { MAX_PORT } from '../is/is-port.ts';
+import { isUndefined } from '../is/is-undefined.ts';
 
 /**
  * Options for `freePort`.
@@ -9,7 +10,9 @@ import { MAX_PORT } from '../is/is-port.ts';
 export interface FreePortOptions {
   /**
    * Host interface to probe, matching the one the server will bind.
-   * Omitted probes every interface, as binding without a host does.
+   * Omitted probes the wildcard plus both loopback addresses, since a bind without a host serves them all.
+   * A port whose `127.0.0.1` side another process holds would otherwise scan as free.
+   * Its IPv4 traffic would then go to the squatter while IPv6 clients still reach the server.
    */
   host?: string;
 
@@ -42,6 +45,8 @@ export interface FreePortOptions {
  * `preferred` of `0` asks the OS for any free ephemeral port instead of scanning.
  * Ports in `exclude` are skipped even when free, so a second call never collides with the first.
  * A port already taken is skipped; any other bind error rejects.
+ * Without `host`, the wildcard and both loopback addresses must all bind for a port to count as free.
+ * A port another process half-holds, like a service squatting only `127.0.0.1`, is therefore skipped.
  *
  * There is a small race: the probe binds and closes, so another process could claim the port first.
  * This is fine for dev convenience; do not rely on it for exclusivity.
@@ -61,10 +66,12 @@ export interface FreePortOptions {
 export async function freePort(preferred = 0, options: FreePortOptions = {}): Promise<number> {
   const { host, attempts = 64, onBusy } = options;
   const exclude = new Set(options.exclude);
+  const check = (port: number): Promise<number | null> =>
+    isUndefined(host) ? probeEverywhere(port) : probe(port, host);
 
   if (preferred === 0) {
     for (let i = 0; i < attempts; i++) {
-      const got = await probe(0, host);
+      const got = await check(0);
       if (!isNull(got) && !exclude.has(got)) return got;
     }
     throw new Error('No free ephemeral port found');
@@ -72,11 +79,35 @@ export async function freePort(preferred = 0, options: FreePortOptions = {}): Pr
 
   for (let port = preferred; port < preferred + attempts && port <= MAX_PORT; port++) {
     if (exclude.has(port)) continue;
-    const got = await probe(port, host);
+    const got = await check(port);
     if (!isNull(got)) return got;
     onBusy?.(port);
   }
   throw new Error(`No free port found near \`${preferred}\``);
+}
+
+/**
+ * Loopback addresses a host-less bind serves; each must be claimable for the port to count as free.
+ * A wildcard bind coexists with another process's specific bind, so only exact probes expose those.
+ */
+const LOOPBACKS = ['127.0.0.1', '::1'];
+
+async function probeEverywhere(port: number): Promise<number | null> {
+  const wildcard = await probe(port);
+  if (isNull(wildcard)) return null;
+  for (const loopback of LOOPBACKS) {
+    try {
+      if (isNull(await probe(wildcard, loopback))) return null;
+    } catch (error) {
+      if (!familyAbsent(error)) throw error;
+    }
+  }
+  return wildcard;
+}
+
+function familyAbsent(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'EADDRNOTAVAIL' || code === 'EAFNOSUPPORT' || code === 'EINVAL';
 }
 
 function probe(port: number, host?: string): Promise<number | null> {
