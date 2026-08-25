@@ -7,6 +7,13 @@
   "clear": "Očisti",
   "clearSearch": "Očisti pretragu",
   "clearSelection": "Poništi odabir",
+  "clipboard": {
+    "copied": "Kopirano",
+    "copy": "Kopiraj",
+    "cut": "Izreži",
+    "pasteAfter": "Zalijepi poslije",
+    "pasteBefore": "Zalijepi prije"
+  },
   "close": "Zatvori",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
@@ -17,6 +24,8 @@
   "deleted": "{count, plural, one {# zapis obrisan} few {# zapisa obrisana} other {# zapisa obrisano}}",
   "deletedPartial": "{count} obrisano, {failed} neuspješno",
   "deselect": "Poništi odabir",
+  "dropItemsHere": "Ispustite stavke ovdje",
+  "duplicate": "Dupliciraj",
   "edit": "Uredi",
   "editFieldValue": "Uredi vrijednost polja",
   "empty": {
@@ -110,11 +119,14 @@
   },
   "menu": {
     "collapse": "Skupi",
-    "expand": "Proširi"
+    "collapseAll": "Skupi sve",
+    "expand": "Proširi",
+    "expandAll": "Proširi sve"
   },
   "new": "Novo",
   "noBlocksAllowed": "Ovdje se ne mogu dodati blokovi",
   "noBlocksMatchSearch": "Nijedan blok ne odgovara pretrazi",
+  "noFieldsToDisplay": "Nema polja za prikaz",
   "noMatches": "Nema rezultata",
   "noResultsFound": "Nema pronađenih rezultata",
   "notFound": "Nije pronađeno",
@@ -162,6 +174,7 @@
   "set": "Postavi",
   "signOut": "Odjava",
   "sort": {
+    "addAfter": "Dodaj poslije",
     "addBefore": "Dodaj prije",
     "ascending": "Sortiraj uzlazno",
     "descending": "Sortiraj silazno",

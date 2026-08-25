@@ -7,6 +7,13 @@
   "clear": "Clear",
   "clearSearch": "Clear search",
   "clearSelection": "Clear selection",
+  "clipboard": {
+    "copied": "Copied",
+    "copy": "Copy",
+    "cut": "Cut",
+    "pasteAfter": "Paste after",
+    "pasteBefore": "Paste before"
+  },
   "close": "Close",
   "collections": "Collections",
   "confirmDelete": "Confirm",
@@ -17,6 +24,8 @@
   "deleted": "{count, plural, one {# record deleted} other {# records deleted}}",
   "deletedPartial": "{count} deleted, {failed} failed",
   "deselect": "Deselect",
+  "dropItemsHere": "Drop items here",
+  "duplicate": "Duplicate",
   "edit": "Edit",
   "editFieldValue": "Edit field value",
   "empty": {
@@ -110,11 +119,14 @@
   },
   "menu": {
     "collapse": "Collapse",
-    "expand": "Expand"
+    "collapseAll": "Collapse all",
+    "expand": "Expand",
+    "expandAll": "Expand all"
   },
   "new": "New",
   "noBlocksAllowed": "No blocks can be added here",
   "noBlocksMatchSearch": "No blocks match your search criteria",
+  "noFieldsToDisplay": "No fields to display",
   "noMatches": "No matches",
   "noResultsFound": "No results found",
   "notFound": "Not found",
@@ -162,6 +174,7 @@
   "set": "Set",
   "signOut": "Sign out",
   "sort": {
+    "addAfter": "Add after",
     "addBefore": "Add before",
     "ascending": "Sort in ascending order",
     "descending": "Sort in descending order",

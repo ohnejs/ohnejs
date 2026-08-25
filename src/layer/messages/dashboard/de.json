@@ -7,6 +7,13 @@
   "clear": "Leeren",
   "clearSearch": "Suche leeren",
   "clearSelection": "Auswahl aufheben",
+  "clipboard": {
+    "copied": "Kopiert",
+    "copy": "Kopieren",
+    "cut": "Ausschneiden",
+    "pasteAfter": "Danach einsetzen",
+    "pasteBefore": "Davor einsetzen"
+  },
   "close": "Schließen",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
@@ -17,6 +24,8 @@
   "deleted": "{count, plural, one {# Datensatz gelöscht} other {# Datensätze gelöscht}}",
   "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
   "deselect": "Abwählen",
+  "dropItemsHere": "Elemente hier ablegen",
+  "duplicate": "Duplizieren",
   "edit": "Bearbeiten",
   "editFieldValue": "Feldwert bearbeiten",
   "empty": {
@@ -110,11 +119,14 @@
   },
   "menu": {
     "collapse": "Einklappen",
-    "expand": "Ausklappen"
+    "collapseAll": "Alle einklappen",
+    "expand": "Ausklappen",
+    "expandAll": "Alle ausklappen"
   },
   "new": "Neu",
   "noBlocksAllowed": "Hier können keine Blöcke hinzugefügt werden",
   "noBlocksMatchSearch": "Keine Blöcke entsprechen der Suche",
+  "noFieldsToDisplay": "Keine Felder zum Anzeigen",
   "noMatches": "Keine Treffer",
   "noResultsFound": "Keine Ergebnisse gefunden",
   "notFound": "Nicht gefunden",
@@ -162,6 +174,7 @@
   "set": "Setzen",
   "signOut": "Abmelden",
   "sort": {
+    "addAfter": "Danach einfügen",
     "addBefore": "Davor einfügen",
     "ascending": "Aufsteigend sortieren",
     "descending": "Absteigend sortieren",
