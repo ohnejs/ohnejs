@@ -8,6 +8,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { placeFloating } from './floater-place.ts';
+import { placeFixed } from './overlay.ts';
 import { type ScrollableHandle, type ScrollableOptions, scrollable } from './scrollable.ts';
 import './tokens.ts';
 
@@ -69,8 +70,8 @@ export interface DropdownOptions {
 
   /**
    * The CSS position of the floating panel.
-   * `'fixed'` is right for most cases; `'absolute'` positions relative to the offset parent,
-   * useful when the dropdown lives inside a scrolling container.
+   * `'fixed'` is right for most cases.
+   * `'absolute'` positions relative to the offset parent, useful inside a scrolling container.
    *
    * @default
    * 'fixed'
@@ -97,8 +98,8 @@ export interface DropdownOptions {
 
   /**
    * Whether the dropdown takes control of keyboard and mouse events while mounted.
-   * While on, the body gets `ohne-no-interaction`, arrows and Tab rove focus through
-   * `.ohne-dropdown-item` rows, and outside clicks or Escape call `onClose`.
+   * While on, the body gets `ohne-no-interaction` and arrows and Tab rove focus through the rows.
+   * Outside clicks or Escape call `onClose`.
    * The chips field passes `false` and keeps keyboard control in its text input.
    *
    * @default
@@ -162,8 +163,9 @@ const containers = new WeakMap<Element, () => HTMLElement | null>();
 
 /**
  * Resolves the hosting container of the dropdown an element sits in.
- * This is the ported `parentContainer` provide: the nearest `.ohne-popup` ancestor or `<body>`
- * under `handleControls`, the panel's direct parent otherwise, `null` outside any dropdown.
+ * This is the ported `parentContainer` provide.
+ * Under `handleControls` it is the nearest `.ohne-popup` ancestor or `<body>`.
+ * Otherwise it is the panel's direct parent, and `null` outside any dropdown.
  * `dropdownItem` refocuses it on mouseleave to keep keyboard context inside a hosting popup.
  */
 export function dropdownContainerOf(el: Element): HTMLElement | null {
@@ -231,14 +233,14 @@ css`
 /**
  * The floating panel primitive, ported 1-to-1 from Pruvious v4's `PUIDropdown`.
  *
- * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements
- * wins, the height clamps to the available space with an 8px inset, and the resolved placement
- * drives the pop-in direction class.
- * With `handleControls` on, the page loses pointer events, focus roves through
- * `.ohne-dropdown-item` rows with wraparound, and Escape or an outside click asks the owner to
- * close.
- * Returns a handle instead of a bare element because the source exposes `update`,
- * `calcItemSizes`, and the scroll surface to its owners; `floater` set the precedent.
+ * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements wins.
+ * The height clamps to the available space with an 8px inset.
+ * The resolved placement drives the pop-in direction class.
+ * With `handleControls` on, the page loses pointer events.
+ * Focus roves through `.ohne-dropdown-item` rows with wraparound.
+ * Escape or an outside click asks the owner to close.
+ * Returns a handle instead of a bare element.
+ * The source exposes `update`, `calcItemSizes`, and the scroll surface; `floater` set the precedent.
  *
  * @example
  * ```ts
@@ -340,8 +342,7 @@ export function dropdown(
       floating: { width: root.offsetWidth, height: root.offsetHeight },
     });
     if (strategy === 'fixed') {
-      root.style.left = `${placed.x}px`;
-      root.style.top = `${placed.y}px`;
+      placeFixed(root, placed.x, placed.y);
     } else {
       const parent = root.offsetParent;
       if (parent instanceof HTMLElement) {

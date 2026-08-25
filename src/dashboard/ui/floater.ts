@@ -13,7 +13,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
-import { FOCUSABLE, lockScroll, listenClickOutside } from './overlay.ts';
+import { FOCUSABLE, lockScroll, listenClickOutside, placeFixed } from './overlay.ts';
 import './tokens.ts';
 
 /**
@@ -316,8 +316,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       });
     }
     if (strategy === 'fixed') {
-      floating.style.left = `${placed.x}px`;
-      floating.style.top = `${placed.y}px`;
+      placeFixed(floating, placed.x, placed.y);
     } else {
       const parent = floating.offsetParent;
       if (parent instanceof HTMLElement) {

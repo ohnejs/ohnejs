@@ -10,6 +10,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
+import { placeFixed } from './overlay.ts';
 import { scrollable } from './scrollable.ts';
 import './tokens.ts';
 
@@ -125,12 +126,12 @@ css`
 /**
  * The right-click and long-press menu, ported 1-to-1 from Pruvious v4's `PUIContextMenu`.
  *
- * An invisible fixed anchor parks at the trigger event's pointer coordinates and, while `event`
- * holds one, a dropdown mounts on it: the roomiest corner wins, height-clamped to the viewport.
- * While open, the page loses pointer events except inside the menu's host (the nearest
- * `.ohne-popup` ancestor or `body`), arrows and Tab cycle the focus through `.ohne-dropdown-item`
- * elements, Escape closes without closing a hosting popup, and any outside press closes -
- * including a second right-click, whose new coordinates land only on the third.
+ * An invisible fixed anchor parks at the trigger event's pointer coordinates.
+ * While `event` holds one, a dropdown mounts on it: the roomiest corner wins, clamped to the viewport.
+ * While open, the page loses pointer events outside the menu's host (`.ohne-popup` ancestor or `body`).
+ * Arrows and Tab cycle the focus through `.ohne-dropdown-item` elements.
+ * Escape closes without closing a hosting popup, and any outside press closes.
+ * A second right-click closes too; its new coordinates land only on the third.
  * Item clicks close nothing by themselves: the consumer usually nulls `event` on click.
  * Closing restores focus to the previously focused element.
  *
@@ -227,8 +228,7 @@ export function contextMenu(
         ...input,
         floating: { width: floating.offsetWidth, height: floating.offsetHeight },
       });
-      floating.style.left = `${placed.x}px`;
-      floating.style.top = `${placed.y}px`;
+      placeFixed(floating, placed.x, placed.y);
       placement.value = placed.placement;
     };
 

@@ -1,3 +1,4 @@
+import type { Child } from '../../render/insert.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { FieldForm } from '../field-form.ts';
 
@@ -12,29 +13,20 @@ import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
+import { card } from '../../ui/card.ts';
 import { blocksOf } from '../_blocks.ts';
 import { itemFormSupports } from '../_items.ts';
 import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
-  .ohne-group {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: var(--s4);
+  /* The card header carries the field label, so the row's own label above the card hides. */
+  .ohne-fieldrow:has(> .ohne-object) > .ohne-fieldrow-head > .ohne-fieldrow-label {
+    display: none;
   }
 
-  .ohne-group-bar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: var(--s2);
-  }
-
-  .ohne-group-unset {
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
-    min-height: var(--control);
+  .ohne-object-has-error > .ohne-card {
+    border-color: hsl(var(--ohne-destructive));
   }
 `;
 
@@ -42,8 +34,10 @@ css`
  * The `object` field's dashboard behaviour.
  *
  * Cells summarize the child by its first text subfield's value.
- * There is no inline cell editor: the child edits on the record page as an inline bordered subform.
- * It clears and re-sets in place, and writes whole with the record's one save.
+ * There is no inline cell editor: the child edits on the record page as a card holding its subform.
+ * The card header carries the field label; an unset child renders the header alone with a set action.
+ * An object-level error paints the card border destructive, with the message under the card.
+ * The child clears and re-sets in place, and writes whole with the record's one save.
  */
 export const objectType: FieldType = {
   display({ field, value }) {
@@ -57,7 +51,7 @@ export const objectType: FieldType = {
   },
   control(context) {
     const subfields = context.field.subfields ?? [];
-    if (subfields.length === 0 || !itemFormSupports(subfields, blocksOf())) return undefined;
+    if (!itemFormSupports(subfields, blocksOf())) return undefined;
     const t = useT();
 
     let base = context.initial;
@@ -83,47 +77,56 @@ export const objectType: FieldType = {
     const swap = (next: FieldForm | null): void => {
       entry.value?.dispose();
       entry.value = next;
+      touched.value = true;
+      routed.value = '';
+      context.onInput();
     };
 
-    const element = h('div', null, () => {
-      const form = entry.value;
-      if (!isNull(form)) {
+    const { field } = context;
+    const label = (): HTMLElement =>
+      h(
+        'span',
+        { class: 'ohne-block ohne-medium ohne-truncate' },
+        field.required ? `${field.label} *` : field.label,
+      );
+    const header = (form: FieldForm | null): Child => {
+      if (isNull(form)) {
         return h(
           'div',
-          { class: 'ohne-group' },
-          context.field.nullable
-            ? h(
-                'div',
-                { class: 'ohne-group-bar' },
-                button(() => t('dashboard.clear'), {
-                  variant: 'ghost',
-                  onClick: () => {
-                    swap(null);
-                    touched.value = true;
-                    routed.value = '';
-                    context.onInput();
-                  },
-                }),
-              )
-            : null,
-          form.render(),
+          { class: 'ohne-justify-between' },
+          label(),
+          button(() => `+ ${t('dashboard.set')}`, {
+            variant: 'ghost',
+            onClick: () => swap(formOf(undefined)),
+          }),
         );
       }
-      return h(
-        'div',
-        { class: 'ohne-group-unset' },
-        dimMark('·'),
-        button(() => `+ ${t('dashboard.set')}`, {
-          variant: 'ghost',
-          onClick: () => {
-            swap(formOf(undefined));
-            touched.value = true;
-            routed.value = '';
-            context.onInput();
-          },
-        }),
-      );
-    });
+      if (field.nullable) {
+        return h(
+          'div',
+          { class: 'ohne-justify-between' },
+          label(),
+          button(() => t('dashboard.clear'), { variant: 'ghost', onClick: () => swap(null) }),
+        );
+      }
+      return label();
+    };
+
+    const element = h(
+      'div',
+      { class: () => `ohne-object${routed.value === '' ? '' : ' ohne-object-has-error'}` },
+      () => {
+        const form = entry.value;
+        return card(
+          isNull(form)
+            ? undefined
+            : subfields.length === 0
+              ? h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay'))
+              : form.render(),
+          { header: header(form) },
+        );
+      },
+    );
 
     return {
       element,
@@ -150,7 +153,8 @@ export const objectType: FieldType = {
         if (!isNull(form) && !form.focusError()) form.focus();
       },
       revert() {
-        swap(baseForm());
+        entry.value?.dispose();
+        entry.value = baseForm();
         touched.value = false;
         routed.value = '';
       },
@@ -159,7 +163,10 @@ export const objectType: FieldType = {
         const form = entry.value;
         // A present child rebases in place, keeping its controls and their focus.
         if (!isNull(form) && isPlainObject<Record<string, unknown>>(value)) form.rebase(value);
-        else swap(baseForm());
+        else {
+          entry.value?.dispose();
+          entry.value = baseForm();
+        }
         touched.value = false;
         routed.value = '';
       },

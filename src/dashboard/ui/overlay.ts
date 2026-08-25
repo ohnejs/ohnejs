@@ -8,6 +8,29 @@ export const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * Pins `el` at the viewport coordinates `x`/`y` under `position: fixed`.
+ * An ancestor with `container-type`, `transform`, or a filter re-anchors fixed descendants to itself.
+ * A zero-size probe beside `el` measures that origin, and the coordinates subtract it.
+ * The probe is used instead of `el`'s own rect, so a mount transition's transform cannot skew it.
+ */
+export function placeFixed(el: HTMLElement, x: number, y: number): void {
+  let driftX = 0;
+  let driftY = 0;
+  const parent = el.parentElement;
+  if (parent !== null && parent !== document.body) {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;';
+    parent.append(probe);
+    const rect = probe.getBoundingClientRect();
+    probe.remove();
+    driftX = rect.x;
+    driftY = rect.y;
+  }
+  el.style.left = `${x - driftX}px`;
+  el.style.top = `${y - driftY}px`;
+}
+
+/**
  * A claim on one overlay depth, held from mount to unmount of a modal surface.
  */
 export interface OverlayHandle {
