@@ -3,37 +3,37 @@ import { base, type Child, css, h } from 'ohne/dashboard';
 import { wrapper } from './wrapper.ts';
 
 css`
-  .o-layout {
+  .o-auth-layout {
     width: 100%;
     max-width: 24rem;
     margin: auto -1rem;
     padding: 0.5rem 0;
   }
 
-  .o-header,
-  .o-footer {
+  .o-auth-header,
+  .o-auth-footer {
     min-height: 1.875rem;
     padding: 0 1.5rem;
   }
 
-  .o-main {
+  .o-auth-main {
     padding: 1rem 1.5rem;
   }
 
-  .o-main hr {
+  .o-auth-main hr {
     position: absolute;
     left: 0;
   }
 
-  .o-main hr:first-child {
+  .o-auth-main hr:first-child {
     margin-top: -0.5rem;
   }
 
-  .o-main hr:last-child {
+  .o-auth-main hr:last-child {
     margin-top: 0.5rem;
   }
 
-  .o-slot {
+  .o-auth-slot {
     position: relative;
     z-index: 1;
   }
@@ -54,10 +54,16 @@ function layout(header: Child, children: Child[]): HTMLElement {
   return wrapper(
     h(
       'div',
-      { class: 'o-layout' },
-      h('div', { class: 'o-header' }, header),
-      h('div', { class: 'o-main' }, h('hr'), h('div', { class: 'o-slot' }, children), h('hr')),
-      h('div', { class: 'o-footer' }),
+      { class: 'o-auth-layout' },
+      h('div', { class: 'o-auth-header' }, header),
+      h(
+        'div',
+        { class: 'o-auth-main' },
+        h('hr'),
+        h('div', { class: 'o-auth-slot' }, children),
+        h('hr'),
+      ),
+      h('div', { class: 'o-auth-footer' }),
     ),
   );
 }
