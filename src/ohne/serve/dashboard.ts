@@ -149,7 +149,7 @@ function synthetic(pattern: string, handler: Route['handler']): Route {
   return { method: 'GET', pattern, file: '', layer: '', handler };
 }
 
-function serveModule({ params }: HandlerContext): Promise<string | undefined> {
+function serveModule({ params }: HandlerContext): Promise<string | Uint8Array | undefined> {
   const resolved = safeResolve(SRC_ROOT, params.path);
   if (isNull(resolved) || !MODULE_ROOTS.some((root) => isPathInside(resolved, root))) {
     throw notFound('Not Found');
@@ -240,6 +240,15 @@ function shellDocument(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ohne</title>
+    <script>
+      try {
+        var mode = localStorage.getItem('ohne-color-mode');
+        var dark =
+          mode === 'dark' ||
+          (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+      } catch {}
+    </script>
     <script type="importmap">${IMPORTMAP}</script>
   </head>
   <body>
