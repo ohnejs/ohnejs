@@ -31,7 +31,7 @@ export { when } from './render/when.ts';
 export { defineDashboardPage } from './router/define-dashboard-page.ts';
 export { navigate, setNavigationGuard, useRoute } from './router/router.ts';
 export type { DashboardPage, RouteContext } from './router/router.ts';
-export { api } from './runtime/api.ts';
+export { api, setUnauthorizedHandler } from './runtime/api.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
 export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
