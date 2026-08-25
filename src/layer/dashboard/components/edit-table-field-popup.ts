@@ -1,8 +1,6 @@
 import {
   api,
-  attachTooltip,
   button,
-  type Child,
   createFieldForm,
   css,
   type DashboardCollection,
@@ -21,6 +19,7 @@ import {
 } from 'ohne/dashboard';
 import { effect, isNull, isUndefined, onCleanup, ref, sleep } from 'ohne/utils';
 
+import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';
 
 /**
@@ -113,10 +112,10 @@ export function setEditQueryParam(value: string | null): void {
  *
  * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`,
  * Cmd/Ctrl+S saving, and dirty-guarded closing through the `unsavedChanges` prompt.
- * The save patches only this field; a `422` routes onto the control and raises the error count
- * toast, a vanished record toasts and closes.
- * The popup follows the `edit` query parameter: when it disappears, the popup closes, and
- * unmounting removes it, so the deep link and the popup stay in step.
+ * The save patches only this field; a `422` routes onto the control and raises the error count toast.
+ * A vanished record toasts and closes.
+ * The popup follows the `edit` query parameter: when it disappears, the popup closes.
+ * Unmounting removes it, so the deep link and the popup stay in step.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup {
@@ -154,16 +153,6 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     if (isUndefined(state)) return;
     form.value.dispose();
     form.value = buildForm(state);
-  };
-
-  const undo = (event?: KeyboardEvent): void => {
-    event?.preventDefault();
-    restore(history.undo());
-  };
-
-  const redo = (event?: KeyboardEvent): void => {
-    event?.preventDefault();
-    restore(history.redo());
   };
 
   const save = async (): Promise<void> => {
@@ -223,32 +212,6 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     closeButton.title = t('dashboard.close');
   });
 
-  const historyButtons = (): Child => {
-    const undoButton = button(icon('arrow-back-up'), {
-      variant: 'outline',
-      disabled: () => !history.canUndo.value,
-      onClick: () => undo(),
-    });
-    onCleanup(
-      attachTooltip(
-        undoButton,
-        () => `${t('dashboard.history.undo')} \`${history.undoCount.value}\``,
-      ),
-    );
-    const redoButton = button(icon('arrow-forward-up'), {
-      variant: 'outline',
-      disabled: () => !history.canRedo.value,
-      onClick: () => redo(),
-    });
-    onCleanup(
-      attachTooltip(
-        redoButton,
-        () => `${t('dashboard.history.redo')} \`${history.redoCount.value}\``,
-      ),
-    );
-    return h('div', { class: 'ohne-row' }, undoButton, redoButton);
-  };
-
   // The source's Save carries no disabled state: re-entry is guarded in `save` itself, and a
   // static class keeps the variant toggles below from being overwritten by a class re-apply.
   const saveButton = button(() => t('dashboard.save'), {
@@ -279,7 +242,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       ),
       footer: disabled
         ? undefined
-        : h('div', { class: 'ohne-justify-between' }, historyButtons(), saveButton),
+        : h('div', { class: 'ohne-justify-between' }, historyButtons(history, restore), saveButton),
       onClose: () => void guardedClose(),
     },
   );
@@ -295,8 +258,6 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
         if (active instanceof HTMLElement) active.blur();
         setTimeout(() => void save());
       });
-      hotkeys.listen('undo', undo);
-      hotkeys.listen('redo', redo);
     });
     setTimeout(() =>
       setTimeout(() =>

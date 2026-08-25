@@ -10,6 +10,8 @@
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
   "confirmDeleteCount": "Bestätigen ({count})",
+  "create": "Erstellen",
+  "created": "Erstellt",
   "delete": "Löschen",
   "deleted": "{count, plural, one {# Datensatz gelöscht} other {# Datensätze gelöscht}}",
   "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
@@ -105,11 +107,12 @@
     "expand": "Ausklappen"
   },
   "new": "Neu",
-  "newRecord": "Neuer Datensatz",
   "noMatches": "Keine Treffer",
   "notFound": "Nicht gefunden",
   "notLinked": "Nicht verknüpft",
+  "ok": "OK",
   "open": "Öffnen",
+  "pageNotFound": "Seite nicht gefunden",
   "pagination": {
     "goToPage": "Gehe zu Seite",
     "next": "Nächste Seite",
@@ -117,14 +120,14 @@
     "showingRecords": "Zeigt Datensätze {from} bis {to}"
   },
   "record": {
-    "copied": "UUID kopiert",
-    "discard": "Verwerfen",
+    "collectionOverview": "`{collection}`-Übersicht",
+    "confirmDelete": "Diesen Eintrag wirklich löschen?",
+    "deleted": "Gelöscht",
     "gone": "Dieser Datensatz existiert nicht mehr",
-    "keepEditing": "Weiter bearbeiten",
-    "revert": "Zurücksetzen",
-    "unsaved": "Ungespeicherte Änderungen"
+    "moreActions": "Weitere Aktionen"
   },
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
+  "redirected": "Weitergeleitet",
   "removeItem": "Entfernen",
   "retry": "Erneut versuchen",
   "save": "Speichern",
@@ -164,6 +167,9 @@
   "typeToNarrow": "Tippen zum Eingrenzen",
   "unlink": "Verknüpfung lösen",
   "unreachable": "Der Server ist nicht erreichbar",
+  "unsavedChanges": {
+    "body": "Vorgenommene Änderungen werden möglicherweise nicht gespeichert."
+  },
   "view": "Ansehen",
   "viewFieldValue": "Feldwert ansehen",
   "writeFailed": "Das Schreiben ist fehlgeschlagen"

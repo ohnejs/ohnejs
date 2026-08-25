@@ -14,12 +14,12 @@ import { recordEditor } from '../../../components/record-editor.ts';
 import { shell } from '../../../components/shell.ts';
 
 css`
-  .record-pane-missing {
+  .o-record-page-missing {
     height: 100%;
     display: grid;
     place-items: center;
-    color: var(--faint);
-    font-size: var(--fs-body);
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 0.875rem;
   }
 `;
 
@@ -57,7 +57,7 @@ function pane(segment: () => string, uuid: () => string): Child {
           const id = uuid();
           return recordEditor(collection, id === 'new' ? undefined : id);
         },
-        () => h('div', { class: 'record-pane-missing' }, () => t('dashboard.notFound')),
+        () => h('div', { class: 'o-record-page-missing' }, () => t('dashboard.notFound')),
       ),
   );
 }

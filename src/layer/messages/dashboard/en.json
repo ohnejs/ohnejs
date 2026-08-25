@@ -10,6 +10,8 @@
   "collections": "Collections",
   "confirmDelete": "Confirm",
   "confirmDeleteCount": "Confirm ({count})",
+  "create": "Create",
+  "created": "Created",
   "delete": "Delete",
   "deleted": "{count, plural, one {# record deleted} other {# records deleted}}",
   "deletedPartial": "{count} deleted, {failed} failed",
@@ -105,11 +107,12 @@
     "expand": "Expand"
   },
   "new": "New",
-  "newRecord": "New record",
   "noMatches": "No matches",
   "notFound": "Not found",
   "notLinked": "Not linked",
+  "ok": "OK",
   "open": "Open",
+  "pageNotFound": "Page not found",
   "pagination": {
     "goToPage": "Go to page",
     "next": "Next page",
@@ -117,14 +120,14 @@
     "showingRecords": "Showing records {from} to {to}"
   },
   "record": {
-    "copied": "UUID copied",
-    "discard": "Discard",
+    "collectionOverview": "`{collection}` overview",
+    "confirmDelete": "Are you sure you want to delete this entry?",
+    "deleted": "Deleted",
     "gone": "This record no longer exists",
-    "keepEditing": "Keep editing",
-    "revert": "Revert",
-    "unsaved": "Unsaved changes"
+    "moreActions": "More actions"
   },
   "records": "{count, plural, one {# record} other {# records}}",
+  "redirected": "Redirected",
   "removeItem": "Remove",
   "retry": "Retry",
   "save": "Save",
@@ -164,6 +167,9 @@
   "typeToNarrow": "Type to narrow",
   "unlink": "Unlink",
   "unreachable": "The server cannot be reached",
+  "unsavedChanges": {
+    "body": "Changes that you made may not be saved."
+  },
   "view": "View",
   "viewFieldValue": "View field value",
   "writeFailed": "The write failed"

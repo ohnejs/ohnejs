@@ -27,6 +27,7 @@ import './cells.ts';
 import { header } from './header.ts';
 import { loginPopup } from './login-popup.ts';
 import { sidebar } from './sidebar.ts';
+import { unsavedChangesGuard } from './unsaved-changes.ts';
 import { wrapper } from './wrapper.ts';
 
 /**
@@ -239,12 +240,13 @@ css`
 `;
 
 /**
- * The signed-in frame, ported from Pruvious v4's default layout: the header row, the sidebar menu
- * column, and the scrollable main area, centered between the wrapper rails.
+ * The signed-in frame, ported from Pruvious v4's default layout.
+ * It holds the header row, the sidebar menu column, and the scrollable main area between the rails.
  * While the session resolves it renders nothing, so the paper stays calm.
  * A signed-out session redirects to the login page, carrying the current path as `next`.
- * Under `1024px` the sidebar becomes an overlay: the hamburger, a left-edge swipe, Escape, and a
- * click on the receded main area all toggle it, and Tab cycles inside header and sidebar.
+ * Under `1024px` the sidebar becomes an overlay.
+ * The hamburger, a left-edge swipe, Escape, and a click on the receded main area all toggle it.
+ * Tab cycles inside header and sidebar while it is open.
  * The sidebar's scroll position and expanded state persist across navigations.
  */
 export function shell(content: () => Child, options: ShellOptions = {}): Child {
@@ -263,6 +265,7 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
         () => layout(content, options),
       ),
     ),
+    unsavedChangesGuard(),
     loginPopup(),
   ]);
   root.classList.add('o-default-layout');
@@ -270,8 +273,7 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
 }
 
 /**
- * The layout grid proper: header, sidebar container, main container, and the overlay-sidebar
- * behavior around them.
+ * The layout grid proper: header, sidebar container, main container, and the overlay-sidebar behavior.
  */
 function layout(content: () => Child, options: ShellOptions): HTMLElement {
   const transition = ref(false);

@@ -1,196 +1,149 @@
 import {
   api,
+  attachTooltip,
   button,
   type Child,
+  container,
   createFieldForm,
   css,
   type DashboardCollection,
   type DashboardField,
+  dropdown,
+  dropdownItem,
   type FieldForm,
   h,
   icon,
   navigate,
+  openDialog,
+  overlayCount,
+  queueToast,
   seedLabel,
   setNavigationGuard,
   toast,
   useDashboardLanguage,
+  useHotkeys,
   useT,
   when,
 } from 'ohne/dashboard';
 import {
+  deepEqual,
+  effect,
   isEmpty,
   isNull,
-  isNumber,
   isString,
   isUndefined,
   onCleanup,
   ref,
   sleep,
+  untracked,
 } from 'ohne/utils';
+
+import { historyButtons } from './history-buttons.ts';
+import { historyScrollState } from './history-scroll-state.ts';
+import { History, unsavedChanges } from './history.ts';
 
 /**
  * One record row, as the collections API answers it.
  */
 type RecordRow = Record<string, unknown>;
 
-const dateFormats = new Map<string, Intl.DateTimeFormat>();
-
 css`
-  .record-editor {
+  .o-record-editor {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
   }
 
-  .record-bar {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: var(--s3);
-    height: var(--bar);
-    padding: 0 var(--s4);
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .record-crumb {
-    color: var(--faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .record-crumb a:hover {
-    color: var(--dim);
-  }
-
-  .record-crumb b {
-    color: var(--text);
+  .o-record-editor-header {
+    padding: calc(0.75rem + 1px) 0.75rem 0.75rem;
+    border-bottom-width: 1px;
+    font-size: 0.875rem;
     font-weight: 500;
   }
 
-  .record-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-family: var(--mono);
-    font-size: var(--fs-micro);
-    color: var(--dim);
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    padding: 2px 6px;
-    white-space: nowrap;
+  .o-record-editor-header .ohne-button {
+    margin-right: 0.25rem;
+    margin-left: 0.25rem;
   }
 
-  button.record-chip {
-    cursor: pointer;
+  .o-record-editor-header .ohne-button:first-child {
+    margin-left: 0;
   }
 
-  button.record-chip:hover {
-    border-color: var(--line-strong);
-    color: var(--text);
+  .o-record-editor-header .ohne-button:last-child {
+    margin-right: 0;
   }
 
-  .record-chip .ohne-icon {
-    width: 11px;
-    height: 11px;
+  .o-record-editor-main {
+    container-type: inline-size;
+    contain: layout;
+    padding: 0.75rem;
   }
 
-  .record-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
+  .o-record-editor-footer {
+    border-top-width: 1px;
+    padding: 0.75rem;
   }
 
-  .record-guard {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
-  }
-
-  .record-guard-note {
-    color: var(--warn);
-    font-size: var(--fs-small);
-  }
-
-  .record-save-keys {
-    margin-left: 5px;
-    opacity: 0.6;
-    font-size: var(--fs-micro);
-  }
-
-  .record-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  .record-column {
-    max-width: 640px;
-    padding: var(--s5) var(--s6) 64px;
-  }
-
-  .record-orphan {
-    margin-bottom: var(--s4);
-    font-size: var(--fs-small);
-    color: var(--danger);
-  }
-
-  .record-fields {
+  .o-record-editor-fields {
     border: 0;
     margin: 0;
     padding: 0;
     min-inline-size: auto;
   }
 
-  .record-missing {
-    height: 100%;
+  .o-record-editor-failed {
     display: grid;
-    place-items: center;
+    justify-items: center;
     align-content: center;
-    gap: var(--s3);
-    color: var(--faint);
+    gap: 0.75rem;
+    padding: 3rem 0;
+    color: hsl(var(--ohne-muted-foreground));
   }
 
-  .record-skeleton {
-    max-width: 640px;
-    padding: var(--s5) var(--s6);
-  }
-
-  .record-skeleton i {
-    display: block;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--raised);
-    margin-bottom: var(--s5);
+  @media (max-width: 1024px) {
+    .o-record-editor-header .ohne-button {
+      --ohne-size: -2;
+    }
   }
 `;
 
 /**
- * The record surface: one routed form where a record is created, read, edited, and deleted.
+ * The record surface, ported from Pruvious v4's collection record pages.
  *
- * Create and edit are the same form; `uuid` absent means create.
- * There is exactly one Save: create posts the touched fields, edit patches only the dirty ones.
- * Composites serialize into that same write, so no nested surface carries its own button.
- * A `422` routes onto the rows it names; what routes nowhere lands on the top failure line.
- * Leaving with unsaved changes swaps the bar for a guard strip instead of losing the edits.
+ * Create and edit share this one page; `uuid` absent means create.
+ * The scrollable page column holds the header row and the field rows.
+ * The sticky footer holds the undo and redo pair, Save with the dirty primary toggle, and the actions menu.
+ * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
+ * `historyScrollState` pins the scroll across the re-render.
+ * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
+ * Cmd/Ctrl+S saves while no overlay is open.
+ * A `422` routes onto the rows it names and raises the error count toast.
+ * A vanished record redirects to the collection with the source's toast.
+ * Create posts the touched fields so server defaults apply, then navigates to the new record.
  */
 export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
   const t = useT();
   const create = isUndefined(uuid);
   const id = uuid ?? '';
-  const canUpdate = collection.operations.update?.allowed === true;
-  const readOnly = !create && !canUpdate;
   const listPath = `/collections/${collection.segment}`;
-  const formID = `record-form-${collection.segment}`;
+  // P4 layers per-record gates (author and editors fields) over these; no ohne meta yet.
+  const canCreate = collection.operations.create?.allowed === true;
+  const canUpdate = collection.operations.update?.allowed === true;
+  const canDelete = collection.operations.delete?.allowed === true;
+  const readOnly = !create && !canUpdate;
+  const showFooter = create || canCreate || canUpdate || canDelete;
 
   const formFields = collection.fields.filter(
     (field) => field.name !== 'UUID' && field.name !== '_updatedAt',
   );
+
+  const history = new History({
+    omit: collection.fields
+      .filter((field) => !field.writable || field.immutable)
+      .map((field) => field.name),
+  });
+
   const buildForm = (initial: RecordRow | undefined): FieldForm =>
     createFieldForm(formFields, initial, {
       mode: create ? 'create' : 'edit',
@@ -199,32 +152,39 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       readOnly,
       language: () => useDashboardLanguage().value,
       onInput: () => {
-        orphan.value = '';
+        const state = currentState();
+        if (!isUndefined(state)) void history.pushDebounced(state);
       },
     });
 
-  // The body region branches on `state` alone; the record's data lives outside the reactive
-  // graph, so a successful save never rebuilds the form around the user's focus.
-  const state = ref<'loading' | 'ready' | 'missing' | 'failed'>(create ? 'ready' : 'loading');
-  const heading = ref('');
-  const updatedAt = ref<number | undefined>(undefined);
+  // The body region branches on `state` alone; the form lives in its own ref, so a save or a
+  // restore rebuilds only the fieldset region.
+  const state = ref<'loading' | 'ready' | 'failed'>(create ? 'ready' : 'loading');
   const form = ref<FieldForm | undefined>(create ? buildForm(undefined) : undefined);
   const busy = ref(false);
-  const orphan = ref('');
-  const armed = ref(false);
-  const pending = ref<string | null>(null);
-  let armTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => form.value?.dispose());
 
-  const dirty = (): boolean => form.value?.dirty() === true;
+  const currentState = (): RecordRow | undefined => {
+    const reading = form.value?.read();
+    if (isUndefined(reading) || !isUndefined(reading.errors)) return undefined;
+    return (reading.value ?? {}) as RecordRow;
+  };
 
-  const settle = (row: RecordRow): void => {
-    heading.value = titleOf(collection, row);
-    const at = row['_updatedAt'];
-    updatedAt.value = isNumber(at) ? at : updatedAt.value;
+  const restore = (restored: RecordRow): void => {
+    form.value?.dispose();
+    form.value = buildForm(restored);
+  };
+
+  const redirectGone = (): void => {
+    queueToast(t('dashboard.redirected'), {
+      type: 'error',
+      description: t('dashboard.pageNotFound'),
+      showAfterRouteChange: true,
+    });
+    navigate(listPath);
   };
 
   const load = async (): Promise<void> => {
-    if (create) return;
     state.value = 'loading';
     const row = await readRecord(collection.segment, id);
     if (isUndefined(row)) {
@@ -232,57 +192,52 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       return;
     }
     if (isNull(row)) {
-      state.value = 'missing';
+      redirectGone();
       return;
     }
     form.value?.dispose();
     form.value = buildForm(row);
-    settle(row);
+    history.push(currentState() ?? {});
     state.value = 'ready';
     settleHash();
   };
-  void load();
-  if (create) settleHash();
-  onCleanup(() => form.value?.dispose());
+  if (create) {
+    // Untracked: the seed read touches every control ref, and construction runs inside the page
+    // region - a tracked read would subscribe the whole page to the first keystroke.
+    history.push(untracked(currentState) ?? {});
+    settleHash();
+  } else {
+    void load();
+  }
+  // P4 additionally wires the content-language watcher that jumps between translations and the
+  // translations popup here; the translation meta has no ohne counterpart yet.
 
+  // The in-app leg of P4's leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard((target) => {
-    if (!dirty()) return true;
-    pending.value = target;
+    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) {
+      unsavedChanges.history = null;
+      return true;
+    }
+    void unsavedChanges.prompt().then((leave) => {
+      if (leave) {
+        setNavigationGuard(null);
+        navigate(target);
+      }
+    });
     return false;
   });
   onCleanup(() => setNavigationGuard(null));
 
-  const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-    if (dirty()) event.preventDefault();
-  };
-  window.addEventListener('beforeunload', onBeforeUnload);
-  onCleanup(() => window.removeEventListener('beforeunload', onBeforeUnload));
-
-  const onKeydown = (event: KeyboardEvent): void => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-      event.preventDefault();
-      if (dirty() && !busy.value) void save();
-    }
-  };
-  document.addEventListener('keydown', onKeydown, { capture: true });
-  onCleanup(() => document.removeEventListener('keydown', onKeydown, { capture: true }));
-
-  const resume = (): void => {
-    const target = pending.value;
-    pending.value = null;
-    if (!isNull(target)) navigate(target);
-  };
-
   const save = async (): Promise<void> => {
     const live = form.value;
     if (isUndefined(live) || busy.value || readOnly) return;
-    orphan.value = '';
-    const reading = create ? live.read() : live.readPatch();
+    const reading = live.read();
     if (!isUndefined(reading.errors)) {
       live.focusError();
       return;
     }
-    const body = (reading.value ?? {}) as RecordRow;
+    const full = (reading.value ?? {}) as RecordRow;
+    const body = create ? full : changedSince(full, history.getOriginalState() ?? {});
     if (!create && isEmpty(body)) return;
     const focused = document.activeElement;
     busy.value = true;
@@ -292,190 +247,226 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
       live.rebase(outcome.record);
-      settle(outcome.record);
+      const settled = currentState();
+      if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
       seedRecordLabel(collection, outcome.record);
-      toast(t('dashboard.saved'), { type: 'success', description: heading.value });
-      if (!isNull(pending.value)) {
-        resume();
-        return;
-      }
-      if (create && isString(outcome.record.UUID)) {
-        navigate(`${listPath}/${outcome.record.UUID}`, { replace: true });
+      if (create) {
+        queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
+        if (isString(outcome.record.UUID)) navigate(`${listPath}/${outcome.record.UUID}`);
+      } else {
+        queueToast(t('dashboard.saved'), { type: 'success' });
       }
       return;
     }
     if (outcome.kind === 'invalid') {
-      orphan.value = live.setErrors(outcome.errors);
+      live.setErrors(outcome.errors);
       live.focusError();
+      toast(t('dashboard.foundErrors', { count: Object.keys(outcome.errors).length }), {
+        type: 'error',
+      });
       return;
     }
     if (outcome.kind === 'gone') {
-      live.revert();
-      toast(t('dashboard.record.gone'), { type: 'error' });
-      navigate(listPath, { replace: true });
+      history.clear();
+      redirectGone();
       return;
     }
-    orphan.value = t(
-      outcome.kind === 'unreachable' ? 'dashboard.unreachable' : 'dashboard.writeFailed',
-    );
+    toast(t(outcome.kind === 'unreachable' ? 'dashboard.unreachable' : 'dashboard.writeFailed'), {
+      type: 'error',
+    });
   };
 
-  const disarm = (): void => {
-    armed.value = false;
-    if (!isUndefined(armTimer)) clearTimeout(armTimer);
-  };
-
-  const remove = async (): Promise<void> => {
-    if (create || busy.value) return;
-    if (!armed.value) {
-      armed.value = true;
-      armTimer = setTimeout(disarm, 4000);
-      return;
-    }
-    disarm();
+  const removeRecord = async (): Promise<void> => {
+    if (busy.value) return;
+    const action = await openDialog({
+      content: t('dashboard.record.confirmDelete'),
+      actions: [
+        { name: 'cancel', label: t('dashboard.cancel') },
+        { name: 'delete', label: t('dashboard.delete'), variant: 'destructive' },
+      ],
+    });
+    if (action !== 'delete') return;
     busy.value = true;
-    await deleteRecord(collection.segment, id);
+    const gone = await deleteRecord(collection.segment, id);
     busy.value = false;
-    form.value?.revert();
-    toast(t('dashboard.deleted', { count: 1 }), { type: 'error' });
-    navigate(listPath, { replace: true });
+    if (!gone) return;
+    setTimeout(() => {
+      history.clear();
+      queueToast(t('dashboard.record.deleted'), { type: 'success', showAfterRouteChange: true });
+      navigate(listPath);
+    }, overlayTransitionDuration());
   };
 
-  const title = (): string => (create ? t('dashboard.newRecord') : heading.value);
+  const { listen } = useHotkeys();
+  listen('save', (event) => {
+    if (overlayCount() > 0) return;
+    event.preventDefault();
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    setTimeout(() => void save());
+  });
 
-  const copyUUID = (): void => {
-    if (create) return;
-    void navigator.clipboard
-      .writeText(id)
-      .then(() => toast(t('dashboard.record.copied'), { type: 'success' }));
-  };
-
-  const saveButton = button(
-    () => [t('dashboard.save'), h('span', { class: 'record-save-keys' }, '⌘S')],
-    { type: 'submit', disabled: () => busy.value || !dirty() },
+  // P4 renders the collection's own icon here; the discovery data carries none, so the back
+  // button shows P4's default collection icon.
+  const backButton = button(icon('folder'), { variant: 'outline', href: listPath });
+  onCleanup(
+    attachTooltip(backButton, () =>
+      t('dashboard.record.collectionOverview', { collection: collection.label }),
+    ),
   );
-  saveButton.setAttribute('form', formID);
 
-  const bar = h(
+  const headerEl = h(
     'div',
-    { class: 'record-bar' },
+    { class: 'o-record-editor-header' },
     h(
-      'span',
-      { class: 'record-crumb' },
-      h('a', { href: '/' }, () => t('dashboard.collections')),
-      ' / ',
-      h('a', { href: listPath }, collection.label),
-      ' / ',
-      h('b', null, title),
-    ),
-    create
-      ? null
-      : [
-          h(
-            'button',
-            {
-              class: 'record-chip',
-              type: 'button',
-              title: id,
-              onClick: copyUUID,
-            },
-            icon('copy'),
-            id.slice(0, 8),
-          ),
-          h('span', { class: 'record-chip' }, icon('clock'), () => updatedText(updatedAt.value)),
-        ],
-    when(
-      () => !isNull(pending.value),
-      () =>
-        h(
-          'div',
-          { class: 'record-guard' },
-          h('span', { class: 'record-guard-note' }, () => t('dashboard.record.unsaved')),
-          button(() => t('dashboard.record.keepEditing'), {
-            variant: 'ghost',
-            onClick: () => {
-              pending.value = null;
-            },
-          }),
-          button(() => t('dashboard.record.discard'), {
-            variant: 'ghost',
-            destructiveHover: true,
-            onClick: () => {
-              form.value?.revert();
-              resume();
-            },
-          }),
-          button(() => t('dashboard.save'), {
-            disabled: () => busy.value,
-            onClick: () => void save(),
-          }),
-        ),
-      () =>
-        h(
-          'div',
-          { class: 'record-actions' },
-          when(
-            () => dirty(),
-            () =>
-              button(() => t('dashboard.record.revert'), {
-                variant: 'ghost',
-                disabled: () => busy.value,
-                onClick: () => form.value?.revert(),
-              }),
-          ),
-          !create && collection.operations.delete?.allowed === true
-            ? button(() => (armed.value ? t('dashboard.confirmDelete') : t('dashboard.delete')), {
-                variant: 'ghost',
-                destructiveHover: true,
-                disabled: () => busy.value,
-                onClick: () => void remove(),
-              })
-            : null,
-          readOnly ? null : saveButton,
-        ),
+      'div',
+      { class: 'ohne-row' },
+      backButton,
+      h('span', { class: 'ohne-truncate' }, collection.label),
+      // P4's create header also shows the `New translation of #id` variant; translations have no
+      // ohne counterpart yet.
+      create
+        ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
+        : h('span', { class: 'ohne-shrink-0 ohne-muted' }, `(#${id.slice(0, 8)})`),
     ),
   );
 
-  return h(
-    'div',
-    { class: 'record-editor' },
-    bar,
-    h('div', { class: 'record-body' }, () => {
-      if (state.value === 'failed') {
-        return h(
-          'div',
-          { class: 'record-missing' },
-          () => t('dashboard.unreachable'),
-          button(() => t('dashboard.retry'), { variant: 'outline', onClick: () => void load() }),
-        );
-      }
-      if (state.value === 'loading') return skeleton();
-      if (state.value === 'missing') {
-        return h(
-          'div',
-          { class: 'record-missing' },
-          () => t('dashboard.notFound'),
-          button(() => collection.label, { variant: 'outline', onClick: () => navigate(listPath) }),
-        );
-      }
-      const live = form.value;
-      if (isUndefined(live)) return null;
+  const mainEl = h('div', { class: 'o-record-editor-main' }, () => {
+    if (state.value === 'failed') {
       return h(
-        'form',
-        {
-          class: 'record-column',
-          id: formID,
-          novalidate: true,
-          onSubmit: (event: SubmitEvent) => {
-            event.preventDefault();
-            void save();
-          },
-        },
-        () => (orphan.value === '' ? null : h('div', { class: 'record-orphan' }, orphan.value)),
-        h('fieldset', { class: 'record-fields', disabled: () => busy.value }, live.render()),
+        'div',
+        { class: 'o-record-editor-failed' },
+        () => t('dashboard.unreachable'),
+        button(() => t('dashboard.retry'), { variant: 'outline', onClick: () => void load() }),
       );
-    }),
+    }
+    if (state.value !== 'ready') return null;
+    return h('fieldset', { class: 'o-record-editor-fields', disabled: () => busy.value }, () =>
+      form.value?.render(),
+    );
+  });
+
+  const containerEl = container([headerEl, mainEl]);
+  containerEl.classList.add('ohne-flex-1');
+
+  const scrollY = ref(0);
+  containerEl.addEventListener(
+    'scroll',
+    () => {
+      scrollY.value = containerEl.scrollTop;
+    },
+    { passive: true },
   );
+  historyScrollState({
+    y: () => scrollY.value,
+    setY: (value) => {
+      containerEl.scrollTop = value;
+      scrollY.value = value;
+    },
+  });
+
+  // The source's Save carries no disabled state: re-entry is guarded in `save` itself, and a
+  // static class keeps the variant toggles below from being overwritten by a class re-apply.
+  const saveButton = button(
+    [
+      h('span', null, () => t(create ? 'dashboard.create' : 'dashboard.save')),
+      icon('device-floppy'),
+    ],
+    { variant: 'outline', onClick: () => void save() },
+  );
+  effect(() => {
+    const dirty = history.isDirty.value;
+    saveButton.classList.toggle('ohne-button-primary', dirty);
+    saveButton.classList.toggle('ohne-button-outline', !dirty);
+  });
+
+  const footerEl = showFooter
+    ? h(
+        'div',
+        { class: 'o-record-editor-footer' },
+        h(
+          'div',
+          { class: 'ohne-justify-between ohne-w-full' },
+          when(
+            () => (create || canUpdate) && !isUndefined(form.value),
+            () => historyButtons(history, restore),
+          ),
+          h(
+            'div',
+            { class: 'ohne-row ohne-ml-auto' },
+            // P4 splices plugin-filtered footer buttons in here; ohne has no plugin filters.
+            create || canUpdate ? saveButton : null,
+            create ? null : recordMenu(),
+          ),
+        ),
+      )
+    : null;
+
+  /**
+   * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
+   * New links to the create page, and Delete confirms through the dialog.
+   */
+  function recordMenu(): Child {
+    if (!canCreate && !canDelete) return null;
+    const open = ref(false);
+    const close = (): void => {
+      open.value = false;
+    };
+    const trigger = button(icon('dots-vertical'), {
+      variant: 'outline',
+      onClick: () => {
+        open.value = true;
+      },
+    });
+    effect(() => {
+      trigger.title = t('dashboard.record.moreActions');
+      trigger.classList.toggle('ohne-button-primary', open.value);
+      trigger.classList.toggle('ohne-button-outline', !open.value);
+    });
+    return h(
+      'div',
+      { class: 'ohne-flex' },
+      trigger,
+      when(
+        () => open.value,
+        () => {
+          const items: Child[] = [];
+          if (canCreate) {
+            const item = dropdownItem([icon('note'), h('span', null, () => t('dashboard.new'))], {
+              href: `${listPath}/new`,
+              onClick: close,
+            });
+            effect(() => {
+              item.title = t('dashboard.new');
+            });
+            items.push(item);
+          }
+          // P4 lists Translate, Copy, Paste, and Duplicate here; translations, the clipboard
+          // helpers, and the duplicate endpoint have no ohne counterpart yet.
+          if (canCreate && canDelete) items.push(h('hr'));
+          if (canDelete) {
+            const item = dropdownItem(
+              [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
+              {
+                destructive: true,
+                onClick: () => {
+                  close();
+                  void removeRecord();
+                },
+              },
+            );
+            effect(() => {
+              item.title = t('dashboard.delete');
+            });
+            items.push(item);
+          }
+          return dropdown(items, { reference: trigger, onClose: close }).root;
+        },
+      ),
+    );
+  }
+
+  return h('div', { class: 'o-record-editor' }, containerEl, footerEl);
 }
 
 /**
@@ -540,32 +531,32 @@ async function write(
 }
 
 /**
- * Deletes the record, retrying once on a busy `503`; a failure surfaces on the list reload.
+ * Deletes the record, retrying once on a busy `503`; answers whether the delete landed.
  */
-async function deleteRecord(segment: string, uuid: string): Promise<void> {
+async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
   const send = (): Promise<Response> => api(`DELETE /collections/${segment}/${uuid}`);
   try {
-    const response = await send();
+    let response = await send();
     if (response.status === 503) {
       await sleep(1000);
-      await send();
+      response = await send();
     }
+    return response.ok;
   } catch {
-    /* the list shows what survived */
+    return false;
   }
 }
 
 /**
- * The record's display title: its first plain text field's value, or the short `UUID`.
+ * The fields of `full` whose value differs from `original`, the edit save's `PATCH` body.
+ * The source's `prepareFieldData` diff against the pre-edit state, over the form's read.
  */
-function titleOf(collection: DashboardCollection, row: RecordRow): string {
-  const field = labelField(collection);
-  if (!isUndefined(field)) {
-    const value = row[field.name];
-    if (isString(value) && value !== '') return value;
+function changedSince(full: RecordRow, original: RecordRow): RecordRow {
+  const changed: RecordRow = {};
+  for (const [key, value] of Object.entries(full)) {
+    if (!deepEqual(value, original[key])) changed[key] = value;
   }
-  const id = row.UUID;
-  return isString(id) ? id.slice(0, 8) : '';
+  return changed;
 }
 
 /**
@@ -595,20 +586,6 @@ function labelField(collection: DashboardCollection): DashboardField | undefined
 }
 
 /**
- * The updated chip's text, formatted for the active language.
- */
-function updatedText(value: number | undefined): string {
-  if (!isNumber(value)) return '';
-  const language = useDashboardLanguage().value;
-  let format = dateFormats.get(language);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, { dateStyle: 'short', timeStyle: 'short' });
-    dateFormats.set(language, format);
-  }
-  return format.format(value);
-}
-
-/**
  * Scrolls a `#field-<name>` hash target into view and focuses its control once the form stands.
  */
 function settleHash(): void {
@@ -624,13 +601,13 @@ function settleHash(): void {
 }
 
 /**
- * The loading placeholder: dim field-row bars instead of a spinner.
+ * Reads the overlay transition duration off the body, in milliseconds; `300` when unreadable.
  */
-function skeleton(): Child {
-  const widths = ['32%', '58%', '44%', '66%', '38%', '52%'];
-  return h(
-    'div',
-    { class: 'record-skeleton' },
-    widths.map((width) => h('i', { style: `width:${width}` })),
-  );
+function overlayTransitionDuration(): number {
+  const raw = getComputedStyle(document.body)
+    .getPropertyValue('--ohne-overlay-transition-duration')
+    .trim();
+  if (raw.endsWith('ms')) return parseInt(raw, 10) || 300;
+  if (raw.endsWith('s')) return parseFloat(raw) * 1000 || 300;
+  return 300;
 }

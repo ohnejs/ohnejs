@@ -10,6 +10,8 @@
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
   "confirmDeleteCount": "Potvrdi ({count})",
+  "create": "Kreiraj",
+  "created": "Kreirano",
   "delete": "Obriši",
   "deleted": "{count, plural, one {# zapis obrisan} few {# zapisa obrisana} other {# zapisa obrisano}}",
   "deletedPartial": "{count} obrisano, {failed} neuspješno",
@@ -105,11 +107,12 @@
     "expand": "Proširi"
   },
   "new": "Novo",
-  "newRecord": "Novi zapis",
   "noMatches": "Nema rezultata",
   "notFound": "Nije pronađeno",
   "notLinked": "Nije povezano",
+  "ok": "OK",
   "open": "Otvori",
+  "pageNotFound": "Stranica nije pronađena",
   "pagination": {
     "goToPage": "Idi na stranicu",
     "next": "Sljedeća stranica",
@@ -117,14 +120,14 @@
     "showingRecords": "Prikazuje zapise {from} do {to}"
   },
   "record": {
-    "copied": "UUID kopiran",
-    "discard": "Odbaci",
+    "collectionOverview": "Pregled `{collection}`",
+    "confirmDelete": "Da li zaista želite obrisati ovaj unos?",
+    "deleted": "Obrisano",
     "gone": "Ovaj zapis više ne postoji",
-    "keepEditing": "Nastavi uređivanje",
-    "revert": "Vrati",
-    "unsaved": "Nesačuvane izmjene"
+    "moreActions": "Više radnji"
   },
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+  "redirected": "Preusmjereno",
   "removeItem": "Ukloni",
   "retry": "Pokušaj ponovo",
   "save": "Sačuvaj",
@@ -164,6 +167,9 @@
   "typeToNarrow": "Kucajte za sužavanje",
   "unlink": "Ukloni vezu",
   "unreachable": "Server nije dostupan",
+  "unsavedChanges": {
+    "body": "Izmjene koje ste napravili možda neće biti sačuvane."
+  },
   "view": "Pogledaj",
   "viewFieldValue": "Pogledaj vrijednost polja",
   "writeFailed": "Upis nije uspio"
