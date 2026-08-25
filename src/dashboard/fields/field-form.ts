@@ -169,9 +169,12 @@ export function createFieldForm(
   for (const field of fields) {
     if (field.name === 'UUID') continue;
     const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
-    // An immutable field stays settable while the item does not exist yet.
+    // An immutable field stays settable while the record or item does not exist yet.
+    // Create mode always qualifies, so an undo-restored create form does not lock the field.
     const settable =
-      options.readOnly !== true && field.writable && (!field.immutable || isUndefined(initial));
+      options.readOnly !== true &&
+      field.writable &&
+      (!field.immutable || options.mode === 'create' || isUndefined(initial));
     // Construction runs untracked: a control reading its own fresh refs while it builds must not
     // subscribe the ambient region, or the first keystroke would rebuild the whole surface.
     // It runs inside the form's own scope, so `dispose` releases everything the controls created.
