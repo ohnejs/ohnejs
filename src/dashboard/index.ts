@@ -16,6 +16,7 @@ export type {
   FieldEditorContext,
   FieldType,
 } from './fields/field-type.ts';
+export { labelFieldOf, targetOf } from './fields/_search.ts';
 export { labelOf, seedLabel, wantLabels } from './fields/labels.ts';
 export { parseIntegerValue, parseRealValue, parseTextValue } from './fields/parse.ts';
 export type { ScalarParse } from './fields/parse.ts';
@@ -132,7 +133,7 @@ export { icon } from './ui/icon.ts';
 export type { IconName } from './ui/icon.ts';
 export { numberInput } from './ui/number-input.ts';
 export type { NumberInputOptions } from './ui/number-input.ts';
-export { acquireOverlay, overlayCount } from './ui/overlay.ts';
+export { acquireOverlay, FOCUSABLE, overlayCount } from './ui/overlay.ts';
 export type { OverlayHandle } from './ui/overlay.ts';
 export { paginationPages } from './ui/pagination-pages.ts';
 export { pagination } from './ui/pagination.ts';
