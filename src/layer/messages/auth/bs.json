@@ -1,4 +1,5 @@
 {
+  "alreadyInstalled": "Već instalirano",
   "invalidEmail": "Unesite ispravnu email adresu",
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",

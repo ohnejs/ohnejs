@@ -4,8 +4,6 @@ import {
   dropdownItem,
   h,
   icon,
-  logout,
-  navigate,
   resolvedColorMode,
   setColorMode,
   useT,
@@ -17,7 +15,7 @@ import { effect, ref } from 'ohne/utils';
  * The header's kebab user menu, ported from Pruvious v4's `HeaderDropdownMenu`.
  * The trigger turns primary while the dropdown is open.
  * One group toggles the color mode against the resolved OS-aware mode.
- * A rule separates it from the destructive sign-out, which ends the session and lands on the login page.
+ * A rule separates it from the destructive sign-out, a link to the logout page as in the source.
  * P4's `My account` and `Clear page cache` items have no ohne counterpart and are omitted.
  */
 export function headerDropdownMenu(): HTMLElement {
@@ -71,11 +69,9 @@ export function headerDropdownMenu(): HTMLElement {
             },
             h('hr'),
             dropdownItem([icon('logout'), h('span', null, () => t('dashboard.signOut'))], {
+              href: '/logout',
               destructive: true,
-              onClick: () => {
-                close();
-                void logout().then(() => navigate('/login'));
-              },
+              onClick: close,
             }),
           ],
           { reference: trigger, onClose: close },

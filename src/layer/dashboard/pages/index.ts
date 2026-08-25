@@ -1,20 +1,17 @@
-import { css, defineDashboardPage, h, useT } from 'ohne/dashboard';
-
-import { shell } from '../components/shell.ts';
-
-css`
-  .home-empty {
-    height: 100%;
-    display: grid;
-    place-items: center;
-    color: hsl(var(--ohne-muted-foreground));
-  }
-`;
+import { defineDashboardPage, navigate, sessionUser } from 'ohne/dashboard';
+import { effect, isNull, isUndefined } from 'ohne/utils';
 
 /**
- * The home page: the shell with a calm empty state until a collection is chosen.
+ * The home page, ported from Pruvious v4's dashboard index redirect.
+ * It renders nothing.
+ * Once the session resolves, a signed-in visitor lands on `/overview` and a signed-out one on `/login`.
+ * Both replace the history entry.
  */
 export default defineDashboardPage(() => {
-  const t = useT();
-  return shell(() => h('div', { class: 'home-empty' }, () => t('dashboard.selectCollection')));
+  effect(() => {
+    const user = sessionUser();
+    if (isUndefined(user)) return;
+    navigate(isNull(user) ? '/login' : '/overview', { replace: true });
+  });
+  return null;
 });

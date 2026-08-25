@@ -90,6 +90,10 @@
     "redo": "Redo",
     "undo": "Undo"
   },
+  "install": {
+    "submit": "Create account",
+    "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
+  },
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
   "login": {
@@ -114,6 +118,12 @@
   "notFound": "Not found",
   "ok": "OK",
   "open": "Open",
+  "overview": {
+    "activity": "Activity",
+    "quickCreate": "Quick create",
+    "recentEdits": "Recent edits",
+    "shortcuts": "Shortcuts"
+  },
   "pageNotFound": "Page not found",
   "pagination": {
     "goToPage": "Go to page",
@@ -175,5 +185,8 @@
   },
   "view": "View",
   "viewFieldValue": "View field value",
+  "widget": {
+    "dashboard": "Dashboard"
+  },
   "writeFailed": "The write failed"
 }

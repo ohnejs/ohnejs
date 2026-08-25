@@ -1,4 +1,5 @@
 {
+  "alreadyInstalled": "Already installed",
   "invalidEmail": "Enter a valid email address",
   "invalidCredentials": "Incorrect email or password",
   "invalidRoles": "Roles must be a list of role names",

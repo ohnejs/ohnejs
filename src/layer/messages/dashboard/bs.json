@@ -90,6 +90,10 @@
     "redo": "Ponovi",
     "undo": "Poništi"
   },
+  "install": {
+    "submit": "Kreiraj račun",
+    "welcomeMessage": "Dobrodošli u ohne! Unesite svoje podatke da kreirate primarni administratorski račun."
+  },
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
   "login": {
@@ -114,6 +118,12 @@
   "notFound": "Nije pronađeno",
   "ok": "OK",
   "open": "Otvori",
+  "overview": {
+    "activity": "Aktivnost",
+    "quickCreate": "Brzo kreiranje",
+    "recentEdits": "Nedavne izmjene",
+    "shortcuts": "Prečice"
+  },
   "pageNotFound": "Stranica nije pronađena",
   "pagination": {
     "goToPage": "Idi na stranicu",
@@ -175,5 +185,8 @@
   },
   "view": "Pogledaj",
   "viewFieldValue": "Pogledaj vrijednost polja",
+  "widget": {
+    "dashboard": "Dashboard"
+  },
   "writeFailed": "Upis nije uspio"
 }

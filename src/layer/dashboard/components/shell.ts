@@ -3,6 +3,7 @@ import {
   type Child,
   container,
   css,
+  FOCUSABLE,
   h,
   isEditingText,
   navigate,
@@ -58,10 +59,14 @@ interface LayoutState {
 
 const layoutState = ref<LayoutState>({ sidebarExpanded: false, sidebarScrollY: 0 });
 
-const EDGE_ZONE_PX = 24;
+/**
+ * Forgets the persisted sidebar state, as the source's logout page resets its layout state.
+ */
+export function resetLayoutState(): void {
+  layoutState.value = { sidebarExpanded: false, sidebarScrollY: 0 };
+}
 
-const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+const EDGE_ZONE_PX = 24;
 
 css`
   .o-layout {
