@@ -3,6 +3,7 @@ import type { Stats } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 import { etag } from '../../utils/etag/etag.ts';
+import { readFileBytes } from '../../utils/fs/read-file-bytes.ts';
 import { readFile } from '../../utils/fs/read-file.ts';
 import { stat } from '../../utils/fs/stat.ts';
 import { silenceFirstStripWarning } from '../../utils/imports/silence-strip-warning.js';
@@ -43,14 +44,15 @@ export interface SendFileOptions {
 }
 
 /**
- * Serves a UTF-8 file from the first of `roots` that contains it, for the current request.
+ * Serves a file from the first of `roots` that contains it, for the current request.
  *
  * `path` is resolved against each root and confined to it, so `..` and absolute paths cannot escape.
  * The first existing file wins; a missing path or a directory is a miss, and no match throws `404`.
  *
  * A TypeScript file (`.ts`/`.mts`) is stripped to JavaScript on the fly and served as a module.
  * This is the stripping Node uses to run `.ts`, pointed at the browser.
- * Any other file is served with the content type for its extension.
+ * Any other file is served verbatim as bytes with the content type for its extension.
+ * Binary assets like fonts and images pass through intact.
  *
  * The response carries a weak `ETag` from the file's size and modification time, so a fresh request is `304`.
  * A fresh request short-circuits on the stat alone: the file is neither read nor stripped.
@@ -66,7 +68,7 @@ export async function sendFile(
   roots: string[],
   path: string,
   options: SendFileOptions = {},
-): Promise<string | undefined> {
+): Promise<string | Uint8Array | undefined> {
   for (const root of roots) {
     const resolved = safeResolve(root, path);
     if (isNull(resolved)) continue;
@@ -81,7 +83,7 @@ async function serve(
   file: string,
   stats: Stats,
   options: SendFileOptions,
-): Promise<string | undefined> {
+): Promise<string | Uint8Array | undefined> {
   const typescript = TYPESCRIPT.test(file);
 
   const response = useResponse();
@@ -97,6 +99,6 @@ async function serve(
     return undefined;
   }
 
-  const source = (await readFile(file)) ?? '';
-  return typescript ? stripTypeScriptTypes(source) : source;
+  if (typescript) return stripTypeScriptTypes((await readFile(file)) ?? '');
+  return (await readFileBytes(file)) ?? new Uint8Array();
 }
