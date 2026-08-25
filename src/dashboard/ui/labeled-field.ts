@@ -10,25 +10,28 @@ css`
   }
 
   .ohne-field + .ohne-field {
-    margin-top: 20px;
+    margin-top: var(--s4);
   }
 
-  .ohne-field .ohne-caps {
+  .ohne-labeled-field-label {
     display: block;
-    margin-bottom: 2px;
+    font-size: var(--fs-small);
+    font-weight: 500;
+    color: var(--dim);
+    margin-bottom: 5px;
   }
 
   .ohne-field-error {
     display: block;
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 5px;
+    font-size: var(--fs-small);
     color: var(--danger);
     min-height: 1em;
   }
 `;
 
 /**
- * A labeled form row: a small-caps label above its control, with an optional error line beneath.
+ * A labeled form row: the label above its control, with an optional error line beneath.
  * The row is a `label` element, so clicking the text focuses the control.
  *
  * @example
@@ -40,7 +43,7 @@ export function labeledField(label: () => Child, control: Child, error?: () => C
   return h(
     'label',
     { class: 'ohne-field' },
-    h('span', { class: 'ohne-caps' }, label),
+    h('span', { class: 'ohne-labeled-field-label' }, label),
     control,
     error ? h('span', { class: 'ohne-field-error' }, error) : null,
   );

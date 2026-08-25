@@ -1,76 +1,84 @@
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
+import { deepEqual } from '../../../utils/object/deep-equal.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
 import { each } from '../../render/each.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
-import { drawer } from '../../ui/drawer.ts';
-import { createTargetSearch, labelFieldOf, rowLabel, targetOf } from '../_search.ts';
-import { dimMark, type FieldCell, registerFieldCell } from '../field-cell.ts';
+import { labelFieldOf, targetOf } from '../_search.ts';
+import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { labelOf } from '../labels.ts';
+import { recordSelect } from '../record-select.ts';
 
 css`
   .ohne-links-row {
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 3px 0;
-    border-bottom: 1px solid var(--hairline);
+    gap: var(--s1);
+    height: 28px;
+    border-bottom: 1px solid var(--line);
   }
 
-  .ohne-links-row .cell-mono {
-    margin-right: auto;
+  .ohne-links-index {
+    width: 18px;
+    flex: none;
   }
 
-  .ohne-links-search {
-    margin: 16px 0 4px;
-  }
-
-  .ohne-links-result {
-    padding: 5px 10px;
+  .ohne-links-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    cursor: default;
   }
 
-  .ohne-links-result:hover {
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  .ohne-links-add {
+    margin-top: var(--s2);
   }
 `;
 
 /**
- * The `records` field's sheet cell: a dim count of the linked records.
- * Editing opens a drawer over the ordered links: search to add, remove, and reorder.
- * Saving writes the whole `UUID` list; the target must be readable to search it.
+ * The `records` field's dashboard behaviour.
+ *
+ * Cells summarize the ordered links as the first record's label plus a dim `+n` tail.
+ * There is no inline cell editor: the list edits on the record page.
+ * The form control lists every link with reorder and remove; a stay-open combobox appends link after link.
  */
-export const recordsCell: FieldCell = {
-  display({ value }) {
+export const recordsType: FieldType = {
+  display({ field, value }) {
     return () => {
       const current = value();
-      return dimMark(`[${isArray(current) ? current.length : 0}]`);
+      const links = isArray(current) ? current.filter(isString) : [];
+      if (links.length === 0) return dimMark('·');
+      const first = links[0] as string;
+      const resolved = labelOf(field.target ?? '', first);
+      return [
+        isUndefined(resolved)
+          ? h('span', { class: 'cell-mono cell-dim' }, first.slice(0, 8))
+          : resolved,
+        links.length > 1 ? dimMark(` +${links.length - 1}`) : null,
+      ];
     };
   },
-  editor(context) {
+  control(context) {
     const target = targetOf(context.field);
     if (isUndefined(target)) return undefined;
-    const label = labelFieldOf(target);
-    if (isUndefined(label)) return undefined;
+    if (isUndefined(labelFieldOf(target))) return undefined;
     const t = useT();
-    const links = ref<readonly string[]>(
-      isArray(context.value()) ? (context.value() as unknown[]).filter(isString) : [],
-    );
-    const search = createTargetSearch(target, label);
-    const busy = ref(false);
-    const failure = ref('');
-    search.prime();
 
-    const append = (uuid: string): void => {
-      if (!links.value.includes(uuid)) links.value = [...links.value, uuid];
-    };
+    let base = listOf(context.initial);
+    const links = ref<readonly string[]>(base);
+    const touched = ref(false);
+    const routed = ref('');
 
-    const remove = (uuid: string): void => {
-      links.value = links.value.filter((link) => link !== uuid);
+    const change = (next: readonly string[]): void => {
+      links.value = next;
+      touched.value = true;
+      routed.value = '';
+      context.onInput();
     };
 
     const move = (uuid: string, delta: -1 | 1): void => {
@@ -80,31 +88,12 @@ export const recordsCell: FieldCell = {
       if (from < 0 || to < 0 || to >= list.length) return;
       const [link] = list.splice(from, 1);
       list.splice(to, 0, link as string);
-      links.value = list;
+      change(list);
     };
 
-    const save = (): void => {
-      if (busy.value) return;
-      busy.value = true;
-      failure.value = '';
-      void context.commit(links.value).then((landing) => {
-        busy.value = false;
-        if (landing.landed) return;
-        const message = Object.values(landing.errors ?? {})[0];
-        failure.value = message ?? t('dashboard.writeFailed');
-      });
-    };
-
-    const input = h('input', {
-      class: 'ohne-input ohne-links-search',
-      type: 'text',
-      placeholder: label.label,
-    }) as HTMLInputElement;
-    input.addEventListener('input', () => search.search(input.value));
-    queueMicrotask(() => input.focus());
-
-    return drawer(
-      { title: () => context.field.label, onClose: context.cancel },
+    const element = h(
+      'div',
+      { class: 'ohne-links', tabindex: '-1' },
       each(
         () => links.value,
         (link) => link,
@@ -112,51 +101,83 @@ export const recordsCell: FieldCell = {
           h(
             'div',
             { class: 'ohne-links-row' },
-            h('span', { class: 'cell-mono' }, () => link()),
+            h('span', { class: 'ohne-caps ohne-links-index' }, () => String(index() + 1)),
+            h('span', { class: 'ohne-links-label' }, () => {
+              const resolved = labelOf(target.name, link());
+              return isUndefined(resolved)
+                ? h('span', { class: 'cell-mono cell-dim' }, link().slice(0, 8))
+                : resolved;
+            }),
             button('↑', {
-              kind: 'ghost',
+              variant: 'ghost',
               disabled: () => index() === 0,
               onClick: () => move(link(), -1),
             }),
             button('↓', {
-              kind: 'ghost',
+              variant: 'ghost',
               disabled: () => index() === links.value.length - 1,
               onClick: () => move(link(), 1),
             }),
-            button('✕', { kind: 'ghost', onClick: () => remove(link()) }),
+            button('✕', {
+              variant: 'ghost',
+              ariaLabel: t('dashboard.unlink'),
+              onClick: () => change(links.value.filter((entry) => entry !== link())),
+            }),
           ),
       ),
-      input,
       h(
         'div',
-        null,
-        each(
-          () =>
-            search.rows().filter((row) => isString(row.UUID) && !links.value.includes(row.UUID)),
-          (row, index) => String(row.UUID ?? index),
-          (row) =>
-            h(
-              'div',
-              {
-                class: 'ohne-links-result',
-                onMousedown: (event: MouseEvent) => {
-                  event.preventDefault();
-                  const uuid = row().UUID;
-                  if (isString(uuid)) append(uuid);
-                },
-              },
-              () => rowLabel(row(), label.name),
-            ),
-        ),
-      ),
-      h('div', { class: 'ohne-item-failure' }, () => failure.value),
-      h(
-        'div',
-        { class: 'ohne-item-actions' },
-        button(() => t('dashboard.save'), { disabled: () => busy.value, onClick: save }),
+        { class: 'ohne-links-add' },
+        recordSelect({
+          field: context.field,
+          mode: 'form',
+          stayOpen: true,
+          value: () => null,
+          exclude: () => links.value,
+          placeholder: () => t('dashboard.linkRecord'),
+          onPick: (uuid) => {
+            if (isString(uuid) && !links.value.includes(uuid)) change([...links.value, uuid]);
+          },
+        }),
       ),
     );
+
+    return {
+      element,
+      read() {
+        if (!touched.value && isUndefined(context.initial)) return {};
+        return { value: links.value };
+      },
+      setErrors(errors) {
+        routed.value = errors[''] ?? '';
+        for (const [key, message] of Object.entries(errors)) {
+          if (key !== '') return message;
+        }
+        return '';
+      },
+      error: () => routed.value,
+      dirty: () => touched.value && !deepEqual(links.value, base),
+      focus: () => element.focus(),
+      revert() {
+        links.value = base;
+        touched.value = false;
+        routed.value = '';
+      },
+      rebase(value) {
+        base = listOf(value);
+        links.value = base;
+        touched.value = false;
+        routed.value = '';
+      },
+    };
   },
 };
 
-registerFieldCell('records', recordsCell);
+/**
+ * The stored value as a `UUID` list, malformed entries dropped.
+ */
+function listOf(value: unknown): readonly string[] {
+  return isArray(value) ? value.filter(isString) : [];
+}
+
+registerFieldType('records', recordsType);

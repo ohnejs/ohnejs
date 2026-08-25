@@ -10,7 +10,7 @@ const adopted = new Set<string>();
  * ```ts
  * css`
  *   .sheet-cell {
- *     border-bottom: 1px solid var(--hairline);
+ *     border-bottom: 1px solid var(--line);
  *     font-variant-numeric: tabular-nums;
  *   }
  * `

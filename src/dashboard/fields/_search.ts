@@ -25,6 +25,11 @@ export interface TargetSearch {
   rows(): readonly SearchRow[];
 
   /**
+   * Whether any query has answered yet, separating "still loading" from "no matches".
+   */
+  settled(): boolean;
+
+  /**
    * Schedules a debounced search for `text`; an empty text lists the first rows.
    */
   search(text: string): void;
@@ -62,18 +67,28 @@ export function createTargetSearch(
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        settle();
+        return;
+      }
       const rows = (await response.json()) as SearchRow[];
       if (generation === mine) results.value = rows;
     } catch {
-      /* the previous results stand */
+      settle();
     }
   };
+  // A failed first answer settles on an empty list, so a caller's loading state never sticks;
+  // once anything answered, the previous results stand.
+  const settle = (): void => {
+    if (isUndefined(results.value)) results.value = [];
+  };
+
   const scheduled = debounce((text: string) => void load(text), 200);
   onCleanup(() => scheduled.cancel());
 
   return {
     rows: () => results.value ?? [],
+    settled: () => !isUndefined(results.value),
     search: scheduled,
     prime: () => void load(''),
   };

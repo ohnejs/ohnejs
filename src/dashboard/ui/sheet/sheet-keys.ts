@@ -15,12 +15,22 @@ export interface SheetActions {
   move(dx: number, dy: number, extend: boolean): void;
 
   /**
-   * Selects the whole grid.
+   * Checks every row on the page.
    */
-  selectAll(): void;
+  checkAll(): void;
 
   /**
-   * Deselects everything.
+   * Flips the check on the cursor's row.
+   */
+  check(): void;
+
+  /**
+   * Opens the cursor's row, the way a gutter anchor would.
+   */
+  open(): void;
+
+  /**
+   * Steps the clear ladder: a stretched range collapses, then checks clear, then the cursor.
    */
   clear(): void;
 
@@ -37,8 +47,9 @@ export interface SheetActions {
 
 /**
  * The sheet's key bindings, compiled to a matcher.
- * Arrows move, with Shift they stretch; Home and End jump the row; `mod+a` selects all.
- * PageUp and PageDown step pages, Enter edits, Escape deselects.
+ * Arrows move, with Shift they stretch; Home and End jump the row.
+ * Space flips the cursor row's check and `mod+a` checks the whole page.
+ * PageUp and PageDown step pages, Enter edits, `mod+Enter` opens, Escape steps the clear ladder.
  *
  * @example
  * ```ts
@@ -59,7 +70,9 @@ export function sheetKeymap(actions: SheetActions, options: KeymapOptions = {}):
       'shift+arrowright': () => actions.move(1, 0, true),
       home: () => actions.move(-Infinity, 0, false),
       end: () => actions.move(Infinity, 0, false),
-      'mod+a': () => actions.selectAll(),
+      'mod+a': () => actions.checkAll(),
+      space: () => actions.check(),
+      'mod+enter': () => actions.open(),
       pageup: () => actions.page(-1),
       pagedown: () => actions.page(1),
       enter: () => actions.edit(),

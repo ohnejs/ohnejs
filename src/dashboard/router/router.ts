@@ -35,6 +35,8 @@ interface Active extends MatchedRoute {
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 let token = 0;
+let guard: ((target: string) => boolean) | null = null;
+let rendered = '';
 
 /**
  * Starts the client router: it renders the matched page for the current URL into `container`.
@@ -47,7 +49,14 @@ export async function startRouter(
   container: Element,
 ): Promise<void> {
   pages = compilePages(manifest);
-  window.addEventListener('popstate', () => void render());
+  window.addEventListener('popstate', () => {
+    const target = location.pathname + location.search + location.hash;
+    if (!isNull(guard) && !guard(target)) {
+      history.pushState(null, '', rendered);
+      return;
+    }
+    void render();
+  });
   document.addEventListener('click', interceptLink);
   await render();
   mount(() => view(), container);
@@ -55,11 +64,25 @@ export async function startRouter(
 
 /**
  * Navigates to `path` through the History API and re-renders; a no-op when already there.
+ * A navigation guard set through `setNavigationGuard` may abort it.
+ * `replace` swaps the current history entry instead of pushing one.
  */
-export function navigate(path: string): void {
+export function navigate(path: string, options?: { replace?: boolean }): void {
   if (path === location.pathname + location.search + location.hash) return;
-  history.pushState(null, '', path);
+  if (!isNull(guard) && !guard(path)) return;
+  if (options?.replace === true) history.replaceState(null, '', path);
+  else history.pushState(null, '', path);
   void render();
+}
+
+/**
+ * Installs the guard every navigation consults before touching history, or uninstalls it with `null`.
+ * A guard returning `false` aborts the navigation and owns resuming it later.
+ * The record page's unsaved-changes strip resumes the blocked target on Discard or Save.
+ * The back and forward buttons are guarded too: a blocked popstate re-pushes the rendered path.
+ */
+export function setNavigationGuard(next: ((target: string) => boolean) | null): void {
+  guard = next;
 }
 
 /**
@@ -90,6 +113,7 @@ function notFound(): Child {
 
 async function render(): Promise<void> {
   const mine = ++token;
+  rendered = location.pathname + location.search + location.hash;
   const match = matchPages(pages, location.pathname);
   if (isNull(match)) {
     active.value = null;

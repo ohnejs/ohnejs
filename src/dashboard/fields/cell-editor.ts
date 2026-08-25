@@ -1,4 +1,4 @@
-import type { CommitLanding } from './field-cell.ts';
+import type { CommitLanding } from './field-type.ts';
 
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -49,10 +49,12 @@ css`
     min-width: 140px;
     border: none;
     outline: none;
-    background: var(--paper);
+    background: var(--bg);
     color: inherit;
     font: inherit;
-    padding: 5px 10px;
+    padding: 0 var(--s3);
+    height: var(--row);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
 
   .cell-editor.invalid {

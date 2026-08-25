@@ -1,407 +1,526 @@
 import type { Child } from '../../render/insert.ts';
-import type { DashboardBlock, DashboardField } from '../../runtime/meta-types.ts';
-import type { ItemForm } from '../item-form.ts';
+import type { DashboardBlock } from '../../runtime/meta-types.ts';
+import type { FieldForm } from '../field-form.ts';
 
-import { first } from '../../../utils/array/first.ts';
-import { last } from '../../../utils/array/last.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
-import { isEmpty } from '../../../utils/is/is-empty.ts';
+import { isNull } from '../../../utils/is/is-null.ts';
 import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
+import { effectScope } from '../../../utils/reactive/effect-scope.ts';
 import { type Ref, ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
 import { each } from '../../render/each.ts';
 import { h } from '../../render/h.ts';
+import { when } from '../../render/when.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
-import { drawer } from '../../ui/drawer.ts';
-import { select, type SelectOption } from '../../ui/select.ts';
+import { icon } from '../../ui/icon.ts';
+import { popover } from '../../ui/popover.ts';
 import { blocksOf } from '../_blocks.ts';
-import { blockNamed, carriedField, itemFormSupports } from '../_items.ts';
-import { dimMark, type FieldCell, registerFieldCell } from '../field-cell.ts';
-import { createItemForm, scopedErrors } from '../item-form.ts';
+import { blockNamed, itemFormSupports } from '../_items.ts';
+import { createFieldForm } from '../field-form.ts';
+import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
- * One editable block instance: its type, the instance it keeps, and the lists below it.
+ * One editable block instance.
  *
  * `key` is local and monotonic, never the instance `UUID`.
  * A fresh item has no `UUID` yet, and a reordered row must keep its DOM.
  * `uuid` absent is what inserts the item on save.
+ * `open` gates only rendering; the form outlives every collapse, so edits survive.
  */
 interface BlockNode {
   key: number;
   block: string;
   uuid: string | undefined;
-  form: ItemForm;
-  lists: readonly BlockList[];
-  error: Ref<string>;
-}
-
-/**
- * One `blocks` list under a node: the subfield it fills and the nodes it holds, in order.
- */
-interface BlockList {
-  field: DashboardField;
-  nodes: Ref<readonly BlockNode[]>;
+  seed: Ref<Readonly<Record<string, unknown>>>;
+  form: FieldForm;
+  open: Ref<boolean>;
+  own: Ref<string>;
 }
 
 css`
+  .ohne-blocks-node + .ohne-blocks-node {
+    margin-top: var(--s1);
+  }
+
   .ohne-blocks-row {
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 6px 0;
-    border-top: 1px solid var(--hairline);
+    gap: var(--s2);
+    height: 28px;
+    padding: 0 var(--s1);
+    border-radius: var(--radius);
+    cursor: default;
   }
 
-  .ohne-blocks-name {
-    margin-right: auto;
+  .ohne-blocks-row:hover {
+    background: var(--surface);
   }
 
-  .ohne-blocks-flag {
-    margin-left: 6px;
-    color: var(--danger);
+  .ohne-blocks-row .ohne-icon {
+    color: var(--dim);
+    transition: transform var(--pace);
   }
 
-  .ohne-blocks-empty {
-    padding: 6px 0;
-    border-top: 1px solid var(--hairline);
+  .ohne-blocks-row.closed .ohne-icon.ohne-blocks-chevron {
+    transform: rotate(-90deg);
   }
 
-  .ohne-blocks-add {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 12px;
-  }
-
-  .ohne-blocks-trail,
-  .ohne-blocks-sub-label {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .ohne-blocks-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--dim);
   }
 
-  .ohne-blocks-trail {
-    margin-bottom: 20px;
+  .ohne-blocks-mark {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--danger);
   }
 
-  .ohne-blocks-sub {
-    margin-top: 24px;
+  .ohne-blocks-body {
+    margin: var(--s2) 0 var(--s3) var(--s3);
+    padding: var(--s3) var(--s4) var(--s4);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--line-strong);
+    border-radius: var(--radius);
+  }
+
+  .ohne-blocks-own {
+    margin-bottom: var(--s2);
+    font-size: var(--fs-small);
+    color: var(--danger);
+  }
+
+  .ohne-blocks-add {
+    margin-top: var(--s2);
+  }
+
+  .ohne-blocks-menu-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    height: 28px;
+    padding: 0 10px;
+    white-space: nowrap;
+    cursor: default;
+  }
+
+  .ohne-blocks-menu-row:hover {
+    background: var(--accent-wash);
+  }
+
+  .ohne-blocks-menu-name {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--fs-micro);
+    color: var(--faint);
   }
 `;
 
 /**
- * The `blocks` field's sheet cell: a dim count of the items.
+ * The `blocks` field's dashboard behaviour.
  *
- * Editing opens one drawer that walks the list.
- * A row opens its item, and an item's own `blocks` subfields list their rows in turn.
- * Depth is navigated rather than stacked: the wire nests without limit, a fixed drawer cannot.
- * Saving writes the whole list once: an item keeps its `UUID`, and anything left out is deleted.
+ * Cells summarize the list as the first block's type label plus a dim `+n` tail.
+ * There is no inline cell editor: the list edits on the record page as collapsible rows, one per block.
+ * Each row expands into its item form in place.
+ * Nested `blocks` subfields recurse through this same control, so depth costs one indent per level.
+ * The record's one save writes the whole list: an item keeps its `UUID`, and anything left out is deleted.
+ *
+ * A stored type the registry cannot round-trip refuses the control.
+ * The field then falls back to a locked read-only row and the stored value carries through untouched.
  */
-export const blocksCell: FieldCell = {
+export const blocksType: FieldType = {
   display({ value }) {
     return () => {
       const current = value();
-      return dimMark(`[${isArray(current) ? current.length : 0}]`);
+      const items = isArray(current) ? current : [];
+      if (items.length === 0) return dimMark('·');
+      const first = items[0];
+      const name =
+        isPlainObject<Record<string, unknown>>(first) && isString(first.block) ? first.block : '';
+      return [
+        labelOf(name, blocksOf()),
+        items.length > 1 ? dimMark(` +${items.length - 1}`) : null,
+      ];
     };
   },
-  editor(context) {
-    const t = useT();
+  control(context) {
     const blocks = blocksOf();
-    let nextKey = 0;
-    const keyed = (): number => (nextKey += 1);
-
-    const root = ref<readonly BlockNode[]>(nodesOf(context.value(), blocks, keyed));
-    const trail = ref<readonly BlockNode[]>([]);
-    const busy = ref(false);
-    const failure = ref('');
-
-    // A whole-list write must resubmit every item, so one type it cannot rebuild locks the field.
-    // The stored list decides this once: the picker only ever offers types that do round-trip.
-    const locked = !stored(root.value).every((name) => editable(name, blocks));
+    const stored = storedTypes(context.initial);
+    if (!stored.every((name) => editable(name, blocks))) return undefined;
     const offered = (context.field.allow ?? []).filter((name) => editable(name, blocks));
+    if (offered.length === 0 && stored.length === 0) return undefined;
+    const t = useT();
 
-    const save = (event: SubmitEvent): void => {
-      event.preventDefault();
-      if (busy.value || locked) return;
-      const sent = root.value;
-      const items = serialize(sent);
-      if (isUndefined(items)) {
-        failure.value = '';
-        return;
-      }
-      busy.value = true;
-      failure.value = '';
-      void context.commit(items).then((landing) => {
-        busy.value = false;
-        if (landing.landed) return;
-        if (isUndefined(landing.errors)) {
-          failure.value = t('dashboard.writeFailed');
-          return;
-        }
-        const placed = route(sent, context.field.name, landing.errors);
-        failure.value = placed ? '' : (first(Object.values(landing.errors)) ?? '');
-      });
+    let base = context.initial;
+    let nextKey = 0;
+    // Later nodes are built from event handlers where no scope is active; the owner catches them,
+    // so the record surface's teardown releases their effects too.
+    const owner = effectScope();
+
+    const nodeOf = (item: Readonly<Record<string, unknown>>, open: boolean): BlockNode => {
+      const key = (nextKey += 1);
+      const name = isString(item.block) ? item.block : '';
+      // A fresh item has no `fields` yet; seeding its form `undefined` keeps immutable subfields
+      // settable, exactly as a new record does.
+      const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : undefined;
+      return {
+        key,
+        block: name,
+        uuid: isString(item.UUID) ? item.UUID : undefined,
+        seed: ref<Readonly<Record<string, unknown>>>(fields ?? {}),
+        form: owner.run(() =>
+          createFieldForm(blockNamed(blocks, name)?.fields ?? [], fields, {
+            mode: context.mode,
+            path: `${context.path}[${key}].fields`,
+            language: context.language,
+            onInput: context.onInput,
+          }),
+        ),
+        open: ref(open),
+        own: ref(''),
+      };
     };
 
-    const rows = (nodes: Ref<readonly BlockNode[]>): Child => [
+    const baseNodes = (): readonly BlockNode[] =>
+      (isArray(base) ? base : [])
+        .filter((item) => isPlainObject<Record<string, unknown>>(item))
+        .map((item) => nodeOf(item, false));
+
+    const nodes = ref<readonly BlockNode[]>(baseNodes());
+    const touched = ref(false);
+    const routed = ref('');
+
+    const baseItems = (): Readonly<Record<string, unknown>>[] =>
+      (isArray(base) ? base : []).filter((item) => isPlainObject<Record<string, unknown>>(item));
+
+    const rebuild = (): void => {
+      for (const node of nodes.value) node.form.dispose();
+      nodes.value = baseNodes();
+    };
+
+    const change = (next: readonly BlockNode[]): void => {
+      nodes.value = next;
+      touched.value = true;
+      routed.value = '';
+      context.onInput();
+    };
+
+    const move = (key: number, delta: -1 | 1): void => {
+      const list = [...nodes.value];
+      const from = list.findIndex((node) => node.key === key);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= list.length) return;
+      const [node] = list.splice(from, 1);
+      list.splice(to, 0, node as BlockNode);
+      change(list);
+    };
+
+    const add = (name: string): void => {
+      const node = nodeOf({ block: name }, true);
+      change([...nodes.value, node]);
+      queueMicrotask(() => node.form.focus());
+    };
+
+    const flagged = (node: BlockNode): boolean => node.own.value !== '' || node.form.errored();
+
+    const element = h(
+      'div',
+      { tabindex: '-1' },
       each(
         () => nodes.value,
         (node) => node.key,
-        (node, index) =>
-          h(
-            'div',
-            { class: 'ohne-blocks-row' },
-            h('span', { class: 'ohne-caps' }, () => String(index() + 1)),
-            h(
-              'span',
-              { class: 'ohne-blocks-name' },
-              button(() => labelOf(node().block, blocks), {
-                kind: 'ghost',
-                disabled: () => busy.value,
-                onClick: () => {
-                  trail.value = [...trail.value, node()];
-                },
-              }),
-              () => (flagged(node()) ? h('span', { class: 'ohne-blocks-flag' }, '!') : null),
-            ),
-            button('↑', {
-              kind: 'ghost',
-              disabled: () => busy.value || index() === 0,
-              onClick: () => move(nodes, node().key, -1),
-            }),
-            button('↓', {
-              kind: 'ghost',
-              disabled: () => busy.value || index() === nodes.value.length - 1,
-              onClick: () => move(nodes, node().key, 1),
-            }),
-            button('✕', {
-              kind: 'ghost',
-              disabled: () => busy.value,
-              onClick: () => {
-                nodes.value = nodes.value.filter((entry) => entry.key !== node().key);
-              },
-            }),
-          ),
+        (node, index) => blockRow(node, index, nodes, move, change, flagged, t, blocks),
       ),
-      () =>
-        nodes.value.length === 0 ? h('div', { class: 'ohne-blocks-empty' }, dimMark('·')) : null,
-    ];
-
-    const adder = (nodes: Ref<readonly BlockNode[]>, types: readonly string[]): Child => {
-      if (types.length === 0) return null;
-      const choice = ref(first(types) ?? '');
-      return h(
-        'div',
-        { class: 'ohne-blocks-add' },
-        select(
-          choice,
-          () => types.map((name): SelectOption => ({ value: name, label: labelOf(name, blocks) })),
-          () => busy.value,
-        ),
-        button(() => t('dashboard.addBlock'), {
-          kind: 'ghost',
-          disabled: () => busy.value,
-          onClick: () => {
-            nodes.value = [...nodes.value, nodeOf({ block: choice.value }, blocks, keyed)];
-          },
-        }),
-      );
-    };
-
-    const list = (nodes: Ref<readonly BlockNode[]>, types: readonly string[]): Child => [
-      rows(nodes),
-      adder(nodes, types),
-    ];
-
-    const item = (node: BlockNode): Child => [
-      node.form.render(),
-      () =>
-        node.error.value === '' ? null : h('div', { class: 'ohne-item-failure' }, node.error.value),
-      node.lists.map((sub) =>
-        h(
-          'div',
-          { class: 'ohne-blocks-sub' },
-          h('div', { class: 'ohne-blocks-sub-label' }, sub.field.label),
-          list(
-            sub.nodes,
-            (sub.field.allow ?? []).filter((name) => editable(name, blocks)),
-          ),
-        ),
-      ),
-    ];
-
-    const up = (): void => {
-      if (trail.value.length === 0) context.cancel();
-      else trail.value = trail.value.slice(0, -1);
-    };
-
-    return drawer(
-      { title: () => context.field.label, onClose: up },
-      h(
-        'form',
-        { onSubmit: save },
-        () =>
-          trail.value.length === 0
-            ? null
-            : h(
-                'div',
-                { class: 'ohne-blocks-trail' },
-                button(context.field.label, {
-                  kind: 'ghost',
-                  onClick: () => {
-                    trail.value = [];
-                  },
-                }),
-                trail.value.map((node, depth) => [
-                  ' / ',
-                  button(labelOf(node.block, blocks), {
-                    kind: 'ghost',
-                    onClick: () => {
-                      trail.value = trail.value.slice(0, depth + 1);
-                    },
-                  }),
-                ]),
-              ),
-        locked
-          ? h('div', { class: 'ohne-item-failure' }, t('dashboard.blocksLocked'))
-          : () => {
-              const open = last(trail.value);
-              return isUndefined(open) ? list(root, offered) : item(open);
-            },
-        h('div', { class: 'ohne-item-failure' }, () => failure.value),
-        h(
-          'div',
-          { class: 'ohne-item-actions' },
-          button(() => t('dashboard.save'), {
-            type: 'submit',
-            disabled: () => busy.value || locked,
-          }),
-        ),
-      ),
+      offered.length > 0 ? adder(offered, blocks, add, t) : null,
     );
+
+    return {
+      element,
+      read() {
+        const live = nodes.value;
+        if (!touched.value && isUndefined(base) && !live.some((node) => node.form.dirty())) {
+          return {};
+        }
+        const errors = blank();
+        const items: Record<string, unknown>[] = [];
+        live.forEach((node, index) => {
+          const reading = node.form.read();
+          if (!isUndefined(reading.errors)) {
+            for (const [key, message] of Object.entries(reading.errors)) {
+              errors[`[${index}].fields${key.startsWith('[') ? key : `.${key}`}`] = message;
+            }
+            return;
+          }
+          const item: Record<string, unknown> = { block: node.block };
+          if (!isUndefined(node.uuid)) item.UUID = node.uuid;
+          item.fields = reading.value ?? {};
+          items.push(item);
+        });
+        if (Object.keys(errors).length > 0) return { errors };
+        return { value: items };
+      },
+      setErrors(errors) {
+        routed.value = errors[''] ?? '';
+        let unplaced = '';
+        const live = nodes.value;
+        const grouped = new Map<number, Record<string, string>>();
+        for (const node of live) node.own.value = '';
+        for (const [key, message] of Object.entries(errors)) {
+          if (key === '') continue;
+          const match = /^\[(\d+)\]/.exec(key);
+          const node = isNull(match) ? undefined : live[Number(match[1])];
+          if (isUndefined(node) || isNull(match)) {
+            if (unplaced === '') unplaced = message;
+            continue;
+          }
+          const rest = key.slice(match[0].length);
+          if (rest === '' || rest === '.block' || rest === '.UUID' || rest === '.fields') {
+            node.own.value = message;
+            continue;
+          }
+          if (rest.startsWith('.fields.')) {
+            const index = Number(match[1]);
+            const scoped = grouped.get(index) ?? blank();
+            scoped[rest.slice('.fields.'.length)] = message;
+            grouped.set(index, scoped);
+            continue;
+          }
+          if (unplaced === '') unplaced = message;
+        }
+        live.forEach((node, index) => {
+          const leftover = node.form.setErrors(grouped.get(index) ?? blank());
+          if (leftover !== '' && unplaced === '') unplaced = leftover;
+          if (flagged(node)) node.open.value = true;
+        });
+        return unplaced;
+      },
+      error: () => routed.value,
+      errored: () => nodes.value.some(flagged),
+      dirty: () => touched.value || nodes.value.some((node) => node.form.dirty()),
+      focus() {
+        const errored = nodes.value.find(flagged);
+        if (!isUndefined(errored)) {
+          errored.open.value = true;
+          // The expanded body mounts on the reactive flush's microtask; focusing before it would
+          // land on a detached input.
+          queueMicrotask(() => {
+            if (!errored.form.focusError()) errored.form.focus();
+          });
+          return;
+        }
+        nodes.value[0]?.form.focus();
+      },
+      revert() {
+        rebuild();
+        touched.value = false;
+        routed.value = '';
+      },
+      rebase(value) {
+        base = value;
+        const items = baseItems();
+        const live = nodes.value;
+        // A matching answer rebases each node in place, keeping forms, focus, and open rows;
+        // fresh items pick up the `UUID` the server minted.
+        const matches =
+          items.length === live.length &&
+          items.every(
+            (item, index) =>
+              (isString(item.block) ? item.block : '') === (live[index] as BlockNode).block,
+          );
+        if (matches) {
+          items.forEach((item, index) => {
+            const node = live[index] as BlockNode;
+            const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : {};
+            node.uuid = isString(item.UUID) ? item.UUID : undefined;
+            node.seed.value = fields;
+            node.form.rebase(fields);
+            node.own.value = '';
+          });
+        } else {
+          rebuild();
+        }
+        touched.value = false;
+        routed.value = '';
+      },
+    };
   },
 };
 
-registerFieldCell('blocks', blocksCell);
-
 /**
- * The nodes one stored list edits into, malformed items skipped.
+ * One block's row and, while open, its item form in an indented card.
  */
-function nodesOf(
-  value: unknown,
+function blockRow(
+  node: () => BlockNode,
+  index: () => number,
+  nodes: Ref<readonly BlockNode[]>,
+  move: (key: number, delta: -1 | 1) => void,
+  change: (next: readonly BlockNode[]) => void,
+  flagged: (node: BlockNode) => boolean,
+  t: (key: 'dashboard.removeItem') => string,
   blocks: readonly DashboardBlock[],
-  keyed: () => number,
-): readonly BlockNode[] {
-  if (!isArray(value)) return [];
-  return value
-    .filter((entry) => isPlainObject<Record<string, unknown>>(entry))
-    .map((entry) => nodeOf(entry, blocks, keyed));
-}
-
-/**
- * One node over a stored item: a form on the block's own fields, a list per `blocks` subfield.
- *
- * The form is seeded from `fields` alone and never attaches a `UUID`.
- * A block item carries its instance on the envelope beside `block`, never inside `fields`.
- */
-function nodeOf(
-  item: Readonly<Record<string, unknown>>,
-  blocks: readonly DashboardBlock[],
-  keyed: () => number,
-): BlockNode {
-  const name = isString(item.block) ? item.block : '';
-  const own = blockNamed(blocks, name)?.fields ?? [];
-  const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : {};
-  return {
-    key: keyed(),
-    block: name,
-    uuid: isString(item.UUID) ? item.UUID : undefined,
-    form: createItemForm(own, fields, { attachUUID: false }),
-    lists: own
-      .filter((field) => field.kind === 'blocks' && carriedField(field))
-      .map((field) => ({ field, nodes: ref(nodesOf(fields[field.name], blocks, keyed)) })),
-    error: ref(''),
+): Child {
+  const toggle = (): void => {
+    node().open.value = !node().open.value;
   };
+  const chevron = icon('chevron-down');
+  chevron.classList.add('ohne-blocks-chevron');
+  return h(
+    'div',
+    { class: 'ohne-blocks-node' },
+    h(
+      'div',
+      {
+        class: () => `ohne-blocks-row${node().open.value ? '' : ' closed'}`,
+        role: 'button',
+        tabindex: '0',
+        'aria-expanded': () => (node().open.value ? 'true' : 'false'),
+        onClick: (event: MouseEvent) => {
+          const target = event.target;
+          if (target instanceof Element && !isNull(target.closest('button'))) return;
+          toggle();
+        },
+        onKeydown: (event: KeyboardEvent) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          toggle();
+        },
+      },
+      chevron,
+      h('span', { class: 'ohne-caps' }, () => String(index() + 1)),
+      h('span', { class: 'ohne-caps' }, () => labelOf(node().block, blocks)),
+      h('span', { class: 'ohne-blocks-summary' }, () => summaryOf(node(), blocks)),
+      () => (flagged(node()) ? h('span', { class: 'ohne-blocks-mark' }) : null),
+      button('↑', {
+        variant: 'ghost',
+        disabled: () => index() === 0,
+        onClick: () => move(node().key, -1),
+      }),
+      button('↓', {
+        variant: 'ghost',
+        disabled: () => index() === nodes.value.length - 1,
+        onClick: () => move(node().key, 1),
+      }),
+      button('✕', {
+        variant: 'ghost',
+        ariaLabel: t('dashboard.removeItem'),
+        onClick: () => {
+          node().form.dispose();
+          change(nodes.value.filter((live) => live.key !== node().key));
+        },
+      }),
+    ),
+    when(
+      () => node().open.value,
+      () =>
+        h(
+          'div',
+          { class: 'ohne-blocks-body' },
+          () =>
+            node().own.value === ''
+              ? null
+              : h('div', { class: 'ohne-blocks-own' }, node().own.value),
+          node().form.render(),
+        ),
+    ),
+  );
 }
 
 /**
- * The whole list as the wire takes it, or `undefined` once any form below it failed to parse.
- * Every form is read either way, so each bad row is marked before the write is abandoned.
+ * The add affordance: one admitted type adds directly, several open a picker menu.
  */
-function serialize(nodes: readonly BlockNode[]): Record<string, unknown>[] | undefined {
-  const items: Record<string, unknown>[] = [];
-  let ok = true;
-  for (const node of nodes) {
-    const fields = node.form.read();
-    if (isUndefined(fields)) ok = false;
-    for (const list of node.lists) {
-      const nested = serialize(list.nodes.value);
-      if (isUndefined(nested)) ok = false;
-      else if (!isUndefined(fields)) fields[list.field.name] = nested;
-    }
-    if (isUndefined(fields)) continue;
-    const item: Record<string, unknown> = { block: node.block, fields };
-    if (!isUndefined(node.uuid)) item.UUID = node.uuid;
-    items.push(item);
+function adder(
+  offered: readonly string[],
+  blocks: readonly DashboardBlock[],
+  add: (name: string) => void,
+  t: (key: 'dashboard.addBlock') => string,
+): Child {
+  if (offered.length === 1) {
+    const only = offered[0] as string;
+    return h(
+      'div',
+      { class: 'ohne-blocks-add' },
+      button(() => `+ ${t('dashboard.addBlock')}`, { variant: 'ghost', onClick: () => add(only) }),
+    );
   }
-  return ok ? items : undefined;
-}
-
-/**
- * Routes a `422` onto the nodes it names, answering whether anything landed at all.
- *
- * The server keys an item's own failures under `<path>[<i>].fields.`.
- * Its envelope keys at `<path>[<i>]`, `.block`, `.UUID` and `.fields`.
- * A nested list keys one level deeper again.
- * A message no row and no nested list can claim becomes that node's own line.
- * A path the grammar does not predict is therefore read rather than stored unseen.
- */
-function route(
-  nodes: readonly BlockNode[],
-  path: string,
-  errors: Readonly<Record<string, string>>,
-): boolean {
-  let placed = false;
-  nodes.forEach((node, index) => {
-    const at = `${path}[${index}]`;
-    const envelope =
-      errors[at] ?? errors[`${at}.block`] ?? errors[`${at}.UUID`] ?? errors[`${at}.fields`] ?? '';
-    const owned: Record<string, string> = Object.create(null) as Record<string, string>;
-    for (const [key, message] of Object.entries(scopedErrors(errors, `${at}.fields.`))) {
-      if (node.lists.some((list) => key.startsWith(`${list.field.name}[`))) continue;
-      owned[key] = message;
-    }
-    const leftover = node.form.setErrors(owned);
-    node.error.value = envelope === '' ? leftover : envelope;
-    if (envelope !== '' || !isEmpty(owned)) placed = true;
-    for (const list of node.lists) {
-      if (route(list.nodes.value, `${at}.fields.${list.field.name}`, errors)) placed = true;
-    }
+  const open = ref(false);
+  const trigger = button(() => `+ ${t('dashboard.addBlock')}`, {
+    variant: 'ghost',
+    onClick: () => {
+      open.value = !open.value;
+    },
   });
-  return placed;
+  return h(
+    'div',
+    { class: 'ohne-blocks-add' },
+    trigger,
+    when(
+      () => open.value,
+      () =>
+        popover(
+          {
+            anchor: trigger,
+            onClose: () => {
+              open.value = false;
+            },
+          },
+          offered.map((name) =>
+            h(
+              'div',
+              {
+                class: 'ohne-blocks-menu-row',
+                onClick: () => {
+                  open.value = false;
+                  add(name);
+                },
+              },
+              labelOf(name, blocks),
+              h('span', { class: 'ohne-blocks-menu-name' }, name),
+            ),
+          ),
+        ),
+    ),
+  );
 }
 
 /**
- * Whether the node or anything beneath it carries a message, so a row can point deeper.
+ * The row's summary: the seed's first non-empty text subfield, stale until the next save.
  */
-function flagged(node: BlockNode): boolean {
-  if (node.error.value !== '' || node.form.errored()) return true;
-  return node.lists.some((list) => list.nodes.value.some(flagged));
-}
-
-/**
- * Every block type the list holds, at every depth.
- */
-function stored(nodes: readonly BlockNode[]): string[] {
-  const names: string[] = [];
-  for (const node of nodes) {
-    names.push(node.block);
-    for (const list of node.lists) names.push(...stored(list.nodes.value));
+function summaryOf(node: BlockNode, blocks: readonly DashboardBlock[]): string {
+  const fields = blockNamed(blocks, node.block)?.fields ?? [];
+  for (const field of fields) {
+    if (field.logicalType !== 'text' || field.type === 'password' || !field.readable) continue;
+    const value = node.seed.value[field.name];
+    if (isString(value) && value !== '') return value;
   }
+  return '';
+}
+
+/**
+ * Every block type a stored list holds, at every depth, so the round-trip gate sees them all.
+ */
+function storedTypes(value: unknown): string[] {
+  const names: string[] = [];
+  const walk = (items: unknown): void => {
+    if (!isArray(items)) return;
+    for (const item of items) {
+      if (!isPlainObject<Record<string, unknown>>(item)) continue;
+      if (isString(item.block)) names.push(item.block);
+      const fields = item.fields;
+      if (!isPlainObject<Record<string, unknown>>(fields)) continue;
+      for (const nested of Object.values(fields)) walk(nested);
+    }
+  };
+  walk(value);
   return names;
 }
 
@@ -421,14 +540,10 @@ function labelOf(name: string, blocks: readonly DashboardBlock[]): string {
 }
 
 /**
- * Moves the keyed node one place, clamped to the list.
+ * A fresh error map with no prototype, since subfield names may collide with `Object` keys.
  */
-function move(nodes: Ref<readonly BlockNode[]>, key: number, delta: -1 | 1): void {
-  const list = [...nodes.value];
-  const from = list.findIndex((entry) => entry.key === key);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= list.length) return;
-  const [entry] = list.splice(from, 1);
-  list.splice(to, 0, entry as BlockNode);
-  nodes.value = list;
+function blank(): Record<string, string> {
+  return Object.create(null) as Record<string, string>;
 }
+
+registerFieldType('blocks', blocksType);

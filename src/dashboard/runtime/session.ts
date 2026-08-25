@@ -52,14 +52,19 @@ export function sessionUser(): SessionUser | null | undefined {
 /**
  * Signs in with an email and password.
  * Success stores the session cookie, updates `sessionUser` reactively, and resets the discovery store.
+ * `remember` asks for a persistent cookie; without it the session ends with the browser.
  * The API never says whether the email or the password was wrong.
  */
-export async function login(email: string, password: string): Promise<LoginOutcome> {
+export async function login(
+  email: string,
+  password: string,
+  remember = false,
+): Promise<LoginOutcome> {
   let response: Response;
   try {
     response = await api('POST /auth/login', {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, remember }),
     });
   } catch {
     return 'unreachable';

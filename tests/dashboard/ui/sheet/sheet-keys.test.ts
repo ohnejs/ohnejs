@@ -7,7 +7,9 @@ function recorder() {
   const calls: unknown[][] = [];
   const actions: SheetActions = {
     move: (dx, dy, extend) => void calls.push(['move', dx, dy, extend]),
-    selectAll: () => void calls.push(['selectAll']),
+    checkAll: () => void calls.push(['checkAll']),
+    check: () => void calls.push(['check']),
+    open: () => void calls.push(['open']),
     clear: () => void calls.push(['clear']),
     page: (delta) => void calls.push(['page', delta]),
     edit: () => void calls.push(['edit']),
@@ -51,12 +53,20 @@ describe('sheet keymap', () => {
     ]);
   });
 
-  it('selects all on mod+a per platform', () => {
+  it('checks the page on mod+a per platform', () => {
     const { calls, actions } = recorder();
     const match = sheetKeymap(actions, { platform: 'mac' });
     strictEqual(match(stroke('a', { meta: true })), true);
     strictEqual(match(stroke('a', { ctrl: true })), false);
-    deepStrictEqual(calls, [['selectAll']]);
+    deepStrictEqual(calls, [['checkAll']]);
+  });
+
+  it('checks with Space and opens with mod+Enter', () => {
+    const { calls, actions } = recorder();
+    const match = sheetKeymap(actions, { platform: 'mac' });
+    strictEqual(match(stroke(' ')), true);
+    strictEqual(match(stroke('Enter', { meta: true })), true);
+    deepStrictEqual(calls, [['check'], ['open']]);
   });
 
   it('steps pages, edits, and clears', () => {
