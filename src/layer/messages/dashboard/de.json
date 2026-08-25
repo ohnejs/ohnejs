@@ -92,6 +92,7 @@
   },
   "install": {
     "submit": "Konto erstellen",
+    "title": "Installation",
     "welcomeMessage": "Willkommen bei ohne! Gib deine Daten ein, um das primäre Administratorkonto zu erstellen."
   },
   "invalidInteger": "Ganze Zahl eingeben",
@@ -104,6 +105,7 @@
     "rememberMe": "Angemeldet bleiben",
     "showPassword": "Passwort anzeigen",
     "submit": "Anmelden",
+    "title": "Anmeldung",
     "unreachable": "Der Server ist nicht erreichbar"
   },
   "menu": {
@@ -122,7 +124,8 @@
     "activity": "Aktivität",
     "quickCreate": "Schnell erstellen",
     "recentEdits": "Letzte Änderungen",
-    "shortcuts": "Schnellzugriff"
+    "shortcuts": "Schnellzugriff",
+    "title": "Übersicht"
   },
   "pageNotFound": "Seite nicht gefunden",
   "pagination": {

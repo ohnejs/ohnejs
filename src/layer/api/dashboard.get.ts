@@ -182,6 +182,11 @@ export interface DashboardCollection {
   label: string;
 
   /**
+   * The Tabler icon name the sidebar menu shows, as declared; absent when the collection declares none.
+   */
+  icon?: string;
+
+  /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.
    */
   translatable: boolean;
@@ -285,14 +290,16 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     const operations = describeOperations(meta.collection.api, meta.name, user);
     if (isNull(operations)) continue;
     const query = queryMetadata(meta.name);
-    collections.push({
+    const collection: DashboardCollection = {
       name: meta.name,
       segment: toKebabCase(meta.name),
       label: toSentenceCase(meta.name),
       translatable: query.translatable === true,
       operations,
       fields: describeFields(query.fields, meta.collection.fields),
-    });
+    };
+    if (!isUndefined(meta.collection.icon)) collection.icon = meta.collection.icon;
+    collections.push(collection);
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
   return {

@@ -21,8 +21,8 @@ const STORAGE_KEY = 'ohne:content-locale';
  * The content locale the dashboard edits records in, shared app-wide.
  * Distinct from the interface language: it addresses translatable field values.
  * `undefined` means the app's default locale; the switcher writes chosen codes here.
- * The preference persists in `localStorage`; nothing consumes it yet - the sheet and record
- * editor integration lands with the translatable-fields rework.
+ * The preference persists in `localStorage`.
+ * The record editor and the single-field edit popup resolve field values through it.
  */
 export const contentLocale: Ref<string | undefined> = ref<string | undefined>(
   localStorage.getItem(STORAGE_KEY) ?? undefined,
@@ -39,8 +39,8 @@ css`
  * The header's content-language dropdown, ported from Pruvious v4's `ContentLanguageSwitcher`.
  * It renders only while the discovery data lists more than one locale.
  * The button shows the active locale's formatted code; picking another persists it and toasts.
- * P4 gated visibility per page and persisted through the account; ohne has neither surface yet,
- * so the switcher always shows and persists locally.
+ * P4 gated visibility per page and persisted through the account.
+ * ohne has neither surface, so the switcher always shows and persists locally.
  */
 export function contentLanguageSwitcher(): Child {
   return when(

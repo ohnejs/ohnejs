@@ -38,6 +38,7 @@ import {
   untracked,
 } from 'ohne/utils';
 
+import { contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History, unsavedChanges } from './history.ts';
@@ -150,7 +151,8 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       path: '',
       readOnlyRows: true,
       readOnly,
-      language: () => useDashboardLanguage().value,
+      // P4 resolves translatable values in the content language; the interface language backfills.
+      language: () => contentLocale.value ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);

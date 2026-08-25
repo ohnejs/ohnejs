@@ -11,6 +11,7 @@ import {
   navigate,
   prose,
   sessionUser,
+  setDocumentTitle,
   textInput,
   toast,
   useT,
@@ -28,6 +29,10 @@ import { authLogo } from '../components/logo.ts';
  * An installed system redirects to the login page; a signed-in visitor goes home.
  */
 export default defineDashboardPage(() => {
+  const t = useT();
+
+  effect(() => setDocumentTitle(t('dashboard.install.title')));
+
   effect(() => {
     if (!isNullish(sessionUser())) navigate('/');
   });

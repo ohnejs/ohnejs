@@ -5,10 +5,11 @@ import {
   dashboardMeta,
   defineDashboardPage,
   h,
+  setDocumentTitle,
   useT,
   when,
 } from 'ohne/dashboard';
-import { isUndefined } from 'ohne/utils';
+import { effect, isUndefined } from 'ohne/utils';
 
 import { recordEditor } from '../../../components/record-editor.ts';
 import { shell } from '../../../components/shell.ts';
@@ -46,6 +47,18 @@ function pane(segment: () => string, uuid: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
+  // The chunk mirrors the source's `#id - label` and `New - label`, with the editor's short-UUID chip.
+  effect(() => {
+    const collection = entry();
+    const id = uuid();
+    setDocumentTitle(
+      isUndefined(collection)
+        ? undefined
+        : id === 'new'
+          ? `${t('dashboard.new')} - ${collection.label}`
+          : `#${id.slice(0, 8)} - ${collection.label}`,
+    );
+  });
   return when(
     () => !isUndefined(dashboardMeta()),
     () =>

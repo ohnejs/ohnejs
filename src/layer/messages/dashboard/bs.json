@@ -92,6 +92,7 @@
   },
   "install": {
     "submit": "Kreiraj račun",
+    "title": "Instalacija",
     "welcomeMessage": "Dobrodošli u ohne! Unesite svoje podatke da kreirate primarni administratorski račun."
   },
   "invalidInteger": "Unesite cijeli broj",
@@ -104,6 +105,7 @@
     "rememberMe": "Zapamti me",
     "showPassword": "Prikaži lozinku",
     "submit": "Prijava",
+    "title": "Prijava",
     "unreachable": "Server nije dostupan"
   },
   "menu": {
@@ -122,7 +124,8 @@
     "activity": "Aktivnost",
     "quickCreate": "Brzo kreiranje",
     "recentEdits": "Nedavne izmjene",
-    "shortcuts": "Prečice"
+    "shortcuts": "Prečice",
+    "title": "Pregled"
   },
   "pageNotFound": "Stranica nije pronađena",
   "pagination": {

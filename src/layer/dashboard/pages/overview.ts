@@ -5,6 +5,7 @@ import {
   h,
   icon,
   isMac,
+  setDocumentTitle,
   textInput,
   useT,
   when,
@@ -180,6 +181,8 @@ function overview(): Child {
   const t = useT();
   const mac = isMac();
   const search = createOverviewSearch();
+
+  effect(() => setDocumentTitle(t('dashboard.overview.title')));
 
   const searchIcon = icon('search');
   searchIcon.classList.add('o-overview-search-icon');

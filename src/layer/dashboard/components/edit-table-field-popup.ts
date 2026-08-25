@@ -19,6 +19,7 @@ import {
 } from 'ohne/dashboard';
 import { effect, isNull, isUndefined, onCleanup, ref, sleep } from 'ohne/utils';
 
+import { contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';
 
@@ -130,7 +131,8 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       path: '',
       readOnly: disabled,
       readOnlyRows: true,
-      language: () => useDashboardLanguage().value,
+      // P4 resolves translatable values in the content language; the interface language backfills.
+      language: () => contentLocale.value ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);

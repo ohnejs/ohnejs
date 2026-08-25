@@ -92,6 +92,7 @@
   },
   "install": {
     "submit": "Create account",
+    "title": "Installation",
     "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
   },
   "invalidInteger": "Enter a whole number",
@@ -104,6 +105,7 @@
     "rememberMe": "Remember me",
     "showPassword": "Show password",
     "submit": "Sign in",
+    "title": "Login",
     "unreachable": "The server cannot be reached"
   },
   "menu": {
@@ -122,7 +124,8 @@
     "activity": "Activity",
     "quickCreate": "Quick create",
     "recentEdits": "Recent edits",
-    "shortcuts": "Shortcuts"
+    "shortcuts": "Shortcuts",
+    "title": "Overview"
   },
   "pageNotFound": "Page not found",
   "pagination": {

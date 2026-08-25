@@ -1,4 +1,11 @@
-import { card, defineDashboardPage, navigate, sessionUser } from 'ohne/dashboard';
+import {
+  card,
+  defineDashboardPage,
+  navigate,
+  sessionUser,
+  setDocumentTitle,
+  useT,
+} from 'ohne/dashboard';
 import { effect, isNull, isNullish } from 'ohne/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
@@ -13,7 +20,10 @@ import { installRequired } from './install.ts';
  * While the first-user setup is pending, the page yields to the install page.
  */
 export default defineDashboardPage(() => {
+  const t = useT();
   const destination = nextPath();
+
+  effect(() => setDocumentTitle(t('dashboard.login.title')));
 
   effect(() => {
     if (!isNullish(sessionUser())) navigate(destination);

@@ -5,6 +5,8 @@ import {
   dashboardMeta,
   each,
   h,
+  icon,
+  type IconName,
   type Translate,
   useRoute,
   useT,
@@ -12,7 +14,7 @@ import {
   verticalMenu,
   when,
 } from 'ohne/dashboard';
-import { isUndefined, withTrailingSlash } from 'ohne/utils';
+import { isNull, isUndefined, withTrailingSlash } from 'ohne/utils';
 
 css`
   .o-menu-wrapper > * + * {
@@ -25,7 +27,8 @@ css`
  * Each discovery menu group renders one `verticalMenu`: the group label as its uppercase title,
  * an empty label rendering the list without one, and one link row per collection.
  * A link is active while the route sits under its collection, so record pages highlight it too.
- * The discovery data carries neither icons nor submenus, so rows render label-only and flat.
+ * A collection's declared icon renders before its label when it names a registry icon.
+ * The discovery data carries no submenus, so the menu stays flat.
  */
 export function sidebar(): HTMLElement {
   const t = useT();
@@ -68,7 +71,25 @@ function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
     const entry = collections.find((candidate) => candidate.name === name);
     if (isUndefined(entry)) continue;
     const to = `/collections/${entry.segment}`;
-    items.push({ to, label: entry.label, active: path.startsWith(withTrailingSlash(to)) });
+    const item: VerticalMenuItemModel = {
+      to,
+      label: entry.label,
+      active: path.startsWith(withTrailingSlash(to)),
+    };
+    const glyph = iconOf(entry.icon);
+    if (!isUndefined(glyph)) item.icon = glyph;
+    items.push(item);
   }
   return items;
+}
+
+/**
+ * The collection's declared menu icon, or `undefined` when it names no registry icon.
+ * The registry exports no runtime name guard, so membership shows in the built SVG:
+ * a known name parses to element children, an unknown one to none.
+ */
+function iconOf(name: string | undefined): SVGSVGElement | undefined {
+  if (isUndefined(name)) return undefined;
+  const glyph = icon(name as IconName);
+  return isNull(glyph.firstElementChild) ? undefined : glyph;
 }

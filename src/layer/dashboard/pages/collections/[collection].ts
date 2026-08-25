@@ -5,10 +5,11 @@ import {
   dashboardMeta,
   defineDashboardPage,
   h,
+  setDocumentTitle,
   useT,
   when,
 } from 'ohne/dashboard';
-import { isUndefined } from 'ohne/utils';
+import { effect, isUndefined } from 'ohne/utils';
 
 import { collectionTable } from '../../components/collection-table.ts';
 import { shell } from '../../components/shell.ts';
@@ -41,6 +42,7 @@ function pane(segment: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
+  effect(() => setDocumentTitle(entry()?.label));
   return when(
     () => !isUndefined(dashboardMeta()),
     () =>
