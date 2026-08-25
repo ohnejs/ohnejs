@@ -1,7 +1,4 @@
-import { ref } from '../../utils/reactive/ref.ts';
-import { untracked } from '../../utils/reactive/untracked.ts';
-
-const count = ref(0);
+let count = 0;
 
 /**
  * A claim on one overlay depth, held from mount to unmount of a modal surface.
@@ -15,7 +12,7 @@ export interface OverlayHandle {
 
   /**
    * Whether this overlay is currently the topmost one.
-   * Reactive: reading inside an effect re-runs it when the depth changes.
+   * A plain snapshot read, meant for event handlers.
    */
   isTopmost(): boolean;
 
@@ -34,22 +31,25 @@ export interface OverlayHandle {
 
 /**
  * The number of currently open overlays.
- * Reactive: reading inside an effect subscribes it.
  * Hotkeys read it to stand down while any overlay is open.
+ *
+ * Deliberately not reactive: an overlay acquires its depth from a mount timer and releases it on dispose.
+ * A region that read a reactive count while creating an overlay would subscribe to its own bookkeeping.
+ * Every acquire and release would then rebuild the region, forever.
  */
 export function overlayCount(): number {
-  return count.value;
+  return count;
 }
 
 /**
  * Claims the next overlay depth, ported 1-to-1 from Pruvious v4's popup bookkeeping.
  *
- * The model is a bare counter plus the `ohne-overlay-active` body class - there is no z-index
- * allocation and no body scroll lock.
- * Stacking is a fixed ladder: popups sit at `z-index` 100 (DOM order breaks ties), floating panels
- * at 99997, toasts at 99998, tooltips at 99999.
- * Closing assumes LIFO order: `undim` acts only when the counter is exactly 1, so overlays closed
- * out of order keep the body dimmed until the last one releases.
+ * The model is a bare counter plus the `ohne-overlay-active` body class.
+ * There is no z-index allocation and no body scroll lock.
+ * Stacking is a fixed ladder: popups sit at `z-index` 100, with DOM order breaking ties.
+ * Floating panels sit at 99997, toasts at 99998, tooltips at 99999.
+ * Closing assumes LIFO order: `undim` acts only when the counter is exactly 1.
+ * Overlays closed out of order keep the body dimmed until the last one releases.
  *
  * @example
  * ```ts
@@ -58,24 +58,24 @@ export function overlayCount(): number {
  * ```
  */
 export function acquireOverlay(): OverlayHandle {
-  count.value += 1;
-  const depth = untracked(() => count.value);
+  count += 1;
+  const depth = count;
   document.body.classList.add('ohne-overlay-active');
   let released = false;
 
   return {
     depth,
-    isTopmost: () => count.value === depth,
+    isTopmost: () => count === depth,
     undim: () => {
-      if (untracked(() => count.value) === 1) {
+      if (count === 1) {
         document.body.classList.remove('ohne-overlay-active');
       }
     },
     release: () => {
       if (released) return;
       released = true;
-      count.value -= 1;
-      if (untracked(() => count.value) === 0) {
+      count -= 1;
+      if (count === 0) {
         document.body.classList.remove('ohne-overlay-active');
       }
     },

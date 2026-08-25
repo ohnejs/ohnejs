@@ -23,8 +23,8 @@ export interface Hotkeys {
 
   /**
    * Whether this instance stays live while an overlay is open.
-   * Even then it only fires at the overlay depth it was created at, so an instance made inside
-   * a popup dies when a deeper popup opens on top.
+   * Even then it only fires at the overlay depth it was created at.
+   * An instance made inside a popup dies when a deeper popup opens on top.
    */
   allowInOverlays: Ref<boolean>;
 
@@ -79,13 +79,13 @@ export interface HotkeysOptions {
 /**
  * Creates an independent keyboard-shortcut instance, ported 1-to-1 from Pruvious v4.
  *
- * The instance pins itself to the overlay depth present shortly after creation - deferred one
- * tick plus a timeout, so an overlay mounting in the same cycle counts itself first.
- * While any overlay is open, only instances with `allowInOverlays` at exactly that depth fire;
- * the `ohne-no-interaction` body class mutes everything.
+ * The instance pins itself to the overlay depth present shortly after creation.
+ * The snapshot defers one tick plus a timeout, so an overlay mounting in the same cycle counts itself first.
+ * While any overlay is open, only instances with `allowInOverlays` at exactly that depth fire.
+ * The `ohne-no-interaction` body class mutes everything.
  * `save` alone pierces both gates and text editing, so Cmd/Ctrl+S always lands.
- * Created inside a reactive scope, the listener detaches when the scope disposes;
- * standalone instances must `pause` themselves.
+ * Created inside a reactive scope, the listener detaches when the scope disposes.
+ * Standalone instances must `pause` themselves.
  *
  * @example
  * ```ts
@@ -106,7 +106,7 @@ export function useHotkeys(options: HotkeysOptions = {}): Hotkeys {
   let currentOverlay = -1;
   void nextTick().then(() => {
     setTimeout(() => {
-      currentOverlay = untracked(() => overlayCount());
+      currentOverlay = overlayCount();
     });
   });
 
@@ -162,8 +162,8 @@ export function useHotkeys(options: HotkeysOptions = {}): Hotkeys {
 
 /**
  * Whether focus sits in a text-editing element.
- * Walks from the active element up to `body`, looking for a non-checkbox input, a textarea,
- * or anything `contenteditable`.
+ * Walks from the active element up to `body`.
+ * It looks for a non-checkbox input, a textarea, or anything `contenteditable`.
  */
 export function isEditingText(): boolean {
   let el = document.activeElement;
