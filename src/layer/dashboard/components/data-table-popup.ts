@@ -1,0 +1,633 @@
+import {
+  attachTooltip,
+  button,
+  buttonGroup,
+  card,
+  type Child,
+  css,
+  type DashboardField,
+  each,
+  h,
+  icon,
+  numberInput,
+  popup,
+  type Popup,
+  type Primitive,
+  select,
+  type SelectChoice,
+  textInput,
+  useHotkeys,
+  useT,
+  when,
+} from 'ohne/dashboard';
+import {
+  computed,
+  type ConditionObject,
+  effect,
+  isUndefined,
+  jsonClone,
+  naturalCompare,
+  onCleanup,
+  type Ref,
+  ref,
+} from 'ohne/utils';
+
+import {
+  type FilterableType,
+  type FilterCondition,
+  filterDefaultValue,
+  filterFromWhere,
+  type FilterGroup,
+  filterKey,
+  type FilterModel,
+  type FilterNode,
+  type FilterOperator,
+  filterOperatorsFor,
+  filterToWhere,
+} from './data-table-filter.ts';
+import { unsavedChanges } from './history.ts';
+
+/**
+ * Options for `dataTablePopup`.
+ */
+export interface DataTablePopupOptions {
+  /**
+   * The popup title, read reactively when given as a getter.
+   */
+  title: string | (() => string);
+
+  /**
+   * The filterable field candidates, read reactively.
+   * The builder keeps the column-backed ones whose storage primitive it can compare.
+   */
+  fields: () => DashboardField[];
+
+  /**
+   * The currently applied `where`, rebuilt into the tree through `filterFromWhere`.
+   */
+  where: ConditionObject | undefined;
+
+  /**
+   * Called with the serialized `where` on Apply: the exact `ConditionObject` the body-query
+   * endpoint reads, or `undefined` when no conditions are set. See `filterToWhere` for the
+   * precise emitted shape.
+   */
+  onApply(where: ConditionObject | undefined): void;
+
+  /**
+   * Called when the popup asks to close, with its animated close function.
+   * The caller awaits it and then disposes the region that created the popup.
+   */
+  onClose(close: () => Promise<void>): void;
+
+  /**
+   * The CSS width of the popup.
+   *
+   * @default
+   * '50rem'
+   */
+  width?: string;
+}
+
+const OPERATOR_LABEL_KEYS = {
+  eq: 'dashboard.filter.operator.equals',
+  ne: 'dashboard.filter.operator.doesNotEqual',
+  lt: 'dashboard.filter.operator.lessThan',
+  lte: 'dashboard.filter.operator.lessThanOrEqualTo',
+  gt: 'dashboard.filter.operator.greaterThan',
+  gte: 'dashboard.filter.operator.greaterThanOrEqualTo',
+  startsWith: 'dashboard.filter.operator.startsWith',
+  endsWith: 'dashboard.filter.operator.endsWith',
+  contains: 'dashboard.filter.operator.contains',
+  notContains: 'dashboard.filter.operator.doesNotContain',
+} as const;
+
+const FILTERABLE: ReadonlySet<string> = new Set(['text', 'integer', 'real', 'boolean']);
+
+let sequence = 0;
+
+css`
+  .o-data-table-title {
+    font-weight: 500;
+  }
+
+  .o-where-filters > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .o-where-filters :where(.o-where-filters-actions) {
+    display: none;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .o-where-filters-item:hover
+    > .ohne-card-header
+    > .o-where-filters-row
+    > .o-where-filters-actions {
+    display: flex;
+  }
+
+  .o-where-filters-small-button {
+    display: none;
+  }
+
+  @container (max-width: 480px) {
+    .o-where-filters-large-button {
+      display: none;
+    }
+
+    .o-where-filters-small-button {
+      display: inline-flex;
+    }
+  }
+
+  .o-where-filters-condition {
+    width: 100%;
+  }
+
+  .o-where-filters-condition-field {
+    width: calc(50% - 6.5rem);
+  }
+
+  .o-field-filter-operator {
+    width: 12rem;
+  }
+
+  .o-field-filter-value {
+    flex: 1;
+  }
+
+  @container (max-width: 640px) {
+    .o-where-filters-condition {
+      flex-direction: column;
+    }
+
+    .o-where-filters-condition > * {
+      width: 100%;
+    }
+
+    .o-field-filter {
+      flex-direction: column;
+    }
+
+    .o-field-filter-operator,
+    .o-field-filter-value {
+      width: 100%;
+    }
+  }
+`;
+
+/**
+ * The filter builder popup, the port of Pruvious v4's `WhereFilters` tree inside its
+ * view-configuration popup.
+ *
+ * Each condition picks a field, an operator valid for the field's storage primitive, and a
+ * typed value input; condition groups nest with a toggleable and/or relation, and the top
+ * level carries its own relation over all members.
+ * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`; a dirty
+ * tree guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
+ */
+export function dataTablePopup(options: DataTablePopupOptions): Popup {
+  const t = useT();
+  const id = `o-where-filters-${++sequence}`;
+  const version = ref(0);
+  const initial: FilterModel = filterFromWhere(options.where);
+  const root: FilterGroup = { key: filterKey(), relation: initial.relation, items: initial.items };
+  const currentWhere = (): ConditionObject | undefined =>
+    filterToWhere({ relation: root.relation, items: root.items });
+  const baseline = JSON.stringify(currentWhere() ?? null);
+  const dirty = computed(() => {
+    void version.value;
+    return JSON.stringify(currentWhere() ?? null) !== baseline;
+  });
+
+  const commit = (): void => {
+    version.value += 1;
+  };
+
+  const fieldChoices = (): DashboardField[] =>
+    options
+      .fields()
+      .filter((field) => field.kind === 'column' && FILTERABLE.has(field.logicalType ?? ''))
+      .sort((a, b) => naturalCompare(a.label, b.label));
+
+  const fieldByName = (name: string): DashboardField | undefined =>
+    fieldChoices().find((field) => field.name === name);
+
+  const typeOf = (name: string): FilterableType =>
+    (fieldByName(name)?.logicalType ?? 'text') as FilterableType;
+
+  const newCondition = (): FilterCondition | undefined => {
+    const first = fieldChoices()[0];
+    if (isUndefined(first)) return undefined;
+    return {
+      key: filterKey(),
+      field: first.name,
+      operator: 'eq',
+      value: filterDefaultValue(typeOf(first.name)),
+    };
+  };
+
+  const addCondition = (group: FilterGroup): void => {
+    const condition = newCondition();
+    if (isUndefined(condition)) return;
+    group.items.push(condition);
+    commit();
+  };
+
+  const addGroup = (group: FilterGroup): void => {
+    const condition = newCondition();
+    if (isUndefined(condition)) return;
+    group.items.push({ key: filterKey(), relation: 'or', items: [condition] });
+    commit();
+  };
+
+  const duplicate = (group: FilterGroup, index: number): void => {
+    const node = group.items[index];
+    if (isUndefined(node)) return;
+    const clone = jsonClone(node);
+    rekey(clone);
+    group.items.splice(index, 0, clone);
+    commit();
+  };
+
+  const remove = (group: FilterGroup, index: number): void => {
+    group.items.splice(index, 1);
+    commit();
+  };
+
+  const actionButton = (
+    glyph: Child,
+    tooltip: () => string,
+    onClick: () => void,
+    destructiveHover = false,
+  ): HTMLElement => {
+    const control = button(glyph, { size: -2, variant: 'ghost', destructiveHover, onClick });
+    onCleanup(attachTooltip(control, tooltip));
+    return control;
+  };
+
+  const relationToggle = (relation: () => 'and' | 'or', onToggle: () => void): HTMLElement => {
+    const control = button(
+      () =>
+        h('span', null, () =>
+          t(relation() === 'and' ? 'dashboard.filter.and' : 'dashboard.filter.or'),
+        ),
+      { size: -2, variant: 'secondary', class: 'ohne-uppercase', onClick: onToggle },
+    );
+    onCleanup(attachTooltip(control, () => t('dashboard.filter.toggleRelation')));
+    return control;
+  };
+
+  const relationText = (relation: () => 'and' | 'or'): Child =>
+    h('span', { class: 'ohne-muted ohne-truncate' }, () =>
+      t(relation() === 'and' ? 'dashboard.filter.allMustMatch' : 'dashboard.filter.anyMustMatch'),
+    );
+
+  const valueInput = (node: FilterCondition, inputID: string): Child => {
+    const type = typeOf(node.field);
+    if (type === 'boolean') {
+      const bridged: Ref<Primitive> = {
+        get value() {
+          void version.value;
+          return Boolean(node.value);
+        },
+        set value(next) {
+          node.value = next === true;
+          commit();
+        },
+      };
+      return buttonGroup(bridged, {
+        choices: () => [
+          { value: false, label: t('dashboard.filter.false') },
+          { value: true, label: t('dashboard.filter.true') },
+        ],
+        variant: 'accent',
+        id: inputID,
+        name: inputID,
+      });
+    }
+    if (type === 'text') {
+      const bridged: Ref<string> = {
+        get value() {
+          void version.value;
+          return String(node.value);
+        },
+        set value(next) {
+          node.value = next;
+        },
+      };
+      return textInput(bridged, {
+        id: inputID,
+        name: inputID,
+        placeholder: () => t('dashboard.filter.empty'),
+        onBlur: () => commit(),
+      });
+    }
+    const bridged: Ref<number> = {
+      get value() {
+        void version.value;
+        return Number(node.value);
+      },
+      set value(next) {
+        node.value = next;
+      },
+    };
+    return numberInput(bridged, {
+      id: inputID,
+      name: inputID,
+      showSteppers: true,
+      onCommit: (next) => {
+        node.value = next;
+        commit();
+      },
+    });
+  };
+
+  const conditionRow = (group: FilterGroup, node: FilterCondition): Child => {
+    const inputID = `${id}-${++sequence}`;
+    const fieldModel: Ref<Primitive> = {
+      get value() {
+        void version.value;
+        return node.field;
+      },
+      set value(next) {
+        const field = fieldByName(String(next));
+        if (isUndefined(field)) return;
+        const type = typeOf(field.name);
+        const valid = filterOperatorsFor(type);
+        const index = group.items.indexOf(node);
+        if (index === -1) return;
+        group.items[index] = {
+          key: filterKey(),
+          field: field.name,
+          operator: valid.includes(node.operator) ? node.operator : valid[0]!,
+          value: filterDefaultValue(type),
+        };
+        commit();
+      },
+    };
+    const operatorModel: Ref<Primitive> = {
+      get value() {
+        void version.value;
+        return node.operator;
+      },
+      set value(next) {
+        node.operator = next as FilterOperator;
+        commit();
+      },
+    };
+    return h(
+      'div',
+      { class: 'o-where-filters-condition ohne-row' },
+      h(
+        'div',
+        { class: 'o-where-filters-condition-field' },
+        select(
+          fieldModel,
+          (): SelectChoice[] =>
+            fieldChoices().map((field) => ({ label: field.label, value: field.name })),
+          { id: `${inputID}-field`, name: `${inputID}-field` },
+        ),
+      ),
+      h(
+        'div',
+        { class: 'o-field-filter ohne-row ohne-flex-1' },
+        h(
+          'div',
+          { class: 'o-field-filter-operator' },
+          select(
+            operatorModel,
+            (): SelectChoice[] =>
+              filterOperatorsFor(typeOf(node.field)).map((operator) => ({
+                label: t(OPERATOR_LABEL_KEYS[operator]),
+                value: operator,
+              })),
+            { id: `${inputID}-operator`, name: `${inputID}-operator` },
+          ),
+        ),
+        h('div', { class: 'o-field-filter-value' }, valueInput(node, `${inputID}-value`)),
+      ),
+    );
+  };
+
+  const smallAddButton = (
+    glyph: 'plus' | 'copy',
+    tooltip: () => string,
+    onClick: () => void,
+  ): HTMLElement => {
+    const control = button(icon(glyph), {
+      variant: 'outline',
+      class: 'o-where-filters-small-button',
+      disabled: () => fieldChoices().length === 0,
+      onClick,
+    });
+    onCleanup(attachTooltip(control, tooltip));
+    return control;
+  };
+
+  const addButtons = (group: FilterGroup): Child =>
+    h(
+      'div',
+      { class: 'ohne-row' },
+      button([icon('plus'), h('span', null, () => t('dashboard.filter.condition'))], {
+        variant: 'outline',
+        class: 'o-where-filters-large-button',
+        disabled: () => fieldChoices().length === 0,
+        onClick: () => addCondition(group),
+      }),
+      smallAddButton(
+        'plus',
+        () => t('dashboard.filter.addCondition'),
+        () => addCondition(group),
+      ),
+      // The source's condition-group icon is `copy-plus`, not in the icon registry yet.
+      button([icon('copy'), h('span', null, () => t('dashboard.filter.conditionGroup'))], {
+        variant: 'outline',
+        class: 'o-where-filters-large-button',
+        disabled: () => fieldChoices().length === 0,
+        onClick: () => addGroup(group),
+      }),
+      smallAddButton(
+        'copy',
+        () => t('dashboard.filter.addConditionGroup'),
+        () => addGroup(group),
+      ),
+    );
+
+  const itemHeader = (group: FilterGroup, node: () => FilterNode, index: () => number): Child =>
+    h(
+      'div',
+      { class: 'ohne-row o-where-filters-row' },
+      h(
+        'span',
+        { class: 'ohne-muted ohne-truncate' },
+        () =>
+          `${index() + 1}. ${t(
+            'items' in node() ? 'dashboard.filter.conditionGroup' : 'dashboard.filter.condition',
+          )}`,
+      ),
+      h(
+        'div',
+        { class: 'o-where-filters-actions' },
+        actionButton(
+          icon('copy'),
+          () => t('dashboard.filter.duplicate'),
+          () => duplicate(group, index()),
+        ),
+        actionButton(
+          icon('trash'),
+          () => t('dashboard.delete'),
+          () => remove(group, index()),
+          true,
+        ),
+      ),
+    );
+
+  function groupBody(group: FilterGroup): Child {
+    return h(
+      'div',
+      { class: 'o-where-filters' },
+      each(
+        () => {
+          void version.value;
+          return group.items.slice();
+        },
+        (node) => node.key,
+        (node, index) => {
+          const current = node();
+          const row = card('items' in current ? groupCard(current) : conditionRow(group, current), {
+            header: itemHeader(group, node, index),
+          });
+          row.classList.add('o-where-filters-item');
+          return row;
+        },
+      ),
+      addButtons(group),
+    );
+  }
+
+  function groupCard(group: FilterGroup): Child {
+    return card(groupBody(group), {
+      header: h(
+        'div',
+        { class: 'ohne-row' },
+        relationToggle(
+          () => {
+            void version.value;
+            return group.relation;
+          },
+          () => {
+            group.relation = group.relation === 'and' ? 'or' : 'and';
+            commit();
+          },
+        ),
+        relationText(() => {
+          void version.value;
+          return group.relation;
+        }),
+      ),
+    });
+  }
+
+  const rootHeader = (): Child =>
+    h(
+      'div',
+      { class: 'ohne-row' },
+      when(
+        () => {
+          void version.value;
+          return root.items.length > 0;
+        },
+        () => [
+          relationToggle(
+            () => {
+              void version.value;
+              return root.relation;
+            },
+            () => {
+              root.relation = root.relation === 'and' ? 'or' : 'and';
+              commit();
+            },
+          ),
+          relationText(() => {
+            void version.value;
+            return root.relation;
+          }),
+        ],
+        () =>
+          h('span', { class: 'ohne-muted ohne-truncate' }, () =>
+            t('dashboard.filter.noConditions'),
+          ),
+      ),
+    );
+
+  const guardedClose = async (): Promise<void> => {
+    if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+      options.onClose(handle.close);
+    }
+  };
+
+  const apply = (): void => {
+    options.onApply(currentWhere());
+    options.onClose(handle.close);
+  };
+
+  const closeButton = button(icon('x'), {
+    size: -2,
+    variant: 'ghost',
+    class: 'ohne-ml-auto',
+    onClick: () => void guardedClose(),
+  });
+  effect(() => {
+    closeButton.title = t('dashboard.close');
+  });
+
+  const applyButton = button(() => t('dashboard.apply'), {
+    variant: 'outline',
+    class: 'ohne-ml-auto',
+    onClick: apply,
+  });
+  effect(() => {
+    const changed = dirty.value;
+    applyButton.classList.toggle('ohne-button-primary', changed);
+    applyButton.classList.toggle('ohne-button-outline', !changed);
+  });
+
+  const handle = popup(card(groupBody(root), { header: rootHeader() }), {
+    size: -1,
+    width: options.width,
+    fullHeight: true,
+    header: h(
+      'div',
+      { class: 'ohne-row' },
+      h('span', { class: 'o-data-table-title' }, options.title),
+      closeButton,
+    ),
+    footer: h('div', { class: 'ohne-justify-between' }, applyButton),
+    onClose: () => void guardedClose(),
+  });
+
+  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
+  setTimeout(() => {
+    hotkeys.isListening.value = true;
+    hotkeys.listen('save', (event) => {
+      event.preventDefault();
+      apply();
+    });
+  });
+
+  return handle;
+}
+
+/**
+ * Fresh reconciliation keys for a duplicated subtree, so it never collides with its source.
+ */
+function rekey(node: FilterNode): void {
+  node.key = filterKey();
+  if ('items' in node) {
+    for (const child of node.items) rekey(child);
+  }
+}

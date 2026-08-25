@@ -1,14 +1,21 @@
 {
+  "actions": "Aktionen",
   "addBlock": "Block hinzufügen",
   "addItem": "Eintrag hinzufügen",
+  "apply": "Anwenden",
+  "cancel": "Abbrechen",
   "clear": "Leeren",
   "clearSearch": "Suche leeren",
+  "close": "Schließen",
   "collections": "Sammlungen",
   "confirmDelete": "Bestätigen",
   "confirmDeleteCount": "Bestätigen ({count})",
   "delete": "Löschen",
   "deleted": "{count, plural, one {# Datensatz gelöscht} other {# Datensätze gelöscht}}",
   "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
+  "deselect": "Abwählen",
+  "edit": "Bearbeiten",
+  "editFieldValue": "Feldwert bearbeiten",
   "empty": {
     "title": "Keine Datensätze",
     "body": "Diese Sammlung ist leer."
@@ -29,6 +36,36 @@
       "label": "Aktualisiert"
     }
   },
+  "filter": {
+    "addCondition": "Bedingung hinzufügen",
+    "addConditionGroup": "Bedingungsgruppe hinzufügen",
+    "allMustMatch": "Alle der folgenden Bedingungen müssen erfüllt sein",
+    "and": "und",
+    "anyMustMatch": "Mindestens eine der folgenden Bedingungen muss erfüllt sein",
+    "condition": "Bedingung",
+    "conditionGroup": "Bedingungsgruppe",
+    "duplicate": "Duplizieren",
+    "empty": "Leer",
+    "false": "Falsch",
+    "noConditions": "Keine Bedingungen gesetzt",
+    "operator": {
+      "contains": "Enthält",
+      "doesNotContain": "Enthält nicht",
+      "doesNotEqual": "Ungleich",
+      "endsWith": "Endet mit",
+      "equals": "Gleich",
+      "greaterThan": "Größer als",
+      "greaterThanOrEqualTo": "Größer oder gleich",
+      "lessThan": "Kleiner als",
+      "lessThanOrEqualTo": "Kleiner oder gleich",
+      "startsWith": "Beginnt mit"
+    },
+    "or": "oder",
+    "title": "Filter",
+    "toggleRelation": "Verknüpfung umschalten",
+    "true": "Wahr"
+  },
+  "foundErrors": "{count, plural, one {# Fehler gefunden} other {# Fehler gefunden}}",
   "header": {
     "contentLanguage": "Inhaltssprache",
     "darkMode": "Dunkler Modus",
@@ -45,6 +82,10 @@
     "move": "bewegen",
     "open": "öffnen",
     "search": "suchen"
+  },
+  "history": {
+    "redo": "Wiederholen",
+    "undo": "Rückgängig"
   },
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
@@ -69,6 +110,12 @@
   "notFound": "Nicht gefunden",
   "notLinked": "Nicht verknüpft",
   "open": "Öffnen",
+  "pagination": {
+    "goToPage": "Gehe zu Seite",
+    "next": "Nächste Seite",
+    "previous": "Vorherige Seite",
+    "showingRecords": "Zeigt Datensätze {from} bis {to}"
+  },
   "record": {
     "copied": "UUID kopiert",
     "discard": "Verwerfen",
@@ -83,6 +130,7 @@
   "save": "Speichern",
   "saved": "Gespeichert",
   "search": "Suchen",
+  "select": "Auswählen",
   "selectCollection": "Sammlung wählen",
   "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
   "session": {
@@ -92,8 +140,31 @@
   },
   "set": "Setzen",
   "signOut": "Abmelden",
+  "sort": {
+    "addBefore": "Davor einfügen",
+    "ascending": "Aufsteigend sortieren",
+    "descending": "Absteigend sortieren",
+    "moveDown": "Nach unten",
+    "moveUp": "Nach oben",
+    "none": "Keine Sortierung angewendet",
+    "title": "Sortierung"
+  },
+  "table": {
+    "allCount": "Alle ({count})",
+    "confirmDeleteMany": "Wirklich {count, plural, one {# Datensatz} other {# Datensätze}} löschen?",
+    "confirmDeleteOne": "Diesen Datensatz wirklich löschen?",
+    "deleteCount": "{count, plural, one {# Datensatz} other {# Datensätze}} löschen",
+    "noData": "Keine Daten verfügbar",
+    "pageCount": "Seite ({count})",
+    "selectPageOrAll": "{perPage, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite auswählen oder alle {total} Datensätze?",
+    "selectedAcrossPages": "{entryCount, plural, one {# Datensatz} other {# Datensätze}} über {pageCount, plural, one {# Seite} other {# Seiten}} ausgewählt",
+    "selectedCount": "{count, plural, one {# Datensatz} other {# Datensätze}} ausgewählt",
+    "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt"
+  },
   "typeToNarrow": "Tippen zum Eingrenzen",
   "unlink": "Verknüpfung lösen",
   "unreachable": "Der Server ist nicht erreichbar",
+  "view": "Ansehen",
+  "viewFieldValue": "Feldwert ansehen",
   "writeFailed": "Das Schreiben ist fehlgeschlagen"
 }

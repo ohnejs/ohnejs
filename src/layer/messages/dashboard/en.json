@@ -1,14 +1,21 @@
 {
+  "actions": "Actions",
   "addBlock": "Add block",
   "addItem": "Add item",
+  "apply": "Apply",
+  "cancel": "Cancel",
   "clear": "Clear",
   "clearSearch": "Clear search",
+  "close": "Close",
   "collections": "Collections",
   "confirmDelete": "Confirm",
   "confirmDeleteCount": "Confirm ({count})",
   "delete": "Delete",
   "deleted": "{count, plural, one {# record deleted} other {# records deleted}}",
   "deletedPartial": "{count} deleted, {failed} failed",
+  "deselect": "Deselect",
+  "edit": "Edit",
+  "editFieldValue": "Edit field value",
   "empty": {
     "title": "No records",
     "body": "This collection is empty."
@@ -29,6 +36,36 @@
       "label": "Updated"
     }
   },
+  "filter": {
+    "addCondition": "Add condition",
+    "addConditionGroup": "Add condition group",
+    "allMustMatch": "All of the following conditions must be met",
+    "and": "and",
+    "anyMustMatch": "At least one of the following conditions must be met",
+    "condition": "Condition",
+    "conditionGroup": "Condition group",
+    "duplicate": "Duplicate",
+    "empty": "Empty",
+    "false": "False",
+    "noConditions": "No conditions set",
+    "operator": {
+      "contains": "Contains",
+      "doesNotContain": "Does not contain",
+      "doesNotEqual": "Does not equal",
+      "endsWith": "Ends with",
+      "equals": "Equals",
+      "greaterThan": "Greater than",
+      "greaterThanOrEqualTo": "Greater than or equal to",
+      "lessThan": "Less than",
+      "lessThanOrEqualTo": "Less than or equal to",
+      "startsWith": "Starts with"
+    },
+    "or": "or",
+    "title": "Filters",
+    "toggleRelation": "Toggle relation",
+    "true": "True"
+  },
+  "foundErrors": "{count, plural, one {Found # error} other {Found # errors}}",
   "header": {
     "contentLanguage": "Content language",
     "darkMode": "Dark mode",
@@ -45,6 +82,10 @@
     "move": "move",
     "open": "open",
     "search": "search"
+  },
+  "history": {
+    "redo": "Redo",
+    "undo": "Undo"
   },
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
@@ -69,6 +110,12 @@
   "notFound": "Not found",
   "notLinked": "Not linked",
   "open": "Open",
+  "pagination": {
+    "goToPage": "Go to page",
+    "next": "Next page",
+    "previous": "Previous page",
+    "showingRecords": "Showing records {from} to {to}"
+  },
   "record": {
     "copied": "UUID copied",
     "discard": "Discard",
@@ -83,6 +130,7 @@
   "save": "Save",
   "saved": "Saved",
   "search": "Search",
+  "select": "Select",
   "selectCollection": "Select a collection",
   "selected": "{count, plural, one {# selected} other {# selected}}",
   "session": {
@@ -92,8 +140,31 @@
   },
   "set": "Set",
   "signOut": "Sign out",
+  "sort": {
+    "addBefore": "Add before",
+    "ascending": "Sort in ascending order",
+    "descending": "Sort in descending order",
+    "moveDown": "Move down",
+    "moveUp": "Move up",
+    "none": "No sorting applied",
+    "title": "Sorting"
+  },
+  "table": {
+    "allCount": "All ({count})",
+    "confirmDeleteMany": "Are you sure you want to delete {count, plural, one {# record} other {# records}}?",
+    "confirmDeleteOne": "Are you sure you want to delete this record?",
+    "deleteCount": "Delete {count, plural, one {# record} other {# records}}",
+    "noData": "No data available",
+    "pageCount": "Page ({count})",
+    "selectPageOrAll": "Would you like to select {perPage, plural, one {# record} other {# records}} on this page or all {total} records?",
+    "selectedAcrossPages": "Selected {entryCount, plural, one {# record} other {# records}} across {pageCount, plural, one {# page} other {# pages}}",
+    "selectedCount": "Selected {count, plural, one {# record} other {# records}}",
+    "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page"
+  },
   "typeToNarrow": "Type to narrow",
   "unlink": "Unlink",
   "unreachable": "The server cannot be reached",
+  "view": "View",
+  "viewFieldValue": "View field value",
   "writeFailed": "The write failed"
 }

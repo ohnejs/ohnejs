@@ -1,14 +1,21 @@
 {
+  "actions": "Radnje",
   "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
+  "apply": "Primijeni",
+  "cancel": "Otkaži",
   "clear": "Očisti",
   "clearSearch": "Očisti pretragu",
+  "close": "Zatvori",
   "collections": "Kolekcije",
   "confirmDelete": "Potvrdi",
   "confirmDeleteCount": "Potvrdi ({count})",
   "delete": "Obriši",
   "deleted": "{count, plural, one {# zapis obrisan} few {# zapisa obrisana} other {# zapisa obrisano}}",
   "deletedPartial": "{count} obrisano, {failed} neuspješno",
+  "deselect": "Poništi odabir",
+  "edit": "Uredi",
+  "editFieldValue": "Uredi vrijednost polja",
   "empty": {
     "title": "Nema zapisa",
     "body": "Ova kolekcija je prazna."
@@ -29,6 +36,36 @@
       "label": "Ažurirano"
     }
   },
+  "filter": {
+    "addCondition": "Dodaj uslov",
+    "addConditionGroup": "Dodaj grupu uslova",
+    "allMustMatch": "Svi sljedeći uslovi moraju biti ispunjeni",
+    "and": "i",
+    "anyMustMatch": "Barem jedan od sljedećih uslova mora biti ispunjen",
+    "condition": "Uslov",
+    "conditionGroup": "Grupa uslova",
+    "duplicate": "Dupliciraj",
+    "empty": "Prazno",
+    "false": "Netačno",
+    "noConditions": "Nema postavljenih uslova",
+    "operator": {
+      "contains": "Sadrži",
+      "doesNotContain": "Ne sadrži",
+      "doesNotEqual": "Nije jednako",
+      "endsWith": "Završava sa",
+      "equals": "Jednako",
+      "greaterThan": "Veće od",
+      "greaterThanOrEqualTo": "Veće ili jednako",
+      "lessThan": "Manje od",
+      "lessThanOrEqualTo": "Manje ili jednako",
+      "startsWith": "Počinje sa"
+    },
+    "or": "ili",
+    "title": "Filteri",
+    "toggleRelation": "Promijeni vezu",
+    "true": "Tačno"
+  },
+  "foundErrors": "{count, plural, one {Pronađena # greška} few {Pronađene # greške} other {Pronađeno # grešaka}}",
   "header": {
     "contentLanguage": "Jezik sadržaja",
     "darkMode": "Tamni režim",
@@ -45,6 +82,10 @@
     "move": "kretanje",
     "open": "otvori",
     "search": "traži"
+  },
+  "history": {
+    "redo": "Ponovi",
+    "undo": "Poništi"
   },
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
@@ -69,6 +110,12 @@
   "notFound": "Nije pronađeno",
   "notLinked": "Nije povezano",
   "open": "Otvori",
+  "pagination": {
+    "goToPage": "Idi na stranicu",
+    "next": "Sljedeća stranica",
+    "previous": "Prethodna stranica",
+    "showingRecords": "Prikazuje zapise {from} do {to}"
+  },
   "record": {
     "copied": "UUID kopiran",
     "discard": "Odbaci",
@@ -83,6 +130,7 @@
   "save": "Sačuvaj",
   "saved": "Sačuvano",
   "search": "Pretraga",
+  "select": "Odaberi",
   "selectCollection": "Odaberite kolekciju",
   "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "session": {
@@ -92,8 +140,31 @@
   },
   "set": "Postavi",
   "signOut": "Odjava",
+  "sort": {
+    "addBefore": "Dodaj prije",
+    "ascending": "Sortiraj uzlazno",
+    "descending": "Sortiraj silazno",
+    "moveDown": "Pomjeri dolje",
+    "moveUp": "Pomjeri gore",
+    "none": "Sortiranje nije primijenjeno",
+    "title": "Sortiranje"
+  },
+  "table": {
+    "allCount": "Svi ({count})",
+    "confirmDeleteMany": "Da li zaista želite obrisati {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}?",
+    "confirmDeleteOne": "Da li zaista želite obrisati ovaj zapis?",
+    "deleteCount": "Obriši {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+    "noData": "Nema dostupnih podataka",
+    "pageCount": "Stranica ({count})",
+    "selectPageOrAll": "Želite li odabrati {perPage, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici ili svih {total} zapisa?",
+    "selectedAcrossPages": "Odabrano {entryCount, plural, one {# zapis} few {# zapisa} other {# zapisa}} kroz {pageCount, plural, one {# stranicu} few {# stranice} other {# stranica}}",
+    "selectedCount": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+    "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
+  },
   "typeToNarrow": "Kucajte za sužavanje",
   "unlink": "Ukloni vezu",
   "unreachable": "Server nije dostupan",
+  "view": "Pogledaj",
+  "viewFieldValue": "Pogledaj vrijednost polja",
   "writeFailed": "Upis nije uspio"
 }
