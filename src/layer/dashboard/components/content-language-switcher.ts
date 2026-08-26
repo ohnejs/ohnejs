@@ -10,6 +10,7 @@ import {
   icon,
   toast,
   useDashboardLanguage,
+  useRoute,
   useT,
   when,
 } from 'ohne/dashboard';
@@ -48,16 +49,28 @@ css`
 
 /**
  * The header's content-language dropdown, ported from Pruvious v4's `ContentLanguageSwitcher`.
- * It renders only while the discovery data lists more than one locale.
+ * It renders only while the discovery data lists more than one locale and the page is translatable.
+ * Pages where translation means nothing carry no switcher.
  * The button shows the active locale's formatted code; picking another persists it and toasts.
- * P4 gated visibility per page and persisted through the account.
- * ohne has neither surface, so the switcher always shows and persists locally.
+ * P4 persisted the choice through the account; ohne persists locally.
  */
 export function contentLanguageSwitcher(): Child {
   return when(
-    () => (dashboardMeta()?.locales.length ?? 0) > 1,
+    () => (dashboardMeta()?.locales.length ?? 0) > 1 && translatableContext(),
     () => switcher(),
   );
+}
+
+/**
+ * Whether the current page edits translatable content, reactively.
+ * The collection pages qualify while their collection declares translatable fields.
+ * P4's pages provide this flag; ohne derives it from the route, since only those pages carry one.
+ */
+function translatableContext(): boolean {
+  const segment = useRoute()?.params.collection;
+  if (segment === undefined) return false;
+  const meta = dashboardMeta();
+  return meta?.collections.find((entry) => entry.segment === segment)?.translatable === true;
 }
 
 /**
