@@ -113,8 +113,8 @@ export function describeControl(
 
 /**
  * One form row rendered through the field primitives: the label row, the control, the message.
- * The label carries the required mark; the metadata marks, the dirty dot, and the revert
- * affordance sit at the row's right edge, sized by the label row.
+ * The label carries the required mark.
+ * The metadata marks, the dirty dot, and the revert affordance sit at the row's right edge.
  * The message under the control shows the description muted, or the error destructive in its place.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.
  */
