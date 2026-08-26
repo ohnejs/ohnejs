@@ -30,12 +30,13 @@ export interface FieldRowOptions {
   path: string;
 
   /**
-   * Reactive dirty flag; while set, the row shows the dot and the revert affordance.
+   * Reactive dirty flag; while set, the row shows the touched dot at its right edge.
    */
   dirty?: () => boolean;
 
   /**
-   * Reverts the control to its baseline; rendered as a muted undo mark while dirty.
+   * Reverts the control to its baseline.
+   * While dirty, the touched dot doubles as this action: hover or focus morphs it into an undo mark.
    */
   onRevert?: () => void;
 
@@ -65,21 +66,45 @@ css`
     font-size: 1em;
   }
 
-  .ohne-field-label .ohne-fieldrow-revert {
-    color: hsl(var(--ohne-muted-foreground));
-  }
-
-  .ohne-field-label .ohne-fieldrow-revert:hover {
-    color: hsl(var(--ohne-foreground));
+  .ohne-fieldrow-touched {
+    flex: none;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.25em;
+    height: 1.25em;
   }
 
   .ohne-fieldrow-dot {
-    flex: none;
-    align-self: center;
     width: 0.3125rem;
     height: 0.3125rem;
     border-radius: 50%;
     background-color: hsl(var(--ohne-primary));
+    transition: var(--ohne-transition);
+    transition-property: opacity;
+  }
+
+  .ohne-fieldrow-revert::before {
+    content: '';
+    position: absolute;
+    inset: -0.25em;
+  }
+
+  .ohne-fieldrow-revert svg {
+    position: absolute;
+    opacity: 0;
+    color: hsl(var(--ohne-foreground));
+    transition: var(--ohne-transition);
+    transition-property: opacity;
+  }
+
+  .ohne-fieldrow-revert:is(:hover, :focus-visible) svg {
+    opacity: 1;
+  }
+
+  .ohne-fieldrow-revert:is(:hover, :focus-visible) .ohne-fieldrow-dot {
+    opacity: 0;
   }
 `;
 
@@ -114,7 +139,9 @@ export function describeControl(
 /**
  * One form row rendered through the field primitives: the label row, the control, the message.
  * The label carries the required mark.
- * The metadata marks, the dirty dot, and the revert affordance sit at the row's right edge.
+ * The metadata marks and the touched dot sit at the row's right edge.
+ * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
+ * The pattern mirrors the macOS close button, which shows its cross over the document-edited dot.
  * The message under the control shows the description muted, or the error destructive in its place.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.
  */
@@ -143,20 +170,26 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
       options.locked === true
         ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.locked'))
         : null,
-      () => (options.dirty?.() === true ? h('span', { class: 'ohne-fieldrow-dot' }) : null),
-      () =>
-        options.dirty?.() === true && !isUndefined(options.onRevert)
-          ? h(
-              'button',
-              {
-                class: 'ohne-fieldrow-meta ohne-fieldrow-revert',
-                type: 'button',
-                'aria-label': () => t('dashboard.field.revert'),
-                onClick: () => options.onRevert?.(),
-              },
-              icon('arrow-back-up'),
-            )
-          : null,
+      () => {
+        if (options.dirty?.() !== true) return null;
+        const dot = h('span', { class: 'ohne-fieldrow-dot' });
+        if (isUndefined(options.onRevert)) {
+          return h('span', { class: 'ohne-fieldrow-touched' }, dot);
+        }
+        const revert = h(
+          'button',
+          {
+            class: 'ohne-fieldrow-touched ohne-fieldrow-revert',
+            type: 'button',
+            'aria-label': () => t('dashboard.field.revert'),
+            onClick: () => options.onRevert?.(),
+          },
+          dot,
+          icon('arrow-back-up'),
+        );
+        onCleanup(attachTooltip(revert, () => t('dashboard.field.revert')));
+        return revert;
+      },
     ],
     { required: options.field.required },
   );
