@@ -24,6 +24,7 @@
   "deleted": "{count, plural, one {# Datensatz gelöscht} other {# Datensätze gelöscht}}",
   "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
   "deselect": "Abwählen",
+  "disable": "Deaktivieren",
   "dropItemsHere": "Elemente hier ablegen",
   "duplicate": "Duplizieren",
   "edit": "Bearbeiten",
@@ -32,9 +33,10 @@
     "title": "Keine Datensätze",
     "body": "Diese Sammlung ist leer."
   },
+  "enable": "Aktivieren",
   "field": {
     "hidePassword": "Passwort verbergen",
-    "locked": "gesperrt",
+    "locked": "Dieses Feld kann nicht bearbeitet werden",
     "missing": {
       "body": "Die Dashboard-Komponente für den Feldtyp `{type}` fehlt. Ein Dashboard-Modul registriert sie mit:",
       "title": "Fehlende Feldkomponente"

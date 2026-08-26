@@ -24,6 +24,7 @@
   "deleted": "{count, plural, one {# record deleted} other {# records deleted}}",
   "deletedPartial": "{count} deleted, {failed} failed",
   "deselect": "Deselect",
+  "disable": "Disable",
   "dropItemsHere": "Drop items here",
   "duplicate": "Duplicate",
   "edit": "Edit",
@@ -32,9 +33,10 @@
     "title": "No records",
     "body": "This collection is empty."
   },
+  "enable": "Enable",
   "field": {
     "hidePassword": "Hide password",
-    "locked": "locked",
+    "locked": "This field cannot be edited",
     "missing": {
       "body": "The dashboard component for the field type `{type}` is missing. A dashboard module registers it with:",
       "title": "Missing field component"

@@ -24,6 +24,7 @@
   "deleted": "{count, plural, one {# zapis obrisan} few {# zapisa obrisana} other {# zapisa obrisano}}",
   "deletedPartial": "{count} obrisano, {failed} neuspješno",
   "deselect": "Poništi odabir",
+  "disable": "Onemogući",
   "dropItemsHere": "Ispustite stavke ovdje",
   "duplicate": "Dupliciraj",
   "edit": "Uredi",
@@ -32,9 +33,10 @@
     "title": "Nema zapisa",
     "body": "Ova kolekcija je prazna."
   },
+  "enable": "Omogući",
   "field": {
     "hidePassword": "Sakrij lozinku",
-    "locked": "zaključano",
+    "locked": "Ovo polje se ne može uređivati",
     "missing": {
       "body": "Dashboard komponenta za tip polja `{type}` nedostaje. Dashboard modul je registruje sa:",
       "title": "Nedostaje komponenta polja"
