@@ -14,6 +14,7 @@ import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { type Primitive } from './button-group.ts';
+import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
 import { icon } from './icon.ts';
 import { listenClickOutside, lockScroll } from './overlay.ts';
@@ -112,8 +113,8 @@ export interface DynamicChipsOptions {
 
   /**
    * The minimum number of items allowed in the array; `false` disables the limit.
-   * Accepted for API parity with the source, which never enforces it in the component either;
-   * enforcement lives in validators.
+   * Accepted for API parity with the source, which never enforces it in the component either.
+   * Enforcement lives in validators.
    *
    * @default
    * false
@@ -193,6 +194,7 @@ export interface DynamicChipsOptions {
   /**
    * A scrollable ancestor, scroll-locked while the dropdown is open.
    * The window locks regardless.
+   * Omitted, the control's nearest `.ohne-container` ancestor stands in.
    */
   scrollContainer?: HTMLElement;
 
@@ -453,8 +455,9 @@ function labelOrDash(choice: DynamicChipsChoice): string {
 /**
  * The async multi-value chips field, ported 1-to-1 from Pruvious v4's `PUIDynamicChips`.
  *
- * Chips resolve through `selectedChoicesResolver`; addable choices search remotely with a 250ms
- * debounce and paginate on scroll inside a width-matched `dropdown` that carries the focus ring.
+ * Chips resolve through `selectedChoicesResolver`.
+ * Addable choices search remotely with a 250ms debounce and paginate on scroll.
+ * They render inside a width-matched `dropdown` that carries the focus ring.
  * Rows add on mousedown with prevented default, so the text input keeps focus for multi-adding.
  * Backspace deletes in two steps, previewing the last chip destructively before removing it.
  * Chips reorder by mouse drag or touch long-press onto the dropzones between them.
@@ -939,9 +942,8 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     if (isDropdownVisible.value) {
       untracked(() => {
         const unlockWindow = lockScroll(document.documentElement);
-        const unlockContainer = options.scrollContainer
-          ? lockScroll(options.scrollContainer)
-          : undefined;
+        const pane = options.scrollContainer ?? nearestContainer(input);
+        const unlockContainer = pane ? lockScroll(pane) : undefined;
         const stopOutsideClick = listenClickOutside(root as HTMLElement, () => input.blur());
         const onResize = (): void => input.blur();
         window.addEventListener('resize', onResize);

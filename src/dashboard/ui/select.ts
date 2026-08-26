@@ -15,6 +15,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { type Primitive } from './button-group.ts';
+import { nearestContainer } from './container.ts';
 import { icon } from './icon.ts';
 import { listenClickOutside, lockScroll } from './overlay.ts';
 import { type ScrollableHandle, scrollable } from './scrollable.ts';
@@ -109,8 +110,8 @@ export interface SelectOptions {
   name?: string;
 
   /**
-   * A scrollable ancestor: scroll-locked while open and used as the height reference
-   * for the expanding choices overlay instead of the window.
+   * A scrollable ancestor: scroll-locked while open, and the choices overlay's height reference.
+   * Omitted, the control's nearest `.ohne-container` ancestor stands in, then the window.
    */
   scrollContainer?: HTMLElement;
 
@@ -291,10 +292,10 @@ function toDisplay(value: Primitive): string {
 /**
  * The static single-select combobox, ported 1-to-1 from Pruvious v4's `PUISelect`.
  *
- * The choices expand in place: an absolutely positioned overlay grows over the field, capped at
- * 12 rows, translated upward just enough to fit and clamped to the window or `scrollContainer`.
- * Arrows highlight with clamped ends, Enter selects, Space selects or toggles, Tab highlights the
- * first choice while open, and typing runs a 750ms-windowed typeahead that underlines the match.
+ * The choices expand in place: an absolutely positioned overlay grows over the field, capped at 12 rows.
+ * It translates upward just enough to fit, clamped to the window or `scrollContainer`.
+ * Arrows highlight with clamped ends, Enter selects, Space selects or toggles.
+ * Tab highlights the first choice while open; typing runs a 750ms-windowed typeahead underlining the match.
  * Hover highlighting pauses after keyboard moves until the mouse really travels again.
  * A trailing hidden input carries `id` and `name` for label linkage and form serialization.
  *
@@ -368,8 +369,9 @@ export function select(
     const onResize = (): void => close();
     window.addEventListener('resize', onResize);
     stopResize = () => window.removeEventListener('resize', onResize);
+    const pane = options.scrollContainer ?? nearestContainer(combobox);
     unlockWindow = lockScroll(document.documentElement);
-    unlockContainer = options.scrollContainer ? lockScroll(options.scrollContainer) : undefined;
+    unlockContainer = pane ? lockScroll(pane) : undefined;
 
     const items = choices().reduce(
       (acc, choice) => acc + ('group' in choice ? choice.choices.length + 1 : 1),
@@ -377,7 +379,7 @@ export function select(
     );
     const { itemHeight } = calcItemSizes();
     const rootRect = combobox.getBoundingClientRect();
-    const container = options.scrollContainer;
+    const container = pane;
     const parentHeight = container ? container.offsetHeight : window.innerHeight;
     const rootTop = container ? rootRect.top - container.getBoundingClientRect().top : rootRect.top;
     const rootBottom = parentHeight - rootTop;

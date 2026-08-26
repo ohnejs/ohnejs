@@ -10,6 +10,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { sleep } from '../../utils/sleep/sleep.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { container } from './container.ts';
 import { isEditingText } from './hotkeys.ts';
 import { acquireOverlay, FOCUSABLE, type OverlayHandle } from './overlay.ts';
 import './tokens.ts';
@@ -124,42 +125,6 @@ export interface Popup {
 const trapStack: HTMLElement[] = [];
 
 css`
-  .ohne-container {
-    display: flex;
-    flex-direction: column;
-    outline: none;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--ohne-foreground) / 0.25) transparent;
-  }
-
-  .ohne-container-scroll-button {
-    flex-shrink: 0;
-    position: sticky;
-    z-index: 21;
-    height: 1.5rem;
-    cursor: default;
-    visibility: hidden;
-  }
-
-  .ohne-container-scroll-button-active {
-    visibility: visible;
-  }
-
-  .ohne-container-scroll-button:first-child {
-    top: 0;
-    margin-bottom: -1.5rem;
-  }
-
-  .ohne-container-scroll-button:last-child {
-    bottom: 0;
-    margin-top: -1.5rem;
-  }
-
-  .ohne-container-content {
-    flex: 1;
-  }
-
   .ohne-popup {
     position: fixed;
     z-index: 100;
@@ -269,20 +234,6 @@ css`
   }
 `;
 
-function scrollButton(): HTMLElement {
-  return h('div', { class: 'ohne-container-scroll-button' });
-}
-
-function container(classNames: string, ...children: Child[]): HTMLElement {
-  return h(
-    'div',
-    { tabindex: '-1', class: `ohne-container ${classNames}` },
-    scrollButton(),
-    h('div', { class: 'ohne-container-content' }, children),
-    scrollButton(),
-  );
-}
-
 /**
  * The modal layer, ported 1-to-1 from Pruvious v4's `PUIPopup`.
  * A dimmed backdrop and a centered card appended to `document.body`, the base of every popup.
@@ -328,8 +279,15 @@ export function popup(
   const slot = (value: Child | ((slotClose: PopupClose) => Child)): Child =>
     isFunction<(slotClose: PopupClose) => Child>(value) ? value(close) : value;
 
+  // The live `container` scroll pane, so drag edge-scroll and pane locks work inside popups.
+  const scrollPane = (classNames: string, children: Child | (() => Child)): HTMLElement => {
+    const pane = container(children);
+    for (const name of classNames.split(' ')) pane.classList.add(name);
+    return pane;
+  };
+
   const contentRoot = fullHeight
-    ? container('ohne-popup-content', () => slot(content))
+    ? scrollPane('ohne-popup-content', () => slot(content))
     : h('div', { class: 'ohne-popup-content' }, () => slot(content));
 
   const panel = h(
@@ -353,7 +311,7 @@ export function popup(
 
   const root = fullHeight
     ? h('div', { tabindex: '-1', class: classes }, overlayEl, panel)
-    : container(classes, overlayEl, panel);
+    : scrollPane(classes, [overlayEl, panel]);
 
   root.style.setProperty('--ohne-overlay-transition-duration', `${duration}ms`);
   if (!isUndefined(options.size)) root.style.setProperty('--ohne-size', String(options.size));

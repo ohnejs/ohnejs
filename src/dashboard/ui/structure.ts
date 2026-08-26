@@ -12,7 +12,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { structureDraggable } from './container.ts';
+import { nearestContainer, structureDraggable } from './container.ts';
 import { listenClickOutside } from './overlay.ts';
 import { structureItem } from './structure-item.ts';
 import { structureAccepts, structureDropIndex } from './structure-model.ts';
@@ -208,7 +208,9 @@ export function structure<TItem extends Record<string, unknown>>(
   );
 
   let prevScrollY = 0;
+  let prevPaneY = 0;
   let stopFreeze: (() => void) | null = null;
+  let unfreezePane: (() => void) | null = null;
 
   const freeze = (): void => {
     const y = options.scroll ? options.scroll.y.value : window.scrollY;
@@ -223,11 +225,24 @@ export function structure<TItem extends Record<string, unknown>>(
   const pauseScrollWatcher = debounce(() => {
     stopFreeze?.();
     stopFreeze = null;
+    unfreezePane?.();
+    unfreezePane = null;
   }, 250);
 
   const resumeScrollWatcher = (): void => {
     prevScrollY = options.scroll ? options.scroll.y.value : window.scrollY;
     stopFreeze ??= effect(freeze);
+    // Without a reactive handle, the nearest pane pins through its scroll events instead, as the
+    // source pins the injected `PUIContainer` scroll.
+    const pane = options.scroll ? undefined : nearestContainer(root);
+    if (pane && !unfreezePane) {
+      prevPaneY = pane.scrollTop;
+      const pin = (): void => {
+        if (pane.scrollTop !== prevPaneY) pane.scrollTop = prevPaneY;
+      };
+      pane.addEventListener('scroll', pin);
+      unfreezePane = () => pane.removeEventListener('scroll', pin);
+    }
   };
 
   const setDraggable = (
@@ -324,13 +339,16 @@ export function structure<TItem extends Record<string, unknown>>(
     pauseScrollWatcher.cancel();
     stopFreeze?.();
     stopFreeze = null;
+    unfreezePane?.();
+    unfreezePane = null;
   });
 
-  return h(
+  const root = h(
     'div',
     {
       class: () =>
         'ohne-structure' +
+        (disabled() ? ' ohne-structure-disabled' : '') +
         (model.value.length ? '' : ' ohne-structure-empty') +
         (!model.value.length && droppable.value && !disabled() ? ' ohne-structure-dropzone' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
@@ -356,4 +374,6 @@ export function structure<TItem extends Record<string, unknown>>(
       },
     ),
   );
+
+  return root;
 }

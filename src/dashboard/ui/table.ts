@@ -169,8 +169,8 @@ export interface TableOptions<TColumns extends TableColumns> {
   onSelectAll?: (value: boolean) => void;
 
   /**
-   * Called when a row is double-clicked, after the text selection the double-click made is
-   * cleared.
+   * Called when a row is double-clicked.
+   * The text selection the double-click made is cleared first.
    */
   onDoubleClick?: (row: TableRow<TColumns>, event: MouseEvent) => void;
 }
@@ -186,8 +186,8 @@ export interface Table {
 
   /**
    * The row id anchoring the next shift-click range, or `null`.
-   * Writable: a caller that selects a row programmatically seeds it, so a following shift-click
-   * ranges from that row.
+   * Writable: a caller that selects a row programmatically seeds it.
+   * A following shift-click then ranges from that row.
    */
   selectOrigin: Ref<number | string | null>;
 }
@@ -294,12 +294,13 @@ css`
     justify-content: flex-end;
   }
 
-  .ohne-table :where(th):not(:hover) .ohne-table-sort-button {
-    display: none;
+  /* Opacity, not display, so the buttons stay tabbable and reveal on keyboard focus. */
+  .ohne-table :where(th):not(:hover) .ohne-table-sort-button:not(:focus-visible) {
+    opacity: 0;
   }
 
-  .ohne-table :where(tr):not(:hover) .ohne-table-action-button {
-    display: none;
+  .ohne-table :where(tr):not(:hover) .ohne-table-action-button:not(:focus-visible) {
+    opacity: 0;
   }
 `;
 
@@ -320,15 +321,14 @@ function trackShift(): void {
 }
 
 /**
- * A fixed-layout data table, ported 1-to-1 from Pruvious v4's `PUITable`: sticky header and edge
- * columns, per-column sort toggles, checkbox row selection with shift ranges, a per-row actions
- * menu, and an empty state.
- * Column widths come only from the `<colgroup>`; the table sets no height and never scrolls -
- * put it inside a scroll container.
- * Sort and action buttons hide off-hover through CSS; the sorted column and the open menu stay
- * visible.
- * Selection bookkeeping lives in the caller: `onSelectAll` fills or clears `selected`, and
- * selection writes are recomputed into `selectAllState` there.
+ * A fixed-layout data table, ported 1-to-1 from Pruvious v4's `PUITable`.
+ * It brings a sticky header and edge columns, per-column sort toggles, and shift-range selection.
+ * A per-row actions menu and an empty state round it out.
+ * Column widths come only from the `<colgroup>`.
+ * The table sets no height and never scrolls - put it inside a scroll container.
+ * Sort and action buttons hide off-hover through CSS; the sorted column and the open menu stay visible.
+ * Selection bookkeeping lives in the caller.
+ * `onSelectAll` fills or clears `selected`, and selection writes are recomputed into `selectAllState` there.
  *
  * @example
  * ```ts
@@ -450,7 +450,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
           sort?.column === key && sort.direction === 'asc'
             ? (labels().sortInDescendingOrder ?? 'Sort in descending order')
             : (labels().sortInAscendingOrder ?? 'Sort in ascending order');
-        sortButton.style.display = sort?.column === key ? 'inline-flex' : '';
+        sortButton.style.opacity = sort?.column === key ? '1' : '';
       });
       children.push(
         h(
@@ -504,7 +504,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
     });
     batchedEffect(() => {
       actionButton.title = labels().actions ?? 'Actions';
-      actionButton.style.display = visibleActions.value === rowIndex() ? 'inline-flex' : '';
+      actionButton.style.opacity = visibleActions.value === rowIndex() ? '1' : '';
     });
     return h(
       'td',

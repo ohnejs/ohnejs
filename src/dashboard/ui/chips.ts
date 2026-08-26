@@ -9,6 +9,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
 import { icon } from './icon.ts';
 import { attachTooltip } from './tooltip.ts';
@@ -145,6 +146,7 @@ export interface ChipsOptions {
   /**
    * The surrounding scroll container, scroll-locked while the dropdown is open.
    * The window locks regardless.
+   * Omitted, the control's nearest `.ohne-container` ancestor stands in.
    */
   scrollContainer?: HTMLElement;
 }
@@ -583,7 +585,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
       } else if (event.key === 'Backspace') {
         if (!inputValue.value) {
           const at = backspaceIndex.value;
-          if (at !== null && model.value[at] !== undefined && at === removeIndex.value) {
+          if (at !== null && model.value[at] && at === removeIndex.value) {
             model.value = model.value.filter((_, i) => i !== at);
             removeIndex.value = null;
             backspaceIndex.value = null;
@@ -815,7 +817,8 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   effect(() => {
     if (isDropdownVisible.value && choicesOf) {
       const unlockWindow = lockScroll(document.documentElement);
-      const unlockContainer = options.scrollContainer ? lockScroll(options.scrollContainer) : null;
+      const pane = options.scrollContainer ?? nearestContainer(input);
+      const unlockContainer = pane ? lockScroll(pane) : null;
       const onOutsideClick = (event: MouseEvent): void => {
         if (event.target instanceof Node && root && !root.contains(event.target)) input.blur();
       };

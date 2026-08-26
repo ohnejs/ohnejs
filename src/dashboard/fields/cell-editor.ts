@@ -49,16 +49,16 @@ css`
     min-width: 140px;
     border: none;
     outline: none;
-    background: var(--bg);
+    background: hsl(var(--ohne-background));
     color: inherit;
     font: inherit;
-    padding: 0 var(--s3);
-    height: var(--row);
-    box-shadow: inset 0 0 0 1px var(--accent);
+    padding: 0 0.75rem;
+    height: 100%;
+    box-shadow: inset 0 0 0 1px hsl(var(--ohne-ring));
   }
 
   .cell-editor.invalid {
-    color: var(--danger);
+    color: hsl(var(--ohne-destructive));
   }
 `;
 

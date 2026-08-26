@@ -12,6 +12,9 @@ import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
 import { placeFixed } from './overlay.ts';
 import { scrollable } from './scrollable.ts';
+// The menu renders `dropdown`'s panel chrome by hand, so it takes those styles from their owner.
+// Re-declaring them here would re-order them after every consumer's overrides.
+import './dropdown.ts';
 import './tokens.ts';
 
 /**
@@ -65,61 +68,6 @@ const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-star
 css`
   .ohne-context-menu-floating {
     position: fixed;
-  }
-
-  .ohne-dropdown {
-    z-index: 99997;
-    display: flex;
-    flex-direction: column;
-    width: 15em;
-    max-width: 100%;
-    outline: none;
-    font-size: calc(1rem + var(--ohne-size) * 0.125rem);
-  }
-
-  .ohne-no-interaction .ohne-dropdown,
-  .ohne-no-interaction .ohne-dropdown * {
-    pointer-events: all !important;
-  }
-
-  .ohne-dropdown-scrollable {
-    background-color: hsl(var(--ohne-background));
-    border-radius: calc(var(--ohne-radius) - 0.125rem);
-    box-shadow: var(--ohne-shadow);
-    color: hsl(var(--ohne-foreground));
-  }
-
-  .ohne-dropdown-mounted .ohne-dropdown-scrollable {
-    transition: var(--ohne-transition);
-    transition-property: opacity, transform;
-  }
-
-  .ohne-dropdown:not(.ohne-dropdown-mounted) .ohne-dropdown-scrollable {
-    opacity: 0;
-    transform: translate3d(0, -0.5rem, 0) scale(0.95);
-  }
-
-  .ohne-dropdown-top-start:not(.ohne-dropdown-mounted) .ohne-dropdown-scrollable,
-  .ohne-dropdown-top-end:not(.ohne-dropdown-mounted) .ohne-dropdown-scrollable {
-    transform: translate3d(0, 0.5rem, 0) scale(0.95);
-  }
-
-  .ohne-dropdown-inner {
-    padding: 0.25rem;
-  }
-
-  .ohne-dropdown-inner > hr {
-    width: calc(100% + 0.5rem);
-    margin: 0.25rem -0.25rem;
-    height: 1px;
-    background-color: hsl(var(--ohne-card) / 0.16);
-    border: none;
-  }
-
-  .ohne-dropdown-inner > hr + hr,
-  .ohne-dropdown-inner > hr:first-child,
-  .ohne-dropdown-inner > hr:last-child {
-    display: none;
   }
 `;
 

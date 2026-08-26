@@ -5,7 +5,7 @@ let count = 0;
  * One definition, so the traps in the floater and the popup agree on what counts as focusable.
  */
 export const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not(:disabled), input:not(:disabled):not([hidden]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Pins `el` at the viewport coordinates `x`/`y` under `position: fixed`.

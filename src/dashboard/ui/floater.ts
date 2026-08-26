@@ -12,6 +12,7 @@ import { sleep } from '../../utils/sleep/sleep.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { nearestContainer } from './container.ts';
 import { placeFloating } from './floater-place.ts';
 import { FOCUSABLE, lockScroll, listenClickOutside, placeFixed } from './overlay.ts';
 import './tokens.ts';
@@ -65,6 +66,7 @@ export interface FloaterOptions {
 
   /**
    * A scrollable ancestor locked alongside the window while the floater is open.
+   * Omitted, the handle's nearest `.ohne-container` ancestor stands in.
    */
   scrollContainer?: HTMLElement;
 
@@ -422,7 +424,8 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
     window.addEventListener('resize', onResize);
     stopResize = () => window.removeEventListener('resize', onResize);
     unlockWindow = lockScroll(document.documentElement);
-    unlockContainer = options.scrollContainer ? lockScroll(options.scrollContainer) : undefined;
+    const pane = options.scrollContainer ?? nearestContainer(handle);
+    unlockContainer = pane ? lockScroll(pane) : undefined;
     setTimeout(() => {
       if (untracked(() => isVisible.value)) activateTrap();
     }, transitionDuration);

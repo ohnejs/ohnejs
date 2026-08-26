@@ -9,6 +9,20 @@ import { h } from '../render/h.ts';
 import './tokens.ts';
 
 /**
+ * The nearest scrollable pane above `el`: its closest `.ohne-container` ancestor, if any.
+ * Pickers lock and size against it when no explicit `scrollContainer` is passed.
+ * The source injects the nearest `PUIContainer` the same way.
+ *
+ * @example
+ * ```ts
+ * nearestContainer(combobox) // -> the popup's scroll pane, or undefined outside one
+ * ```
+ */
+export function nearestContainer(el: Element): HTMLElement | undefined {
+  return el.closest<HTMLElement>('.ohne-container') ?? undefined;
+}
+
+/**
  * The structure item currently being dragged.
  */
 export interface StructureDraggable {
@@ -105,11 +119,10 @@ css`
 `;
 
 /**
- * A scrollable flex column, ported 1-to-1 from Pruvious v4's `PUIContainer`, with invisible
- * hover-to-scroll edge zones that activate only during a non-touch structure drag, so users can
- * scroll while dragging.
- * Each sticky zone shows only while there is somewhere left to scroll in its direction; hovering
- * one scrolls `distance` pixels per second, and a manual wheel cancels the auto-scroll.
+ * A scrollable flex column, ported 1-to-1 from Pruvious v4's `PUIContainer`.
+ * Its invisible hover-to-scroll edge zones let users scroll during a non-touch structure drag.
+ * Each sticky zone shows only while there is somewhere left to scroll in its direction.
+ * Hovering one scrolls `distance` pixels per second; a manual wheel cancels the auto-scroll.
  * The source's legacy `mousewheel` listener becomes `wheel`.
  *
  * @example

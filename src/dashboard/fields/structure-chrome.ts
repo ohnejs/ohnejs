@@ -122,6 +122,16 @@ css`
     flex-shrink: 0;
   }
 
+  /* A disabled structure hides the drag handle; the inset re-aligns the header, as the source. */
+  .ohne-structure-disabled
+    > *
+    > :where(.ohne-structure-items)
+    > :where(.ohne-card)
+    > :where(.ohne-card-header)
+    > :where(:first-child) {
+    margin-left: 0.25rem;
+  }
+
   .ohne-item-error-mark + * {
     border-color: hsl(var(--ohne-destructive));
   }

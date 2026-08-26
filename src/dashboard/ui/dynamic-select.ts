@@ -15,6 +15,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { type Primitive } from './button-group.ts';
+import { nearestContainer } from './container.ts';
 import { icon } from './icon.ts';
 import { listenClickOutside, lockScroll } from './overlay.ts';
 import { type ScrollableHandle, scrollable } from './scrollable.ts';
@@ -161,8 +162,8 @@ export interface DynamicSelectOptions {
   initialKeyword?: string;
 
   /**
-   * A scrollable ancestor: scroll-locked while open and used as the height reference
-   * for the expanding choices overlay instead of the window.
+   * A scrollable ancestor: scroll-locked while open, and the choices overlay's height reference.
+   * Omitted, the control's nearest `.ohne-container` ancestor stands in, then the window.
    */
   scrollContainer?: HTMLElement;
 
@@ -405,11 +406,11 @@ function labelOrDash(choice: DynamicSelectChoice): string {
 /**
  * The async single-select combobox, ported 1-to-1 from Pruvious v4's `PUIDynamicSelect`.
  *
- * The same in-place overlay as `select`, plus a sticky search input, a 250ms-debounced remote
- * search, and infinite-scroll pagination; every open refetches page 1 through `choicesResolver`.
+ * The same in-place overlay as `select`, plus a sticky search input and a 250ms-debounced remote search.
+ * Results paginate on infinite scroll; every open refetches page 1 through `choicesResolver`.
  * The overlay caps at the search row plus 11 choice rows and grows or shrinks with the results.
- * The selected choice resolves asynchronously through `selectedChoiceResolver`, so the field
- * renders its placeholder until the initial resolve lands, replacing the source's async setup.
+ * The selected choice resolves asynchronously through `selectedChoiceResolver`.
+ * The field renders its placeholder until the initial resolve lands, replacing the source's async setup.
  * Row height follows the first choice: a `detail` there switches the whole list to tall rows.
  *
  * @example
@@ -491,8 +492,9 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     const onResize = (): void => close();
     window.addEventListener('resize', onResize);
     stopResize = () => window.removeEventListener('resize', onResize);
+    const pane = options.scrollContainer ?? nearestContainer(combobox);
     unlockWindow = lockScroll(document.documentElement);
-    unlockContainer = options.scrollContainer ? lockScroll(options.scrollContainer) : undefined;
+    unlockContainer = pane ? lockScroll(pane) : undefined;
 
     updateSizes();
     mousePaused.value = true;
@@ -664,7 +666,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
   const updateSizes = (): void => {
     const { itemHeight, detailedItemHeight } = calcItemSizes();
     const rootRect = combobox.getBoundingClientRect();
-    const container = options.scrollContainer;
+    const container = options.scrollContainer ?? nearestContainer(combobox);
     const parentHeight = container ? container.offsetHeight : window.innerHeight;
     const rootTop = container ? rootRect.top - container.getBoundingClientRect().top : rootRect.top;
     const rootBottom = parentHeight - rootTop;
