@@ -24,6 +24,7 @@ import {
   computed,
   type ConditionObject,
   effect,
+  first,
   isUndefined,
   jsonClone,
   naturalCompare,
@@ -68,9 +69,8 @@ export interface DataTablePopupOptions {
   where: ConditionObject | undefined;
 
   /**
-   * Called with the serialized `where` on Apply: the exact `ConditionObject` the body-query
-   * endpoint reads, or `undefined` when no conditions are set. See `filterToWhere` for the
-   * precise emitted shape.
+   * Called with the serialized `where` on Apply, or `undefined` when no conditions are set.
+   * The emitted value is the exact `ConditionObject` the body-query endpoint reads; see `filterToWhere`.
    */
   onApply(where: ConditionObject | undefined): void;
 
@@ -115,13 +115,23 @@ css`
     margin-top: 0.75rem;
   }
 
+  .o-where-filters-card {
+    --ohne-padding-header: 0.5rem;
+  }
+
+  /* The source indents item headers with a drag handle; without one, meet the body's 0.75rem grid. */
+  .o-where-filters-row {
+    min-height: 2em;
+    padding-left: 0.25rem;
+  }
+
   .o-where-filters :where(.o-where-filters-actions) {
     display: none;
     gap: 0.25rem;
     margin-left: auto;
   }
 
-  .o-where-filters-item:hover
+  :where(.o-where-filters-item:hover, .o-where-filters-item:focus-within)
     > .ohne-card-header
     > .o-where-filters-row
     > .o-where-filters-actions {
@@ -179,14 +189,12 @@ css`
 `;
 
 /**
- * The filter builder popup, the port of Pruvious v4's `WhereFilters` tree inside its
- * view-configuration popup.
+ * The filter builder popup, ported from Pruvious v4's `WhereFilters` tree in its view-configuration popup.
  *
- * Each condition picks a field, an operator valid for the field's storage primitive, and a
- * typed value input; condition groups nest with a toggleable and/or relation, and the top
- * level carries its own relation over all members.
- * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`; a dirty
- * tree guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * Each condition picks a field, an operator valid for its storage primitive, and a typed value input.
+ * Condition groups nest with a toggleable and/or relation; the top level carries its own over all members.
+ * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`.
+ * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function dataTablePopup(options: DataTablePopupOptions): Popup {
@@ -220,13 +228,13 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     (fieldByName(name)?.logicalType ?? 'text') as FilterableType;
 
   const newCondition = (): FilterCondition | undefined => {
-    const first = fieldChoices()[0];
-    if (isUndefined(first)) return undefined;
+    const choice = first(fieldChoices());
+    if (isUndefined(choice)) return undefined;
     return {
       key: filterKey(),
-      field: first.name,
+      field: choice.name,
       operator: 'eq',
-      value: filterDefaultValue(typeOf(first.name)),
+      value: filterDefaultValue(typeOf(choice.name)),
     };
   };
 
@@ -443,7 +451,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
         () => t('dashboard.filter.addCondition'),
         () => addCondition(group),
       ),
-      // The source's condition-group icon is `copy-plus`, not in the icon registry yet.
+      // The source's condition-group icon is `copy-plus`, which the icon registry lacks.
       button([icon('copy'), h('span', null, () => t('dashboard.filter.conditionGroup'))], {
         variant: 'outline',
         class: 'o-where-filters-large-button',
@@ -596,7 +604,10 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     applyButton.classList.toggle('ohne-button-outline', !changed);
   });
 
-  const handle = popup(card(groupBody(root), { header: rootHeader() }), {
+  const filtersCard = card(groupBody(root), { header: rootHeader() });
+  filtersCard.classList.add('o-where-filters-card');
+
+  const handle = popup(filtersCard, {
     size: -1,
     width: options.width,
     fullHeight: true,
