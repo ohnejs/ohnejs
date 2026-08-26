@@ -1,8 +1,9 @@
 import type { Child } from '../render/insert.ts';
 
+import { first } from '../../utils/array/first.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
-import { onCleanup } from '../../utils/reactive/effect-scope.ts';
+import { effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
@@ -131,6 +132,7 @@ const heights = ref<{ toastId: string | number; height: number }[]>([]);
 const queue = ref<{ message: string; options?: ToastOptions }[]>([]);
 
 let counter = 0;
+let outlet: HTMLElement | undefined;
 
 const TYPE_ICONS: Record<Exclude<ToastRecord['type'], 'default'>, IconName> = {
   success: 'circle-check',
@@ -738,12 +740,21 @@ export function queueToast(message: string, options?: ToastOptions): void {
  * Swipe-up dismisses (20px or 0.11 px/ms), exits get a 200ms window, and Alt+T focuses the stack.
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.
  *
+ * The outlet is a lazy singleton built in a detached scope: every call returns the same element.
+ * A screen swap re-parents it instead of rebuilding it.
+ * A showing toast keeps its DOM, its running timer, and its animation state across navigations.
+ *
  * @example
  * ```ts
  * h('div', null, page, toaster())
  * ```
  */
 export function toaster(): HTMLElement {
+  outlet ??= effectScope(true).run(createToaster);
+  return outlet;
+}
+
+function createToaster(): HTMLElement {
   const expanded = ref(false);
   const interacting = ref(false);
   let isFocusWithin = false;
@@ -961,7 +972,7 @@ export function toaster(): HTMLElement {
       'data-x-position': 'center',
       'data-lifted': 'false',
       style: () =>
-        `--front-toast-height: ${heights.value[0]?.height}px; ` +
+        `--front-toast-height: ${first(heights.value)?.height}px; ` +
         `--offset: 0.5rem; --width: 336px; --gap: ${GAP}px;`,
       onMouseenter: () => (expanded.value = true),
       onMousemove: () => (expanded.value = true),
