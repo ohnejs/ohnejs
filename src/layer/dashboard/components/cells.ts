@@ -8,7 +8,7 @@ import {
   textInput,
   useT,
 } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { effect, ref } from 'ohne/utils';
 
 import './roles-field.ts';
 
@@ -26,32 +26,44 @@ registerFieldType('password', {
       cancel,
     });
   },
-  control({ field, mode, path, onInput }) {
+  control({ field, mode, path, disabled, onInput }) {
     const t = useT();
+    const off = disabled === true;
     const raw = ref('');
     const routed = ref('');
     const revealed = ref(false);
 
     const error = (): string => routed.value;
 
-    const reveal = (): HTMLElement => {
-      const glyph = icon(revealed.value ? 'eye' : 'eye-off');
-      glyph.setAttribute('width', '1.125em');
-      glyph.setAttribute('height', '1.125em');
-      const toggle = button(glyph, {
-        variant: revealed.value ? 'accent' : 'ghost',
+    // One persistent button whose icon swaps in place, so a click never unmounts the focused node.
+    const reveal = button(
+      () => {
+        const glyph = icon(revealed.value ? 'eye' : 'eye-off');
+        glyph.setAttribute('width', '1.125em');
+        glyph.setAttribute('height', '1.125em');
+        return glyph;
+      },
+      {
+        variant: 'ghost',
+        disabled: off ? (): boolean => true : undefined,
         onClick: () => {
           revealed.value = !revealed.value;
         },
-      });
-      toggle.title = t(
+      },
+    );
+    reveal.tabIndex = -1;
+    // The source binds the variant reactively; `button` takes a static one, so the classes patch
+    // here. The button's own class attribute has no reactive dependency, so the patch persists.
+    effect(() => {
+      reveal.classList.toggle('ohne-button-accent', revealed.value);
+      reveal.classList.toggle('ohne-button-ghost', !revealed.value);
+      reveal.title = t(
         revealed.value ? 'dashboard.field.hidePassword' : 'dashboard.field.showPassword',
       );
-      toggle.tabIndex = -1;
-      return toggle;
-    };
+    });
 
     const root = textInput(raw, {
+      disabled: () => off,
       type: () => (revealed.value ? 'text' : 'password'),
       placeholder: mode === 'edit' ? () => t('dashboard.field.unchanged') : undefined,
       autocomplete: 'new-password',

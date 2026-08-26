@@ -178,7 +178,6 @@
     "expiredBody": "Your session has timed out due to inactivity. Please log in again to continue.",
     "leave": "Leave"
   },
-  "set": "Set",
   "signOut": "Sign out",
   "sort": {
     "addAfter": "Add after",

@@ -387,7 +387,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     const gone = await deleteRecord(segment, String(id));
     deleteBusy = false;
     if (gone) {
-      queueToast(t('dashboard.deleted', { count: 1 }), { type: 'error' });
+      queueToast(t('dashboard.deleted', { count: 1 }), { type: 'success' });
       refresh();
     } else {
       toast(t('dashboard.deletedPartial', { count: 0, failed: 1 }), { type: 'error' });
@@ -427,7 +427,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     }
     deleteBusy = false;
     if (lost === 0) {
-      queueToast(t('dashboard.deleted', { count: uuids.length }), { type: 'error' });
+      queueToast(t('dashboard.deleted', { count: uuids.length }), { type: 'success' });
     } else {
       toast(t('dashboard.deletedPartial', { count: uuids.length - lost, failed: lost }), {
         type: 'error',

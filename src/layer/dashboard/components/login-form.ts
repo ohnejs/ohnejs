@@ -13,7 +13,7 @@ import {
   useT,
   when,
 } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { effect, ref } from 'ohne/utils';
 
 /**
  * Options for `loginForm`.
@@ -65,22 +65,31 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     else if (outcome === 'unreachable') toast(t('dashboard.login.unreachable'), { type: 'error' });
   };
 
-  const reveal = (): HTMLElement => {
-    const glyph = icon(revealed.value ? 'eye' : 'eye-off');
-    glyph.setAttribute('width', '1.125em');
-    glyph.setAttribute('height', '1.125em');
-    const control = button(glyph, {
-      variant: revealed.value ? 'accent' : 'ghost',
+  // One persistent button whose icon swaps in place, so a click never unmounts the focused node.
+  const reveal = button(
+    () => {
+      const glyph = icon(revealed.value ? 'eye' : 'eye-off');
+      glyph.setAttribute('width', '1.125em');
+      glyph.setAttribute('height', '1.125em');
+      return glyph;
+    },
+    {
+      variant: 'ghost',
       onClick: () => {
         revealed.value = !revealed.value;
       },
-    });
-    control.title = t(
+    },
+  );
+  reveal.tabIndex = -1;
+  // The source binds the variant reactively; `button` takes a static one, so the classes patch here.
+  // The button's own class attribute has no reactive dependency, so it never overwrites the patch.
+  effect(() => {
+    reveal.classList.toggle('ohne-button-accent', revealed.value);
+    reveal.classList.toggle('ohne-button-ghost', !revealed.value);
+    reveal.title = t(
       revealed.value ? 'dashboard.login.hidePassword' : 'dashboard.login.showPassword',
     );
-    control.tabIndex = -1;
-    return control;
-  };
+  });
 
   const rememberRow = checkbox(remember, () => t('dashboard.login.rememberMe'));
   rememberRow.addEventListener('keydown', (event) => {

@@ -57,7 +57,10 @@ css`
     margin-top: 0.75rem;
   }
 
-  .o-order-by .o-order-by-item:hover > .ohne-card-header > .o-order-by-row > .o-order-by-actions {
+  :where(.o-order-by-item:hover, .o-order-by-item:focus-within)
+    > .ohne-card-header
+    > .o-order-by-row
+    > .o-order-by-actions {
     display: flex;
   }
 `;
@@ -65,11 +68,12 @@ css`
 /**
  * The sorting rule builder, ported from Pruvious v4's `OrderBy`.
  *
- * Each rule is a card: a field select beside the ascending/descending pair, whose icons follow
- * the field's storage primitive, with hover-revealed move, add-before, and delete actions.
+ * Each rule is a card: a field select beside the ascending/descending pair.
+ * The pair's icons follow the field's storage primitive.
+ * Move, add-before, and delete actions reveal on hover or focus.
  * A field appears in one rule at most; taken fields render disabled in the other selects.
- * It emits ohne order strings (`field` ascending, `-field` descending); the source's `nulls`
- * placement pair has no ohne counterpart and is not rendered.
+ * It emits ohne order strings: `field` ascending, `-field` descending.
+ * The source's `nulls` placement pair has no ohne counterpart and is not rendered.
  */
 export function orderBy(options: OrderByOptions): HTMLElement {
   const t = useT();

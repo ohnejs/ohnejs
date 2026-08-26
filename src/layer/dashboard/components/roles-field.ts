@@ -72,6 +72,7 @@ registerFieldType('roles', {
     };
 
     const element = chips(model, {
+      disabled: () => context.disabled === true,
       choices: () => (dashboardMeta()?.roles ?? []).map((name): ChipsChoice => ({ value: name })),
       error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,

@@ -19,8 +19,7 @@ css`
     height: 100%;
     display: grid;
     place-items: center;
-    color: var(--faint);
-    font-size: var(--fs-body);
+    color: hsl(var(--ohne-muted-foreground));
   }
 `;
 

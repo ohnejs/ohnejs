@@ -99,14 +99,16 @@ css`
     flex-wrap: wrap;
   }
 
+  /* Opacity, not display, so the button stays tabbable and its own focus trips td:focus-within. */
   .o-editable-field-cell-button {
     flex-shrink: 0;
-    display: none;
+    display: inline-flex;
+    opacity: 0;
   }
 
   :where(td):hover .o-editable-field-cell-button,
   :where(td):focus-within .o-editable-field-cell-button {
-    display: inline-flex;
+    opacity: 1;
   }
 
   .o-editable-field-cell-button-absolute {
@@ -123,11 +125,10 @@ css`
 /**
  * The editable cell wrapper, ported from Pruvious v4's `EditableFieldCell`.
  *
- * It renders the field's display content with a hover-revealed edit button; clicking sets the
- * `edit=<field>:<id>` query parameter, exactly as the source.
- * It also owns the deep link, the part every source table-field component repeated: while the
- * parameter names this cell, the single-field edit popup is mounted, in view mode for a
- * read-only field.
+ * It renders the field's display content with a hover-revealed edit button.
+ * Clicking sets the `edit=<field>:<id>` query parameter, exactly as the source.
+ * It also owns the deep link, the part every source table-field component repeated.
+ * While the parameter names this cell, the single-field edit popup mounts, in view mode for a read-only field.
  */
 export function editableFieldCell(
   content: Child | (() => Child),
