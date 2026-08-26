@@ -8,7 +8,6 @@ import {
   type FieldForm,
   h,
   icon,
-  navigate,
   popup,
   type Popup,
   toast,
@@ -89,23 +88,36 @@ css`
   }
 `;
 
+const editSignal = ref(0);
+
 /**
  * Reads the `edit` query parameter, reactively: `<field>:<uuid>` while a cell edit is deep-linked.
+ * Both `setEditQueryParam` writes and full navigations refresh the read.
  */
 export function editQueryParam(): string | null {
   useRoute();
+  void editSignal.value;
   return new URLSearchParams(location.search).get('edit');
 }
 
 /**
- * Navigates with the `edit` query parameter set, or removed when `value` is `null`.
+ * Writes the `edit` query parameter into history, or removes it when `value` is `null`.
+ * It deliberately bypasses the router: a deep-linked cell edit opens over the LIVE page, so the
+ * popup animates and the table is not rebuilt - the source's leave guard special-cases `edit`
+ * for the same reason.
+ * The back button still closes the popup: the pushed entry re-renders through the router.
  */
 export function setEditQueryParam(value: string | null): void {
   const params = new URLSearchParams(location.search);
   if (isNull(value)) params.delete('edit');
   else params.set('edit', value);
   const query = params.toString();
-  navigate(location.pathname + (query === '' ? '' : `?${query}`) + location.hash);
+  history.pushState(
+    null,
+    '',
+    location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
+  );
+  editSignal.value += 1;
 }
 
 /**

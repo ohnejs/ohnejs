@@ -433,6 +433,9 @@ export function popup(
   const mountTimer = setTimeout(() => {
     if (disposed) return;
     overlay = acquireOverlay();
+    // The forced reflow registers the hidden state's computed style; without it a fast timer
+    // beats the first paint and the element is born visible, skipping the entrance transition.
+    void root.offsetWidth;
     visible.value = true;
     autofocus();
     void nextTick().then(() => {
