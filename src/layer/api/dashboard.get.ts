@@ -12,6 +12,7 @@ import {
   useBlocks,
   useCollections,
   useConfig,
+  useRoles,
 } from 'ohne';
 import {
   isBoolean,
@@ -264,6 +265,11 @@ export interface DashboardMeta {
   blocks: DashboardBlock[];
 
   /**
+   * The role names the app declares, in registry order.
+   */
+  roles: string[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];
@@ -306,6 +312,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     menu: resolveMenu(collections),
     collections,
     blocks: describeBlocks(collections),
+    roles: useRoles().keys(),
     locales,
     defaultLocale,
   };

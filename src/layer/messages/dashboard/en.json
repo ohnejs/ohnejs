@@ -33,10 +33,15 @@
     "body": "This collection is empty."
   },
   "field": {
-    "i18n": "i18n",
+    "hidePassword": "Hide password",
     "locked": "locked",
-    "reveal": "Reveal",
+    "missing": {
+      "body": "The dashboard component for the field type `{type}` is missing. A dashboard module registers it with:",
+      "title": "Missing field component"
+    },
     "revert": "Revert",
+    "showPassword": "Show password",
+    "translatable": "This field stores a separate value for each language.",
     "unchanged": "unchanged",
     "unique": "unique"
   },

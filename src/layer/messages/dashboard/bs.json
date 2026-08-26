@@ -33,10 +33,15 @@
     "body": "Ova kolekcija je prazna."
   },
   "field": {
-    "i18n": "i18n",
+    "hidePassword": "Sakrij lozinku",
     "locked": "zaključano",
-    "reveal": "Prikaži",
+    "missing": {
+      "body": "Dashboard komponenta za tip polja `{type}` nedostaje. Dashboard modul je registruje sa:",
+      "title": "Nedostaje komponenta polja"
+    },
     "revert": "Vrati",
+    "showPassword": "Prikaži lozinku",
+    "translatable": "Ovo polje čuva zasebnu vrijednost za svaki jezik.",
     "unchanged": "nepromijenjeno",
     "unique": "jedinstveno"
   },

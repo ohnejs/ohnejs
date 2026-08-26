@@ -33,10 +33,15 @@
     "body": "Diese Sammlung ist leer."
   },
   "field": {
-    "i18n": "i18n",
+    "hidePassword": "Passwort verbergen",
     "locked": "gesperrt",
-    "reveal": "Anzeigen",
+    "missing": {
+      "body": "Die Dashboard-Komponente für den Feldtyp `{type}` fehlt. Ein Dashboard-Modul registriert sie mit:",
+      "title": "Fehlende Feldkomponente"
+    },
     "revert": "Zurücksetzen",
+    "showPassword": "Passwort anzeigen",
+    "translatable": "Dieses Feld speichert je Sprache einen eigenen Wert.",
     "unchanged": "unverändert",
     "unique": "eindeutig"
   },
