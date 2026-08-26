@@ -3,11 +3,16 @@ import type { DashboardField } from '../runtime/meta-types.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
+import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { when } from '../render/when.ts';
 import { useT } from '../runtime/use-t.ts';
-import { button } from '../ui/button.ts';
+import { fieldLabel } from '../ui/field-label.ts';
+import { fieldMessage } from '../ui/field-message.ts';
+import { field } from '../ui/field.ts';
 import { icon } from '../ui/icon.ts';
+import { attachTooltip } from '../ui/tooltip.ts';
 import { controlIDs } from './field-type.ts';
 
 /**
@@ -15,7 +20,7 @@ import { controlIDs } from './field-type.ts';
  */
 export interface FieldRowOptions {
   /**
-   * The field the row presents; drives the label, the required mark, and the metadata chips.
+   * The field the row presents; drives the label, the required mark, and the metadata marks.
    */
   field: DashboardField;
 
@@ -25,19 +30,19 @@ export interface FieldRowOptions {
   path: string;
 
   /**
-   * Reactive dirty flag; while set, the row shows the accent dot and the revert affordance.
+   * Reactive dirty flag; while set, the row shows the dot and the revert affordance.
    */
   dirty?: () => boolean;
 
   /**
-   * Reverts the control to its baseline; rendered as a ghost undo button while dirty.
+   * Reverts the control to its baseline; rendered as a muted undo mark while dirty.
    */
   onRevert?: () => void;
 
   /**
-   * The reactive error line under the control; space is reserved so appearing never shifts layout.
+   * The control's reactive message; while non-empty it renders destructive in place of the description.
    */
-  error?: () => Child;
+  error?: () => string;
 
   /**
    * Focuses the control; wired to a click on the label text.
@@ -45,68 +50,36 @@ export interface FieldRowOptions {
   onLabelClick?: () => void;
 
   /**
-   * Renders the locked chip, for immutable and read-only rows.
+   * Renders the locked mark, for immutable and read-only rows.
    */
   locked?: boolean;
 }
 
 css`
-  .ohne-fieldrow + .ohne-fieldrow {
-    margin-top: var(--s4);
-  }
-
-  .ohne-fieldrow-head {
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
-    min-height: 16px;
-    margin-bottom: 5px;
-  }
-
-  .ohne-fieldrow-label {
-    font-size: var(--fs-small);
-    font-weight: 500;
-    color: var(--dim);
+  .ohne-fieldrow .ohne-label {
     cursor: default;
   }
 
-  .ohne-fieldrow-head .ohne-caps {
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    padding: 1px 5px;
+  .ohne-field-label .ohne-fieldrow-meta {
+    display: flex;
+    font-size: 1em;
+  }
+
+  .ohne-field-label .ohne-fieldrow-revert {
+    color: hsl(var(--ohne-muted-foreground));
+  }
+
+  .ohne-field-label .ohne-fieldrow-revert:hover {
+    color: hsl(var(--ohne-foreground));
   }
 
   .ohne-fieldrow-dot {
-    width: 5px;
-    height: 5px;
     flex: none;
+    align-self: center;
+    width: 0.3125rem;
+    height: 0.3125rem;
     border-radius: 50%;
-    background: var(--accent);
-  }
-
-  .ohne-fieldrow-head .ohne-button {
-    height: 18px;
-  }
-
-  .ohne-fieldrow-tail {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
-  }
-
-  .ohne-fieldrow-desc {
-    margin: -2px 0 6px;
-    font-size: var(--fs-small);
-    color: var(--dim);
-  }
-
-  .ohne-fieldrow-error {
-    display: block;
-    margin-top: 5px;
-    font-size: var(--fs-small);
-    color: var(--danger);
-    min-height: 1em;
+    background-color: hsl(var(--ohne-primary));
   }
 `;
 
@@ -139,50 +112,72 @@ export function describeControl(
 }
 
 /**
- * One form row: label and metadata above the control, the error line reserved beneath.
- * The dirty dot and the revert affordance appear only while the control differs from its baseline.
+ * One form row rendered through the field primitives: the label row, the control, the message.
+ * The label carries the required mark; the metadata marks, the dirty dot, and the revert
+ * affordance sit at the row's right edge, sized by the label row.
+ * The message under the control shows the description muted, or the error destructive in its place.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.
  */
 export function fieldRow(options: FieldRowOptions, control: Child): Child {
   const t = useT();
-  const { field } = options;
   const ids = controlIDs(options.path);
-  return h(
-    'div',
-    { class: 'ohne-fieldrow', id: ids.row },
-    h(
-      'div',
-      { class: 'ohne-fieldrow-head' },
+  const failure = (): string => options.error?.() ?? '';
+
+  const languageMark = (): HTMLElement => {
+    const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('language'));
+    onCleanup(attachTooltip(mark, () => t('dashboard.field.translatable')));
+    return mark;
+  };
+
+  const head = fieldLabel(
+    [
       h(
         'span',
-        { class: 'ohne-fieldrow-label', id: ids.label, onClick: () => options.onLabelClick?.() },
-        field.required ? `${field.label} *` : field.label,
+        { class: 'ohne-label', id: ids.label, onClick: () => options.onLabelClick?.() },
+        options.field.label,
       ),
-      field.unique ? h('span', { class: 'ohne-caps' }, () => t('dashboard.field.unique')) : null,
-      field.translatable
-        ? h('span', { class: 'ohne-caps' }, () => t('dashboard.field.i18n'))
+      options.field.unique
+        ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.unique'))
         : null,
+      options.field.translatable ? languageMark() : null,
       options.locked === true
-        ? h('span', { class: 'ohne-caps' }, () => t('dashboard.field.locked'))
+        ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.locked'))
         : null,
-      h(
-        'div',
-        { class: 'ohne-fieldrow-tail' },
-        () => (options.dirty?.() === true ? h('span', { class: 'ohne-fieldrow-dot' }) : null),
-        () =>
-          options.dirty?.() === true && !isUndefined(options.onRevert)
-            ? button(icon('arrow-back-up'), {
-                variant: 'ghost',
-                onClick: options.onRevert,
-                ariaLabel: t('dashboard.field.revert'),
-              })
-            : null,
-      ),
-    ),
-    isUndefined(field.description)
-      ? null
-      : h('div', { class: 'ohne-fieldrow-desc', id: ids.description }, field.description),
-    control,
-    isUndefined(options.error) ? null : h('span', { class: 'ohne-fieldrow-error' }, options.error),
+      () => (options.dirty?.() === true ? h('span', { class: 'ohne-fieldrow-dot' }) : null),
+      () =>
+        options.dirty?.() === true && !isUndefined(options.onRevert)
+          ? h(
+              'button',
+              {
+                class: 'ohne-fieldrow-meta ohne-fieldrow-revert',
+                type: 'button',
+                'aria-label': () => t('dashboard.field.revert'),
+                onClick: () => options.onRevert?.(),
+              },
+              icon('arrow-back-up'),
+            )
+          : null,
+    ],
+    { required: options.field.required },
   );
+
+  const message =
+    isUndefined(options.error) && isUndefined(options.field.description)
+      ? null
+      : when(
+          () => failure() !== '' || !isUndefined(options.field.description),
+          () =>
+            fieldMessage(
+              () => {
+                const current = failure();
+                if (current !== '') return h('p', null, current);
+                return h('p', { id: ids.description }, options.field.description);
+              },
+              { error: () => failure() !== '' },
+            ),
+        );
+
+  const row = field([head, control, message], { class: 'ohne-fieldrow' });
+  row.id = ids.row;
+  return row;
 }

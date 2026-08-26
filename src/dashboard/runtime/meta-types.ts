@@ -231,6 +231,11 @@ export interface DashboardMeta {
   blocks: DashboardBlock[];
 
   /**
+   * The role names the app declares, in registry order.
+   */
+  roles: string[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];

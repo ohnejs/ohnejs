@@ -21,7 +21,7 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
   /* The card header carries the field label, so the row's own label above the card hides. */
-  .ohne-fieldrow:has(> .ohne-object) > .ohne-fieldrow-head > .ohne-fieldrow-label {
+  .ohne-fieldrow:has(> .ohne-object) > .ohne-field-label .ohne-label {
     display: none;
   }
 

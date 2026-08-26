@@ -146,8 +146,8 @@ css`
   .ohne-fieldrow-static {
     display: flex;
     align-items: center;
-    min-height: var(--control);
-    color: var(--dim);
+    min-height: calc(2em + 0.25rem);
+    color: hsl(var(--ohne-muted-foreground));
   }
 `;
 

@@ -7,8 +7,13 @@ import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { useT } from '../runtime/use-t.ts';
+import { alert } from '../ui/alert.ts';
+import { icon } from '../ui/icon.ts';
+import { prose, renderProse } from '../ui/prose.ts';
 
 /**
  * What a cell's display renderer receives.
@@ -269,6 +274,13 @@ export function controlIDs(path: string): {
   };
 }
 
+css`
+  .ohne-field-missing {
+    --ohne-line-height: 1.5em;
+    margin-top: 0.5rem;
+  }
+`;
+
 const FALLBACK: FieldType = {
   display({ value }) {
     return () => {
@@ -279,6 +291,62 @@ const FALLBACK: FieldType = {
       }
       if (isPlainObject(current)) return dimMark('{…}');
       return String(current as string | number | boolean);
+    };
+  },
+  control({ field, initial }) {
+    const t = useT();
+    const type = field.type ?? field.kind;
+    let base = initial;
+    const routed = ref('');
+
+    const content = prose(
+      () => {
+        const flow = h('div', null);
+        renderProse(flow, t('dashboard.field.missing.body', { type }));
+        return [
+          ...flow.children,
+          h('pre', null, h('code', null, `registerFieldType('${type}', { ... })`)),
+        ];
+      },
+      { spacing: -3 },
+    );
+    content.classList.add('ohne-field-missing');
+    const element = alert(content, {
+      title: t('dashboard.field.missing.title'),
+      icon: icon('barrier-block'),
+    });
+    element.tabIndex = -1;
+
+    return {
+      element,
+      // The stored value rides through unchanged, so a whole-item write never blanks a field
+      // the dashboard cannot edit.
+      read() {
+        return isUndefined(base) ? {} : { value: base };
+      },
+      setErrors(errors) {
+        routed.value = errors[''] ?? '';
+        for (const [key, message] of Object.entries(errors)) {
+          if (key !== '') return message;
+        }
+        return '';
+      },
+      error() {
+        return routed.value;
+      },
+      dirty() {
+        return false;
+      },
+      focus() {
+        element.focus();
+      },
+      revert() {
+        routed.value = '';
+      },
+      rebase(value) {
+        base = value;
+        routed.value = '';
+      },
     };
   },
 };
