@@ -19,7 +19,7 @@ import {
 } from 'ohne/dashboard';
 import { effect, isNull, isUndefined, onCleanup, ref, sleep } from 'ohne/utils';
 
-import { contentLocale } from './content-language-switcher.ts';
+import { activeContentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';
 
@@ -132,7 +132,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       readOnly: disabled,
       readOnlyRows: true,
       // P4 resolves translatable values in the content language; the interface language backfills.
-      language: () => contentLocale.value ?? useDashboardLanguage().value,
+      language: () => activeContentLocale() ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);
@@ -169,6 +169,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       collection.segment,
       uuid,
       (reading.value ?? {}) as Record<string, unknown>,
+      collection.translatable ? activeContentLocale() : undefined,
     );
     busy.value = false;
     if (outcome.kind === 'saved') {
@@ -299,14 +300,17 @@ type WriteOutcome =
 
 /**
  * Sends the one-field `PATCH`, retrying once on a busy `503`, exactly as the sheet's cell write.
+ * A given `locale` rides the URL, so a translatable collection writes that locale's value.
  */
 async function writeField(
   segment: string,
   uuid: string,
   body: Record<string, unknown>,
+  locale?: string,
 ): Promise<WriteOutcome> {
+  const suffix = isUndefined(locale) ? '' : `?locale=${encodeURIComponent(locale)}`;
   const send = (): Promise<Response> =>
-    api(`PATCH /collections/${segment}/${uuid}`, {
+    api(`PATCH /collections/${segment}/${uuid}${suffix}`, {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });

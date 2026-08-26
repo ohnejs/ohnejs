@@ -28,6 +28,17 @@ export const contentLocale: Ref<string | undefined> = ref<string | undefined>(
   localStorage.getItem(STORAGE_KEY) ?? undefined,
 );
 
+/**
+ * The validated content locale, reactively: the chosen code while the discovery data lists it.
+ * `undefined` while nothing valid is chosen, so reads and writes address the default locale.
+ * A stale persisted code the app no longer configures reads as `undefined`, never as itself.
+ */
+export function activeContentLocale(): string | undefined {
+  const chosen = contentLocale.value;
+  if (chosen === undefined) return undefined;
+  return (dashboardMeta()?.locales.includes(chosen) ?? false) ? chosen : undefined;
+}
+
 css`
   .ohne-button .o-content-language-label,
   .ohne-button .o-content-language-icon {

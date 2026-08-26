@@ -38,7 +38,7 @@ import {
   untracked,
 } from 'ohne/utils';
 
-import { contentLocale } from './content-language-switcher.ts';
+import { activeContentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History, unsavedChanges } from './history.ts';
@@ -152,7 +152,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       readOnlyRows: true,
       readOnly,
       // P4 resolves translatable values in the content language; the interface language backfills.
-      language: () => contentLocale.value ?? useDashboardLanguage().value,
+      language: () => activeContentLocale() ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);
@@ -188,7 +188,11 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   const load = async (): Promise<void> => {
     state.value = 'loading';
-    const row = await readRecord(collection.segment, id);
+    const row = await readRecord(
+      collection.segment,
+      id,
+      collection.translatable ? untracked(activeContentLocale) : undefined,
+    );
     if (isUndefined(row)) {
       state.value = 'failed';
       return;
@@ -210,9 +214,23 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     settleHash();
   } else {
     void load();
+    if (collection.translatable) {
+      // P4's update page swaps the record in place when the content language changes, silently.
+      // The cleared history reseeds on the newly read locale, so Save starts clean against it.
+      let initial = true;
+      effect(() => {
+        activeContentLocale();
+        if (initial) {
+          initial = false;
+          return;
+        }
+        history.clear();
+        void load();
+      });
+    }
   }
-  // P4 additionally wires the content-language watcher that jumps between translations and the
-  // translations popup here; the translation meta has no ohne counterpart yet.
+  // P4 additionally opens the translations popup from this watcher; that meta has no ohne
+  // counterpart.
 
   // The in-app leg of P4's leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard((target) => {
@@ -243,7 +261,12 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     if (!create && isEmpty(body)) return;
     const focused = document.activeElement;
     busy.value = true;
-    const outcome = await write(collection.segment, uuid, body);
+    const outcome = await write(
+      collection.segment,
+      uuid,
+      body,
+      collection.translatable ? activeContentLocale() : undefined,
+    );
     busy.value = false;
     // The saving fieldset blurs whatever was focused; the element survives the save, so restore.
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
@@ -472,14 +495,22 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 }
 
 /**
- * Reads the record by `UUID` through the body-query endpoint.
+ * Reads the record by `UUID` through the body-query endpoint, at `locale` when one is given.
  * Resolves the row, `null` when the collection has no such record, `undefined` on failure.
  */
-async function readRecord(segment: string, uuid: string): Promise<RecordRow | null | undefined> {
+async function readRecord(
+  segment: string,
+  uuid: string,
+  locale?: string,
+): Promise<RecordRow | null | undefined> {
   try {
     const response = await api(`POST /collections/${segment}/query`, {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ where: { UUID: uuid }, perPage: 1 }),
+      body: JSON.stringify({
+        where: { UUID: uuid },
+        perPage: 1,
+        ...(isUndefined(locale) ? {} : { locale }),
+      }),
     });
     if (!response.ok) return undefined;
     const page = (await response.json()) as { records?: RecordRow[] };
@@ -498,15 +529,20 @@ type WriteOutcome =
 
 /**
  * Sends the save, retrying once on a busy `503`: a create `POST`, or a partial `PATCH` by `UUID`.
+ * A given `locale` rides the URL, so a translatable collection writes that locale's values.
  */
 async function write(
   segment: string,
   uuid: string | undefined,
   body: RecordRow,
+  locale?: string,
 ): Promise<WriteOutcome> {
+  const suffix = isUndefined(locale) ? '' : `?locale=${encodeURIComponent(locale)}`;
   const send = (): Promise<Response> =>
     api(
-      isUndefined(uuid) ? `POST /collections/${segment}` : `PATCH /collections/${segment}/${uuid}`,
+      isUndefined(uuid)
+        ? `POST /collections/${segment}${suffix}`
+        : `PATCH /collections/${segment}/${uuid}${suffix}`,
       {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),

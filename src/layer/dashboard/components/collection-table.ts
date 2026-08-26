@@ -54,6 +54,7 @@ import {
   stripEditParam,
   type TableURLState,
 } from './collection-table-state.ts';
+import { activeContentLocale } from './content-language-switcher.ts';
 import { dataTablePopup } from './data-table-popup.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
 import { unsavedChanges } from './history.ts';
@@ -149,15 +150,15 @@ css`
 /**
  * The collection table page body, ported from Pruvious v4's collection index page.
  *
- * The state lives in the URL: `page`, `order`, `where`, and `columns` are query params, so a
- * reload or back and forward re-renders the same view, and the last query string per segment is
- * remembered and restored when the collection is revisited bare.
- * Every cell renders its field's display inside an editable cell whose popup patches only that
- * field; sorting, the filter and sorting popups, and the pagination push new URL state.
- * Rows select with shift ranges into the batch delete; a row's actions menu opens, edits, and
- * deletes single records with the source's confirm dialogs.
- * Reads page through the body-query endpoint exactly as the sheet did; deletes run record by
- * record with the sheet's toasts.
+ * The state lives in the URL: `page`, `order`, `where`, and `columns` are query params.
+ * A reload or back and forward re-renders the same view.
+ * The last query string per segment is remembered and restored when the collection is revisited bare.
+ * Every cell renders its field's display inside an editable cell whose popup patches only that field.
+ * Sorting, the filter and sorting popups, and the pagination push new URL state.
+ * Rows select with shift ranges into the batch delete.
+ * A row's actions menu opens, edits, and deletes single records with the source's confirm dialogs.
+ * Reads page through the body-query endpoint exactly as the sheet did.
+ * Deletes run record by record with the sheet's toasts.
  */
 export function collectionTable(collection: DashboardCollection): HTMLElement {
   const t = useT();
@@ -237,6 +238,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       order: state.order,
     };
     if (!isUndefined(state.where)) body.where = state.where;
+    // Read inside the load effect, so a content-language switch reloads the page at that locale.
+    const locale = collection.translatable ? activeContentLocale() : undefined;
+    if (!isUndefined(locale)) body.locale = locale;
     return body;
   };
 
@@ -834,8 +838,7 @@ function seedLabels(collection: DashboardCollection, records: readonly TableReco
 }
 
 /**
- * The collection's first plain readable text field, the label heuristic the seeding shares
- * with the sheet.
+ * The collection's first plain readable text field, the label heuristic the seeding shares with the sheet.
  */
 function labelField(collection: DashboardCollection): DashboardField | undefined {
   return collection.fields.find(
