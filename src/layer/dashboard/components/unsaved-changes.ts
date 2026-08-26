@@ -9,7 +9,7 @@ import {
   useT,
   when,
 } from 'ohne/dashboard';
-import { onCleanup, ref } from 'ohne/utils';
+import { isString, onCleanup, ref } from 'ohne/utils';
 
 import { unsavedChanges } from './history.ts';
 
@@ -76,7 +76,8 @@ export function unsavedChangesGuard(): Child {
   // swallowing the undo and redo strokes at capture keeps the history frozen while deciding.
   const suppressHistoryKeys = (event: KeyboardEvent): void => {
     const mac = isMac();
-    const letter = event.key.toLowerCase();
+    // Chrome's autofill fires keydowns whose `key` is `undefined` despite the type.
+    const letter = isString(event.key) ? event.key.toLowerCase() : '';
     if (mac && (!event.metaKey || event.altKey || event.ctrlKey)) return;
     if (!mac && (!event.ctrlKey || event.altKey || event.metaKey)) return;
     if ((letter === 'y' && !event.shiftKey) || (letter === 'z' && (mac || !event.shiftKey))) {
