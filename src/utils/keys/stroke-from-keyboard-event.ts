@@ -1,5 +1,7 @@
 import type { KeyStroke } from './key-stroke.ts';
 
+import { isString } from '../is/is-string.ts';
+
 /**
  * The subset of a browser `KeyboardEvent` a `KeyStroke` is built from.
  */
@@ -14,6 +16,7 @@ export interface KeyboardEventLike {
 /**
  * Normalizes a browser `KeyboardEvent` into a `KeyStroke`.
  * The browser already speaks `KeyboardEvent.key`, so this is a straight field rename.
+ * Chrome's autofill fires keydowns whose `key` is `undefined` despite the type; those read as `''`.
  *
  * @example
  * ```ts
@@ -22,7 +25,7 @@ export interface KeyboardEventLike {
  */
 export function strokeFromKeyboardEvent(event: KeyboardEventLike): KeyStroke {
   return {
-    key: event.key,
+    key: isString(event.key) ? event.key : '',
     ctrl: event.ctrlKey,
     alt: event.altKey,
     shift: event.shiftKey,
