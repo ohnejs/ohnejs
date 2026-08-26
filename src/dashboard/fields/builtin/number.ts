@@ -2,6 +2,7 @@ import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
+import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { textInput } from '../../ui/text-input.ts';
 import { cellEditor } from '../cell-editor.ts';
@@ -11,7 +12,6 @@ import { parseRealValue } from '../parse.ts';
 
 css`
   .ohne-input.ohne-number {
-    max-width: 180px;
     font-variant-numeric: tabular-nums;
   }
 `;
@@ -26,7 +26,9 @@ export const numberType: FieldType = {
   display({ value }) {
     return () => {
       const current = value();
-      return isNullish(current) ? dimMark('·') : String(current as number);
+      if (isNullish(current)) return dimMark('·');
+      const text = String(current as number);
+      return h('span', { class: 'ohne-truncate', title: text }, text);
     };
   },
   editor({ field, value, commit, cancel }) {
@@ -41,8 +43,9 @@ export const numberType: FieldType = {
       cancel,
     });
   },
-  control({ field, initial, path, onInput }) {
+  control({ field, initial, path, disabled, onInput }) {
     const t = useT();
+    const off = disabled === true;
     let base = initial;
     const raw = ref(isNullish(base) ? '' : String(base as number));
     const local = ref('');
@@ -55,7 +58,7 @@ export const numberType: FieldType = {
       onInput();
     };
 
-    const control = textInput(raw);
+    const control = textInput(raw, { disabled: () => off });
     const input = control.querySelector('input') as HTMLInputElement;
     control.classList.add('ohne-number');
     input.setAttribute('inputmode', 'decimal');

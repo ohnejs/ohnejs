@@ -12,7 +12,7 @@ import { h } from '../render/h.ts';
 import { blocksOf } from './_blocks.ts';
 import { carriedField, carryValue } from './_items.ts';
 import { fieldRow } from './field-row.ts';
-import { fieldTypeFor } from './field-type.ts';
+import { fieldTypeFor, registeredFieldType } from './field-type.ts';
 
 /**
  * Options for `createFieldForm`.
@@ -38,7 +38,8 @@ export interface FieldFormOptions {
   attachUUID?: boolean;
 
   /**
-   * Renders readable fields that have no control as locked display-only rows.
+   * Renders readable fields the form cannot edit as locked rows.
+   * A field with a registered control renders it disabled; one without renders display-only.
    * Omitted, such fields are carried through silently, the right shape for nested items.
    *
    * @default
@@ -47,12 +48,21 @@ export interface FieldFormOptions {
   readOnlyRows?: boolean;
 
   /**
-   * Renders every readable field as a locked display-only row, for a viewer who cannot write.
+   * Renders every readable field as a locked row, for a viewer who cannot write.
    *
    * @default
    * false
    */
   readOnly?: boolean;
+
+  /**
+   * Builds every control disabled, for a composite whose own row is locked.
+   * The form renders full field layouts that only display; reads collect nothing.
+   *
+   * @default
+   * false
+   */
+  disabled?: boolean;
 
   /**
    * The dashboard's active language, handed to every control.
@@ -163,8 +173,11 @@ export function createFieldForm(
   let seed = initial;
   const scope = effectScope();
   const rows: ControlRow[] = [];
+  const lockedRows: ControlRow[] = [];
   const carried: DashboardField[] = [];
   const statics: DashboardField[] = [];
+  const showsLocked =
+    options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
 
   for (const field of fields) {
     if (field.name === 'UUID') continue;
@@ -172,38 +185,48 @@ export function createFieldForm(
     // An immutable field stays settable while the record or item does not exist yet.
     // Create mode always qualifies, so an undo-restored create form does not lock the field.
     const settable =
+      options.disabled !== true &&
       options.readOnly !== true &&
       field.writable &&
       (!field.immutable || options.mode === 'create' || isUndefined(initial));
+    // A locked field renders its real control disabled, exactly as the P4 source dims the layout.
+    const lockable =
+      !settable &&
+      showsLocked &&
+      field.readable &&
+      !isUndefined(registeredFieldType(field)?.control);
     // Construction runs untracked: a control reading its own fresh refs while it builds must not
     // subscribe the ambient region, or the first keystroke would rebuild the whole surface.
     // It runs inside the form's own scope, so `dispose` releases everything the controls created.
-    const control = settable
-      ? scope.run(() =>
-          untracked(() =>
-            fieldTypeFor(field).control?.({
-              field,
-              initial: initial?.[field.name],
-              mode: options.mode,
-              path,
-              language: options.language,
-              onInput: () => options.onInput?.(),
-            }),
-          ),
-        )
-      : undefined;
+    const control =
+      settable || lockable
+        ? scope.run(() =>
+            untracked(() =>
+              fieldTypeFor(field).control?.({
+                field,
+                initial: initial?.[field.name],
+                mode: options.mode,
+                path,
+                disabled: !settable,
+                language: options.language,
+                onInput: () => options.onInput?.(),
+              }),
+            ),
+          )
+        : undefined;
     if (!isUndefined(control)) {
-      rows.push({ field, path, control });
+      (settable ? rows : lockedRows).push({ field, path, control });
       continue;
     }
     if (field.writable && !field.immutable && carriedField(field)) carried.push(field);
-    if ((options.readOnlyRows === true || options.readOnly === true) && field.readable) {
-      statics.push(field);
-    }
+    if (showsLocked && field.readable) statics.push(field);
   }
 
   const rowByName = new Map(rows.map((row) => [row.field.name, row]));
-  const ordered = fields.filter((field) => rowByName.has(field.name) || statics.includes(field));
+  const lockedByName = new Map(lockedRows.map((row) => [row.field.name, row]));
+  const ordered = fields.filter(
+    (field) => rowByName.has(field.name) || lockedByName.has(field.name) || statics.includes(field),
+  );
 
   const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
     const item: Record<string, unknown> = {};
@@ -233,6 +256,10 @@ export function createFieldForm(
   return {
     render() {
       return ordered.map((field) => {
+        const lockedRow = lockedByName.get(field.name);
+        if (!isUndefined(lockedRow)) {
+          return fieldRow({ field, path: lockedRow.path, locked: true }, lockedRow.control.element);
+        }
         const row = rowByName.get(field.name);
         if (isUndefined(row)) return staticRow(field, options, () => seed?.[field.name]);
         const { control } = row;
@@ -241,7 +268,12 @@ export function createFieldForm(
             field,
             path: row.path,
             dirty: () => control.dirty(),
-            onRevert: () => control.revert(),
+            // A row revert is a user change: without the input ping, the host's history would
+            // keep the pre-revert state and still guard navigation as unsaved.
+            onRevert: () => {
+              control.revert();
+              options.onInput?.();
+            },
             error: () => control.error(),
             onLabelClick: () => control.focus(),
           },
@@ -299,6 +331,7 @@ export function createFieldForm(
     rebase(item) {
       seed = item;
       for (const row of rows) row.control.rebase(item?.[row.field.name]);
+      for (const row of lockedRows) row.control.rebase(item?.[row.field.name]);
     },
     dispose() {
       scope.dispose();
@@ -321,7 +354,7 @@ export function scopedErrors(
 }
 
 /**
- * A locked display-only row for a readable field the form cannot edit.
+ * A locked display-only row for a readable field without a registered control.
  */
 function staticRow(field: DashboardField, options: FieldFormOptions, value: () => unknown): Child {
   const path = options.path === '' ? field.name : `${options.path}.${field.name}`;

@@ -93,6 +93,7 @@ export const blocksType: FieldType = {
     if (offered.length === 0 && stored.length === 0) return undefined;
     const t = useT();
 
+    const off = context.disabled === true;
     let base = context.initial;
     let surface: StructureHandle | undefined;
     // Later nodes are built from event handlers where no scope is active; the owner catches them,
@@ -110,6 +111,7 @@ export const blocksType: FieldType = {
         createFieldForm(blockNamed(blocks, name)?.fields ?? [], fields, {
           mode: context.mode,
           path: `${context.path}[${key}].fields`,
+          disabled: context.disabled === true,
           language: context.language,
           onInput: context.onInput,
         }),
@@ -240,49 +242,53 @@ export const blocksType: FieldType = {
         types: offered,
         resolveItemType: (node) => node.block,
         allowCrossDrop: true,
+        disabled: () => off,
+        isDraggable: !off,
         dropItemsHereLabel: t('dashboard.dropItemsHere'),
         expose: (handle) => {
           surface = handle;
         },
         header: (node, index) => [
           h('span', { class: 'ohne-muted ohne-truncate' }, () => labelOf(node().block, blocks)),
-          structureActions({
-            index,
-            count: () => nodes.value.length,
-            expanded: () => node().$expanded,
-            allExpanded,
-            allCollapsed,
-            onToggleExpanded: () => toggleExpanded(node()),
-            onExpandAll: () => setAllExpanded(true),
-            onCollapseAll: () => setAllExpanded(false),
-            onMove: (delta) => {
-              surface?.resumeScrollWatcher();
-              move(node(), delta);
-              surface?.pauseScrollWatcher();
-            },
-            onAdd:
-              offered.length === 0
-                ? undefined
-                : (at) => {
-                    if (offered.length > 1) pick(at);
-                    else addAt(offered[0] as string, at);
-                  },
-            copyPayload: () => ({
-              ohneClipboardDataType: 'blocks',
-              data: [{ $key: node().block, ...valueOf(node().form) }],
-            }),
-            canPaste: () => {
-              const payload = clipboardData.value;
-              return (
-                !isNull(payload) &&
-                payload.ohneClipboardDataType === 'blocks' &&
-                payload.data.every(({ $key }) => offered.includes($key))
-              );
-            },
-            onPaste: pasteAt,
-            onDuplicate: () => duplicate(node()),
-            onRemove: () => remove(node()),
-          }),
+          off
+            ? null
+            : structureActions({
+                index,
+                count: () => nodes.value.length,
+                expanded: () => node().$expanded,
+                allExpanded,
+                allCollapsed,
+                onToggleExpanded: () => toggleExpanded(node()),
+                onExpandAll: () => setAllExpanded(true),
+                onCollapseAll: () => setAllExpanded(false),
+                onMove: (delta) => {
+                  surface?.resumeScrollWatcher();
+                  move(node(), delta);
+                  surface?.pauseScrollWatcher();
+                },
+                onAdd:
+                  offered.length === 0
+                    ? undefined
+                    : (at) => {
+                        if (offered.length > 1) pick(at);
+                        else addAt(offered[0] as string, at);
+                      },
+                copyPayload: () => ({
+                  ohneClipboardDataType: 'blocks',
+                  data: [{ $key: node().block, ...valueOf(node().form) }],
+                }),
+                canPaste: () => {
+                  const payload = clipboardData.value;
+                  return (
+                    !isNull(payload) &&
+                    payload.ohneClipboardDataType === 'blocks' &&
+                    payload.data.every(({ $key }) => offered.includes($key))
+                  );
+                },
+                onPaste: pasteAt,
+                onDuplicate: () => duplicate(node()),
+                onRemove: () => remove(node()),
+              }),
         ],
         // The form and type are stable per row; untracked reads keep expand-all's item replacement
         // from rebuilding the body region and dropping focus.
@@ -309,7 +315,7 @@ export const blocksType: FieldType = {
         { class: 'ohne-blocks-add' },
         button([icon('plus'), h('span', null, () => t('dashboard.addBlock'))], {
           variant: 'outline',
-          disabled: offered.length === 0 ? (): boolean => true : undefined,
+          disabled: off || offered.length === 0 ? (): boolean => true : undefined,
           onClick: () => {
             if (offered.length > 1) pick();
             else if (offered.length === 1) focusNew(addAt(offered[0] as string));

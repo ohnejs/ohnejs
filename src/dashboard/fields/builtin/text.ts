@@ -2,7 +2,6 @@ import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { when } from '../../render/when.ts';
 import { textArea } from '../../ui/text-area.ts';
@@ -11,12 +10,6 @@ import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseTextValue } from '../parse.ts';
-
-css`
-  .cell-faint {
-    color: var(--faint);
-  }
-`;
 
 /**
  * The `text` field type: cell display, inline cell editor, and form control.
@@ -32,7 +25,7 @@ export const textType: FieldType = {
       if (isNullish(current)) return dimMark('·');
       const text = String(current as string);
       if (text === '') return h('span', { class: 'cell-faint cell-mono' }, '""');
-      return h('span', { title: text }, text);
+      return h('span', { class: 'ohne-truncate', title: text }, text);
     };
   },
   editor({ field, value, commit, cancel }) {
@@ -43,7 +36,8 @@ export const textType: FieldType = {
       cancel,
     });
   },
-  control({ field, initial, path, onInput }) {
+  control({ field, initial, path, disabled, onInput }) {
+    const off = disabled === true;
     let base = initial;
     const seed = isNullish(base) ? '' : String(base as string);
     const raw = ref(seed);
@@ -59,7 +53,7 @@ export const textType: FieldType = {
     };
 
     const singleLine = (): HTMLElement => {
-      const control = textInput(raw);
+      const control = textInput(raw, { disabled: () => off });
       const input = control.querySelector('input') as HTMLInputElement;
       input.addEventListener('input', touch);
       input.addEventListener('keydown', (event) => {
@@ -78,7 +72,7 @@ export const textType: FieldType = {
     };
 
     const multiLine = (): HTMLElement => {
-      const control = textArea(raw);
+      const control = textArea(raw, { disabled: () => off });
       const area = control.querySelector('textarea') as HTMLTextAreaElement;
       area.addEventListener('input', touch);
       describeControl(area, field, path, error);

@@ -94,6 +94,15 @@ export interface FieldControlContext {
   path: string;
 
   /**
+   * Renders the control non-interactive and dimmed, for a locked row.
+   * A locked control only displays: the hosting form never reads, focuses, or error-routes it.
+   *
+   * @default
+   * false
+   */
+  disabled?: boolean;
+
+  /**
    * The dashboard's active language, for locale-aware formatting.
    */
   language: () => string;
@@ -199,12 +208,16 @@ const registry = new Map<string, FieldType>();
 
 css`
   .cell-dim {
-    color: var(--dim);
+    color: hsl(var(--ohne-muted-foreground));
+  }
+
+  .cell-faint {
+    color: hsl(var(--ohne-muted-foreground) / 0.64);
   }
 
   .cell-mono {
-    font-family: var(--mono);
-    font-size: 12px;
+    font-family: var(--ohne-font-mono);
+    font-size: 0.75rem;
   }
 `;
 
@@ -230,14 +243,21 @@ export function registerFieldType(type: string, fieldType: FieldType): void {
  * That fallback renders primitives as text, lists as counts, and objects as a dim mark.
  */
 export function fieldTypeFor(field: DashboardField): FieldType {
+  return registeredFieldType(field) ?? FALLBACK;
+}
+
+/**
+ * The registered dashboard behaviour for `field`, or `undefined` when only the generic fallback applies.
+ * A form uses it to decide whether a locked field can render a real disabled control.
+ */
+export function registeredFieldType(field: DashboardField): FieldType | undefined {
   const fieldType = isNull(field.type) ? undefined : registry.get(field.type);
   if (!isUndefined(fieldType)) return fieldType;
   if (field.kind === 'column') {
     const primitive = PRIMITIVES[field.logicalType ?? ''];
-    const delegate = isUndefined(primitive) ? undefined : registry.get(primitive);
-    if (!isUndefined(delegate)) return delegate;
+    return isUndefined(primitive) ? undefined : registry.get(primitive);
   }
-  return FALLBACK;
+  return undefined;
 }
 
 const PRIMITIVES: Readonly<Record<string, string>> = {

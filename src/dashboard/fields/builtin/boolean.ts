@@ -1,17 +1,10 @@
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { checkbox } from '../../ui/checkbox.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-
-css`
-  .cell-faint {
-    color: var(--faint);
-  }
-`;
 
 /**
  * The `boolean` field type: cell display, inline cell editor, and form control.
@@ -34,21 +27,24 @@ export const booleanType: FieldType = {
     });
     return null;
   },
-  control({ field, initial, path, onInput }) {
+  control({ field, initial, path, disabled, onInput }) {
     let base = initial;
     const checked = ref(base === true);
     const touched = ref(false);
     const routed = ref('');
 
     const error = (): string => routed.value;
-    const element = checkbox(checked);
+    const element = checkbox(checked, undefined, { disabled: () => disabled === true });
     const input = element.querySelector('input') as HTMLInputElement;
+    // The native input is the hidden proxy; the visible `role="checkbox"` button carries focus
+    // and the aria wiring, or both would land on a `display: none` element and do nothing.
+    const proxy = element.querySelector('button') as HTMLElement;
     input.addEventListener('change', () => {
       touched.value = true;
       routed.value = '';
       onInput();
     });
-    describeControl(input, field, path, error);
+    describeControl(proxy, field, path, error);
 
     // Untouched, the value is whatever is stored, so a stored null saves as null; once touched
     // the box reads binary, and only the row's revert leads back to null.
@@ -75,7 +71,7 @@ export const booleanType: FieldType = {
         return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
       },
       focus() {
-        input.focus();
+        proxy.focus();
       },
       revert() {
         checked.value = base === true;

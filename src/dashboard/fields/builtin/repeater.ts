@@ -84,6 +84,7 @@ export const repeaterType: FieldType = {
         .sort()
         .join(',');
 
+    const off = context.disabled === true;
     let base = context.initial;
     // Later items are built from event handlers where no scope is active; the owner catches them,
     // so the record surface's teardown releases their effects too.
@@ -199,36 +200,40 @@ export const repeaterType: FieldType = {
         types: [itemType],
         resolveItemType: () => itemType,
         allowCrossDrop: true,
+        disabled: () => off,
+        isDraggable: !off,
         dropItemsHereLabel: t('dashboard.dropItemsHere'),
         header: (entry, index) => [
           h('span', { class: 'ohne-muted ohne-truncate' }, () => `#${index() + 1}`),
-          structureActions({
-            index,
-            count: () => entries.value.length,
-            expanded: () => entry().$expanded,
-            allExpanded,
-            allCollapsed,
-            onToggleExpanded: () => toggleExpanded(entry()),
-            onExpandAll: () => setAllExpanded(true),
-            onCollapseAll: () => setAllExpanded(false),
-            onMove: (delta) => move(entry(), delta),
-            onAdd: (at) => addAt(at),
-            copyPayload: () => ({
-              ohneClipboardDataType: 'structure-item',
-              data: { $type: itemType, ...valueOf(entry().form) },
-            }),
-            canPaste: () => {
-              const payload = clipboardData.value;
-              return (
-                !isNull(payload) &&
-                payload.ohneClipboardDataType === 'structure-item' &&
-                payload.data.$type === itemType
-              );
-            },
-            onPaste: pasteAt,
-            onDuplicate: () => duplicate(entry()),
-            onRemove: () => remove(entry()),
-          }),
+          off
+            ? null
+            : structureActions({
+                index,
+                count: () => entries.value.length,
+                expanded: () => entry().$expanded,
+                allExpanded,
+                allCollapsed,
+                onToggleExpanded: () => toggleExpanded(entry()),
+                onExpandAll: () => setAllExpanded(true),
+                onCollapseAll: () => setAllExpanded(false),
+                onMove: (delta) => move(entry(), delta),
+                onAdd: (at) => addAt(at),
+                copyPayload: () => ({
+                  ohneClipboardDataType: 'structure-item',
+                  data: { $type: itemType, ...valueOf(entry().form) },
+                }),
+                canPaste: () => {
+                  const payload = clipboardData.value;
+                  return (
+                    !isNull(payload) &&
+                    payload.ohneClipboardDataType === 'structure-item' &&
+                    payload.data.$type === itemType
+                  );
+                },
+                onPaste: pasteAt,
+                onDuplicate: () => duplicate(entry()),
+                onRemove: () => remove(entry()),
+              }),
         ],
         // The form is stable per row; an untracked read keeps expand-all's item replacement from
         // rebuilding the body region and dropping focus.
@@ -246,6 +251,7 @@ export const repeaterType: FieldType = {
         { class: 'ohne-repeater-add' },
         button([icon('plus'), h('span', null, () => t('dashboard.addItem'))], {
           variant: 'outline',
+          disabled: off ? (): boolean => true : undefined,
           onClick: () => {
             const entry = addAt();
             queueMicrotask(() => entry.form.focus());
@@ -368,6 +374,7 @@ function itemForm(
     mode: context.mode,
     path: `${context.path}[${key}]`,
     attachUUID: true,
+    disabled: context.disabled === true,
     language: context.language,
     onInput: context.onInput,
   });

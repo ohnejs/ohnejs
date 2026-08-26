@@ -173,7 +173,7 @@ export const recordType: FieldType = {
       if (isUndefined(resolved)) {
         return h('span', { class: 'cell-mono cell-dim', title: uuid }, uuid.slice(0, 8));
       }
-      return h('span', { title: uuid }, resolved);
+      return h('span', { class: 'ohne-truncate', title: uuid }, resolved);
     };
   },
   editor(context) {
@@ -189,6 +189,7 @@ export const recordType: FieldType = {
     const target = untracked(() => targetOf(context.field));
     const label = isUndefined(target) ? undefined : labelFieldOf(target);
     const t = useT();
+    const off = context.disabled === true;
 
     let base = context.initial;
     const model = ref<Primitive>(isString(base) ? base : null);
@@ -208,13 +209,14 @@ export const recordType: FieldType = {
     let sync: (() => void) | undefined;
 
     if (isUndefined(target) || isUndefined(label)) {
-      const fallback = fallbackInput(context, model, current, change, () => routed.value);
+      const fallback = fallbackInput(context, model, current, change, () => routed.value, off);
       element = fallback.element;
       focusControl = fallback.focus;
       sync = fallback.sync;
     } else {
       const source = recordChoiceSource(target, label);
       const select = dynamicSelect(model, {
+        disabled: () => off,
         choicesResolver: source.choicesResolver,
         selectedChoiceResolver: (value) =>
           isString(value) ? source.choiceOf(value) : Promise.resolve(null),
@@ -247,6 +249,7 @@ export const recordType: FieldType = {
         if (!context.field.nullable) return open;
         const clear = button(icon('x'), {
           variant: 'outline',
+          disabled: off ? (): boolean => true : undefined,
           ariaLabel: t('dashboard.clearSelection'),
           onClick: () => {
             model.value = null;
@@ -302,9 +305,10 @@ function fallbackInput(
   current: () => string | null,
   change: () => void,
   error: () => string,
+  disabled: boolean,
 ): { element: HTMLElement; focus(): void; sync(): void } {
   const raw = ref(untracked(current) ?? '');
-  const control = textInput(raw, { error: () => error() !== '' });
+  const control = textInput(raw, { error: () => error() !== '', disabled: () => disabled });
   const input = control.querySelector('input') as HTMLInputElement;
   input.addEventListener('input', () => {
     model.value = input.value === '' ? null : input.value;

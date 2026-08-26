@@ -87,6 +87,7 @@ export const recordsType: FieldType = {
     };
 
     const chips = dynamicChips(model, {
+      disabled: () => context.disabled === true,
       choicesResolver: source.choicesResolver,
       selectedChoicesResolver: (values) => source.choicesOf(values.map(String)),
       error: () => routed.value !== '',

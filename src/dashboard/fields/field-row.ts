@@ -76,11 +76,16 @@ css`
     height: 1.25em;
   }
 
+  /* Hidden, not unmounted: the box keeps its slot, and a pristine revert leaves the tab order. */
+  .ohne-fieldrow-pristine {
+    visibility: hidden;
+  }
+
   .ohne-fieldrow-dot {
     width: 0.3125rem;
     height: 0.3125rem;
     border-radius: 50%;
-    background-color: hsl(var(--ohne-primary));
+    background-color: hsl(var(--ohne-primary) / 0.64);
     transition: var(--ohne-transition);
     transition-property: opacity;
   }
@@ -127,7 +132,10 @@ export function describeControl(
   const ids = controlIDs(path);
   element.id = ids.input;
   element.setAttribute('aria-labelledby', ids.label);
-  if (!isUndefined(field.description)) element.setAttribute('aria-describedby', ids.description);
+  // The error paragraph reuses the description id, so the reference also serves errored controls.
+  if (!isUndefined(field.description) || !isUndefined(error)) {
+    element.setAttribute('aria-describedby', ids.description);
+  }
   if (!isUndefined(error)) {
     batchedEffect(() => {
       if (error() === '') element.removeAttribute('aria-invalid');
@@ -156,6 +164,34 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     return mark;
   };
 
+  const lockMark = (): HTMLElement => {
+    const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('lock'));
+    onCleanup(attachTooltip(mark, () => t('dashboard.field.locked')));
+    return mark;
+  };
+
+  // Mounted once and hidden while pristine, so the sibling marks never shift when dirt toggles.
+  const touchedMark = (): Child => {
+    if (isUndefined(options.dirty)) return null;
+    const box = (): string =>
+      `ohne-fieldrow-touched${options.dirty?.() === true ? '' : ' ohne-fieldrow-pristine'}`;
+    const dot = h('span', { class: 'ohne-fieldrow-dot' });
+    if (isUndefined(options.onRevert)) return h('span', { class: box }, dot);
+    const revert = h(
+      'button',
+      {
+        class: () => `${box()} ohne-fieldrow-revert`,
+        type: 'button',
+        'aria-label': () => t('dashboard.field.revert'),
+        onClick: () => options.onRevert?.(),
+      },
+      dot,
+      icon('arrow-back-up'),
+    );
+    onCleanup(attachTooltip(revert, () => t('dashboard.field.revert')));
+    return revert;
+  };
+
   const head = fieldLabel(
     [
       h(
@@ -167,29 +203,8 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
         ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.unique'))
         : null,
       options.field.translatable ? languageMark() : null,
-      options.locked === true
-        ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.locked'))
-        : null,
-      () => {
-        if (options.dirty?.() !== true) return null;
-        const dot = h('span', { class: 'ohne-fieldrow-dot' });
-        if (isUndefined(options.onRevert)) {
-          return h('span', { class: 'ohne-fieldrow-touched' }, dot);
-        }
-        const revert = h(
-          'button',
-          {
-            class: 'ohne-fieldrow-touched ohne-fieldrow-revert',
-            type: 'button',
-            'aria-label': () => t('dashboard.field.revert'),
-            onClick: () => options.onRevert?.(),
-          },
-          dot,
-          icon('arrow-back-up'),
-        );
-        onCleanup(attachTooltip(revert, () => t('dashboard.field.revert')));
-        return revert;
-      },
+      options.locked === true ? lockMark() : null,
+      touchedMark(),
     ],
     { required: options.field.required },
   );
@@ -203,7 +218,7 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
             fieldMessage(
               () => {
                 const current = failure();
-                if (current !== '') return h('p', null, current);
+                if (current !== '') return h('p', { id: ids.description }, current);
                 return h('p', { id: ids.description }, options.field.description);
               },
               { error: () => failure() !== '' },
