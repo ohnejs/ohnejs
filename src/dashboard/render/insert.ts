@@ -6,6 +6,7 @@ import { isNumber } from '../../utils/is/is-number.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { effectScope, type EffectScope } from '../../utils/reactive/effect-scope.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 
 /**
  * A renderable dashboard child.
@@ -42,7 +43,9 @@ export function insert(parent: Node, getter: () => Child): void {
   const end = parent.appendChild(document.createComment(''));
   let scope: EffectScope | null = null;
   batchedEffect(() => {
-    scope?.dispose();
+    // Untracked: disposal runs the outgoing content's cleanups inside this region effect, and a
+    // ref a cleanup reads must tear down state, never subscribe the region that outlived it.
+    untracked(() => scope?.dispose());
     scope = effectScope();
     scope.run(() => patch(start, end, getter()));
   });
