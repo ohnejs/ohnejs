@@ -23,6 +23,9 @@ export interface EffectScope {
  *
  * Effects and computeds created inside `run` are stopped when the scope is disposed.
  * A scope created inside another scope's `run` is itself owned by that outer scope.
+ * `detached` opts out of that adoption: the scope takes no parent and outlives the creating scope.
+ * Only its own `dispose` tears it down.
+ * It anchors app-lifetime singletons built during an owned render.
  *
  * @example
  * ```ts
@@ -34,10 +37,14 @@ export interface EffectScope {
  * count.value = 1 // logs 1
  * scope.dispose()
  * count.value = 2 // nothing logged
+ *
+ * const outer = effectScope()
+ * const inner = outer.run(() => effectScope(true))
+ * outer.dispose() // `inner` stays active until `inner.dispose()`
  * ```
  */
-export function effectScope(): EffectScope {
-  const parent = activeScope();
+export function effectScope(detached = false): EffectScope {
+  const parent = detached ? null : activeScope();
   const scope: Scope = {
     effects: [],
     scopes: [],

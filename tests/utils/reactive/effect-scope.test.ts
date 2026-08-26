@@ -110,6 +110,28 @@ describe('effectScope', () => {
     deepStrictEqual([...cleaned].sort(), [0, 1, 2, 3]);
   });
 
+  it('keeps a detached scope alive past the creating scope', () => {
+    const outer = effectScope();
+    const r = ref(0);
+    let runs = 0;
+    let inner!: EffectScope;
+    outer.run(() => {
+      inner = effectScope(true);
+      inner.run(() =>
+        effect(() => {
+          void r.value;
+          runs++;
+        }),
+      );
+    });
+    outer.dispose();
+    r.value = 1;
+    strictEqual(runs, 2);
+    inner.dispose();
+    r.value = 2;
+    strictEqual(runs, 2);
+  });
+
   it('treats top-level onCleanup as a no-op', () => {
     doesNotThrow(() => onCleanup(() => {}));
   });
