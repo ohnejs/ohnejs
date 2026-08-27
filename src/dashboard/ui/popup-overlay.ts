@@ -348,9 +348,12 @@ export function popup(
   const onWindowKeydown = (event: KeyboardEvent): void => options.onKeydown?.(event);
   window.addEventListener('keydown', onWindowKeydown);
 
+  // A click hands focus over through a transient `body`, which the microtask after `focusout` still
+  // sees, so the re-anchor waits a macrotask for the new target to settle. It focuses the root only
+  // once: the delayed second focus belongs to the entrance transition and would steal the click.
   const onFocusChange = (): void => {
-    void nextTick().then(() => {
-      if (document.activeElement?.nodeName === 'BODY' && overlay?.isTopmost()) focusRoot();
+    setTimeout(() => {
+      if (document.activeElement?.nodeName === 'BODY' && overlay?.isTopmost()) root.focus();
     });
   };
   window.addEventListener('focusin', onFocusChange);
