@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -229,7 +230,7 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
         'ohne-input' +
         (options.error?.() ? ' ohne-input-has-errors' : '') +
         (options.disabled?.() ? ' ohne-input-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
     },
     options.prefix,
