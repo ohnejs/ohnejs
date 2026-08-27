@@ -141,6 +141,10 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .ohne-input-numeric {
+    font-variant-numeric: tabular-nums;
+  }
+
   .ohne-input-control {
     display: flex;
     width: 100%;
@@ -182,6 +186,7 @@ css`
  * The prefix and suffix render inside the box; a nested `button` steps down one size to fit.
  * Typing writes into the model; writing the model updates the input.
  * Escape blurs the input without bubbling, and double-clicks stop at the box.
+ * `ohne-input-numeric` on the box renders the value in tabular numerals.
  *
  * @example
  * ```ts

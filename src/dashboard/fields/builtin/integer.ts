@@ -2,7 +2,6 @@ import { isInteger } from '../../../utils/is/is-integer.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { textInput } from '../../ui/text-input.ts';
@@ -10,12 +9,6 @@ import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseIntegerValue } from '../parse.ts';
-
-css`
-  .ohne-input.ohne-number {
-    font-variant-numeric: tabular-nums;
-  }
-`;
 
 /**
  * The `integer` field type: cell display, inline cell editor, and form control.
@@ -61,7 +54,7 @@ export const integerType: FieldType = {
 
     const control = textInput(raw, { disabled: () => off });
     const input = control.querySelector('input') as HTMLInputElement;
-    control.classList.add('ohne-number');
+    control.classList.add('ohne-input-numeric');
     input.setAttribute('inputmode', 'numeric');
     input.addEventListener('input', touch);
     input.addEventListener('blur', () => {
