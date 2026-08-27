@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -121,7 +122,10 @@ css`
     cursor: not-allowed;
   }
 
-  .ohne-switch-disabled .ohne-switch-button {
+  /* A deviation from the source, which leaves a disabled track lit: it mutes, as a disabled input does. */
+  .ohne-switch-disabled .ohne-switch-button,
+  .ohne-switch-disabled .ohne-switch-control[data-checked='true'] + .ohne-switch-button {
+    background-color: hsl(var(--ohne-muted));
     pointer-events: none;
   }
 
@@ -135,8 +139,8 @@ let sequence = 0;
 
 /**
  * A toggle switch: the checkbox's hidden-input-and-proxy-button pattern with an animated knob.
- * The track and the label both toggle the input; the model follows its `change` events, and
- * writing the model slides the knob.
+ * The track and the label both toggle the input.
+ * The model follows its `change` events, and writing the model slides the knob.
  * Space on the focused track toggles too - there is no drag support.
  *
  * @example
@@ -173,7 +177,7 @@ export function switchInput(
         `ohne-switch ohne-switch-${variant}` +
         (options.error?.() ? ' ohne-switch-has-errors' : '') +
         (options.disabled?.() ? ' ohne-switch-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
     input,
     h('button', {
@@ -184,7 +188,7 @@ export function switchInput(
       class: 'ohne-switch-button ohne-raw',
       onClick: () => input.click(),
     }),
-    label === undefined
+    isUndefined(label)
       ? null
       : h(
           'label',

@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -59,8 +60,8 @@ export interface CheckboxOptions {
   description?: Child | (() => Child);
 
   /**
-   * Called after a toggle with the new value and the native `change` event,
-   * so a caller can read modifier keys for range selection.
+   * Called after a toggle with the new value and the native `change` event.
+   * The event lets a caller read modifier keys for range selection.
    */
   onChange?: (value: boolean, event: Event) => void;
 }
@@ -139,8 +140,16 @@ css`
     cursor: not-allowed;
   }
 
-  .ohne-checkbox-disabled .ohne-checkbox-button {
+  /* A deviation from the source, which leaves a disabled box lit: it mutes, as a disabled input does. */
+  .ohne-checkbox-disabled .ohne-checkbox-button,
+  .ohne-checkbox-disabled .ohne-checkbox-control[data-checked='true'] + .ohne-checkbox-button {
+    background-color: hsl(var(--ohne-muted));
+    border-color: hsl(var(--ohne-input));
     pointer-events: none;
+  }
+
+  .ohne-checkbox-disabled .ohne-checkbox-control[data-checked='true'] + .ohne-checkbox-button {
+    color: hsl(var(--ohne-muted-foreground));
   }
 
   .ohne-checkbox-content {
@@ -169,10 +178,9 @@ function markIcon(indeterminate: boolean): SVGSVGElement {
 }
 
 /**
- * A styled checkbox: a hidden native input behind a proxy button, with optional label and
- * description.
- * The button and the label both toggle the input; the model follows its `change` events, and
- * writing the model updates the box.
+ * A styled checkbox: a hidden native input behind a proxy button, with optional label and description.
+ * The button and the label both toggle the input.
+ * The model follows its `change` events, and writing the model updates the box.
  * The check flips instantly - only the switch animates.
  *
  * @example
@@ -188,7 +196,7 @@ export function checkbox(
 ): HTMLElement {
   const variant = options.variant ?? 'primary';
   const localId = options.id ?? `ohne-checkbox-${++sequence}`;
-  const hasContent = label !== undefined || options.description !== undefined;
+  const hasContent = !isUndefined(label) || !isUndefined(options.description);
   const input = h('input', {
     'data-checked': () => String(model.value),
     id: localId,
@@ -212,7 +220,7 @@ export function checkbox(
         (hasContent ? ' ohne-checkbox-has-content' : '') +
         (options.error?.() ? ' ohne-checkbox-has-errors' : '') +
         (options.disabled?.() ? ' ohne-checkbox-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
     },
     input,
@@ -232,7 +240,7 @@ export function checkbox(
       ? h(
           'div',
           { class: 'ohne-checkbox-content' },
-          label === undefined
+          isUndefined(label)
             ? null
             : h(
                 'label',
@@ -245,7 +253,7 @@ export function checkbox(
                 },
                 label,
               ),
-          options.description === undefined
+          isUndefined(options.description)
             ? null
             : h('div', { class: 'ohne-checkbox-description' }, options.description),
         )
