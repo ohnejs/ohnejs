@@ -47,14 +47,24 @@ interface OrderByItem {
 let sequence = 0;
 
 css`
+  .o-order-by > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .o-order-by-item {
+    --ohne-padding-header: 0.5rem;
+  }
+
+  /* The source indents item headers with a drag handle; without one, meet the body's 0.75rem grid. */
+  .o-order-by-row {
+    min-height: 2em;
+    padding-left: 0.25rem;
+  }
+
   .o-order-by :where(.o-order-by-actions) {
     display: none;
     gap: 0.25rem;
     margin-left: auto;
-  }
-
-  .o-order-by > * + * {
-    margin-top: 0.75rem;
   }
 
   :where(.o-order-by-item:hover, .o-order-by-item:focus-within)
