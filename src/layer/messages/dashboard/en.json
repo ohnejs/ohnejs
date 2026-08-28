@@ -131,6 +131,7 @@
     "expandAll": "Expand all"
   },
   "new": "New",
+  "no": "No",
   "noBlocksAllowed": "No blocks can be added here",
   "noBlocksMatchSearch": "No blocks match your search criteria",
   "noFieldsToDisplay": "No fields to display",
@@ -210,5 +211,6 @@
   "widget": {
     "dashboard": "Dashboard"
   },
-  "writeFailed": "The write failed"
+  "writeFailed": "The write failed",
+  "yes": "Yes"
 }

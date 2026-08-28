@@ -131,6 +131,7 @@
     "expandAll": "Alle ausklappen"
   },
   "new": "Neu",
+  "no": "Nein",
   "noBlocksAllowed": "Hier können keine Blöcke hinzugefügt werden",
   "noBlocksMatchSearch": "Keine Blöcke entsprechen der Suche",
   "noFieldsToDisplay": "Keine Felder zum Anzeigen",
@@ -210,5 +211,6 @@
   "widget": {
     "dashboard": "Dashboard"
   },
-  "writeFailed": "Das Schreiben ist fehlgeschlagen"
+  "writeFailed": "Das Schreiben ist fehlgeschlagen",
+  "yes": "Ja"
 }

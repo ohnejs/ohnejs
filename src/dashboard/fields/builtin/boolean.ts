@@ -1,24 +1,31 @@
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { h } from '../../render/h.ts';
+import { useT } from '../../runtime/use-t.ts';
+import { badge } from '../../ui/badge.ts';
 import { checkbox } from '../../ui/checkbox.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
  * The `boolean` field type: cell display, inline cell editor, and form control.
- * The cell shows a check for `true`, a faint cross for `false`, and a dim dot for `null`.
+ * The cell shows a secondary badge reading yes or no, and a dim hyphen for `null`.
+ * The `false` badge inherits the cell's muted color, so only a `true` reads as foreground.
  * The cell editor toggles the value at once; a failed toggle closes back to the stored value.
  * The control is a checkbox that stays pristine until touched; once touched it reads binary.
  * A stored `null` therefore returns to `null` only through the row's revert.
  */
 export const booleanType: FieldType = {
   display({ value }) {
+    const t = useT();
     return () => {
       const current = value();
-      if (isNullish(current)) return dimMark('·');
-      return current === true ? '✓' : h('span', { class: 'cell-faint' }, '✕');
+      if (isNullish(current)) return dimMark('-');
+      const yes = current === true;
+      return badge(() => (yes ? t('dashboard.yes') : t('dashboard.no')), {
+        color: 'secondary',
+        textColor: yes ? undefined : 'inherit',
+      });
     };
   },
   editor({ value, commit, cancel }) {

@@ -131,6 +131,7 @@
     "expandAll": "Proširi sve"
   },
   "new": "Novo",
+  "no": "Ne",
   "noBlocksAllowed": "Ovdje se ne mogu dodati blokovi",
   "noBlocksMatchSearch": "Nijedan blok ne odgovara pretrazi",
   "noFieldsToDisplay": "Nema polja za prikaz",
@@ -210,5 +211,6 @@
   "widget": {
     "dashboard": "Dashboard"
   },
-  "writeFailed": "Upis nije uspio"
+  "writeFailed": "Upis nije uspio",
+  "yes": "Da"
 }
