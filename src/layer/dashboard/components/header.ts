@@ -99,7 +99,7 @@ export function header(options: HeaderOptions): HTMLElement {
 
   const home = h(
     'a',
-    { href: '/', title: t('dashboard.header.goBackHome'), class: 'o-header-logo ohne-raw' },
+    { href: '/', title: t('dashboard.goBackHome'), class: 'o-header-logo ohne-raw' },
     logoMark(),
   );
 

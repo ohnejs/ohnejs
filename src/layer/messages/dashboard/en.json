@@ -85,10 +85,10 @@
     "true": "True"
   },
   "foundErrors": "{count, plural, one {Found # error} other {Found # errors}}",
+  "goBackHome": "Go back home",
   "header": {
     "contentLanguage": "Content language",
     "darkMode": "Dark mode",
-    "goBackHome": "Go back home",
     "lightMode": "Light mode",
     "openUserMenu": "Open user menu",
     "switchedContentLanguage": "Switched content language to `{language}`",

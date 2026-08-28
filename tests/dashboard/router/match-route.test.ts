@@ -34,4 +34,12 @@ describe('matchPages', () => {
     const only = compilePages([{ pattern: '/users/[id]', url: 'x' }]);
     strictEqual(matchPages(only, '/posts/1'), null);
   });
+
+  it('keeps the root page reachable behind a root catch-all', () => {
+    const withRoot = compilePages([
+      { pattern: '/[...all]', url: '/m/app/pages/[...all].ts' },
+      { pattern: '/', url: '/m/app/pages/index.ts' },
+    ]);
+    strictEqual(matchPages(withRoot, '/')?.url, '/m/app/pages/index.ts');
+  });
 });

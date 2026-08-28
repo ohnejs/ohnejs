@@ -11,6 +11,7 @@ export type IconName =
   | 'arrow-bar-to-down'
   | 'arrow-bar-to-up'
   | 'arrow-forward-up'
+  | 'arrow-left'
   | 'arrows-horizontal'
   | 'arrows-sort'
   | 'arrows-vertical'
@@ -84,6 +85,8 @@ const SHAPES: Record<IconName, string> = {
     '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v10m0-10l4 4m-4-4l-4 4M4 4h16"/>',
   'arrow-forward-up':
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m15 14l4-4l-4-4"/><path d="M19 10H8a4 4 0 1 0 0 8h1"/></g>',
+  'arrow-left':
+    '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12l6 6m-6-6l6-6"/>',
   'arrows-horizontal':
     '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m7 8l-4 4l4 4m10-8l4 4l-4 4M3 12h18"/>',
   'arrows-sort':

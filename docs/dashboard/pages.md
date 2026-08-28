@@ -61,7 +61,7 @@ navigate('/authors/42');
 ```
 
 The most specific matching route wins, and a page's module loads on demand the first time its
-route matches. An unmatched path renders a plain "Not found".
+route matches. An unmatched path renders the dashboard's not-found page.
 
 ## What a page may import
 

@@ -85,10 +85,10 @@
     "true": "Wahr"
   },
   "foundErrors": "{count, plural, one {# Fehler gefunden} other {# Fehler gefunden}}",
+  "goBackHome": "Zur Startseite",
   "header": {
     "contentLanguage": "Inhaltssprache",
     "darkMode": "Dunkler Modus",
-    "goBackHome": "Zur Startseite",
     "lightMode": "Heller Modus",
     "openUserMenu": "Benutzermenü öffnen",
     "switchedContentLanguage": "Inhaltssprache auf `{language}` umgestellt",

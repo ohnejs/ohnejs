@@ -192,4 +192,4 @@ export default defineDashboardPage((route) => h('h1', null, `Post ${route.params
 
 `route.params` holds the captured segments, URI-decoded; `route.path` is the matched location
 path. Page modules load on demand - a page's code is fetched the first time its route renders -
-and a URL no page matches renders "Not found".
+and a URL no page matches renders the dashboard's not-found page.

@@ -85,10 +85,10 @@
     "true": "Tačno"
   },
   "foundErrors": "{count, plural, one {Pronađena # greška} few {Pronađene # greške} other {Pronađeno # grešaka}}",
+  "goBackHome": "Nazad na početnu",
   "header": {
     "contentLanguage": "Jezik sadržaja",
     "darkMode": "Tamni režim",
-    "goBackHome": "Nazad na početnu",
     "lightMode": "Svijetli režim",
     "openUserMenu": "Otvori korisnički meni",
     "switchedContentLanguage": "Jezik sadržaja promijenjen na `{language}`",
