@@ -6,7 +6,7 @@ import {
   setDocumentTitle,
   useT,
 } from 'ohne/dashboard';
-import { effect, isNull, isNullish } from 'ohne/utils';
+import { effect, isNullish, isString, parseSearchParams } from 'ohne/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { loginForm } from '../components/login-form.ts';
@@ -41,8 +41,8 @@ export default defineDashboardPage(() => {
  * A protocol-relative (`//`) or backslashed (`/\`) value is not safe and falls back to home.
  */
 function nextPath(): string {
-  const next = new URLSearchParams(location.search).get('next');
-  if (isNull(next)) return '/';
+  const next = parseSearchParams(location.search).next;
+  if (!isString(next)) return '/';
   if (next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) return next;
   return '/';
 }

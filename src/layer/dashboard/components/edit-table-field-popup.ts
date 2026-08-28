@@ -16,7 +16,19 @@ import {
   useRoute,
   useT,
 } from 'ohne/dashboard';
-import { effect, isNull, isUndefined, onCleanup, ref, sleep } from 'ohne/utils';
+import {
+  effect,
+  isNull,
+  isString,
+  isUndefined,
+  onCleanup,
+  parseSearchParams,
+  ref,
+  type SearchParamValue,
+  sleep,
+  stringifySearchParams,
+  toArray,
+} from 'ohne/utils';
 
 import { activeContentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
@@ -91,13 +103,15 @@ css`
 const editSignal = ref(0);
 
 /**
- * Reads the `edit` query parameter, reactively: `<field>:<uuid>` while a cell edit is deep-linked.
+ * Reads the `edit` query parameter, reactively.
+ * It carries `[field, uuid]` while a cell edit is deep-linked, and is empty otherwise.
  * Both `setEditQueryParam` writes and full navigations refresh the read.
  */
-export function editQueryParam(): string | null {
+export function editQueryParam(): string[] {
   useRoute();
   void editSignal.value;
-  return new URLSearchParams(location.search).get('edit');
+  const edit = parseSearchParams(location.search).edit;
+  return toArray<SearchParamValue | undefined>(edit).filter(isString);
 }
 
 /**
@@ -107,11 +121,11 @@ export function editQueryParam(): string | null {
  * for the same reason.
  * The back button still closes the popup: the pushed entry re-renders through the router.
  */
-export function setEditQueryParam(value: string | null): void {
-  const params = new URLSearchParams(location.search);
-  if (isNull(value)) params.delete('edit');
-  else params.set('edit', value);
-  const query = params.toString();
+export function setEditQueryParam(value: string[] | null): void {
+  const query = stringifySearchParams({
+    ...parseSearchParams(location.search),
+    edit: isNull(value) ? undefined : value,
+  });
   history.pushState(
     null,
     '',
@@ -290,7 +304,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   }
 
   effect(() => {
-    if (isNull(editQueryParam())) {
+    if (editQueryParam().length === 0) {
       setTimeout(() => {
         history.clear();
         options.onClose(handle.close);
@@ -320,7 +334,7 @@ async function writeField(
   body: Record<string, unknown>,
   locale?: string,
 ): Promise<WriteOutcome> {
-  const suffix = isUndefined(locale) ? '' : `?locale=${encodeURIComponent(locale)}`;
+  const suffix = isUndefined(locale) ? '' : `?${stringifySearchParams({ locale })}`;
   const send = (): Promise<Response> =>
     api(`PATCH /collections/${segment}/${uuid}${suffix}`, {
       headers: { 'content-type': 'application/json' },

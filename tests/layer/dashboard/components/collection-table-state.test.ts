@@ -39,14 +39,14 @@ describe('parseTableState', () => {
 
   it('reads page, order, where, and columns', () => {
     const state = parseTableState(
-      `?page=3&order=-title,views&where=${encodeURIComponent('{"views":{"atLeast":2}}')}&columns=title|20rem`,
+      '?page=3&order=[-title,views]&where={views:{atLeast:2}}&columns=[title|20rem]',
       DEFAULT_ORDER,
     );
     deepStrictEqual(state, {
       page: 3,
       order: ['-title', 'views'],
       where: { views: { atLeast: 2 } },
-      columns: 'title|20rem',
+      columns: ['title|20rem'],
     });
   });
 
@@ -57,7 +57,13 @@ describe('parseTableState', () => {
   });
 
   it('falls back on an empty order', () => {
-    deepStrictEqual(parseTableState('?order=,', DEFAULT_ORDER).order, ['-_updatedAt']);
+    deepStrictEqual(parseTableState('?order=[]', DEFAULT_ORDER).order, ['-_updatedAt']);
+    deepStrictEqual(parseTableState('?order=', DEFAULT_ORDER).order, ['-_updatedAt']);
+  });
+
+  it('reads a lone order entry as a one-entry list', () => {
+    deepStrictEqual(parseTableState('?order=-title', DEFAULT_ORDER).order, ['-title']);
+    deepStrictEqual(parseTableState('?order=[-title]', DEFAULT_ORDER).order, ['-title']);
   });
 
   it('reads a malformed or non-object where as no filter', () => {
@@ -82,9 +88,13 @@ describe('serializeTableState', () => {
       page: 4,
       order: ['title', '-views'],
       where: { published: { equalsTo: true } },
-      columns: 'title|20rem,views',
+      columns: ['title|20rem', 'views'],
     };
     const query = serializeTableState(state, DEFAULT_ORDER);
+    strictEqual(
+      query,
+      'page=4&order=[title,-views]&where={published:{equalsTo:true}}&columns=[title|20rem,views]',
+    );
     deepStrictEqual(parseTableState(`?${query}`, DEFAULT_ORDER), state);
   });
 
@@ -95,8 +105,12 @@ describe('serializeTableState', () => {
       where: undefined,
       columns: undefined,
     };
-    const query = serializeTableState(state, DEFAULT_ORDER, '?edit=title:abc&page=9&order=-views');
-    strictEqual(query, 'edit=title%3Aabc&page=2&order=title');
+    const query = serializeTableState(
+      state,
+      DEFAULT_ORDER,
+      '?edit=[title,abc]&page=9&order=[-views]',
+    );
+    strictEqual(query, 'edit=[title,abc]&page=2&order=[title]');
   });
 });
 
@@ -114,9 +128,16 @@ describe('sortFromOrder', () => {
 
 describe('stripEditParam', () => {
   it('removes only the edit param', () => {
-    strictEqual(stripEditParam('?page=2&edit=title:abc'), '?page=2');
-    strictEqual(stripEditParam('?edit=title:abc'), '');
+    strictEqual(stripEditParam('?page=2&edit=[title,abc]'), '?page=2');
+    strictEqual(stripEditParam('?edit=[title,abc]'), '');
     strictEqual(stripEditParam(''), '');
+  });
+
+  it('leaves a readable filter untouched', () => {
+    strictEqual(
+      stripEditParam('?where={email:{contains:@}}&edit=[title,abc]'),
+      '?where={email:{contains:@}}',
+    );
   });
 });
 
@@ -141,7 +162,7 @@ describe('resolveTableColumns', () => {
   });
 
   it('does not sort composite kinds', () => {
-    const columns = resolveTableColumns(FIELDS, 'sections');
+    const columns = resolveTableColumns(FIELDS, ['sections']);
     strictEqual(columns[0]?.sortable, false);
   });
 
@@ -159,7 +180,7 @@ describe('resolveTableColumns', () => {
   });
 
   it('resolves a columns spec with widths', () => {
-    const columns = resolveTableColumns(FIELDS, 'title|20rem,views,published|50%|10rem');
+    const columns = resolveTableColumns(FIELDS, ['title|20rem', 'views', 'published|50%|10rem']);
     deepStrictEqual(columns, [
       { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
       { name: 'views', label: 'views', sortable: 'numeric', minWidth: '16rem' },
@@ -175,13 +196,13 @@ describe('resolveTableColumns', () => {
 
   it('skips unknown fields in a spec', () => {
     deepStrictEqual(
-      resolveTableColumns(FIELDS, 'title,ghost').map((column) => column.name),
+      resolveTableColumns(FIELDS, ['title', 'ghost']).map((column) => column.name),
       ['title'],
     );
   });
 
   it('falls back to the UUID column when nothing resolves', () => {
-    deepStrictEqual(resolveTableColumns(FIELDS, 'ghost'), [
+    deepStrictEqual(resolveTableColumns(FIELDS, ['ghost']), [
       { name: 'UUID', label: 'UUID', sortable: 'text' },
     ]);
   });

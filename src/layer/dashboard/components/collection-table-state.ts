@@ -1,4 +1,15 @@
-import { type ConditionObject, isNull, isPlainObject, isUndefined } from 'ohne/utils';
+import {
+  type ConditionObject,
+  isEmpty,
+  isPlainObject,
+  isPositiveInteger,
+  isString,
+  isUndefined,
+  parseSearchParams,
+  type SearchParamValue,
+  stringifySearchParams,
+  toArray,
+} from 'ohne/utils';
 
 /**
  * The slice of `DashboardField` the column resolver reads.
@@ -85,9 +96,9 @@ export interface TableURLState {
   where: ConditionObject | undefined;
 
   /**
-   * The raw `columns` spec (`name|width` pairs joined by commas); absent means default columns.
+   * The `columns` spec, one `name|width|minWidth` entry per column; absent means default columns.
    */
-  columns: string | undefined;
+  columns: string[] | undefined;
 }
 
 /**
@@ -104,23 +115,23 @@ function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
  *
  * Without a `spec`, the first four declared readable fields become columns, `_updatedAt` closing
  * the set - the counterpart of the source's five-column default with its trailing `createdAt`.
- * A `spec` names columns as `name|width|minWidth` entries joined by commas; an unknown name warns
- * and is skipped, and a missing width keeps the `16rem` minimum.
+ * A `spec` lists columns as `name|width|minWidth` entries.
+ * An unknown name warns and is skipped, and a missing width keeps the `16rem` minimum.
  * An empty result falls back to the `UUID` column alone, as the source fell back to `id`.
  *
  * @example
  * ```ts
- * resolveTableColumns(fields)                    // -> first 4 declared fields + _updatedAt
- * resolveTableColumns(fields, 'title|20rem,age') // -> title at 20rem, age at min 16rem
+ * resolveTableColumns(fields)                         // -> first 4 declared fields + _updatedAt
+ * resolveTableColumns(fields, ['title|20rem', 'age']) // -> title at 20rem, age at min 16rem
  * ```
  */
 export function resolveTableColumns(
   fields: readonly TableFieldMeta[],
-  spec?: string,
+  spec?: readonly string[],
 ): TableColumnSpec[] {
   const columns: TableColumnSpec[] = [];
 
-  if (isUndefined(spec) || spec === '') {
+  if (isUndefined(spec) || isEmpty(spec)) {
     const declared = fields.filter(
       (field) => field.readable && field.name !== 'UUID' && field.name !== '_updatedAt',
     );
@@ -142,7 +153,7 @@ export function resolveTableColumns(
       });
     }
   } else {
-    for (const entry of spec.split(',')) {
+    for (const entry of spec) {
       const [name, width, minWidth] = entry.split('|').map((part) => part.trim());
       if (isUndefined(name) || name === '') continue;
       const field = fields.find((candidate) => candidate.name === name);
@@ -173,46 +184,40 @@ export function resolveTableColumns(
 }
 
 /**
+ * The non-empty strings a parsed param carries, as a list.
+ * A lone value reads as a one-entry list, so `order=title` and `order=[title]` agree.
+ */
+function stringList(value: SearchParamValue | undefined): string[] {
+  return toArray<SearchParamValue | undefined>(value).filter(
+    (entry): entry is string => isString(entry) && entry !== '',
+  );
+}
+
+/**
  * Reads the table state out of a query string.
- * A missing or invalid `page` reads as `1`; a missing or empty `order` reads as `defaultOrder`;
- * a malformed `where` reads as no filter.
+ * A missing or invalid `page` reads as `1`, a missing or empty `order` as `defaultOrder`.
+ * A `where` that is not an object reads as no filter.
  *
  * @example
  * ```ts
  * parseTableState('', ['-_updatedAt'])
  * // -> { page: 1, order: ['-_updatedAt'], where: undefined, columns: undefined }
  *
- * parseTableState('?page=3&order=-title&where=%7B%22age%22%3A2%7D', ['-_updatedAt'])
+ * parseTableState('?page=3&order=[-title]&where={age:2}', ['-_updatedAt'])
  * // -> { page: 3, order: ['-title'], where: { age: 2 }, columns: undefined }
  * ```
  */
 export function parseTableState(search: string, defaultOrder: readonly string[]): TableURLState {
-  const params = new URLSearchParams(search);
+  const params = parseSearchParams(search);
 
-  const pageRaw = Number(params.get('page') ?? '');
-  const page = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
+  const page = isPositiveInteger(params.page) ? params.page : 1;
 
-  const orderRaw = params.get('order');
-  const parsedOrder = isNull(orderRaw)
-    ? []
-    : orderRaw
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter((entry) => entry !== '');
+  const parsedOrder = stringList(params.order);
   const order = parsedOrder.length === 0 ? [...defaultOrder] : parsedOrder;
 
-  let where: ConditionObject | undefined;
-  const whereRaw = params.get('where');
-  if (!isNull(whereRaw)) {
-    try {
-      const parsed = JSON.parse(whereRaw) as unknown;
-      if (isPlainObject(parsed)) where = parsed as ConditionObject;
-    } catch {
-      /* a malformed filter param reads as no filter */
-    }
-  }
+  const where = isPlainObject<ConditionObject>(params.where) ? params.where : undefined;
 
-  const columns = params.get('columns') ?? undefined;
+  const columns = isUndefined(params.columns) ? undefined : stringList(params.columns);
 
   return { page, order, where, columns };
 }
@@ -229,7 +234,7 @@ export function parseTableState(search: string, defaultOrder: readonly string[])
  * // -> ''
  *
  * serializeTableState({ page: 2, order: ['title'], where: { age: 2 }, columns: undefined }, ['-_updatedAt'])
- * // -> 'page=2&order=title&where=%7B%22age%22%3A2%7D'
+ * // -> 'page=2&order=[title]&where={age:2}'
  * ```
  */
 export function serializeTableState(
@@ -237,18 +242,14 @@ export function serializeTableState(
   defaultOrder: readonly string[],
   search = '',
 ): string {
-  const params = new URLSearchParams(search);
-  params.delete('page');
-  params.delete('order');
-  params.delete('where');
-  params.delete('columns');
-  if (state.page > 1) params.set('page', String(state.page));
-  if (state.order.length > 0 && state.order.join(',') !== defaultOrder.join(',')) {
-    params.set('order', state.order.join(','));
-  }
-  if (!isUndefined(state.where)) params.set('where', JSON.stringify(state.where));
-  if (!isUndefined(state.columns)) params.set('columns', state.columns);
-  return params.toString();
+  const ordered = state.order.length > 0 && state.order.join(',') !== defaultOrder.join(',');
+  return stringifySearchParams({
+    ...parseSearchParams(search),
+    page: state.page > 1 ? state.page : undefined,
+    order: ordered ? state.order : undefined,
+    where: state.where as SearchParamValue | undefined,
+    columns: state.columns,
+  });
 }
 
 /**
@@ -277,13 +278,11 @@ export function sortFromOrder(
  *
  * @example
  * ```ts
- * stripEditParam('?page=2&edit=title:abc') // -> '?page=2'
- * stripEditParam('?edit=title:abc')        // -> ''
+ * stripEditParam('?page=2&edit=[title,abc]') // -> '?page=2'
+ * stripEditParam('?edit=[title,abc]')        // -> ''
  * ```
  */
 export function stripEditParam(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete('edit');
-  const query = params.toString();
+  const query = stringifySearchParams({ ...parseSearchParams(search), edit: undefined });
   return query === '' ? '' : `?${query}`;
 }

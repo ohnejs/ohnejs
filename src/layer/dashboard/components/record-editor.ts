@@ -35,6 +35,7 @@ import {
   onCleanup,
   ref,
   sleep,
+  stringifySearchParams,
   untracked,
 } from 'ohne/utils';
 
@@ -537,7 +538,7 @@ async function write(
   body: RecordRow,
   locale?: string,
 ): Promise<WriteOutcome> {
-  const suffix = isUndefined(locale) ? '' : `?locale=${encodeURIComponent(locale)}`;
+  const suffix = isUndefined(locale) ? '' : `?${stringifySearchParams({ locale })}`;
   const send = (): Promise<Response> =>
     api(
       isUndefined(uuid)

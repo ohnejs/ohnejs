@@ -11,7 +11,7 @@ import {
   useT,
   when,
 } from 'ohne/dashboard';
-import { effect, isNull, isString, isUndefined, ref } from 'ohne/utils';
+import { effect, isNull, isUndefined, ref } from 'ohne/utils';
 
 import {
   editQueryParam,
@@ -142,17 +142,14 @@ export function editableFieldCell(
   const open = ref(false);
 
   effect(() => {
-    const edit = editQueryParam();
-    if (isString(edit)) {
-      const [fieldName, id] = edit.split(':');
-      if (fieldName === options.field.name && id === rowID) open.value = true;
-    }
+    const [fieldName, id] = editQueryParam();
+    if (fieldName === options.field.name && id === rowID) open.value = true;
   });
 
   const editButton = button(icon(options.editable ? 'pencil' : 'list-search'), {
     size: -3,
     variant: 'outline',
-    onClick: () => setEditQueryParam(`${options.field.name}:${rowID}`),
+    onClick: () => setEditQueryParam([options.field.name, rowID]),
   });
   effect(() => {
     editButton.title = t(

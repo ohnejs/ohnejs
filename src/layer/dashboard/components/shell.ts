@@ -19,6 +19,7 @@ import {
   nextTick,
   onCleanup,
   ref,
+  stringifySearchParams,
   untracked,
 } from 'ohne/utils';
 
@@ -260,7 +261,7 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
       // A dirty record editor's guard must not swallow this redirect: the session is gone, and a
       // blocked navigation here would strand a blank page.
       setNavigationGuard(null);
-      navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
+      navigate(`/login?${stringifySearchParams({ next: location.pathname })}`);
     }
   });
   const root = base([
