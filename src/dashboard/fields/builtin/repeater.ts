@@ -17,6 +17,7 @@ import { icon } from '../../ui/icon.ts';
 import { structure } from '../../ui/structure.ts';
 import { blocksOf } from '../_blocks.ts';
 import { itemFormSupports } from '../_items.ts';
+import { summaryParts, summarySpan, summaryTitle } from '../_summary.ts';
 import { clipboardData, stripUUIDs } from '../clipboard.ts';
 import { createFieldForm } from '../field-form.ts';
 import {
@@ -54,7 +55,8 @@ css`
 /**
  * The `repeater` field's dashboard behaviour.
  *
- * Cells show a dim item count.
+ * Cells digest the first item's values on one line, a dim `+N` counting the rest.
+ * A first item with nothing to show keeps the dim item count.
  * There is no inline cell editor: the list edits on the record page as structure cards.
  * Cards drag-reorder across matching repeaters, collapse, and carry the header actions cluster:
  * move, expand, add, clipboard copy and paste, duplicate, and delete.
@@ -63,11 +65,21 @@ css`
  * The record's one save writes the list whole.
  */
 export const repeaterType: FieldType = {
-  display({ value }) {
+  display({ field, value }) {
+    const t = useT();
+    const subfields = field.subfields ?? [];
     return () => {
       const current = value();
-      const length = isArray(current) ? current.length : 0;
-      return dimMark(length === 0 ? '·' : `${length} ×`);
+      const items = isArray(current) ? current : [];
+      if (items.length === 0) return dimMark('-');
+      const first = items[0];
+      if (!isPlainObject<Record<string, unknown>>(first)) return dimMark(`${items.length} ×`);
+      const parts = summaryParts(first, subfields);
+      if (parts.length === 0) return dimMark(`${items.length} ×`);
+      return [
+        summarySpan(parts, summaryTitle(first, subfields, t)),
+        items.length > 1 ? dimMark(` +${items.length - 1}`) : null,
+      ];
     };
   },
   control(context) {

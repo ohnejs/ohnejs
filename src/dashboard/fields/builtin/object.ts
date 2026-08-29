@@ -1,11 +1,9 @@
 import type { Child } from '../../render/insert.ts';
-import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { FieldForm } from '../field-form.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
-import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { effectScope } from '../../../utils/reactive/effect-scope.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
@@ -17,6 +15,7 @@ import { card } from '../../ui/card.ts';
 import { switchInput } from '../../ui/switch.ts';
 import { blocksOf } from '../_blocks.ts';
 import { itemFormSupports } from '../_items.ts';
+import { summaryParts, summarySpan, summaryTitle } from '../_summary.ts';
 import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
@@ -55,7 +54,8 @@ css`
 /**
  * The `object` field's dashboard behaviour.
  *
- * Cells summarize the child by its first text subfield's value.
+ * Cells join the child's values into a one-line digest, nested children flattened in field order.
+ * The cell title lists every carried value as a `label: value` row.
  * There is no inline cell editor: the child edits on the record page as a card holding its subform.
  * The card header carries the field label; a non-nullable child always renders its subform.
  * A nullable child toggles through the header switch, which keeps the discarded values for re-enable.
@@ -64,12 +64,19 @@ css`
  */
 export const objectType: FieldType = {
   display({ field, value }) {
+    const t = useT();
+    const subfields = field.subfields ?? [];
     return () => {
       const current = value();
-      if (isNullish(current)) return dimMark('·');
+      if (isNullish(current)) return dimMark('-');
       if (!isPlainObject<Record<string, unknown>>(current)) return dimMark('{…}');
-      const summary = summaryOf(current, field.subfields ?? []);
-      return summary === '' ? dimMark('{…}') : summary;
+      const parts = summaryParts(current, subfields);
+      const title = summaryTitle(current, subfields, t);
+      if (parts.length === 0) {
+        if (title === '') return dimMark('{…}');
+        return h('span', { class: 'cell-dim', title }, '{…}');
+      }
+      return summarySpan(parts, title);
     };
   },
   control(context) {
@@ -247,21 +254,6 @@ export const objectType: FieldType = {
     };
   },
 };
-
-/**
- * The child's first non-empty text subfield value, for the cell summary.
- */
-function summaryOf(
-  item: Readonly<Record<string, unknown>>,
-  subfields: readonly DashboardField[],
-): string {
-  for (const field of subfields) {
-    if (field.logicalType !== 'text' || field.type === 'password') continue;
-    const value = item[field.name];
-    if (isString(value) && value !== '') return value;
-  }
-  return '';
-}
 
 /**
  * `errors` without the control's own `''` key.

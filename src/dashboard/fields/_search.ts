@@ -13,15 +13,17 @@ export function targetOf(field: DashboardField): DashboardCollection | undefined
 }
 
 /**
+ * Whether a cell summary may draw from the field: readable, never `UUID` or a password.
+ */
+export function summarizable(field: DashboardField): boolean {
+  return field.readable && field.type !== 'password' && field.name !== 'UUID';
+}
+
+/**
  * The target's first plain readable text field, the one a search matches and shows.
  */
 export function labelFieldOf(target: DashboardCollection): DashboardField | undefined {
   return target.fields.find(
-    (field) =>
-      field.readable &&
-      field.kind === 'column' &&
-      field.logicalType === 'text' &&
-      field.type !== 'password' &&
-      field.name !== 'UUID',
+    (field) => summarizable(field) && field.kind === 'column' && field.logicalType === 'text',
   );
 }
