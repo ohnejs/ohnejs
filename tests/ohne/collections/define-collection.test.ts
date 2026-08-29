@@ -249,4 +249,94 @@ describe('defineCollection', () => {
       /Unknown icon `constructor`/,
     );
   });
+
+  it('accepts table columns in both spellings and returns them unchanged', () => {
+    const definition = defineCollection({
+      fields: { title: field('text'), views: field('integer') },
+      table: { columns: ['title | 20rem', 'views|20rem', '_updatedAt'] },
+    });
+    deepStrictEqual(definition.table, { columns: ['title | 20rem', 'views|20rem', '_updatedAt'] });
+  });
+
+  it('rejects a table column naming an unknown field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `slug` is not a field of this collection
+          table: { columns: ['slug'] },
+        }),
+      /unknown field `slug`/,
+    );
+  });
+
+  it('rejects a table column repeating a field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          table: { columns: ['title', 'title|20rem'] },
+        }),
+      /repeats field `title`/,
+    );
+  });
+
+  it('rejects a table column entry naming no field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error an entry must start with a field name
+          table: { columns: [' | 20rem'] },
+        }),
+      /names no field/,
+    );
+  });
+
+  it('rejects an empty table columns list', () => {
+    throws(
+      () => defineCollection({ fields: { title: field('text') }, table: { columns: [] } }),
+      /is empty/,
+    );
+  });
+
+  it('rejects a non-string table column entry', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error an entry must be a string
+          table: { columns: [42] },
+        }),
+      /Invalid `table.columns`/,
+    );
+  });
+
+  it('rejects a table column naming a write-only field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text'), secret: field('text', { readable: false }) },
+          table: { columns: ['secret'] },
+        }),
+      /write-only field `secret`/,
+    );
+  });
+
+  it('accepts plain CSS lengths and rejects any other width', () => {
+    doesNotThrow(() =>
+      defineCollection({
+        fields: { title: field('text'), views: field('integer') },
+        table: { columns: ['title | 50%', 'views|300px|12.5rem'] },
+      }),
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          table: { columns: ['title | calc(100% - 2rem)'] },
+        }),
+      /Invalid `table.columns` width/,
+    );
+  });
 });

@@ -188,3 +188,30 @@ Any top-level field takes `translatable: true` to hold one value per locale - a 
 or a whole item list per locale for composites and `records`. The one exception is an inverse
 `records` field: it follows the owning side's junction. See [translations](./translations.md)
 for the locale set, reading, and writing per locale.
+
+## Dashboard appearance
+
+Two optional keys shape how the dashboard presents a collection.
+
+`icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
+in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.
+
+`table` sets the list view's defaults. Its `columns` lists the columns to show, in order, one entry
+per field. An entry is a field name, optionally followed by its widths as `name|width|minWidth`,
+each a plain CSS length or percentage like `20rem` or `50%`. `UUID` and `_updatedAt` are valid names
+beside your declared readable fields. Omitted, the list view shows the first four readable fields
+with `_updatedAt` closing the set.
+
+```ts
+export default defineCollection({
+  icon: 'note',
+  table: { columns: ['title | 20rem', 'views', '_updatedAt'] },
+  fields: {
+    title: field('text'),
+    views: field('integer'),
+  },
+});
+```
+
+A viewer can rearrange the columns in the dashboard; their choice rides in the URL and overrides
+the declared defaults until they restore them.

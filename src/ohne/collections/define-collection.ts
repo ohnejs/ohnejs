@@ -143,6 +143,35 @@ export interface CompositeIndex<TField extends string = string> {
 }
 
 /**
+ * One `table.columns` entry: a field name, optionally followed by its CSS widths.
+ * The parts are `name`, `width`, and `minWidth`, separated by `|`; both widths are optional.
+ * Spaces around a separator are trimmed, so `title | 20rem` and `title|20rem` are the same entry.
+ */
+export type TableColumnEntry<TField extends string = string> =
+  | TField
+  | 'UUID'
+  | '_updatedAt'
+  | `${TField | 'UUID' | '_updatedAt'}|${string}`
+  | `${TField | 'UUID' | '_updatedAt'} | ${string}`;
+
+/**
+ * A collection's dashboard list-view defaults.
+ */
+export interface CollectionTable<TField extends string = string> {
+  /**
+   * The columns the list view shows, in order, one entry per column.
+   * A width is a plain CSS length or percentage; `minWidth` falls back to `16rem` without a width.
+   * Omitted, the table shows the first four readable fields with `_updatedAt` closing the set.
+   *
+   * @example
+   * ```ts
+   * columns: ['title | 20rem', 'views', '_updatedAt | 150px']
+   * ```
+   */
+  columns?: readonly TableColumnEntry<TField>[];
+}
+
+/**
  * A collection definition: its fields and any collection-level constraints.
  * The collection name is not declared here; it comes from the file under `dirs.collections`.
  */
@@ -210,6 +239,12 @@ export interface CollectionDefinition<
    * ```
    */
   icon?: IconName;
+
+  /**
+   * The dashboard list view's defaults for this collection.
+   * A viewer's own choice, carried in the `columns` query param, overrides them.
+   */
+  table?: CollectionTable<keyof TFields & string>;
 }
 
 /**
@@ -245,6 +280,11 @@ export interface AnyCollectionDefinition {
    * The Tabler icon the dashboard menu shows; omitted, the menu row renders no icon.
    */
   icon?: IconName;
+
+  /**
+   * The dashboard list view's defaults; omitted, the list view derives its columns.
+   */
+  table?: CollectionTable;
 }
 
 /**

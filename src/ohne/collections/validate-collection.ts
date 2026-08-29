@@ -25,6 +25,7 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `icon` must name an icon the vendored set carries.
+ * - `table.columns` must be a non-empty list of entries naming distinct, readable, declared fields.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -37,6 +38,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
   validateIcon(definition.icon, collection);
+  validateTable(definition.table, definition.fields, collection);
 }
 
 /**
@@ -107,6 +109,97 @@ function validateAPI(api: unknown, collection?: string): void {
           '`access` is a function resolving the per-request scope.',
         ],
       });
+    }
+  }
+}
+
+// Must stay in sync with the width grammar the dashboard's column parser accepts.
+const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
+
+/**
+ * Rejects a malformed `table` declaration.
+ * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
+ * An entry fails naming no field, an unknown or write-only field, a repeat, or an invalid width.
+ */
+function validateTable(
+  table: unknown,
+  fields: Record<string, FieldInstance>,
+  collection?: string,
+): void {
+  if (isUndefined(table)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isPlainObject(table)) {
+    throw ohneError({
+      title: 'Invalid `table` declaration',
+      body: [
+        `The \`table\` option${scope} must be an object.`,
+        "Write `table: { columns: ['title | 20rem', 'views'] }`.",
+      ],
+    });
+  }
+  const columns = table.columns;
+  if (isUndefined(columns)) return;
+  if (!isArray(columns) || !columns.every(isString)) {
+    throw ohneError({
+      title: 'Invalid `table.columns` declaration',
+      body: [
+        `The \`table.columns\` option${scope} must be an array of \`name|width|minWidth\` strings.`,
+      ],
+    });
+  }
+  if (columns.length === 0) {
+    throw ohneError({
+      title: 'The `table.columns` list is empty',
+      body: [
+        `An empty \`table.columns\`${scope} would silently show the derived columns.`,
+        'Omit the key instead.',
+      ],
+    });
+  }
+  const known = new Set([...Object.keys(fields), 'UUID', '_updatedAt']);
+  const seen = new Set<string>();
+  for (const entry of columns) {
+    const [name = '', ...widths] = entry.split('|').map((part) => part.trim());
+    if (name === '') {
+      throw ohneError({
+        title: 'A `table.columns` entry names no field',
+        body: [`Every \`table.columns\` entry${scope} must start with a field name.`],
+      });
+    }
+    if (!known.has(name)) {
+      throw ohneError({
+        title: `\`table.columns\` references unknown field \`${name}\``,
+        body: [
+          `No field \`${name}\` is declared${scope}, and it is not \`UUID\` or \`_updatedAt\`.`,
+        ],
+      });
+    }
+    if (fields[name]?.options.readable === false) {
+      throw ohneError({
+        title: `\`table.columns\` references write-only field \`${name}\``,
+        body: [
+          `The field \`${name}\`${scope} is \`readable: false\`, so its column can never show a value.`,
+        ],
+      });
+    }
+    if (seen.has(name)) {
+      throw ohneError({
+        title: `\`table.columns\` repeats field \`${name}\``,
+        body: [
+          `The table keys columns by field name${scope}, so a repeated \`${name}\` collapses.`,
+        ],
+      });
+    }
+    seen.add(name);
+    for (const width of widths) {
+      if (width !== '' && !CSS_WIDTH.test(width)) {
+        throw ohneError({
+          title: `Invalid \`table.columns\` width \`${width}\``,
+          body: [
+            `A width${scope} must be a plain CSS length or percentage, like \`20rem\` or \`50%\`.`,
+          ],
+        });
+      }
     }
   }
 }
