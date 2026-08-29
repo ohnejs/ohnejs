@@ -213,7 +213,7 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
       const el = card(
         [
           when(
-            () => filtered.value.length === 0,
+            () => isEmpty(filtered.value),
             () =>
               h(
                 'div',
