@@ -135,6 +135,15 @@ css`
     inset: 0;
   }
 
+  .o-overview-recent-label:focus-visible {
+    outline: 0.125rem solid transparent;
+    outline-offset: 0.125rem;
+  }
+
+  .o-overview-recent-label:focus-visible::after {
+    box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
+  }
+
   .o-overview-recent-time {
     flex-shrink: 0;
     color: hsl(var(--ohne-muted-foreground));
