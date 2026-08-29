@@ -22,7 +22,7 @@ export const textType: FieldType = {
   display({ value }) {
     return () => {
       const current = value();
-      if (isNullish(current)) return dimMark('·');
+      if (isNullish(current)) return dimMark('-');
       const text = String(current as string);
       if (text === '') return h('span', { class: 'cell-faint cell-mono' }, '""');
       return h('span', { class: 'ohne-truncate', title: text }, text);

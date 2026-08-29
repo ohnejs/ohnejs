@@ -38,7 +38,7 @@ export const recordsType: FieldType = {
     return () => {
       const current = value();
       const links = isArray(current) ? current.filter(isString) : [];
-      if (links.length === 0) return dimMark('·');
+      if (links.length === 0) return dimMark('-');
       const first = links[0] as string;
       const resolved = labelOf(field.target ?? '', first);
       return [

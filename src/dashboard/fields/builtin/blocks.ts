@@ -75,7 +75,7 @@ export const blocksType: FieldType = {
     return () => {
       const current = value();
       const items = isArray(current) ? current : [];
-      if (items.length === 0) return dimMark('·');
+      if (items.length === 0) return dimMark('-');
       const first = items[0];
       const name =
         isPlainObject<Record<string, unknown>>(first) && isString(first.block) ? first.block : '';

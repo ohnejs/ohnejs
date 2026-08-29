@@ -305,7 +305,7 @@ const FALLBACK: FieldType = {
   display({ value }) {
     return () => {
       const current = value();
-      if (isNullish(current)) return dimMark('·');
+      if (isNullish(current)) return dimMark('-');
       if (isArray(current)) {
         return current.every(isString) ? current.join(', ') : dimMark(`[${current.length}]`);
       }

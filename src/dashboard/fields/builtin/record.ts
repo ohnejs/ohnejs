@@ -166,7 +166,7 @@ export const recordType: FieldType = {
   display({ field, value }) {
     return () => {
       const current = value();
-      if (isNullish(current)) return dimMark('·');
+      if (isNullish(current)) return dimMark('-');
       const uuid = String(current as string);
       const target = field.target ?? '';
       const resolved = labelOf(target, uuid);
