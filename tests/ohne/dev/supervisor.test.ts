@@ -162,13 +162,11 @@ describe('dev', () => {
       servers.push(server);
       await waitFor(async () => (await get(port, '/health')) === 200);
 
-      // Trigger a reload, then close the instant the respawn begins - before the new child is ready.
       out.length = 0;
       writeRoute(app, 'users.get.ts');
       await waitFor(async () => out.join('').includes('Reloading API'));
       await server.close();
 
-      // The respawning child must have been drained: nothing binds the port, even after it would boot.
       let bound = false;
       const deadline = Date.now() + 1500;
       while (Date.now() < deadline && !bound) {
@@ -186,7 +184,6 @@ describe('dev', () => {
     const app = writeProject('park', port);
     writeRoute(app, 'health.ts');
 
-    // Capture the in-process supervisor's printer; the child serves in a separate process.
     const out: string[] = [];
     useEnv().set('SILENT', false);
     usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
@@ -255,7 +252,6 @@ describe('dev', () => {
     servers.push(server);
     await waitFor(async () => (await get(port, '/health')) === 200);
 
-    // A config change opens a slow regen; closing inside it must not respawn afterwards.
     writeFileSync(join(app, 'ohne.config.ts'), `${slowConfig}// touched\n`);
     await delay(300);
     await server.close();

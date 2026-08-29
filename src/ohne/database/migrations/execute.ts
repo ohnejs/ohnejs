@@ -1563,7 +1563,6 @@ async function writeValues(
   const notNull = target.columns.find((column) => column.name === to.column)?.notNull === true;
   const where = targetKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
   const update = `UPDATE ${dialect.quote(to.table)} SET ${dialect.quote(to.column)} = ? WHERE ${where}`;
-  // A parent moving onto its child-one table can materialize the child row a plain move would miss.
   const insertsChild =
     target.derived?.kind === 'childOne' && targetKey.length === 1 && targetKey[0] === '_parentUUID';
   const stampsLocale =

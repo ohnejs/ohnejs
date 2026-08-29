@@ -29,7 +29,6 @@ useCollections().register('WTags', {
     },
   },
 });
-// A collection literally named `Sub`: a naive aliasing scheme would collide it with `_subN`; ours cannot.
 useCollections().register('Sub', {
   name: 'Sub',
   collection: { fields: { name: field('text') } },
