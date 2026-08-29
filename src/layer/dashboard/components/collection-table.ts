@@ -856,7 +856,7 @@ function displayFor(field: DashboardField, row: TableRecord): Child {
   if (field.name === '_updatedAt') {
     return () => {
       const value = row['_updatedAt'];
-      if (!isNumber(value)) return dimMark('·');
+      if (!isNumber(value)) return dimMark('-');
       const language = useDashboardLanguage().value;
       const variant: DateVariant = isToday(value) ? 'time' : 'short';
       return h(
@@ -869,7 +869,7 @@ function displayFor(field: DashboardField, row: TableRecord): Child {
   if (field.name === 'UUID') {
     return () => {
       const value = row['UUID'];
-      if (!isString(value)) return dimMark('·');
+      if (!isString(value)) return dimMark('-');
       return h('span', { class: 'cell-mono cell-dim', title: value }, value.slice(0, 8));
     };
   }

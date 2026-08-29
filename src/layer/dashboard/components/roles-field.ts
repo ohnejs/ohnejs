@@ -31,7 +31,7 @@ registerFieldType('roles', {
     return () => {
       const current = value();
       const names = isArray(current) ? current.filter(isString) : [];
-      if (names.length === 0) return dimMark('·');
+      if (names.length === 0) return dimMark('-');
       const joined = names.length <= 3 ? names.join(', ') : (names[0] as string);
       return [
         h('span', { class: 'ohne-truncate', title: joined }, joined),
