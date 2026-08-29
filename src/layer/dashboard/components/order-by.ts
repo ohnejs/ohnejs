@@ -1,5 +1,4 @@
 import {
-  attachTooltip,
   button,
   card,
   type Child,
@@ -9,14 +8,15 @@ import {
   h,
   icon,
   iconGroup,
-  type IconName,
   type Primitive,
   select,
   type SelectChoice,
   useT,
   when,
 } from 'ohne/dashboard';
-import { effect, isUndefined, onCleanup, type Ref, ref, untracked } from 'ohne/utils';
+import { effect, isUndefined, type Ref, ref, untracked } from 'ohne/utils';
+
+import { actionButton } from './item-actions.ts';
 
 /**
  * Options for `orderBy`.
@@ -58,19 +58,6 @@ css`
   .o-order-by-row {
     min-height: 2em;
     padding-left: 0.25rem;
-  }
-
-  .o-order-by :where(.o-order-by-actions) {
-    display: none;
-    gap: 0.25rem;
-    margin-left: auto;
-  }
-
-  :where(.o-order-by-item:hover, .o-order-by-item:focus-within)
-    > .ohne-card-header
-    > .o-order-by-row
-    > .o-order-by-actions {
-    display: flex;
   }
 `;
 
@@ -125,23 +112,6 @@ export function orderBy(options: OrderByOptions): HTMLElement {
     commit(next);
   };
 
-  const actionButton = (
-    glyph: IconName,
-    tooltip: () => string,
-    onClick: () => void,
-    extras: { disabled?: () => boolean; destructiveHover?: boolean } = {},
-  ): HTMLElement => {
-    const control = button(icon(glyph), {
-      size: -2,
-      variant: 'ghost',
-      destructiveHover: extras.destructiveHover,
-      disabled: extras.disabled,
-      onClick,
-    });
-    onCleanup(attachTooltip(control, tooltip));
-    return control;
-  };
-
   const header = (item: () => OrderByItem, index: () => number): Child =>
     h(
       'div',
@@ -153,7 +123,7 @@ export function orderBy(options: OrderByOptions): HTMLElement {
       ),
       h(
         'div',
-        { class: 'o-order-by-actions' },
+        { class: 'o-item-actions' },
         when(
           () => items.value.length > 1,
           () => [

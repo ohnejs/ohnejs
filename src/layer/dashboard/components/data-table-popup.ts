@@ -48,6 +48,7 @@ import {
   filterToWhere,
 } from './data-table-filter.ts';
 import { unsavedChanges } from './history.ts';
+import { actionButton } from './item-actions.ts';
 
 /**
  * Options for `dataTablePopup`.
@@ -267,17 +268,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     commit();
   };
 
-  const actionButton = (
-    glyph: Child,
-    tooltip: () => string,
-    onClick: () => void,
-    destructiveHover = false,
-  ): HTMLElement => {
-    const control = button(glyph, { size: -2, variant: 'ghost', destructiveHover, onClick });
-    onCleanup(attachTooltip(control, tooltip));
-    return control;
-  };
-
   const relationToggle = (relation: () => 'and' | 'or', onToggle: () => void): HTMLElement => {
     const control = button(
       () =>
@@ -481,15 +471,15 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
         'div',
         { class: 'o-where-filters-actions' },
         actionButton(
-          icon('copy'),
+          'copy',
           () => t('dashboard.filter.duplicate'),
           () => duplicate(group, index()),
         ),
         actionButton(
-          icon('trash'),
+          'trash',
           () => t('dashboard.delete'),
           () => remove(group, index()),
-          true,
+          { destructiveHover: true },
         ),
       ),
     );
