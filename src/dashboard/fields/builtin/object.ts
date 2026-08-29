@@ -21,14 +21,11 @@ import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
-  /* The card header carries the field label, so the row's own label above the card hides. */
+  /* The card header carries the field label, so the row's own label above the card hides.
+     Hidden, not removed: it keeps the auto margin and the row's height, so a head left with no
+     glyph neither drifts left nor collapses as dirt toggles. */
   .ohne-fieldrow:has(> .ohne-object) > .ohne-field-label .ohne-label {
-    display: none;
-  }
-
-  /* The hidden label held the auto margin; without it, the meta marks keep the right edge. */
-  .ohne-fieldrow:has(> .ohne-object) > .ohne-field-label {
-    justify-content: flex-end;
+    visibility: hidden;
   }
 
   /* The card header carries the label, so it mirrors the field label's required mark, float and
