@@ -7,16 +7,18 @@ import {
   each,
   h,
   icon,
+  type IconName,
   useT,
   when,
 } from 'ohne/dashboard';
-import { computed, effect, naturalCompare, onCleanup } from 'ohne/utils';
+import { computed, effect, isUndefined, naturalCompare, onCleanup } from 'ohne/utils';
 
 import type { OverviewSearch } from '../pages/overview.ts';
 
 interface QuickCreateShortcut {
   name: string;
   label: string;
+  icon: IconName | undefined;
   to: string;
 }
 
@@ -53,6 +55,7 @@ css`
 /**
  * The Quick create widget.
  * A card of outline buttons, one per creatable collection, each linking to its create page.
+ * A collection's declared icon renders before its label.
  * The shared `search` filters them and the card hides while nothing matches.
  */
 export function overviewQuickCreate(search: OverviewSearch): Child {
@@ -65,6 +68,7 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
       items.push({
         name: collection.name,
         label: collection.label,
+        icon: collection.icon,
         to: `/collections/${collection.segment}/new`,
       });
     }
@@ -91,7 +95,13 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
             (shortcut) => shortcut.name,
             (shortcut) => {
               const link = button(
-                h('span', null, () => shortcut().label),
+                [
+                  () => {
+                    const glyph = shortcut().icon;
+                    return isUndefined(glyph) ? null : icon(glyph);
+                  },
+                  h('span', null, () => shortcut().label),
+                ],
                 {
                   size: -2,
                   variant: 'outline',
