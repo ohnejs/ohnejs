@@ -16,6 +16,12 @@
   },
   "close": "Schließen",
   "collections": "Sammlungen",
+  "columns": {
+    "autoWidth": "Automatische Breite",
+    "column": "Spalte",
+    "fixedWidth": "Feste Breite",
+    "title": "Spalten"
+  },
   "confirmDelete": "Bestätigen",
   "confirmDeleteCount": "Bestätigen ({count})",
   "create": "Erstellen",
@@ -166,6 +172,7 @@
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
   "redirected": "Weitergeleitet",
   "removeItem": "Entfernen",
+  "restoreDefaults": "Standardeinstellungen wiederherstellen",
   "retry": "Erneut versuchen",
   "save": "Speichern",
   "saved": "Gespeichert",

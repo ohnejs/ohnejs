@@ -2,8 +2,11 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import {
+  editableTableColumns,
   parseTableState,
   resolveTableColumns,
+  serializeTableColumnEdits,
+  serializeTableColumns,
   serializeTableState,
   sortFromOrder,
   stripEditParam,
@@ -205,5 +208,135 @@ describe('resolveTableColumns', () => {
     deepStrictEqual(resolveTableColumns(FIELDS, ['ghost']), [
       { name: 'UUID', label: 'UUID', sortable: 'text' },
     ]);
+  });
+
+  it('skips an unreadable field named in a spec, and warns', (t) => {
+    const warn = t.mock.method(console, 'warn');
+    const fields = [...FIELDS, field('secret', { readable: false })];
+    deepStrictEqual(
+      resolveTableColumns(fields, ['title', 'secret']).map((column) => column.name),
+      ['title'],
+    );
+    strictEqual(warn.mock.callCount(), 1);
+  });
+
+  it('keeps the first of two entries naming the same field, and warns', (t) => {
+    const warn = t.mock.method(console, 'warn');
+    deepStrictEqual(resolveTableColumns(FIELDS, ['title|20rem', 'title']), [
+      { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
+    ]);
+    strictEqual(warn.mock.callCount(), 1);
+  });
+
+  it('drops a width slot that is not a plain CSS length, and warns', (t) => {
+    const warn = t.mock.method(console, 'warn');
+    deepStrictEqual(resolveTableColumns(FIELDS, ['title|1px;background:url(//evil.example/x)']), [
+      { name: 'title', label: 'title', sortable: 'text', minWidth: '16rem' },
+    ]);
+    deepStrictEqual(resolveTableColumns(FIELDS, ['title|20rem|calc(100%)']), [
+      { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
+    ]);
+    strictEqual(warn.mock.callCount(), 2);
+  });
+});
+
+describe('serializeTableColumns', () => {
+  it('serializes each entry shape', () => {
+    deepStrictEqual(
+      serializeTableColumns([
+        { name: 'title', label: 'title', sortable: 'text', minWidth: '16rem' },
+        { name: 'title', label: 'title', sortable: 'text', width: '256px' },
+        { name: 'title', label: 'title', sortable: 'text', minWidth: '24rem' },
+        { name: 'title', label: 'title', sortable: 'text', width: '50%', minWidth: '24rem' },
+      ]),
+      ['title', 'title|256px', 'title||24rem', 'title|50%|24rem'],
+    );
+  });
+
+  it('round-trips through resolveTableColumns', () => {
+    const specs = [
+      ['title'],
+      ['title|256px'],
+      ['title|256px|24rem'],
+      ['title||24rem'],
+      ['title|50%|24rem'],
+    ];
+    for (const spec of specs) {
+      deepStrictEqual(serializeTableColumns(resolveTableColumns(FIELDS, spec)), spec);
+    }
+  });
+
+  it('serializes the auto default to bare entries', () => {
+    deepStrictEqual(serializeTableColumns(resolveTableColumns(FIELDS)), [
+      'title',
+      'views',
+      'published',
+      'author',
+      '_updatedAt',
+    ]);
+  });
+});
+
+describe('editableTableColumns', () => {
+  it('decodes widths: absent to auto, a pixel count to its number, anything else preserved', () => {
+    deepStrictEqual(editableTableColumns(['title'], FIELDS), [
+      { $key: 'title', name: 'title', width: null },
+    ]);
+    deepStrictEqual(editableTableColumns(['title|256px'], FIELDS), [
+      { $key: 'title', name: 'title', width: 256, rawWidth: '256px' },
+    ]);
+    deepStrictEqual(editableTableColumns(['title|20rem'], FIELDS), [
+      { $key: 'title', name: 'title', width: false, rawWidth: '20rem' },
+    ]);
+  });
+
+  it('rejects a zero-padded pixel width', () => {
+    strictEqual(editableTableColumns(['title|01px'], FIELDS)[0]?.width, false);
+  });
+
+  it('preserves a pixel width beside a minimum, so the pair survives a round trip', () => {
+    deepStrictEqual(editableTableColumns(['title|256px|24rem'], FIELDS), [
+      { $key: 'title', name: 'title', width: false, rawWidth: '256px', rawMinWidth: '24rem' },
+    ]);
+  });
+
+  it('keeps the minWidth slot as written', () => {
+    deepStrictEqual(editableTableColumns(['title|50%|24rem'], FIELDS), [
+      { $key: 'title', name: 'title', width: false, rawWidth: '50%', rawMinWidth: '24rem' },
+    ]);
+  });
+
+  it('drops unknown, unreadable, and repeated names', (t) => {
+    t.mock.method(console, 'warn');
+    const fields = [...FIELDS, field('secret', { readable: false })];
+    deepStrictEqual(
+      editableTableColumns(['ghost', 'secret', 'title', 'title'], fields).map((item) => item.name),
+      ['title'],
+    );
+  });
+});
+
+describe('serializeTableColumnEdits', () => {
+  it('inverts editableTableColumns for each entry shape', () => {
+    const specs = [
+      ['title'],
+      ['title|256px'],
+      ['title|256px|24rem'],
+      ['title|20rem'],
+      ['title||24rem'],
+      ['title|50%|24rem'],
+    ];
+    for (const spec of specs) {
+      deepStrictEqual(serializeTableColumnEdits(editableTableColumns(spec, FIELDS)), spec);
+    }
+  });
+
+  it('drops the minimum from a fixed width', () => {
+    deepStrictEqual(
+      serializeTableColumnEdits([
+        { $key: 'title', name: 'title', width: 300, rawMinWidth: '24rem' },
+      ]),
+      ['title|300px'],
+    );
   });
 });

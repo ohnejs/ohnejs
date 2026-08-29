@@ -36,7 +36,10 @@ import {
 import {
   computed,
   type ConditionObject,
+  deepEqual,
   effect,
+  hasKey,
+  isEmpty,
   isNull,
   isNumber,
   isString,
@@ -45,11 +48,13 @@ import {
   type Ref,
   ref,
   sleep,
+  uniqueArray,
 } from 'ohne/utils';
 
 import {
   parseTableState,
   resolveTableColumns,
+  serializeTableColumns,
   serializeTableState,
   sortFromOrder,
   stripEditParam,
@@ -60,6 +65,7 @@ import { dataTablePopup } from './data-table-popup.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
 import { unsavedChanges } from './history.ts';
 import { orderBy } from './order-by.ts';
+import { tableColumnsConfigurator } from './table-columns-configurator.ts';
 
 /**
  * One record row, as the collections API answers it.
@@ -178,13 +184,14 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const state = parseTableState(location.search, DEFAULT_ORDER);
   const whereDirty = !isUndefined(state.where);
+  const orderDirty = state.order.join(',') !== DEFAULT_ORDER.join(',');
 
   const push = (patch: Partial<TableURLState>, replace = false): void => {
     const next: TableURLState = {
       page: patch.page ?? state.page,
       order: patch.order ?? state.order,
-      where: Object.hasOwn(patch, 'where') ? patch.where : state.where,
-      columns: state.columns,
+      where: hasKey(patch, 'where') ? patch.where : state.where,
+      columns: hasKey(patch, 'columns') ? patch.columns : state.columns,
     };
     const query = serializeTableState(next, DEFAULT_ORDER, location.search);
     const search = query === '' ? '' : `?${query}`;
@@ -192,7 +199,12 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     navigate(location.pathname + search, { replace });
   };
 
-  const specs = resolveTableColumns(collection.fields, state.columns);
+  const declared = collection.table?.columns;
+  const source = isUndefined(state.columns) || isEmpty(state.columns) ? declared : state.columns;
+  const specs = resolveTableColumns(collection.fields, source);
+  const defaultEntries = serializeTableColumns(resolveTableColumns(collection.fields, declared));
+  const currentEntries = serializeTableColumns(specs);
+  const columnsDirty = !deepEqual(currentEntries, defaultEntries);
   const columns: TableColumns = {};
   for (const spec of specs) {
     const definition: Parameters<typeof tableColumn>[0] = {
@@ -206,7 +218,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const fieldByName = (name: string): DashboardField | undefined =>
     collection.fields.find((field) => field.name === name);
-  const filterFields = (): DashboardField[] => collection.fields.filter((field) => field.readable);
+  const readableFields = (): DashboardField[] =>
+    collection.fields.filter((field) => field.readable);
   const sortableFields = (): DashboardField[] =>
     collection.fields.filter((field) => field.readable && field.kind === 'column');
 
@@ -224,6 +237,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       : Object.values(selected.value).filter(Boolean).length,
   );
   const filterOpen = ref(false);
+  const columnsOpen = ref(false);
   const sortingOpen = ref(false);
   let generation = 0;
   let deleteBusy = false;
@@ -234,6 +248,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const queryBody = (): Record<string, unknown> => {
     const body: Record<string, unknown> = {
+      // The explicit `UUID` keeps the row identity when it is not a visible column.
+      select: uniqueArray(['UUID', ...specs.map((spec) => spec.name)]),
       page: state.page,
       perPage: PER_PAGE,
       order: state.order,
@@ -602,8 +618,18 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   });
   onCleanup(attachTooltip(filterButton, () => t('dashboard.filter.title')));
 
+  const columnsButton = button(icon('layout-columns'), {
+    variant: columnsDirty ? 'accent' : 'outline',
+    bubble: columnsDirty ? bubble() : undefined,
+    onClick: () => {
+      columnsOpen.value = true;
+    },
+  });
+  onCleanup(attachTooltip(columnsButton, () => t('dashboard.columns.title')));
+
   const sortingButton = button(icon('arrows-sort'), {
-    variant: 'outline',
+    variant: orderDirty ? 'accent' : 'outline',
+    bubble: orderDirty ? bubble() : undefined,
     onClick: () => {
       sortingOpen.value = true;
     },
@@ -629,6 +655,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         { class: 'ohne-row ohne-ml-auto' },
         when(() => canDelete && selectable.value, deleteButton),
         filterButton,
+        columnsButton,
         sortingButton,
         newButton,
       ),
@@ -642,7 +669,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       let apply = false;
       dataTablePopup({
         title: () => t('dashboard.filter.title'),
-        fields: filterFields,
+        fields: readableFields,
         where: state.where,
         onApply: (where) => {
           pending = where;
@@ -654,6 +681,106 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
             if (apply) push({ where: pending });
           }),
       });
+      return null;
+    },
+  );
+
+  const columnsPopup = when(
+    () => columnsOpen.value,
+    () => {
+      const current = ref<string[]>([...currentEntries]);
+      const dirty = computed(() => !deepEqual(current.value, currentEntries));
+      const isDefault = computed(() => deepEqual(current.value, defaultEntries));
+      let apply = false;
+
+      const finish = (): void => {
+        void handle.close().then(() => {
+          const next = isDefault.value ? undefined : [...current.value];
+          columnsOpen.value = false;
+          if (apply) push({ columns: next });
+        });
+      };
+
+      const guardedClose = (): void => {
+        void (async () => {
+          if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) finish();
+        })();
+      };
+
+      const closeButton = button(icon('x'), {
+        size: -2,
+        variant: 'ghost',
+        class: 'ohne-ml-auto',
+        onClick: guardedClose,
+      });
+      effect(() => {
+        closeButton.title = t('dashboard.close');
+      });
+
+      const restoreButton = when(
+        () => !isDefault.value,
+        () =>
+          button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
+            variant: 'outline',
+            onClick: () => {
+              current.value = [...defaultEntries];
+            },
+          }),
+      );
+
+      const applyButton = button(() => t('dashboard.apply'), {
+        variant: 'outline',
+        class: 'ohne-ml-auto',
+        onClick: () => {
+          apply = true;
+          finish();
+        },
+      });
+      effect(() => {
+        const changed = dirty.value;
+        applyButton.classList.toggle('ohne-button-primary', changed);
+        applyButton.classList.toggle('ohne-button-outline', !changed);
+      });
+
+      const handle = popup(
+        tableColumnsConfigurator({
+          model: () => current.value,
+          fields: readableFields,
+          onCommit: (columns) => {
+            current.value = columns;
+          },
+        }),
+        {
+          size: -1,
+          width: '50rem',
+          fullHeight: true,
+          header: h(
+            'div',
+            { class: 'ohne-row' },
+            h('span', { class: 'o-collection-table-title' }, () => t('dashboard.columns.title')),
+            closeButton,
+          ),
+          footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
+          onClose: () => guardedClose(),
+        },
+      );
+
+      const hotkeys = useHotkeys({
+        allowInOverlays: true,
+        target: () => handle.root,
+        listen: false,
+      });
+      setTimeout(() => {
+        hotkeys.isListening.value = true;
+        hotkeys.listen('save', (event) => {
+          event.preventDefault();
+          // Blur first and defer, so a width still being typed commits before the entries are read.
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          apply = true;
+          setTimeout(finish);
+        });
+      });
+
       return null;
     },
   );
@@ -779,6 +906,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     h('div', { tabindex: '-1', class: 'o-collection-table-scroller o-scrollbar' }, grid.root),
     footer,
     filterPopup,
+    columnsPopup,
     sortingPopup,
   );
 }

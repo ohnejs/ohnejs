@@ -62,6 +62,7 @@ useCollections().register('DashNotes', {
   name: 'DashNotes',
   collection: {
     api: { read: true, create: true, update: true, delete: true },
+    table: { columns: ['title | 20rem', 'note'] },
     fields: {
       title: field('text'),
       note: field('text', { nullable: true }),
@@ -256,6 +257,14 @@ describe('operations', () => {
   it('names the URL segment in kebab-case', async () => {
     const { body } = await call(user);
     strictEqual(collection(body, 'DashNotes').segment, 'dash-notes');
+  });
+});
+
+describe('table', () => {
+  it('ships the declared list-view defaults verbatim and omits the key elsewhere', async () => {
+    const { body } = await call(admin);
+    deepStrictEqual(collection(body, 'DashNotes').table, { columns: ['title | 20rem', 'note'] });
+    strictEqual('table' in collection(body, 'DashPublic'), false);
   });
 });
 

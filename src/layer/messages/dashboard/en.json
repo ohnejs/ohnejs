@@ -16,6 +16,12 @@
   },
   "close": "Close",
   "collections": "Collections",
+  "columns": {
+    "autoWidth": "Auto width",
+    "column": "Column",
+    "fixedWidth": "Fixed width",
+    "title": "Columns"
+  },
   "confirmDelete": "Confirm",
   "confirmDeleteCount": "Confirm ({count})",
   "create": "Create",
@@ -166,6 +172,7 @@
   "records": "{count, plural, one {# record} other {# records}}",
   "redirected": "Redirected",
   "removeItem": "Remove",
+  "restoreDefaults": "Restore defaults",
   "retry": "Retry",
   "save": "Save",
   "saved": "Saved",

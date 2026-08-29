@@ -16,6 +16,12 @@
   },
   "close": "Zatvori",
   "collections": "Kolekcije",
+  "columns": {
+    "autoWidth": "Automatska širina",
+    "column": "Kolona",
+    "fixedWidth": "Fiksna širina",
+    "title": "Kolone"
+  },
   "confirmDelete": "Potvrdi",
   "confirmDeleteCount": "Potvrdi ({count})",
   "create": "Kreiraj",
@@ -166,6 +172,7 @@
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
   "redirected": "Preusmjereno",
   "removeItem": "Ukloni",
+  "restoreDefaults": "Vrati zadane postavke",
   "retry": "Pokušaj ponovo",
   "save": "Sačuvaj",
   "saved": "Sačuvano",

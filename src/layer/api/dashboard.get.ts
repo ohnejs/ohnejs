@@ -165,6 +165,16 @@ export interface DashboardField {
 }
 
 /**
+ * A collection's declared dashboard list-view defaults.
+ */
+export interface DashboardTable {
+  /**
+   * The declared column entries, one `name|width|minWidth` string per column.
+   */
+  columns?: readonly string[];
+}
+
+/**
  * One collection the signed-in user may work with over the collections API.
  */
 export interface DashboardCollection {
@@ -188,6 +198,11 @@ export interface DashboardCollection {
    * Validated at boot, so the name always resolves to a shape.
    */
   icon?: IconName;
+
+  /**
+   * The declared dashboard list-view defaults; absent when the collection declares none.
+   */
+  table?: DashboardTable;
 
   /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.
@@ -307,6 +322,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
       fields: describeFields(query.fields, meta.collection.fields),
     };
     if (!isUndefined(meta.collection.icon)) collection.icon = meta.collection.icon;
+    if (!isUndefined(meta.collection.table)) collection.table = meta.collection.table;
     collections.push(collection);
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
