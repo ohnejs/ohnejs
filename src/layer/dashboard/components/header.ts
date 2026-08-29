@@ -89,7 +89,7 @@ css`
 `;
 
 /**
- * The header row, ported from Pruvious v4's `Header` and `HeaderMenu`.
+ * The header row.
  * It holds the home logo link, the under-`1024px` hamburger, and the right-side cluster.
  * The cluster is the content-language switcher and the kebab user menu.
  * The hamburger renders accented while the sidebar overlay is expanded, outline otherwise.

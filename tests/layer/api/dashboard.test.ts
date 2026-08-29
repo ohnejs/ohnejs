@@ -31,7 +31,6 @@ import { keyBy } from '../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
-// A tiny scrypt cost keeps the password field's hashing fast.
 useLayers().add({
   path: '/dashboard-test',
   input: {

@@ -12,8 +12,7 @@ import { effect, ref } from 'ohne/utils';
 
 import './roles-field.ts';
 
-// The hash never reaches the browser: the display is a fixed mark, an emptied editor cancels,
-// and a pristine or emptied control omits - a password is never cleared from here.
+// The hash never reaches the browser and an emptied field omits, so a password is never cleared here.
 registerFieldType('password', {
   display() {
     return dimMark('···');
@@ -52,8 +51,7 @@ registerFieldType('password', {
       },
     );
     reveal.tabIndex = -1;
-    // The source binds the variant reactively; `button` takes a static one, so the classes patch
-    // here. The button's own class attribute has no reactive dependency, so the patch persists.
+    // `button` takes a static variant, so the classes patch here; its class attribute is not reactive.
     effect(() => {
       reveal.classList.toggle('ohne-button-accent', revealed.value);
       reveal.classList.toggle('ohne-button-ghost', !revealed.value);

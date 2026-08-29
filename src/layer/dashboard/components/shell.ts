@@ -23,8 +23,7 @@ import {
   untracked,
 } from 'ohne/utils';
 
-// The layer's field types must register on every signed-in page, not only where the sheet loads:
-// a record page opened directly would otherwise fall back to the primitive controls.
+// The layer's field types must register on every signed-in page, not only where the sheet loads.
 import './cells.ts';
 import { header } from './header.ts';
 import { loginPopup } from './login-popup.ts';
@@ -61,7 +60,7 @@ interface LayoutState {
 const layoutState = ref<LayoutState>({ sidebarExpanded: false, sidebarScrollY: 0 });
 
 /**
- * Forgets the persisted sidebar state, as the source's logout page resets its layout state.
+ * Forgets the persisted sidebar state.
  */
 export function resetLayoutState(): void {
   layoutState.value = { sidebarExpanded: false, sidebarScrollY: 0 };
@@ -246,7 +245,7 @@ css`
 `;
 
 /**
- * The signed-in frame, ported from Pruvious v4's default layout.
+ * The signed-in frame.
  * It holds the header row, the sidebar menu column, and the scrollable main area between the rails.
  * While the session resolves it renders nothing, so the paper stays calm.
  * A signed-out session redirects to the login page, carrying the current path as `next`.
@@ -258,8 +257,7 @@ css`
 export function shell(content: () => Child, options: ShellOptions = {}): Child {
   effect(() => {
     if (isNull(sessionUser())) {
-      // A dirty record editor's guard must not swallow this redirect: the session is gone, and a
-      // blocked navigation here would strand a blank page.
+      // The session is gone: a dirty editor's guard would block this redirect and strand a blank page.
       setNavigationGuard(null);
       navigate(`/login?${stringifySearchParams({ next: location.pathname })}`);
     }
@@ -316,8 +314,6 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
     if (untracked(expanded)) toggleSidebar();
   });
 
-  // The source's focus trap, by hand: while the overlay sidebar is open, Tab cycles through
-  // header and sidebar only; clicks stay allowed and focus is neither seeded nor returned.
   let releaseTrap: (() => void) | undefined;
   const activateTrap = (): void => {
     if (releaseTrap) return;
@@ -379,7 +375,7 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
   queueMicrotask(() => {
     sidebarEl.scrollTop = layoutState.value.sidebarScrollY;
     queueMicrotask(() => {
-      // A persisted expanded overlay closes itself, animated, after navigating via a menu item.
+      // A persisted expanded overlay closes itself, animated, after a menu-item navigation.
       if (layoutState.value.sidebarExpanded) toggleSidebar();
     });
   });

@@ -116,9 +116,8 @@ export function editQueryParam(): string[] {
 
 /**
  * Writes the `edit` query parameter into history, or removes it when `value` is `null`.
- * It deliberately bypasses the router: a deep-linked cell edit opens over the LIVE page, so the
- * popup animates and the table is not rebuilt - the source's leave guard special-cases `edit`
- * for the same reason.
+ * It deliberately bypasses the router: a deep-linked cell edit opens over the LIVE page.
+ * The popup animates and the table is not rebuilt.
  * The back button still closes the popup: the pushed entry re-renders through the router.
  */
 export function setEditQueryParam(value: string[] | null): void {
@@ -135,10 +134,10 @@ export function setEditQueryParam(value: string[] | null): void {
 }
 
 /**
- * The single-field edit popup, ported from Pruvious v4's `EditTableFieldPopup`.
+ * The single-field edit popup.
  *
- * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`,
- * Cmd/Ctrl+S saving, and dirty-guarded closing through the `unsavedChanges` prompt.
+ * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`.
+ * Cmd/Ctrl+S saves, and closing is dirty-guarded through the `unsavedChanges` prompt.
  * The save patches only this field; a `422` routes onto the control and raises the error count toast.
  * A vanished record toasts and closes.
  * The popup follows the `edit` query parameter: when it disappears, the popup closes.
@@ -157,7 +156,6 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       path: '',
       readOnly: disabled,
       readOnlyRows: true,
-      // P4 resolves translatable values in the content language; the interface language backfills.
       language: () => activeContentLocale() ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
@@ -241,8 +239,8 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     closeButton.title = t('dashboard.close');
   });
 
-  // The source's Save carries no disabled state: re-entry is guarded in `save` itself, and a
-  // static class keeps the variant toggles below from being overwritten by a class re-apply.
+  // `save` guards re-entry itself, so Save carries no disabled state.
+  // The class stays static: a reactive one would re-apply and overwrite the variant toggles below.
   const saveButton = button(() => t('dashboard.save'), {
     variant: 'outline',
     class: 'ohne-ml-auto',

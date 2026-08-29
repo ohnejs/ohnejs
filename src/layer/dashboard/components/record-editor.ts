@@ -111,7 +111,7 @@ css`
 `;
 
 /**
- * The record surface, ported from Pruvious v4's collection record pages.
+ * The record surface.
  *
  * Create and edit share this one page; `uuid` absent means create.
  * The scrollable page column holds the header row and the field rows.
@@ -121,7 +121,7 @@ css`
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
- * A vanished record redirects to the collection with the source's toast.
+ * A vanished record redirects to the collection with a toast.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
  */
 export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
@@ -129,7 +129,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   const create = isUndefined(uuid);
   const id = uuid ?? '';
   const listPath = `/collections/${collection.segment}`;
-  // P4 layers per-record gates (author and editors fields) over these; no ohne meta yet.
   const canCreate = collection.operations.create?.allowed === true;
   const canUpdate = collection.operations.update?.allowed === true;
   const canDelete = collection.operations.delete?.allowed === true;
@@ -152,7 +151,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       path: '',
       readOnlyRows: true,
       readOnly,
-      // P4 resolves translatable values in the content language; the interface language backfills.
       language: () => activeContentLocale() ?? useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
@@ -160,8 +158,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       },
     });
 
-  // The body region branches on `state` alone; the form lives in its own ref, so a save or a
-  // restore rebuilds only the fieldset region.
+  // The form lives in its own ref so a save or a restore rebuilds only the fieldset, not the body.
   const state = ref<'loading' | 'ready' | 'failed'>(create ? 'ready' : 'loading');
   const form = ref<FieldForm | undefined>(create ? buildForm(undefined) : undefined);
   const busy = ref(false);
@@ -209,15 +206,13 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     settleHash();
   };
   if (create) {
-    // Untracked: the seed read touches every control ref, and construction runs inside the page
-    // region - a tracked read would subscribe the whole page to the first keystroke.
+    // Untracked: a tracked seed read would subscribe the whole page region to the first keystroke.
     history.push(untracked(currentState) ?? {});
     settleHash();
   } else {
     void load();
     if (collection.translatable) {
-      // P4's update page swaps the record in place when the content language changes, silently.
-      // The cleared history reseeds on the newly read locale, so Save starts clean against it.
+      // Clearing reseeds the history on the newly read locale, so Save starts clean against it.
       let initial = true;
       effect(() => {
         activeContentLocale();
@@ -230,10 +225,8 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       });
     }
   }
-  // P4 additionally opens the translations popup from this watcher; that meta has no ohne
-  // counterpart.
 
-  // The in-app leg of P4's leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
+  // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard((target) => {
     if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) {
       unsavedChanges.history = null;
@@ -332,8 +325,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     setTimeout(() => void save());
   });
 
-  // P4 renders the collection's own icon here; the discovery data carries none, so the back
-  // button shows P4's default collection icon.
   const backButton = button(icon('folder'), { variant: 'outline', href: listPath });
   onCleanup(
     attachTooltip(backButton, () =>
@@ -349,8 +340,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       { class: 'ohne-row' },
       backButton,
       h('span', { class: 'ohne-truncate' }, collection.label),
-      // P4's create header also shows the `New translation of #id` variant; translations have no
-      // ohne counterpart yet.
       create
         ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
         : h('span', { class: 'ohne-shrink-0 ohne-muted' }, `(#${id.slice(0, 8)})`),
@@ -391,8 +380,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     },
   });
 
-  // The source's Save carries no disabled state: re-entry is guarded in `save` itself, and a
-  // static class keeps the variant toggles below from being overwritten by a class re-apply.
+  // Save takes no disabled state: `save` guards re-entry, and a static variant keeps the toggles below.
   const saveButton = button(
     [
       h('span', null, () => t(create ? 'dashboard.create' : 'dashboard.save')),
@@ -420,7 +408,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
           h(
             'div',
             { class: 'ohne-row ohne-ml-auto' },
-            // P4 splices plugin-filtered footer buttons in here; ohne has no plugin filters.
             create || canUpdate ? saveButton : null,
             create ? null : recordMenu(),
           ),
@@ -467,8 +454,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             });
             items.push(item);
           }
-          // P4 lists Translate, Copy, Paste, and Duplicate here; translations, the clipboard
-          // helpers, and the duplicate endpoint have no ohne counterpart yet.
           if (canCreate && canDelete) items.push(h('hr'));
           if (canDelete) {
             const item = dropdownItem(
@@ -588,7 +573,6 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
 
 /**
  * The fields of `full` whose value differs from `original`, the edit save's `PATCH` body.
- * The source's `prepareFieldData` diff against the pre-edit state, over the form's read.
  */
 function changedSince(full: RecordRow, original: RecordRow): RecordRow {
   const changed: RecordRow = {};

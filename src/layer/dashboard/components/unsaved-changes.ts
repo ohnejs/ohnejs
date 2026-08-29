@@ -21,7 +21,7 @@ css`
 `;
 
 /**
- * The unsaved-changes dialog, ported 1-to-1 from Pruvious v4, mounted once by the shell.
+ * The unsaved-changes dialog, mounted once by the shell.
  * It installs `unsavedChanges.prompt`: each call opens the dialog.
  * The promise resolves `true` to leave, discarding the edits, or `false` to stay.
  * OK, and a bare Enter while no button holds focus, leave.
@@ -72,8 +72,7 @@ export function unsavedChangesGuard(): Child {
   window.addEventListener('beforeunload', onBeforeUnload);
   onCleanup(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
-  // The popup mutes plain hotkeys, but instances allowed in overlays at its depth still fire;
-  // swallowing the undo and redo strokes at capture keeps the history frozen while deciding.
+  // Hotkeys allowed in overlays still fire at the popup's depth, so undo and redo are swallowed here.
   const suppressHistoryKeys = (event: KeyboardEvent): void => {
     const mac = isMac();
     // Chrome's autofill fires keydowns whose `key` is `undefined` despite the type.

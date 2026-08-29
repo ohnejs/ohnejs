@@ -47,7 +47,6 @@ function pane(segment: () => string, uuid: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
-  // The chunk mirrors the source's `#id - label` and `New - label`, with the editor's short-UUID chip.
   effect(() => {
     const collection = entry();
     const id = uuid();

@@ -22,7 +22,7 @@ css`
 `;
 
 /**
- * The sidebar menu column, ported from Pruvious v4's `MenuWrapper` and menu sections.
+ * The sidebar menu column.
  * Each discovery menu group renders one `verticalMenu`, the group label as its uppercase title.
  * An empty label renders the list without one, and each collection contributes one link row.
  * A link is active while the route sits under its collection, so record pages highlight it too.
@@ -60,7 +60,7 @@ function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
 
 /**
  * The group's link rows: each collection name resolved against the discovery store.
- * Active mirrors P4's `prepareDashboardMenu`: a trailing-slash-normalized prefix match.
+ * Active is a trailing-slash-normalized prefix match.
  */
 function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
   const collections = dashboardMeta()?.collections ?? [];

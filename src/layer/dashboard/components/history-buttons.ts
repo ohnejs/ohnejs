@@ -4,7 +4,7 @@ import { isUndefined, onCleanup } from 'ohne/utils';
 import type { History } from './history.ts';
 
 /**
- * The undo and redo button pair for a `History` instance, ported 1-to-1 from Pruvious v4.
+ * The undo and redo button pair for a `History` instance.
  *
  * Two outline buttons, disabled while `canUndo`/`canRedo` say so.
  * Each carries a live tooltip showing the action label and the remaining step count.

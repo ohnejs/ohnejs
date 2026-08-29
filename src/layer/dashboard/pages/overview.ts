@@ -17,9 +17,8 @@ import { overviewRecentEdits } from '../components/overview-recent-edits.ts';
 import { shell } from '../components/shell.ts';
 
 /**
- * The overview page's shared search state, ported from Pruvious v4's `useOverviewSearch`.
- * The source shared it through a Nuxt composable.
- * Here the page creates one instance per visit and hands it to each widget explicitly.
+ * The overview page's shared search state.
+ * The page creates one instance per visit and hands it to each widget explicitly.
  * Unmounting therefore resets the query by construction.
  */
 export interface OverviewSearch {
@@ -168,7 +167,7 @@ css`
 `;
 
 /**
- * The overview page, ported from Pruvious v4's dashboard overview.
+ * The overview page.
  * The search input sits over the widget sections, on the signed-in shell.
  */
 export default defineDashboardPage(() => shell(() => overview()));
@@ -230,8 +229,7 @@ function overview(): Child {
     focusSearch();
   };
 
-  // Captured, unlike the source's bubbling listener: `textInput` blurs on Escape and stops the
-  // event, so only the capture phase can clear the query first and keep the input focused.
+  // Capture phase only: `textInput` blurs on Escape and stops the event before it can bubble here.
   const onKeydown = (event: KeyboardEvent): void => {
     if (
       event.code === 'KeyK' &&
@@ -258,19 +256,14 @@ function overview(): Child {
       'section',
       { class: 'o-overview-section' },
       h('h2', { class: 'o-overview-section-title' }, () => t('dashboard.overview.shortcuts')),
-      // The source pairs the card with `OverviewExtraShortcuts`, a filter stub absent in ohne.
       h('div', { class: 'o-overview-grid' }, overviewQuickCreate(search)),
     ),
     h(
       'section',
       { class: 'o-overview-section' },
       h('h2', { class: 'o-overview-section-title' }, () => t('dashboard.overview.activity')),
-      // The source adds `OverviewDrafts` (needs draft metadata) and `OverviewExtraActivity`
-      // (a filter stub); neither exists in ohne.
       h('div', { class: 'o-overview-grid' }, overviewRecentEdits(search)),
     ),
-    // The source's Content section holds only `OverviewRoutes` (needs the routes collection)
-    // and `OverviewExtraContent` (a filter stub); with both absent in ohne it is dropped whole.
     when(
       () => search.active() && !search.hasAnyResults(),
       () =>

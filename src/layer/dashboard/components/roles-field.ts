@@ -26,9 +26,6 @@ css`
   }
 `;
 
-// Cells join the names, summarizing four or more as the first plus a dim `+n` tail.
-// There is no inline cell editor: the list edits in the record form's choice-restricted chips,
-// whose dropdown offers the meta's registered role names; unknown names reject server-side.
 registerFieldType('roles', {
   display({ value }) {
     return () => {
@@ -50,8 +47,7 @@ registerFieldType('roles', {
     const routed = ref('');
     const erroredIndices = ref<number[]>([]);
 
-    // The chips write the model directly on add, remove, and reorder; this relays every write
-    // after the first into the control's change bookkeeping. `silent` mutes revert and rebase.
+    // The chips write `model` directly; `silent` mutes the effect's first run, revert, and rebase.
     let silent = true;
     effect(() => {
       void model.value;

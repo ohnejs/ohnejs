@@ -102,8 +102,8 @@ export interface TableURLState {
 }
 
 /**
- * How a field sorts: `text` and letter icons for text columns, `numeric` for the rest,
- * `false` for the composite kinds no single column backs.
+ * How a field sorts: `text` and letter icons for text columns, `numeric` for the rest.
+ * `false` covers the composite kinds no single column backs.
  */
 function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
   if (field.kind !== 'column' && field.kind !== 'record') return false;
@@ -111,13 +111,12 @@ function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
 }
 
 /**
- * Resolves the table's columns, ported from the source page's `resolveColumns`.
+ * Resolves the table's columns.
  *
- * Without a `spec`, the first four declared readable fields become columns, `_updatedAt` closing
- * the set - the counterpart of the source's five-column default with its trailing `createdAt`.
+ * Without a `spec`, the first four declared readable fields become columns, `_updatedAt` closing the set.
  * A `spec` lists columns as `name|width|minWidth` entries.
  * An unknown name warns and is skipped, and a missing width keeps the `16rem` minimum.
- * An empty result falls back to the `UUID` column alone, as the source fell back to `id`.
+ * An empty result falls back to the `UUID` column alone.
  *
  * @example
  * ```ts
@@ -224,9 +223,9 @@ export function parseTableState(search: string, defaultOrder: readonly string[])
 
 /**
  * Writes the table state into a query string, without the leading `?`.
- * Params carrying their default - page `1`, the default order, no filter - are omitted, so the
- * default view keeps a bare URL; params this module does not own, like `edit`, carry over
- * from `search` untouched.
+ * Params carrying their default - page `1`, the default order, no filter - are omitted.
+ * The default view therefore keeps a bare URL.
+ * Params this module does not own, like `edit`, carry over from `search` untouched.
  *
  * @example
  * ```ts

@@ -10,9 +10,8 @@ import {
 } from 'ohne/utils';
 
 /**
- * The friendly filter operators the builder offers, ported from Pruvious v4's `FilterOperator`.
- * The source's case-insensitive `*I` variants collapse away: ohne's `contains`, `startsWith`,
- * and `endsWith` are single operators without a case toggle.
+ * The friendly filter operators the builder offers.
+ * `contains`, `startsWith`, and `endsWith` are single operators without a case toggle.
  */
 export type FilterOperator =
   | 'eq'
@@ -57,7 +56,7 @@ export interface FilterCondition {
 }
 
 /**
- * A nested group of rules joined by one relation, the port of the source's condition groups.
+ * A nested group of rules joined by one relation.
  */
 export interface FilterGroup {
   /**
@@ -111,7 +110,7 @@ export function filterKey(): string {
 }
 
 /**
- * The operators one storage primitive admits, the port of the source's `getValidFilterOperators`.
+ * The operators one storage primitive admits.
  *
  * @example
  * ```ts
@@ -142,17 +141,18 @@ export function filterDefaultValue(type: FilterableType): string | number | bool
 /**
  * Serializes the filter model into the `where` shape ohne's body-query endpoint reads.
  *
- * The emitted value is a `ConditionObject`, exactly what `POST /collections/[segment]/query`
- * accepts as its `where` key. Precisely:
+ * The emitted value is a `ConditionObject`.
+ * That is exactly what `POST /collections/[segment]/query` accepts as its `where` key.
+ * Precisely:
  *
  * - `eq` emits `{ [field]: { equalsTo: value } }`.
  * - `ne` emits `{ not: { [field]: { equalsTo: value } } }`.
  * - `lt`, `lte`, `gt`, `gte` emit `lessThan`, `atMost`, `greaterThan`, `atLeast`.
- * - `startsWith`, `endsWith`, `contains` emit the same-named ohne operator; an empty string
- *   value becomes `' '`, as in the source, so an unfilled pattern never matches everything.
+ * - `startsWith`, `endsWith`, `contains` emit the same-named ohne operator.
+ *   An empty string value becomes `' '`, so an unfilled pattern never matches everything.
  * - `notContains` emits `{ not: { [field]: { contains: value } } }`.
- * - A member list emits its single member's object alone, or `{ and: [...] }` / `{ or: [...] }`
- *   with one object per member; an empty group is omitted entirely.
+ * - A member list emits `{ and: [...] }` / `{ or: [...] }` with one object per member.
+ *   A single member emits its object alone, and an empty group is omitted entirely.
  * - An empty model serializes to `undefined`: the query carries no `where` at all.
  *
  * @example
@@ -169,9 +169,9 @@ export function filterToWhere(model: FilterModel): ConditionObject | undefined {
 }
 
 /**
- * Rebuilds the filter model from a previously emitted `where`, the `fromModelValue` port.
- * The round-trip covers what `filterToWhere` emits; foreign conditions the builder cannot
- * represent, like `isNull` or a negated group, are dropped.
+ * Rebuilds the filter model from a previously emitted `where`.
+ * The round-trip covers what `filterToWhere` emits.
+ * Foreign conditions the builder cannot represent, like `isNull` or a negated group, are dropped.
  *
  * @example
  * ```ts

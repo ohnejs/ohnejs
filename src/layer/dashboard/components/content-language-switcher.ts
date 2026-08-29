@@ -48,11 +48,11 @@ css`
 `;
 
 /**
- * The header's content-language dropdown, ported from Pruvious v4's `ContentLanguageSwitcher`.
+ * The header's content-language dropdown.
  * It renders only while the discovery data lists more than one locale and the page is translatable.
  * Pages where translation means nothing carry no switcher.
  * The button shows the active locale's formatted code; picking another persists it and toasts.
- * P4 persisted the choice through the account; ohne persists locally.
+ * The choice persists locally.
  */
 export function contentLanguageSwitcher(): Child {
   return when(
@@ -64,7 +64,7 @@ export function contentLanguageSwitcher(): Child {
 /**
  * Whether the current page edits translatable content, reactively.
  * The collection pages qualify while their collection declares translatable fields.
- * P4's pages provide this flag; ohne derives it from the route, since only those pages carry one.
+ * The flag derives from the route, since only those pages carry one.
  */
 function translatableContext(): boolean {
   const segment = useRoute()?.params.collection;
@@ -152,7 +152,7 @@ function current(): string {
 }
 
 /**
- * Formats a locale code for the trigger, as P4's `formatLanguageCode` did.
+ * Formats a locale code for the trigger.
  */
 function formatLocaleCode(code: string): string {
   const [language = '', region] = code.split('-');
@@ -163,7 +163,7 @@ function formatLocaleCode(code: string): string {
 
 /**
  * The locale's display name in the dashboard's interface language, falling back to the code.
- * P4 showed configured language names; ohne's discovery data carries only codes.
+ * The discovery data carries only codes.
  */
 function localeName(code: string): string {
   try {

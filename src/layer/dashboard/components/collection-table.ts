@@ -149,7 +149,7 @@ css`
 `;
 
 /**
- * The collection table page body, ported from Pruvious v4's collection index page.
+ * The collection table page body.
  *
  * The state lives in the URL: `page`, `order`, `where`, and `columns` are query params.
  * A reload or back and forward re-renders the same view.
@@ -157,8 +157,8 @@ css`
  * Every cell renders its field's display inside an editable cell whose popup patches only that field.
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
  * Rows select with shift ranges into the batch delete.
- * A row's actions menu opens, edits, and deletes single records with the source's confirm dialogs.
- * Reads page through the body-query endpoint exactly as the sheet did.
+ * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
+ * Reads page through the body-query endpoint.
  * Deletes run record by record with the sheet's toasts.
  */
 export function collectionTable(collection: DashboardCollection): HTMLElement {

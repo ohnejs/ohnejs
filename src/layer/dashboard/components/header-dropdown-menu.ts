@@ -12,11 +12,10 @@ import {
 import { effect, ref } from 'ohne/utils';
 
 /**
- * The header's kebab user menu, ported from Pruvious v4's `HeaderDropdownMenu`.
+ * The header's kebab user menu.
  * The trigger turns primary while the dropdown is open.
  * One group toggles the color mode against the resolved OS-aware mode.
- * A rule separates it from the destructive sign-out, a link to the logout page as in the source.
- * P4's `My account` and `Clear page cache` items have no ohne counterpart and are omitted.
+ * A rule separates it from the destructive sign-out, a link to the logout page.
  */
 export function headerDropdownMenu(): HTMLElement {
   const t = useT();

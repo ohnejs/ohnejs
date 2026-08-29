@@ -51,10 +51,9 @@ css`
 `;
 
 /**
- * The Quick create widget, ported from Pruvious v4's `OverviewQuickCreate`.
+ * The Quick create widget.
  * A card of outline buttons, one per creatable collection, each linking to its create page.
  * The shared `search` filters them and the card hides while nothing matches.
- * The source received the search state through a composable; here the page passes it in.
  */
 export function overviewQuickCreate(search: OverviewSearch): Child {
   const t = useT();
@@ -63,8 +62,6 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
     const items: QuickCreateShortcut[] = [];
     for (const collection of dashboardMeta()?.collections ?? []) {
       if (collection.operations.create?.allowed !== true) continue;
-      // The source also skips `ui.hidden` collections and renders a `ui.icon` per shortcut;
-      // ohne's discovery data carries neither.
       items.push({
         name: collection.name,
         label: collection.label,

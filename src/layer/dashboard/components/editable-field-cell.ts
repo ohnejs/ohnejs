@@ -73,7 +73,6 @@ export interface EditableFieldCellOptions {
 
   /**
    * Hides the edit button, for hosts that render cells outside an editable table.
-   * The port of the source's `hideEditableFieldCellActions` injection.
    *
    * @default
    * false
@@ -123,12 +122,12 @@ css`
 `;
 
 /**
- * The editable cell wrapper, ported from Pruvious v4's `EditableFieldCell`.
+ * The editable cell wrapper.
  *
  * It renders the field's display content with a hover-revealed edit button.
- * Clicking sets the `edit=<field>:<id>` query parameter, exactly as the source.
- * It also owns the deep link, the part every source table-field component repeated.
- * While the parameter names this cell, the single-field edit popup mounts, in view mode for a read-only field.
+ * Clicking sets the `edit=<field>:<id>` query parameter.
+ * While the parameter names this cell, the single-field edit popup mounts.
+ * A read-only field opens in view mode.
  */
 export function editableFieldCell(
   content: Child | (() => Child),

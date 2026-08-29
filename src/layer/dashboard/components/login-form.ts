@@ -48,8 +48,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   const passwordError = ref(false);
   const busy = ref(false);
 
-  // Reading the failure strings at construction starts their catalog fetches, so a first
-  // failed attempt toasts translated text instead of freezing the raw key into the toast.
+  // Reading the failure strings here starts their catalog fetches, so the first toast is translated.
   t('auth.invalidCredentials');
   t('dashboard.login.unreachable');
 
@@ -81,8 +80,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     },
   );
   reveal.tabIndex = -1;
-  // The source binds the variant reactively; `button` takes a static one, so the classes patch here.
-  // The button's own class attribute has no reactive dependency, so it never overwrites the patch.
+  // `button` takes a static variant, so the accent state patches the class list instead.
   effect(() => {
     reveal.classList.toggle('ohne-button-accent', revealed.value);
     reveal.classList.toggle('ohne-button-ghost', !revealed.value);

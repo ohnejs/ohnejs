@@ -120,14 +120,13 @@ css`
 `;
 
 /**
- * The Recent edits widget, ported from Pruvious v4's `OverviewRecentEdits`.
+ * The Recent edits widget.
  * The most recently updated records across every readable collection.
  * Each row links to its record page, with a relative time and a label-plus-collection tooltip.
- * The source read a dedicated endpoint.
- * Here each readable collection answers the body-query `POST` ordered by `-_updatedAt`.
+ * Each readable collection answers the body-query `POST` ordered by `-_updatedAt`.
  * The merged rows keep the newest twenty.
  * The shared `search` filters the rows; while searching, an empty card hides.
- * The source received the search state through a composable; here the page passes it in.
+ * The page passes the search state in.
  */
 export function overviewRecentEdits(search: OverviewSearch): Child {
   const t = useT();
@@ -194,8 +193,6 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
 
 /**
  * One list row: the record link stretched over the row, and the relative time with its tooltip.
- * The source also renders a collection icon and language and draft badges here.
- * ohne's discovery data has no icons, per-language rows, or draft state.
  */
 function recentRow(entry: () => RecentEdit): Child {
   const time = h('span', { class: 'o-overview-recent-time' }, () =>
@@ -235,7 +232,6 @@ async function loadRecentEdits(meta: DashboardMeta): Promise<RecentEdit[]> {
 /**
  * One collection's newest records through the body-query endpoint; a failure resolves empty.
  * A record without a label value shows `#` plus its `UUID`'s first eight characters.
- * That mirrors the source's `#id` fallback.
  */
 async function loadCollection(collection: DashboardCollection): Promise<RecentEdit[]> {
   const label = labelFieldOf(collection);
@@ -269,7 +265,7 @@ async function loadCollection(collection: DashboardCollection): Promise<RecentEd
 }
 
 /**
- * The elapsed time in words, standing in for the source's `dayjs().fromNow()` via `Intl`.
+ * The elapsed time in words, formatted through `Intl`.
  */
 function relativeTime(timestamp: number, language: string): string {
   const format = formatFor(language);

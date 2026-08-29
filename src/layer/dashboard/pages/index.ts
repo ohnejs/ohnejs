@@ -2,7 +2,7 @@ import { defineDashboardPage, navigate, sessionUser } from 'ohne/dashboard';
 import { effect, isNull, isUndefined } from 'ohne/utils';
 
 /**
- * The home page, ported from Pruvious v4's dashboard index redirect.
+ * The home page.
  * It renders nothing.
  * Once the session resolves, a signed-in visitor lands on `/overview` and a signed-out one on `/login`.
  * Both replace the history entry.

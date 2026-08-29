@@ -87,7 +87,6 @@ function cookiePair(response: Response): string {
   return header.split(';', 1)[0];
 }
 
-// The framework leaves account creation to the app, so the tests insert users directly.
 async function createUser(email: string, password: string): Promise<void> {
   await queryUntyped('Users').createOrThrow({ email, password });
 }

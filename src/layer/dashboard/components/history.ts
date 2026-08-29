@@ -31,7 +31,7 @@ export interface HistoryOptions {
 }
 
 /**
- * The module-global unsaved-changes registration, ported 1-to-1 from Pruvious v4.
+ * The module-global unsaved-changes registration.
  */
 export interface UnsavedChanges {
   /**
@@ -52,7 +52,7 @@ export interface UnsavedChanges {
 export const unsavedChanges: UnsavedChanges = { history: null, prompt: undefined };
 
 /**
- * Data history manager with undo and redo functionality, ported 1-to-1 from Pruvious v4.
+ * Data history manager with undo and redo functionality.
  * States are deep-cloned in and out, compared as JSON with the `omit` keys stripped.
  */
 export class History<T extends Record<string, unknown> = Record<string, unknown>> {

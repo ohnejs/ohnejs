@@ -55,7 +55,6 @@ css`
     --ohne-padding-header: 0.5rem;
   }
 
-  /* The source indents item headers with a drag handle; without one, meet the body's 0.75rem grid. */
   .o-order-by-row {
     min-height: 2em;
     padding-left: 0.25rem;
@@ -76,14 +75,13 @@ css`
 `;
 
 /**
- * The sorting rule builder, ported from Pruvious v4's `OrderBy`.
+ * The sorting rule builder.
  *
  * Each rule is a card: a field select beside the ascending/descending pair.
  * The pair's icons follow the field's storage primitive.
  * Move, add-before, and delete actions reveal on hover or focus.
  * A field appears in one rule at most; taken fields render disabled in the other selects.
  * It emits ohne order strings: `field` ascending, `-field` descending.
- * The source's `nulls` placement pair has no ohne counterpart and is not rendered.
  */
 export function orderBy(options: OrderByOptions): HTMLElement {
   const t = useT();
@@ -223,8 +221,7 @@ export function orderBy(options: OrderByOptions): HTMLElement {
               ? { label: field.label, value: field.name }
               : { label: field.label, value: field.name, disabled: true },
           ),
-      // An untracked read: the id is static, and a tracked one would rebuild the whole row
-      // on every direction toggle.
+      // Untracked: the id is static, and a tracked read would rebuild the row on every toggle.
       { id: `${id}-${untracked(() => item().field)}-field`, name: id },
     );
   };

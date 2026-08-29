@@ -37,7 +37,7 @@ css`
 `;
 
 /**
- * The catch-all page, ported from Pruvious v4's dashboard `[...slug]` route.
+ * The catch-all page.
  * It claims every URL no other page matches, so an unknown path lands on the shell instead of a bare heading.
  * A signed-out visitor never reaches it: the shell redirects to the login page, carrying `next`.
  */
@@ -47,7 +47,6 @@ export default defineDashboardPage(() =>
 
 /**
  * The page body: the dim code over the message, and one link back to the dashboard home.
- * The source's `:deep(.p-page-main)` height rule has no counterpart.
  * There is no per-page chrome between the main area and the body: `.o-main-content` carries that height.
  */
 function notFound(): Child {

@@ -120,7 +120,7 @@ css`
     --ohne-padding-header: 0.5rem;
   }
 
-  /* The source indents item headers with a drag handle; without one, meet the body's 0.75rem grid. */
+  /* No drag handle here, so the row meets the body's 0.75rem grid. */
   .o-where-filters-row {
     min-height: 2em;
     padding-left: 0.25rem;
@@ -190,7 +190,7 @@ css`
 `;
 
 /**
- * The filter builder popup, ported from Pruvious v4's `WhereFilters` tree in its view-configuration popup.
+ * The filter builder popup.
  *
  * Each condition picks a field, an operator valid for its storage primitive, and a typed value input.
  * Condition groups nest with a toggleable and/or relation; the top level carries its own over all members.

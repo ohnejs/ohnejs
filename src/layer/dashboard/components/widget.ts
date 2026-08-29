@@ -9,8 +9,7 @@ import { logoMark } from './logo.ts';
 export interface WidgetOptions {
   /**
    * Resolves the edit link for the content behind the widget; `null` hides the link.
-   * The source computed it from the active public route and the user's update permission.
-   * ohne has no public-route registry, so the caller supplies the destination.
+   * The caller supplies the destination.
    */
   editHref?: () => string | null;
 }
@@ -136,7 +135,7 @@ css`
 `;
 
 /**
- * The floating dashboard widget, ported from Pruvious v4's `Widget.vue`.
+ * The floating dashboard widget.
  * A fixed, `--o-widget-*`-themable pill holding the logo mark, a dashboard link, and an edit link.
  * When a `--o-widget-*` position pins it to a viewport edge, it collapses toward that edge.
  * It waits three seconds after the pointer and focus both leave, and slides back on either's return.

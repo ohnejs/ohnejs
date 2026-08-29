@@ -19,7 +19,7 @@ export interface HistoryScroll {
 }
 
 /**
- * Renderless scroll pinning across undo and redo re-renders, ported 1-to-1 from Pruvious v4.
+ * Renderless scroll pinning across undo and redo re-renders.
  *
  * It listens for the `undo` and `redo` hotkeys through `useHotkeys({ allowInOverlays: true })`.
  * Its listeners fire alongside the `historyButtons` ones.
@@ -40,8 +40,6 @@ export function historyScrollState(scroll: HistoryScroll): null {
   };
   const schedulePause = debounce(pause, 250);
 
-  // The source's paused `watchPausable`: ohne has no pausable effect, so the watcher only exists
-  // during the 250ms window - created on trigger, stopped by the debounced pause.
   const trigger = (): void => {
     pinnedY = scroll.y();
     stopWatcher ??= effect(() => {
