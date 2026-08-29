@@ -1,6 +1,7 @@
 import {
   api,
   attachTooltip,
+  button,
   card,
   type Child,
   css,
@@ -15,7 +16,18 @@ import {
   useT,
   when,
 } from 'ohne/dashboard';
-import { computed, effect, isNumber, isString, isUndefined, onCleanup, ref } from 'ohne/utils';
+import {
+  computed,
+  effect,
+  first,
+  isEmpty,
+  isNumber,
+  isString,
+  isUndefined,
+  onCleanup,
+  ref,
+  untracked,
+} from 'ohne/utils';
 
 import type { OverviewSearch } from '../pages/overview.ts';
 
@@ -31,7 +43,19 @@ interface RecentEdit {
   editURL: string;
 }
 
-const LIMIT = 20;
+/**
+ * One collection's cursor into the merged feed.
+ * `rows` buffers the records the feed has fetched but not emitted, newest first.
+ */
+interface Bucket {
+  collection: DashboardCollection;
+  labelField: string | undefined;
+  rows: RecentEdit[];
+  offset: number;
+  done: boolean;
+}
+
+const PAGE_SIZE = 20;
 
 const UNIT_STEPS: readonly [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 31536000],
@@ -117,6 +141,15 @@ css`
     font-size: 0.75rem;
     white-space: nowrap;
   }
+
+  .o-overview-recent-more {
+    display: flex;
+    justify-content: center;
+    /* defeats the card body's stacking margin */
+    margin-top: 0;
+    padding: 0.375rem;
+    border-top-width: 1px;
+  }
 `;
 
 /**
@@ -124,7 +157,8 @@ css`
  * The most recently updated records across every readable collection.
  * Each row links to its record page, with a relative time and a label-plus-collection tooltip.
  * Each readable collection answers the body-query `POST` ordered by `-_updatedAt`.
- * The merged rows keep the newest twenty.
+ * The collections merge newest first, one page at a time.
+ * `Load more` extends the feed and hides once every collection has run out.
  * The shared `search` filters the rows; while searching, an empty card hides.
  * The page passes the search state in.
  */
@@ -132,16 +166,27 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
   const t = useT();
   const entries = ref<RecentEdit[]>([]);
   const loaded = ref(false);
+  const loading = ref(false);
+  const exhausted = ref(false);
+  let buckets: Bucket[] = [];
   let started = false;
+
+  const loadMore = async (): Promise<void> => {
+    if (loading.value || exhausted.value) return;
+    loading.value = true;
+    const page = await takePage(buckets);
+    entries.value = [...entries.value, ...page];
+    exhausted.value = isDrained(buckets);
+    loading.value = false;
+    loaded.value = true;
+  };
 
   effect(() => {
     const meta = dashboardMeta();
     if (isUndefined(meta) || started) return;
     started = true;
-    void loadRecentEdits(meta).then((rows) => {
-      entries.value = rows;
-      loaded.value = true;
-    });
+    buckets = bucketsOf(meta);
+    void untracked(loadMore);
   });
 
   const filtered = computed(() =>
@@ -157,25 +202,44 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
     () => loaded.value && (filtered.value.length > 0 || !search.active()),
     () => {
       const el = card(
-        when(
-          () => filtered.value.length === 0,
-          () =>
-            h(
-              'div',
-              { class: 'o-overview-recent-empty' },
-              h('span', null, () => t('dashboard.table.noData')),
-            ),
-          () =>
-            h(
-              'ul',
-              { class: 'o-overview-recent-list' },
-              each(
-                () => filtered.value,
-                (entry) => `${entry.collectionName}:${entry.uuid}`,
-                (entry) => recentRow(entry),
+        [
+          when(
+            () => filtered.value.length === 0,
+            () =>
+              h(
+                'div',
+                { class: 'o-overview-recent-empty' },
+                h('span', null, () => t('dashboard.table.noData')),
               ),
-            ),
-        ),
+            () =>
+              h(
+                'ul',
+                { class: 'o-overview-recent-list' },
+                each(
+                  () => filtered.value,
+                  (entry) => `${entry.collectionName}:${entry.uuid}`,
+                  (entry) => recentRow(entry),
+                ),
+              ),
+          ),
+          when(
+            () => !exhausted.value,
+            () =>
+              h(
+                'div',
+                { class: 'o-overview-recent-more' },
+                button(
+                  h('span', null, () => t('dashboard.overview.loadMore')),
+                  {
+                    size: -2,
+                    variant: 'ghost',
+                    disabled: () => loading.value,
+                    onClick: () => void loadMore(),
+                  },
+                ),
+              ),
+          ),
+        ],
         {
           header: h(
             'div',
@@ -216,51 +280,105 @@ function recentRow(entry: () => RecentEdit): Child {
 }
 
 /**
- * The merged feed: every readable collection's newest records, newest first, capped at `LIMIT`.
+ * One cursor per readable collection, each starting empty at offset zero.
  */
-async function loadRecentEdits(meta: DashboardMeta): Promise<RecentEdit[]> {
-  const readable = meta.collections.filter(
-    (collection) => collection.operations.read?.allowed === true,
-  );
-  const buckets = await Promise.all(readable.map((collection) => loadCollection(collection)));
-  return buckets
-    .flat()
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, LIMIT);
+function bucketsOf(meta: DashboardMeta): Bucket[] {
+  const buckets: Bucket[] = [];
+  for (const collection of meta.collections) {
+    if (collection.operations.read?.allowed !== true) continue;
+    buckets.push({
+      collection,
+      labelField: labelFieldOf(collection)?.name,
+      rows: [],
+      offset: 0,
+      done: false,
+    });
+  }
+  return buckets;
 }
 
 /**
- * One collection's newest records through the body-query endpoint; a failure resolves empty.
+ * The feed's next page, newest first, shorter than `PAGE_SIZE` once the collections run out.
+ * Every unfinished bucket holds a buffered row before the merge picks one, so the pick is the true newest.
+ */
+async function takePage(buckets: Bucket[]): Promise<RecentEdit[]> {
+  const page: RecentEdit[] = [];
+  while (page.length < PAGE_SIZE) {
+    await Promise.all(buckets.filter(isHungry).map(fillBucket));
+    const next = takeNewest(buckets);
+    if (isUndefined(next)) break;
+    page.push(next);
+  }
+  return page;
+}
+
+/**
+ * Whether `bucket` must fetch before the merge can weigh it.
+ */
+function isHungry(bucket: Bucket): boolean {
+  return !bucket.done && isEmpty(bucket.rows);
+}
+
+/**
+ * Whether the feed has emitted every record `buckets` can answer.
+ */
+function isDrained(buckets: Bucket[]): boolean {
+  return buckets.every((bucket) => bucket.done && isEmpty(bucket.rows));
+}
+
+/**
+ * Removes and answers the newest buffered row, `undefined` once every buffer is empty.
+ */
+function takeNewest(buckets: Bucket[]): RecentEdit | undefined {
+  let newest: Bucket | undefined;
+  let newestAt = -Infinity;
+  for (const bucket of buckets) {
+    const head = first(bucket.rows);
+    if (isUndefined(head) || head.updatedAt <= newestAt) continue;
+    newest = bucket;
+    newestAt = head.updatedAt;
+  }
+  return newest?.rows.shift();
+}
+
+/**
+ * Appends `bucket`'s next page to its buffer through the body-query endpoint.
+ * It asks for one row past the page, so only a full answer proves the collection holds more.
+ * A short answer ends the bucket; a failure ends it too, so a broken collection drops out of the feed.
  * A record without a label value shows `#` plus its `UUID`'s first eight characters.
  */
-async function loadCollection(collection: DashboardCollection): Promise<RecentEdit[]> {
-  const label = labelFieldOf(collection);
-  const select = isUndefined(label) ? ['UUID', '_updatedAt'] : ['UUID', '_updatedAt', label.name];
+async function fillBucket(bucket: Bucket): Promise<void> {
+  const select = ['UUID', '_updatedAt'];
+  if (!isUndefined(bucket.labelField)) select.push(bucket.labelField);
+  const limit = PAGE_SIZE + 1;
   try {
-    const response = await api(`POST /collections/${collection.segment}/query`, {
+    const response = await api(`POST /collections/${bucket.collection.segment}/query`, {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ select, order: ['-_updatedAt'], limit: LIMIT }),
+      body: JSON.stringify({ select, order: ['-_updatedAt'], limit, offset: bucket.offset }),
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      bucket.done = true;
+      return;
+    }
     const rows = (await response.json()) as Record<string, unknown>[];
-    const edits: RecentEdit[] = [];
+    bucket.offset += rows.length;
+    bucket.done = rows.length < limit;
     for (const row of rows) {
       const uuid = row.UUID;
       const updatedAt = row._updatedAt;
       if (!isString(uuid) || !isNumber(updatedAt)) continue;
-      const value = isUndefined(label) ? undefined : row[label.name];
-      edits.push({
-        collectionName: collection.name,
-        collectionLabel: collection.label,
+      const value = isUndefined(bucket.labelField) ? undefined : row[bucket.labelField];
+      bucket.rows.push({
+        collectionName: bucket.collection.name,
+        collectionLabel: bucket.collection.label,
         uuid,
         label: isString(value) && value !== '' ? value : `#${uuid.slice(0, 8)}`,
         updatedAt,
-        editURL: `/collections/${collection.segment}/${uuid}`,
+        editURL: `/collections/${bucket.collection.segment}/${uuid}`,
       });
     }
-    return edits;
   } catch {
-    return [];
+    bucket.done = true;
   }
 }
 
