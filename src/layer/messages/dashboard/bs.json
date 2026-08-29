@@ -45,7 +45,7 @@
     "showPassword": "Prikaži lozinku",
     "translatable": "Ovo polje čuva zasebnu vrijednost za svaki jezik.",
     "unchanged": "nepromijenjeno",
-    "unique": "jedinstveno"
+    "unique": "Jedinstveno"
   },
   "fields": {
     "uuid": {

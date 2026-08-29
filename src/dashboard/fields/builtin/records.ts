@@ -44,7 +44,7 @@ export const recordsType: FieldType = {
       return [
         isUndefined(resolved)
           ? h('span', { class: 'cell-mono cell-dim' }, first.slice(0, 8))
-          : resolved,
+          : h('span', { class: 'ohne-truncate', title: first }, resolved),
         links.length > 1 ? dimMark(` +${links.length - 1}`) : null,
       ];
     };

@@ -45,7 +45,7 @@
     "showPassword": "Passwort anzeigen",
     "translatable": "Dieses Feld speichert je Sprache einen eigenen Wert.",
     "unchanged": "unverändert",
-    "unique": "eindeutig"
+    "unique": "Eindeutig"
   },
   "fields": {
     "uuid": {

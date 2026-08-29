@@ -45,7 +45,7 @@
     "showPassword": "Show password",
     "translatable": "This field stores a separate value for each language.",
     "unchanged": "unchanged",
-    "unique": "unique"
+    "unique": "Unique"
   },
   "fields": {
     "uuid": {

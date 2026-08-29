@@ -31,9 +31,11 @@ css`
     justify-content: flex-end;
   }
 
-  /* The card header carries the label, so it mirrors the field label's required mark. */
-  .ohne-object-required::after {
+  /* The card header carries the label, so it mirrors the field label's required mark, float and
+     all: the header truncates, and the ellipsis must trim the text rather than the mark. */
+  .ohne-object-required::before {
     content: '*';
+    float: right;
     margin-left: 0.125em;
     margin-left: round(0.125em, 1px);
     color: hsl(var(--ohne-destructive));

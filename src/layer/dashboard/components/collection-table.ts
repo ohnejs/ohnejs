@@ -863,7 +863,7 @@ function displayFor(field: DashboardField, row: TableRecord): Child {
       const variant: DateVariant = isToday(value) ? 'time' : 'short';
       return h(
         'span',
-        { title: dateFormat(language, 'full').format(value) },
+        { class: 'ohne-truncate', title: dateFormat(language, 'full').format(value) },
         dateFormat(language, variant).format(value),
       );
     };

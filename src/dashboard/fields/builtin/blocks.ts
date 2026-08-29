@@ -79,8 +79,9 @@ export const blocksType: FieldType = {
       const first = items[0];
       const name =
         isPlainObject<Record<string, unknown>>(first) && isString(first.block) ? first.block : '';
+      const label = labelOf(name, blocksOf());
       return [
-        labelOf(name, blocksOf()),
+        h('span', { class: 'ohne-truncate', title: label }, label),
         items.length > 1 ? dimMark(` +${items.length - 1}`) : null,
       ];
     };

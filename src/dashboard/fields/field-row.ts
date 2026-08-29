@@ -61,6 +61,32 @@ css`
     cursor: default;
   }
 
+  /* The group stands in for the label as the row's flexible item, so it repeats the label's basis
+     and cap. The size reset undoes the label row's shrink, keeping the nested label at its own size.
+     Centred, not baselined: Inter's ascent less its descent is its cap height, so a line box centres
+     its own cap band, and the shorter chip lands on the label's letters without growing the row. */
+  .ohne-field-label .ohne-fieldrow-name {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    max-width: max-content;
+    margin-right: auto;
+    font-size: 1em;
+  }
+
+  .ohne-field-label .ohne-fieldrow-unique {
+    flex: none;
+    padding: 0.125em 0.4375em;
+    border-radius: calc(var(--ohne-radius) - 0.25rem);
+    background-color: hsl(var(--ohne-muted));
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: calc(1em - 0.3125rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
   .ohne-field-label .ohne-fieldrow-meta {
     display: flex;
     font-size: 1em;
@@ -76,9 +102,10 @@ css`
     height: 1.25em;
   }
 
-  /* Hidden, not unmounted: the box keeps its slot, and a pristine revert leaves the tab order. */
+  /* Removed from layout, not unmounted: the metadata glyphs hold the right edge until dirt lands,
+     and a pristine revert stays out of the tab order. */
   .ohne-fieldrow-pristine {
-    visibility: hidden;
+    display: none;
   }
 
   .ohne-fieldrow-dot {
@@ -146,8 +173,8 @@ export function describeControl(
 
 /**
  * One form row rendered through the field primitives: the label row, the control, the message.
- * The label carries the required mark.
- * The metadata marks and the touched dot sit at the row's right edge.
+ * The label carries the required mark, and a unique field pairs it with the unique chip.
+ * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
  * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
  * The pattern mirrors the macOS close button, which shows its cross over the document-edited dot.
  * The message under the control shows the description muted, or the error destructive in its place.
@@ -170,7 +197,7 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     return mark;
   };
 
-  // Mounted once and hidden while pristine, so the sibling marks never shift when dirt toggles.
+  // Mounted once and hidden while pristine, so one tooltip outlives every dirt toggle.
   const touchedMark = (): Child => {
     if (isUndefined(options.dirty)) return null;
     const box = (): string =>
@@ -192,16 +219,26 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     return revert;
   };
 
+  const label = h(
+    'span',
+    { class: 'ohne-label', id: ids.label, onClick: () => options.onLabelClick?.() },
+    options.field.label,
+  );
+
+  // The chip qualifies the value, as the required asterisk does.
+  // It pairs with the label instead of joining the glyphs at the row's right edge.
+  const name = options.field.unique
+    ? h(
+        'span',
+        { class: 'ohne-fieldrow-name' },
+        label,
+        h('span', { class: 'ohne-fieldrow-unique' }, () => t('dashboard.field.unique')),
+      )
+    : label;
+
   const head = fieldLabel(
     [
-      h(
-        'span',
-        { class: 'ohne-label', id: ids.label, onClick: () => options.onLabelClick?.() },
-        options.field.label,
-      ),
-      options.field.unique
-        ? h('span', { class: 'ohne-muted' }, () => t('dashboard.field.unique'))
-        : null,
+      name,
       options.field.translatable ? languageMark() : null,
       options.locked === true ? lockMark() : null,
       touchedMark(),
