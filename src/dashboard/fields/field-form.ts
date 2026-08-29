@@ -38,6 +38,16 @@ export interface FieldFormOptions {
   attachUUID?: boolean;
 
   /**
+   * Renders the item's `UUID` as a row, for a form built over that one field.
+   * It is never writable, so it shows only under `readOnlyRows` or `readOnly`.
+   * Omitted, it never renders: a nested item carries its identity without showing it.
+   *
+   * @default
+   * false
+   */
+  renderUUID?: boolean;
+
+  /**
    * Renders readable fields the form cannot edit as locked rows.
    * A field with a registered control renders it disabled; one without renders display-only.
    * Omitted, such fields are carried through silently, the right shape for nested items.
@@ -163,7 +173,8 @@ css`
 
 /**
  * Builds a `FieldForm` over `fields`, seeded from `initial`, an existing item or `undefined`.
- * The item `UUID` never renders as a row; `attachUUID` decides whether it rides the read value.
+ * The item `UUID` renders as a row only under `renderUUID`.
+ * `attachUUID` decides whether it rides the read value.
  */
 export function createFieldForm(
   fields: readonly DashboardField[],
@@ -180,7 +191,7 @@ export function createFieldForm(
     options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
 
   for (const field of fields) {
-    if (field.name === 'UUID') continue;
+    if (field.name === 'UUID' && options.renderUUID !== true) continue;
     const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
     // Create mode always qualifies, so an undo-restored create form does not lock the field.
     const settable =
