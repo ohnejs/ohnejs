@@ -33,8 +33,8 @@ export interface TextAreaOptions {
   rows?: number;
 
   /**
-   * How the textarea resizes: `false` fixes the height to `rows`, `'manual'` shows the native drag
-   * handle, `'auto'` grows and shrinks with the content.
+   * How the textarea resizes: `false` fixes the height to `rows`, `'manual'` shows the native drag handle.
+   * `'auto'` grows and shrinks with the content.
    *
    * @default
    * 'auto'
@@ -167,7 +167,7 @@ css`
  * Typing writes into the model; writing the model updates the textarea.
  * Escape blurs the textarea without bubbling, and double-clicks stop at the box.
  *
- * The resize mode is read once at construction, as in the original.
+ * The resize mode is read once at construction.
  *
  * @example
  * ```ts

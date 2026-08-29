@@ -290,7 +290,7 @@ css`
 let sequence = 0;
 
 /**
- * Sidebar navigation, ported 1-to-1 from Pruvious v4's `PUIVerticalMenu`.
+ * Sidebar navigation.
  * An optional uppercase title sits above a recursive list of expandable items.
  * The expanded state is keyed by each item's index path, so reordering `items` remaps it.
  * An active leaf auto-expands all of its ancestors.
@@ -340,7 +340,7 @@ export function verticalMenu(options: VerticalMenuOptions = {}): HTMLElement {
 }
 
 /**
- * One menu row, ported 1-to-1 from Pruvious v4's `PUIVerticalMenuItem`.
+ * One menu row.
  * It is a link, an action button, or a pure toggle, with an optional recursive submenu.
  * A collapsed submenu stays in the DOM, hidden.
  * Children keep their recorded expanded state and reappear when the parent reopens.

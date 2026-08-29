@@ -2,9 +2,9 @@ import type { KeyStroke } from '../../utils/keys/key-stroke.ts';
 
 /**
  * A named keyboard shortcut the dashboard understands.
- * The bindings are fixed, ported 1-to-1 from Pruvious v4: `delete` is Delete or Backspace
- * (plus Ctrl+D on mac), `close` is Escape, and the rest ride the platform modifier -
- * Command on mac, Control elsewhere.
+ * The bindings are fixed.
+ * `delete` is Delete or Backspace (plus Ctrl+D on mac), and `close` is Escape.
+ * The rest ride the platform modifier - Command on mac, Control elsewhere.
  */
 export type HotkeyAction =
   | 'close'
@@ -48,8 +48,8 @@ export interface HotkeyContext {
 
 /**
  * Resolves a keystroke to a hotkey action, or `null` when nothing matches.
- * The decision tree is the exact Pruvious v4 order: `delete` and `close` first, then the platform
- * gate (Command on mac, Control elsewhere, never with Alt or the other modifier), then the letter.
+ * `delete` and `close` come first, then the platform gate, then the letter.
+ * The gate is Command on mac and Control elsewhere, never with Alt or the other modifier.
  * `save` alone ignores `editing` and `disabled`; on non-mac `Ctrl+Shift+Z` is deliberately nothing.
  *
  * @example
@@ -106,7 +106,7 @@ export function matchHotkey(stroke: KeyStroke, context: HotkeyContext): HotkeyAc
 
 /**
  * The display labels for the default hotkeys, e.g. `Cmd + S` for `save`.
- * `insertAfter` and `insertBefore` carry no label, exactly as in Pruvious v4.
+ * `insertAfter` and `insertBefore` carry no label.
  *
  * @example
  * ```ts

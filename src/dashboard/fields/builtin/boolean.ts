@@ -43,8 +43,7 @@ export const booleanType: FieldType = {
     const error = (): string => routed.value;
     const element = checkbox(checked, undefined, { disabled: () => disabled === true });
     const input = element.querySelector('input') as HTMLInputElement;
-    // The native input is the hidden proxy; the visible `role="checkbox"` button carries focus
-    // and the aria wiring, or both would land on a `display: none` element and do nothing.
+    // The native input is `display: none`, so focus and the aria wiring go on the visible button.
     const proxy = element.querySelector('button') as HTMLElement;
     input.addEventListener('change', () => {
       touched.value = true;
@@ -53,8 +52,6 @@ export const booleanType: FieldType = {
     });
     describeControl(proxy, field, path, error);
 
-    // Untouched, the value is whatever is stored, so a stored null saves as null; once touched
-    // the box reads binary, and only the row's revert leads back to null.
     const wire = (): unknown => {
       if (touched.value) return checked.value;
       return isNullish(base) ? (field.nullable ? null : false) : base === true;

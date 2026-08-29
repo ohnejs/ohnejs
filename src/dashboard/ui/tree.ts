@@ -300,8 +300,7 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
     Object.fromEntries((options.selectedItems?.value ?? []).map((item) => [item.id, true])),
   );
 
-  // ohne has no deep reactivity: after any in-place tree mutation the model ref is re-set to a
-  // shallow copy of the root array, so `activeItems` and the model-change effect re-run.
+  // Reactivity is shallow, so re-setting the root ref is what re-runs `activeItems` and the effects.
   const invalidate = (): void => {
     model.value = [...untracked(() => model.value)];
   };
@@ -676,8 +675,6 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
     focused.value = event.relatedTarget instanceof Node && root.contains(event.relatedTarget);
   });
 
-  // On tree model changes: unset vanished highlighted and selected items, briefly lock the
-  // scroll container while the DOM reshuffles, and re-measure its edges.
   let firstModelRun = true;
   effect(() => {
     void model.value;
@@ -706,7 +703,6 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
     });
   });
 
-  // Keyboard actions register only while the tree has focus and a selection exists.
   effect(() => {
     const items = selected();
     const isFocused = focused.value;
@@ -790,8 +786,7 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
 
   effect(() => updatePlaceholder(scrollHandle.y.value));
 
-  // The first placeholder run happens before the element is attached, when `offsetHeight` is 0;
-  // re-measure once the tree is in the document.
+  // The first run measures an unattached element, whose `offsetHeight` is 0.
   requestAnimationFrame(() => updatePlaceholder(scrollHandle.y.value));
 
   const stopClickOutside = listenClickOutside(root, () => {

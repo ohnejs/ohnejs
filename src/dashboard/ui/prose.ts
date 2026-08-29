@@ -22,7 +22,7 @@ export interface ProseOptions {
 }
 
 /**
- * A typographic flow container, ported from PUIProse.
+ * A typographic flow container.
  * Wraps rich content in the foundation's `ohne-prose` class, which supplies the vertical rhythm.
  *
  * @example
@@ -104,7 +104,6 @@ function renderBlocks(target: HTMLElement, text: string): void {
  * It also covers backticked code, `[label](https://url)` links opening in a new tab, and line breaks.
  * `markdown: false` renders the text as-is.
  *
- * The zero-dependency stand-in for the source's marked + DOMPurify pipeline.
  * Content never reaches `innerHTML`, so server-provided strings stay inert.
  * Style the target with `ohne-prose` for the typographic flow.
  */

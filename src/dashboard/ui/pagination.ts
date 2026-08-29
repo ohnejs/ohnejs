@@ -40,8 +40,8 @@ export interface PaginationOptions {
   nextPageTitle?: string;
 
   /**
-   * The text to display in the `title` attribute of the page number buttons, followed by the
-   * page number.
+   * The text to display in the `title` attribute of the page number buttons.
+   * The page number follows it.
    *
    * @default
    * 'Go to page'
@@ -184,12 +184,12 @@ css`
 `;
 
 /**
- * Numbered pagination, ported 1-to-1 from Pruvious v4's `PUIPagination`: an ellipsis-windowed
- * button row, and a prev / number-input / next combo below 767px container width.
+ * Numbered pagination: an ellipsis-windowed button row.
+ * A prev / number-input / next combo replaces it below 767px container width.
  * The component never owns the page state - every interaction reports through `onChange`.
  * A single page hides the whole component.
- * The responsive switch is a container query: it only fires inside an ancestor with
- * `container-type: inline-size`; without one the combo never appears.
+ * The responsive switch is a container query, firing only inside a `container-type: inline-size` ancestor.
+ * Without one the combo never appears.
  *
  * @example
  * ```ts
@@ -220,7 +220,6 @@ export function pagination(options: PaginationOptions): HTMLElement {
       icon('chevron-left'),
     );
 
-  // The source omits type="button" on both next buttons; the quirk carries over.
   const nextButton = (): HTMLElement =>
     h(
       'button',
@@ -242,7 +241,6 @@ export function pagination(options: PaginationOptions): HTMLElement {
     },
   };
 
-  // The v-if root becomes a hidden toggle, so the component keeps an element return.
   return h(
     'div',
     {

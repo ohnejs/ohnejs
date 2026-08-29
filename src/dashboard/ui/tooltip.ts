@@ -98,13 +98,12 @@ function renderContent(target: HTMLElement, text: string): void {
 /**
  * Attaches a tooltip to an element; returns the dispose.
  *
- * A zero-dependency replacement for the tippy-based Pruvious v4 directive with its defaults:
- * arrow, top placement flipping when starved for space, 10px offset, 320px max width, instant
- * show and hide, z-index 99999, hidden on any click, and touch showing only while holding.
- * The content string speaks markdown-lite - `**bold**`, backticked code, and `<br>` breaks -
- * rendered as constructed text nodes, so caller content never reaches `innerHTML`.
- * A getter as `content` re-renders reactively while visible; a getter returning empty shows
- * nothing, and one turning empty while visible keeps the last content, as the source did.
+ * Defaults are an arrow, top placement flipping when space is short, a 10px offset, and 320px max width.
+ * Show and hide are instant at z-index 99999, any click hides, and touch shows only while holding.
+ * The content string speaks markdown-lite: `**bold**`, backticked code, and `<br>` breaks.
+ * It renders as constructed text nodes, so caller content never reaches `innerHTML`.
+ * A getter as `content` re-renders reactively while visible.
+ * A getter returning empty shows nothing; one turning empty while visible keeps the last content.
  * Dispose in `onCleanup` when the element's region unmounts.
  *
  * @example

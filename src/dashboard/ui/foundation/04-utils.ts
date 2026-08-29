@@ -1,7 +1,7 @@
 import { css } from '../../render/css.ts';
 
 /**
- * The utility class vocabulary, ported 1-to-1 from Pruvious v4.
+ * The utility class vocabulary.
  * `ohne-clamp` reads its line count from `--ohne-clamp` (default 1).
  * `ohne-no-transition` on `<body>` suppresses every transition during a theme switch.
  */

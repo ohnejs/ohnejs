@@ -156,7 +156,7 @@ css`
 `;
 
 /**
- * Two stacked `time` inputs with mutual bounds, ported from PUITimeRange.
+ * Two stacked `time` inputs with mutual bounds.
  * The model holds a `[from, to]` tuple of ms within a day, each between `0` and `86399000`.
  * Each side's bounds derive from the other side, `min`/`max`, and `minRange`/`maxRange`.
  * A side decorator visually connects the two inputs.

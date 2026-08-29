@@ -182,22 +182,18 @@ export function createFieldForm(
   for (const field of fields) {
     if (field.name === 'UUID') continue;
     const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
-    // An immutable field stays settable while the record or item does not exist yet.
     // Create mode always qualifies, so an undo-restored create form does not lock the field.
     const settable =
       options.disabled !== true &&
       options.readOnly !== true &&
       field.writable &&
       (!field.immutable || options.mode === 'create' || isUndefined(initial));
-    // A locked field renders its real control disabled, exactly as the P4 source dims the layout.
     const lockable =
       !settable &&
       showsLocked &&
       field.readable &&
       !isUndefined(registeredFieldType(field)?.control);
-    // Construction runs untracked: a control reading its own fresh refs while it builds must not
-    // subscribe the ambient region, or the first keystroke would rebuild the whole surface.
-    // It runs inside the form's own scope, so `dispose` releases everything the controls created.
+    // Construction runs untracked: a control's own reads must not subscribe the ambient region.
     const control =
       settable || lockable
         ? scope.run(() =>
@@ -268,8 +264,7 @@ export function createFieldForm(
             field,
             path: row.path,
             dirty: () => control.dirty(),
-            // A row revert is a user change: without the input ping, the host's history would
-            // keep the pre-revert state and still guard navigation as unsaved.
+            // A revert is a user change: without the ping, history still guards navigation as unsaved.
             onRevert: () => {
               control.revert();
               options.onInput?.();

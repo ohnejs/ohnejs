@@ -82,8 +82,8 @@ css`
 
 /**
  * A static callout box with an optional icon and title, announced as `role="alert"`.
- * The destructive variant retheming bakes a `0.15` alpha into `--ohne-accent`, so nested accent
- * surfaces wash to 15% destructive.
+ * The destructive variant retheming bakes a `0.15` alpha into `--ohne-accent`.
+ * Nested accent surfaces therefore wash to 15% destructive.
  *
  * @example
  * ```ts

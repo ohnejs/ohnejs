@@ -1,7 +1,7 @@
 import { css } from '../../render/css.ts';
 
 /**
- * Typographic flow for rendered rich text under an `ohne-prose` root, ported 1-to-1 from Pruvious v4.
+ * Typographic flow for rendered rich text under an `ohne-prose` root.
  * Vertical rhythm is margin-top only, scaled by `--ohne-spacing`.
  * `ohne-muted` is intentionally re-declared here so source order keeps it effective inside prose.
  */

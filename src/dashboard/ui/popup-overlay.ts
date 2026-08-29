@@ -65,7 +65,7 @@ export interface PopupOptions {
 
   /**
    * The header slot, rendered above the content with a bottom border.
-   * A function form receives the close function, exactly as the source's scoped slot did.
+   * A function form receives the close function.
    */
   header?: Child | ((close: PopupClose) => Child);
 
@@ -95,7 +95,7 @@ export interface PopupOptions {
 }
 
 /**
- * A mounted popup: the elements plus the close surface the source exposed.
+ * A mounted popup: the elements plus the close surface.
  */
 export interface Popup {
   /**
@@ -111,13 +111,12 @@ export interface Popup {
 
   /**
    * Closes the popup with a transition; resolves when the transition is complete.
-   * The caller unmounts afterwards, exactly as the source's `close` emit contract had it.
+   * The caller unmounts afterwards.
    */
   close: PopupClose;
 
   /**
    * Focuses the popup root, now and again after the overlay transition.
-   * The source accidentally exposed the global `window.focus` here; this exposes the intended root focus.
    */
   focus(): void;
 }
@@ -235,7 +234,7 @@ css`
 `;
 
 /**
- * The modal layer, ported 1-to-1 from Pruvious v4's `PUIPopup`.
+ * The modal layer.
  * A dimmed backdrop and a centered card appended to `document.body`, the base of every popup.
  *
  * Mounting claims an overlay depth a timeout later, so same-cycle hotkey instances pin above it.
@@ -348,9 +347,8 @@ export function popup(
   const onWindowKeydown = (event: KeyboardEvent): void => options.onKeydown?.(event);
   window.addEventListener('keydown', onWindowKeydown);
 
-  // A click hands focus over through a transient `body`, which the microtask after `focusout` still
-  // sees, so the re-anchor waits a macrotask for the new target to settle. It focuses the root only
-  // once: the delayed second focus belongs to the entrance transition and would steal the click.
+  // Focus passes through a transient `body` between targets, so the re-anchor waits a macrotask.
+  // It focuses the root once: the entrance transition's delayed second focus would steal the click.
   const onFocusChange = (): void => {
     setTimeout(() => {
       if (document.activeElement?.nodeName === 'BODY' && overlay?.isTopmost()) root.focus();
@@ -394,8 +392,7 @@ export function popup(
   const mountTimer = setTimeout(() => {
     if (disposed) return;
     overlay = acquireOverlay();
-    // The forced reflow registers the hidden state's computed style; without it a fast timer
-    // beats the first paint and the element is born visible, skipping the entrance transition.
+    // Forcing a reflow paints the hidden state first, so the entrance transition is not skipped.
     void root.offsetWidth;
     visible.value = true;
     autofocus();

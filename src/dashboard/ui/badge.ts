@@ -51,8 +51,9 @@ css`
 
 /**
  * An inline pill label with an arbitrary background color and automatic contrast text color.
- * A token color name pairs with its foreground token; any other CSS color is measured after
- * attachment, and the text turns white when the WCAG relative luminance lands below `0.5`.
+ * A token color name pairs with its foreground token.
+ * Any other CSS color is measured after attachment.
+ * The text turns white when the WCAG relative luminance lands below `0.5`.
  *
  * @example
  * ```ts
@@ -77,8 +78,7 @@ export function badge(content: Child | (() => Child), options: BadgeOptions = {}
     },
     content,
   );
-  // Measured a microtask after construction, when the caller has attached the badge and
-  // `getComputedStyle` can resolve the token vars, mirroring the source's mounted + nextTick read.
+  // Deferred a microtask so the badge is attached and `getComputedStyle` resolves the token vars.
   if (textColor === null) {
     queueMicrotask(() => {
       const resolved = getComputedStyle(root).getPropertyValue('background-color');

@@ -25,13 +25,13 @@ css`
 `;
 
 /**
- * The `records` field's dashboard behaviour, its form control ported from Pruvious v4's `Records`.
+ * The `records` field's dashboard behaviour.
  *
  * Cells summarize the ordered links as the first record's label plus a dim `+n` tail.
  * There is no inline cell editor: the list edits on the record page and in the edit popup.
  * The form control is the async `dynamicChips` field over the target's records.
  * Chips remove and drag-reorder, the dropdown searches and paginates, a double-click opens the record.
- * Server messages keyed by index mark their chips destructive, as the source's `erroredItems`.
+ * Server messages keyed by index mark their chips destructive.
  */
 export const recordsType: FieldType = {
   display({ field, value }) {
@@ -62,8 +62,7 @@ export const recordsType: FieldType = {
     const routed = ref('');
     const erroredIndices = ref<number[]>([]);
 
-    // The chips write the model directly on add, remove, and reorder; this relays every write
-    // after the first into the control's change bookkeeping. `silent` mutes revert and rebase.
+    // The chips write the model directly; this effect relays edits; `silent` mutes the first run and resets.
     let silent = true;
     effect(() => {
       void model.value;

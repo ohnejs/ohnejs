@@ -95,8 +95,8 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
   size?: number;
 
   /**
-   * The scroll surface the freezer pins during a drop, replacing the source's `scroll` injection.
-   * Omitted, the freezer targets `window`, which - as in the source - has no reactive offset.
+   * The scroll surface the freezer pins during a drop.
+   * Omitted, the freezer targets `window`, which has no reactive offset.
    * So only an explicit surface actually re-triggers the revert.
    */
   scroll?: ScrollableHandle;
@@ -174,14 +174,13 @@ css`
 
 /**
  * A vertical list of card items with cross-list drag-drop reorder.
- * Ported 1-to-1 from Pruvious v4's `PUIStructure`.
  *
  * Every instance shares the `structureDraggable` signal.
  * A drag started in one structure lights up the drop zones of every structure that accepts it.
  * A mouseup over a zone moves the item.
  * A same-structure drop reorders in place.
  * A cross-structure drop inserts here first and removes from the donor a tick later.
- * So the item transiently exists in both lists, as in the source.
+ * So the item transiently exists in both lists.
  * `onCommit` fires two ticks after a drop, once the model has settled, and on a cross-structure departure.
  * While empty and accepting, the structure renders a dashed dropzone with `dropItemsHereLabel`.
  * A click outside cancels an in-flight drag without dropping.
@@ -220,8 +219,6 @@ export function structure<TItem extends Record<string, unknown>>(
     }
   };
 
-  // The source's paused `watchPausable`: the freezing effect only exists during the drop window -
-  // created on resume, stopped by the debounced pause.
   const pauseScrollWatcher = debounce(() => {
     stopFreeze?.();
     stopFreeze = null;
@@ -232,8 +229,7 @@ export function structure<TItem extends Record<string, unknown>>(
   const resumeScrollWatcher = (): void => {
     prevScrollY = options.scroll ? options.scroll.y.value : window.scrollY;
     stopFreeze ??= effect(freeze);
-    // Without a reactive handle, the nearest pane pins through its scroll events instead, as the
-    // source pins the injected `PUIContainer` scroll.
+    // The effect alone cannot revert a non-reactive offset, so the pane pins on its scroll events.
     const pane = options.scroll ? undefined : nearestContainer(root);
     if (pane && !unfreezePane) {
       prevPaneY = pane.scrollTop;
@@ -285,7 +281,6 @@ export function structure<TItem extends Record<string, unknown>>(
       model.value = [...items.slice(0, at), item as TItem, ...items.slice(at)];
     } else {
       model.value = [...model.value.slice(0, at), item as TItem, ...model.value.slice(at)];
-      // The donor removal runs a tick later, so the item transiently exists in both lists.
       void nextTick().then(() => remove(isSameStructure));
     }
 

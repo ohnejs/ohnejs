@@ -8,7 +8,6 @@ import './foundation/06-tooltip.ts';
 /**
  * The dashboard's design foundation, adopted once on import.
  *
- * The system is a 1-to-1 port of Pruvious v4's `@pruvious/ui` foundation.
  * Tokens, fonts, base reset, utility classes, prose flow, and the tooltip theme adopt in that order.
  * The order is semantic: the zero-specificity base expects component css to load later.
  * `ohne-muted` relies on prose re-declaring it.

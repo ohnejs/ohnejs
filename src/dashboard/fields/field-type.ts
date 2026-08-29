@@ -339,8 +339,7 @@ const FALLBACK: FieldType = {
 
     return {
       element,
-      // The stored value rides through unchanged, so a whole-item write never blanks a field
-      // the dashboard cannot edit.
+      // The stored value rides through, so a whole-item write never blanks an uneditable field.
       read() {
         return isUndefined(base) ? {} : { value: base };
       },

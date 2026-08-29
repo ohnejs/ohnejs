@@ -43,8 +43,7 @@ export function insert(parent: Node, getter: () => Child): void {
   const end = parent.appendChild(document.createComment(''));
   let scope: EffectScope | null = null;
   batchedEffect(() => {
-    // Untracked: disposal runs the outgoing content's cleanups inside this region effect, and a
-    // ref a cleanup reads must tear down state, never subscribe the region that outlived it.
+    // Untracked, so a ref read by an outgoing cleanup does not subscribe this region effect.
     untracked(() => scope?.dispose());
     scope = effectScope();
     scope.run(() => patch(start, end, getter()));

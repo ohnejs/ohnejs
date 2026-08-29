@@ -52,7 +52,7 @@ css`
 `;
 
 /**
- * The `repeater` field's dashboard behaviour, its control ported from Pruvious v4's `Repeater`.
+ * The `repeater` field's dashboard behaviour.
  *
  * Cells show a dim item count.
  * There is no inline cell editor: the list edits on the record page as structure cards.
@@ -75,8 +75,6 @@ export const repeaterType: FieldType = {
     if (subfields.length === 0 || !itemFormSupports(subfields, blocksOf())) return undefined;
     const t = useT();
 
-    // The source's ohash item type hash, as a deterministic subfield-map string; only equality
-    // matters, deciding which structures and clipboard payloads exchange items.
     const itemType =
       'repeater:' +
       subfields
@@ -86,8 +84,7 @@ export const repeaterType: FieldType = {
 
     const off = context.disabled === true;
     let base = context.initial;
-    // Later items are built from event handlers where no scope is active; the owner catches them,
-    // so the record surface's teardown releases their effects too.
+    // Items built in event handlers have no active scope; the owner catches their effects for teardown.
     const owner = effectScope();
     const ownForms = new WeakSet<FieldForm>();
 
@@ -118,7 +115,7 @@ export const repeaterType: FieldType = {
 
     const rebuild = (): void => {
       for (const entry of entries.value) entry.form.dispose();
-      // The source's expansion rule on a model replace: collapsed stays collapsed, else expanded.
+      // Collapsed stays collapsed on a model replace; an empty list expands.
       const expanded = entries.value.length === 0 || !allCollapsed();
       entries.value = baseEntries(expanded);
     };
@@ -183,8 +180,7 @@ export const repeaterType: FieldType = {
       entries.value = entries.value.map((entry) => ({ ...entry, $expanded: expanded }));
     };
 
-    // A drop settled: a foreign item, arrived through a cross-structure drop, rebuilds as an own
-    // entry seeded from its donor form's current value, shed of every `UUID`.
+    // A cross-dropped item's form lives in the donor's scope, so it rebuilds here, shed of every `UUID`.
     const settle = (items: RepeaterEntry[]): void => {
       change(
         items.map((item) =>
@@ -235,8 +231,7 @@ export const repeaterType: FieldType = {
                 onRemove: () => remove(entry()),
               }),
         ],
-        // The form is stable per row; an untracked read keeps expand-all's item replacement from
-        // rebuilding the body region and dropping focus.
+        // The form is stable per row, so the untracked read cannot go stale; it holds focus through expand-all.
         item: (entry) =>
           h('div', { class: 'ohne-repeater-item' }, untracked(() => entry().form).render()),
         itemBefore: (entry) =>
@@ -330,8 +325,7 @@ export const repeaterType: FieldType = {
             entry === target ? { ...entry, $expanded: true } : entry,
           );
         }
-        // The expanded body mounts on the reactive flush's microtask; focusing before it would
-        // land on a detached input.
+        // The expanded body mounts on the reactive flush's microtask; focusing sooner hits a detached input.
         queueMicrotask(() => {
           if (!target.form.focusError()) target.form.focus();
         });
@@ -344,8 +338,7 @@ export const repeaterType: FieldType = {
       rebase(value) {
         base = value;
         const items = baseItems();
-        // A matching answer rebases each item's form in place, keeping controls and their focus;
-        // fresh items pick up the `UUID` the server minted through their new seed.
+        // A matching length rebases in place, keeping each item's controls and their focus.
         if (items.length === entries.value.length) {
           entries.value.forEach((entry, index) => {
             entry.form.rebase(items[index]);

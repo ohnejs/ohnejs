@@ -240,8 +240,6 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
     const choices = options.choices();
     if (choices.length === 0) return;
     const index = choices.findIndex((choice) => choice.value === model.value);
-    // The source crashes when the value is absent from the choices; landing on the first
-    // choice recovers instead, matching the library's own `fallback` semantics.
     const at =
       index === -1
         ? 0

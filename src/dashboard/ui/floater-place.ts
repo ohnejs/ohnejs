@@ -10,7 +10,7 @@ export type Side = 'top' | 'bottom' | 'left' | 'right';
 export type Alignment = 'start' | 'end';
 
 /**
- * A side with an optional alignment, the floating-ui placement vocabulary.
+ * A side with an optional alignment.
  */
 export type Placement = Side | `${Side}-${Alignment}`;
 
@@ -84,7 +84,7 @@ export interface PlaceInput {
 
   /**
    * When set, the placement with the most main-axis space wins, earlier entries breaking ties.
-   * This is floating-ui's `autoPlacement`: the preferred `placement` is ignored entirely.
+   * The preferred `placement` is ignored entirely.
    */
   allowedPlacements?: Placement[];
 
@@ -98,8 +98,8 @@ export interface PlaceInput {
 
   /**
    * The main-axis gap between reference and floating element.
-   * Applied AFTER the placement choice and the space measurement, exactly as the Pruvious v4
-   * middleware order has it - placement decisions ignore the gap.
+   * Applied AFTER the placement choice and the space measurement.
+   * Placement decisions ignore the gap.
    *
    * @default
    * 0
@@ -144,13 +144,13 @@ export interface PlaceResult {
 
   /**
    * The width available before the element would poke past the padded viewport.
-   * Measured at the pre-offset coordinates, exactly as the Pruvious v4 middleware order has it.
+   * Measured at the pre-offset coordinates.
    */
   availableWidth: number;
 
   /**
    * The height available before the element would poke past the padded viewport.
-   * Measured at the pre-offset coordinates, exactly as the Pruvious v4 middleware order has it.
+   * Measured at the pre-offset coordinates.
    */
   availableHeight: number;
 
@@ -312,10 +312,9 @@ function availabilityAt(
 }
 
 /**
- * Computes where a floating element goes, ported from the Pruvious v4 floater's floating-ui setup.
- * The pipeline keeps the source's exact middleware order: choose the placement (auto pick or flip),
- * measure the available space, THEN apply the offset, then slide along the cross axis to stay
- * `shiftPadding` from the viewport edge.
+ * Computes where a floating element goes.
+ * Choose the placement (auto pick or flip), measure the available space, THEN apply the offset.
+ * Finally slide along the cross axis to stay `shiftPadding` from the viewport edge.
  * Pure math over plain rects, so pickers, dropdowns, and tooltips share one engine.
  *
  * @example

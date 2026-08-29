@@ -70,8 +70,9 @@ css`
  * The root host a dashboard screen renders through.
  * It wraps the content and mounts the app-wide singletons beside it: the dialog host and the toaster.
  * Render exactly one per screen; the classes are structural hooks and carry no styling of their own.
- * While mounted it swallows the plain platform-modifier `D` and `S` keydowns, matched by physical
- * `event.code`, so browser bookmark and save-page never fire and dashboard hotkeys own them.
+ * While mounted it swallows the plain platform-modifier `D` and `S` keydowns.
+ * The match is on physical `event.code`.
+ * So browser bookmark and save-page never fire and dashboard hotkeys own them.
  */
 export function base(content: Child | (() => Child), options: BaseOptions = {}): HTMLElement {
   const mac = isMac();

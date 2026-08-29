@@ -21,15 +21,12 @@ import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
-  /* The card header carries the field label, so the row's own label above the card hides.
-     Hidden, not removed: it keeps the auto margin and the row's height, so a head left with no
-     glyph neither drifts left nor collapses as dirt toggles. */
+  /* Hidden, not removed: the row keeps its height and the head keeps its auto margin. */
   .ohne-fieldrow:has(> .ohne-object) > .ohne-field-label .ohne-label {
     visibility: hidden;
   }
 
-  /* The card header carries the label, so it mirrors the field label's required mark, float and
-     all: the header truncates, and the ellipsis must trim the text rather than the mark. */
+  /* Floated so the header's ellipsis trims the label text rather than the mark. */
   .ohne-object-required::before {
     content: '*';
     float: right;
@@ -56,7 +53,7 @@ css`
 `;
 
 /**
- * The `object` field's dashboard behaviour, following Pruvious v4's `Object` and `NullableObject`.
+ * The `object` field's dashboard behaviour.
  *
  * Cells summarize the child by its first text subfield's value.
  * There is no inline cell editor: the child edits on the record page as a card holding its subform.
@@ -82,8 +79,7 @@ export const objectType: FieldType = {
     const off = context.disabled === true;
 
     let base = context.initial;
-    // Later forms are built from event handlers where no scope is active; the owner catches them,
-    // so the record surface's teardown releases their effects too.
+    // Later forms build outside any active scope; the owner keeps their effects in the teardown.
     const owner = effectScope();
     const baseObject = (): Record<string, unknown> | undefined =>
       isPlainObject<Record<string, unknown>>(base) ? base : undefined;
@@ -99,9 +95,7 @@ export const objectType: FieldType = {
         }),
       );
 
-    // `seed` is what the current form was built from; base identity marks the pristine base form.
-    // `stash` keeps the values a toggle-off discarded, restored on the next toggle-on, as the source
-    // preserves its `objectValue` across the switch.
+    // `seed` is the object the current form was built from; identity with the base marks it pristine.
     let seed: Record<string, unknown> | undefined;
     let stash: Record<string, unknown> | undefined;
 
@@ -110,8 +104,6 @@ export const objectType: FieldType = {
       return formOf(item);
     };
     const { field } = context;
-    // A nullable child rests unset; a non-nullable one always holds a form, exactly as the source
-    // splits `nullableObject` and `object`.
     const baseForm = (): FieldForm | null => {
       const stored = baseObject();
       if (!field.nullable) return buildForm(stored);
@@ -241,7 +233,7 @@ export const objectType: FieldType = {
         base = value;
         stash = undefined;
         const form = entry.value;
-        // A present child rebases in place, keeping its controls and their focus.
+        // Rebasing in place keeps the child's controls and their focus.
         if (!isNull(form) && isPlainObject<Record<string, unknown>>(value)) {
           form.rebase(value);
           seed = baseObject();

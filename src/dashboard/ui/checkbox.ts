@@ -140,7 +140,6 @@ css`
     cursor: not-allowed;
   }
 
-  /* A deviation from the source, which leaves a disabled box lit: it mutes, as a disabled input does. */
   .ohne-checkbox-disabled .ohne-checkbox-button,
   .ohne-checkbox-disabled .ohne-checkbox-control[data-checked='true'] + .ohne-checkbox-button {
     background-color: hsl(var(--ohne-muted));

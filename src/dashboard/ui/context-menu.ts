@@ -12,8 +12,7 @@ import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
 import { placeFixed } from './overlay.ts';
 import { scrollable } from './scrollable.ts';
-// The menu renders `dropdown`'s panel chrome by hand, so it takes those styles from their owner.
-// Re-declaring them here would re-order them after every consumer's overrides.
+// The menu renders `dropdown`'s chrome by hand; re-declaring its styles would re-order them after overrides.
 import './dropdown.ts';
 import './tokens.ts';
 
@@ -72,7 +71,7 @@ css`
 `;
 
 /**
- * The right-click and long-press menu, ported 1-to-1 from Pruvious v4's `PUIContextMenu`.
+ * The right-click and long-press menu.
  *
  * An invisible fixed anchor parks at the trigger event's pointer coordinates.
  * While `event` holds one, a dropdown mounts on it: the roomiest corner wins, clamped to the viewport.

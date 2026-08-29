@@ -20,9 +20,7 @@ import {
 const NY = 'America/New_York';
 const BERLIN = 'Europe/Berlin';
 
-// Reference instants that pin the fixOffset seed: dayjs seeds with the zone's offset "now",
-// so DST-overlap picks are seasonal there. A winter reference makes the seed the standard
-// offset, a summer reference the DST offset. Every expected value is dayjs 1.11.21's answer.
+// The reference instant seeds the offset that resolves DST overlaps, so its season matters.
 const WINTER = Date.UTC(2024, 0, 15, 12);
 const SUMMER = Date.UTC(2024, 6, 15, 12);
 
@@ -105,8 +103,6 @@ describe('zonedFromWallClock', () => {
   });
 
   it('keeps years before 1000 intact', () => {
-    // dayjs falls back to the engine's lenient parser here and returns garbage in non-UTC
-    // environments; the port resolves through Intl and stays correct.
     const date = zonedFromWallClock('UTC', 100, 1, 1, 0, 0, 0, WINTER);
     strictEqual(date.timestamp, -59011459200000);
     strictEqual(date.year, 100);
@@ -145,8 +141,6 @@ describe('zonedFromTimestamp', () => {
   });
 
   it('reads the minimum bound in a second-precision offset era', () => {
-    // dayjs drifts this instant by 28s through its second-precision round-trip;
-    // the port keeps the timestamp and reads the same wall clock.
     const min = zonedFromTimestamp(-59011459200000, BERLIN);
     strictEqual(min.timestamp, -59011459200000);
     strictEqual(fields(min), '100-1-1 0:53:28');
@@ -186,8 +180,7 @@ describe('startOfZonedDay', () => {
   });
 
   it('rolls forward when midnight falls into a DST gap', () => {
-    // Chile starts DST at midnight: 2019-09-08 00:00 does not exist. Same instant as dayjs;
-    // dayjs merely labels it with the stale pre-transition wall clock.
+    // Chile starts DST at midnight, so 2019-09-08 00:00 does not exist.
     const day = zonedFromTimestamp(Date.UTC(2019, 8, 8, 15), 'America/Santiago');
     const start = startOfZonedDay(day, WINTER);
     strictEqual(start.timestamp, 1567915200000);
@@ -264,7 +257,7 @@ describe('clampZoned', () => {
     strictEqual(clampZoned(zonedFromWallClock('UTC', 2024, 4, 15), min, max), max);
   });
 
-  it('keeps the date itself on an exact tie, like dayjs minMax', () => {
+  it('keeps the date itself on an exact tie', () => {
     const tie = zonedFromWallClock('UTC', 2024, 3, 1);
     strictEqual(clampZoned(tie, min, max), tie);
   });
@@ -288,7 +281,7 @@ describe('parseDateInput', () => {
     strictEqual(parseDateInput(1734220800000), 1734220800000);
   });
 
-  it('reads dayjs-pattern strings as local time', () => {
+  it('reads unzoned strings as local time', () => {
     strictEqual(parseDateInput('2024-12-15'), new Date(2024, 11, 15).getTime());
     strictEqual(parseDateInput('2024'), new Date(2024, 0, 1).getTime());
     strictEqual(parseDateInput('2024/03/05'), new Date(2024, 2, 5).getTime());
@@ -358,7 +351,7 @@ describe('resolveTimezone', () => {
 });
 
 describe('timezones', () => {
-  it('carries the Pruvious v4 zone list', () => {
+  it('carries the full IANA zone list', () => {
     strictEqual(timezones.length, 598);
     strictEqual(timezones.includes('Europe/Berlin'), true);
     strictEqual(timezones.includes('UTC'), true);

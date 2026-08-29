@@ -197,7 +197,7 @@ describe('moveTreeItems', () => {
     deepStrictEqual(ids(tree), ['a', 'b', 'c']);
   });
 
-  it('shares the ratchet across parent slots, exactly as the source', () => {
+  it('shares the ratchet across parent slots', () => {
     const child = { ...leaf('a1'), movable: true };
     const tree = [
       branch('a', [child, { ...leaf('a2'), movable: true }], true),

@@ -335,7 +335,6 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
     const model = options.model();
     const tree = options.tree();
 
-    // Shown only when the item is the last child of its parent and has no visible descendants.
     if (
       model.index === (model.parents[0]?.item.children ?? tree).length - 1 &&
       !model.descendants.length
@@ -500,13 +499,11 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
     if (
       isFunction(current.droppable) ? current.droppable(selected, current, zone) : current.droppable
     ) {
-      // Items cannot be dropped in themselves.
       if (zone === 'inside' && selected.some(({ id }) => id === current.id)) {
         refuse('inside', current.id);
         return false;
       }
 
-      // Parent items cannot be dropped inside their descendants.
       if (
         selected.some((selectedItem) =>
           getChildTreeItems(selectedItem, options.tree()).some(({ id }) => id === current.id),
@@ -757,8 +754,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
     ),
   );
 
-  // Focus follows highlight, skipping the construction-time value like the source's watcher, so
-  // a row scrolling into the virtualization window does not steal focus.
+  // Skipping the construction-time highlight keeps a virtualized row from stealing focus on scroll.
   let firstHighlight = true;
   effect(() => {
     const highlighted = options.highlightedItem?.();

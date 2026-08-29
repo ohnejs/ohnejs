@@ -285,15 +285,16 @@ function leadingZeros(value: number, width: number): string {
 
 /**
  * A numeric input over a text field with its own display string.
- * Arrow keys, optional steppers, and an optional drag button step the value by `increment`;
+ * Arrow keys, optional steppers, and an optional drag button step the value by `increment`.
  * Shift multiplies a step by 10, and Escape blurs, or ends a drag.
- * Typing writes the model on every valid number; blur, steps, and drag end settle the value -
- * clamped to the bounds, rounded to `decimalPlaces`, zero-padded - and report it to `onCommit`.
+ * Typing writes the model on every valid number.
+ * Blur, steps, and drag end settle the value, then report it to `onCommit`.
+ * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display.
  *
- * With `autoWidth` the input hugs its content, re-measured through a hidden mirror span whenever
- * it resizes and after an `ohne-overlay-animated` window event, so widths measured while an
- * overlay animates get fixed.
+ * With `autoWidth` the input hugs its content, measured through a hidden mirror span.
+ * It re-measures whenever the span resizes and after an `ohne-overlay-animated` window event.
+ * A width measured while an overlay animates therefore gets fixed.
  *
  * @example
  * ```ts
@@ -315,7 +316,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
 
   const numericValue = (): number =>
     /[0-9,. ]/.test(stringified.value)
-      ? // Only the first comma becomes a dot, as in the original.
+      ? // The comma is the decimal separator, so only the first one becomes a dot.
         +stringified.value.replace(',', '.').replace(/ +/g, '')
       : +stringified.value;
 

@@ -3,7 +3,7 @@ import { css } from '../../render/css.ts';
 /**
  * Self-hosted faces for `Inter` (variable, 100-900) and `Fira Mono` (400 and 500).
  * The subsets split by unicode range and serve from `src/dashboard/assets/fonts/`.
- * Ported 1-to-1 from Pruvious v4; the subset ranges are Google Fonts snapshots, kept exact.
+ * The subset ranges are Google Fonts snapshots, kept exact.
  */
 css`
   @font-face {

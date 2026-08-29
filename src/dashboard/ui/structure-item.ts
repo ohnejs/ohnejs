@@ -174,7 +174,7 @@ css`
 `;
 
 /**
- * One structure card, ported 1-to-1 from Pruvious v4's `PUIStructureItem`.
+ * One structure card.
  *
  * The header carries a drag handle.
  * A primary mouse press followed by more than 5px of travel reports the drag through `onDraggable`.

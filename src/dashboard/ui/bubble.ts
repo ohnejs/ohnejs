@@ -67,8 +67,8 @@ css`
 /**
  * A tiny count or notification pill, usually docked to a corner of another control.
  * Its border paints a fake cutout in `--ohne-background`, so token-retheming parents blend it in.
- * Pass no content to render a plain dot: the `:empty` state drops the padding, and a reactive
- * getter child would defeat it, so keep dot bubbles static.
+ * Pass no content to render a plain dot: the `:empty` state drops the padding.
+ * A reactive getter child would defeat it, so keep dot bubbles static.
  *
  * @example
  * ```ts

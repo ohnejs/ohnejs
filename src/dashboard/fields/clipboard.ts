@@ -4,9 +4,7 @@ import { isString } from '../../utils/is/is-string.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 
 /**
- * The dashboard's clipboard payload union, ported from Pruvious v4's `PruviousClipboardData`.
- * Only the `blocks` and `structure-item` variants are ported.
- * The source's `record` and `singleton` variants wait for the record surfaces that would consume them.
+ * The dashboard's clipboard payload union.
  */
 export type ClipboardData =
   | {
@@ -35,7 +33,6 @@ export type ClipboardData =
 /**
  * The one live clipboard payload, shared by every field in the dashboard.
  * `null` while nothing dashboard-shaped has been copied.
- * The module-level ref replaces the source's `usePruviousClipboardData` state.
  */
 export const clipboardData: Ref<ClipboardData | null> = ref<ClipboardData | null>(null);
 

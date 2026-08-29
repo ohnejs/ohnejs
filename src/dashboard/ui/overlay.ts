@@ -72,7 +72,7 @@ export function overlayCount(): number {
 }
 
 /**
- * Claims the next overlay depth, ported 1-to-1 from Pruvious v4's popup bookkeeping.
+ * Claims the next overlay depth.
  *
  * The model is a bare counter plus the `ohne-overlay-active` body class.
  * There is no z-index allocation and no body scroll lock.

@@ -112,11 +112,11 @@ css`
 `;
 
 /**
- * Opens the block picker popup, ported from Pruvious v4's `BlockPickerPopup`.
+ * Opens the block picker popup.
  *
  * A search-first popup over the block types `allowed` names, or every described type when omitted.
  * Typing anywhere before the search input takes focus funnels into the search.
- * Arrows walk the grid - up and down move within a column, left and right step through the list -
+ * Arrows walk the grid: up and down move within a column, left and right step through the list.
  * Enter picks the highlighted block, and Tab moves focus onto the grid itself.
  * Mouse highlighting pauses after keyboard moves until the pointer really travels again.
  *
@@ -139,10 +139,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
       let settled = false;
       let initialFocus = false;
 
-      // ohne meta describes neither block groups nor tags, so the source's grouped sections and
-      // tag filter row collapse into one unlabeled group; its label never rendered for a single
-      // group anyway. The description is absent too, so the search text is label plus name, with
-      // the source's pad keeping their relative relevance.
+      // The label pads to a fixed width so a label match always outranks a name match in the search.
       const blocks = computed<readonly PickerBlock[]>(() => {
         const registry = blocksOf();
         const names = allowed ?? registry.map((block) => block.name);
@@ -216,8 +213,6 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         handle.root.querySelector('input')?.focus();
       };
 
-      // Until the search input takes focus after the overlay animates, printable keys funnel
-      // into the search value, exactly as the source's self-removing capture listener did.
       const onCaptureKeydown = (event: KeyboardEvent): void => {
         if (initialFocus) {
           window.removeEventListener('keydown', onCaptureKeydown, { capture: true });
@@ -302,8 +297,6 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
             disabled: () => mousePaused.value,
             onClick: () => choose(block().name),
           },
-          // ohne meta carries no per-block icon or description, so the source's leading icon
-          // column and description line are skipped.
           h(
             'span',
             { class: 'ohne-block-picker-block-meta' },

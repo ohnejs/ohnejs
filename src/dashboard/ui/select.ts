@@ -290,7 +290,7 @@ function toDisplay(value: Primitive): string {
 }
 
 /**
- * The static single-select combobox, ported 1-to-1 from Pruvious v4's `PUISelect`.
+ * The static single-select combobox.
  *
  * The choices expand in place: an absolutely positioned overlay grows over the field, capped at 12 rows.
  * It translates upward just enough to fit, clamped to the window or `scrollContainer`.
@@ -655,7 +655,6 @@ export function select(
     'div',
     {
       role: 'combobox',
-      // A literal source quirk: the original carries `type="text"` on this div.
       type: 'text',
       'aria-expanded': () => (isExpanded.value ? 'true' : 'false'),
       tabindex: () => (disabled() ? -1 : 0),

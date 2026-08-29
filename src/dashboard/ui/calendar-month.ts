@@ -175,8 +175,7 @@ function weeks(options: CalendarMonthOptions): DayCell[][] {
 
   const currentMonthDays = Array.from({ length: daysInMonth(year, month) }, (_, i): DayCell => {
     const day = i + 1;
-    // The fixed 24h window matches the source: a day is selectable when any instant of it lies
-    // within the bounds, tested without DST awareness.
+    // Deliberately a fixed 24h window: the bounds test ignores DST.
     const start = zonedFromWallClock(zone, year, month, day).timestamp;
     const end = start + 86400000 - 1;
     return {
@@ -234,7 +233,7 @@ function dayButton(cell: DayCell, options: CalendarMonthOptions): HTMLElement {
 }
 
 /**
- * The month grid of the calendar, ported 1-to-1 from Pruvious v4's `PUICalendarMonth`.
+ * The month grid of the calendar.
  *
  * A fixed-layout table: one header row of rotated short day names, then 4 to 6 week rows.
  * Leading and trailing filler cells carry real adjacent-month day numbers but stay disabled.

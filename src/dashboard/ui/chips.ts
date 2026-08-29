@@ -437,8 +437,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     if (choicesOf) {
       const highlighted = filteredChoices.value[highlightedIndex.value]?.value;
       if (highlighted !== undefined) {
-        // As in the source, the duplicate check compares the typed text, not the highlighted
-        // value; real duplicate prevention comes from `filterChoices` excluding selected values.
+        // The check compares the typed text; `filterChoices` already excludes selected values.
         if ((options.enforceUniqueItems ?? true) && model.value.includes(value)) {
           inputValue.value = '';
         } else if (maxItems === false || model.value.length < maxItems) {

@@ -61,10 +61,6 @@ css`
     cursor: default;
   }
 
-  /* The group stands in for the label as the row's flexible item, so it repeats the label's basis
-     and cap. The size reset undoes the label row's shrink, keeping the nested label at its own size.
-     Centred, not baselined: Inter's ascent less its descent is its cap height, so a line box centres
-     its own cap band, and the shorter chip lands on the label's letters without growing the row. */
   .ohne-field-label .ohne-fieldrow-name {
     flex: 1 1 0;
     display: flex;
@@ -102,8 +98,6 @@ css`
     height: 1.25em;
   }
 
-  /* Removed from layout, not unmounted: the metadata glyphs hold the right edge until dirt lands,
-     and a pristine revert stays out of the tab order. */
   .ohne-fieldrow-pristine {
     display: none;
   }
@@ -225,8 +219,6 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     options.field.label,
   );
 
-  // The chip qualifies the value, as the required asterisk does.
-  // It pairs with the label instead of joining the glyphs at the row's right edge.
   const name = options.field.unique
     ? h(
         'span',

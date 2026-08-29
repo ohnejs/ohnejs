@@ -1,11 +1,12 @@
 import { last } from '../../utils/array/last.ts';
 
 /**
- * The page entries a `pagination` renders, ported 1-to-1 from Pruvious v4's window math.
+ * The page entries a `pagination` renders.
  *
  * A window of up to seven pages centers on the current page.
- * When the window misses the first page, `1` is prepended, with an ellipsis only when the gap is
- * more than one page; the last page is appended the same way.
+ * When the window misses the first page, `1` is prepended.
+ * An ellipsis joins it only when the gap is more than one page.
+ * The last page is appended the same way.
  * A single page yields `[1]`, and the component renders nothing for it.
  *
  * @example

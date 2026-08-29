@@ -309,8 +309,7 @@ css`
 const shiftHeld = ref(false);
 let shiftTracked = false;
 
-// The source's useMagicKeys tracks Shift on the window; the flag can stick when focus leaves
-// mid-hold, exactly as there.
+// Shift is tracked on the window, so the flag can stick when focus leaves mid-hold.
 function trackShift(): void {
   if (shiftTracked) return;
   shiftTracked = true;
@@ -323,7 +322,7 @@ function trackShift(): void {
 }
 
 /**
- * A fixed-layout data table, ported 1-to-1 from Pruvious v4's `PUITable`.
+ * A fixed-layout data table.
  * It brings a sticky header and edge columns, per-column sort toggles, and shift-range selection.
  * A per-row actions menu and an empty state round it out.
  * Column widths come only from the `<colgroup>`.

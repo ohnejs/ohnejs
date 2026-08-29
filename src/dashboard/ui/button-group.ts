@@ -179,8 +179,8 @@ css`
  * A segmented single-select control in the shape of a radio group.
  * Arrow keys step through the choices and clamp at the edges; Space cycles with wraparound.
  * A trailing hidden input carries `id` and `name`, so label linkage and form serialization work.
- * A `focus:<id>` trigger focuses the group and shows the ring, since `:focus-visible` cannot
- * match a programmatic focus.
+ * A `focus:<id>` trigger focuses the group and shows the ring.
+ * `:focus-visible` cannot match a programmatic focus.
  *
  * @example
  * ```ts
@@ -200,8 +200,6 @@ export function buttonGroup(model: Ref<Primitive>, options: ButtonGroupOptions):
     const choices = options.choices();
     if (choices.length === 0) return;
     const index = choices.findIndex((choice) => choice.value === model.value);
-    // The source crashes when the value is absent from the choices; landing on the first
-    // choice recovers instead, matching the library's own `fallback` semantics.
     const at =
       index === -1
         ? 0

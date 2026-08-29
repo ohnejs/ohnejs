@@ -14,7 +14,7 @@ import './tokens.ts';
 
 /**
  * A data shape for consumers building nested dropdown menus.
- * The component itself does not consume it; it mirrors the source's exported model.
+ * The component itself does not consume it.
  */
 export interface DropdownItemModel {
   /**
@@ -115,7 +115,6 @@ export interface DropdownOptions {
 
   /**
    * Keeps the surrounding color scheme instead of the primary panel colors.
-   * Replaces the source's Vue style-merge trick of binding the scheme variables to `undefined`.
    *
    * @default
    * false
@@ -135,7 +134,7 @@ export interface DropdownOptions {
 }
 
 /**
- * A mounted dropdown: the panel element plus the surface the source exposed.
+ * A mounted dropdown: the panel element plus the surface it exposes.
  */
 export interface DropdownHandle {
   /**
@@ -163,7 +162,6 @@ const containers = new WeakMap<Element, () => HTMLElement | null>();
 
 /**
  * Resolves the hosting container of the dropdown an element sits in.
- * This is the ported `parentContainer` provide.
  * Under `handleControls` it is the nearest `.ohne-popup` ancestor or `<body>`.
  * Otherwise it is the panel's direct parent, and `null` outside any dropdown.
  * `dropdownItem` refocuses it on mouseleave to keep keyboard context inside a hosting popup.
@@ -231,7 +229,7 @@ css`
 `;
 
 /**
- * The floating panel primitive, ported 1-to-1 from Pruvious v4's `PUIDropdown`.
+ * The floating panel primitive.
  *
  * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements wins.
  * The height clamps to the available space with an 8px inset.
@@ -240,7 +238,7 @@ css`
  * Focus roves through `.ohne-dropdown-item` rows with wraparound.
  * Escape or an outside click asks the owner to close.
  * Returns a handle instead of a bare element.
- * The source exposes `update`, `calcItemSizes`, and the scroll surface; `floater` set the precedent.
+ * The handle exposes `update`, `calcItemSizes`, and the scroll surface; `floater` set the precedent.
  *
  * @example
  * ```ts
@@ -331,7 +329,6 @@ export function dropdown(
       ...input,
       floating: { width: root.offsetWidth, height: root.offsetHeight },
     });
-    // The source's size middleware: clamp when the content overflows, remove the clamp otherwise.
     if (measured.availableHeight < inner.scrollHeight) {
       root.style.height = `${Math.max(0, measured.availableHeight)}px`;
     } else {
@@ -420,7 +417,7 @@ export function dropdown(
           }
         };
         const onPress = (event: MouseEvent): void => {
-          // Strict descendants only, as the source's `isDescendant` walks from the parent node.
+          // Strict descendants only: a click on the panel itself, outside any row, closes the dropdown.
           const inside =
             event.target instanceof HTMLElement &&
             event.target !== root &&

@@ -28,7 +28,7 @@ export interface DropdownItemOptions {
 
   /**
    * The button's form role.
-   * Omitted resolves to `'button'` unless `is` names a non-button tag, exactly as the source.
+   * Omitted resolves to `'button'` unless `is` names a non-button tag.
    */
   type?: 'button' | 'submit' | 'reset';
 
@@ -125,14 +125,14 @@ css`
 `;
 
 /**
- * One menu row inside a `dropdown`, ported 1-to-1 from Pruvious v4's `PUIDropdownItem`.
+ * One menu row inside a `dropdown`.
  *
- * Hover moves real focus, so the `:focus` styling doubles as the hover highlight and keyboard and
- * mouse never desync; leaving a row refocuses the hosting popup, or blurs when the host is
- * `<body>`.
+ * Hover moves real focus, so the `:focus` styling doubles as the hover highlight.
+ * Keyboard and mouse never desync.
+ * Leaving a row refocuses the hosting popup, or blurs when the host is `<body>`.
  * Space activates the row like Enter, so links trigger from the keyboard too.
- * Content children follow the source's conventions: an `svg` grows a step, a `span` ellipsizes,
- * and a `kbd` right-aligns as a shortcut hint.
+ * An `svg` child grows a step and a `span` child ellipsizes.
+ * A `kbd` right-aligns as a shortcut hint.
  *
  * @example
  * ```ts

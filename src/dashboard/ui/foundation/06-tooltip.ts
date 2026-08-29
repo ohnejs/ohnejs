@@ -1,12 +1,11 @@
 import { css } from '../../render/css.ts';
 
 /**
- * The tooltip theme, ported 1-to-1 from Pruvious v4.
+ * The tooltip theme.
  * The arrow is a CSS border triangle that inherits currentColor, so it recolors per theme.
  * The em context comes from a 0.875rem base plus the `--ohne-tooltip-size` knob.
  * Tooltips sit one step smaller than everything else.
- * The left placement offsets with `-0.4375rem` while the others use em; the original quirk is kept.
- * The original's dead `.is-sorting` hook is dropped; nothing ever set it.
+ * The left placement offsets with `-0.4375rem` while the others use em.
  */
 css`
   .ohne-tooltip[data-animation='fade'][data-state='hidden'] {

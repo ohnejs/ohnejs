@@ -122,7 +122,6 @@ css`
     cursor: not-allowed;
   }
 
-  /* A deviation from the source, which leaves a disabled track lit: it mutes, as a disabled input does. */
   .ohne-switch-disabled .ohne-switch-button,
   .ohne-switch-disabled .ohne-switch-control[data-checked='true'] + .ohne-switch-button {
     background-color: hsl(var(--ohne-muted));

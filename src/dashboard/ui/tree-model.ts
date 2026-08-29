@@ -60,7 +60,7 @@ export type TreeItemModel<T> = {
 
   /**
    * Specifies whether the tree item can be moved within the same level using keyboard shortcuts.
-   * Only truthiness is checked, exactly as in the source: a function form is never invoked.
+   * Only truthiness is checked: a function form is never invoked.
    * So passing a function means the item is always movable.
    *
    * @default
@@ -288,8 +288,7 @@ export interface Tree<T> {
 export function useTree<T>(source: T[], mapper: TreeMapper<T>): Tree<T> {
   const tree = ref(mapper(source));
 
-  // ohne has no deep reactivity: the helpers mutate the model in place, so each one re-sets
-  // `tree.value` to a shallow copy of the root array to notify dependents.
+  // There is no deep reactivity: the helpers mutate in place, so a shallow re-set notifies.
   const invalidate = (): void => {
     tree.value = [...tree.value];
   };
@@ -514,7 +513,7 @@ export function addTreeItemsAfter<T>(
  * Returns the moved tree items with their parent item, old index, and new index.
  *
  * The `min`/`max` ratchets compress a stacked selection at the edges without crossing.
- * They are shared across parent slots exactly as in the source.
+ * They are shared across parent slots.
  * So a selection spanning levels can be over-constrained.
  */
 export function moveTreeItems<T>(

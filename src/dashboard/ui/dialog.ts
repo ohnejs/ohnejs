@@ -103,7 +103,7 @@ css`
  * Opens the global confirm dialog; `dialogHost` renders it.
  * Resolves with the name of the clicked action, or `undefined` on Escape or an overlay click.
  *
- * There is no queue, exactly as the source documents.
+ * There is no queue.
  * Calling `openDialog` while a dialog is open replaces it, and the earlier promise never settles.
  *
  * @example
@@ -141,7 +141,7 @@ export function openDialog<const TActions extends readonly DialogAction[]>(
 }
 
 /**
- * The global confirm dialog outlet, ported 1-to-1 from Pruvious v4's `PUIDialog`.
+ * The global confirm dialog outlet.
  * Mount it once in the shell.
  * It renders the `openDialog` state inside a popup sized by the `--ohne-dialog-size` knob.
  * The actions sit right-aligned in array order.

@@ -129,7 +129,7 @@ css`
 `;
 
 /**
- * A 24-hour time-of-day input over three `numberInput` segments (hh:mm:ss), ported from PUITime.
+ * A 24-hour time-of-day input over three `numberInput` segments (hh:mm:ss).
  * The model holds ms within a day, an integer between `0` (00:00:00) and `86399000` (23:59:59).
  * Segment bounds cascade from `min` and `max`, and every write clamps the composed value into them.
  * A trailing hidden input carries `id`, `name`, and the composed value for label linkage and forms.

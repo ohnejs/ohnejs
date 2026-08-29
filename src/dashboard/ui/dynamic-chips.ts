@@ -113,8 +113,7 @@ export interface DynamicChipsOptions {
 
   /**
    * The minimum number of items allowed in the array; `false` disables the limit.
-   * Accepted for API parity with the source, which never enforces it in the component either.
-   * Enforcement lives in validators.
+   * This component never enforces it; enforcement lives in validators.
    *
    * @default
    * false
@@ -453,7 +452,7 @@ function labelOrDash(choice: DynamicChipsChoice): string {
 }
 
 /**
- * The async multi-value chips field, ported 1-to-1 from Pruvious v4's `PUIDynamicChips`.
+ * The async multi-value chips field.
  *
  * Chips resolve through `selectedChoicesResolver`.
  * Addable choices search remotely with a 250ms debounce and paginate on scroll.
@@ -621,7 +620,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
   const drop = (index: number): void => {
     const from = draggingIndex.value;
     if (from !== null) {
-      // A null placeholder keeps target indices valid; the filter drops it, as the source does.
+      // A null placeholder keeps the target indices valid; the filter then drops it.
       const items = [...model.value];
       const dragged = items.splice(from, 1, null)[0];
       items.splice(index, 0, dragged);
@@ -662,7 +661,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
       inputValue.value = input.value;
     },
     onKeydown: (event: KeyboardEvent) => {
-      // Any key other than Backspace disarms a pending two-stage deletion.
       if (backspaceIndex.value !== null && event.code !== 'Backspace') {
         removeIndex.value = null;
         backspaceIndex.value = null;
@@ -736,7 +734,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
             : '') +
           (hasDetails.value ? ' ohne-dynamic-chips-dropdown-item-detailed' : ''),
         onClick: (event: MouseEvent) => event.preventDefault(),
-        // Mousedown with prevented default, so the text input never loses focus.
         onMousedown: (event: MouseEvent) => {
           event.preventDefault();
           model.value = [...model.value, choice.value];
@@ -900,8 +897,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     }),
   );
 
-  // Replaces the source's async setup: the chips resolve after construction, and a resolve is
-  // dropped when the model moved on while it was in flight.
   effect(() => {
     const value = model.value;
     untracked(() => {
@@ -961,7 +956,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     }
   });
 
-  // Load the next page when the dropdown list rests at the bottom while more pages exist.
   effect(() => {
     const handle = dropdownRef.value;
     const hasArrived = handle ? handle.scrollable.arrivedBottom.value : false;

@@ -64,6 +64,6 @@ async function load(): Promise<void> {
     const response = await api('GET /dashboard');
     if (response.ok && generation === mine) meta.value = (await response.json()) as DashboardMeta;
   } catch {
-    /* the store stays undefined; the shell's session guard owns the failure surface */
+    /* the shell's session guard owns the failure surface */
   }
 }

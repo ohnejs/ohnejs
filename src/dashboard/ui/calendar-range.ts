@@ -245,7 +245,7 @@ css`
 `;
 
 /**
- * The date range picker, ported 1-to-1 from Pruvious v4's `PUICalendarRange`.
+ * The date range picker.
  *
  * Two stacked calendars share one `[from, to]` tuple model and constrain each other:
  * `minRange` keeps the ends apart even against the global bounds, `maxRange` caps the span.

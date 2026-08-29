@@ -56,7 +56,7 @@ css`
 `;
 
 /**
- * The `blocks` field's dashboard behaviour, its control ported from Pruvious v4's `Blocks`.
+ * The `blocks` field's dashboard behaviour.
  *
  * Cells summarize the list as the first block's type label plus a dim `+n` tail.
  * There is no inline cell editor: the list edits on the record page as structure cards.
@@ -97,16 +97,14 @@ export const blocksType: FieldType = {
     const off = context.disabled === true;
     let base = context.initial;
     let surface: StructureHandle | undefined;
-    // Later nodes are built from event handlers where no scope is active; the owner catches them,
-    // so the record surface's teardown releases their effects too.
+    // Nodes built from event handlers have no active scope; this owner holds their effects for teardown.
     const owner = effectScope();
     const ownForms = new WeakSet<FieldForm>();
 
     const nodeOf = (item: Readonly<Record<string, unknown>>, expanded: boolean): BlockNode => {
       const key = (nextNodeKey += 1);
       const name = isString(item.block) ? item.block : '';
-      // A fresh item has no `fields` yet; seeding its form `undefined` keeps immutable subfields
-      // settable, exactly as a new record does.
+      // Seeding a fresh item's form `undefined` keeps its immutable subfields settable.
       const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : undefined;
       const form = owner.run(() =>
         createFieldForm(blockNamed(blocks, name)?.fields ?? [], fields, {
@@ -147,7 +145,6 @@ export const blocksType: FieldType = {
 
     const rebuild = (): void => {
       for (const node of nodes.value) node.form.dispose();
-      // The source's expansion rule on a model replace: collapsed stays collapsed, else expanded.
       const expanded = nodes.value.length === 0 || !allCollapsed();
       nodes.value = baseNodes(expanded);
     };
@@ -214,8 +211,6 @@ export const blocksType: FieldType = {
       nodes.value = nodes.value.map((node) => ({ ...node, $expanded: expanded }));
     };
 
-    // A drop settled: a foreign item, arrived through a cross-structure drop, rebuilds as an own
-    // node seeded from its donor form's current value, shed of every `UUID`.
     const settle = (items: BlockNode[]): void => {
       change(
         items.map((item) =>
@@ -291,8 +286,7 @@ export const blocksType: FieldType = {
                 onRemove: () => remove(node()),
               }),
         ],
-        // The form and type are stable per row; untracked reads keep expand-all's item replacement
-        // from rebuilding the body region and dropping focus.
+        // Untracked reads keep expand-all's replacement from rebuilding the body and dropping focus.
         item: (node) => {
           const form = untracked(() => node().form);
           const name = untracked(() => node().block);
@@ -398,8 +392,7 @@ export const blocksType: FieldType = {
             node === target ? { ...node, $expanded: true } : node,
           );
         }
-        // The expanded body mounts on the reactive flush's microtask; focusing before it would
-        // land on a detached input.
+        // The expanded body mounts on the reactive flush, so focusing sooner hits a detached input.
         queueMicrotask(() => {
           if (!target.form.focusError()) target.form.focus();
         });
@@ -413,8 +406,7 @@ export const blocksType: FieldType = {
         base = value;
         const items = baseItems();
         const live = nodes.value;
-        // A matching answer rebases each node in place, keeping forms, focus, and open rows;
-        // fresh items pick up the `UUID` the server minted.
+        // Rebasing in place keeps forms, focus, and open rows; a rebuild would drop all three.
         const matches =
           items.length === live.length &&
           items.every(

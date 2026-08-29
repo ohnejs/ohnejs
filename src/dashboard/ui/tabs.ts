@@ -149,12 +149,13 @@ let sequence = 0;
 let activeContext: Ref<number | string | undefined> | null = null;
 
 /**
- * The tab controller, ported 1-to-1 from Pruvious v4's `PUITabs`: it owns the active-tab state,
- * renders a nav (by default an equal-width button group, only when there is more than one tab),
- * and a content area whose min-height is pinned for 250ms during tab switches, so the layout
- * never jumps while the incoming panel mounts.
- * The content is a function, called once during construction; `tab` calls inside it bind to this
- * instance - the port's stand-in for the source's provide/inject.
+ * The tab controller.
+ * It owns the active-tab state and renders a nav, by default an equal-width button group.
+ * The nav appears only when there is more than one tab.
+ * It also renders a content area whose min-height is pinned for 250ms during tab switches.
+ * The layout therefore never jumps while the incoming panel mounts.
+ * The content is a function, called once during construction.
+ * `tab` calls inside it bind to this instance.
  * `onChange` fires only from user interaction, never from a prop-driven reset.
  *
  * @example
@@ -219,8 +220,7 @@ export function tabs<T extends number | string>(
       first = false;
       return;
     }
-    // This effect runs synchronously on the write, before the panel regions rebuild on their
-    // microtask, so it measures the outgoing panel - the source's pre-flush watcher.
+    // Runs on the write, before panels rebuild on their microtask, so this measures the outgoing panel.
     setContentMinHeight(inner.offsetHeight);
   });
 
@@ -292,8 +292,8 @@ export function tabs<T extends number | string>(
 }
 
 /**
- * One conditional tab panel: its content renders only while the enclosing `tabs` has `name`
- * active, and unmounts otherwise, so panel-local state resets on switch.
+ * One conditional tab panel: its content renders only while the enclosing `tabs` has `name` active.
+ * It unmounts otherwise, so panel-local state resets on switch.
  * Must be called inside the content function of a `tabs` - anywhere else it renders nothing.
  * Pass the content as a function so each activation rebuilds it fresh.
  *

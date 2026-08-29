@@ -404,13 +404,13 @@ function labelOrDash(choice: DynamicSelectChoice): string {
 }
 
 /**
- * The async single-select combobox, ported 1-to-1 from Pruvious v4's `PUIDynamicSelect`.
+ * The async single-select combobox.
  *
  * The same in-place overlay as `select`, plus a sticky search input and a 250ms-debounced remote search.
  * Results paginate on infinite scroll; every open refetches page 1 through `choicesResolver`.
  * The overlay caps at the search row plus 11 choice rows and grows or shrinks with the results.
  * The selected choice resolves asynchronously through `selectedChoiceResolver`.
- * The field renders its placeholder until the initial resolve lands, replacing the source's async setup.
+ * The field renders its placeholder until the initial resolve lands.
  * Row height follows the first choice: a `detail` there switches the whole list to tall rows.
  *
  * @example
@@ -476,7 +476,6 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     if (isExpanded.value) return;
     event?.preventDefault();
 
-    // Pre-fill the search input so a free-form value can be copied or edited instead of retyped.
     keyword.value = options.initialKeyword ?? '';
 
     const fc = ++fetchCounter;
@@ -499,7 +498,6 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     updateSizes();
     mousePaused.value = true;
 
-    // Focus the keyword input once the expand animation ends, selecting any pre-filled text.
     setTimeout(() => {
       keywordInput.focus();
       keywordInput.select();
@@ -815,7 +813,6 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     'div',
     {
       role: 'combobox',
-      // A literal source quirk: the original carries `type="text"` on this div.
       type: 'text',
       'aria-expanded': () => (isExpanded.value ? 'true' : 'false'),
       tabindex: () => (disabled() ? -1 : 0),
@@ -884,8 +881,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     ),
   );
 
-  // Replaces the source's async setup: the selected choice resolves after construction, and
-  // a resolve is dropped when the model moved on while it was in flight.
+  // A resolve is dropped when the model moved on while it was in flight.
   effect(() => {
     const value = model.value;
     untracked(() => {
@@ -899,7 +895,6 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     });
   });
 
-  // Load the next page when the list rests at the bottom while more pages exist.
   effect(() => {
     const hasArrived = scroll.arrivedBottom.value;
     untracked(() => {

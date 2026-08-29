@@ -240,8 +240,8 @@ css`
 /**
  * The button primitive: a variant matrix, an icon-aware inner layout, and an optional corner bubble.
  * An icon-only content centers absolutely in a guaranteed square; edge icons pull inward.
- * `href` renders an `<a>` the router intercepts; `disabled` never sets the attribute, so links
- * and buttons disable identically through CSS `pointer-events` and `tabindex`.
+ * `href` renders an `<a>` the router intercepts.
+ * `disabled` never sets the attribute; links and buttons disable through CSS `pointer-events` and `tabindex`.
  *
  * @example
  * ```ts

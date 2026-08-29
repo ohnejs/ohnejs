@@ -11,7 +11,6 @@ import './tokens.ts';
 /**
  * The nearest scrollable pane above `el`: its closest `.ohne-container` ancestor, if any.
  * Pickers lock and size against it when no explicit `scrollContainer` is passed.
- * The source injects the nearest `PUIContainer` the same way.
  *
  * @example
  * ```ts
@@ -61,7 +60,6 @@ export interface StructureDraggable {
 /**
  * The active structure drag, shared across every container and structure instance.
  * Non-null only while a structure item is being dragged; the structure component writes it.
- * The module-level ref replaces the source's `useState('pruvious-ui-structure-draggable')`.
  */
 export const structureDraggable: Ref<StructureDraggable | null> = ref<StructureDraggable | null>(
   null,
@@ -119,11 +117,10 @@ css`
 `;
 
 /**
- * A scrollable flex column, ported 1-to-1 from Pruvious v4's `PUIContainer`.
+ * A scrollable flex column.
  * Its invisible hover-to-scroll edge zones let users scroll during a non-touch structure drag.
  * Each sticky zone shows only while there is somewhere left to scroll in its direction.
  * Hovering one scrolls `distance` pixels per second; a manual wheel cancels the auto-scroll.
- * The source's legacy `mousewheel` listener becomes `wheel`.
  *
  * @example
  * ```ts

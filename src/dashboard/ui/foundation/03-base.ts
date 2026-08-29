@@ -1,7 +1,7 @@
 import { css } from '../../render/css.ts';
 
 /**
- * The base reset and element defaults, ported 1-to-1 from Pruvious v4.
+ * The base reset and element defaults.
  *
  * The `:where()` blocks have zero specificity, so any component declaration wins.
  * `border: 0 solid hsl(var(--ohne-border))` sits on everything.

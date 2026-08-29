@@ -38,9 +38,7 @@ css`
     font-size: calc(1rem + var(--ohne-size) * 0.0625rem);
   }
 
-  /* Flex collects lines from max-content widths before it flexes, so an unflexed label would take
-     the row alone and push the extras onto a second one. The zero basis hides it from that step;
-     the cap keeps its box on its text, so the auto margin still holds the extras at the edge. */
+  /* The zero basis and max-content cap keep the label from taking the row alone and wrapping the extras. */
   .ohne-field-label :where(label, .ohne-label) {
     flex: 1 1 0;
     max-width: max-content;
@@ -51,8 +49,7 @@ css`
     white-space: nowrap;
   }
 
-  /* The mark floats out of the inline flow, so the ellipsis trims the text and never the mark.
-     It generates before the text because a float trailing a full line has no room and drops. */
+  /* Floats so the ellipsis trims the text; a ::before because a trailing float has no room and drops. */
   .ohne-field-label-required :where(label, .ohne-label)::before {
     content: '*';
     float: right;

@@ -145,9 +145,9 @@ css`
 /**
  * A 6px drag strip that straddles one edge of a positioned parent, driving a numeric size model.
  * Dragging writes the model continuously; releasing calls `onCommit` once with the final value.
- * Escape, mouseup, and touchend all end the drag; a `body.ohne-resizing` class suppresses text
- * selection and iframe pointer events for the duration.
- * A movement-free click still commits the last dragged value, as in the source.
+ * Escape, mouseup, and touchend all end the drag.
+ * A `body.ohne-resizing` class suppresses text selection and iframe pointer events for the duration.
+ * A movement-free click still commits the last dragged value.
  *
  * @example
  * ```ts

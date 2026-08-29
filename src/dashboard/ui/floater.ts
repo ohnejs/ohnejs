@@ -231,7 +231,7 @@ css`
 `;
 
 /**
- * The picker overlay engine, ported 1-to-1 from Pruvious v4's `PUIFloater`.
+ * The picker overlay engine.
  *
  * A full-width handle button toggles a panel positioned by `placeFloating`.
  * Bottom-start is preferred, the roomiest corner wins, 7px gap, 8px viewport padding, clamped to fit.
@@ -301,7 +301,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       ...input,
       floating: { width: floating.offsetWidth, height: floating.offsetHeight },
     });
-    // The clamps mirror the source's size middleware: set when starved for space, never removed.
+    // The clamps are set when space runs short and never removed.
     let clamped = false;
     if (placed.availableWidth < container.offsetWidth) {
       floating.style.width = `${Math.max(0, placed.availableWidth)}px`;
@@ -334,8 +334,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   };
 
   const buildFloating = (): Child => {
-    // tabindex -1 lets openers park focus on the container (the calendar does after month steps),
-    // exactly as the source's focusable scroll pane.
+    // tabindex -1 lets openers park focus on the container, as the calendar does after a month step.
     const container = h('div', { class: 'ohne-floater-container', tabindex: '-1' }, content);
     const floating = h(
       'div',

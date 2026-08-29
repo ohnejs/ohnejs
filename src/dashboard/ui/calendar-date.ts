@@ -5,11 +5,10 @@ import { isString } from '../../utils/is/is-string.ts';
 
 /**
  * A wall-clock reading of one instant in one IANA time zone.
- * The calendar's replacement for a `Dayjs` instance: a plain immutable record instead of a class.
+ * A plain immutable record.
  *
  * `timestamp` is the instant; every other field describes its wall clock in `zone`.
  * After `addZonedMonths`/`addZonedYears` the offset is the one captured at construction.
- * A `dayjs` timezone instance keeps its fixed offset through calendar arithmetic in exactly the same way.
  */
 export interface ZonedDate {
   /**
@@ -125,14 +124,14 @@ function wallParts(timestamp: number, zone: string): number[] {
     const position = PART_POSITIONS[type];
     if (position !== undefined) filled[position] = Number.parseInt(value, 10);
   }
-  // Some platforms format midnight as hour 24; dayjs carries the same guard.
+  // Some platforms format midnight as hour 24.
   if (filled[3] === 24) filled[3] = 0;
   return filled;
 }
 
 /**
  * The zone's UTC offset at `timestamp`, in whole milliseconds.
- * Mirrors dayjs's `tzOffset`, including its truncation of the instant to second precision.
+ * The instant truncates to second precision.
  */
 function zoneOffset(timestamp: number, zone: string): number {
   const [year, month, day, hour, minute, second] = wallParts(timestamp, zone) as [
@@ -148,9 +147,9 @@ function zoneOffset(timestamp: number, zone: string): number {
 
 /**
  * Finds the instant whose wall clock in `zone` reads `wall` (a wall value in UTC milliseconds).
- * The port of dayjs's `fixOffset` (itself lifted from Luxon), in integer millisecond space.
+ * Works in integer millisecond space.
  *
- * `seed` is the offset guess to start from; dayjs seeds with the zone's offset at the current time.
+ * `seed` is the offset guess to start from.
  * That offset is what decides between the two valid instants of a DST-overlap wall time.
  * A wall time inside a DST gap resolves to the instant after the transition with the later offset.
  * So 02:30 in a zone that jumps from 02:00 to 03:00 reads back as 03:30.
@@ -184,10 +183,9 @@ function fromWall(timestamp: number, offset: number, zone: string): ZonedDate {
 
 /**
  * Reads the instant `timestamp` as a wall clock in `zone`.
- * The equivalent of `dayjs(timestamp).tz(zone)`: the instant is kept, the fields change.
+ * The instant is kept, the fields change.
  *
- * Unlike dayjs, the fields come straight from `Intl.DateTimeFormat`, so years before 1000 stay correct.
- * dayjs round-trips through `toLocaleString` and the engine's lenient string parser.
+ * The fields come straight from `Intl.DateTimeFormat`, so years before 1000 stay correct.
  *
  * @example
  * ```ts
@@ -221,10 +219,9 @@ export function zonedFromTimestamp(timestamp: number, zone: string): ZonedDate {
 }
 
 /**
- * Resolves a wall-clock time in `zone` to an instant, the way `dayjs.tz('Y-M-D h:m:s', zone)` does.
+ * Resolves a wall-clock time in `zone` to an instant.
  * A wall time inside a DST gap rolls forward by the width of the gap.
  * A wall time inside a DST overlap resolves to the occurrence matching the zone's offset at `reference`.
- * dayjs uses the current time, so the pick is seasonal there.
  * Out-of-range fields roll over like `Date`, so day 31 of February lands in early March.
  *
  * @example
@@ -249,7 +246,7 @@ export function zonedFromWallClock(
 }
 
 /**
- * The wall-clock midnight of `date`'s day in its zone, like `dayjs().tz(zone).startOf('day')`.
+ * The wall-clock midnight of `date`'s day in its zone.
  * When midnight falls into a DST gap the result is the first instant after the transition.
  * `reference` seeds the overlap pick exactly as in `zonedFromWallClock`.
  */
@@ -280,9 +277,9 @@ function shiftWall(date: ZonedDate, year: number, month: number): ZonedDate {
 }
 
 /**
- * Adds `months` (negative to subtract) on the wall clock, like `dayjs().tz(zone).add(n, 'month')`.
+ * Adds `months` (negative to subtract) on the wall clock.
  * The day clamps to the target month's length, so January 31 plus one month is the last day of February.
- * As in dayjs, the offset captured at construction stays fixed - the zone is not re-resolved.
+ * The offset captured at construction stays fixed - the zone is not re-resolved.
  * So a step across a DST change shifts the instant by the stale offset.
  *
  * @example
@@ -297,7 +294,7 @@ export function addZonedMonths(date: ZonedDate, months: number): ZonedDate {
 }
 
 /**
- * Adds `years` (negative to subtract) on the wall clock, like `dayjs().tz(zone).add(n, 'year')`.
+ * Adds `years` (negative to subtract) on the wall clock.
  * February 29 clamps to February 28 in a non-leap target year.
  * The fixed-offset semantics match `addZonedMonths`.
  */
@@ -307,7 +304,6 @@ export function addZonedYears(date: ZonedDate, years: number): ZonedDate {
 
 /**
  * Clamps `date` between `min` and `max` by instant, returning one of the three inputs unchanged.
- * Matches `dayjs.min(dayjs.max(date, min), max)` including its tie behavior.
  * On equal instants the date itself wins, so the returned object keeps its own wall clock.
  */
 export function clampZoned(date: ZonedDate, min: ZonedDate, max: ZonedDate): ZonedDate {
@@ -336,9 +332,9 @@ const REGEX_PARSE =
   /^(\d{4})[-/]?(\d{1,2})?[-/]?(\d{0,2})[Tt\s]*(\d{1,2})?:?(\d{1,2})?:?(\d{1,2})?[.:]?(\d+)?$/;
 
 /**
- * Parses a calendar `min`/`max`/`initial` input into a timestamp with dayjs's string semantics.
+ * Parses a calendar `min`/`max`/`initial` input into a timestamp.
  * A number passes through.
- * A string matching dayjs's parse pattern (and not ending in `Z`) reads as local time.
+ * A string matching the parse pattern (and not ending in `Z`) reads as local time.
  * So `'2024-12-15'` is local midnight - unlike `Date.parse`, which reads date-only strings as UTC.
  * Anything else, including `Z`-suffixed ISO strings, falls back to the `Date` parser.
  */
@@ -377,7 +373,7 @@ export function parseDateTime(date: number | string): number {
 }
 
 /**
- * Converts a jose-style duration string to whole seconds, ported 1-to-1 from Pruvious v4's `toSeconds`.
+ * Converts a jose-style duration string to whole seconds.
  * One signed `<value> <unit>` segment with an optional `ago`/`from now` suffix; a year is 365.25 days.
  * Kept private because it differs observably from `parseDuration` in `src/utils/duration`.
  */
@@ -467,7 +463,7 @@ export function resolveTimezone(timezone?: string): string {
 }
 
 /**
- * Every IANA time zone name the calendar accepts, ported 1-to-1 from Pruvious v4's `puiTimezones`.
+ * Every IANA time zone name the calendar accepts.
  */
 export const timezones = [
   'Africa/Abidjan',

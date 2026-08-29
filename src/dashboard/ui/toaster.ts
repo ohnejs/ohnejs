@@ -734,8 +734,8 @@ export function queueToast(message: string, options?: ToastOptions): void {
 }
 
 /**
- * The global toast outlet, a zero-dependency reimplementation of the vue-sonner runtime.
- * It carries Pruvious v4's exact configuration: a top-center stack of at most 3 visible toasts, expanded.
+ * The global toast outlet.
+ * A top-center stack of at most 3 visible toasts, expanded.
  * The toasts sit 336px wide with an 8px gap, on 4000ms timers that pause while hovered or held.
  * Swipe-up dismisses (20px or 0.11 px/ms), exits get a 200ms window, and Alt+T focuses the stack.
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.

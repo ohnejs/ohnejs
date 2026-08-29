@@ -77,7 +77,7 @@ export interface HotkeysOptions {
 }
 
 /**
- * Creates an independent keyboard-shortcut instance, ported 1-to-1 from Pruvious v4.
+ * Creates an independent keyboard-shortcut instance.
  *
  * The instance pins itself to the overlay depth present shortly after creation.
  * The snapshot defers one tick plus a timeout, so an overlay mounting in the same cycle counts itself first.

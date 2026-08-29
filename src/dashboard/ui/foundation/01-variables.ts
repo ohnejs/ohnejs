@@ -1,7 +1,7 @@
 import { css } from '../../render/css.ts';
 
 /**
- * The design tokens, ported 1-to-1 from Pruvious v4.
+ * The design tokens.
  * Every color token is a raw HSL triplet, composed at use sites as `hsl(var(--ohne-x))`.
  * An alpha composes as `hsl(var(--ohne-x) / 0.25)`.
  * Light values live on `:root`; `.dark` on `<html>` overrides colors only.

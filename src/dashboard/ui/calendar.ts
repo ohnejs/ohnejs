@@ -295,8 +295,6 @@ const LABEL_DEFAULTS: Required<CalendarLabels> = {
 const MIN_TIMESTAMP = -59011459200000;
 
 css`
-  /* In the source the calendar class sits on the floater root and inherits its font size; here a
-     wrapper carries the class, so it derives the same em context for the range's margin rule. */
   .ohne-calendar {
     font-size: calc(1rem + var(--ohne-size) * 0.125rem);
   }
@@ -406,7 +404,7 @@ css`
 `;
 
 /**
- * The date picker, ported 1-to-1 from Pruvious v4's `PUICalendar`.
+ * The date picker.
  *
  * A floater whose panel holds a month grid, month and year selector panes, and optionally a time row.
  * The model is a millisecond timestamp or `null`.

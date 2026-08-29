@@ -164,7 +164,6 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
       if (isUndefined(entry.value)) entry.value = uuid;
     }
   } catch {
-    /* the refs stay unresolved; the next read re-enqueues the batch */
   } finally {
     for (const key of keys) inFlight.delete(key);
   }

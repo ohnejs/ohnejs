@@ -122,7 +122,7 @@ css`
     flex-shrink: 0;
   }
 
-  /* A disabled structure hides the drag handle; the inset re-aligns the header, as the source. */
+  /* The drag handle is hidden while disabled; the inset takes its place so the header stays aligned. */
   .ohne-structure-disabled
     > *
     > :where(.ohne-structure-items)
@@ -143,7 +143,6 @@ css`
 
 /**
  * The item header actions cluster the `repeater` and `blocks` controls share.
- * Ported 1-to-1 from the cluster Pruvious v4 duplicates across `Repeater.vue` and `Blocks.vue`.
  *
  * Move up and down, the expand toggle, and the more-actions dropdown.
  * The dropdown carries add, clipboard, duplicate, delete, and expand-all actions.
@@ -196,8 +195,7 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
     variant: 'ghost',
     onClick: () => options.onToggleExpanded(),
   });
-  // The source binds the variant reactively; `button` takes a static one, so the classes patch here.
-  // The button's own class attribute has no reactive dependency, so it never overwrites the patch.
+  // `button` takes a static variant; the reactive one patches classes, and nothing re-applies over it.
   effect(() => {
     const expanded = options.expanded();
     toggle.classList.toggle('ohne-button-ghost', expanded);
@@ -347,7 +345,7 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
 }
 
 /**
- * The hidden marker rendered before an errored item's card, the source's `itemBefore` slot.
+ * The hidden marker rendered before an errored item's card.
  * While `errored` reports `true`, the sibling selector paints the card border destructive.
  */
 export function structureErrorMark(errored: () => boolean): Child {
@@ -355,7 +353,7 @@ export function structureErrorMark(errored: () => boolean): Child {
 }
 
 /**
- * The item-level error message rendered under an item's card, the source's `itemAfter` slot.
+ * The item-level error message rendered under an item's card.
  * Renders nothing while `message` is empty.
  */
 export function structureItemError(message: () => string): Child {

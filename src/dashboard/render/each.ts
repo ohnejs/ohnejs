@@ -69,8 +69,7 @@ export function each<T, K>(
 
     for (const [k, row] of rows) {
       if (next.has(k)) continue;
-      // Untracked for the same reason as `insert`: a leaving row's cleanups must not subscribe
-      // this region to whatever they read while tearing down.
+      // Untracked, so a leaving row's cleanups cannot subscribe this region to what they read.
       untracked(() => row.scope.dispose());
       clearRange(row.start, row.end);
       row.start.remove();

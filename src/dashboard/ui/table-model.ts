@@ -10,8 +10,8 @@ export interface TableColumn<T = unknown> {
 
   /**
    * Controls if the column can be sorted.
-   * Accepts a boolean to enable/disable sorting or a string to specify the data type for proper
-   * sort icons.
+   * Accepts a boolean to enable/disable sorting.
+   * A string specifies the data type for proper sort icons.
    *
    * @default
    * false
@@ -20,18 +20,18 @@ export interface TableColumn<T = unknown> {
 
   /**
    * Sets the width of a table column using CSS values like `100px`, `20rem`, `50%`, `auto`, etc.
-   * The specified `width` is applied to the `style` attribute of `<col>` elements within the
-   * `<colgroup>`.
+   * The specified `width` is applied to the `style` attribute of `<col>` elements.
+   * Those elements sit within the `<colgroup>`.
    */
   width?: string;
 
   /**
    * Sets the minimum width of a table column using CSS values like `100px`, `20rem`, etc.
-   * The specified `min-width` is applied to the `style` attribute of `<col>` elements within the
-   * `<colgroup>`.
+   * The specified `min-width` is applied to the `style` attribute of `<col>` elements.
+   * Those elements sit within the `<colgroup>`.
    *
-   * The `minWidth` property is useful for specifying `width` in percentages while ensuring a
-   * minimum width for the column.
+   * The `minWidth` property is useful for specifying `width` in percentages.
+   * It ensures a minimum width for the column.
    */
   minWidth?: string;
 
@@ -152,8 +152,8 @@ export function toggleSort<T extends TableColumns>(
 
 /**
  * The selection map after a shift-click that ranges from the anchor row to the target row.
- * Every row in the inclusive index range takes `value` on a copy of `selected`; the anchor row is
- * then forced back to `true`, so a deselecting range never drops its own anchor.
+ * Every row in the inclusive index range takes `value` on a copy of `selected`.
+ * The anchor row is then forced back to `true`, so a deselecting range never drops its own anchor.
  * Both ids must be present in `rows`; the anchor row does not move.
  *
  * @example

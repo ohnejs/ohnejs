@@ -154,7 +154,7 @@ function emptyPage(): DynamicSelectPaginatedChoices {
 }
 
 /**
- * The `record` field's dashboard behaviour, its form control ported from Pruvious v4's `Record`.
+ * The `record` field's dashboard behaviour.
  *
  * Cells display the target's resolved label, falling back to the short `UUID` while it loads.
  * The form control is the async `dynamicSelect` combobox over the target's records.
@@ -224,8 +224,7 @@ export const recordType: FieldType = {
         name: context.path,
         searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
         noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
-        // `onCommit` fires before the select writes the model; write it first so the form's
-        // debounced history push reads the committed value, then let the select's own write no-op.
+        // `onCommit` runs before the select writes the model; writing here lets the history push see it.
         onCommit: (value) => {
           model.value = isString(value) ? value : null;
           change();
