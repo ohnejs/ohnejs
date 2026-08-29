@@ -154,6 +154,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     createFieldForm([field], initial, {
       mode: 'edit',
       path: '',
+      renderUUID: true,
       readOnly: disabled,
       readOnlyRows: true,
       language: () => activeContentLocale() ?? useDashboardLanguage().value,
