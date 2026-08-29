@@ -44,6 +44,7 @@ export type {
   DashboardMeta,
   DashboardOperation,
   DashboardOperations,
+  DashboardTable,
 } from './runtime/meta.ts';
 export { login, logout, sessionUser } from './runtime/session.ts';
 export type { LoginOutcome, SessionUser } from './runtime/session.ts';

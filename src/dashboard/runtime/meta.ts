@@ -6,6 +6,7 @@ import type {
   DashboardMeta,
   DashboardOperation,
   DashboardOperations,
+  DashboardTable,
 } from './meta-types.ts';
 
 import { ref } from '../../utils/reactive/ref.ts';
@@ -19,6 +20,7 @@ export type {
   DashboardMeta,
   DashboardOperation,
   DashboardOperations,
+  DashboardTable,
 };
 
 const meta = ref<DashboardMeta | undefined>(undefined);
