@@ -175,9 +175,8 @@ export function orderBy(options: OrderByOptions): HTMLElement {
             ),
           ],
         ),
-        // The source's add-before icon is `arrow-bar-to-up`, not in the icon registry yet.
         actionButton(
-          'plus',
+          'arrow-bar-to-up',
           () => t('dashboard.sort.addBefore'),
           () => addColumn(index()),
           {

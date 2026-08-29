@@ -24,6 +24,7 @@ import {
   toSentenceCase,
 } from 'ohne/utils';
 
+import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
@@ -183,9 +184,10 @@ export interface DashboardCollection {
   label: string;
 
   /**
-   * The Tabler icon name the sidebar menu shows, as declared; absent when the collection declares none.
+   * The Tabler icon the sidebar menu shows, as declared; absent when the collection declares none.
+   * Validated at boot, so the name always resolves to a shape.
    */
-  icon?: string;
+  icon?: IconName;
 
   /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.

@@ -1,8 +1,11 @@
+import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type { NamedMiddlewareKey } from '../middleware/known-middleware.ts';
 import type { QueryScope } from '../query/wire/apply.ts';
 
 import { validateCollectionDefinition } from './validate-collection.ts';
+
+export type { IconName } from '../../utils/icon/icon-name.ts';
 
 /**
  * The condition form an `access` scope's `where` takes, keyed to the collection's declared fields.
@@ -197,15 +200,16 @@ export interface CollectionDefinition<
   api?: boolean | CollectionAPI<keyof TFields & string>;
 
   /**
-   * The Tabler icon name the dashboard menu shows for this collection.
+   * The Tabler icon the dashboard menu shows for this collection.
    * Omitted, the menu row renders no icon.
+   * The name completes to the full Tabler set; an unknown one fails at boot.
    *
    * @example
    * ```ts
    * icon: 'note'
    * ```
    */
-  icon?: string;
+  icon?: IconName;
 }
 
 /**
@@ -238,9 +242,9 @@ export interface AnyCollectionDefinition {
   api?: boolean | CollectionAPI;
 
   /**
-   * The Tabler icon name the dashboard menu shows; omitted, the menu row renders no icon.
+   * The Tabler icon the dashboard menu shows; omitted, the menu row renders no icon.
    */
-  icon?: string;
+  icon?: IconName;
 }
 
 /**

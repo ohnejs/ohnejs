@@ -1,78 +1,18 @@
+import type { IconName } from '../../utils/icon/icon-name.ts';
+
+import { isNull } from '../../utils/is/is-null.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import './tokens.ts';
 
-/**
- * The icons the dashboard ships, named after their Tabler originals.
- */
-export type IconName =
-  | 'adjustments'
-  | 'adjustments-horizontal'
-  | 'arrow-back-up'
-  | 'arrow-bar-to-down'
-  | 'arrow-bar-to-up'
-  | 'arrow-forward-up'
-  | 'arrow-left'
-  | 'arrows-horizontal'
-  | 'arrows-sort'
-  | 'arrows-vertical'
-  | 'barrier-block'
-  | 'calendar-down'
-  | 'calendar-up'
-  | 'calendar-week'
-  | 'check'
-  | 'checkbox'
-  | 'chevron-down'
-  | 'chevron-left'
-  | 'chevron-right'
-  | 'chevron-up'
-  | 'circle-check'
-  | 'clipboard'
-  | 'clipboard-check'
-  | 'clipboard-plus'
-  | 'clock'
-  | 'copy'
-  | 'cut'
-  | 'device-desktop'
-  | 'device-floppy'
-  | 'dots'
-  | 'dots-vertical'
-  | 'exclamation-circle'
-  | 'exclamation-circle-filled'
-  | 'eye'
-  | 'eye-off'
-  | 'folder'
-  | 'grip-horizontal'
-  | 'grip-vertical'
-  | 'history'
-  | 'info-circle'
-  | 'language'
-  | 'list-search'
-  | 'lock'
-  | 'logout'
-  | 'maximize'
-  | 'menu-2'
-  | 'minimize'
-  | 'minus'
-  | 'moon'
-  | 'note'
-  | 'pencil'
-  | 'plus'
-  | 'search'
-  | 'search-off'
-  | 'selector'
-  | 'sort-ascending'
-  | 'sort-ascending-letters'
-  | 'sort-ascending-numbers'
-  | 'sort-descending'
-  | 'sort-descending-letters'
-  | 'sort-descending-numbers'
-  | 'square-off'
-  | 'sun'
-  | 'trash'
-  | 'trash-x'
-  | 'x';
+export type { IconName };
 
-const SHAPES: Record<IconName, string> = {
+/**
+ * The icons the dashboard's own chrome draws, inlined so they paint with the first frame.
+ * The set holds thousands more; `icon` fetches one of those on demand instead.
+ * A key that is not an icon name fails to typecheck, so this table cannot drift from the set.
+ */
+const INLINE: Partial<Record<IconName, string>> = {
   adjustments:
     '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 10a2 2 0 1 0 4 0a2 2 0 0 0-4 0m2-6v4m0 4v8m4-4a2 2 0 1 0 4 0a2 2 0 0 0-4 0m2-12v10m0 4v2m4-13a2 2 0 1 0 4 0a2 2 0 0 0-4 0m2-3v1m0 4v11"/>',
   'adjustments-horizontal':
@@ -204,9 +144,41 @@ css`
 `;
 
 /**
- * One dashboard icon: an inline Tabler SVG on a 24x24 grid, stroked in the current text colour.
+ * The route the dashboard server serves single shapes from, resolved against this module's own URL.
+ * The kernel is served under `/m/`, so the shapes sit beside it and no base path is hardcoded.
+ */
+const SHAPE_BASE = new URL('../../icon/', import.meta.url);
+
+/**
+ * The in-flight or settled request per name, so a name is fetched once however many icons draw it.
+ * A name the server answers for keeps its answer, the `404` included: that answer cannot change.
+ * A request that never reached the server is dropped instead, so the next icon of that name retries.
+ */
+const fetched = new Map<IconName, Promise<string | null>>();
+
+function shapeOf(name: IconName): Promise<string | null> {
+  let pending = fetched.get(name);
+  if (isUndefined(pending)) {
+    pending = fetch(new URL(name, SHAPE_BASE))
+      .then((response) => (response.ok ? response.text() : null))
+      .catch(() => {
+        fetched.delete(name);
+        return null;
+      });
+    fetched.set(name, pending);
+  }
+  return pending;
+}
+
+/**
+ * One dashboard icon: a Tabler SVG on a 24x24 grid, stroked in the current text colour.
  *
- * The shapes are module constants, so the markup never carries anything a caller supplied.
+ * The element comes back synchronously and is never empty for long.
+ * An inlined icon carries its shape at once.
+ * Any other name is fetched from the dashboard server once and fills the element on arrival.
+ * The chrome therefore paints without waiting on the network.
+ * The markup is never anything a caller supplied.
+ * It is a module constant, or a vendored shape the server found by name.
  * Width and height are `1em`, so an icon sizes with the local font size.
  * Shapes carry `stroke-width` 2; the base stylesheet thins every icon to 1.5.
  * `ohne-stroke-2` reverts where emphasis calls for it.
@@ -223,6 +195,13 @@ export function icon(name: IconName): SVGSVGElement {
   svg.setAttribute('width', '1em');
   svg.setAttribute('height', '1em');
   svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML = SHAPES[name];
+  const inline = INLINE[name];
+  if (isUndefined(inline)) {
+    void shapeOf(name).then((shape) => {
+      if (!isNull(shape)) svg.innerHTML = shape;
+    });
+  } else {
+    svg.innerHTML = inline;
+  }
   return svg;
 }

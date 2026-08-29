@@ -3,7 +3,9 @@ import type { Child } from '../render/insert.ts';
 import type { TableColumn, TableColumns, TableCell, TableRow, TableSort } from './table-model.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
@@ -15,7 +17,7 @@ import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { button } from './button.ts';
 import { checkbox } from './checkbox.ts';
-import { icon, type IconName } from './icon.ts';
+import { icon } from './icon.ts';
 import { rangeSelect, toggleSort } from './table-model.ts';
 import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
@@ -347,7 +349,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
   const selectAllState = (): boolean | 'indeterminate' => options.selectAllState?.() ?? false;
   const sortValue = (): TableSort<TColumns> => options.sort?.value ?? null;
   const selectedValue = (): Record<number | string, boolean> => options.selected?.value ?? {};
-  const buttonSize = options.size === undefined ? -3 : options.size - 2;
+  const buttonSize = isUndefined(options.size) ? -3 : options.size - 2;
   // Safari ignores min-width on <col>, so its cols take the minimum as the width instead.
   const isSafari =
     window.navigator.userAgent.includes('Safari') && !window.navigator.userAgent.includes('Chrome');
@@ -376,7 +378,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
 
   const shiftSelect = (id: number | string, value: boolean): void => {
     const origin = untracked(() => selectOrigin.value);
-    if (origin === null) {
+    if (isNull(origin)) {
       select(id, value);
     } else if (origin !== id) {
       writeSelected(rangeSelect(untracked(rows), untracked(selectedValue), origin, id, value));
@@ -396,13 +398,11 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
     const sort = sortValue();
     if (!sort || sort.column !== key) return icon('arrows-sort');
     const ascending = sort.direction === 'asc';
-    // The numeric and letter variants are not in the icon registry yet; the casts keep the
-    // source's exact names for when they land.
     if (sortable === 'numeric') {
-      return icon((ascending ? 'sort-ascending-numbers' : 'sort-descending-numbers') as IconName);
+      return icon(ascending ? 'sort-ascending-numbers' : 'sort-descending-numbers');
     }
     if (sortable === 'text') {
-      return icon((ascending ? 'sort-ascending-letters' : 'sort-descending-letters') as IconName);
+      return icon(ascending ? 'sort-ascending-letters' : 'sort-descending-letters');
     }
     return icon(ascending ? 'sort-ascending' : 'sort-descending');
   };
@@ -580,7 +580,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
         'ohne-table' +
         (selectable() ? ' ohne-table-selectable' : '') +
         (options.actions ? ' ohne-table-has-actions' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
     h(
       'colgroup',

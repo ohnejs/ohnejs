@@ -2,6 +2,7 @@ import type { FieldInstance } from '../fields/field.ts';
 import type { CollectionDefinition, CompositeIndex } from './define-collection.ts';
 
 import {
+  didYouMean,
   isArray,
   isBoolean,
   isFunction,
@@ -10,6 +11,7 @@ import {
   isString,
   isUndefined,
 } from '../../utils/index.ts';
+import { iconNames, isIconName } from '../dashboard/icon-shapes.ts';
 import { validateFieldName, validateUniqueNames } from '../database/naming/validate-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
@@ -22,6 +24,7 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - Each composite index must cover only declared fields, at least one, with no repeat.
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
+ * - `icon` must name an icon the vendored set carries.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -33,6 +36,27 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateUniqueNames(fieldNames, 'field', collection);
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
+  validateIcon(definition.icon, collection);
+}
+
+/**
+ * Rejects an `icon` the vendored Tabler set does not carry.
+ * The type already narrows this for a TypeScript caller, and the check catches a plain-JS one.
+ * A menu row that would silently render no icon becomes a named failure at boot.
+ */
+function validateIcon(icon: string | undefined, collection?: string): void {
+  if (isUndefined(icon) || isIconName(icon)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  const near = didYouMean(icon, iconNames());
+  throw ohneError({
+    title: `Unknown icon \`${icon}\``,
+    body: [
+      `The \`icon\` option${scope} names an icon the set does not carry.`,
+      isUndefined(near)
+        ? 'Every icon is a Tabler original; browse the names at `https://tabler.io/icons`.'
+        : `Did you mean \`${near}\`?`,
+    ],
+  });
 }
 
 /**

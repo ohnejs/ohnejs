@@ -6,7 +6,6 @@ import {
   each,
   h,
   icon,
-  type IconName,
   type Translate,
   useRoute,
   useT,
@@ -14,7 +13,7 @@ import {
   verticalMenu,
   when,
 } from 'ohne/dashboard';
-import { isNull, isUndefined, withTrailingSlash } from 'ohne/utils';
+import { isUndefined, withTrailingSlash } from 'ohne/utils';
 
 css`
   .o-menu-wrapper > * + * {
@@ -24,10 +23,10 @@ css`
 
 /**
  * The sidebar menu column, ported from Pruvious v4's `MenuWrapper` and menu sections.
- * Each discovery menu group renders one `verticalMenu`: the group label as its uppercase title,
- * an empty label rendering the list without one, and one link row per collection.
+ * Each discovery menu group renders one `verticalMenu`, the group label as its uppercase title.
+ * An empty label renders the list without one, and each collection contributes one link row.
  * A link is active while the route sits under its collection, so record pages highlight it too.
- * A collection's declared icon renders before its label when it names a registry icon.
+ * A collection's declared icon renders before its label.
  * The discovery data carries no submenus, so the menu stays flat.
  */
 export function sidebar(): HTMLElement {
@@ -76,20 +75,8 @@ function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
       label: entry.label,
       active: path.startsWith(withTrailingSlash(to)),
     };
-    const glyph = iconOf(entry.icon);
-    if (!isUndefined(glyph)) item.icon = glyph;
+    if (!isUndefined(entry.icon)) item.icon = icon(entry.icon);
     items.push(item);
   }
   return items;
-}
-
-/**
- * The collection's declared menu icon, or `undefined` when it names no registry icon.
- * The registry exports no runtime name guard, so membership shows in the built SVG:
- * a known name parses to element children, an unknown one to none.
- */
-function iconOf(name: string | undefined): SVGSVGElement | undefined {
-  if (isUndefined(name)) return undefined;
-  const glyph = icon(name as IconName);
-  return isNull(glyph.firstElementChild) ? undefined : glyph;
 }

@@ -305,4 +305,38 @@ describe('serveDashboard', () => {
     const port = await serve('app-traversal');
     strictEqual((await req(port, '/m/app/%2Fetc%2Fpasswd')).status, 404);
   });
+
+  it('serves one icon shape by name', async () => {
+    const port = await serve('icon');
+    const res = await req(port, '/m/icon/note');
+    strictEqual(res.status, 200);
+    strictEqual(res.headers['content-type'], 'text/plain; charset=utf-8');
+    strictEqual(res.body.startsWith('<path '), true);
+    strictEqual(res.body.includes('<svg'), false);
+  });
+
+  it('serves an icon the dashboard does not inline', async () => {
+    const port = await serve('icon-lazy');
+    strictEqual((await req(port, '/m/icon/brand-github')).status, 200);
+  });
+
+  it('answers an unknown icon name with 404', async () => {
+    const port = await serve('icon-missing');
+    strictEqual((await req(port, '/m/icon/not-an-icon')).status, 404);
+  });
+
+  it('does not serve an inherited name as an icon', async () => {
+    const port = await serve('icon-inherited');
+    strictEqual((await req(port, '/m/icon/constructor')).status, 404);
+    strictEqual((await req(port, '/m/icon/toString')).status, 404);
+  });
+
+  it('answers 304 when the client already holds the shape', async () => {
+    const port = await serve('icon-etag');
+    const first = await req(port, '/m/icon/note');
+    const tag = first.headers['etag'];
+    strictEqual(typeof tag, 'string');
+    const second = await req(port, '/m/icon/note', { 'if-none-match': tag as string });
+    strictEqual(second.status, 304);
+  });
 });

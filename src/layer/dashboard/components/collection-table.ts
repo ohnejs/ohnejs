@@ -37,6 +37,7 @@ import {
   computed,
   type ConditionObject,
   effect,
+  isNull,
   isNumber,
   isString,
   isUndefined,
@@ -277,7 +278,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       return sortValue as TableSort<TableColumns>;
     },
     set value(next) {
-      if (next === null) return;
+      if (isNull(next)) return;
       const column = String(next.column);
       push({ page: 1, order: [next.direction === 'desc' ? `-${column}` : column] });
     },
@@ -488,8 +489,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
     actions: ({ row, reference, close }) => {
       const href = rowHref(row.id);
-      // The source's `pencil`, `list-search`, `trash-x`, `square-off`, and `checkbox` icons are
-      // not in the icon registry yet; the nearest registered shapes stand in.
       const openItem = canUpdate
         ? dropdownItem([icon('pencil'), h('span', null, () => t('dashboard.edit'))], {
             href,
@@ -583,7 +582,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
   });
 
-  // The source's `trash-x`, `adjustments`, and `note` icons are not in the icon registry yet.
   const deleteButton = (): HTMLElement => {
     const el = button(icon('trash-x'), {
       variant: 'destructive',

@@ -1,6 +1,8 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
+import { isNull } from '../../utils/is/is-null.ts';
 import { isString } from '../../utils/is/is-string.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
@@ -35,7 +37,7 @@ export interface VerticalMenuItemModel {
   label: string;
 
   /**
-   * The button icon: a registry icon name, or a ready element.
+   * The button icon: an icon name, or a ready element.
    */
   icon?: IconName | Element;
 
@@ -69,8 +71,8 @@ export interface VerticalMenuOptions {
   items?: () => VerticalMenuItemModel[];
 
   /**
-   * The expanded state of the items, keyed by hyphen-joined index path (`'0'`, `'0-2'`, ...),
-   * two-way: the items keep it updated, and a caller write is reflected immediately.
+   * The expanded state of the items, keyed by hyphen-joined index path (`'0'`, `'0-2'`, ...).
+   * It is two-way: the items keep it updated, and a caller write is reflected immediately.
    * Omitted, the menu keeps the state internally.
    */
   expandedState?: Ref<Record<string, boolean>>;
@@ -105,8 +107,8 @@ export interface VerticalMenuOptions {
  */
 export interface VerticalMenuItemOptions {
   /**
-   * The hyphen-joined index path identifying the item (`'0'`, `'0-2'`, `'0-2-1'`), the key into
-   * the expanded state.
+   * The hyphen-joined index path identifying the item (`'0'`, `'0-2'`, `'0-2-1'`).
+   * It is the key into the expanded state.
    */
   id: string;
 
@@ -288,8 +290,8 @@ css`
 let sequence = 0;
 
 /**
- * Sidebar navigation, ported 1-to-1 from Pruvious v4's `PUIVerticalMenu`: an optional uppercase
- * title above a recursive list of expandable items.
+ * Sidebar navigation, ported 1-to-1 from Pruvious v4's `PUIVerticalMenu`.
+ * An optional uppercase title sits above a recursive list of expandable items.
  * The expanded state is keyed by each item's index path, so reordering `items` remaps it.
  * An active leaf auto-expands all of its ancestors.
  *
@@ -309,15 +311,15 @@ export function verticalMenu(options: VerticalMenuOptions = {}): HTMLElement {
     {
       role: 'navigation',
       class: 'ohne-vertical-menu',
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
-    options.title === undefined
+    isUndefined(options.title)
       ? null
       : h('span', { id: titleId, class: 'ohne-vertical-menu-title' }, options.title),
     h(
       'ul',
       {
-        'aria-labelledby': options.title === undefined ? undefined : titleId,
+        'aria-labelledby': isUndefined(options.title) ? undefined : titleId,
         role: 'list',
         class: 'ohne-vertical-menu-list',
       },
@@ -338,12 +340,12 @@ export function verticalMenu(options: VerticalMenuOptions = {}): HTMLElement {
 }
 
 /**
- * One menu row, ported 1-to-1 from Pruvious v4's `PUIVerticalMenuItem`: a link, an action button,
- * or a pure toggle, with an optional recursive submenu.
- * A collapsed submenu stays in the DOM, hidden - children keep their recorded expanded state and
- * reappear when the parent reopens.
- * ArrowUp/ArrowDown move focus through the menu's buttons in document order; ArrowLeft collapses
- * and ArrowRight expands from any focused descendant.
+ * One menu row, ported 1-to-1 from Pruvious v4's `PUIVerticalMenuItem`.
+ * It is a link, an action button, or a pure toggle, with an optional recursive submenu.
+ * A collapsed submenu stays in the DOM, hidden.
+ * Children keep their recorded expanded state and reappear when the parent reopens.
+ * ArrowUp and ArrowDown move focus through the menu's buttons in document order.
+ * ArrowLeft collapses and ArrowRight expands from any focused descendant.
  * Rows are usually built by `verticalMenu`; call this directly only for a detached single row.
  *
  * @example
@@ -375,7 +377,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
   let previousActive: boolean | undefined;
   effect(() => {
     const isActive = item().active === true;
-    if (previousActive === undefined || isActive !== previousActive) {
+    if (isUndefined(previousActive) || isActive !== previousActive) {
       previousActive = isActive;
       if (isActive) untracked(expand);
     }
@@ -385,7 +387,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
     const target = event.target;
     if (!(target instanceof Element)) return;
     const menu = target.closest('.ohne-vertical-menu');
-    if (menu === null) return;
+    if (isNull(menu)) return;
     const buttons = [...menu.querySelectorAll<HTMLElement>('.ohne-vertical-menu-item-button')];
     const index = buttons.indexOf(target as HTMLElement);
     buttons[index + offset]?.focus();

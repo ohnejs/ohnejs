@@ -1,3 +1,5 @@
+import type { IconName } from '../../utils/icon/icon-name.ts';
+
 /**
  * One exposed collections-API operation, as the signed-in user sees it.
  * Mirrors the `GET /dashboard` response.
@@ -150,9 +152,10 @@ export interface DashboardCollection {
   label: string;
 
   /**
-   * The Tabler icon name the sidebar menu shows, as declared; absent when the collection declares none.
+   * The Tabler icon the sidebar menu shows, as declared; absent when the collection declares none.
+   * The API validates it at boot, so the name always resolves to a shape.
    */
-  icon?: string;
+  icon?: IconName;
 
   /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.

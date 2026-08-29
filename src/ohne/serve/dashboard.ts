@@ -5,13 +5,16 @@ import { fileURLToPath } from 'node:url';
 
 import type { HandlerContext, Route } from '../routes/route.ts';
 
+import { etag } from '../../utils/etag/etag.ts';
 import { exists } from '../../utils/fs/index.ts';
 import {
+  cacheControl,
   canonicalizeLanguage,
   dirname,
   isNull,
   isPathInside,
   isPort,
+  isUndefined,
   joinPath,
   jsonForScript,
   MAX_PORT,
@@ -25,14 +28,18 @@ import { codegenDir } from '../codegen/codegen-dir.ts';
 import { buildDashboardPageManifest } from '../dashboard/build-dashboard-page-manifest.ts';
 import { collectDashboardPages } from '../dashboard/collect-dashboard-pages.ts';
 import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
+import { iconShape } from '../dashboard/icon-shapes.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { notFound } from '../http/http-error.ts';
+import { isFresh } from '../http/is-fresh.ts';
 import { createRouter } from '../http/router.ts';
 import { type EventStream, sendEvents } from '../http/send-events.ts';
 import { sendFile } from '../http/send-file.ts';
+import { sendNotModified } from '../http/send-not-modified.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
+import { useResponse } from '../http/use-response.ts';
 import { DEFAULT_API_PORT, DEFAULT_DASHBOARD_PORT } from '../layers/config.ts';
 import { loadLayers } from '../layers/load-layers.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
@@ -50,6 +57,19 @@ const MODULE_BASE = '/m';
  * URL prefix under which each layer's dashboard modules are served, merged closer-layer-first.
  */
 const APP_MODULE_BASE = `${MODULE_BASE}/app`;
+
+/**
+ * URL prefix the dashboard server answers one icon shape under, as `/m/icon/<name>`.
+ * `src/dashboard/ui/icon.ts` resolves it against its own served URL, so the two cannot drift.
+ */
+const ICON_BASE = `${MODULE_BASE}/icon`;
+
+/**
+ * How long a served shape stays fresh, in seconds.
+ * A name's shape only changes when the vendored set is bumped, so a day of freshness costs nothing.
+ * The `ETag` settles the rest.
+ */
+const ICON_MAX_AGE = 86_400;
 
 /**
  * Path of the dev live-reload event stream the browser subscribes to, gated by `DASHBOARD_RELOAD`.
@@ -127,6 +147,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     synthetic(`${APP_MODULE_BASE}/[...path]`, ({ params }: HandlerContext) =>
       sendFile(appRoots, params.path, { notFound: 'Not Found' }),
     ),
+    synthetic(`${ICON_BASE}/[name]`, serveIcon),
     synthetic(`${MODULE_BASE}/[...path]`, serveModule),
   ];
   if (reload) liveReload(routes);
@@ -153,6 +174,32 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
 
 function synthetic(pattern: string, handler: Route['handler']): Route {
   return { method: 'GET', pattern, file: '', layer: '', handler };
+}
+
+/**
+ * Serves one vendored shape as the markup that goes inside an `svg` element.
+ *
+ * The body is looked up by name in the shape table, never anything the request supplied.
+ * `text/plain` is both honest and the safest type to hand back from the dashboard's own origin.
+ * An unknown name is a `404`, which the browser caches as "no shape" and stops asking for.
+ */
+function serveIcon({ params }: HandlerContext): string | undefined {
+  const shape = iconShape(params.name);
+  if (isUndefined(shape)) throw notFound('Not Found');
+
+  const response = useResponse();
+  response.headers.set('content-type', 'text/plain; charset=utf-8');
+  response.headers.set('etag', etag(shape));
+  response.headers.set(
+    'cache-control',
+    cacheControl({ public: true, maxAge: ICON_MAX_AGE, immutable: true }),
+  );
+
+  if (isFresh()) {
+    sendNotModified();
+    return undefined;
+  }
+  return shape;
 }
 
 function serveModule({ params }: HandlerContext): Promise<string | Uint8Array | undefined> {

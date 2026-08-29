@@ -9,6 +9,7 @@ import {
   each,
   h,
   icon,
+  type IconName,
   numberInput,
   popup,
   type Popup,
@@ -422,7 +423,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   };
 
   const smallAddButton = (
-    glyph: 'plus' | 'copy',
+    glyph: IconName,
     tooltip: () => string,
     onClick: () => void,
   ): HTMLElement => {
@@ -451,15 +452,14 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
         () => t('dashboard.filter.addCondition'),
         () => addCondition(group),
       ),
-      // The source's condition-group icon is `copy-plus`, which the icon registry lacks.
-      button([icon('copy'), h('span', null, () => t('dashboard.filter.conditionGroup'))], {
+      button([icon('copy-plus'), h('span', null, () => t('dashboard.filter.conditionGroup'))], {
         variant: 'outline',
         class: 'o-where-filters-large-button',
         disabled: () => fieldChoices().length === 0,
         onClick: () => addGroup(group),
       }),
       smallAddButton(
-        'copy',
+        'copy-plus',
         () => t('dashboard.filter.addConditionGroup'),
         () => addGroup(group),
       ),

@@ -1,7 +1,8 @@
-import { deepStrictEqual, doesNotThrow, throws } from 'node:assert';
+import { deepStrictEqual, doesNotThrow, match, ok, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { defineCollection } from '../../../src/ohne/collections/define-collection.ts';
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 
 describe('defineCollection', () => {
@@ -194,6 +195,58 @@ describe('defineCollection', () => {
           api: { create: null },
         }),
       /Invalid `api` operation `create`/,
+    );
+  });
+
+  it('accepts an icon the vendored set carries', () => {
+    doesNotThrow(() => defineCollection({ fields: { title: field('text') }, icon: 'note' }));
+    doesNotThrow(() =>
+      defineCollection({ fields: { title: field('text') }, icon: 'brand-github' }),
+    );
+  });
+
+  it('rejects an icon the set does not carry, suggesting the nearest name', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `notez` is not an icon name
+          icon: 'notez',
+        }),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /Unknown icon `notez`/);
+        match([error.body].flat().join('\n'), /Did you mean `note`\?/);
+        return true;
+      },
+    );
+  });
+
+  it('points at the icon set when nothing is close', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `qqqqqqqqqqqq` is not an icon name
+          icon: 'qqqqqqqqqqqq',
+        }),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match([error.body].flat().join('\n'), /tabler\.io\/icons/);
+        return true;
+      },
+    );
+  });
+
+  it('does not take an inherited name for an icon', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `constructor` is not an icon name
+          icon: 'constructor',
+        }),
+      /Unknown icon `constructor`/,
     );
   });
 });
