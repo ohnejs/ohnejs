@@ -43,7 +43,7 @@
     },
     "revert": "Revert",
     "showPassword": "Show password",
-    "translatable": "This field stores a separate value for each language.",
+    "translatable": "This field stores a separate value for each language",
     "unchanged": "unchanged",
     "unique": "Unique"
   },
