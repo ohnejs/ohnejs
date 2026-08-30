@@ -156,9 +156,13 @@ export type TableColumnEntry<TField extends string = string> =
   | `${TField | 'UUID' | '_updatedAt'} | ${string}`;
 
 /**
- * A collection's record-label declaration: one field name, or several whose values join in order.
+ * A collection's record-label declaration.
+ * One field name, several whose values join in order, or a template naming fields in `{braces}`.
  */
-export type RecordLabel<TField extends string = string> = TField | readonly TField[];
+export type RecordLabel<TField extends string = string> =
+  | TField
+  | readonly TField[]
+  | `${string}{${TField}}${string}`;
 
 /**
  * A collection's dashboard list-view defaults.
@@ -196,12 +200,15 @@ export interface CollectionDashboard<TField extends string = string> {
   /**
    * The field or fields whose values name a record wherever the dashboard shows one.
    * A list joins its parts with single spaces, skipping empty values.
-   * Each part must name a readable plain `text` field; anything else fails at boot.
+   * A template names fields in `{braces}`; a literal renders only when every field beside it renders.
+   * Each part must name a readable field stored as a plain text column; anything else fails at boot.
    * Omitted, the first readable plain text field names the record.
    *
    * @example
    * ```ts
+   * recordLabel: 'title'
    * recordLabel: ['firstName', 'lastName']
+   * recordLabel: '{lastName}, {firstName}'
    * ```
    */
   recordLabel?: RecordLabel<TField>;

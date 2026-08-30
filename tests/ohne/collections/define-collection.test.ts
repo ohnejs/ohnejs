@@ -289,6 +289,48 @@ describe('defineCollection', () => {
     deepStrictEqual(listed.dashboard?.recordLabel, ['firstName', 'lastName']);
   });
 
+  it('accepts a recordLabel template unchanged', () => {
+    const templated = defineCollection({
+      fields: { firstName: field('text'), lastName: field('text') },
+      dashboard: { recordLabel: '{lastName}, {firstName}' },
+    });
+    deepStrictEqual(templated.dashboard?.recordLabel, '{lastName}, {firstName}');
+  });
+
+  it('rejects a malformed recordLabel template', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error the template's token is never closed
+          dashboard: { recordLabel: '{title' },
+        }),
+      /Invalid `dashboard\.recordLabel` template/,
+    );
+  });
+
+  it('rejects a recordLabel template naming an unknown field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { recordLabel: '{titel}, {title}' },
+        }),
+      /unknown field `titel`/,
+    );
+  });
+
+  it('rejects a recordLabel template repeating a field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { recordLabel: '{title} - {title}' },
+        }),
+      /repeats field `title`/,
+    );
+  });
+
   it('rejects a recordLabel naming an unknown field', () => {
     throws(
       () =>

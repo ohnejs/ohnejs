@@ -11,11 +11,13 @@ import {
   isPlainObject,
   isString,
   isUndefined,
+  templateFields,
 } from '../../utils/index.ts';
 import { iconNames, isIconName } from '../dashboard/icon-shapes.ts';
 import { validateFieldName, validateUniqueNames } from '../database/naming/validate-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { useFields } from '../fields/use-fields.ts';
+import { isRecordLabelTemplate } from './record-label.ts';
 
 const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
 
@@ -200,7 +202,8 @@ function validateCopyTranslation(
 
 /**
  * Rejects a malformed `dashboard.recordLabel` declaration.
- * A failure is a value that is not a field name or an array of them, an empty list, or one past ten.
+ * A failure is a value that is not a field name, an array of them, or a `{field}` template.
+ * A template fails on a stray brace or an empty token; a list fails empty; either fails past ten.
  * A part fails naming an unknown, write-only, repeated, or non-text field.
  * The text check reads the field-type registry, so an unregistered type defers to the boot pass.
  */
@@ -220,7 +223,22 @@ function validateRecordLabel(
       ],
     });
   }
-  const names = isString(recordLabel) ? [recordLabel] : recordLabel;
+  let names: readonly string[];
+  if (isRecordLabelTemplate(recordLabel)) {
+    const parts = templateFields(recordLabel);
+    if (isUndefined(parts)) {
+      throw ohneError({
+        title: 'Invalid `dashboard.recordLabel` template',
+        body: [
+          `The \`recordLabel\` template${scope} has a stray brace or an empty \`{}\` token.`,
+          "Write `recordLabel: '{lastName}, {firstName}'`.",
+        ],
+      });
+    }
+    names = parts;
+  } else {
+    names = isString(recordLabel) ? [recordLabel] : recordLabel;
+  }
   if (isEmpty(names)) {
     throw ohneError({
       title: 'The `dashboard.recordLabel` list is empty',
@@ -232,7 +250,7 @@ function validateRecordLabel(
   }
   if (names.length > 10) {
     throw ohneError({
-      title: 'The `dashboard.recordLabel` lists more than ten fields',
+      title: 'The `dashboard.recordLabel` names more than ten fields',
       body: [
         `A record picker orders by every part${scope}, and a query orders by at most ten keys.`,
       ],
