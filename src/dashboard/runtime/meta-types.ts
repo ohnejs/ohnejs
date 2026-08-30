@@ -77,6 +77,11 @@ export interface DashboardField {
   description?: string;
 
   /**
+   * The empty-input hint, resolved in the request's language; absent when none is declared.
+   */
+  placeholder?: string;
+
+  /**
    * Whether the field's value admits `null`.
    */
   nullable: boolean;
@@ -112,9 +117,11 @@ export interface DashboardField {
   immutable: boolean;
 
   /**
-   * Whether an empty value is accepted; present only on field types that declare the option.
+   * The field type's declared options as resolved, reduced to plain JSON data.
+   * Structural options other members already describe, like a composite's `fields`, stay out.
+   * Absent when nothing ships, so a plain field carries no empty object.
    */
-  allowEmpty?: boolean;
+  options?: Readonly<Record<string, unknown>>;
 
   /**
    * The target collection name; relation kinds (`record`, `records`) only.
