@@ -31,6 +31,8 @@ export { targetOf } from './fields/_search.ts';
 export { fallbackLabel, joinLabel, labelOf, seedLabel, wantLabels } from './fields/labels.ts';
 export { parseIntegerValue, parseRealValue, parseTextValue } from './fields/parse.ts';
 export type { ScalarParse } from './fields/parse.ts';
+export { recordPicker, registerRecordPicker } from './fields/record-picker.ts';
+export type { RecordPicker, RecordPickerRequest } from './fields/record-picker.ts';
 export { css } from './render/css.ts';
 export { each } from './render/each.ts';
 export { h } from './render/h.ts';

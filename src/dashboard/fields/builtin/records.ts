@@ -17,6 +17,7 @@ import { targetOf } from '../_search.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { labelOf } from '../labels.ts';
+import { pickerTrigger } from '../record-picker.ts';
 import { recordChoiceSource } from './record.ts';
 
 css`
@@ -31,6 +32,7 @@ css`
  * Cells summarize the ordered links as the first record's label plus a dim `+n` tail.
  * There is no inline cell editor: the list edits on the record page and in the edit popup.
  * The form control is the async `dynamicChips` field over the target's records.
+ * A leading table-overview button opens the record picker over the target's full data table.
  * Chips remove and drag-reorder, the dropdown searches and paginates, a double-click opens the record.
  * Server messages keyed by index mark their chips destructive.
  */
@@ -101,8 +103,25 @@ export const recordsType: FieldType = {
     const input = chips.querySelector<HTMLInputElement>('.ohne-dynamic-chips-input');
     if (!isNull(input)) describeControl(input, context.field, context.path, () => routed.value);
 
+    const picker = pickerTrigger({
+      field: context.field,
+      target,
+      values: () => model.value.filter(isString),
+      multiple: true,
+      disabled: () => context.disabled === true,
+      onApply: (uuids) => {
+        model.value = [...uuids];
+      },
+    });
+
     return {
-      element: h('div', { class: 'ohne-records-field ohne-row' }, chips),
+      element: h(
+        'div',
+        { class: 'ohne-records-field ohne-row' },
+        picker?.trigger,
+        chips,
+        picker?.host,
+      ),
       read() {
         if (!touched.value && isUndefined(context.initial)) return {};
         return { value: model.value };

@@ -28,6 +28,7 @@ import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { fallbackLabel, joinLabel, labelOf, seedLabel } from '../labels.ts';
+import { pickerTrigger } from '../record-picker.ts';
 
 const PER_PAGE = 50;
 
@@ -170,9 +171,10 @@ function emptyPage(): DynamicSelectPaginatedChoices {
  *
  * Cells display the target's resolved label, falling back to the short `UUID` while it loads.
  * The form control is the async `dynamicSelect` combobox over the target's records.
+ * A leading table-overview button opens the record picker over the target's full data table.
  * Beside it sit an open-in-new-tab button and, on a nullable field, a clear button while linked.
  * The inline cell editor is a plain mono `UUID` input; combobox editing lives in the edit popup.
- * The filter compares by identity through the same combobox.
+ * The filter compares by identity through the same combobox, with the same picker beside it.
  * When the target is unreadable or has no label field, the mono `UUID` input stands in everywhere.
  */
 export const recordType: FieldType = {
@@ -246,8 +248,22 @@ export const recordType: FieldType = {
       if (!isNull(combobox)) {
         describeControl(combobox, context.field, context.path, () => routed.value);
       }
+      const picker = pickerTrigger({
+        field: context.field,
+        target,
+        values: () => {
+          const value = current();
+          return isNull(value) ? [] : [value];
+        },
+        multiple: false,
+        disabled: off ? (): boolean => true : undefined,
+        onApply: (uuids) => {
+          model.value = uuids[0] ?? null;
+          change();
+        },
+      });
       const canUpdate = target.operations.update?.allowed === true;
-      element = h('div', { class: 'ohne-row' }, select, () => {
+      element = h('div', { class: 'ohne-row' }, picker?.trigger, select, picker?.host, () => {
         const value = current();
         if (isNull(value)) return null;
         const open = button(icon(canUpdate ? 'pencil' : 'list-search'), {
@@ -338,7 +354,17 @@ export const recordType: FieldType = {
           context.commit(isString(next) ? next : '');
         },
       };
-      return dynamicSelect(bridged, {
+      const picker = pickerTrigger({
+        field: context.field,
+        target,
+        values: () => {
+          const current = context.value();
+          return isString(current) && current !== '' ? [current] : [];
+        },
+        multiple: false,
+        onApply: (uuids) => context.commit(uuids[0] ?? ''),
+      });
+      const select = dynamicSelect(bridged, {
         choicesResolver: source.choicesResolver,
         selectedChoiceResolver: (value) =>
           isString(value) && value !== '' ? source.choiceOf(value) : Promise.resolve(null),
@@ -346,6 +372,8 @@ export const recordType: FieldType = {
         searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
         noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
       });
+      if (isUndefined(picker)) return select;
+      return h('div', { class: 'ohne-row' }, picker.trigger, select, picker.host);
     },
   },
 };
