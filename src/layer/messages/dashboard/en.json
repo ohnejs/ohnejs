@@ -48,6 +48,7 @@
       "body": "The dashboard component for the field type `{type}` is missing. A dashboard module registers it with:",
       "title": "Missing field component"
     },
+    "noEditor": "This value cannot be edited here and is saved unchanged",
     "revert": "Revert",
     "showPassword": "Show password",
     "translatable": "This field stores a separate value for each language",
@@ -215,10 +216,14 @@
   },
   "tableOverview": "Table overview",
   "translations": {
+    "confirmDelete": "Are you sure you want to delete the `{locale}` translation?",
     "copied": "Copied",
     "copy": "Copy `{from}` to `{to}`",
     "copyFailed": "An error occurred while copying the translation",
     "currentlyEditing": "currently editing",
+    "delete": "Delete the `{locale}` translation",
+    "deleted": "Translation deleted",
+    "deleteFailed": "An error occurred while deleting the translation",
     "edit": "Edit translation",
     "new": "New translation",
     "selected": "selected",

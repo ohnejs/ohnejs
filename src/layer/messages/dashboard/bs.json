@@ -48,6 +48,7 @@
       "body": "Dashboard komponenta za tip polja `{type}` nedostaje. Dashboard modul je registruje sa:",
       "title": "Nedostaje komponenta polja"
     },
+    "noEditor": "Ova vrijednost se ovdje ne može uređivati i ostaje nepromijenjena pri spremanju",
     "revert": "Vrati",
     "showPassword": "Prikaži lozinku",
     "translatable": "Ovo polje čuva zasebnu vrijednost za svaki jezik",
@@ -215,10 +216,14 @@
   },
   "tableOverview": "Pregled tabele",
   "translations": {
+    "confirmDelete": "Da li zaista želite obrisati prijevod `{locale}`?",
     "copied": "Kopirano",
     "copy": "Kopiraj `{from}` u `{to}`",
     "copyFailed": "Došlo je do greške pri kopiranju prijevoda",
     "currentlyEditing": "trenutno se uređuje",
+    "delete": "Obriši prijevod `{locale}`",
+    "deleted": "Prijevod obrisan",
+    "deleteFailed": "Došlo je do greške pri brisanju prijevoda",
     "edit": "Uredi prijevod",
     "new": "Novi prijevod",
     "selected": "odabrano",

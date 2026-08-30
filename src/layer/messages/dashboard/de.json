@@ -48,6 +48,7 @@
       "body": "Die Dashboard-Komponente für den Feldtyp `{type}` fehlt. Ein Dashboard-Modul registriert sie mit:",
       "title": "Fehlende Feldkomponente"
     },
+    "noEditor": "Dieser Wert kann hier nicht bearbeitet werden und bleibt beim Speichern unverändert",
     "revert": "Zurücksetzen",
     "showPassword": "Passwort anzeigen",
     "translatable": "Dieses Feld speichert je Sprache einen eigenen Wert",
@@ -215,10 +216,14 @@
   },
   "tableOverview": "Tabellenübersicht",
   "translations": {
+    "confirmDelete": "Die Übersetzung `{locale}` wirklich löschen?",
     "copied": "Kopiert",
     "copy": "`{from}` nach `{to}` kopieren",
     "copyFailed": "Beim Kopieren der Übersetzung ist ein Fehler aufgetreten",
     "currentlyEditing": "wird gerade bearbeitet",
+    "delete": "Übersetzung `{locale}` löschen",
+    "deleted": "Übersetzung gelöscht",
+    "deleteFailed": "Beim Löschen der Übersetzung ist ein Fehler aufgetreten",
     "edit": "Übersetzung bearbeiten",
     "new": "Neue Übersetzung",
     "selected": "ausgewählt",
