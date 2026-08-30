@@ -15,6 +15,7 @@ import {
   hasModifierKey,
   icon,
   isEditingText,
+  joinLabel,
   navigate,
   openDialog,
   overlayCount,
@@ -950,31 +951,17 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
 
 /**
  * Seeds the label cache from a loaded page, so relation cells naming these rows resolve free.
+ * A row missing a label part never seeds, so a page selecting only some parts cannot cache a partial join.
  */
 function seedLabels(collection: DashboardCollection, records: readonly TableRecord[]): void {
-  const label = labelField(collection);
-  if (isUndefined(label)) return;
+  const names = collection.labelFields;
+  if (isEmpty(names)) return;
   for (const row of records) {
     const uuid = row.UUID;
-    const value = row[label.name];
-    if (isString(uuid) && isString(value) && value !== '') {
-      seedLabel(collection.name, uuid, value);
-    }
+    if (!isString(uuid) || !names.every((name) => hasKey(row, name))) continue;
+    const label = joinLabel(row, names);
+    if (label !== '') seedLabel(collection.name, uuid, label);
   }
-}
-
-/**
- * The collection's first plain readable text field, the label heuristic the seeding shares with the sheet.
- */
-function labelField(collection: DashboardCollection): DashboardField | undefined {
-  return collection.fields.find(
-    (field) =>
-      field.readable &&
-      field.kind === 'column' &&
-      field.logicalType === 'text' &&
-      field.type !== 'password' &&
-      field.name !== 'UUID',
-  );
 }
 
 /**

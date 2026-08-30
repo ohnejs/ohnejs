@@ -7,12 +7,12 @@ import {
   createFieldForm,
   css,
   type DashboardCollection,
-  type DashboardField,
   dropdown,
   dropdownItem,
   type FieldForm,
   h,
   icon,
+  joinLabel,
   navigate,
   openDialog,
   overlayCount,
@@ -586,26 +586,9 @@ function changedSince(full: RecordRow, original: RecordRow): RecordRow {
  * Seeds the label cache with the saved record's own label, so relation cells resolve it for free.
  */
 function seedRecordLabel(collection: DashboardCollection, row: RecordRow): void {
-  const field = labelField(collection);
-  if (isUndefined(field)) return;
-  const value = row[field.name];
-  if (isString(row.UUID) && isString(value) && value !== '') {
-    seedLabel(collection.name, row.UUID, value);
-  }
-}
-
-/**
- * The collection's first readable plain text field, the one that names a record.
- */
-function labelField(collection: DashboardCollection): DashboardField | undefined {
-  return collection.fields.find(
-    (field) =>
-      field.readable &&
-      field.kind === 'column' &&
-      field.logicalType === 'text' &&
-      field.type !== 'password' &&
-      field.name !== 'UUID',
-  );
+  if (!isString(row.UUID)) return;
+  const label = joinLabel(row, collection.labelFields);
+  if (label !== '') seedLabel(collection.name, row.UUID, label);
 }
 
 /**

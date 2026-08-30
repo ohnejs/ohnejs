@@ -9,9 +9,10 @@ import {
   type DashboardMeta,
   dashboardMeta,
   each,
+  fallbackLabel,
   h,
   icon,
-  labelFieldOf,
+  joinLabel,
   useDashboardLanguage,
   useT,
   when,
@@ -49,7 +50,6 @@ interface RecentEdit {
  */
 interface Bucket {
   collection: DashboardCollection;
-  labelField: string | undefined;
   rows: RecentEdit[];
   offset: number;
   done: boolean;
@@ -208,7 +208,7 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
   onCleanup(() => search.unregisterCount('overview-recent-edits'));
 
   return when(
-    () => loaded.value && (filtered.value.length > 0 || !search.active()),
+    () => loaded.value && (!isEmpty(filtered.value) || !search.active()),
     () => {
       const el = card(
         [
@@ -295,13 +295,7 @@ function bucketsOf(meta: DashboardMeta): Bucket[] {
   const buckets: Bucket[] = [];
   for (const collection of meta.collections) {
     if (collection.operations.read?.allowed !== true) continue;
-    buckets.push({
-      collection,
-      labelField: labelFieldOf(collection)?.name,
-      rows: [],
-      offset: 0,
-      done: false,
-    });
+    buckets.push({ collection, rows: [], offset: 0, done: false });
   }
   return buckets;
 }
@@ -357,8 +351,7 @@ function takeNewest(buckets: Bucket[]): RecentEdit | undefined {
  * A record without a label value shows `#` plus its `UUID`'s first eight characters.
  */
 async function fillBucket(bucket: Bucket): Promise<void> {
-  const select = ['UUID', '_updatedAt'];
-  if (!isUndefined(bucket.labelField)) select.push(bucket.labelField);
+  const select = ['UUID', '_updatedAt', ...bucket.collection.labelFields];
   const limit = PAGE_SIZE + 1;
   try {
     const response = await api(`POST /collections/${bucket.collection.segment}/query`, {
@@ -376,12 +369,12 @@ async function fillBucket(bucket: Bucket): Promise<void> {
       const uuid = row.UUID;
       const updatedAt = row._updatedAt;
       if (!isString(uuid) || !isNumber(updatedAt)) continue;
-      const value = isUndefined(bucket.labelField) ? undefined : row[bucket.labelField];
+      const label = joinLabel(row, bucket.collection.labelFields);
       bucket.rows.push({
         collectionName: bucket.collection.name,
         collectionLabel: bucket.collection.label,
         uuid,
-        label: isString(value) && value !== '' ? value : `#${uuid.slice(0, 8)}`,
+        label: label !== '' ? label : fallbackLabel(uuid),
         updatedAt,
         editURL: `/collections/${bucket.collection.segment}/${uuid}`,
       });
