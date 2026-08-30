@@ -18,12 +18,3 @@ export function targetOf(field: DashboardField): DashboardCollection | undefined
 export function summarizable(field: DashboardField): boolean {
   return field.readable && field.type !== 'password' && field.name !== 'UUID';
 }
-
-/**
- * The target's first plain readable text field, the one a search matches and shows.
- */
-export function labelFieldOf(target: DashboardCollection): DashboardField | undefined {
-  return target.fields.find(
-    (field) => summarizable(field) && field.kind === 'column' && field.logicalType === 'text',
-  );
-}
