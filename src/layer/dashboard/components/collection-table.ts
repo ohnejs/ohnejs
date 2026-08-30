@@ -226,8 +226,11 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     collection.fields.find((field) => field.name === name);
   const readableFields = (): DashboardField[] =>
     collection.fields.filter((field) => field.readable);
+  // A json column holds a list, which has no order to sort by.
   const sortableFields = (): DashboardField[] =>
-    collection.fields.filter((field) => field.readable && field.kind === 'column');
+    collection.fields.filter(
+      (field) => field.readable && field.kind === 'column' && field.logicalType !== 'json',
+    );
 
   const data = ref<TableRow<TableColumns>[]>([]);
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });

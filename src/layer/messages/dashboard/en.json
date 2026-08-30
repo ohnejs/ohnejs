@@ -77,10 +77,12 @@
       "contains": "Contains",
       "doesNotContain": "Does not contain",
       "doesNotEqual": "Does not equal",
+      "doesNotInclude": "Does not include",
       "endsWith": "Ends with",
       "equals": "Equals",
       "greaterThan": "Greater than",
       "greaterThanOrEqualTo": "Greater than or equal to",
+      "includes": "Includes",
       "lessThan": "Less than",
       "lessThanOrEqualTo": "Less than or equal to",
       "startsWith": "Starts with"

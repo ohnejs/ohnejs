@@ -77,10 +77,12 @@
       "contains": "Enthält",
       "doesNotContain": "Enthält nicht",
       "doesNotEqual": "Ungleich",
+      "doesNotInclude": "Enthält den Eintrag nicht",
       "endsWith": "Endet mit",
       "equals": "Gleich",
       "greaterThan": "Größer als",
       "greaterThanOrEqualTo": "Größer oder gleich",
+      "includes": "Enthält den Eintrag",
       "lessThan": "Kleiner als",
       "lessThanOrEqualTo": "Kleiner oder gleich",
       "startsWith": "Beginnt mit"

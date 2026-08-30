@@ -141,10 +141,11 @@ export type TableColumnEdit = {
 
 /**
  * How a field sorts: `text` and letter icons for text columns, `numeric` for the rest.
- * `false` covers the composite kinds no single column backs.
+ * `false` covers the composite kinds no single column backs, and a json column's unordered list.
  */
 function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
   if (field.kind !== 'column' && field.kind !== 'record') return false;
+  if (field.logicalType === 'json') return false;
   return field.logicalType === 'text' ? 'text' : 'numeric';
 }
 

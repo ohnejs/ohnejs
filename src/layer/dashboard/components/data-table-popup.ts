@@ -1,22 +1,30 @@
 import {
   attachTooltip,
   button,
-  buttonGroup,
   card,
   type Child,
   css,
   type DashboardField,
   each,
+  type FieldFilter,
+  fieldTypeFor,
+  type FilterCondition,
+  filterFromWhere,
+  type FilterGroup,
+  filterKey,
+  type FilterModel,
+  type FilterNode,
+  type FilterOperator,
+  filterToWhere,
   h,
   icon,
   type IconName,
-  numberInput,
   popup,
   type Popup,
   type Primitive,
   select,
   type SelectChoice,
-  textInput,
+  useDashboardLanguage,
   useHotkeys,
   useT,
   when,
@@ -34,19 +42,6 @@ import {
   ref,
 } from 'ohne/utils';
 
-import {
-  type FilterableType,
-  type FilterCondition,
-  filterDefaultValue,
-  filterFromWhere,
-  type FilterGroup,
-  filterKey,
-  type FilterModel,
-  type FilterNode,
-  type FilterOperator,
-  filterOperatorsFor,
-  filterToWhere,
-} from './data-table-filter.ts';
 import { unsavedChanges } from './history.ts';
 import { actionButton } from './item-actions.ts';
 
@@ -102,9 +97,9 @@ const OPERATOR_LABEL_KEYS = {
   endsWith: 'dashboard.filter.operator.endsWith',
   contains: 'dashboard.filter.operator.contains',
   notContains: 'dashboard.filter.operator.doesNotContain',
+  includes: 'dashboard.filter.operator.includes',
+  notIncludes: 'dashboard.filter.operator.doesNotInclude',
 } as const;
-
-const FILTERABLE: ReadonlySet<string> = new Set(['text', 'integer', 'real', 'boolean']);
 
 let sequence = 0;
 
@@ -217,27 +212,31 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     version.value += 1;
   };
 
+  const filterOf = (field: DashboardField): FieldFilter | undefined => fieldTypeFor(field).filter;
+
   const fieldChoices = (): DashboardField[] =>
     options
       .fields()
-      .filter((field) => field.kind === 'column' && FILTERABLE.has(field.logicalType ?? ''))
+      .filter((field) => field.readable && !isUndefined(filterOf(field)))
       .sort((a, b) => naturalCompare(a.label, b.label));
 
   const fieldByName = (name: string): DashboardField | undefined =>
     fieldChoices().find((field) => field.name === name);
 
-  const typeOf = (name: string): FilterableType =>
-    (fieldByName(name)?.logicalType ?? 'text') as FilterableType;
+  const seedCondition = (field: DashboardField): FilterCondition | undefined => {
+    const filter = filterOf(field);
+    if (isUndefined(filter)) return undefined;
+    return {
+      key: filterKey(),
+      field: field.name,
+      operator: filter.operators(field)[0] ?? 'eq',
+      value: filter.seed(field),
+    };
+  };
 
   const newCondition = (): FilterCondition | undefined => {
     const choice = first(fieldChoices());
-    if (isUndefined(choice)) return undefined;
-    return {
-      key: filterKey(),
-      field: choice.name,
-      operator: 'eq',
-      value: filterDefaultValue(typeOf(choice.name)),
-    };
+    return isUndefined(choice) ? undefined : seedCondition(choice);
   };
 
   const addCondition = (group: FilterGroup): void => {
@@ -286,62 +285,28 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     );
 
   const valueInput = (node: FilterCondition, inputID: string): Child => {
-    const type = typeOf(node.field);
-    if (type === 'boolean') {
-      const bridged: Ref<Primitive> = {
-        get value() {
-          void version.value;
-          return Boolean(node.value);
-        },
-        set value(next) {
-          node.value = next === true;
-          commit();
-        },
-      };
-      return buttonGroup(bridged, {
-        choices: () => [
-          { value: false, label: t('dashboard.filter.false') },
-          { value: true, label: t('dashboard.filter.true') },
-        ],
-        variant: 'accent',
-        id: inputID,
-        name: inputID,
-      });
-    }
-    if (type === 'text') {
-      const bridged: Ref<string> = {
-        get value() {
-          void version.value;
-          return String(node.value);
-        },
-        set value(next) {
-          node.value = next;
-        },
-      };
-      return textInput(bridged, {
-        id: inputID,
-        name: inputID,
-        placeholder: () => t('dashboard.filter.empty'),
-        onBlur: () => commit(),
-      });
-    }
-    const bridged: Ref<number> = {
-      get value() {
+    const field = fieldByName(node.field);
+    const filter = isUndefined(field) ? undefined : filterOf(field);
+    if (isUndefined(field) || isUndefined(filter)) return null;
+    return filter.input({
+      field,
+      operator: () => {
         void version.value;
-        return Number(node.value);
+        return node.operator;
       },
-      set value(next) {
+      value: () => {
+        void version.value;
+        return node.value;
+      },
+      set: (next) => {
         node.value = next;
       },
-    };
-    return numberInput(bridged, {
-      id: inputID,
-      name: inputID,
-      showSteppers: true,
-      onCommit: (next) => {
-        node.value = next;
+      commit: (next) => {
+        if (!isUndefined(next)) node.value = next;
         commit();
       },
+      inputID,
+      language: () => useDashboardLanguage().value,
     });
   };
 
@@ -355,15 +320,16 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       set value(next) {
         const field = fieldByName(String(next));
         if (isUndefined(field)) return;
-        const type = typeOf(field.name);
-        const valid = filterOperatorsFor(type);
+        const filter = filterOf(field);
+        if (isUndefined(filter)) return;
+        const valid = filter.operators(field);
         const index = group.items.indexOf(node);
         if (index === -1) return;
         group.items[index] = {
           key: filterKey(),
           field: field.name,
-          operator: valid.includes(node.operator) ? node.operator : valid[0]!,
-          value: filterDefaultValue(type),
+          operator: valid.includes(node.operator) ? node.operator : (valid[0] ?? 'eq'),
+          value: filter.seed(field),
         };
         commit();
       },
@@ -399,11 +365,15 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
           { class: 'o-field-filter-operator' },
           select(
             operatorModel,
-            (): SelectChoice[] =>
-              filterOperatorsFor(typeOf(node.field)).map((operator) => ({
+            (): SelectChoice[] => {
+              const field = fieldByName(node.field);
+              const filter = isUndefined(field) ? undefined : filterOf(field);
+              if (isUndefined(field) || isUndefined(filter)) return [];
+              return filter.operators(field).map((operator) => ({
                 label: t(OPERATOR_LABEL_KEYS[operator]),
                 value: operator,
-              })),
+              }));
+            },
             { id: `${inputID}-operator`, name: `${inputID}-operator` },
           ),
         ),

@@ -6,7 +6,10 @@ import {
   describeControl,
   dimMark,
   h,
+  type Primitive,
   registerFieldType,
+  select,
+  type SelectChoice,
   useT,
 } from 'ohne/dashboard';
 import {
@@ -16,6 +19,7 @@ import {
   isNull,
   isString,
   isUndefined,
+  type Ref,
   ref,
   untracked,
 } from 'ohne/utils';
@@ -116,6 +120,25 @@ registerFieldType('roles', {
         reset(base);
       },
     };
+  },
+  filter: {
+    operators: () => ['includes', 'notIncludes'],
+    seed: () => dashboardMeta()?.roles[0] ?? '',
+    input({ value, commit, inputID }) {
+      const bridged: Ref<Primitive> = {
+        get value() {
+          return value();
+        },
+        set value(next) {
+          commit(String(next));
+        },
+      };
+      return select(
+        bridged,
+        (): SelectChoice[] => (dashboardMeta()?.roles ?? []).map((name) => ({ value: name })),
+        { id: inputID, name: inputID },
+      );
+    },
   },
 });
 

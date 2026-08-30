@@ -77,10 +77,12 @@
       "contains": "Sadrži",
       "doesNotContain": "Ne sadrži",
       "doesNotEqual": "Nije jednako",
+      "doesNotInclude": "Ne uključuje",
       "endsWith": "Završava sa",
       "equals": "Jednako",
       "greaterThan": "Veće od",
       "greaterThanOrEqualTo": "Veće ili jednako",
+      "includes": "Uključuje",
       "lessThan": "Manje od",
       "lessThanOrEqualTo": "Manje ili jednako",
       "startsWith": "Počinje sa"
