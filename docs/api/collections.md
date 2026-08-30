@@ -29,13 +29,20 @@ The URL segment is the collection's kebab-case name: `Posts` serves at `/collect
 `UserGroups` at `/collections/user-groups`.
 
 ```
-GET    /collections/posts          list records
-POST   /collections/posts/query    the same list read, query in the body
-POST   /collections/posts          create a record
-GET    /collections/posts/[uuid]   read one record
-PATCH  /collections/posts/[uuid]   update one record
-DELETE /collections/posts/[uuid]   delete one record
+GET    /collections/posts                             list records
+POST   /collections/posts/query                       the same list read, query in the body
+POST   /collections/posts                             create a record
+GET    /collections/posts/[uuid]                      read one record
+PATCH  /collections/posts/[uuid]                      update one record
+DELETE /collections/posts/[uuid]                      delete one record
+GET    /collections/posts/[uuid]/translations         list the locales holding a translation
+POST   /collections/posts/[uuid]/translations/copy    copy one locale's translation onto another
+DELETE /collections/posts/[uuid]/translations         delete one locale's translation
 ```
+
+The three translation routes apply only to collections with
+[translatable fields](../database/translations.md); on any other they answer the same `404` as an
+unknown collection.
 
 These are ordinary [routes](./routes.md) shipped by the ohne layer, so everything routes do
 applies: `api.basePath` prefixes them, your app overrides one by shipping the same route id, and
@@ -66,6 +73,14 @@ filter or window param is a `400`, since the `UUID` already pins the row. No mat
 sanitizers run, exactly what a re-read returns. `PATCH` updates one record and answers with its
 final state; `DELETE` answers `204`. A translatable collection writes one locale at a time:
 `?locale=de` on the create or update addresses that locale's values.
+
+The translation routes manage those locales as units. The `GET` lists the locales at which the
+record holds a translation, in the configured order. The copy takes an optional JSON body naming
+the `source` locale and projects its translatable values onto `?locale=`'s target, answering the
+target's new state. The `DELETE` removes one locale's values whole - `?locale=de` drops the
+German translation while the record and every other locale survive, `204` on success and `404`
+when the record held nothing there. Reads gate on the `read` operation, the copy on `update`, and
+the translation delete on `delete`.
 
 ```
 POST /collections/posts
