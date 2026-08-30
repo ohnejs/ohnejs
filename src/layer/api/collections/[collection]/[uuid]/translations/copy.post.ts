@@ -2,6 +2,7 @@ import type { SearchParamValue } from 'ohne/utils';
 
 import {
   defineHandler,
+  type LocaleCode,
   parseLocaleParam,
   queryMetadata,
   queryUntyped,
@@ -40,8 +41,9 @@ export default defineHandler(async ({ params }) => {
   }
   const source = parseLocaleParam(body.source as SearchParamValue | undefined, meta, 'source');
   const { defaultLocale } = queryLocales();
-  const sourceLocale = source ?? defaultLocale;
-  const targetLocale = target ?? defaultLocale;
+  // The wire parsers admit only configured locales, so the codegen-narrowed cast holds.
+  const sourceLocale = (source ?? defaultLocale) as LocaleCode;
+  const targetLocale = (target ?? defaultLocale) as LocaleCode;
   if (sourceLocale === targetLocale) throw sameLocaleError(targetLocale);
 
   const reader = queryUntyped(gate.collection).where({ UUID: params.uuid });
@@ -69,6 +71,6 @@ export default defineHandler(async ({ params }) => {
     return scopedRecord(current, gate.scope);
   }
   const records = await scoped.updateOrThrow(input);
-  if (records.length === 0) throw notFound();
+  if (isEmpty(records)) throw notFound();
   return scopedRecord(records[0], gate.scope);
 });
