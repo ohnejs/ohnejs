@@ -9,6 +9,7 @@ import {
   type LogicalType,
   type Message,
   queryMetadata,
+  type RecordLabel,
   useBlocks,
   useCollections,
   useConfig,
@@ -16,8 +17,10 @@ import {
 } from 'ohne';
 import {
   isBoolean,
+  isEmpty,
   isNull,
   isPlainObject,
+  isString,
   isUndefined,
   naturalCompare,
   toKebabCase,
@@ -218,6 +221,12 @@ export interface DashboardCollection {
    * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
    */
   fields: DashboardField[];
+
+  /**
+   * The fields whose non-empty values, joined with single spaces in order, name a record.
+   * The declared `recordLabel` as a list, or the first readable plain text field; empty without either.
+   */
+  labelFields: readonly string[];
 }
 
 /**
@@ -313,13 +322,15 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     const operations = describeOperations(meta.collection.api, meta.name, user);
     if (isNull(operations)) continue;
     const query = queryMetadata(meta.name);
+    const fields = describeFields(query.fields, meta.collection.fields);
     const collection: DashboardCollection = {
       name: meta.name,
       segment: toKebabCase(meta.name),
       label: toSentenceCase(meta.name),
       translatable: query.translatable === true,
       operations,
-      fields: describeFields(query.fields, meta.collection.fields),
+      fields,
+      labelFields: labelFieldsOf(meta.collection.recordLabel, fields),
     };
     if (!isUndefined(meta.collection.icon)) collection.icon = meta.collection.icon;
     if (!isUndefined(meta.collection.table)) collection.table = meta.collection.table;
@@ -345,7 +356,7 @@ function describeBlocks(collections: readonly DashboardCollection[]): DashboardB
   const described = new Map<string, DashboardBlock>();
   const pending: string[] = [];
   for (const collection of collections) collectAllowed(collection.fields, pending);
-  while (pending.length > 0) {
+  while (!isEmpty(pending)) {
     const name = pending.pop() as string;
     if (described.has(name)) continue;
     const meta = useBlocks().get(name);
@@ -502,6 +513,26 @@ function subInstancesOf(
 }
 
 /**
+ * The fields that name a record: the declared `recordLabel` as a list, or the first plain text field.
+ * The fallback is the first readable plain `text` column, never `UUID` or a password.
+ */
+function labelFieldsOf(
+  declared: RecordLabel | undefined,
+  fields: readonly DashboardField[],
+): readonly string[] {
+  if (!isUndefined(declared)) return isString(declared) ? [declared] : declared;
+  const fallback = fields.find(
+    (field) =>
+      field.readable &&
+      field.kind === 'column' &&
+      field.logicalType === 'text' &&
+      field.type !== 'password' &&
+      field.name !== 'UUID',
+  );
+  return isUndefined(fallback) ? [] : [fallback.name];
+}
+
+/**
  * Folds the configured `dashboard.menu` over the accessible collections.
  * Configured groups keep their order and drop inaccessible names; the rest trail unlabeled.
  */
@@ -511,7 +542,7 @@ function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
   for (const group of useConfig().dashboard?.menu ?? []) {
     const members = group.collections.filter((name) => names.has(name));
     for (const name of members) names.delete(name);
-    if (members.length > 0) {
+    if (!isEmpty(members)) {
       groups.push({
         label: isUndefined(group.label) ? '' : resolveMessage(group.label),
         collections: members,

@@ -62,6 +62,7 @@ useCollections().register('DashNotes', {
   name: 'DashNotes',
   collection: {
     api: { read: true, create: true, update: true, delete: true },
+    recordLabel: ['title', 'note'],
     table: { columns: ['title | 20rem', 'note'] },
     fields: {
       title: field('text'),
@@ -83,7 +84,7 @@ useCollections().register('DashOwners', {
 });
 useCollections().register('DashPublic', {
   name: 'DashPublic',
-  collection: { api: { read: 'public' }, fields: { title: field('text') } },
+  collection: { api: { read: 'public' }, recordLabel: 'title', fields: { title: field('text') } },
 });
 useCollections().register('DashClosed', {
   name: 'DashClosed',
@@ -146,6 +147,13 @@ useCollections().register('DashPages', {
 useCollections().register('DashVault', {
   name: 'DashVault',
   collection: { fields: { body: field('blocks', { allow: ['DashSecret'] }) } },
+});
+useCollections().register('DashMetrics', {
+  name: 'DashMetrics',
+  collection: {
+    api: { read: 'public' },
+    fields: { views: field('integer'), secret: field('text', { readable: false, nullable: true }) },
+  },
 });
 
 const dialect = new SQLiteDialect();
@@ -213,6 +221,7 @@ describe('access', () => {
       'DashArticles',
       'DashLabels',
       'DashPages',
+      'DashMetrics',
     ]);
   });
 
@@ -227,6 +236,7 @@ describe('access', () => {
       'DashArticles',
       'DashLabels',
       'DashPages',
+      'DashMetrics',
     ]);
   });
 });
@@ -265,6 +275,24 @@ describe('table', () => {
     const { body } = await call(admin);
     deepStrictEqual(collection(body, 'DashNotes').table, { columns: ['title | 20rem', 'note'] });
     strictEqual('table' in collection(body, 'DashPublic'), false);
+  });
+});
+
+describe('labelFields', () => {
+  it('ships the declared recordLabel as a list', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(collection(body, 'DashNotes').labelFields, ['title', 'note']);
+    deepStrictEqual(collection(body, 'DashPublic').labelFields, ['title']);
+  });
+
+  it('derives the first readable plain text field when none is declared', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(collection(body, 'DashOwners').labelFields, ['name']);
+  });
+
+  it('is empty when no field can label a record', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(collection(body, 'DashMetrics').labelFields, []);
   });
 });
 
@@ -343,6 +371,7 @@ describe('menu', () => {
           'DashArticles',
           'DashLabels',
           'DashPages',
+          'DashMetrics',
         ],
       },
     ]);
@@ -362,6 +391,7 @@ describe('menu', () => {
           'DashArticles',
           'DashLabels',
           'DashPages',
+          'DashMetrics',
         ],
       },
     ]);
