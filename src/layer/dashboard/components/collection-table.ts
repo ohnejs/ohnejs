@@ -3,34 +3,27 @@ import {
   attachTooltip,
   bubble,
   button,
-  type Child,
   css,
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
-  dimMark,
   dropdown,
   dropdownItem,
-  fieldTypeFor,
   h,
   hasModifierKey,
   icon,
   isEditingText,
-  joinLabel,
   navigate,
   openDialog,
   overlayCount,
   pagination,
-  popup,
   queueToast,
-  seedLabel,
   type TableColumns,
   type TableRow,
   type TableSort,
   table,
   tableColumn,
   toast,
-  useDashboardLanguage,
   useHotkeys,
   useT,
   when,
@@ -43,7 +36,6 @@ import {
   hasKey,
   isEmpty,
   isNull,
-  isNumber,
   isString,
   isUndefined,
   onCleanup,
@@ -55,6 +47,17 @@ import {
 } from 'ohne/utils';
 
 import {
+  DEFAULT_ORDER,
+  displayFor,
+  loadPage,
+  PER_PAGE,
+  readableFields,
+  seedLabels,
+  sortableFields,
+  tableMemory,
+  type TableRecord,
+} from './collection-table-data.ts';
+import {
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -63,48 +66,12 @@ import {
   stripEditParam,
   type TableURLState,
 } from './collection-table-state.ts';
+import { columnsPopup } from './columns-popup.ts';
 import { activeContentLocale } from './content-language-switcher.ts';
-import { dataTablePopup } from './data-table-popup.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
-import { unsavedChanges } from './history.ts';
-import { orderBy } from './order-by.ts';
-import { tableColumnsConfigurator } from './table-columns-configurator.ts';
+import { filterPopup } from './filter-popup.ts';
+import { sortingPopup } from './sorting-popup.ts';
 import { translationsPopup } from './translations-popup.ts';
-
-/**
- * One record row, as the collections API answers it.
- */
-type TableRecord = Record<string, unknown>;
-
-/**
- * One page of records, as the body-query endpoint answers it.
- */
-interface QueryPage {
-  records: TableRecord[];
-  page: number;
-  lastPage: number;
-  perPage: number;
-  total: number;
-}
-
-/**
- * The `_updatedAt` renderings: time-only for today, short date otherwise, medium for the tooltip.
- */
-type DateVariant = 'time' | 'short' | 'full';
-
-const PER_PAGE = 50;
-
-const DEFAULT_ORDER: readonly string[] = ['-_updatedAt'];
-
-const DATE_OPTIONS: Record<DateVariant, Intl.DateTimeFormatOptions> = {
-  time: { timeStyle: 'short' },
-  short: { dateStyle: 'short', timeStyle: 'short' },
-  full: { dateStyle: 'medium', timeStyle: 'short' },
-};
-
-const dateFormats = new Map<string, Intl.DateTimeFormat>();
-
-const tableMemory = new Map<string, string>();
 
 css`
   .o-collection-table {
@@ -224,13 +191,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const fieldByName = (name: string): DashboardField | undefined =>
     collection.fields.find((field) => field.name === name);
-  const readableFields = (): DashboardField[] =>
-    collection.fields.filter((field) => field.readable);
-  // A json column holds a list, which has no order to sort by.
-  const sortableFields = (): DashboardField[] =>
-    collection.fields.filter(
-      (field) => field.readable && field.kind === 'column' && field.logicalType !== 'json',
-    );
 
   const data = ref<TableRow<TableColumns>[]>([]);
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
@@ -685,14 +645,14 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     ),
   );
 
-  const filterPopup = when(
+  const filterHost = when(
     () => filterOpen.value,
     () => {
       let pending: ConditionObject | undefined;
       let apply = false;
-      dataTablePopup({
+      filterPopup({
         title: () => t('dashboard.filter.title'),
-        fields: readableFields,
+        fields: () => readableFields(collection),
         where: state.where,
         onApply: (where) => {
           pending = where;
@@ -708,188 +668,47 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
   );
 
-  const columnsPopup = when(
+  const columnsHost = when(
     () => columnsOpen.value,
     () => {
-      const current = ref<string[]>([...currentEntries]);
-      const dirty = computed(() => !deepEqual(current.value, currentEntries));
-      const isDefault = computed(() => deepEqual(current.value, defaultEntries));
+      let pending: string[] | undefined;
       let apply = false;
-
-      const finish = (): void => {
-        void handle.close().then(() => {
-          const next = isDefault.value ? undefined : [...current.value];
-          columnsOpen.value = false;
-          if (apply) push({ columns: next });
-        });
-      };
-
-      const guardedClose = (): void => {
-        void (async () => {
-          if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) finish();
-        })();
-      };
-
-      const closeButton = button(icon('x'), {
-        size: -2,
-        variant: 'ghost',
-        class: 'ohne-ml-auto',
-        onClick: guardedClose,
-      });
-      effect(() => {
-        closeButton.title = t('dashboard.close');
-      });
-
-      const restoreButton = when(
-        () => !isDefault.value,
-        () =>
-          button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
-            variant: 'outline',
-            onClick: () => {
-              current.value = [...defaultEntries];
-            },
+      columnsPopup({
+        fields: () => readableFields(collection),
+        current: currentEntries,
+        defaults: defaultEntries,
+        onApply: (columns) => {
+          pending = columns;
+          apply = true;
+        },
+        onClose: (close) =>
+          void close().then(() => {
+            columnsOpen.value = false;
+            if (apply) push({ columns: pending });
           }),
-      );
-
-      const applyButton = button(() => t('dashboard.apply'), {
-        variant: 'outline',
-        class: 'ohne-ml-auto',
-        onClick: () => {
-          apply = true;
-          finish();
-        },
       });
-      effect(() => {
-        const changed = dirty.value;
-        applyButton.classList.toggle('ohne-button-primary', changed);
-        applyButton.classList.toggle('ohne-button-outline', !changed);
-      });
-
-      const handle = popup(
-        tableColumnsConfigurator({
-          model: () => current.value,
-          fields: readableFields,
-          onCommit: (columns) => {
-            current.value = columns;
-          },
-        }),
-        {
-          size: -1,
-          width: '50rem',
-          fullHeight: true,
-          header: h(
-            'div',
-            { class: 'ohne-row' },
-            h('span', { class: 'o-collection-table-title' }, () => t('dashboard.columns.title')),
-            closeButton,
-          ),
-          footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
-          onClose: () => guardedClose(),
-        },
-      );
-
-      const hotkeys = useHotkeys({
-        allowInOverlays: true,
-        target: () => handle.root,
-        listen: false,
-      });
-      setTimeout(() => {
-        hotkeys.isListening.value = true;
-        hotkeys.listen('save', (event) => {
-          event.preventDefault();
-          // Blur first and defer, so a width still being typed commits before the entries are read.
-          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-          apply = true;
-          setTimeout(finish);
-        });
-      });
-
       return null;
     },
   );
 
-  const sortingPopup = when(
+  const sortingHost = when(
     () => sortingOpen.value,
     () => {
-      const current = ref<string[]>([...state.order]);
-      const baseline = JSON.stringify(state.order);
-      const dirty = computed(() => JSON.stringify(current.value) !== baseline);
+      let pending: string[] = [];
       let apply = false;
-
-      const finish = (): void => {
-        void handle.close().then(() => {
-          sortingOpen.value = false;
-          if (apply) push({ order: current.value });
-        });
-      };
-
-      const guardedClose = (): void => {
-        void (async () => {
-          if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) finish();
-        })();
-      };
-
-      const closeButton = button(icon('x'), {
-        size: -2,
-        variant: 'ghost',
-        class: 'ohne-ml-auto',
-        onClick: guardedClose,
-      });
-      effect(() => {
-        closeButton.title = t('dashboard.close');
-      });
-
-      const applyButton = button(() => t('dashboard.apply'), {
-        variant: 'outline',
-        class: 'ohne-ml-auto',
-        onClick: () => {
+      sortingPopup({
+        fields: () => sortableFields(collection),
+        order: state.order,
+        onApply: (order) => {
+          pending = order;
           apply = true;
-          finish();
         },
+        onClose: (close) =>
+          void close().then(() => {
+            sortingOpen.value = false;
+            if (apply) push({ order: pending });
+          }),
       });
-      effect(() => {
-        const changed = dirty.value;
-        applyButton.classList.toggle('ohne-button-primary', changed);
-        applyButton.classList.toggle('ohne-button-outline', !changed);
-      });
-
-      const handle = popup(
-        orderBy({
-          model: () => current.value,
-          fields: sortableFields,
-          onCommit: (order) => {
-            current.value = order;
-          },
-        }),
-        {
-          size: -1,
-          width: '50rem',
-          fullHeight: true,
-          header: h(
-            'div',
-            { class: 'ohne-row' },
-            h('span', { class: 'o-collection-table-title' }, () => t('dashboard.sort.title')),
-            closeButton,
-          ),
-          footer: h('div', { class: 'ohne-justify-between' }, applyButton),
-          onClose: () => guardedClose(),
-        },
-      );
-
-      const hotkeys = useHotkeys({
-        allowInOverlays: true,
-        target: () => handle.root,
-        listen: false,
-      });
-      setTimeout(() => {
-        hotkeys.isListening.value = true;
-        hotkeys.listen('save', (event) => {
-          event.preventDefault();
-          apply = true;
-          finish();
-        });
-      });
-
       return null;
     },
   );
@@ -947,30 +766,11 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
     h('div', { tabindex: '-1', class: 'o-collection-table-scroller o-scrollbar' }, grid.root),
     footer,
-    filterPopup,
-    columnsPopup,
-    sortingPopup,
+    filterHost,
+    columnsHost,
+    sortingHost,
     translationsHost,
   );
-}
-
-/**
- * Loads one page through `POST /collections/[segment]/query`; a failure resolves `undefined`.
- */
-async function loadPage(
-  segment: string,
-  body: Record<string, unknown>,
-): Promise<QueryPage | undefined> {
-  try {
-    const response = await api(`POST /collections/${segment}/query`, {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) return undefined;
-    return (await response.json()) as QueryPage;
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -989,76 +789,4 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * Seeds the label cache from a loaded page, so relation cells naming these rows resolve free.
- * A row missing a label part never seeds, so a page selecting only some parts cannot cache a partial join.
- */
-function seedLabels(collection: DashboardCollection, records: readonly TableRecord[]): void {
-  const names = collection.labelFields;
-  if (isEmpty(names)) return;
-  for (const row of records) {
-    const uuid = row.UUID;
-    if (!isString(uuid) || !names.every((name) => hasKey(row, name))) continue;
-    const label = joinLabel(row, collection);
-    if (label !== '') seedLabel(collection.name, uuid, label);
-  }
-}
-
-/**
- * The cell's display content: system fields render specially, the rest through their field type.
- */
-function displayFor(field: DashboardField, row: TableRecord): Child {
-  if (field.name === '_updatedAt') {
-    return () => {
-      const value = row['_updatedAt'];
-      if (!isNumber(value)) return dimMark('-');
-      const language = useDashboardLanguage().value;
-      const variant: DateVariant = isToday(value) ? 'time' : 'short';
-      return h(
-        'span',
-        { class: 'ohne-truncate', title: dateFormat(language, 'full').format(value) },
-        dateFormat(language, variant).format(value),
-      );
-    };
-  }
-  if (field.name === 'UUID') {
-    return () => {
-      const value = row['UUID'];
-      if (!isString(value)) return dimMark('-');
-      return h('span', { class: 'cell-mono cell-dim', title: value }, value.slice(0, 8));
-    };
-  }
-  return fieldTypeFor(field).display({
-    field,
-    value: () => row[field.name],
-    language: () => useDashboardLanguage().value,
-  });
-}
-
-/**
- * Whether the timestamp falls on the viewer's local today.
- */
-function isToday(timestamp: number): boolean {
-  const date = new Date(timestamp);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
-
-/**
- * The memoized `_updatedAt` formatter for `language` in `variant`.
- */
-function dateFormat(language: string, variant: DateVariant): Intl.DateTimeFormat {
-  const key = `${language} ${variant}`;
-  let format = dateFormats.get(key);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, DATE_OPTIONS[variant]);
-    dateFormats.set(key, format);
-  }
-  return format;
 }

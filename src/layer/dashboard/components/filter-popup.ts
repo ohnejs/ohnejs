@@ -46,9 +46,9 @@ import { unsavedChanges } from './history.ts';
 import { actionButton } from './item-actions.ts';
 
 /**
- * Options for `dataTablePopup`.
+ * Options for `filterPopup`.
  */
-export interface DataTablePopupOptions {
+export interface FilterPopupOptions {
   /**
    * The popup title, read reactively when given as a getter.
    */
@@ -104,7 +104,7 @@ const OPERATOR_LABEL_KEYS = {
 let sequence = 0;
 
 css`
-  .o-data-table-title {
+  .o-filter-popup-title {
     font-weight: 500;
   }
 
@@ -194,7 +194,7 @@ css`
  * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
-export function dataTablePopup(options: DataTablePopupOptions): Popup {
+export function filterPopup(options: FilterPopupOptions): Popup {
   const t = useT();
   const id = `o-where-filters-${++sequence}`;
   const version = ref(0);
@@ -574,7 +574,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     header: h(
       'div',
       { class: 'ohne-row' },
-      h('span', { class: 'o-data-table-title' }, options.title),
+      h('span', { class: 'o-filter-popup-title' }, options.title),
       closeButton,
     ),
     footer: h('div', { class: 'ohne-justify-between' }, applyButton),
