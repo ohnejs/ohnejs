@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   editableTableColumns,
+  orderedSelection,
   parseTableState,
   resolveTableColumns,
   serializeTableColumnEdits,
@@ -141,6 +142,23 @@ describe('stripEditParam', () => {
       stripEditParam('?where={email:{contains:@}}&edit=[title,abc]'),
       '?where={email:{contains:@}}',
     );
+  });
+});
+
+describe('orderedSelection', () => {
+  it('keeps retained entries in order and appends new picks', () => {
+    deepStrictEqual(orderedSelection(['a', 'b'], { a: true, b: true, c: true }), ['a', 'b', 'c']);
+    deepStrictEqual(orderedSelection([], { a: true, b: true }), ['a', 'b']);
+  });
+
+  it('drops deselected entries without reshuffling the rest', () => {
+    deepStrictEqual(orderedSelection(['a', 'b', 'c'], { a: true, c: true }), ['a', 'c']);
+    deepStrictEqual(orderedSelection(['a', 'b'], { b: true }), ['b']);
+  });
+
+  it('ignores keys marked false and never re-appends a kept entry', () => {
+    deepStrictEqual(orderedSelection(['a'], { a: true, b: false }), ['a']);
+    deepStrictEqual(orderedSelection(['b', 'a'], { a: true, b: true }), ['b', 'a']);
   });
 });
 

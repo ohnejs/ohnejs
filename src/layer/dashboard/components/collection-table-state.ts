@@ -430,6 +430,27 @@ export function sortFromOrder(
 }
 
 /**
+ * The ordered selection after a selection-map write.
+ * Entries of `previous` still selected keep their order; newly selected keys append in map order.
+ * The record picker maintains pick order with this, so applying never reshuffles linked records.
+ *
+ * @example
+ * ```ts
+ * orderedSelection(['a', 'b'], { a: true, b: true, c: true }) // -> ['a', 'b', 'c']
+ * orderedSelection(['a', 'b'], { b: true })                   // -> ['b']
+ * ```
+ */
+export function orderedSelection(
+  previous: readonly string[],
+  selected: Readonly<Record<number | string, boolean>>,
+): string[] {
+  const kept = previous.filter((key) => selected[key] === true);
+  const seen = new Set(kept);
+  const added = Object.keys(selected).filter((key) => selected[key] === true && !seen.has(key));
+  return [...kept, ...added];
+}
+
+/**
  * A search string without the `edit` deep-link param, in `location.search` form.
  * The per-segment memory stores this, so returning to a collection never reopens an edit popup.
  *

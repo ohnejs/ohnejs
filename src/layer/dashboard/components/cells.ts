@@ -10,6 +10,7 @@ import {
 } from 'ohne/dashboard';
 import { effect, ref } from 'ohne/utils';
 
+import './data-table-popup.ts';
 import './roles-field.ts';
 
 // The hash never reaches the browser and an emptied field omits, so a password is never cleared here.
