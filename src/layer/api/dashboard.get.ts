@@ -6,6 +6,7 @@ import {
   defineHandler,
   type FieldInstance,
   type FieldQueryMeta,
+  isRecordLabelTemplate,
   type LogicalType,
   type Message,
   queryMetadata,
@@ -23,6 +24,7 @@ import {
   isString,
   isUndefined,
   naturalCompare,
+  templateFields,
   toKebabCase,
   toSentenceCase,
 } from 'ohne/utils';
@@ -224,9 +226,16 @@ export interface DashboardCollection {
 
   /**
    * The fields whose non-empty values, joined with single spaces in order, name a record.
-   * The declared `recordLabel` as a list, or the first readable plain text field; empty without either.
+   * The declared `recordLabel` as a list, a template's tokens, or the first readable plain text field.
+   * Empty without any of those.
    */
   labelFields: readonly string[];
+
+  /**
+   * The declared label template, its `{field}` tokens over `labelFields`; absent for the joined form.
+   * When present, the label renders from the template instead of the space-joined parts.
+   */
+  labelTemplate?: string;
 }
 
 /**
@@ -333,6 +342,10 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
       fields,
       labelFields: labelFieldsOf(dashboard?.recordLabel, fields),
     };
+    const recordLabel = dashboard?.recordLabel;
+    if (!isUndefined(recordLabel) && isRecordLabelTemplate(recordLabel)) {
+      collection.labelTemplate = recordLabel;
+    }
     if (!isUndefined(dashboard?.icon)) collection.icon = dashboard.icon;
     if (!isUndefined(dashboard?.table)) collection.table = dashboard.table;
     collections.push(collection);
@@ -515,13 +528,17 @@ function subInstancesOf(
 
 /**
  * The fields that name a record: the declared `recordLabel` as a list, or the first plain text field.
+ * A declared template contributes its `{field}` tokens in order.
  * The fallback is the first readable plain `text` column, never `UUID` or a password.
  */
 function labelFieldsOf(
   declared: RecordLabel | undefined,
   fields: readonly DashboardField[],
 ): readonly string[] {
-  if (!isUndefined(declared)) return isString(declared) ? [declared] : declared;
+  if (!isUndefined(declared)) {
+    if (isRecordLabelTemplate(declared)) return templateFields(declared) ?? [];
+    return isString(declared) ? [declared] : declared;
+  }
   const fallback = fields.find(
     (field) =>
       field.readable &&

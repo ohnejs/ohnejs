@@ -92,6 +92,14 @@ useCollections().register('DashPublic', {
     fields: { title: field('text') },
   },
 });
+useCollections().register('DashPeople', {
+  name: 'DashPeople',
+  collection: {
+    api: { read: 'public' },
+    dashboard: { recordLabel: '{lastName}, {firstName}' },
+    fields: { firstName: field('text'), lastName: field('text') },
+  },
+});
 useCollections().register('DashClosed', {
   name: 'DashClosed',
   collection: { fields: { title: field('text') } },
@@ -224,6 +232,7 @@ describe('access', () => {
       'DashNotes',
       'DashOwners',
       'DashPublic',
+      'DashPeople',
       'DashArticles',
       'DashLabels',
       'DashPages',
@@ -238,6 +247,7 @@ describe('access', () => {
       'DashNotes',
       'DashOwners',
       'DashPublic',
+      'DashPeople',
       'DashDenied',
       'DashArticles',
       'DashLabels',
@@ -289,6 +299,14 @@ describe('labelFields', () => {
     const { body } = await call(user);
     deepStrictEqual(collection(body, 'DashNotes').labelFields, ['title', 'note']);
     deepStrictEqual(collection(body, 'DashPublic').labelFields, ['title']);
+  });
+
+  it('ships a template recordLabel as its tokens plus the template', async () => {
+    const { body } = await call(user);
+    const people = collection(body, 'DashPeople');
+    deepStrictEqual(people.labelFields, ['lastName', 'firstName']);
+    strictEqual(people.labelTemplate, '{lastName}, {firstName}');
+    strictEqual('labelTemplate' in collection(body, 'DashNotes'), false);
   });
 
   it('derives the first readable plain text field when none is declared', async () => {
@@ -374,6 +392,7 @@ describe('menu', () => {
           'Sessions',
           'DashOwners',
           'DashPublic',
+          'DashPeople',
           'DashArticles',
           'DashLabels',
           'DashPages',
@@ -393,6 +412,7 @@ describe('menu', () => {
           'Sessions',
           'DashOwners',
           'DashPublic',
+          'DashPeople',
           'DashDenied',
           'DashArticles',
           'DashLabels',

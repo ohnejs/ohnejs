@@ -67,7 +67,7 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
 
   const keep = (row: Record<string, unknown>): DynamicSelectChoice => {
     const uuid = String(row.UUID);
-    const label = joinLabel(row, names);
+    const label = joinLabel(row, target);
     const resolved = label !== '' ? label : fallbackLabel(uuid);
     seedLabel(target.name, uuid, resolved);
     const choice = { value: uuid, label: resolved };

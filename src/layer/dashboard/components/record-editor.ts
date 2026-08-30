@@ -629,7 +629,7 @@ function changedSince(full: RecordRow, original: RecordRow): RecordRow {
  */
 function seedRecordLabel(collection: DashboardCollection, row: RecordRow): void {
   if (!isString(row.UUID)) return;
-  const label = joinLabel(row, collection.labelFields);
+  const label = joinLabel(row, collection);
   if (label !== '') seedLabel(collection.name, row.UUID, label);
 }
 

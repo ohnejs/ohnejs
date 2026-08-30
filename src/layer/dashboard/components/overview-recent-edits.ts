@@ -383,7 +383,7 @@ async function fillBucket(bucket: Bucket): Promise<void> {
       const uuid = row.UUID;
       const updatedAt = row._updatedAt;
       if (!isString(uuid) || !isNumber(updatedAt)) continue;
-      const label = joinLabel(row, bucket.collection.labelFields);
+      const label = joinLabel(row, bucket.collection);
       bucket.rows.push({
         collectionName: bucket.collection.name,
         collectionLabel: bucket.collection.label,

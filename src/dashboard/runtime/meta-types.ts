@@ -190,9 +190,16 @@ export interface DashboardCollection {
 
   /**
    * The fields whose non-empty values, joined with single spaces in order, name a record.
-   * The declared `recordLabel` as a list, or the first readable plain text field; empty without either.
+   * The declared `recordLabel` as a list, a template's tokens, or the first readable plain text field.
+   * Empty without any of those.
    */
   labelFields: readonly string[];
+
+  /**
+   * The declared label template, its `{field}` tokens over `labelFields`; absent for the joined form.
+   * When present, the label renders from the template instead of the space-joined parts.
+   */
+  labelTemplate?: string;
 }
 
 /**

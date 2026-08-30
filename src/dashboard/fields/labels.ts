@@ -6,6 +6,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref, type Ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
+import { renderTemplate } from '../../utils/template/render-template.ts';
 import { api } from '../runtime/api.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
 
@@ -59,11 +60,13 @@ export function fallbackLabel(uuid: string): string {
 }
 
 /**
- * Joins a row's label-field values with single spaces, skipping empty ones; `''` when none carries text.
- * `names` is the collection's `labelFields`, as the discovery read resolves them.
+ * The label a row's values give a record of `collection`; `''` when no label field carries text.
+ * A declared `labelTemplate` renders with its literals, a literal dropping beside an empty field.
+ * Without one, the `labelFields` values join with single spaces in order, skipping empty ones.
  */
-export function joinLabel(row: Record<string, unknown>, names: readonly string[]): string {
-  return names
+export function joinLabel(row: Record<string, unknown>, collection: DashboardCollection): string {
+  if (!isUndefined(collection.labelTemplate)) return renderTemplate(collection.labelTemplate, row);
+  return collection.labelFields
     .map((name) => row[name])
     .filter((value): value is string => isString(value) && value !== '')
     .join(' ');
@@ -173,7 +176,7 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
       const uuid = row.UUID;
       if (!isString(uuid)) continue;
       answered.add(uuid);
-      const label = joinLabel(row, names);
+      const label = joinLabel(row, collection);
       write(target, uuid, label !== '' ? label : fallbackLabel(uuid));
     }
     for (const uuid of uuids) {

@@ -998,7 +998,7 @@ function seedLabels(collection: DashboardCollection, records: readonly TableReco
   for (const row of records) {
     const uuid = row.UUID;
     if (!isString(uuid) || !names.every((name) => hasKey(row, name))) continue;
-    const label = joinLabel(row, names);
+    const label = joinLabel(row, collection);
     if (label !== '') seedLabel(collection.name, uuid, label);
   }
 }

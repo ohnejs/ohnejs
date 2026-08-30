@@ -202,6 +202,11 @@ shows one: relation cells, record pickers, the activity feed. A list joins its p
 spaces, skipping empty values, so `['firstName', 'lastName']` renders as `Ada Lovelace`, and a
 picker search matches each of its first ten words against every part. Each part must be a readable
 plain text field.
+
+For anything beyond spaces, write a template: `'{lastName}, {firstName}'` renders as
+`Lovelace, Ada`, keeping the literal text between its fields. A literal only renders between
+filled fields, so an empty `firstName` gives `Lovelace`, not `Lovelace,`. Search and sorting keep
+working: the template's fields are the label fields.
 Omitted, the first readable text field titles the record. A record with no label text shows `#`
 plus the first eight characters of its `UUID`.
 
