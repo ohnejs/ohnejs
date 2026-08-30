@@ -28,7 +28,14 @@ export type {
   FilterValue,
 } from './fields/filter.ts';
 export { targetOf } from './fields/_search.ts';
-export { fallbackLabel, joinLabel, labelOf, seedLabel, wantLabels } from './fields/labels.ts';
+export {
+  fallbackLabel,
+  joinLabel,
+  knownLabel,
+  labelOf,
+  seedLabel,
+  wantLabels,
+} from './fields/labels.ts';
 export { parseIntegerValue, parseRealValue, parseTextValue } from './fields/parse.ts';
 export type { ScalarParse } from './fields/parse.ts';
 export { recordPicker, registerRecordPicker } from './fields/record-picker.ts';

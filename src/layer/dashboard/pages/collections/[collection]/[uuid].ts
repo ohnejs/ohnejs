@@ -4,7 +4,9 @@ import {
   type DashboardCollection,
   dashboardMeta,
   defineDashboardPage,
+  fallbackLabel,
   h,
+  knownLabel,
   setDocumentTitle,
   useT,
   when,
@@ -55,7 +57,7 @@ function pane(segment: () => string, uuid: () => string): Child {
         ? undefined
         : id === 'new'
           ? `${t('dashboard.new')} - ${collection.label}`
-          : `#${id.slice(0, 8)} - ${collection.label}`,
+          : `${knownLabel(collection.name, id) ?? fallbackLabel(id)} - ${collection.label}`,
     );
   });
   return when(

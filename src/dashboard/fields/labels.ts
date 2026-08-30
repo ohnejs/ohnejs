@@ -33,6 +33,15 @@ export function labelOf(target: string, uuid: string): string | undefined {
 }
 
 /**
+ * The label already resolved for one record, `undefined` while none is; it never fetches.
+ * The read is reactive, so the binding lands on the label the moment a seed writes one.
+ * A surface reading the record itself binds this and seeds from its own row, sparing a second query.
+ */
+export function knownLabel(target: string, uuid: string): string | undefined {
+  return entryOf(`${target}:${uuid}`).value;
+}
+
+/**
  * Requests labels ahead of display, so they resolve before their bindings first read.
  * Requests dedupe, batch per target, and flush on a microtask as one query per target.
  */

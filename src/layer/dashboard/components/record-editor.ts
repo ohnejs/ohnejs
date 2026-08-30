@@ -10,10 +10,12 @@ import {
   dashboardMeta,
   dropdown,
   dropdownItem,
+  fallbackLabel,
   type FieldForm,
   h,
   icon,
   joinLabel,
+  knownLabel,
   navigate,
   openDialog,
   overlayCount,
@@ -29,6 +31,7 @@ import {
 import {
   deepEqual,
   effect,
+  hasKey,
   isEmpty,
   isNull,
   isString,
@@ -203,6 +206,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       redirectGone();
       return;
     }
+    seedRecordLabel(collection, row);
     form.value?.dispose();
     form.value = buildForm(row);
     history.push(currentState() ?? {});
@@ -354,7 +358,11 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       h('span', { class: 'ohne-truncate' }, collection.label),
       create
         ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
-        : h('span', { class: 'ohne-shrink-0 ohne-muted' }, `(#${id.slice(0, 8)})`),
+        : h(
+            'span',
+            { class: 'ohne-truncate ohne-muted' },
+            () => `(${knownLabel(collection.name, id) ?? fallbackLabel(id)})`,
+          ),
     ),
   );
 
@@ -625,12 +633,18 @@ function changedSince(full: RecordRow, original: RecordRow): RecordRow {
 }
 
 /**
- * Seeds the label cache with the saved record's own label, so relation cells resolve it for free.
+ * Seeds the label cache with the record's own label, so the header, the title, and relation cells read it.
+ * A row carrying every label field and still joining to nothing names the record by `fallbackLabel`.
+ * A scoped answer that omits one seeds nothing: its empty join says nothing about the record.
  */
 function seedRecordLabel(collection: DashboardCollection, row: RecordRow): void {
-  if (!isString(row.UUID)) return;
+  const uuid = row.UUID;
+  if (!isString(uuid)) return;
   const label = joinLabel(row, collection);
-  if (label !== '') seedLabel(collection.name, row.UUID, label);
+  if (label !== '') seedLabel(collection.name, uuid, label);
+  else if (collection.labelFields.every((name) => hasKey(row, name))) {
+    seedLabel(collection.name, uuid, fallbackLabel(uuid));
+  }
 }
 
 /**
