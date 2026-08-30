@@ -3,6 +3,7 @@
   "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
   "apply": "Primijeni",
+  "applyCount": "Primijeni ({count})",
   "cancel": "Otkaži",
   "clear": "Očisti",
   "clearSearch": "Očisti pretragu",
@@ -212,6 +213,7 @@
     "selectedCount": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
     "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
   },
+  "tableOverview": "Pregled tabele",
   "translations": {
     "copied": "Kopirano",
     "copy": "Kopiraj `{from}` u `{to}`",
