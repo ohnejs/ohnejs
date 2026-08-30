@@ -138,17 +138,17 @@ describe('defineField', () => {
       options: {
         choices: option<string[]>({ required: true }),
         max: option({ default: 10 }),
-        placeholder: option<string>(),
+        pattern: option<string>(),
       },
       emitType: (ctx) => {
         const choices: string[] = ctx.options.choices;
         const max: number = ctx.options.max;
-        const placeholder: string | undefined = ctx.options.placeholder;
+        const pattern: string | undefined = ctx.options.pattern;
         const nullable: boolean = ctx.options.nullable;
         const label = ctx.importType('./geo.ts', 'LatLng');
         // @ts-expect-error `nope` is neither a declared nor a common option
         const nope: unknown = ctx.options.nope;
-        return `${label}${choices.length}${max}${placeholder}${nullable}${nope}`;
+        return `${label}${choices.length}${max}${pattern}${nullable}${nope}`;
       },
     });
     strictEqual(def.columnType, 'text');

@@ -42,7 +42,7 @@ const COMMON = {
   immutable: false,
 };
 
-const TEXT = { ...COMMON, allowEmpty: false };
+const TEXT = { ...COMMON, allowEmpty: false, multiline: false };
 
 const LIST = { ...COMMON, allowEmpty: true };
 
@@ -198,7 +198,7 @@ describe('queryMetadata', () => {
         featured: {
           kind: 'column',
           fieldType: boolean,
-          options: COMMON,
+          options: { ...COMMON, display: 'checkbox' },
           nullable: false,
           logicalType: 'boolean',
           column: 'featured',

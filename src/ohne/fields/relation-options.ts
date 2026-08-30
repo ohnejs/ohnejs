@@ -56,6 +56,16 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
            * true
            */
           allowEmpty?: boolean;
+
+          /**
+           * The fewest links a written list may hold.
+           */
+          min?: number;
+
+          /**
+           * The most links a written list may hold.
+           */
+          max?: number;
         }
       | {
           /**
@@ -88,6 +98,16 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
            * true
            */
           allowEmpty?: boolean;
+
+          /**
+           * The fewest links a written list may hold.
+           */
+          min?: number;
+
+          /**
+           * The most links a written list may hold.
+           */
+          max?: number;
         }
   : {
       [C in keyof KnownCollections & string]:
@@ -128,6 +148,16 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
              * true
              */
             allowEmpty?: boolean;
+
+            /**
+             * The fewest links a written list may hold.
+             */
+            min?: number;
+
+            /**
+             * The most links a written list may hold.
+             */
+            max?: number;
           }
         | {
             /**
@@ -160,5 +190,15 @@ export type RecordsOptions = [keyof KnownCollections] extends [never]
              * true
              */
             allowEmpty?: boolean;
+
+            /**
+             * The fewest links a written list may hold.
+             */
+            min?: number;
+
+            /**
+             * The most links a written list may hold.
+             */
+            max?: number;
           };
     }[keyof KnownCollections & string];

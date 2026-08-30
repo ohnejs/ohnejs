@@ -197,6 +197,13 @@ export interface PresentationOptions {
    * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
    */
   description?: Message;
+
+  /**
+   * The hint an empty dashboard input shows for this field.
+   * Pass a message key to translate it per the viewer's language.
+   * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
+   */
+  placeholder?: Message;
 }
 
 /**

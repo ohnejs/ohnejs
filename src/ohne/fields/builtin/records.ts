@@ -1,8 +1,9 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
 
-import { isArray } from '../../../utils/index.ts';
+import { isArray, isUndefined } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
+import { validationMessage } from '../validation-message.ts';
 
 /**
  * The built-in `records` field type: an ordered many-to-many relation to another collection.
@@ -46,6 +47,16 @@ export const records = defineField({
      * true
      */
     allowEmpty: option({ default: true }),
+
+    /**
+     * The fewest links a written list may hold.
+     */
+    min: option<number>(),
+
+    /**
+     * The most links a written list may hold.
+     */
+    max: option<number>(),
   },
   schema: (ctx) => ({
     kind: 'junction',
@@ -58,5 +69,16 @@ export const records = defineField({
       !ctx.options.allowEmpty && isArray(value) && value.length === 0
         ? 'validation.emptyValue'
         : undefined,
+    (value, ctx) => {
+      if (!isArray(value)) return undefined;
+      const { min, max } = ctx.options;
+      if (!isUndefined(min) && value.length < min) {
+        return validationMessage('validation.minItems', { min });
+      }
+      if (!isUndefined(max) && value.length > max) {
+        return validationMessage('validation.maxItems', { max });
+      }
+      return undefined;
+    },
   ],
 });

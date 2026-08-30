@@ -20,7 +20,7 @@ describe('resolveFieldOptions', () => {
     columnType: 'text',
     options: {
       max: option({ default: 10 }),
-      placeholder: option<string>(),
+      pattern: option<string>(),
     },
   });
 
@@ -68,7 +68,7 @@ describe('resolveFieldOptions', () => {
   });
 
   it('keeps a passed declared value over its default', () => {
-    deepStrictEqual(resolveFieldOptions(bounded, { max: 5, placeholder: 'name' }), {
+    deepStrictEqual(resolveFieldOptions(bounded, { max: 5, pattern: 'name' }), {
       nullable: false,
       unique: false,
       index: false,
@@ -79,7 +79,7 @@ describe('resolveFieldOptions', () => {
       writable: true,
       immutable: false,
       max: 5,
-      placeholder: 'name',
+      pattern: 'name',
     });
   });
 

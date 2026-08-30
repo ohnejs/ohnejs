@@ -26,7 +26,7 @@ describe('resolveFieldStorage', () => {
   it('classifies a plain column with no hint', () => {
     deepStrictEqual(resolveFieldStorage('title', field('text'), text), {
       fieldType: text,
-      options: { ...COMMON, allowEmpty: false },
+      options: { ...COMMON, allowEmpty: false, multiline: false },
       hint: undefined,
       kind: 'column',
     });

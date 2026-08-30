@@ -30,6 +30,7 @@ const RESERVED_OPTIONS = new Set([
   'when',
   'label',
   'description',
+  'placeholder',
 ]);
 
 /**
