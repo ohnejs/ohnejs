@@ -309,6 +309,12 @@ describe('table', () => {
     deepStrictEqual(collection(body, 'DashNotes').table, { columns: ['title | 20rem', 'note'] });
     strictEqual('table' in collection(body, 'DashPublic'), false);
   });
+
+  it('ships the layer collections with their default icons', async () => {
+    const { body } = await call(admin);
+    strictEqual(collection(body, 'Users').icon, 'users');
+    strictEqual(collection(body, 'Sessions').icon, 'key');
+  });
 });
 
 describe('labelFields', () => {

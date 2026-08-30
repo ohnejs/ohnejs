@@ -30,6 +30,7 @@ export default defineCollection({
     read: { public: true, access: ownSessions },
     delete: { public: true, access: ownSessions },
   },
+  dashboard: { icon: 'key' },
   fields: {
     user: field('record', {
       collection: 'Users',

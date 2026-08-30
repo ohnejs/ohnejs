@@ -14,6 +14,7 @@ import { normalizeEmail } from '../auth/_email.ts';
  */
 const users = defineCollection({
   api: true,
+  dashboard: { icon: 'users' },
   fields: {
     email: field('text', {
       unique: true,
