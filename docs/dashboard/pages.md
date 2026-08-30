@@ -63,6 +63,47 @@ navigate('/authors/42');
 The most specific matching route wins, and a page's module loads on demand the first time its
 route matches. An unmatched path renders the dashboard's not-found page.
 
+## The sidebar
+
+A page is reachable by URL the moment its file exists. To give it a row in the sidebar, list it
+under `dashboard.menu` in [config](../project/config.md):
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohne';
+
+export default defineConfig({
+  dashboard: {
+    menu: [
+      {
+        label: 'Content',
+        items: ['Pages', 'Posts', { to: '/reports', label: 'Reports', icon: 'chart-bar' }],
+      },
+      { label: 'People', items: ['Users'] },
+    ],
+  },
+});
+```
+
+A group's `items` hold two kinds of row, in the order you write them.
+
+A **string** names a [collection](../database/collections.md) and renders its list link. The label
+and icon come from the collection itself, and the row disappears for a viewer who cannot reach it.
+
+An **object** is a link to any dashboard path: `to`, a `label`, and an optional
+[Tabler icon](https://tabler.io/icons). Nothing filters it - the dashboard knows no capability for
+a page - so scope one with the [`dashboard:menu`](../api/hooks.md#dashboardmenu) hook.
+
+The group's own `label` is its heading; omit it for a list without one. Both labels take a
+[message key](../i18n/messages.md), so a heading and a link translate per viewer:
+
+```ts
+{ label: 'menu.content', items: [{ to: '/reports', label: 'menu.reports' }] }
+```
+
+Collections you list nowhere trail in a final unlabeled group, and a group left with no row drops.
+Omit `menu` and the sidebar lists every accessible collection in one unlabeled group.
+
 ## What a page may import
 
 The shell injects an import map with exactly three entries:

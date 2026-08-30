@@ -21,6 +21,8 @@ import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
@@ -29,6 +31,12 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { keyBy } from '../../../src/utils/index.ts';
 
+declare module 'ohne' {
+  interface KnownMessages {
+    'dashMenu.tools': { n: number };
+  }
+}
+
 usePrinter().configure({ stream: { write: () => true } });
 
 useLayers().add({
@@ -36,7 +44,22 @@ useLayers().add({
   input: {
     auth: { password: { cost: 1024 } },
     collections: { locales: ['en', 'de'], defaultLocale: 'en' },
-    dashboard: { menu: [{ label: 'Content', collections: ['DashNotes', 'DashClosed'] }] },
+    dashboard: {
+      menu: [
+        {
+          label: 'Content',
+          items: [
+            'DashNotes',
+            { to: '/reports', label: 'dash.menu.reports', icon: 'chart-bar' },
+            'DashClosed',
+          ],
+        },
+        {
+          label: { key: 'dashMenu.tools', params: { n: 2 } },
+          items: [{ to: '/tools', label: 'Tools' }],
+        },
+      ],
+    },
   },
 });
 
@@ -57,6 +80,8 @@ useMessages().register('en', {
   'dash.owners.name.label': 'Owner name',
   'dash.kinds.title.placeholder': 'Short name',
   'dash.blocks.hero.label': 'Hero section',
+  'dash.menu.reports': 'Reports',
+  'dashMenu.tools': '{n, plural, one {# tool} other {# tools}}',
 });
 
 useCollections().register('DashNotes', {
@@ -226,6 +251,13 @@ async function call(bearer: string | null): Promise<{ status: number; body: Dash
 
 function names(body: DashboardMeta): string[] {
   return body.collections.map((collection) => collection.name);
+}
+
+function menuPaths(body: DashboardMeta): { label: string; items: string[] }[] {
+  return body.menu.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => item.to),
+  }));
 }
 
 function collection(body: DashboardMeta, name: string): DashboardCollection {
@@ -430,45 +462,83 @@ describe('fields', () => {
 
 describe('menu', () => {
   it('folds the configured groups over the accessible collections, the rest trailing', async () => {
-    deepStrictEqual((await call(user)).body.menu, [
-      { label: 'Content', collections: ['DashNotes'] },
+    deepStrictEqual(menuPaths((await call(user)).body), [
+      { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
+      { label: '2 tools', items: ['/tools'] },
       {
         label: '',
-        collections: [
-          'Sessions',
-          'DashOwners',
-          'DashPublic',
-          'DashPeople',
-          'DashArticles',
-          'DashLabels',
-          'DashPages',
-          'DashMetrics',
-          'DashKinds',
+        items: [
+          '/collections/sessions',
+          '/collections/dash-owners',
+          '/collections/dash-public',
+          '/collections/dash-people',
+          '/collections/dash-articles',
+          '/collections/dash-labels',
+          '/collections/dash-pages',
+          '/collections/dash-metrics',
+          '/collections/dash-kinds',
         ],
       },
     ]);
   });
 
   it('scopes the groups per user', async () => {
-    deepStrictEqual((await call(admin)).body.menu, [
-      { label: 'Content', collections: ['DashNotes'] },
+    deepStrictEqual(menuPaths((await call(admin)).body), [
+      { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
+      { label: '2 tools', items: ['/tools'] },
       {
         label: '',
-        collections: [
-          'Users',
-          'Sessions',
-          'DashOwners',
-          'DashPublic',
-          'DashPeople',
-          'DashDenied',
-          'DashArticles',
-          'DashLabels',
-          'DashPages',
-          'DashMetrics',
-          'DashKinds',
+        items: [
+          '/collections/users',
+          '/collections/sessions',
+          '/collections/dash-owners',
+          '/collections/dash-public',
+          '/collections/dash-people',
+          '/collections/dash-denied',
+          '/collections/dash-articles',
+          '/collections/dash-labels',
+          '/collections/dash-pages',
+          '/collections/dash-metrics',
+          '/collections/dash-kinds',
         ],
       },
     ]);
+  });
+
+  it('resolves a collection row to its list route, sentence-cased label, and declared icon', async () => {
+    const { menu } = (await call(admin)).body;
+    deepStrictEqual(menu[0]?.items[0], { to: '/collections/dash-notes', label: 'Dash notes' });
+    deepStrictEqual(menu[2]?.items[0], {
+      to: '/collections/users',
+      label: 'Users',
+      icon: 'users',
+    });
+  });
+
+  it('resolves a declared link as authored, its label in the request language', async () => {
+    const { menu } = (await call(user)).body;
+    deepStrictEqual(menu[0]?.items[1], { to: '/reports', label: 'Reports', icon: 'chart-bar' });
+    deepStrictEqual(menu[1], { label: '2 tools', items: [{ to: '/tools', label: 'Tools' }] });
+  });
+});
+
+describe('the dashboard:menu hook', () => {
+  it('filters the resolved menu, carrying the user and the accessible collections', async () => {
+    let seen: string[] = [];
+    hook('dashboard:menu', (menu, context) => {
+      seen = context.collections.map((entry) => entry.name);
+      return [...menu, { label: context.user.email, items: [{ to: '/audit', label: 'Audit' }] }];
+    });
+    try {
+      const { menu } = (await call(user)).body;
+      deepStrictEqual(menu.at(-1), {
+        label: 'user@example.com',
+        items: [{ to: '/audit', label: 'Audit' }],
+      });
+      deepStrictEqual(seen, names((await call(user)).body));
+    } finally {
+      useHooks().delete('dashboard:menu');
+    }
   });
 });
 

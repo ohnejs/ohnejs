@@ -27,6 +27,7 @@ export * from './dashboard/build-dashboard-page-manifest.ts';
 export * from './dashboard/collect-dashboard-pages.ts';
 export * from './dashboard/dashboard-page.ts';
 export * from './dashboard/dashboard-roots.ts';
+export * from './dashboard/menu.ts';
 export * from './dashboard/scan-dashboard-pages.ts';
 export * from './database/adapter.ts';
 export * from './database/connect.ts';

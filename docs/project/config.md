@@ -134,6 +134,8 @@ When and how to set these for production is covered in [deployment](../productio
 - `apiURL` - the absolute API base URL the browser calls, including any `api.basePath`. Omitted, it
   is derived from `api`; set it when the API sits at a different origin, such as behind a reverse
   proxy.
+- `menu` - the [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Omitted, the sidebar
+  lists every accessible collection in one unlabeled group.
 
 ## The database
 
@@ -205,11 +207,14 @@ Two kinds of keys resolve differently:
 - **Accumulating** - the five `disable` lists combine entries across every layer, deduped.
 - **Own** - never inherited: a layer's value applies to that layer alone, and only your own config
   reaches your app. These are `dirs`, `printer`, `api.port`, `api.host`, `dashboard.port`,
-  `dashboard.host`, `dashboard.apiURL`, `database.dialect`, `database.url`, and
-  `database.sync.force`.
+  `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`, `dashboard.menu`, `database.dialect`,
+  `database.url`, and `database.sync.force`.
 
 The own list is a trust boundary: a dependency layer cannot move your ports, point you at its
-database, silence your printer, or force a destructive sync. Leave an own key unset and the
+database, silence your printer, or force a destructive sync. It cuts both ways for
+`dashboard.menu`: a layer that ships dashboard pages cannot add its own sidebar rows, so list them
+yourself or have the layer append them through the [`dashboard:menu`](../api/hooks.md#dashboardmenu)
+hook. Leave an own key unset and the
 framework default applies, no matter what any layer set.
 
 ## Reading config

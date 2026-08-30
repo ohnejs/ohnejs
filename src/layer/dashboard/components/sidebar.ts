@@ -13,7 +13,7 @@ import {
   verticalMenu,
   when,
 } from 'ohne/dashboard';
-import { isUndefined, withTrailingSlash } from 'ohne/utils';
+import { isEmpty, isUndefined, withTrailingSlash } from 'ohne/utils';
 
 css`
   .o-menu-wrapper > * + * {
@@ -24,9 +24,9 @@ css`
 /**
  * The sidebar menu column.
  * Each discovery menu group renders one `verticalMenu`, the group label as its uppercase title.
- * An empty label renders the list without one, and each collection contributes one link row.
- * A link is active while the route sits under its collection, so record pages highlight it too.
- * A collection's declared icon renders before its label.
+ * An empty label renders the list without one, and each group row contributes one link.
+ * A row is active while the route sits under its target, so record pages highlight their collection.
+ * A row's icon renders before its label.
  * The discovery data carries no submenus, so the menu stays flat.
  */
 export function sidebar(): HTMLElement {
@@ -43,11 +43,11 @@ export function sidebar(): HTMLElement {
 }
 
 /**
- * One menu group, rendered only while it resolves at least one link.
+ * One menu group, rendered only while it holds a row.
  */
 function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
   return when(
-    () => itemsOf(group()).length > 0,
+    () => !isEmpty(group().items),
     () =>
       verticalMenu({
         title: group().label === '' ? undefined : group().label,
@@ -59,24 +59,19 @@ function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
 }
 
 /**
- * The group's link rows: each collection name resolved against the discovery store.
- * Active is a trailing-slash-normalized prefix match.
+ * The group's rows as menu models, active while the route sits at or under the row's target.
  */
 function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
-  const collections = dashboardMeta()?.collections ?? [];
   const path = withTrailingSlash(useRoute()?.path ?? '/');
-  const items: VerticalMenuItemModel[] = [];
-  for (const name of group.collections) {
-    const entry = collections.find((candidate) => candidate.name === name);
-    if (isUndefined(entry)) continue;
-    const to = `/collections/${entry.segment}`;
+  return group.items.map((entry) => {
+    const to = withTrailingSlash(entry.to);
     const item: VerticalMenuItemModel = {
-      to,
+      to: entry.to,
       label: entry.label,
-      active: path.startsWith(withTrailingSlash(to)),
+      // Every path sits under the root, so a row targeting it matches exactly instead.
+      active: to === '/' ? path === '/' : path.startsWith(to),
     };
     if (!isUndefined(entry.icon)) item.icon = icon(entry.icon);
-    items.push(item);
-  }
-  return items;
+    return item;
+  });
 }

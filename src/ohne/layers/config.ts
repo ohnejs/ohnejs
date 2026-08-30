@@ -8,9 +8,11 @@ import type {
 import type { KnownBlocks } from '../blocks/known-blocks.ts';
 import type { KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
+import type { DashboardMenuEntry } from '../dashboard/menu.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
+import type { Message } from '../messages/known-messages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
 import type { KnownRoles } from '../roles/known-roles.ts';
 import type { LayerName } from './layer-name.ts';
@@ -588,21 +590,43 @@ export interface Config {
 
     /**
      * Menu groups for the dashboard sidebar, in order.
-     * Each group names the collections it holds; a group whose collections are all inaccessible drops.
+     * Each group holds collection names and page links; a group left with no row drops.
+     * A collection the viewer cannot reach drops from its group.
      * Accessible collections in no group land in a trailing unlabeled group.
      * Omitted, the menu lists every accessible collection in one unlabeled group.
+     *
+     * @example
+     * ```ts
+     * menu: [
+     *   { label: 'menu.content', items: ['Pages', 'Posts'] },
+     *   {
+     *     label: 'Shop',
+     *     items: ['Orders', { to: '/sales', label: 'Sales', icon: 'coin' }],
+     *   },
+     *   { items: ['Users'] },
+     * ]
+     * ```
      */
     menu?: {
       /**
-       * The group's heading, as a message key or plain text.
+       * The group's heading, shown above its rows.
+       * Pass a message key to translate it per the viewer's language.
+       * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
        * Omitted renders the group without a heading.
+       *
+       * @example
+       * ```ts
+       * label: 'menu.content'                         // a message key, translated
+       * label: { key: 'menu.shop', params: { n: 2 } } // a parameterized message
+       * ```
        */
-      label?: string;
+      label?: Message;
 
       /**
-       * The registered collection names the group holds, in order.
+       * The rows the group holds, in order.
+       * A collection name renders that collection's list link; a link object opens any dashboard page.
        */
-      collections: string[];
+      items: DashboardMenuEntry[];
     }[];
   };
 

@@ -61,6 +61,7 @@ export type {
   DashboardCollection,
   DashboardField,
   DashboardMenuGroup,
+  DashboardMenuItem,
   DashboardMeta,
   DashboardOperation,
   DashboardOperations,

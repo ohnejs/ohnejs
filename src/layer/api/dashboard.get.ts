@@ -1,8 +1,10 @@
 import {
+  applyHook,
   blockQueryMetadata,
   type Capability,
   type CollectionAPI,
   type CollectionEndpoint,
+  type DashboardMenuLink,
   defineHandler,
   type FieldInstance,
   type FieldQueryMeta,
@@ -273,7 +275,28 @@ export interface DashboardBlock {
 }
 
 /**
- * One sidebar menu group: a heading and the collections it holds.
+ * One sidebar menu row: a link the dashboard draws, already resolved for the signed-in user.
+ * A collection row and a declared page link arrive in the same shape, so the sidebar renders one kind.
+ */
+export interface DashboardMenuItem {
+  /**
+   * The dashboard path the row opens; a collection row points at its list route.
+   */
+  to: string;
+
+  /**
+   * The row label, resolved in the request's language.
+   */
+  label: string;
+
+  /**
+   * The Tabler icon shown before the label; absent when the row declares none.
+   */
+  icon?: IconName;
+}
+
+/**
+ * One sidebar menu group: a heading and the rows it holds.
  */
 export interface DashboardMenuGroup {
   /**
@@ -282,9 +305,9 @@ export interface DashboardMenuGroup {
   label: string;
 
   /**
-   * The collection names the group holds, in order.
+   * The rows the group holds, in order.
    */
-  collections: string[];
+  items: DashboardMenuItem[];
 }
 
 /**
@@ -292,7 +315,8 @@ export interface DashboardMenuGroup {
  */
 export interface DashboardMeta {
   /**
-   * The sidebar menu groups, resolved from `dashboard.menu` and filtered to accessible collections.
+   * The sidebar menu groups, resolved from `dashboard.menu` and filtered by the `dashboard:menu` hook.
+   * Collection rows are scoped to what the user may reach; a declared link is not.
    */
   menu: DashboardMenuGroup[];
 
@@ -321,6 +345,23 @@ export interface DashboardMeta {
    * The locale an unspecified read or write addresses.
    */
   defaultLocale: string;
+}
+
+declare module 'ohne' {
+  interface Hooks {
+    /**
+     * Filters the sidebar menu after `dashboard.menu` resolves, before `GET /dashboard` answers.
+     * Fires once per discovery read, inside the request context, so the viewer's language is in scope.
+     * The groups arrive resolved: every row carries a `to`, a translated `label`, and any icon.
+     * Append a group, reorder the rows, or drop a link the `context.user` should not see.
+     * Collection rows are already scoped to what the user may reach; a declared link is not.
+     * Return a replacement `DashboardMenuGroup[]`, or mutate the array in place and return nothing.
+     */
+    'dashboard:menu': (
+      menu: DashboardMenuGroup[],
+      context: { user: User; collections: readonly DashboardCollection[] },
+    ) => void | DashboardMenuGroup[] | Promise<void | DashboardMenuGroup[]>;
+  }
 }
 
 const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -367,8 +408,9 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     collections.push(collection);
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
+  const menu = await applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
   return {
-    menu: resolveMenu(collections),
+    menu,
     collections,
     blocks: describeBlocks(collections),
     roles: useRoles().keys(),
@@ -595,20 +637,51 @@ function labelFieldsOf(
 /**
  * Folds the configured `dashboard.menu` over the accessible collections.
  * Configured groups keep their order and drop inaccessible names; the rest trail unlabeled.
+ * A named collection is spent on first use, so a later group cannot repeat it.
+ * A declared link resolves as authored: the dashboard knows no capability for a page.
  */
 function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
-  const names = new Set(collections.map((collection) => collection.name));
+  const unplaced = new Map(collections.map((collection) => [collection.name, collection]));
   const groups: DashboardMenuGroup[] = [];
   for (const group of useConfig().dashboard?.menu ?? []) {
-    const members = group.collections.filter((name) => names.has(name));
-    for (const name of members) names.delete(name);
-    if (!isEmpty(members)) {
-      groups.push({
-        label: isUndefined(group.label) ? '' : resolveMessage(group.label),
-        collections: members,
-      });
+    const items: DashboardMenuItem[] = [];
+    for (const entry of group.items) {
+      if (!isString(entry)) {
+        items.push(linkItem(entry));
+        continue;
+      }
+      const collection = unplaced.get(entry);
+      if (isUndefined(collection)) continue;
+      unplaced.delete(entry);
+      items.push(collectionItem(collection));
+    }
+    if (!isEmpty(items)) {
+      groups.push({ label: isUndefined(group.label) ? '' : resolveMessage(group.label), items });
     }
   }
-  if (names.size > 0) groups.push({ label: '', collections: [...names] });
+  if (unplaced.size > 0) {
+    groups.push({ label: '', items: [...unplaced.values()].map(collectionItem) });
+  }
   return groups;
+}
+
+/**
+ * One collection's row: its list route, its label, and its declared icon.
+ */
+function collectionItem(collection: DashboardCollection): DashboardMenuItem {
+  const item: DashboardMenuItem = {
+    to: `/collections/${collection.segment}`,
+    label: collection.label,
+  };
+  if (!isUndefined(collection.icon)) item.icon = collection.icon;
+  return item;
+}
+
+/**
+ * One declared link's row, its label resolved in the request's language.
+ */
+function linkItem(link: DashboardMenuLink): DashboardMenuItem {
+  const item: DashboardMenuItem = { to: link.to, label: resolveMessage(link.label) };
+  if (!isUndefined(link.icon)) item.icon = link.icon;
+  return item;
 }

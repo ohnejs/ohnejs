@@ -235,7 +235,28 @@ export interface DashboardBlock {
 }
 
 /**
- * One sidebar menu group: a heading and the collections it holds.
+ * One sidebar menu row: a link the dashboard draws, already resolved for the signed-in user.
+ * A collection row and a declared page link arrive in the same shape, so the sidebar renders one kind.
+ */
+export interface DashboardMenuItem {
+  /**
+   * The dashboard path the row opens; a collection row points at its list route.
+   */
+  to: string;
+
+  /**
+   * The row label, resolved in the request's language.
+   */
+  label: string;
+
+  /**
+   * The Tabler icon shown before the label; absent when the row declares none.
+   */
+  icon?: IconName;
+}
+
+/**
+ * One sidebar menu group: a heading and the rows it holds.
  */
 export interface DashboardMenuGroup {
   /**
@@ -244,9 +265,9 @@ export interface DashboardMenuGroup {
   label: string;
 
   /**
-   * The collection names the group holds, in order.
+   * The rows the group holds, in order.
    */
-  collections: string[];
+  items: DashboardMenuItem[];
 }
 
 /**
@@ -254,7 +275,7 @@ export interface DashboardMenuGroup {
  */
 export interface DashboardMeta {
   /**
-   * The sidebar menu groups, filtered to accessible collections.
+   * The sidebar menu groups, their rows resolved for this user.
    */
   menu: DashboardMenuGroup[];
 

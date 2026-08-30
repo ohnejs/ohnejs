@@ -77,6 +77,7 @@ Every built-in hook, by the lifecycle it belongs to. Each is covered below.
 | `query:complete`       | action | a row read finished, with its timing                      |
 | `populate:targets`     | filter | a populate node's target records, before they key back    |
 | `schema:synced`        | action | the schema reconcile committed                            |
+| `dashboard:menu`       | filter | the dashboard sidebar resolved, before discovery answers  |
 
 ## Server lifecycle
 
@@ -480,6 +481,33 @@ hook('schema:synced', async (report) => {
   }
 });
 ```
+
+## The dashboard
+
+### `dashboard:menu`
+
+Filters the [sidebar menu](../dashboard/pages.md#the-sidebar) after `dashboard.menu` resolves, just
+before `GET /dashboard` answers. It fires once per discovery read, inside the request context, so
+the viewer's language is in scope. The groups arrive resolved: every row already carries a `to`, a
+translated `label`, and any icon, so a layer can append a group without knowing the config. Return
+a replacement `DashboardMenuGroup[]`, or mutate the array in place and return nothing.
+
+Collection rows are already scoped to what the user may reach. A declared link is not - the
+dashboard knows no capability for a page - so this is where you scope one:
+
+```ts
+// boot/menu.ts
+import { hook } from 'ohne';
+
+hook('dashboard:menu', (menu, { user }) => {
+  if (user.roles.includes('admin')) {
+    menu.push({ label: 'Ops', items: [{ to: '/audit', label: 'Audit log', icon: 'history' }] });
+  }
+});
+```
+
+The `context` also carries `collections`, the accessible collections as the same read describes
+them, so a group can be built from the registry rather than named one by one.
 
 ## Declaring your own
 
