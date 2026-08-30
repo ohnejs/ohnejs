@@ -209,6 +209,12 @@ export interface CollectionDashboard<TField extends string = string> {
   /**
    * The list view's defaults for this collection.
    * A viewer's own choice, carried in the `columns` query param, overrides them.
+   * A column entry is `name`, `name | width`, or `name | width | minWidth`.
+   *
+   * @example
+   * ```ts
+   * table: { columns: ['title | 25% | 16rem', 'views', '_updatedAt | 150px'] }
+   * ```
    */
   table?: CollectionTable<TField>;
 }
