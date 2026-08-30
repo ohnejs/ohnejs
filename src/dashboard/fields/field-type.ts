@@ -1,5 +1,6 @@
 import type { Child } from '../render/insert.ts';
 import type { DashboardField } from '../runtime/meta-types.ts';
+import type { FilterOperator, FilterValue } from './filter.ts';
 
 import { isArray } from '../../utils/is/is-array.ts';
 import { isNull } from '../../utils/is/is-null.ts';
@@ -183,6 +184,69 @@ export interface FieldControl {
 }
 
 /**
+ * What a field type's filter `input` receives.
+ * The hosting builder owns the condition; the input reads and writes it through this handle.
+ */
+export interface FieldFilterContext {
+  /**
+   * The field, as the discovery read describes it.
+   */
+  field: DashboardField;
+
+  /**
+   * The condition's active operator; read it reactively to follow operator switches.
+   */
+  operator(): FilterOperator;
+
+  /**
+   * The condition's live value; read it reactively to follow tree edits like a duplicate.
+   */
+  value(): FilterValue;
+
+  /**
+   * Writes the value without re-rendering the tree, for live typing.
+   */
+  set(next: FilterValue): void;
+
+  /**
+   * Writes the value and commits the tree, so the builder re-reads its dirt.
+   * Call it with no argument to commit what `set` already wrote, like on blur.
+   */
+  commit(next?: FilterValue): void;
+
+  /**
+   * The id the rendered input carries, wired to the builder's labels.
+   */
+  inputID: string;
+
+  /**
+   * The dashboard's active language, for locale-aware formatting.
+   */
+  language(): string;
+}
+
+/**
+ * One field type's filter behaviour: the operators it compares with and the value input it renders.
+ * A field type without one never appears in the filter builder.
+ */
+export interface FieldFilter {
+  /**
+   * The operators the field admits, first one seeding a fresh condition.
+   */
+  operators(field: DashboardField): FilterOperator[];
+
+  /**
+   * The value a fresh condition on the field starts with.
+   */
+  seed(field: DashboardField): FilterValue;
+
+  /**
+   * Renders the condition's value input.
+   */
+  input(context: FieldFilterContext): Child;
+}
+
+/**
  * One field type's dashboard behaviour: how it displays in a cell, edits in place, and edits in a form.
  */
 export interface FieldType {
@@ -202,6 +266,11 @@ export interface FieldType {
    * The hosting form then carries the stored value through unchanged.
    */
   control?(context: FieldControlContext): FieldControl | undefined;
+
+  /**
+   * The field's filter behaviour; a type without one never appears in the filter builder.
+   */
+  filter?: FieldFilter;
 }
 
 const registry = new Map<string, FieldType>();

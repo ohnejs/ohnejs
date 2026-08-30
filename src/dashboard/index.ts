@@ -14,8 +14,19 @@ export type {
   FieldControl,
   FieldControlContext,
   FieldEditorContext,
+  FieldFilter,
+  FieldFilterContext,
   FieldType,
 } from './fields/field-type.ts';
+export { filterFromWhere, filterKey, filterToWhere } from './fields/filter.ts';
+export type {
+  FilterCondition,
+  FilterGroup,
+  FilterModel,
+  FilterNode,
+  FilterOperator,
+  FilterValue,
+} from './fields/filter.ts';
 export { targetOf } from './fields/_search.ts';
 export { fallbackLabel, joinLabel, labelOf, seedLabel, wantLabels } from './fields/labels.ts';
 export { parseIntegerValue, parseRealValue, parseTextValue } from './fields/parse.ts';
