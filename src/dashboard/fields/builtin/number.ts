@@ -1,8 +1,11 @@
+import type { Ref } from '../../../utils/reactive/ref.ts';
+
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
+import { numberInput } from '../../ui/number-input.ts';
 import { textInput } from '../../ui/text-input.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
@@ -51,7 +54,7 @@ export const numberType: FieldType = {
       onInput();
     };
 
-    const control = textInput(raw, { disabled: () => off });
+    const control = textInput(raw, { disabled: () => off, placeholder: field.placeholder });
     const input = control.querySelector('input') as HTMLInputElement;
     control.classList.add('ohne-input-numeric');
     input.setAttribute('inputmode', 'decimal');
@@ -101,6 +104,26 @@ export const numberType: FieldType = {
         routed.value = '';
       },
     };
+  },
+  filter: {
+    operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
+    seed: () => 0,
+    input({ value, set, commit, inputID }) {
+      const bridged: Ref<number> = {
+        get value() {
+          return Number(value());
+        },
+        set value(next) {
+          set(next);
+        },
+      };
+      return numberInput(bridged, {
+        id: inputID,
+        name: inputID,
+        showSteppers: true,
+        onCommit: (next) => commit(next),
+      });
+    },
   },
 };
 

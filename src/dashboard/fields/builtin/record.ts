@@ -172,6 +172,7 @@ function emptyPage(): DynamicSelectPaginatedChoices {
  * The form control is the async `dynamicSelect` combobox over the target's records.
  * Beside it sit an open-in-new-tab button and, on a nullable field, a clear button while linked.
  * The inline cell editor is a plain mono `UUID` input; combobox editing lives in the edit popup.
+ * The filter compares by identity through the same combobox.
  * When the target is unreadable or has no label field, the mono `UUID` input stands in everywhere.
  */
 export const recordType: FieldType = {
@@ -303,6 +304,49 @@ export const recordType: FieldType = {
         sync?.();
       },
     };
+  },
+  filter: {
+    operators: () => ['eq', 'ne'],
+    seed: () => '',
+    input(context) {
+      const target = untracked(() => targetOf(context.field));
+      if (isUndefined(target) || isEmpty(target.labelFields)) {
+        const bridged: Ref<string> = {
+          get value() {
+            return String(context.value());
+          },
+          set value(next) {
+            context.set(next);
+          },
+        };
+        const control = textInput(bridged, {
+          id: context.inputID,
+          name: context.inputID,
+          onBlur: () => context.commit(),
+        });
+        control.classList.add('cell-mono');
+        return control;
+      }
+      const t = useT();
+      const source = recordChoiceSource(target);
+      const bridged: Ref<Primitive> = {
+        get value() {
+          const current = context.value();
+          return current === '' ? null : current;
+        },
+        set value(next) {
+          context.commit(isString(next) ? next : '');
+        },
+      };
+      return dynamicSelect(bridged, {
+        choicesResolver: source.choicesResolver,
+        selectedChoiceResolver: (value) =>
+          isString(value) && value !== '' ? source.choiceOf(value) : Promise.resolve(null),
+        name: context.inputID,
+        searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
+        noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
+      });
+    },
   },
 };
 
