@@ -23,7 +23,8 @@ export default defineCollection({
 
 ## Column fields
 
-`text`, `integer`, `number`, and `boolean` are the column types. Each stores one value per row.
+`text`, `integer`, `number`, and `boolean` are the plain column types. Each stores one value per
+row. The choice and date-time types below store through the same columns, adding shape on top.
 
 `integer` holds whole numbers within JavaScript's safe range. `number` holds finite decimals - an
 IEEE 754 double, exactly what a JavaScript number is, so every stored value reads back unchanged.
@@ -44,8 +45,78 @@ fields: {
 A `text` field additionally rejects the empty string - `''` is not a value by default. Pass
 `allowEmpty: true` to permit it.
 
+`text`, `integer`, and `number` take `min` and `max` bounds. On `integer` and `number` they bound
+the value; on `text` they bound the length in characters:
+
+```ts
+fields: {
+  title: field('text', { min: 3, max: 120 }),
+  rating: field('integer', { min: 1, max: 5 }),
+}
+```
+
 `unique` and `index` cover single-column constraints; multi-column ones live on the collection.
 Both are in [schema sync](./sync.md).
+
+## Choice fields
+
+`select` holds one value out of a list you declare. The generated record type narrows to exactly
+that union, and a write outside the list rejects:
+
+```ts
+fields: {
+  status: field('select', { choices: ['draft', 'published', 'archived'] }),
+}
+```
+
+A choice may pair its stored value with a label the dashboard shows. Pass a message key to
+translate it per the viewer's language:
+
+```ts
+status: field('select', {
+  choices: [
+    { value: 'draft', label: 'app.status.draft' },
+    { value: 'published', label: 'app.status.published' },
+  ],
+}),
+```
+
+`multiSelect` holds an ordered list of distinct strings, stored as a JSON list. With `choices`
+every entry must come from the list; without, any strings are legal - free-form tags. Duplicates
+collapse on write, and a create that omits the field stores `[]`:
+
+```ts
+fields: {
+  channels: field('multiSelect', { choices: ['web', 'email', 'push'] }),
+  keywords: field('multiSelect'),
+}
+```
+
+`min` and `max` on a `multiSelect` bound the entry count. In queries, the `includes` operators
+probe the list, so `where: { channels: { includes: 'web' } }` finds records carrying an entry.
+
+## Date and time fields
+
+Three types cover moments and calendar values, each stored in the form that matches what it is:
+
+- `date` is a calendar day, stored as `YYYY-MM-DD` text. A day is not an instant, so no timezone
+  is involved and no conversion can shift it.
+- `time` is a time of day, stored as `HH:MM:SS` text. `HH:MM` input is accepted and stored with
+  `:00` seconds.
+- `dateTime` is an instant, stored as epoch milliseconds - the same representation `_updatedAt`
+  uses. The dashboard renders it in the viewer's own timezone.
+
+```ts
+fields: {
+  publishedOn: field('date'),
+  opensAt: field('time', { min: '08:00', max: '18:00' }),
+  expiresAt: field('dateTime', { nullable: true }),
+}
+```
+
+All three take `min` and `max` bounds in their own value form; `dateTime` also accepts ISO 8601
+strings there. Because `date` and `time` store fixed-width ISO text, comparisons and sorting work
+in calendar and clock order without any parsing.
 
 ## Write-only and locked fields
 
@@ -117,7 +188,8 @@ fields: {
 ```
 
 Here `onDelete` is `cascade` or `restrict` and defaults to `cascade`, which removes the link when
-its target is deleted - the referencing row stays.
+its target is deleted - the referencing row stays. `min` and `max` bound how many links a written
+list may hold.
 
 ### Both sides of a relation
 
@@ -177,6 +249,8 @@ tells you which item is which.
 Inside a repeater, a `unique` subfield spans every item of every record at once.
 `uniquePerParent: true` scopes it to each record's own list, so a value may repeat across records.
 
+A repeater takes `min` and `max` to bound how many items a written list may hold.
+
 ## Blocks
 
 Where a repeater repeats one shape, a `blocks` field holds an ordered list of mixed, reusable
@@ -191,8 +265,34 @@ for the locale set, reading, and writing per locale.
 
 ## Dashboard appearance
 
-The optional `dashboard` key groups how the dashboard presents a collection. It holds three keys:
-`icon`, `recordLabel`, and `table`.
+Every field takes three presentation options, shown wherever the dashboard renders it. `label`
+replaces the sentence-cased field name, `description` renders beneath it, and `placeholder` hints
+an empty input. Each accepts a plain string or a message key that translates per the viewer's
+language:
+
+```ts
+fields: {
+  slug: field('text', {
+    label: 'app.slug.label',
+    description: 'Lowercase words joined by hyphens.',
+    placeholder: 'my-first-post',
+  }),
+}
+```
+
+Two field types take a display variant on top. A `boolean` edits as a checkbox unless you pass
+`display: 'switch'`, and a `text` field with `multiline: true` edits as a text area from the
+start. Neither changes what is stored:
+
+```ts
+fields: {
+  published: field('boolean', { display: 'switch' }),
+  body: field('text', { multiline: true }),
+}
+```
+
+The optional collection-level `dashboard` key groups how the dashboard presents the collection
+itself. It holds three keys: `icon`, `recordLabel`, and `table`.
 
 `icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
 in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.
