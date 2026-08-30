@@ -4,10 +4,15 @@
  */
 import './blocks.ts';
 import './boolean.ts';
+import './date.ts';
+import './date-time.ts';
 import './integer.ts';
+import './multi-select.ts';
 import './number.ts';
 import './object.ts';
 import './record.ts';
 import './records.ts';
 import './repeater.ts';
+import './select.ts';
 import './text.ts';
+import './time.ts';
