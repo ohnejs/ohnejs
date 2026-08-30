@@ -1,7 +1,6 @@
 import {
   api,
   attachTooltip,
-  button,
   card,
   type Child,
   css,
@@ -152,12 +151,30 @@ css`
   }
 
   .o-overview-recent-more {
-    display: flex;
-    justify-content: center;
+    display: block;
+    width: 100%;
     /* defeats the card body's stacking margin */
     margin-top: 0;
-    padding: 0.375rem;
+    padding: 0.5rem 0.75rem;
     border-top-width: 1px;
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .o-overview-recent-more:hover:not(:disabled) {
+    background-color: hsl(var(--ohne-muted) / 0.4);
+    color: hsl(var(--ohne-foreground));
+  }
+
+  .o-overview-recent-more:disabled {
+    cursor: default;
+  }
+
+  .o-overview-recent-more:focus-visible {
+    outline: 0.125rem solid transparent;
+    outline-offset: 0.125rem;
+    box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
   }
 `;
 
@@ -235,17 +252,14 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
             () => !exhausted.value,
             () =>
               h(
-                'div',
-                { class: 'o-overview-recent-more' },
-                button(
-                  h('span', null, () => t('dashboard.overview.loadMore')),
-                  {
-                    size: -2,
-                    variant: 'ghost',
-                    disabled: () => loading.value,
-                    onClick: () => void loadMore(),
-                  },
-                ),
+                'button',
+                {
+                  disabled: () => loading.value,
+                  type: 'button',
+                  class: 'o-overview-recent-more ohne-raw',
+                  onClick: () => void loadMore(),
+                },
+                () => t('dashboard.overview.loadMore'),
               ),
           ),
         ],
