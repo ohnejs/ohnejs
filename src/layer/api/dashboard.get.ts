@@ -19,6 +19,7 @@ import {
 import {
   isBoolean,
   isEmpty,
+  isJSONValue,
   isNull,
   isPlainObject,
   isString,
@@ -114,6 +115,11 @@ export interface DashboardField {
   description?: string;
 
   /**
+   * The empty-input hint, resolved in the request's language; absent when none is declared.
+   */
+  placeholder?: string;
+
+  /**
    * Whether the field's value admits `null`.
    */
   nullable: boolean;
@@ -149,9 +155,11 @@ export interface DashboardField {
   immutable: boolean;
 
   /**
-   * Whether an empty value is accepted; present only on field types that declare the option.
+   * The field type's declared options as resolved, reduced to plain JSON data.
+   * Structural options other members already describe, like a composite's `fields`, stay out.
+   * Absent when nothing ships, so a plain field carries no empty object.
    */
-  allowEmpty?: boolean;
+  options?: Readonly<Record<string, unknown>>;
 
   /**
    * The target collection name; relation kinds (`record`, `records`) only.
@@ -314,6 +322,14 @@ export interface DashboardMeta {
    */
   defaultLocale: string;
 }
+
+const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
+  record: new Set(['collection', 'onDelete']),
+  records: new Set(['collection', 'inverse', 'onDelete']),
+  childOne: new Set(['fields']),
+  childMany: new Set(['fields']),
+  blocks: new Set(['allow']),
+};
 
 /**
  * `GET /dashboard`
@@ -486,13 +502,39 @@ function describeField(
   if (!isUndefined(options.description)) {
     field.description = resolveMessage(options.description as Message);
   }
-  if (!isUndefined(options.allowEmpty)) field.allowEmpty = options.allowEmpty === true;
+  if (!isUndefined(options.placeholder)) {
+    field.placeholder = resolveMessage(options.placeholder as Message);
+  }
+  const wire = wireOptions(meta, options);
+  if (!isUndefined(wire)) field.options = wire;
   if (!isUndefined(meta.target)) field.target = meta.target;
   if (!isUndefined(meta.subfields)) {
     field.subfields = describeFields(meta.subfields, subInstancesOf(instance));
   }
   if (!isUndefined(meta.allow)) field.allow = meta.allow;
   return field;
+}
+
+/**
+ * The declared options of one field as the wire carries them, or `undefined` when nothing ships.
+ * Only options the field type declares ship; the common flags already ride as their own members.
+ * Structural options other members describe - a composite's `fields`, a relation's target - stay out.
+ * So does any value that is not plain JSON data, like a computed default.
+ */
+function wireOptions(
+  meta: FieldQueryMeta,
+  options: Readonly<Record<string, unknown>>,
+): Record<string, unknown> | undefined {
+  const declared = meta.fieldType?.options;
+  if (isUndefined(declared)) return undefined;
+  const structural = STRUCTURAL_OPTIONS[meta.kind];
+  const wire: Record<string, unknown> = {};
+  for (const name of Object.keys(declared)) {
+    if (structural?.has(name)) continue;
+    const value = options[name];
+    if (!isUndefined(value) && isJSONValue(value)) wire[name] = value;
+  }
+  return isEmpty(wire) ? undefined : wire;
 }
 
 /**

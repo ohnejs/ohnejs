@@ -55,6 +55,7 @@ useMessages().register('en', {
   'dashboard.fields.uuid.label': 'UUID',
   'dashboard.fields.updatedAt.label': 'Updated',
   'dash.owners.name.label': 'Owner name',
+  'dash.kinds.title.placeholder': 'Short name',
   'dash.blocks.hero.label': 'Hero section',
 });
 
@@ -170,6 +171,20 @@ useCollections().register('DashMetrics', {
   },
 });
 
+useCollections().register('DashKinds', {
+  name: 'DashKinds',
+  collection: {
+    api: { read: 'public' },
+    fields: {
+      title: field('text', { placeholder: 'dash.kinds.title.placeholder', max: 40 }),
+      status: field('select', { choices: ['draft', { value: 'live', label: 'Published' }] }),
+      tags: field('multiSelect', { choices: ['a', 'b'], max: 2 }),
+      day: field('date', { min: '2024-01-01', nullable: true }),
+      flag: field('boolean', { display: 'switch' }),
+    },
+  },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 registerDialect(dialect);
@@ -237,6 +252,7 @@ describe('access', () => {
       'DashLabels',
       'DashPages',
       'DashMetrics',
+      'DashKinds',
     ]);
   });
 
@@ -253,6 +269,7 @@ describe('access', () => {
       'DashLabels',
       'DashPages',
       'DashMetrics',
+      'DashKinds',
     ]);
   });
 });
@@ -362,12 +379,35 @@ describe('fields', () => {
     strictEqual(fields.title?.kind, 'column');
     strictEqual(fields.title?.logicalType, 'text');
     strictEqual(fields.owner?.logicalType, 'text');
-    strictEqual(fields.title?.allowEmpty, false);
+    strictEqual(fields.title?.options?.allowEmpty, false);
     strictEqual(fields.owner?.kind, 'record');
     strictEqual(fields.owner?.target, 'DashOwners');
     strictEqual(fields.secret?.readable, false);
     const owners = keyBy(collection(body, 'DashOwners').fields, (entry) => entry.name);
     strictEqual(owners.name?.unique, true);
+  });
+
+  it('ships the declared options as plain data, structural ones stripped', async () => {
+    const { body } = await call(user);
+    const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
+    deepStrictEqual(kinds.status?.options, {
+      choices: ['draft', { value: 'live', label: 'Published' }],
+    });
+    deepStrictEqual(kinds.tags?.options, { choices: ['a', 'b'], max: 2 });
+    deepStrictEqual(kinds.day?.options, { min: '2024-01-01' });
+    deepStrictEqual(kinds.flag?.options, { display: 'switch' });
+    deepStrictEqual(kinds.title?.options, { allowEmpty: false, max: 40, multiline: false });
+    const notes = keyBy(collection(body, 'DashNotes').fields, (entry) => entry.name);
+    strictEqual(notes.owner?.options, undefined);
+    const owners = keyBy(collection(body, 'DashOwners').fields, (entry) => entry.name);
+    strictEqual(owners.profile?.options, undefined);
+  });
+
+  it('resolves a declared placeholder in the request language', async () => {
+    const { body } = await call(user);
+    const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
+    strictEqual(kinds.title?.placeholder, 'Short name');
+    strictEqual(kinds.status?.placeholder, undefined);
   });
 
   it('describes composite subfields, the item UUID included', async () => {
@@ -397,6 +437,7 @@ describe('menu', () => {
           'DashLabels',
           'DashPages',
           'DashMetrics',
+          'DashKinds',
         ],
       },
     ]);
@@ -418,6 +459,7 @@ describe('menu', () => {
           'DashLabels',
           'DashPages',
           'DashMetrics',
+          'DashKinds',
         ],
       },
     ]);
