@@ -7,6 +7,7 @@ import type {
   DynamicSelectPaginatedChoices,
 } from '../../ui/dynamic-select.ts';
 
+import { isEmpty } from '../../../utils/is/is-empty.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
@@ -22,11 +23,11 @@ import { dynamicSelect } from '../../ui/dynamic-select.ts';
 import { icon } from '../../ui/icon.ts';
 import { textInput } from '../../ui/text-input.ts';
 import { attachTooltip } from '../../ui/tooltip.ts';
-import { labelFieldOf, targetOf } from '../_search.ts';
+import { targetOf } from '../_search.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-import { labelOf, seedLabel } from '../labels.ts';
+import { fallbackLabel, joinLabel, labelOf, seedLabel } from '../labels.ts';
 
 const PER_PAGE = 50;
 
@@ -36,7 +37,7 @@ const PER_PAGE = 50;
  */
 export interface RecordChoiceSource {
   /**
-   * Resolves one page of target choices, matching `keyword` against the target's label field.
+   * Resolves one page of target choices; each of the first ten `keyword` tokens must match a label field.
    * A failed request resolves an empty first page, so the dropdown settles on "no results".
    */
   choicesResolver(page: number, keyword: string): Promise<DynamicSelectPaginatedChoices>;
@@ -55,21 +56,19 @@ export interface RecordChoiceSource {
 }
 
 /**
- * Creates a `RecordChoiceSource` over `target`, labeling and searching by its `label` field.
- * The fetcher is the collections query `POST`, paged by `page`/`perPage` and ordered by the label.
+ * Creates a `RecordChoiceSource` over `target`, labeling and searching by its `labelFields`.
+ * The fetcher is the collections query `POST`, paged by `page`/`perPage` and ordered by the label parts.
  * Resolved choices are kept in a per-source cache, so re-resolving linked values never refetches.
  */
-export function recordChoiceSource(
-  target: DashboardCollection,
-  label: DashboardField,
-): RecordChoiceSource {
+export function recordChoiceSource(target: DashboardCollection): RecordChoiceSource {
   const t = useT();
+  const names = target.labelFields;
   const cache = new Map<string, DynamicSelectChoice>();
 
   const keep = (row: Record<string, unknown>): DynamicSelectChoice => {
     const uuid = String(row.UUID);
-    const text = row[label.name];
-    const resolved = isString(text) && text !== '' ? text : uuid;
+    const label = joinLabel(row, names);
+    const resolved = label !== '' ? label : fallbackLabel(uuid);
     seedLabel(target.name, uuid, resolved);
     const choice = { value: uuid, label: resolved };
     cache.set(uuid, choice);
@@ -78,7 +77,7 @@ export function recordChoiceSource(
 
   const missing = (uuid: string): DynamicSelectChoice => ({
     value: uuid,
-    label: `${t('dashboard.recordNotFound')} (#${uuid.slice(0, 8)})`,
+    label: `${t('dashboard.recordNotFound')} (${fallbackLabel(uuid)})`,
   });
 
   const query = async (
@@ -87,7 +86,7 @@ export function recordChoiceSource(
     try {
       const response = await api(`POST /collections/${target.segment}/query`, {
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ select: ['UUID', label.name], ...body }),
+        body: JSON.stringify({ select: ['UUID', ...names], ...body }),
       });
       if (!response.ok) return undefined;
       return (await response.json()) as Record<string, unknown>[];
@@ -98,15 +97,28 @@ export function recordChoiceSource(
 
   return {
     async choicesResolver(page, keyword) {
+      // Ten tokens over at most ten parts keep the `where` inside the server's condition cap.
+      const tokens = keyword
+        .split(/\s+/)
+        .filter((token) => token !== '')
+        .slice(0, 10);
       try {
         const response = await api(`POST /collections/${target.segment}/query`, {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            select: ['UUID', label.name],
-            order: [label.name],
+            select: ['UUID', ...names],
+            order: [...names],
             page,
             perPage: PER_PAGE,
-            ...(keyword === '' ? {} : { where: { [label.name]: { contains: keyword } } }),
+            ...(isEmpty(tokens)
+              ? {}
+              : {
+                  where: {
+                    and: tokens.map((token) => ({
+                      or: names.map((name) => ({ [name]: { contains: token } })),
+                    })),
+                  },
+                }),
           }),
         });
         if (!response.ok) return emptyPage();
@@ -137,7 +149,7 @@ export function recordChoiceSource(
     },
     async choicesOf(uuids) {
       const unseen = uuids.filter((uuid) => !cache.has(uuid));
-      if (unseen.length > 0) {
+      if (!isEmpty(unseen)) {
         const rows = await query({ where: { UUID: { in: unseen } }, limit: unseen.length });
         for (const row of rows ?? []) keep(row);
       }
@@ -160,7 +172,7 @@ function emptyPage(): DynamicSelectPaginatedChoices {
  * The form control is the async `dynamicSelect` combobox over the target's records.
  * Beside it sit an open-in-new-tab button and, on a nullable field, a clear button while linked.
  * The inline cell editor is a plain mono `UUID` input; combobox editing lives in the edit popup.
- * When the target is unreadable or has no text field, the mono `UUID` input stands in everywhere.
+ * When the target is unreadable or has no label field, the mono `UUID` input stands in everywhere.
  */
 export const recordType: FieldType = {
   display({ field, value }) {
@@ -187,7 +199,6 @@ export const recordType: FieldType = {
   },
   control(context) {
     const target = untracked(() => targetOf(context.field));
-    const label = isUndefined(target) ? undefined : labelFieldOf(target);
     const t = useT();
     const off = context.disabled === true;
 
@@ -208,13 +219,13 @@ export const recordType: FieldType = {
     let focusControl: () => void;
     let sync: (() => void) | undefined;
 
-    if (isUndefined(target) || isUndefined(label)) {
+    if (isUndefined(target) || isEmpty(target.labelFields)) {
       const fallback = fallbackInput(context, model, current, change, () => routed.value, off);
       element = fallback.element;
       focusControl = fallback.focus;
       sync = fallback.sync;
     } else {
-      const source = recordChoiceSource(target, label);
+      const source = recordChoiceSource(target);
       const select = dynamicSelect(model, {
         disabled: () => off,
         choicesResolver: source.choicesResolver,

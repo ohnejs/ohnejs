@@ -1,6 +1,7 @@
 import type { Primitive } from '../../ui/button-group.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
+import { isEmpty } from '../../../utils/is/is-empty.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -12,7 +13,7 @@ import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { dynamicChips } from '../../ui/dynamic-chips.ts';
-import { labelFieldOf, targetOf } from '../_search.ts';
+import { targetOf } from '../_search.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { labelOf } from '../labels.ts';
@@ -38,7 +39,7 @@ export const recordsType: FieldType = {
     return () => {
       const current = value();
       const links = isArray(current) ? current.filter(isString) : [];
-      if (links.length === 0) return dimMark('-');
+      if (isEmpty(links)) return dimMark('-');
       const first = links[0] as string;
       const resolved = labelOf(field.target ?? '', first);
       return [
@@ -51,10 +52,9 @@ export const recordsType: FieldType = {
   },
   control(context) {
     const target = untracked(() => targetOf(context.field));
-    const label = isUndefined(target) ? undefined : labelFieldOf(target);
-    if (isUndefined(target) || isUndefined(label)) return undefined;
+    if (isUndefined(target) || isEmpty(target.labelFields)) return undefined;
     const t = useT();
-    const source = recordChoiceSource(target, label);
+    const source = recordChoiceSource(target);
 
     let base = listOf(context.initial);
     const model = ref<Primitive[]>([...base]);
@@ -124,7 +124,7 @@ export const recordsType: FieldType = {
         return unplaced;
       },
       error: () => routed.value,
-      errored: () => erroredIndices.value.length > 0,
+      errored: () => !isEmpty(erroredIndices.value),
       dirty: () => touched.value && !deepEqual(model.value, base),
       focus: () => input?.focus(),
       revert() {

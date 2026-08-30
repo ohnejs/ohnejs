@@ -187,6 +187,12 @@ export interface DashboardCollection {
    * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
    */
   fields: DashboardField[];
+
+  /**
+   * The fields whose non-empty values, joined with single spaces in order, name a record.
+   * The declared `recordLabel` as a list, or the first readable plain text field; empty without either.
+   */
+  labelFields: readonly string[];
 }
 
 /**

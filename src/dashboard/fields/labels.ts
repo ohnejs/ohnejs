@@ -1,5 +1,6 @@
 import type { DashboardCollection } from '../runtime/meta-types.ts';
 
+import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
@@ -7,7 +8,6 @@ import { ref, type Ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { api } from '../runtime/api.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
-import { labelFieldOf } from './_search.ts';
 
 const CAPACITY = 2000;
 
@@ -20,7 +20,7 @@ let awaitingMeta = false;
 /**
  * The resolved label for one record of the target collection, `undefined` while unresolved.
  * The read is reactive, and an unknown `uuid` schedules a batched fetch, so a binding resolves in place.
- * A record without a label value, a deleted record, and an unresolvable target all settle on the `uuid`.
+ * A record without label text, a deleted record, and an unresolvable target all settle on `fallbackLabel`.
  * A binding therefore always lands on text and never refetches.
  * `target` is the collection name, as `DashboardField.target` carries it.
  */
@@ -49,6 +49,24 @@ export function wantLabels(target: string, uuids: readonly string[]): void {
 export function seedLabel(target: string, uuid: string, label: string): void {
   pending.get(target)?.delete(uuid);
   write(target, uuid, label);
+}
+
+/**
+ * The placeholder naming a record without label text: `#` plus the `UUID`'s first eight characters.
+ */
+export function fallbackLabel(uuid: string): string {
+  return `#${uuid.slice(0, 8)}`;
+}
+
+/**
+ * Joins a row's label-field values with single spaces, skipping empty ones; `''` when none carries text.
+ * `names` is the collection's `labelFields`, as the discovery read resolves them.
+ */
+export function joinLabel(row: Record<string, unknown>, names: readonly string[]): string {
+  return names
+    .map((name) => row[name])
+    .filter((value): value is string => isString(value) && value !== '')
+    .join(' ');
 }
 
 /**
@@ -127,23 +145,23 @@ function watchMeta(): void {
 }
 
 /**
- * Resolves one target's batch with a single query; a `uuid` the response omits settles on itself.
+ * Resolves one target's batch with a single query; a `uuid` the response omits settles on the placeholder.
  * A failed request leaves its refs unresolved, so a later read re-enqueues the batch.
  */
 async function flushTarget(target: string, uuids: readonly string[]): Promise<void> {
   const collection = readableCollection(target);
-  const label = isUndefined(collection) ? undefined : labelFieldOf(collection);
-  if (isUndefined(collection) || isUndefined(label)) {
-    for (const uuid of uuids) write(target, uuid, uuid);
+  if (isUndefined(collection) || isEmpty(collection.labelFields)) {
+    for (const uuid of uuids) write(target, uuid, fallbackLabel(uuid));
     return;
   }
+  const names = collection.labelFields;
   const keys = uuids.map((uuid) => `${target}:${uuid}`);
   for (const key of keys) inFlight.add(key);
   try {
     const response = await api(`POST /collections/${collection.segment}/query`, {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        select: ['UUID', label.name],
+        select: ['UUID', ...names],
         where: { UUID: { in: uuids } },
         limit: uuids.length,
       }),
@@ -155,13 +173,13 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
       const uuid = row.UUID;
       if (!isString(uuid)) continue;
       answered.add(uuid);
-      const value = row[label.name];
-      write(target, uuid, isString(value) && value !== '' ? value : uuid);
+      const label = joinLabel(row, names);
+      write(target, uuid, label !== '' ? label : fallbackLabel(uuid));
     }
     for (const uuid of uuids) {
       if (answered.has(uuid)) continue;
       const entry = entryOf(`${target}:${uuid}`);
-      if (isUndefined(entry.value)) entry.value = uuid;
+      if (isUndefined(entry.value)) entry.value = fallbackLabel(uuid);
     }
   } catch {
   } finally {

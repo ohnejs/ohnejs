@@ -17,7 +17,7 @@ export type {
   FieldType,
 } from './fields/field-type.ts';
 export { labelFieldOf, targetOf } from './fields/_search.ts';
-export { labelOf, seedLabel, wantLabels } from './fields/labels.ts';
+export { fallbackLabel, joinLabel, labelOf, seedLabel, wantLabels } from './fields/labels.ts';
 export { parseIntegerValue, parseRealValue, parseTextValue } from './fields/parse.ts';
 export type { ScalarParse } from './fields/parse.ts';
 export { css } from './render/css.ts';
