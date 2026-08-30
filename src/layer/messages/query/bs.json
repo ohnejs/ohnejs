@@ -18,6 +18,7 @@
   "invalidPopulateSpec": "`populate` specifikacija dozvoljava samo `select` i `populate`",
   "invalidLocale": "Nepoznat lokalitet `{locale}`",
   "localeNotApplicable": "Ova kolekcija nema prevodivog sadržaja",
+  "sameLocale": "Izvor i cilj su isti lokalitet `{locale}`",
   "tooManyConditions": "Uslov `where` ima previše klauzula (max `{max}`)",
   "hasTooDeep": "Uslov `where` ugniježđuje `has` preduboko (max `{max}`)",
   "listTooLong": "Lista je predugačka (max `{max}`)",

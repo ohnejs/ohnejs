@@ -18,6 +18,7 @@
   "invalidPopulateSpec": "Eine `populate`-Spezifikation erlaubt nur `select` und `populate`",
   "invalidLocale": "Unbekannte Locale `{locale}`",
   "localeNotApplicable": "Diese Kollektion hat keine übersetzbaren Inhalte",
+  "sameLocale": "Quelle und Ziel sind dieselbe Locale `{locale}`",
   "tooManyConditions": "Die `where`-Bedingung hat zu viele Klauseln (max `{max}`)",
   "hasTooDeep": "Die `where`-Bedingung verschachtelt `has` zu tief (max `{max}`)",
   "listTooLong": "Eine Liste ist zu lang (max `{max}`)",
