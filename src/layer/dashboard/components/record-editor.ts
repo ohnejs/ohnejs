@@ -7,6 +7,7 @@ import {
   createFieldForm,
   css,
   type DashboardCollection,
+  dashboardMeta,
   dropdown,
   dropdownItem,
   type FieldForm,
@@ -39,10 +40,11 @@ import {
   untracked,
 } from 'ohne/utils';
 
-import { activeContentLocale } from './content-language-switcher.ts';
+import { activeContentLocale, contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History, unsavedChanges } from './history.ts';
+import { translationsPopup } from './translations-popup.ts';
 
 /**
  * One record row, as the collections API answers it.
@@ -132,6 +134,8 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   const canCreate = collection.operations.create?.allowed === true;
   const canUpdate = collection.operations.update?.allowed === true;
   const canDelete = collection.operations.delete?.allowed === true;
+  const canTranslate =
+    collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
   const readOnly = !create && !canUpdate;
   const showFooter = create || canCreate || canUpdate || canDelete;
 
@@ -212,16 +216,24 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   } else {
     void load();
     if (collection.translatable) {
-      // Clearing reseeds the history on the newly read locale, so Save starts clean against it.
-      let initial = true;
-      effect(() => {
-        activeContentLocale();
-        if (initial) {
-          initial = false;
+      let applied = untracked(activeContentLocale);
+      const switchLocale = async (next: string | undefined): Promise<void> => {
+        const allowed =
+          !busy.value && (!history.isDirty.value || ((await unsavedChanges.prompt?.()) ?? true));
+        if (!allowed) {
+          contentLocale.value = applied;
           return;
         }
+        // Clearing reseeds the history on the newly read locale, so Save starts clean against it.
+        applied = next;
         history.clear();
+        // A confirmed prompt dropped the registration; the editor lives on, so the tab-close guard re-arms.
+        unsavedChanges.history = history;
         void load();
+      };
+      effect(() => {
+        const next = activeContentLocale();
+        if (next !== applied) untracked(() => void switchLocale(next));
       });
     }
   }
@@ -417,11 +429,12 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   /**
    * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
-   * New links to the create page, and Delete confirms through the dialog.
+   * New links to the create page, Translate opens the translations popup, Delete confirms first.
    */
   function recordMenu(): Child {
-    if (!canCreate && !canDelete) return null;
+    if (!canCreate && !canDelete && !canTranslate) return null;
     const open = ref(false);
+    const translationsOpen = ref(false);
     const close = (): void => {
       open.value = false;
     };
@@ -454,7 +467,22 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             });
             items.push(item);
           }
-          if (canCreate && canDelete) items.push(h('hr'));
+          if (canCreate && (canTranslate || canDelete)) items.push(h('hr'));
+          if (canTranslate) {
+            const item = dropdownItem(
+              [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
+              {
+                onClick: () => {
+                  close();
+                  translationsOpen.value = true;
+                },
+              },
+            );
+            effect(() => {
+              item.title = t('dashboard.translations.translate');
+            });
+            items.push(item);
+          }
           if (canDelete) {
             const item = dropdownItem(
               [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
@@ -472,6 +500,20 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             items.push(item);
           }
           return dropdown(items, { reference: trigger, onClose: close }).root;
+        },
+      ),
+      when(
+        () => translationsOpen.value,
+        () => {
+          translationsPopup({
+            collection,
+            uuid: id,
+            onClose: (closePopup) =>
+              void closePopup().then(() => {
+                translationsOpen.value = false;
+              }),
+          });
+          return null;
         },
       ),
     );

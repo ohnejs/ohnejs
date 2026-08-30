@@ -7,6 +7,7 @@ import {
   css,
   type DashboardCollection,
   type DashboardField,
+  dashboardMeta,
   dimMark,
   dropdown,
   dropdownItem,
@@ -50,6 +51,7 @@ import {
   ref,
   sleep,
   uniqueArray,
+  untracked,
 } from 'ohne/utils';
 
 import {
@@ -67,6 +69,7 @@ import { editableFieldCell } from './editable-field-cell.ts';
 import { unsavedChanges } from './history.ts';
 import { orderBy } from './order-by.ts';
 import { tableColumnsConfigurator } from './table-columns-configurator.ts';
+import { translationsPopup } from './translations-popup.ts';
 
 /**
  * One record row, as the collections API answers it.
@@ -174,6 +177,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const canCreate = collection.operations.create?.allowed === true;
   const canUpdate = collection.operations.update?.allowed === true;
   const canDelete = collection.operations.delete?.allowed === true;
+  const canTranslate =
+    collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
 
   const remembered = tableMemory.get(segment) ?? '';
   const redirected = location.search === '' && remembered !== '';
@@ -240,6 +245,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const filterOpen = ref(false);
   const columnsOpen = ref(false);
   const sortingOpen = ref(false);
+  const translationsUUID = ref<string | null>(null);
   let generation = 0;
   let deleteBusy = false;
 
@@ -516,6 +522,18 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
             onClick: () => close(),
           });
       openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
+      const translateItem = canTranslate
+        ? dropdownItem(
+            [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
+            {
+              onClick: () => {
+                close();
+                translationsUUID.value = String(row.id);
+              },
+            },
+          )
+        : null;
+      if (translateItem) translateItem.title = t('dashboard.translations.translate');
       const deleteItem = canDelete
         ? dropdownItem([icon('trash-x'), h('span', null, () => t('dashboard.delete'))], {
             destructive: true,
@@ -529,6 +547,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       const menu = dropdown(
         [
           openItem,
+          translateItem,
           deleteItem,
           h('hr'),
           when(
@@ -872,6 +891,25 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
   );
 
+  const translationsHost = when(
+    () => !isNull(translationsUUID.value),
+    () => {
+      const uuid = translationsUUID.value;
+      if (isNull(uuid)) return null;
+      translationsPopup({
+        collection,
+        uuid,
+        currentlyEditing: () => t('dashboard.translations.selected'),
+        showEditCurrent: true,
+        onClose: (close) =>
+          void close().then(() => {
+            translationsUUID.value = null;
+          }),
+      });
+      return null;
+    },
+  );
+
   const { listen } = useHotkeys();
   listen('selectAll', (event) => {
     if (canDelete && paginated.value.total > 0) {
@@ -909,6 +947,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     filterPopup,
     columnsPopup,
     sortingPopup,
+    translationsHost,
   );
 }
 

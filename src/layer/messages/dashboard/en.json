@@ -210,6 +210,18 @@
     "selectedCount": "Selected {count, plural, one {# record} other {# records}}",
     "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page"
   },
+  "translations": {
+    "copied": "Copied",
+    "copy": "Copy `{from}` to `{to}`",
+    "copyFailed": "An error occurred while copying the translation",
+    "currentlyEditing": "currently editing",
+    "edit": "Edit translation",
+    "new": "New translation",
+    "selected": "selected",
+    "title": "Translations",
+    "translate": "Translate",
+    "view": "View translation"
+  },
   "unreachable": "The server cannot be reached",
   "unsavedChanges": {
     "body": "Changes that you made may not be saved."

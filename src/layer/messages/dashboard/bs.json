@@ -210,6 +210,18 @@
     "selectedCount": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
     "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
   },
+  "translations": {
+    "copied": "Kopirano",
+    "copy": "Kopiraj `{from}` u `{to}`",
+    "copyFailed": "Došlo je do greške pri kopiranju prijevoda",
+    "currentlyEditing": "trenutno se uređuje",
+    "edit": "Uredi prijevod",
+    "new": "Novi prijevod",
+    "selected": "odabrano",
+    "title": "Prijevodi",
+    "translate": "Prevedi",
+    "view": "Pogledaj prijevod"
+  },
   "unreachable": "Server nije dostupan",
   "unsavedChanges": {
     "body": "Izmjene koje ste napravili možda neće biti sačuvane."

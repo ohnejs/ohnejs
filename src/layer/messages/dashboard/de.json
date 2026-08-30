@@ -210,6 +210,18 @@
     "selectedCount": "{count, plural, one {# Datensatz} other {# Datensätze}} ausgewählt",
     "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt"
   },
+  "translations": {
+    "copied": "Kopiert",
+    "copy": "`{from}` nach `{to}` kopieren",
+    "copyFailed": "Beim Kopieren der Übersetzung ist ein Fehler aufgetreten",
+    "currentlyEditing": "wird gerade bearbeitet",
+    "edit": "Übersetzung bearbeiten",
+    "new": "Neue Übersetzung",
+    "selected": "ausgewählt",
+    "title": "Übersetzungen",
+    "translate": "Übersetzen",
+    "view": "Übersetzung ansehen"
+  },
   "unreachable": "Der Server ist nicht erreichbar",
   "unsavedChanges": {
     "body": "Vorgenommene Änderungen werden möglicherweise nicht gespeichert."

@@ -14,7 +14,15 @@ import {
   useT,
   when,
 } from 'ohne/dashboard';
-import { effect, onCleanup, ref, type Ref } from 'ohne/utils';
+import {
+  effect,
+  formatLocaleCode,
+  isNull,
+  isUndefined,
+  onCleanup,
+  ref,
+  type Ref,
+} from 'ohne/utils';
 
 const STORAGE_KEY = 'ohne:content-locale';
 
@@ -36,7 +44,7 @@ export const contentLocale: Ref<string | undefined> = ref<string | undefined>(
  */
 export function activeContentLocale(): string | undefined {
   const chosen = contentLocale.value;
-  if (chosen === undefined) return undefined;
+  if (isUndefined(chosen)) return undefined;
   return (dashboardMeta()?.locales.includes(chosen) ?? false) ? chosen : undefined;
 }
 
@@ -68,7 +76,7 @@ export function contentLanguageSwitcher(): Child {
  */
 function translatableContext(): boolean {
   const segment = useRoute()?.params.collection;
-  if (segment === undefined) return false;
+  if (isUndefined(segment)) return false;
   const meta = dashboardMeta();
   return meta?.collections.find((entry) => entry.segment === segment)?.translatable === true;
 }
@@ -83,7 +91,14 @@ function switcher(): HTMLElement {
   let preferred = localStorage.getItem(STORAGE_KEY);
   effect(() => {
     const locale = contentLocale.value;
-    if (locale !== undefined && locale !== preferred) {
+    if (isUndefined(locale)) {
+      if (!isNull(preferred)) {
+        preferred = null;
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      return;
+    }
+    if (locale !== preferred) {
       preferred = locale;
       localStorage.setItem(STORAGE_KEY, locale);
       toast(t('dashboard.header.switchedContentLanguage', { language: formatLocaleCode(locale) }));
@@ -93,7 +108,12 @@ function switcher(): HTMLElement {
   const chevron = icon('chevron-down');
   chevron.classList.add('o-content-language-icon');
   const trigger = button(
-    [h('span', { class: 'o-content-language-label' }, () => formatLocaleCode(current())), chevron],
+    [
+      h('span', { class: 'o-content-language-label' }, () =>
+        formatLocaleCode(effectiveContentLocale()),
+      ),
+      chevron,
+    ],
     {
       variant: 'outline',
       onClick: () => {
@@ -117,7 +137,7 @@ function switcher(): HTMLElement {
         dropdown(
           () =>
             (dashboardMeta()?.locales ?? []).map((locale) => {
-              const selected = current() === locale;
+              const selected = effectiveContentLocale() === locale;
               return dropdownItem(
                 [selected ? icon('check') : null, h('span', null, localeName(locale))],
                 {
@@ -142,30 +162,21 @@ function switcher(): HTMLElement {
 }
 
 /**
- * The locale in effect: the chosen one while the discovery data lists it, else the default.
+ * The locale in effect, reactively: the chosen one while the discovery data lists it, else the default.
+ * Where `activeContentLocale` answers what a read or write should send, this answers what to display.
  */
-function current(): string {
+export function effectiveContentLocale(): string {
   const meta = dashboardMeta();
   const chosen = contentLocale.value;
-  if (chosen !== undefined && (meta?.locales.includes(chosen) ?? false)) return chosen;
+  if (!isUndefined(chosen) && (meta?.locales.includes(chosen) ?? false)) return chosen;
   return meta?.defaultLocale ?? '';
-}
-
-/**
- * Formats a locale code for the trigger.
- */
-function formatLocaleCode(code: string): string {
-  const [language = '', region] = code.split('-');
-  return region === undefined
-    ? language.toUpperCase()
-    : `${language.toUpperCase()} (${region.toUpperCase()})`;
 }
 
 /**
  * The locale's display name in the dashboard's interface language, falling back to the code.
  * The discovery data carries only codes.
  */
-function localeName(code: string): string {
+export function localeName(code: string): string {
   try {
     return (
       new Intl.DisplayNames([useDashboardLanguage().value], { type: 'language' }).of(code) ?? code
