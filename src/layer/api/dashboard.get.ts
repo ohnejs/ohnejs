@@ -323,6 +323,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     if (isNull(operations)) continue;
     const query = queryMetadata(meta.name);
     const fields = describeFields(query.fields, meta.collection.fields);
+    const dashboard = meta.collection.dashboard;
     const collection: DashboardCollection = {
       name: meta.name,
       segment: toKebabCase(meta.name),
@@ -330,10 +331,10 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
       translatable: query.translatable === true,
       operations,
       fields,
-      labelFields: labelFieldsOf(meta.collection.recordLabel, fields),
+      labelFields: labelFieldsOf(dashboard?.recordLabel, fields),
     };
-    if (!isUndefined(meta.collection.icon)) collection.icon = meta.collection.icon;
-    if (!isUndefined(meta.collection.table)) collection.table = meta.collection.table;
+    if (!isUndefined(dashboard?.icon)) collection.icon = dashboard.icon;
+    if (!isUndefined(dashboard?.table)) collection.table = dashboard.table;
     collections.push(collection);
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);

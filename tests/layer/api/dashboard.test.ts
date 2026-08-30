@@ -62,8 +62,10 @@ useCollections().register('DashNotes', {
   name: 'DashNotes',
   collection: {
     api: { read: true, create: true, update: true, delete: true },
-    recordLabel: ['title', 'note'],
-    table: { columns: ['title | 20rem', 'note'] },
+    dashboard: {
+      recordLabel: ['title', 'note'],
+      table: { columns: ['title | 20rem', 'note'] },
+    },
     fields: {
       title: field('text'),
       note: field('text', { nullable: true }),
@@ -84,7 +86,11 @@ useCollections().register('DashOwners', {
 });
 useCollections().register('DashPublic', {
   name: 'DashPublic',
-  collection: { api: { read: 'public' }, recordLabel: 'title', fields: { title: field('text') } },
+  collection: {
+    api: { read: 'public' },
+    dashboard: { recordLabel: 'title' },
+    fields: { title: field('text') },
+  },
 });
 useCollections().register('DashClosed', {
   name: 'DashClosed',

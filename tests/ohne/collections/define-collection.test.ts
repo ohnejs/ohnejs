@@ -198,10 +198,36 @@ describe('defineCollection', () => {
     );
   });
 
+  it('rejects a non-object dashboard declaration', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error a dashboard declaration is an object
+          dashboard: 'note',
+        }),
+      /Invalid `dashboard` declaration/,
+    );
+  });
+
+  it('rejects an unknown dashboard key', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `menuIcon` is not a dashboard key
+          dashboard: { menuIcon: 'note' },
+        }),
+      /Unknown `dashboard` key `menuIcon`/,
+    );
+  });
+
   it('accepts an icon the vendored set carries', () => {
-    doesNotThrow(() => defineCollection({ fields: { title: field('text') }, icon: 'note' }));
     doesNotThrow(() =>
-      defineCollection({ fields: { title: field('text') }, icon: 'brand-github' }),
+      defineCollection({ fields: { title: field('text') }, dashboard: { icon: 'note' } }),
+    );
+    doesNotThrow(() =>
+      defineCollection({ fields: { title: field('text') }, dashboard: { icon: 'brand-github' } }),
     );
   });
 
@@ -211,7 +237,7 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error `notez` is not an icon name
-          icon: 'notez',
+          dashboard: { icon: 'notez' },
         }),
       (error: unknown) => {
         ok(isOhneError(error));
@@ -228,7 +254,7 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error `qqqqqqqqqqqq` is not an icon name
-          icon: 'qqqqqqqqqqqq',
+          dashboard: { icon: 'qqqqqqqqqqqq' },
         }),
       (error: unknown) => {
         ok(isOhneError(error));
@@ -244,20 +270,23 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error `constructor` is not an icon name
-          icon: 'constructor',
+          dashboard: { icon: 'constructor' },
         }),
       /Unknown icon `constructor`/,
     );
   });
 
   it('accepts a recordLabel field name and list unchanged', () => {
-    const single = defineCollection({ fields: { title: field('text') }, recordLabel: 'title' });
-    deepStrictEqual(single.recordLabel, 'title');
+    const single = defineCollection({
+      fields: { title: field('text') },
+      dashboard: { recordLabel: 'title' },
+    });
+    deepStrictEqual(single.dashboard?.recordLabel, 'title');
     const listed = defineCollection({
       fields: { firstName: field('text'), lastName: field('text') },
-      recordLabel: ['firstName', 'lastName'],
+      dashboard: { recordLabel: ['firstName', 'lastName'] },
     });
-    deepStrictEqual(listed.recordLabel, ['firstName', 'lastName']);
+    deepStrictEqual(listed.dashboard?.recordLabel, ['firstName', 'lastName']);
   });
 
   it('rejects a recordLabel naming an unknown field', () => {
@@ -266,7 +295,7 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error `titel` is not a field of this collection
-          recordLabel: ['titel'],
+          dashboard: { recordLabel: ['titel'] },
         }),
       /unknown field `titel`/,
     );
@@ -274,14 +303,18 @@ describe('defineCollection', () => {
 
   it('rejects an empty recordLabel list', () => {
     throws(
-      () => defineCollection({ fields: { title: field('text') }, recordLabel: [] }),
+      () => defineCollection({ fields: { title: field('text') }, dashboard: { recordLabel: [] } }),
       /list is empty/,
     );
   });
 
   it('rejects a recordLabel repeating a field', () => {
     throws(
-      () => defineCollection({ fields: { title: field('text') }, recordLabel: ['title', 'title'] }),
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { recordLabel: ['title', 'title'] },
+        }),
       /repeats field `title`/,
     );
   });
@@ -291,7 +324,7 @@ describe('defineCollection', () => {
       () =>
         defineCollection({
           fields: { title: field('text'), secret: field('text', { readable: false }) },
-          recordLabel: ['secret'],
+          dashboard: { recordLabel: ['secret'] },
         }),
       /write-only field `secret`/,
     );
@@ -299,7 +332,11 @@ describe('defineCollection', () => {
 
   it('rejects a recordLabel naming a non-text field', () => {
     throws(
-      () => defineCollection({ fields: { views: field('integer') }, recordLabel: ['views'] }),
+      () =>
+        defineCollection({
+          fields: { views: field('integer') },
+          dashboard: { recordLabel: ['views'] },
+        }),
       /non-text field `views`/,
     );
   });
@@ -309,7 +346,7 @@ describe('defineCollection', () => {
       () =>
         defineCollection({
           fields: { owner: field('record', { collection: 'Users' }) },
-          recordLabel: ['owner'],
+          dashboard: { recordLabel: ['owner'] },
         }),
       /non-text field `owner`/,
     );
@@ -332,7 +369,7 @@ describe('defineCollection', () => {
             j: field('text'),
             k: field('text'),
           },
-          recordLabel: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'],
+          dashboard: { recordLabel: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'] },
         }),
       /more than ten fields/,
     );
@@ -344,18 +381,20 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error a recordLabel is a field name or an array of them
-          recordLabel: 42,
+          dashboard: { recordLabel: 42 },
         }),
-      /Invalid `recordLabel` declaration/,
+      /Invalid `dashboard\.recordLabel` declaration/,
     );
   });
 
   it('accepts table columns in both spellings and returns them unchanged', () => {
     const definition = defineCollection({
       fields: { title: field('text'), views: field('integer') },
-      table: { columns: ['title | 20rem', 'views|20rem', '_updatedAt'] },
+      dashboard: { table: { columns: ['title | 20rem', 'views|20rem', '_updatedAt'] } },
     });
-    deepStrictEqual(definition.table, { columns: ['title | 20rem', 'views|20rem', '_updatedAt'] });
+    deepStrictEqual(definition.dashboard?.table, {
+      columns: ['title | 20rem', 'views|20rem', '_updatedAt'],
+    });
   });
 
   it('rejects a table column naming an unknown field', () => {
@@ -364,7 +403,7 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error `slug` is not a field of this collection
-          table: { columns: ['slug'] },
+          dashboard: { table: { columns: ['slug'] } },
         }),
       /unknown field `slug`/,
     );
@@ -375,7 +414,7 @@ describe('defineCollection', () => {
       () =>
         defineCollection({
           fields: { title: field('text') },
-          table: { columns: ['title', 'title|20rem'] },
+          dashboard: { table: { columns: ['title', 'title|20rem'] } },
         }),
       /repeats field `title`/,
     );
@@ -387,7 +426,7 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error an entry must start with a field name
-          table: { columns: [' | 20rem'] },
+          dashboard: { table: { columns: [' | 20rem'] } },
         }),
       /names no field/,
     );
@@ -395,7 +434,11 @@ describe('defineCollection', () => {
 
   it('rejects an empty table columns list', () => {
     throws(
-      () => defineCollection({ fields: { title: field('text') }, table: { columns: [] } }),
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { table: { columns: [] } },
+        }),
       /is empty/,
     );
   });
@@ -406,9 +449,9 @@ describe('defineCollection', () => {
         defineCollection({
           fields: { title: field('text') },
           // @ts-expect-error an entry must be a string
-          table: { columns: [42] },
+          dashboard: { table: { columns: [42] } },
         }),
-      /Invalid `table.columns`/,
+      /Invalid `dashboard\.table\.columns`/,
     );
   });
 
@@ -417,7 +460,7 @@ describe('defineCollection', () => {
       () =>
         defineCollection({
           fields: { title: field('text'), secret: field('text', { readable: false }) },
-          table: { columns: ['secret'] },
+          dashboard: { table: { columns: ['secret'] } },
         }),
       /write-only field `secret`/,
     );
@@ -427,16 +470,16 @@ describe('defineCollection', () => {
     doesNotThrow(() =>
       defineCollection({
         fields: { title: field('text'), views: field('integer') },
-        table: { columns: ['title | 50%', 'views|300px|12.5rem'] },
+        dashboard: { table: { columns: ['title | 50%', 'views|300px|12.5rem'] } },
       }),
     );
     throws(
       () =>
         defineCollection({
           fields: { title: field('text') },
-          table: { columns: ['title | calc(100% - 2rem)'] },
+          dashboard: { table: { columns: ['title | calc(100% - 2rem)'] } },
         }),
-      /Invalid `table.columns` width/,
+      /Invalid `dashboard\.table\.columns` width/,
     );
   });
 

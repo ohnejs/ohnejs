@@ -178,6 +178,42 @@ export interface CollectionTable<TField extends string = string> {
 }
 
 /**
+ * How the dashboard presents a collection: its menu icon, record labels, and list view.
+ */
+export interface CollectionDashboard<TField extends string = string> {
+  /**
+   * The Tabler icon the dashboard menu shows for this collection.
+   * Omitted, the menu row renders no icon.
+   * The name completes to the full Tabler set; an unknown one fails at boot.
+   *
+   * @example
+   * ```ts
+   * icon: 'note'
+   * ```
+   */
+  icon?: IconName;
+
+  /**
+   * The field or fields whose values name a record wherever the dashboard shows one.
+   * A list joins its parts with single spaces, skipping empty values.
+   * Each part must name a readable plain `text` field; anything else fails at boot.
+   * Omitted, the first readable plain text field names the record.
+   *
+   * @example
+   * ```ts
+   * recordLabel: ['firstName', 'lastName']
+   * ```
+   */
+  recordLabel?: RecordLabel<TField>;
+
+  /**
+   * The list view's defaults for this collection.
+   * A viewer's own choice, carried in the `columns` query param, overrides them.
+   */
+  table?: CollectionTable<TField>;
+}
+
+/**
  * The context a collection's `copyTranslation` function receives.
  */
 export interface CopyTranslationContext {
@@ -281,35 +317,18 @@ export interface CollectionDefinition<
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
-   * The Tabler icon the dashboard menu shows for this collection.
-   * Omitted, the menu row renders no icon.
-   * The name completes to the full Tabler set; an unknown one fails at boot.
+   * How the dashboard presents this collection: its menu icon, record labels, and list view.
    *
    * @example
    * ```ts
-   * icon: 'note'
+   * dashboard: {
+   *   icon: 'note',
+   *   recordLabel: 'title',
+   *   table: { columns: ['title | 20rem', '_updatedAt'] },
+   * }
    * ```
    */
-  icon?: IconName;
-
-  /**
-   * The field or fields whose values name a record wherever the dashboard shows one.
-   * A list joins its parts with single spaces, skipping empty values.
-   * Each part must name a readable plain `text` field; anything else fails at boot.
-   * Omitted, the first readable plain text field names the record.
-   *
-   * @example
-   * ```ts
-   * recordLabel: ['firstName', 'lastName']
-   * ```
-   */
-  recordLabel?: RecordLabel<keyof TFields & string>;
-
-  /**
-   * The dashboard list view's defaults for this collection.
-   * A viewer's own choice, carried in the `columns` query param, overrides them.
-   */
-  table?: CollectionTable<keyof TFields & string>;
+  dashboard?: CollectionDashboard<keyof TFields & string>;
 }
 
 /**
@@ -349,19 +368,9 @@ export interface AnyCollectionDefinition {
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
-   * The Tabler icon the dashboard menu shows; omitted, the menu row renders no icon.
+   * How the dashboard presents the collection; omitted, every presentation default applies.
    */
-  icon?: IconName;
-
-  /**
-   * The record-label declaration; omitted, the first readable plain text field names the record.
-   */
-  recordLabel?: RecordLabel;
-
-  /**
-   * The dashboard list view's defaults; omitted, the list view derives its columns.
-   */
-  table?: CollectionTable;
+  dashboard?: CollectionDashboard;
 }
 
 /**

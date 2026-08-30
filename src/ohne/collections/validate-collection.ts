@@ -27,9 +27,10 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
- * - `icon` must name an icon the vendored set carries.
- * - `recordLabel` must list distinct, readable, plain text fields, ten at most.
- * - `table.columns` must be a non-empty list of entries naming distinct, readable, declared fields.
+ * - `dashboard` must be an object holding only `icon`, `recordLabel`, and `table`.
+ * - `dashboard.icon` must name an icon the vendored set carries.
+ * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
+ * - `dashboard.table.columns` must be a non-empty list naming distinct, readable, declared fields.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -42,24 +43,67 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
-  validateIcon(definition.icon, collection);
-  validateRecordLabel(definition.recordLabel, definition.fields, collection);
-  validateTable(definition.table, definition.fields, collection);
+  validateDashboard(definition.dashboard, definition.fields, collection);
+}
+
+const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'table']);
+
+/**
+ * Rejects a malformed `dashboard` declaration.
+ * A failure is a non-object value or an unknown key; each known key then validates on its own.
+ */
+function validateDashboard(
+  dashboard: unknown,
+  fields: Record<string, FieldInstance>,
+  collection?: string,
+): void {
+  if (isUndefined(dashboard)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isPlainObject(dashboard)) {
+    throw ohneError({
+      title: 'Invalid `dashboard` declaration',
+      body: [
+        `The \`dashboard\` option${scope} must be an object.`,
+        "Write `dashboard: { icon: 'note', recordLabel: 'title' }`.",
+      ],
+    });
+  }
+  for (const key of Object.keys(dashboard)) {
+    if (!DASHBOARD_KEYS.has(key)) {
+      throw ohneError({
+        title: `Unknown \`dashboard\` key \`${key}\``,
+        body: [
+          `The \`dashboard\` option${scope} names \`${key}\`.`,
+          'The keys are `icon`, `recordLabel`, and `table`.',
+        ],
+      });
+    }
+  }
+  validateIcon(dashboard.icon, collection);
+  validateRecordLabel(dashboard.recordLabel, fields, collection);
+  validateTable(dashboard.table, fields, collection);
 }
 
 /**
- * Rejects an `icon` the vendored Tabler set does not carry.
+ * Rejects a `dashboard.icon` the vendored Tabler set does not carry.
  * The type already narrows this for a TypeScript caller, and the check catches a plain-JS one.
  * A menu row that would silently render no icon becomes a named failure at boot.
  */
-function validateIcon(icon: string | undefined, collection?: string): void {
-  if (isUndefined(icon) || isIconName(icon)) return;
+function validateIcon(icon: unknown, collection?: string): void {
+  if (isUndefined(icon)) return;
   const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isString(icon)) {
+    throw ohneError({
+      title: 'Invalid `dashboard.icon` declaration',
+      body: [`The \`dashboard.icon\` option${scope} must be an icon name.`],
+    });
+  }
+  if (isIconName(icon)) return;
   const near = didYouMean(icon, iconNames());
   throw ohneError({
     title: `Unknown icon \`${icon}\``,
     body: [
-      `The \`icon\` option${scope} names an icon the set does not carry.`,
+      `The \`dashboard.icon\` option${scope} names an icon the set does not carry.`,
       isUndefined(near)
         ? 'Every icon is a Tabler original; browse the names at `https://tabler.io/icons`.'
         : `Did you mean \`${near}\`?`,
@@ -155,7 +199,7 @@ function validateCopyTranslation(
 }
 
 /**
- * Rejects a malformed `recordLabel` declaration.
+ * Rejects a malformed `dashboard.recordLabel` declaration.
  * A failure is a value that is not a field name or an array of them, an empty list, or one past ten.
  * A part fails naming an unknown, write-only, repeated, or non-text field.
  * The text check reads the field-type registry, so an unregistered type defers to the boot pass.
@@ -169,9 +213,9 @@ function validateRecordLabel(
   const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
   if (!isString(recordLabel) && !(isArray(recordLabel) && recordLabel.every(isString))) {
     throw ohneError({
-      title: 'Invalid `recordLabel` declaration',
+      title: 'Invalid `dashboard.recordLabel` declaration',
       body: [
-        `The \`recordLabel\` option${scope} must be a field name or an array of field names.`,
+        `The \`dashboard.recordLabel\` option${scope} must be a field name or an array of field names.`,
         "Write `recordLabel: 'title'` or `recordLabel: ['firstName', 'lastName']`.",
       ],
     });
@@ -179,7 +223,7 @@ function validateRecordLabel(
   const names = isString(recordLabel) ? [recordLabel] : recordLabel;
   if (isEmpty(names)) {
     throw ohneError({
-      title: 'The `recordLabel` list is empty',
+      title: 'The `dashboard.recordLabel` list is empty',
       body: [
         `An empty \`recordLabel\`${scope} would silently fall back to the derived label.`,
         'Omit the key instead.',
@@ -188,7 +232,7 @@ function validateRecordLabel(
   }
   if (names.length > 10) {
     throw ohneError({
-      title: 'The `recordLabel` lists more than ten fields',
+      title: 'The `dashboard.recordLabel` lists more than ten fields',
       body: [
         `A record picker orders by every part${scope}, and a query orders by at most ten keys.`,
       ],
@@ -200,7 +244,7 @@ function validateRecordLabel(
     if (isUndefined(instance)) {
       const near = didYouMean(name, Object.keys(fields));
       throw ohneError({
-        title: `\`recordLabel\` references unknown field \`${name}\``,
+        title: `\`dashboard.recordLabel\` references unknown field \`${name}\``,
         body: [
           `No field \`${name}\` is declared${scope}.`,
           ...(isUndefined(near) ? [] : [`Did you mean \`${near}\`?`]),
@@ -209,7 +253,7 @@ function validateRecordLabel(
     }
     if (instance.options.readable === false) {
       throw ohneError({
-        title: `\`recordLabel\` references write-only field \`${name}\``,
+        title: `\`dashboard.recordLabel\` references write-only field \`${name}\``,
         body: [
           `The field \`${name}\`${scope} is \`readable: false\`, so it can never label a record.`,
         ],
@@ -217,7 +261,7 @@ function validateRecordLabel(
     }
     if (seen.has(name)) {
       throw ohneError({
-        title: `\`recordLabel\` repeats field \`${name}\``,
+        title: `\`dashboard.recordLabel\` repeats field \`${name}\``,
         body: [`A \`recordLabel\` part${scope} may appear once; a repeat adds nothing.`],
       });
     }
@@ -226,7 +270,7 @@ function validateRecordLabel(
     if (isUndefined(meta)) continue;
     if (meta.fieldType.columnType !== 'text' || !isUndefined(meta.fieldType.schema)) {
       throw ohneError({
-        title: `\`recordLabel\` references non-text field \`${name}\``,
+        title: `\`dashboard.recordLabel\` references non-text field \`${name}\``,
         body: [
           `A label part${scope} must be a plain \`text\` column; \`${name}\` is a \`${instance.type}\` field.`,
         ],
@@ -239,7 +283,7 @@ function validateRecordLabel(
 const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
 
 /**
- * Rejects a malformed `table` declaration.
+ * Rejects a malformed `dashboard.table` declaration.
  * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
  * An entry fails naming no field, an unknown or write-only field, a repeat, or an invalid width.
  */
@@ -252,9 +296,9 @@ function validateTable(
   const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
   if (!isPlainObject(table)) {
     throw ohneError({
-      title: 'Invalid `table` declaration',
+      title: 'Invalid `dashboard.table` declaration',
       body: [
-        `The \`table\` option${scope} must be an object.`,
+        `The \`dashboard.table\` option${scope} must be an object.`,
         "Write `table: { columns: ['title | 20rem', 'views'] }`.",
       ],
     });
@@ -263,15 +307,15 @@ function validateTable(
   if (isUndefined(columns)) return;
   if (!isArray(columns) || !columns.every(isString)) {
     throw ohneError({
-      title: 'Invalid `table.columns` declaration',
+      title: 'Invalid `dashboard.table.columns` declaration',
       body: [
-        `The \`table.columns\` option${scope} must be an array of \`name|width|minWidth\` strings.`,
+        `The \`dashboard.table.columns\` option${scope} must be an array of \`name|width|minWidth\` strings.`,
       ],
     });
   }
   if (isEmpty(columns)) {
     throw ohneError({
-      title: 'The `table.columns` list is empty',
+      title: 'The `dashboard.table.columns` list is empty',
       body: [
         `An empty \`table.columns\`${scope} would silently show the derived columns.`,
         'Omit the key instead.',
@@ -284,13 +328,13 @@ function validateTable(
     const [name = '', ...widths] = entry.split('|').map((part) => part.trim());
     if (name === '') {
       throw ohneError({
-        title: 'A `table.columns` entry names no field',
+        title: 'A `dashboard.table.columns` entry names no field',
         body: [`Every \`table.columns\` entry${scope} must start with a field name.`],
       });
     }
     if (!known.has(name)) {
       throw ohneError({
-        title: `\`table.columns\` references unknown field \`${name}\``,
+        title: `\`dashboard.table.columns\` references unknown field \`${name}\``,
         body: [
           `No field \`${name}\` is declared${scope}, and it is not \`UUID\` or \`_updatedAt\`.`,
         ],
@@ -298,7 +342,7 @@ function validateTable(
     }
     if (fields[name]?.options.readable === false) {
       throw ohneError({
-        title: `\`table.columns\` references write-only field \`${name}\``,
+        title: `\`dashboard.table.columns\` references write-only field \`${name}\``,
         body: [
           `The field \`${name}\`${scope} is \`readable: false\`, so its column can never show a value.`,
         ],
@@ -306,7 +350,7 @@ function validateTable(
     }
     if (seen.has(name)) {
       throw ohneError({
-        title: `\`table.columns\` repeats field \`${name}\``,
+        title: `\`dashboard.table.columns\` repeats field \`${name}\``,
         body: [
           `The table keys columns by field name${scope}, so a repeated \`${name}\` collapses.`,
         ],
@@ -316,7 +360,7 @@ function validateTable(
     for (const width of widths) {
       if (width !== '' && !CSS_WIDTH.test(width)) {
         throw ohneError({
-          title: `Invalid \`table.columns\` width \`${width}\``,
+          title: `Invalid \`dashboard.table.columns\` width \`${width}\``,
           body: [
             `A width${scope} must be a plain CSS length or percentage, like \`20rem\` or \`50%\`.`,
           ],

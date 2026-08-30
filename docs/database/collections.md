@@ -191,7 +191,8 @@ for the locale set, reading, and writing per locale.
 
 ## Dashboard appearance
 
-Three optional keys shape how the dashboard presents a collection.
+The optional `dashboard` key groups how the dashboard presents a collection. It holds three keys:
+`icon`, `recordLabel`, and `table`.
 
 `icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
 in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.
@@ -212,9 +213,11 @@ with `_updatedAt` closing the set.
 
 ```ts
 export default defineCollection({
-  icon: 'note',
-  recordLabel: 'title',
-  table: { columns: ['title | 20rem', 'views', '_updatedAt'] },
+  dashboard: {
+    icon: 'note',
+    recordLabel: 'title',
+    table: { columns: ['title | 20rem', 'views', '_updatedAt'] },
+  },
   fields: {
     title: field('text'),
     views: field('integer'),
