@@ -7,6 +7,7 @@ import type {
 } from '../../utils/index.ts';
 import type { KnownBlocks } from '../blocks/known-blocks.ts';
 import type { KnownCollections } from '../collections/known-collections.ts';
+import type { LocaleCode } from '../collections/known-locales.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
@@ -284,7 +285,7 @@ export interface Config {
      * @default
      * 'en'
      */
-    defaultLocale?: string;
+    defaultLocale?: LocaleCode;
   };
 
   /**
