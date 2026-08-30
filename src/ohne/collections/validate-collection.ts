@@ -5,6 +5,7 @@ import {
   didYouMean,
   isArray,
   isBoolean,
+  isEmpty,
   isFunction,
   isNull,
   isPlainObject,
@@ -14,6 +15,7 @@ import {
 import { iconNames, isIconName } from '../dashboard/icon-shapes.ts';
 import { validateFieldName, validateUniqueNames } from '../database/naming/validate-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { useFields } from '../fields/use-fields.ts';
 
 const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
 
@@ -25,6 +27,7 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `icon` must name an icon the vendored set carries.
+ * - `recordLabel` must list distinct, readable, plain text fields, ten at most.
  * - `table.columns` must be a non-empty list of entries naming distinct, readable, declared fields.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
@@ -38,6 +41,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
   validateIcon(definition.icon, collection);
+  validateRecordLabel(definition.recordLabel, definition.fields, collection);
   validateTable(definition.table, definition.fields, collection);
 }
 
@@ -113,6 +117,87 @@ function validateAPI(api: unknown, collection?: string): void {
   }
 }
 
+/**
+ * Rejects a malformed `recordLabel` declaration.
+ * A failure is a value that is not a field name or an array of them, an empty list, or one past ten.
+ * A part fails naming an unknown, write-only, repeated, or non-text field.
+ * The text check reads the field-type registry, so an unregistered type defers to the boot pass.
+ */
+function validateRecordLabel(
+  recordLabel: unknown,
+  fields: Record<string, FieldInstance>,
+  collection?: string,
+): void {
+  if (isUndefined(recordLabel)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isString(recordLabel) && !(isArray(recordLabel) && recordLabel.every(isString))) {
+    throw ohneError({
+      title: 'Invalid `recordLabel` declaration',
+      body: [
+        `The \`recordLabel\` option${scope} must be a field name or an array of field names.`,
+        "Write `recordLabel: 'title'` or `recordLabel: ['firstName', 'lastName']`.",
+      ],
+    });
+  }
+  const names = isString(recordLabel) ? [recordLabel] : recordLabel;
+  if (isEmpty(names)) {
+    throw ohneError({
+      title: 'The `recordLabel` list is empty',
+      body: [
+        `An empty \`recordLabel\`${scope} would silently fall back to the derived label.`,
+        'Omit the key instead.',
+      ],
+    });
+  }
+  if (names.length > 10) {
+    throw ohneError({
+      title: 'The `recordLabel` lists more than ten fields',
+      body: [
+        `A record picker orders by every part${scope}, and a query orders by at most ten keys.`,
+      ],
+    });
+  }
+  const seen = new Set<string>();
+  for (const name of names) {
+    const instance = fields[name];
+    if (isUndefined(instance)) {
+      const near = didYouMean(name, Object.keys(fields));
+      throw ohneError({
+        title: `\`recordLabel\` references unknown field \`${name}\``,
+        body: [
+          `No field \`${name}\` is declared${scope}.`,
+          ...(isUndefined(near) ? [] : [`Did you mean \`${near}\`?`]),
+        ],
+      });
+    }
+    if (instance.options.readable === false) {
+      throw ohneError({
+        title: `\`recordLabel\` references write-only field \`${name}\``,
+        body: [
+          `The field \`${name}\`${scope} is \`readable: false\`, so it can never label a record.`,
+        ],
+      });
+    }
+    if (seen.has(name)) {
+      throw ohneError({
+        title: `\`recordLabel\` repeats field \`${name}\``,
+        body: [`A \`recordLabel\` part${scope} may appear once; a repeat adds nothing.`],
+      });
+    }
+    seen.add(name);
+    const meta = useFields().get(instance.type);
+    if (isUndefined(meta)) continue;
+    if (meta.fieldType.columnType !== 'text' || !isUndefined(meta.fieldType.schema)) {
+      throw ohneError({
+        title: `\`recordLabel\` references non-text field \`${name}\``,
+        body: [
+          `A label part${scope} must be a plain \`text\` column; \`${name}\` is a \`${instance.type}\` field.`,
+        ],
+      });
+    }
+  }
+}
+
 // Must stay in sync with the width grammar the dashboard's column parser accepts.
 const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
 
@@ -147,7 +232,7 @@ function validateTable(
       ],
     });
   }
-  if (columns.length === 0) {
+  if (isEmpty(columns)) {
     throw ohneError({
       title: 'The `table.columns` list is empty',
       body: [
@@ -217,7 +302,7 @@ function validateCompositeIndexes(
   const known = new Set(fieldNames);
   const seen = new Set<string>();
   for (const entry of entries) {
-    if (entry.fields.length === 0) {
+    if (isEmpty(entry.fields)) {
       throw ohneError({
         title: 'A composite index covers no fields',
         body: [`Every \`compositeIndexes\` entry${scope} must list at least one field.`],

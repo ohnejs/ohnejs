@@ -191,10 +191,18 @@ for the locale set, reading, and writing per locale.
 
 ## Dashboard appearance
 
-Two optional keys shape how the dashboard presents a collection.
+Three optional keys shape how the dashboard presents a collection.
 
 `icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
 in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.
+
+`recordLabel` names the field - or fields - whose values title a record wherever the dashboard
+shows one: relation cells, record pickers, the activity feed. A list joins its parts with single
+spaces, skipping empty values, so `['firstName', 'lastName']` renders as `Ada Lovelace`, and a
+picker search matches each of its first ten words against every part. Each part must be a readable
+plain text field.
+Omitted, the first readable text field titles the record. A record with no label text shows `#`
+plus the first eight characters of its `UUID`.
 
 `table` sets the list view's defaults. Its `columns` lists the columns to show, in order, one entry
 per field. An entry is a field name, optionally followed by its widths as `name|width|minWidth`,
@@ -205,6 +213,7 @@ with `_updatedAt` closing the set.
 ```ts
 export default defineCollection({
   icon: 'note',
+  recordLabel: 'title',
   table: { columns: ['title | 20rem', 'views', '_updatedAt'] },
   fields: {
     title: field('text'),

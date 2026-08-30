@@ -155,6 +155,11 @@ export type TableColumnEntry<TField extends string = string> =
   | `${TField | 'UUID' | '_updatedAt'} | ${string}`;
 
 /**
+ * A collection's record-label declaration: one field name, or several whose values join in order.
+ */
+export type RecordLabel<TField extends string = string> = TField | readonly TField[];
+
+/**
  * A collection's dashboard list-view defaults.
  */
 export interface CollectionTable<TField extends string = string> {
@@ -241,6 +246,19 @@ export interface CollectionDefinition<
   icon?: IconName;
 
   /**
+   * The field or fields whose values name a record wherever the dashboard shows one.
+   * A list joins its parts with single spaces, skipping empty values.
+   * Each part must name a readable plain `text` field; anything else fails at boot.
+   * Omitted, the first readable plain text field names the record.
+   *
+   * @example
+   * ```ts
+   * recordLabel: ['firstName', 'lastName']
+   * ```
+   */
+  recordLabel?: RecordLabel<keyof TFields & string>;
+
+  /**
    * The dashboard list view's defaults for this collection.
    * A viewer's own choice, carried in the `columns` query param, overrides them.
    */
@@ -280,6 +298,11 @@ export interface AnyCollectionDefinition {
    * The Tabler icon the dashboard menu shows; omitted, the menu row renders no icon.
    */
   icon?: IconName;
+
+  /**
+   * The record-label declaration; omitted, the first readable plain text field names the record.
+   */
+  recordLabel?: RecordLabel;
 
   /**
    * The dashboard list view's defaults; omitted, the list view derives its columns.

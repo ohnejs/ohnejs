@@ -250,6 +250,106 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts a recordLabel field name and list unchanged', () => {
+    const single = defineCollection({ fields: { title: field('text') }, recordLabel: 'title' });
+    deepStrictEqual(single.recordLabel, 'title');
+    const listed = defineCollection({
+      fields: { firstName: field('text'), lastName: field('text') },
+      recordLabel: ['firstName', 'lastName'],
+    });
+    deepStrictEqual(listed.recordLabel, ['firstName', 'lastName']);
+  });
+
+  it('rejects a recordLabel naming an unknown field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `titel` is not a field of this collection
+          recordLabel: ['titel'],
+        }),
+      /unknown field `titel`/,
+    );
+  });
+
+  it('rejects an empty recordLabel list', () => {
+    throws(
+      () => defineCollection({ fields: { title: field('text') }, recordLabel: [] }),
+      /list is empty/,
+    );
+  });
+
+  it('rejects a recordLabel repeating a field', () => {
+    throws(
+      () => defineCollection({ fields: { title: field('text') }, recordLabel: ['title', 'title'] }),
+      /repeats field `title`/,
+    );
+  });
+
+  it('rejects a recordLabel naming a write-only field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text'), secret: field('text', { readable: false }) },
+          recordLabel: ['secret'],
+        }),
+      /write-only field `secret`/,
+    );
+  });
+
+  it('rejects a recordLabel naming a non-text field', () => {
+    throws(
+      () => defineCollection({ fields: { views: field('integer') }, recordLabel: ['views'] }),
+      /non-text field `views`/,
+    );
+  });
+
+  it('rejects a recordLabel naming a relation', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { owner: field('record', { collection: 'Users' }) },
+          recordLabel: ['owner'],
+        }),
+      /non-text field `owner`/,
+    );
+  });
+
+  it('rejects a recordLabel of more than ten fields', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: {
+            a: field('text'),
+            b: field('text'),
+            c: field('text'),
+            d: field('text'),
+            e: field('text'),
+            f: field('text'),
+            g: field('text'),
+            h: field('text'),
+            i: field('text'),
+            j: field('text'),
+            k: field('text'),
+          },
+          recordLabel: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'],
+        }),
+      /more than ten fields/,
+    );
+  });
+
+  it('rejects a non-string recordLabel', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error a recordLabel is a field name or an array of them
+          recordLabel: 42,
+        }),
+      /Invalid `recordLabel` declaration/,
+    );
+  });
+
   it('accepts table columns in both spellings and returns them unchanged', () => {
     const definition = defineCollection({
       fields: { title: field('text'), views: field('integer') },
