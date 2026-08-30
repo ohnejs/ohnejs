@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
+import type { DialectName } from './known-dialects.ts';
 import type { TableDiff, TableSchema } from './schema/table-schema.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
@@ -114,7 +115,7 @@ export abstract class Dialect {
   /**
    * The name this dialect registers under, matched by `database.dialect`.
    */
-  abstract readonly name: string;
+  abstract readonly name: DialectName;
 
   /**
    * The most bound parameters the driver accepts in one statement, its hard variable-count wall.

@@ -1,3 +1,5 @@
+import type { BlockName } from '../blocks/known-blocks.ts';
+import type { CollectionName } from '../collections/known-collections.ts';
 import type { FieldInstance } from './field.ts';
 
 /**
@@ -14,7 +16,7 @@ export interface ForeignKeyHint {
    * The target collection, by name.
    * Resolved against the collection registry when the desired schema builds; an unknown name throws.
    */
-  collection: string;
+  collection: CollectionName;
 
   /**
    * The action taken on referencing rows when their target row is deleted.
@@ -37,7 +39,7 @@ export interface JunctionHint {
    * The target collection, by name.
    * Resolved against the collection registry when the desired schema builds; an unknown name throws.
    */
-  collection: string;
+  collection: CollectionName;
 
   /**
    * The owning `records` field on the target collection this field is the inverse of.
@@ -93,7 +95,7 @@ export interface BlocksHint {
    * Resolved against the block registry when the desired schema builds; an unknown name throws.
    * Omitted means every registered block.
    */
-  allow?: readonly string[];
+  allow?: readonly BlockName[];
 }
 
 /**

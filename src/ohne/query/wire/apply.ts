@@ -1,3 +1,4 @@
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { ConditionInput, UntypedQueryBuilder } from '../untyped.ts';
 import type { ParsedQuery } from './parse.ts';
 
@@ -36,7 +37,7 @@ export interface QueryScope {
   /**
    * The locale the endpoint reads when the request names none; a request's `locale` param wins.
    */
-  locale?: string;
+  locale?: LocaleCode;
 }
 
 /**
