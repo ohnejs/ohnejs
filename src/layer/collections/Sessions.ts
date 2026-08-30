@@ -46,7 +46,7 @@ export default defineCollection({
       description: 'auth.sessions.tokenHash.description',
     }),
 
-    expiresAt: field('integer', {
+    expiresAt: field('dateTime', {
       index: true,
       label: 'auth.sessions.expiresAt.label',
       description: 'auth.sessions.expiresAt.description',
