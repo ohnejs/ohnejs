@@ -1,6 +1,7 @@
 import { isArray } from '../../utils/is/is-array.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
+import { deepOmit } from '../../utils/object/deep-omit.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 
 /**
@@ -73,13 +74,5 @@ export function isClipboardData(value: unknown): value is ClipboardData {
  * `UUID` never names a regular field, since forms reserve it for row identity.
  */
 export function stripUUIDs(value: unknown): unknown {
-  if (isArray(value)) return value.map(stripUUIDs);
-  if (isPlainObject<Record<string, unknown>>(value)) {
-    const clean: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value)) {
-      if (key !== 'UUID') clean[key] = stripUUIDs(entry);
-    }
-    return clean;
-  }
-  return value;
+  return deepOmit(value, ['UUID']);
 }
