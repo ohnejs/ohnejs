@@ -9,6 +9,7 @@ import {
   h,
   icon,
   navigate,
+  openDialog,
   popup,
   type Popup,
   toast,
@@ -61,6 +62,12 @@ export interface TranslationsPopupOptions {
   showEditCurrent?: boolean;
 
   /**
+   * Called after a locale's translation deletes, with the deleted locale.
+   * A view showing the record's values refreshes here, since the deleted locale's values are gone.
+   */
+  onDeleted?(locale: string): void;
+
+  /**
    * Called when the popup asks to close, with its animated close function.
    * The caller awaits it and then disposes the region that created the popup.
    */
@@ -75,6 +82,10 @@ type CopyOutcome =
 css`
   .o-translations-title {
     font-weight: 500;
+  }
+
+  .o-translations-locale {
+    min-width: 0;
   }
 
   .o-translations hr {
@@ -94,6 +105,7 @@ css`
  * The current content locale carries a marker instead of an edit button, unless `showEditCurrent`.
  * New and Edit close the popup, route to the record when elsewhere, and switch the content locale.
  * Copy projects the current locale's translatable values onto the target locale, staying open.
+ * Delete confirms first, then removes the locale's translation whole, staying open too.
  * The actions render once the record's translated locales are read; a failed read toasts and closes.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
@@ -102,8 +114,10 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
   const { collection, uuid } = options;
   const showEditCurrent = options.showEditCurrent ?? false;
   const canWrite = collection.operations.update?.allowed === true;
+  const canDelete = collection.operations.delete?.allowed === true;
   const existing = ref<string[] | undefined>(undefined);
   const copying = ref(false);
+  const deleting = ref(false);
 
   const fetchExisting = async (): Promise<boolean> => {
     try {
@@ -158,6 +172,28 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     toast(t('dashboard.translations.copyFailed'), { type: 'error' });
   };
 
+  const remove = async (code: string): Promise<void> => {
+    if (deleting.value) return;
+    const action = await openDialog({
+      content: t('dashboard.translations.confirmDelete', { locale: formatLocaleCode(code) }),
+      actions: [
+        { name: 'cancel', label: t('dashboard.cancel') },
+        { name: 'delete', label: t('dashboard.delete'), variant: 'destructive' },
+      ],
+    });
+    if (action !== 'delete') return;
+    deleting.value = true;
+    const gone = await requestDelete(collection.segment, uuid, code);
+    deleting.value = false;
+    if (gone) {
+      toast(t('dashboard.translations.deleted'), { type: 'success' });
+      void fetchExisting();
+      options.onDeleted?.(code);
+    } else {
+      toast(t('dashboard.translations.deleteFailed'), { type: 'error' });
+    }
+  };
+
   const actions = (code: string): Child[] => {
     const current = effectiveContentLocale();
     const translated = existing.value ?? [];
@@ -187,23 +223,42 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
       items.push(editButton);
     }
 
-    const copyOff = !canWrite || copying.value || !translated.includes(current);
+    const copyOff = !canWrite || copying.value || !translated.includes(current) || code === current;
     const copyButton = button(icon('file-import'), {
       size: -2,
       variant: copyOff ? 'ghost' : 'outline',
       disabled: copyOff ? () => true : undefined,
-      class: code === current ? 'ohne-invisible' : undefined,
       onClick: () => void copy(code),
     });
-    onCleanup(
-      attachTooltip(copyButton, () =>
-        t('dashboard.translations.copy', {
-          from: formatLocaleCode(current),
-          to: formatLocaleCode(code),
-        }),
-      ),
-    );
+    // Copying onto itself is no action, so the self row's disabled copy explains nothing.
+    if (code !== current) {
+      onCleanup(
+        attachTooltip(copyButton, () =>
+          t('dashboard.translations.copy', {
+            from: formatLocaleCode(current),
+            to: formatLocaleCode(code),
+          }),
+        ),
+      );
+    }
     items.push(copyButton);
+
+    if (canDelete) {
+      const deleteOff = deleting.value || !translated.includes(code);
+      const deleteButton = button(icon('trash-x'), {
+        size: -2,
+        variant: deleteOff ? 'ghost' : 'outline',
+        destructiveHover: !deleteOff,
+        disabled: deleteOff ? (): boolean => true : undefined,
+        onClick: () => void remove(code),
+      });
+      onCleanup(
+        attachTooltip(deleteButton, () =>
+          t('dashboard.translations.delete', { locale: formatLocaleCode(code) }),
+        ),
+      );
+      items.push(deleteButton);
+    }
 
     return items;
   };
@@ -217,7 +272,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
         { class: 'ohne-justify-between' },
         h(
           'div',
-          { class: 'ohne-row' },
+          { class: 'ohne-row o-translations-locale' },
           h('div', { class: 'ohne-shrink-0' }, formatLocaleCode(code)),
           h('span', { class: 'ohne-muted ohne-truncate' }, `(${localeName(code)})`),
           code === current
@@ -235,7 +290,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
         ),
         h(
           'div',
-          { class: 'ohne-row' },
+          { class: 'ohne-row ohne-shrink-0' },
           when(
             () => !isUndefined(existing.value),
             () => actions(code),
@@ -300,5 +355,25 @@ async function requestCopy(segment: string, uuid: string, locale: string): Promi
     return { kind: 'failed' };
   } catch {
     return { kind: 'failed' };
+  }
+}
+
+/**
+ * Requests the server-side delete of the record's translation at `locale`.
+ * Resolves whether the translation is gone: any `2xx`, and a `404` that means it already was.
+ * Retries once on a busy `503`.
+ */
+async function requestDelete(segment: string, uuid: string, locale: string): Promise<boolean> {
+  const send = (): Promise<Response> =>
+    api(`DELETE /collections/${segment}/${uuid}/translations?${stringifySearchParams({ locale })}`);
+  try {
+    let response = await send();
+    if (response.status === 503) {
+      await sleep(1000);
+      response = await send();
+    }
+    return response.ok || response.status === 404;
+  } catch {
+    return false;
   }
 }

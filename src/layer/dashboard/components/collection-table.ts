@@ -723,6 +723,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         uuid,
         currentlyEditing: () => t('dashboard.translations.selected'),
         showEditCurrent: true,
+        onDeleted: () => refresh(),
         onClose: (close) =>
           void close().then(() => {
             translationsUUID.value = null;
