@@ -8,13 +8,18 @@ describe('useFields', () => {
     deepStrictEqual(useFields().keys().sort(), [
       'blocks',
       'boolean',
+      'date',
+      'dateTime',
       'integer',
+      'multiSelect',
       'number',
       'object',
       'record',
       'records',
       'repeater',
+      'select',
       'text',
+      'time',
     ]);
   });
 

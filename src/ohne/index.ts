@@ -43,6 +43,7 @@ export * from './database/use-dialects.ts';
 export * from './database/with-lock.ts';
 export * from './env/env.ts';
 export * from './env/use-env.ts';
+export * from './fields/choice.ts';
 export * from './fields/collect-fields.ts';
 export * from './fields/context.ts';
 export * from './fields/define-field.ts';

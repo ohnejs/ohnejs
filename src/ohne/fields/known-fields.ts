@@ -1,12 +1,17 @@
 import type { blocks } from './builtin/blocks.ts';
 import type { boolean } from './builtin/boolean.ts';
+import type { dateTime } from './builtin/date-time.ts';
+import type { date } from './builtin/date.ts';
 import type { integer } from './builtin/integer.ts';
+import type { multiSelect } from './builtin/multi-select.ts';
 import type { number } from './builtin/number.ts';
 import type { object } from './builtin/object.ts';
 import type { record } from './builtin/record.ts';
 import type { records } from './builtin/records.ts';
 import type { repeater } from './builtin/repeater.ts';
+import type { select } from './builtin/select.ts';
 import type { text } from './builtin/text.ts';
+import type { time } from './builtin/time.ts';
 
 /**
  * The registered field types, each name mapped to its definition.
@@ -44,6 +49,31 @@ export interface KnownFields {
    * A true or false value.
    */
   boolean: typeof boolean;
+
+  /**
+   * One value out of a declared choice list.
+   */
+  select: typeof select;
+
+  /**
+   * An ordered list of distinct string values, optionally out of a declared choice list.
+   */
+  multiSelect: typeof multiSelect;
+
+  /**
+   * A calendar day, stored as `YYYY-MM-DD` text.
+   */
+  date: typeof date;
+
+  /**
+   * A time of day, stored as `HH:MM:SS` text.
+   */
+  time: typeof time;
+
+  /**
+   * An instant, stored as epoch milliseconds.
+   */
+  dateTime: typeof dateTime;
 
   /**
    * A reference to one row of another collection.
