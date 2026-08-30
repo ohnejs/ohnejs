@@ -28,6 +28,7 @@ export type WireErrorCode =
   | 'duplicatePopulateField'
   | 'invalidLocale'
   | 'localeNotApplicable'
+  | 'sameLocale'
   | 'tooManyConditions'
   | 'hasTooDeep'
   | 'listTooLong'
@@ -182,10 +183,11 @@ export function invalidSpecError(path: string): HTTPError {
 }
 
 /**
- * A `locale` value that is malformed or outside the configured `collections.locales` set.
+ * A locale value that is malformed or outside the configured `collections.locales` set.
+ * `path` names the offending param; the plain `locale` param stays the default.
  */
-export function invalidLocaleError(locale: string): HTTPError {
-  return wireError('invalidLocale', 'locale', { locale });
+export function invalidLocaleError(locale: string, path = 'locale'): HTTPError {
+  return wireError('invalidLocale', path, { locale });
 }
 
 /**
@@ -193,6 +195,13 @@ export function invalidLocaleError(locale: string): HTTPError {
  */
 export function localeNotApplicableError(): HTTPError {
   return wireError('localeNotApplicable', 'locale');
+}
+
+/**
+ * A translation copy whose `source` and target resolve to the same locale; a copy needs two.
+ */
+export function sameLocaleError(locale: string): HTTPError {
+  return wireError('sameLocale', '', { locale });
 }
 
 /**

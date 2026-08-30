@@ -439,4 +439,36 @@ describe('defineCollection', () => {
       /Invalid `table.columns` width/,
     );
   });
+
+  it('accepts a copyTranslation function unchanged', () => {
+    const copyTranslation = ({ input }: { input: Record<string, unknown> }) => input;
+    const definition = defineCollection({
+      fields: { title: field('text', { translatable: true }) },
+      copyTranslation,
+    });
+    deepStrictEqual(definition.copyTranslation, copyTranslation);
+  });
+
+  it('rejects a non-function copyTranslation', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text', { translatable: true }) },
+          // @ts-expect-error `copyTranslation` must be a function
+          copyTranslation: true,
+        }),
+      /Invalid `copyTranslation` declaration/,
+    );
+  });
+
+  it('rejects a copyTranslation on a collection with no translatable field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          copyTranslation: ({ input }) => input,
+        }),
+      /`copyTranslation` needs a translatable field/,
+    );
+  });
 });

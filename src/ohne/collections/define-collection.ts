@@ -2,6 +2,7 @@ import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type { NamedMiddlewareKey } from '../middleware/known-middleware.ts';
 import type { QueryScope } from '../query/wire/apply.ts';
+import type { LocaleCode } from './known-locales.ts';
 
 import { validateCollectionDefinition } from './validate-collection.ts';
 
@@ -177,6 +178,31 @@ export interface CollectionTable<TField extends string = string> {
 }
 
 /**
+ * The context a collection's `copyTranslation` function receives.
+ */
+export interface CopyTranslationContext {
+  /**
+   * The record as the source locale reads it, every readable field included.
+   */
+  source: Record<string, unknown>;
+
+  /**
+   * The default write input: the translatable, writable, mutable fields, row `UUID`s shed.
+   */
+  input: Record<string, unknown>;
+
+  /**
+   * The resolved locale the copy reads from, narrowed to the configured set once codegen has run.
+   */
+  sourceLocale: LocaleCode;
+
+  /**
+   * The resolved locale the copy writes to, narrowed the same way.
+   */
+  targetLocale: LocaleCode;
+}
+
+/**
  * A collection definition: its fields and any collection-level constraints.
  * The collection name is not declared here; it comes from the file under `dirs.collections`.
  */
@@ -232,6 +258,27 @@ export interface CollectionDefinition<
    * ```
    */
   api?: boolean | CollectionAPI<keyof TFields & string>;
+
+  /**
+   * Shapes the write input when a translation copies to another locale.
+   * The context carries the source record, the computed default `input`, and both resolved locales.
+   * The returned object replaces the default input, and the function may be async.
+   * Only translatable, writable, mutable fields ever write - other keys never apply.
+   * A copy therefore cannot touch values shared across locales.
+   * Row `UUID`s are shed from the result, so copied child rows insert as fresh rows.
+   * Omitted, the default input writes as is.
+   *
+   * @example
+   * ```ts
+   * copyTranslation: ({ input, targetLocale }) => ({
+   *   ...input,
+   *   title: `${input.title} (${targetLocale})`,
+   * })
+   * ```
+   */
+  copyTranslation?: (
+    context: CopyTranslationContext,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
    * The Tabler icon the dashboard menu shows for this collection.
@@ -293,6 +340,13 @@ export interface AnyCollectionDefinition {
    * false
    */
   api?: boolean | CollectionAPI;
+
+  /**
+   * Shapes the write input when a translation copies to another locale; omitted, the default input writes.
+   */
+  copyTranslation?: (
+    context: CopyTranslationContext,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
    * The Tabler icon the dashboard menu shows; omitted, the menu row renders no icon.

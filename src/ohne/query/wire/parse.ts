@@ -560,20 +560,22 @@ function windowBoundParams(window: {
 }
 
 /**
- * Parses a `locale` param into the canonical content locale a translatable collection addresses.
+ * Parses a locale param into the canonical content locale a translatable collection addresses.
  * A locale on a non-translatable collection, a malformed tag, or one outside the configured set throws.
  * `parseQueryParams` runs it for reads; a write endpoint runs it alone, since writes take no query.
+ * `path` names the param a failure reports; the plain `locale` param stays the default.
  */
 export function parseLocaleParam(
   value: SearchParamValue | undefined,
   meta: CollectionQueryMeta,
+  path = 'locale',
 ): string | null {
   if (isUndefined(value)) return null;
   if (meta.translatable !== true) throw localeNotApplicableError();
-  if (!isString(value)) throw invalidLocaleError(String(value));
+  if (!isString(value)) throw invalidLocaleError(String(value), path);
   const canonical = canonicalizeLanguage(value);
   if (isNull(canonical) || !queryLocales().locales.includes(canonical)) {
-    throw invalidLocaleError(value);
+    throw invalidLocaleError(value, path);
   }
   return canonical;
 }

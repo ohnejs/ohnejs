@@ -26,6 +26,7 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - Each composite index must cover only declared fields, at least one, with no repeat.
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
+ * - `copyTranslation` must be a function, on a collection with at least one translatable field.
  * - `icon` must name an icon the vendored set carries.
  * - `recordLabel` must list distinct, readable, plain text fields, ten at most.
  * - `table.columns` must be a non-empty list of entries naming distinct, readable, declared fields.
@@ -40,6 +41,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateUniqueNames(fieldNames, 'field', collection);
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
+  validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
   validateIcon(definition.icon, collection);
   validateRecordLabel(definition.recordLabel, definition.fields, collection);
   validateTable(definition.table, definition.fields, collection);
@@ -114,6 +116,41 @@ function validateAPI(api: unknown, collection?: string): void {
         ],
       });
     }
+  }
+}
+
+/**
+ * Rejects a malformed `copyTranslation` declaration.
+ * A failure is a non-function value, or a function on a collection with no translatable field.
+ * A hook no translation could ever reach is dead config, named at boot rather than kept silent.
+ */
+function validateCopyTranslation(
+  copyTranslation: unknown,
+  fields: Record<string, FieldInstance>,
+  collection?: string,
+): void {
+  if (isUndefined(copyTranslation)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isFunction(copyTranslation)) {
+    throw ohneError({
+      title: 'Invalid `copyTranslation` declaration',
+      body: [
+        `The \`copyTranslation\` option${scope} must be a function.`,
+        'It receives the copy context and returns the write input.',
+      ],
+    });
+  }
+  const translatable = Object.values(fields).some(
+    (instance) => instance.options.translatable === true,
+  );
+  if (!translatable) {
+    throw ohneError({
+      title: '`copyTranslation` needs a translatable field',
+      body: [
+        `No field${scope} is \`translatable\`, so no translation could ever copy.`,
+        'Mark a field `translatable: true`, or drop the option.',
+      ],
+    });
   }
 }
 
