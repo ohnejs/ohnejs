@@ -9,6 +9,7 @@ import { effectScope } from '../../utils/reactive/effect-scope.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { useT } from '../runtime/use-t.ts';
 import { blocksOf } from './_blocks.ts';
 import { carriedField, carryValue } from './_items.ts';
 import { fieldRow } from './field-row.ts';
@@ -187,6 +188,7 @@ export function createFieldForm(
   const lockedRows: ControlRow[] = [];
   const carried: DashboardField[] = [];
   const statics: DashboardField[] = [];
+  const editorless = new Set<DashboardField>();
   const showsLocked =
     options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
 
@@ -225,6 +227,7 @@ export function createFieldForm(
       (settable ? rows : lockedRows).push({ field, path, control });
       continue;
     }
+    if (settable) editorless.add(field);
     if (field.writable && !field.immutable && carriedField(field)) carried.push(field);
     if (showsLocked && field.readable) statics.push(field);
   }
@@ -268,7 +271,9 @@ export function createFieldForm(
           return fieldRow({ field, path: lockedRow.path, locked: true }, lockedRow.control.element);
         }
         const row = rowByName.get(field.name);
-        if (isUndefined(row)) return staticRow(field, options, () => seed?.[field.name]);
+        if (isUndefined(row)) {
+          return staticRow(field, options, () => seed?.[field.name], editorless.has(field));
+        }
         const { control } = row;
         return fieldRow(
           {
@@ -361,11 +366,23 @@ export function scopedErrors(
 
 /**
  * A locked display-only row for a readable field without a registered control.
+ * `editorless` marks a field the form would edit but cannot; its lock explains that instead.
  */
-function staticRow(field: DashboardField, options: FieldFormOptions, value: () => unknown): Child {
+function staticRow(
+  field: DashboardField,
+  options: FieldFormOptions,
+  value: () => unknown,
+  editorless: boolean,
+): Child {
+  const t = useT();
   const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
   return fieldRow(
-    { field, path, locked: true },
+    {
+      field,
+      path,
+      locked: true,
+      lockedHint: editorless ? () => t('dashboard.field.noEditor') : undefined,
+    },
     h(
       'div',
       { class: 'ohne-fieldrow-static' },

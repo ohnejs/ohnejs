@@ -54,6 +54,11 @@ export interface FieldRowOptions {
    * Renders the locked mark, for immutable and read-only rows.
    */
   locked?: boolean;
+
+  /**
+   * Overrides the locked mark's tooltip with a more specific reason.
+   */
+  lockedHint?: () => string;
 }
 
 css`
@@ -187,7 +192,7 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
 
   const lockMark = (): HTMLElement => {
     const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('lock'));
-    onCleanup(attachTooltip(mark, () => t('dashboard.field.locked')));
+    onCleanup(attachTooltip(mark, options.lockedHint ?? (() => t('dashboard.field.locked'))));
     return mark;
   };
 
