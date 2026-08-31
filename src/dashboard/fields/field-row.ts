@@ -100,7 +100,9 @@ css`
     justify-content: center;
     align-items: center;
     width: 1.25em;
+    width: round(1.25em, 1px);
     height: 1.25em;
+    height: round(1.25em, 1px);
   }
 
   .ohne-fieldrow-pristine {
