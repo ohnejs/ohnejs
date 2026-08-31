@@ -18,11 +18,11 @@ import {
   overlayCount,
   pagination,
   queueToast,
+  table,
+  tableColumn,
   type TableColumns,
   type TableRow,
   type TableSort,
-  table,
-  tableColumn,
   toast,
   useHotkeys,
   useT,
@@ -91,6 +91,7 @@ css`
   }
 
   .o-collection-table-footer {
+    container-type: inline-size;
     position: sticky;
     margin-top: auto;
     padding: 0.75rem;
