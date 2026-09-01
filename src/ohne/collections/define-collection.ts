@@ -146,7 +146,7 @@ export interface CompositeIndex<TField extends string = string> {
 /**
  * One `table.columns` entry: a field name, optionally followed by its CSS widths.
  * The parts are `name`, `width`, and `minWidth`, separated by `|`; both widths are optional.
- * Spaces around a separator are trimmed, so `title | 20rem` and `title|20rem` are the same entry.
+ * Spaces around a separator are trimmed, so `title | 320px` and `title|320px` are the same entry.
  */
 export type TableColumnEntry<TField extends string = string> =
   | TField
@@ -170,12 +170,12 @@ export type RecordLabel<TField extends string = string> =
 export interface CollectionTable<TField extends string = string> {
   /**
    * The columns the list view shows, in order, one entry per column.
-   * A width is a plain CSS length or percentage; `minWidth` falls back to `16rem` without a width.
+   * A width is a plain CSS length or percentage; `minWidth` falls back to `256px` without a width.
    * Omitted, the table shows the first four readable fields with `_updatedAt` closing the set.
    *
    * @example
    * ```ts
-   * columns: ['title | 20rem', 'views', '_updatedAt | 150px']
+   * columns: ['title | 320px', 'views', '_updatedAt | 150px']
    * ```
    */
   columns?: readonly TableColumnEntry<TField>[];
@@ -220,7 +220,7 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * table: { columns: ['title | 25% | 16rem', 'views', '_updatedAt | 150px'] }
+   * table: { columns: ['title | 25% | 256px', 'views', '_updatedAt | 150px'] }
    * ```
    */
   table?: CollectionTable<TField>;
@@ -337,7 +337,7 @@ export interface CollectionDefinition<
    * dashboard: {
    *   icon: 'note',
    *   recordLabel: 'title',
-   *   table: { columns: ['title | 20rem', '_updatedAt'] },
+   *   table: { columns: ['title | 320px', '_updatedAt'] },
    * }
    * ```
    */

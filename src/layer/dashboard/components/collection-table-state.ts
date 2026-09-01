@@ -17,6 +17,8 @@ const PX_WIDTH = /^[1-9][0-9]*px$/;
 // The URL is untrusted and widths land in a style attribute, so only a plain length may pass.
 const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
 
+const DEFAULT_MIN_WIDTH = '256px';
+
 /**
  * The slice of `DashboardField` the column resolver reads.
  * A structural subset, so this module stays free of the browser-only dashboard types.
@@ -73,7 +75,7 @@ export interface TableColumnSpec {
   width?: string;
 
   /**
-   * The CSS minimum width; `'16rem'` unless the URL spec sets a `width`.
+   * The CSS minimum width; `'256px'` unless the URL spec sets a `width`.
    */
   minWidth?: string;
 }
@@ -194,11 +196,11 @@ function parseColumnEntries(
 
 /**
  * One serialized `columns` entry: `name`, `width`, and `minWidth` joined with `|`.
- * A `16rem` minimum beside no width is the resolver's default, so it serializes away.
+ * A `256px` minimum beside no width is the resolver's default, so it serializes away.
  * Trailing empty slots drop, keeping a bare entry bare.
  */
 function columnEntry(name: string, width?: string, minWidth?: string): string {
-  const minimum = isUndefined(width) && minWidth === '16rem' ? undefined : minWidth;
+  const minimum = isUndefined(width) && minWidth === DEFAULT_MIN_WIDTH ? undefined : minWidth;
   const parts = [name, width ?? '', minimum ?? ''];
   while (parts.length > 1 && parts.at(-1) === '') parts.pop();
   return parts.join('|');
@@ -210,13 +212,13 @@ function columnEntry(name: string, width?: string, minWidth?: string): string {
  * Without a `spec`, the first four declared readable fields become columns, `_updatedAt` closing the set.
  * A `spec` lists columns as `name|width|minWidth` entries.
  * An unknown, unreadable, or repeated name warns and is skipped.
- * A missing width keeps the `16rem` minimum.
+ * A missing width keeps the `256px` minimum.
  * An empty result falls back to the `UUID` column alone.
  *
  * @example
  * ```ts
  * resolveTableColumns(fields)                         // -> first 4 declared fields + _updatedAt
- * resolveTableColumns(fields, ['title|20rem', 'age']) // -> title at 20rem, age at min 16rem
+ * resolveTableColumns(fields, ['title|320px', 'age']) // -> title at 320px, age at min 256px
  * ```
  */
 export function resolveTableColumns(
@@ -234,7 +236,7 @@ export function resolveTableColumns(
         name: field.name,
         label: field.label,
         sortable: sortableOf(field),
-        minWidth: '16rem',
+        minWidth: DEFAULT_MIN_WIDTH,
       });
     }
     const updatedAt = fields.find((field) => field.name === '_updatedAt');
@@ -243,7 +245,7 @@ export function resolveTableColumns(
         name: updatedAt.name,
         label: updatedAt.label,
         sortable: 'numeric',
-        minWidth: '16rem',
+        minWidth: DEFAULT_MIN_WIDTH,
       });
     }
   } else {
@@ -255,7 +257,7 @@ export function resolveTableColumns(
       };
       if (!isUndefined(width)) column.width = width;
       if (!isUndefined(minWidth)) column.minWidth = minWidth;
-      else if (isUndefined(column.width)) column.minWidth = '16rem';
+      else if (isUndefined(column.width)) column.minWidth = DEFAULT_MIN_WIDTH;
       columns.push(column);
     }
   }
@@ -276,11 +278,11 @@ export function resolveTableColumns(
  *
  * @example
  * ```ts
- * serializeTableColumns([{ name: 'title', label: 'Title', sortable: 'text', minWidth: '16rem' }])
+ * serializeTableColumns([{ name: 'title', label: 'Title', sortable: 'text', minWidth: '256px' }])
  * // -> ['title']
  *
- * serializeTableColumns([{ name: 'title', label: 'Title', sortable: 'text', minWidth: '24rem' }])
- * // -> ['title||24rem']
+ * serializeTableColumns([{ name: 'title', label: 'Title', sortable: 'text', minWidth: '384px' }])
+ * // -> ['title||384px']
  * ```
  */
 export function serializeTableColumns(columns: readonly TableColumnSpec[]): string[] {
@@ -298,8 +300,8 @@ export function serializeTableColumns(columns: readonly TableColumnSpec[]): stri
  * editableTableColumns(['title|256px'], fields)
  * // -> [{ $key: 'title', name: 'title', width: 256, rawWidth: '256px' }]
  *
- * editableTableColumns(['title||24rem'], fields)
- * // -> [{ $key: 'title', name: 'title', width: null, rawMinWidth: '24rem' }]
+ * editableTableColumns(['title||384px'], fields)
+ * // -> [{ $key: 'title', name: 'title', width: null, rawMinWidth: '384px' }]
  * ```
  */
 export function editableTableColumns(
@@ -336,7 +338,7 @@ export function serializeTableColumnEdits(items: readonly TableColumnEdit[]): st
       ? columnEntry(item.name, `${item.width}px`)
       : item.width === false
         ? columnEntry(item.name, item.rawWidth, item.rawMinWidth)
-        : columnEntry(item.name, undefined, item.rawMinWidth ?? '16rem'),
+        : columnEntry(item.name, undefined, item.rawMinWidth ?? DEFAULT_MIN_WIDTH),
   );
 }
 

@@ -317,7 +317,7 @@ function validateTable(
       title: 'Invalid `dashboard.table` declaration',
       body: [
         `The \`dashboard.table\` option${scope} must be an object.`,
-        "Write `table: { columns: ['title | 20rem', 'views'] }`.",
+        "Write `table: { columns: ['title | 320px', 'views'] }`.",
       ],
     });
   }
@@ -380,7 +380,7 @@ function validateTable(
         throw ohneError({
           title: `Invalid \`dashboard.table.columns\` width \`${width}\``,
           body: [
-            `A width${scope} must be a plain CSS length or percentage, like \`20rem\` or \`50%\`.`,
+            `A width${scope} must be a plain CSS length or percentage, like \`320px\` or \`50%\`.`,
           ],
         });
       }

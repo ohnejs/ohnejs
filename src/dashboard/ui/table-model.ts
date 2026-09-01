@@ -118,8 +118,8 @@ export type TableSort<TColumns extends TableColumns> = {
  * @example
  * ```ts
  * const columns = {
- *   id: tableColumn<number>({ label: 'ID', width: '4rem' }),
- *   name: tableColumn<string>({ label: 'Name', minWidth: '8rem' }),
+ *   id: tableColumn<number>({ label: 'ID', width: '64px' }),
+ *   name: tableColumn<string>({ label: 'Name', minWidth: '128px' }),
  * }
  * ```
  */

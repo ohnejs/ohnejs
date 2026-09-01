@@ -170,13 +170,13 @@ describe('resolveTableColumns', () => {
     );
   });
 
-  it('assigns sortability and the 16rem minimum by default', () => {
+  it('assigns sortability and the 256px minimum by default', () => {
     const columns = resolveTableColumns(FIELDS);
     deepStrictEqual(columns[0], {
       name: 'title',
       label: 'title',
       sortable: 'text',
-      minWidth: '16rem',
+      minWidth: '256px',
     });
     strictEqual(columns[1]?.sortable, 'numeric');
     strictEqual(columns[4]?.sortable, 'numeric');
@@ -204,7 +204,7 @@ describe('resolveTableColumns', () => {
     const columns = resolveTableColumns(FIELDS, ['title|20rem', 'views', 'published|50%|10rem']);
     deepStrictEqual(columns, [
       { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
-      { name: 'views', label: 'views', sortable: 'numeric', minWidth: '16rem' },
+      { name: 'views', label: 'views', sortable: 'numeric', minWidth: '256px' },
       {
         name: 'published',
         label: 'published',
@@ -249,7 +249,7 @@ describe('resolveTableColumns', () => {
   it('drops a width slot that is not a plain CSS length, and warns', (t) => {
     const warn = t.mock.method(console, 'warn');
     deepStrictEqual(resolveTableColumns(FIELDS, ['title|1px;background:url(//evil.example/x)']), [
-      { name: 'title', label: 'title', sortable: 'text', minWidth: '16rem' },
+      { name: 'title', label: 'title', sortable: 'text', minWidth: '256px' },
     ]);
     deepStrictEqual(resolveTableColumns(FIELDS, ['title|20rem|calc(100%)']), [
       { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
@@ -262,7 +262,7 @@ describe('serializeTableColumns', () => {
   it('serializes each entry shape', () => {
     deepStrictEqual(
       serializeTableColumns([
-        { name: 'title', label: 'title', sortable: 'text', minWidth: '16rem' },
+        { name: 'title', label: 'title', sortable: 'text', minWidth: '256px' },
         { name: 'title', label: 'title', sortable: 'text', width: '256px' },
         { name: 'title', label: 'title', sortable: 'text', minWidth: '24rem' },
         { name: 'title', label: 'title', sortable: 'text', width: '50%', minWidth: '24rem' },

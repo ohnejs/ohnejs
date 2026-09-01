@@ -312,7 +312,7 @@ plus the first eight characters of its `UUID`.
 
 `table` sets the list view's defaults. Its `columns` lists the columns to show, in order, one entry
 per field. An entry is a field name, optionally followed by its widths as `name|width|minWidth`,
-each a plain CSS length or percentage like `20rem` or `50%`. `UUID` and `_updatedAt` are valid names
+each a plain CSS length or percentage like `320px` or `50%`. `UUID` and `_updatedAt` are valid names
 beside your declared readable fields. Omitted, the list view shows the first four readable fields
 with `_updatedAt` closing the set.
 
@@ -321,7 +321,7 @@ export default defineCollection({
   dashboard: {
     icon: 'note',
     recordLabel: 'title',
-    table: { columns: ['title | 20rem', 'views', '_updatedAt'] },
+    table: { columns: ['title | 320px', 'views', '_updatedAt'] },
   },
   fields: {
     title: field('text'),
