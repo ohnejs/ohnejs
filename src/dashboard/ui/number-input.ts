@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -280,7 +281,7 @@ function leadingZeros(value: number, width: number): string {
   if (width <= 0) return value.toString();
   const [integer = '', decimals] = Math.abs(value).toString().split('.');
   const sign = value < 0 ? '-' : '';
-  return sign + integer.padStart(width, '0') + (decimals === undefined ? '' : `.${decimals}`);
+  return sign + integer.padStart(width, '0') + (isUndefined(decimals) ? '' : `.${decimals}`);
 }
 
 /**
@@ -293,8 +294,7 @@ function leadingZeros(value: number, width: number): string {
  * Writing the model reformats the display.
  *
  * With `autoWidth` the input hugs its content, measured through a hidden mirror span.
- * It re-measures whenever the span resizes and after an `ohne-overlay-animated` window event.
- * A width measured while an overlay animates therefore gets fixed.
+ * It re-measures whenever the span's border box changes.
  *
  * @example
  * ```ts
@@ -390,17 +390,17 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   };
   const pointAlongAxis = (event: MouseEvent | TouchEvent): number | undefined => {
     const point = event instanceof MouseEvent ? event : event.touches[0];
-    if (point === undefined) return undefined;
+    if (isUndefined(point)) return undefined;
     return dragDirection === 'horizontal' ? point.clientX : point.clientY;
   };
   const startDrag = (event: MouseEvent | TouchEvent): void => {
     const start = pointAlongAxis(event);
-    if (start === undefined) return;
+    if (isUndefined(start)) return;
     let prev = start;
     let multiplier = 1;
     const onMove = (event: Event): void => {
       const current = pointAlongAxis(event as MouseEvent | TouchEvent);
-      if (current === undefined) return;
+      if (isUndefined(current)) return;
       const delta = dragDirection === 'horizontal' ? current - prev : prev - current;
       const rounded = delta < 0 ? Math.floor(delta) : Math.ceil(delta);
       prev = current;
@@ -439,20 +439,13 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       { class: 'ohne-number-input ohne-number-input-shadow' },
       () => stringified.value || options.placeholder,
     );
-    const measured = shadow;
-    const update = (): void => {
-      input.style.width = `${measured.getBoundingClientRect().width}px`;
-    };
-    const remeasure = (): void => void setTimeout(update);
-    const observer = new ResizeObserver(update);
-    observer.observe(measured);
-    window.addEventListener('ohne-overlay-animated', remeasure);
-    window.addEventListener('resize', update);
-    onCleanup(() => {
-      observer.disconnect();
-      window.removeEventListener('ohne-overlay-animated', remeasure);
-      window.removeEventListener('resize', update);
+    // The border box, not the client rect: an overlay's entrance transform scales what a rect reports.
+    const observer = new ResizeObserver(([entry]) => {
+      const size = entry?.borderBoxSize[0];
+      if (!isUndefined(size)) input.style.width = `${size.inlineSize}px`;
     });
+    observer.observe(shadow);
+    onCleanup(() => observer.disconnect());
   }
 
   const dragButton = (): HTMLElement => {
@@ -513,7 +506,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
         (options.autoWidth ? ' ohne-number-auto-width' : '') +
         (options.error?.() ? ' ohne-number-has-errors' : '') +
         (disabled() ? ' ohne-number-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
     },
     when(() => (options.showDragButton ?? false) && !disabled(), dragButton),
