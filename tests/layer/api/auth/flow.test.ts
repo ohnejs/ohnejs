@@ -1,4 +1,4 @@
-import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, doesNotMatch, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
@@ -24,6 +24,7 @@ import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { defineHandler } from '../../../../src/ohne/routes/define-handler.ts';
+import { parseDuration } from '../../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -81,18 +82,32 @@ async function call(r: Route, options: CallOptions = {}): Promise<Response> {
   return response;
 }
 
-function cookiePair(response: Response): string {
+function sessionCookie(response: Response): string {
   const header = response.headers.getSetCookie().find((c) => c.startsWith('session='));
   if (header === undefined) throw new Error('no session cookie was set');
-  return header.split(';', 1)[0];
+  return header;
+}
+
+function cookiePair(response: Response): string {
+  return sessionCookie(response).split(';', 1)[0];
 }
 
 async function createUser(email: string, password: string): Promise<void> {
   await queryUntyped('Users').createOrThrow({ email, password });
 }
 
-async function login(email: string, password: string): Promise<Response> {
-  return call(ROUTES.login, { json: { email, password } });
+async function login(email: string, password: string, remember?: boolean): Promise<Response> {
+  return call(ROUTES.login, { json: { email, password, remember } });
+}
+
+async function assertSessionLifetime(userUUID: string, lifetime: string): Promise<void> {
+  const row = await db.queryOne<{ expiresAt: number }>(
+    'SELECT "expiresAt" FROM "Sessions" WHERE "user" = ?',
+    [userUUID],
+  );
+  ok(row);
+  const drift = Math.abs(row.expiresAt - Date.now() - parseDuration(lifetime));
+  ok(drift < parseDuration('1m'), `session expires ${drift}ms away from ${lifetime}`);
 }
 
 describe('auth flow', () => {
@@ -109,6 +124,19 @@ describe('auth flow', () => {
     match(setCookie, /HttpOnly/);
     match(setCookie, /Secure/);
     match(setCookie, /SameSite=Lax/);
+  });
+
+  it('sizes the cookie and the stored row to whether the login asked to be remembered', async () => {
+    await createUser('kept@example.com', 'correct horse');
+    await createUser('brief@example.com', 'correct horse');
+
+    const kept = await login('kept@example.com', 'correct horse', true);
+    match(sessionCookie(kept), /Max-Age=\d+/);
+    await assertSessionLifetime(((await kept.json()) as { UUID: string }).UUID, '30d');
+
+    const brief = await login('brief@example.com', 'correct horse', false);
+    doesNotMatch(sessionCookie(brief), /Max-Age/);
+    await assertSessionLifetime(((await brief.json()) as { UUID: string }).UUID, '1d');
   });
 
   it('logs in only with the right password, and hides whether an email exists', async () => {

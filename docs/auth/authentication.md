@@ -18,7 +18,7 @@ Three routes cover the sign-in flow. Each speaks JSON.
 
 ```bash
 # Sign in. Returns the user and sets the session cookie.
-POST /auth/login   { "email": "ada@example.com", "password": "correct horse" }
+POST /auth/login   { "email": "ada@example.com", "password": "correct horse", "remember": true }
 # -> 200 { "UUID": "…", "email": "ada@example.com", "roles": [] }
 
 # Sign out. Deletes the session and clears the cookie.
@@ -33,6 +33,9 @@ GET  /auth/me
 The email is stored trimmed and lowercased, so `Ada@Example.com` and `ada@example.com` are the same
 account, and `login` matches either. A response never carries the password hash - only `UUID`,
 `email`, and the [role names](./roles.md) cross the wire.
+
+`remember` asks for a lasting session. Omit it and the sign-in counts as not remembered, so a
+scripted client that never sends it gets the shorter lifetime described under [sessions](#sessions).
 
 `login` answers `401` for both a wrong password and an unknown email, with the same message, so a
 caller cannot probe which emails exist.
@@ -125,9 +128,17 @@ into `event.context.user` when there is one and leaves it unset otherwise, never
 ## Sessions
 
 A session is created when a user logs in, or when your signup calls `createSession`. The raw token
-lives only in the cookie; the `Sessions` row stores its sha256 and an `expiresAt`. A request presents the token in the session
-cookie, or as a `Bearer` token in the `Authorization` header when there is no cookie, so a browser
-and an API client both work.
+lives only in the cookie; the `Sessions` row stores its sha256 and an `expiresAt`. A request
+presents the token in the session cookie, or as a `Bearer` token in the `Authorization` header when
+there is no cookie, so a browser and an API client both work.
+
+How far out that `expiresAt` sits depends on `remember`. A remembered sign-in lasts
+`auth.sessionMaxAge`, one without lasts `auth.transientSessionMaxAge`, and the shorter one's cookie
+also ends with the browser. `auth.sessionMaxAge` is the ceiling: no session outlives it, however it
+was opened.
+
+That covers the `Bearer` path too: a token from a sign-in that was not remembered stops working at
+the shorter mark, cookie or header alike.
 
 `logout` deletes the row, so the session is gone server-side, not just cleared from the browser. An
 expired session is deleted the next time it is presented, so a stale cookie never resolves to a user.
@@ -137,10 +148,15 @@ To manage sessions from your own code, the same helpers the endpoints use are ex
 ```ts
 import { createSession, destroySession, useSession } from 'ohne/auth';
 
-await createSession(user.UUID); // opens a session and writes the cookie
-await useSession();             // the current session row, or null
-await destroySession();         // ends the session and clears the cookie
+await createSession(user.UUID);        // opens a remembered session and writes the cookie
+await createSession(user.UUID, false); // the same, on the transient lifetime
+await useSession();                    // the current session row, or null
+await destroySession();                // ends the session and clears the cookie
 ```
+
+The second argument picks the lifetime, for the row and the cookie together. It defaults to `true`,
+so your own signup opens a remembered session unless you pass `false`, while `POST /auth/login`
+reads a missing `remember` as `false`.
 
 ## Configuration
 
@@ -151,13 +167,15 @@ import { defineConfig } from 'ohne';
 
 export default defineConfig({
   auth: {
-    sessionMaxAge: '30d',  // how long a session lasts, as a duration
-    cookieName: 'session', // the session cookie's name
+    sessionMaxAge: '30d',         // a remembered session's lifetime, and the ceiling
+    transientSessionMaxAge: '1d', // the lifetime without remember me
+    cookieName: 'session',        // the session cookie's name
   },
 });
 ```
 
-Every field is optional; the values above are the defaults.
+Every field is optional; the values above are the defaults. Both lifetimes take a duration string
+like `'2h'` or a number of milliseconds.
 
 ### Password hashing cost
 

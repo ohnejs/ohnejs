@@ -10,6 +10,7 @@ describe('useAuthConfig', () => {
   it('fills unset fields from the defaults, deep-merging a partial password override', () => {
     const config = useAuthConfig();
     strictEqual(config.sessionMaxAge, '30d');
+    strictEqual(config.transientSessionMaxAge, '1d');
     strictEqual(config.cookieName, 'session');
     strictEqual(config.password.cost, 1024);
     strictEqual(config.password.blockSize, 8);

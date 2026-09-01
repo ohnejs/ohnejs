@@ -8,8 +8,8 @@ declare module 'ohne' {
      */
     auth?: {
       /**
-       * How long a new session stays valid, as a `parseDuration` value.
-       * Sets the session cookie's `Max-Age` and the row's `expiresAt`; a session past it is treated as gone.
+       * How long a remembered session stays valid, as a `parseDuration` value.
+       * It is also the ceiling: no session outlives it, however it was opened.
        *
        * @default
        * '30d'
@@ -20,6 +20,21 @@ declare module 'ohne' {
        * ```
        */
       sessionMaxAge?: number | string;
+
+      /**
+       * How long a session opened without remember me stays valid, as a `parseDuration` value.
+       * Its cookie also ends with the browser session, so closing the browser drops it earlier.
+       * A value above `sessionMaxAge` is capped to it.
+       *
+       * @default
+       * '1d'
+       *
+       * @example
+       * ```ts
+       * auth: { transientSessionMaxAge: '2h' }
+       * ```
+       */
+      transientSessionMaxAge?: number | string;
 
       /**
        * Name of the cookie the session token travels in.
@@ -73,9 +88,14 @@ declare module 'ohne' {
  */
 export interface ResolvedAuthConfig {
   /**
-   * How long a new session stays valid, as a `parseDuration` value.
+   * How long a remembered session stays valid, and the ceiling for every session.
    */
   sessionMaxAge: number | string;
+
+  /**
+   * How long a session opened without remember me stays valid.
+   */
+  transientSessionMaxAge: number | string;
 
   /**
    * Name of the cookie the session token travels in.
@@ -109,6 +129,7 @@ export interface ResolvedAuthConfig {
  */
 export const AUTH_DEFAULTS = {
   sessionMaxAge: '30d',
+  transientSessionMaxAge: '1d',
   cookieName: 'session',
   password: {
     cost: 32_768,

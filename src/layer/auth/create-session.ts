@@ -1,16 +1,16 @@
 import { query, queryUntyped } from 'ohne';
-import { parseDuration } from 'ohne/utils';
 import { randomToken } from 'ohne/utils/crypto';
 
 import { writeSessionCookie } from './_cookie.ts';
+import { sessionLifetime } from './_lifetime.ts';
 import { hashSessionToken } from './_token.ts';
-import { useAuthConfig } from './config.ts';
 
 /**
  * Opens a session for a user, storing its token hash and writing the session cookie.
- * The raw token exists only in the cookie; the row keeps its hash and an `expiresAt` from `sessionMaxAge`.
+ * The raw token exists only in the cookie; the row keeps its hash and a matching `expiresAt`.
  * Expired rows sweep out first, so abandoned sessions never accrete in the store.
- * A non-persistent session writes a cookie that ends with the browser session; the row's cap is the same.
+ * A remembered session lasts `auth.sessionMaxAge`, one without lasts `auth.transientSessionMaxAge`.
+ * The cookie of a session without remember me additionally ends with the browser session.
  * Call it after a successful `register` or `login`.
  *
  * @example
@@ -18,16 +18,17 @@ import { useAuthConfig } from './config.ts';
  * await createSession(user.UUID)
  * ```
  */
-export async function createSession(userUUID: string, persistent = true): Promise<void> {
+export async function createSession(userUUID: string, remember = true): Promise<void> {
   const token = randomToken(32);
   const now = Date.now();
+  const lifetime = sessionLifetime(remember);
   await queryUntyped('Sessions')
     .where({ expiresAt: { atMost: now } })
     .delete();
   await query('Sessions').createOrThrow({
     user: userUUID,
     tokenHash: hashSessionToken(token),
-    expiresAt: now + parseDuration(useAuthConfig().sessionMaxAge),
+    expiresAt: now + lifetime,
   });
-  writeSessionCookie(token, persistent);
+  writeSessionCookie(token, remember ? lifetime : undefined);
 }

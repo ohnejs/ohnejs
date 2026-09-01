@@ -1,5 +1,5 @@
 import { deleteCookie, setCookie, useAuthorization, useCookies } from 'ohne';
-import { isNull, isUndefined, parseDuration } from 'ohne/utils';
+import { isNull, isUndefined } from 'ohne/utils';
 
 import { useAuthConfig } from './config.ts';
 
@@ -17,17 +17,16 @@ export function readSessionToken(): string | null {
 
 /**
  * Writes the session cookie with the safe session profile: `HttpOnly`, `Secure`, `SameSite=Lax`, root path.
- * A persistent cookie carries a `Max-Age` from `auth.sessionMaxAge`, so it expires with the session it names.
- * A non-persistent one omits `Max-Age` and ends with the browser session, for a login without remember me.
+ * `maxAge` is the cookie's lifetime in milliseconds, rounded down to the seconds the header carries.
+ * Omitting it writes a cookie without `Max-Age`, one that ends with the browser session.
  */
-export function writeSessionCookie(token: string, persistent = true): void {
-  const { cookieName, sessionMaxAge } = useAuthConfig();
-  setCookie(cookieName, token, {
+export function writeSessionCookie(token: string, maxAge?: number): void {
+  setCookie(useAuthConfig().cookieName, token, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: persistent ? Math.floor(parseDuration(sessionMaxAge) / 1000) : undefined,
+    maxAge: isUndefined(maxAge) ? undefined : Math.floor(maxAge / 1000),
   });
 }
 

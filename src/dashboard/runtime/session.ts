@@ -52,7 +52,8 @@ export function sessionUser(): SessionUser | null | undefined {
 /**
  * Signs in with an email and password.
  * Success stores the session cookie, updates `sessionUser` reactively, and resets the discovery store.
- * `remember` asks for a persistent cookie; without it the session ends with the browser.
+ * `remember` picks the session's lifetime: with it the long one, without it the short one.
+ * A session opened without it also gets a cookie that ends with the browser.
  * The API never says whether the email or the password was wrong.
  */
 export async function login(
