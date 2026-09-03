@@ -305,6 +305,16 @@ describe('field scoping', () => {
     deepStrictEqual(body, { title: 'Draft' });
   });
 
+  it('422s a key the collection cannot take before the scope narrows the rest', async () => {
+    const { status, body } = await call(ROUTES.patch, { ...drafts, uuid: draft }, anonymous, {
+      body: { title: 'Draft', notee: 'x' },
+    });
+    strictEqual(status, 422);
+    deepStrictEqual((body as { data: { errors: Record<string, string> } }).data.errors, {
+      notee: 'validation.unknownField',
+    });
+  });
+
   it('narrows a patch to the scope select: out-of-scope input drops, the response narrows', async () => {
     const { status, body } = await call(ROUTES.patch, { ...drafts, uuid: draft }, anonymous, {
       body: { title: 'Draft 2', note: 'rewritten' },
