@@ -89,7 +89,8 @@ The operators and what each field type admits are the same as the fluent builder
 ```
 
 A read with no `select` returns the whole record. An empty `select=[]` is a mistake, not a way to
-ask for the id alone, so it is rejected.
+ask for the id alone, so it is rejected. On a translatable collection the whole record includes
+`_translations`, the locales it holds; name it to keep it under a narrowing `select`.
 
 ## Ordering
 
@@ -187,7 +188,9 @@ Now `GET /posts` only ever reads published posts, only the three named fields, a
 whatever the URL asks for.
 
 A scoped `locale` is a default, not a wall: it applies when the request names none, and a request's
-own `locale` wins. Locales select content, they do not protect it.
+own `locale` wins. Locales select content, they do not protect it. `applyQuery` answers
+`_translations` as stored; the shipped collection endpoints narrow it further, to the locales a
+scoped `where` admits the record at.
 
 ## Reading from a POST body
 

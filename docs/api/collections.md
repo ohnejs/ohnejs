@@ -42,7 +42,7 @@ DELETE /collections/posts/[uuid]/translations         delete one locale's transl
 
 The three translation routes apply only to collections with
 [translatable fields](../database/translations.md); on any other they answer the same `404` as an
-unknown collection.
+unknown collection. The `GET` answers exactly the record's own `_translations` field.
 
 These are ordinary [routes](./routes.md) shipped by the ohne layer, so everything routes do
 applies: `api.basePath` prefixes them, your app overrides one by shipping the same route id, and
@@ -66,6 +66,10 @@ POST /collections/posts/query
 The by-`UUID` read returns one record, shaped by `select`, `populate`, and `locale` alone - a
 filter or window param is a `400`, since the `UUID` already pins the row. No matching record is a
 `404`.
+
+A record of a translatable collection carries `_translations`, the locales it holds a translation
+at, in every read and write answer. Under an `access` scope it lists only the locales the scope
+admits the record at, so a translation the scope hides never shows.
 
 ## Writing
 
