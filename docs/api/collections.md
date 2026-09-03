@@ -101,8 +101,9 @@ Failures keep the shapes the rest of ohne uses:
   `Retry-After`.
 
 A [write-only field](../database/collections.md#write-only-and-locked-fields) never comes back in
-a response, and naming one in a query is indistinguishable from naming a field that does not
-exist. An `immutable` or `writable: false` field in a write body rejects the same way.
+a response unless the operation's [`access`](#access) scope names it, and naming one in a query is
+indistinguishable from naming a field that does not exist. An `immutable` or `writable: false`
+field in a write body rejects the same way.
 
 ## Exposure
 
