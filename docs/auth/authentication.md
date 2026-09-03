@@ -76,7 +76,8 @@ create to bootstrap your first administrator.
 ## Reading the current user
 
 Inside your own [route handler](../api/routes.md), reach for the current user with `useUser`. It
-returns the user, or `null` when the request has no live session.
+returns the user, or `null` when the request has no live session. Outside a request, in a boot
+file or a script, there is no session to read, so it resolves to `null` there too.
 
 ```ts
 // api/profile.get.ts
