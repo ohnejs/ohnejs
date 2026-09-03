@@ -1,4 +1,4 @@
-import { type Event, query, useEvent } from 'ohne';
+import { type Event, query, tryUseEvent } from 'ohne';
 import { isNull, isUndefined } from 'ohne/utils';
 
 import type { Session } from './types.ts';
@@ -10,7 +10,7 @@ const cache = new WeakMap<Event, Promise<Session | null>>();
 
 /**
  * Returns the request's session, or `null` when there is none, memoized per request.
- * Valid only within a request.
+ * Outside a request there is no token to read, so it resolves to `null`.
  *
  * The token comes from the session cookie or a `Bearer` header, hashed, then matched against the store.
  * An expired session is deleted and read as `null`, so a stale cookie never resolves to a live session.
@@ -22,7 +22,8 @@ const cache = new WeakMap<Event, Promise<Session | null>>();
  * ```
  */
 export function useSession(): Promise<Session | null> {
-  const event = useEvent();
+  const event = tryUseEvent();
+  if (isUndefined(event)) return Promise.resolve(null);
   const cached = cache.get(event);
   if (!isUndefined(cached)) return cached;
 
