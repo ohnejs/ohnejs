@@ -77,6 +77,7 @@ useRoles().register('dash-user', {
 useMessages().register('en', {
   'dashboard.fields.uuid.label': 'UUID',
   'dashboard.fields.updatedAt.label': 'Updated',
+  'dashboard.fields.translations.label': 'Translations',
   'dash.owners.name.label': 'Owner name',
   'dash.kinds.title.placeholder': 'Short name',
   'dash.blocks.hero.label': 'Hero section',
@@ -551,6 +552,38 @@ describe('translatable', () => {
     strictEqual(articles.tags?.translatable, true);
     strictEqual(labels.name?.translatable, true);
     strictEqual(labels.articles?.translatable, true);
+  });
+
+  it('describes `_translations` after the system pair on translatable collections only', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(
+      collection(body, 'DashLabels').fields.map((entry) => entry.name),
+      ['UUID', '_updatedAt', '_translations', 'name', 'articles'],
+    );
+    deepStrictEqual(
+      collection(body, 'DashArticles').fields.map((entry) => entry.name),
+      ['UUID', '_updatedAt', '_translations', 'title', 'tags'],
+    );
+    deepStrictEqual(
+      keyBy(collection(body, 'DashLabels').fields, (entry) => entry.name)._translations,
+      {
+        name: '_translations',
+        type: null,
+        kind: 'translations',
+        label: 'Translations',
+        nullable: false,
+        required: false,
+        unique: false,
+        translatable: false,
+        readable: true,
+        writable: false,
+        immutable: false,
+      },
+    );
+    strictEqual(
+      collection(body, 'DashNotes').fields.some((entry) => entry.name === '_translations'),
+      false,
+    );
   });
 });
 

@@ -9,13 +9,18 @@ import {
   readRecordBody,
   useCollections,
 } from 'ohne';
-import { isEmpty, isNull, isUndefined, pick } from 'ohne/utils';
+import { first, isEmpty, isNull, isUndefined, pick } from 'ohne/utils';
 
 import { notFound } from '../../../../../../ohne/http/http-error.ts';
 import { queryLocales } from '../../../../../../ohne/query/locale.ts';
 import { sameLocaleError, unknownParamError } from '../../../../../../ohne/query/wire/errors.ts';
 import { copyTranslationInput } from '../../../../../../ohne/query/write/copy-translation.ts';
-import { gateCollection, scopedRecord, writeLocale } from '../../../../../collections-api/gate.ts';
+import {
+  gateCollection,
+  scopedRecord,
+  scopeTranslations,
+  writeLocale,
+} from '../../../../../collections-api/gate.ts';
 
 /**
  * `POST /collections/[collection]/[uuid]/translations/copy`
@@ -26,6 +31,7 @@ import { gateCollection, scopedRecord, writeLocale } from '../../../../../collec
  * Any other body key is a `400`, as is a `source` equal to the target - a copy needs two locales.
  * Only translatable, writable, mutable fields ever write, whatever a `copyTranslation` hook returns.
  * The operation's `access` scope ANDs in, so an out-of-scope record answers the same `404`.
+ * Its `where` also narrows the answered `_translations` to the locales it admits the record at.
  * A non-translatable collection and a missing record answer that identical `404`.
  * A validation failure answers `422` with per-field messages.
  */
@@ -65,12 +71,11 @@ export default defineHandler(async ({ params }) => {
   if (!isUndefined(gate.scope.where)) writer.where(gate.scope.where);
   const scoped = isNull(target) ? writer : writer.locale(target);
   // An empty update would still bump `_updatedAt`, so a copy carrying nothing skips the write.
-  if (isEmpty(input)) {
-    const current = await scoped.findFirst();
-    if (isUndefined(current)) throw notFound();
-    return scopedRecord(current, gate.scope);
-  }
-  const records = await scoped.updateOrThrow(input);
-  if (isEmpty(records)) throw notFound();
-  return scopedRecord(records[0], gate.scope);
+  const current = isEmpty(input)
+    ? await scoped.findFirst()
+    : first(await scoped.updateOrThrow(input));
+  if (isUndefined(current)) throw notFound();
+  const answer = scopedRecord(current, gate.scope);
+  await scopeTranslations([answer], gate.collection, meta, gate.scope);
+  return answer;
 });

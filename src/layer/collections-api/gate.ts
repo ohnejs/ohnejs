@@ -7,21 +7,37 @@ import type {
   ParsedQuery,
   QueryScope,
 } from 'ohne';
-import type { SearchParamValue } from 'ohne/utils';
+import type { Defined, SearchParamValue } from 'ohne/utils';
 
 import {
   applyQuery,
   parseLocaleParam,
+  parseQueryParams,
+  queryMetadata,
   queryUntyped,
+  resolveGuards,
   useCollections,
   useEvent,
   useMiddleware,
   useSearchParams,
 } from 'ohne';
-import { isBoolean, isNull, isUndefined, pick, toKebabCase } from 'ohne/utils';
+import {
+  chunk,
+  isArray,
+  isBoolean,
+  isEmpty,
+  isNull,
+  isString,
+  isUndefined,
+  parseCondition,
+  pick,
+  toKebabCase,
+  walkCondition,
+} from 'ohne/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
+import { queryLocales } from '../../ohne/query/locale.ts';
 import { unknownParamError } from '../../ohne/query/wire/errors.ts';
 import { requireCapability } from '../auth/capabilities.ts';
 
@@ -85,15 +101,105 @@ export async function gateCollection(
  * Pins a list read's terminal: `paginate` when the request names a page, `findMany` otherwise.
  * Shared by the `GET` list and the `POST` body-query endpoint, so both transports read identically.
  * The gate's access scope composes in, narrowing the rows and fields the request may reach.
+ * Each answered record's `_translations` then narrows to the locales the scope admits it at.
  */
-export function listRecords(
+export async function listRecords(
   collection: string,
   parsed: ParsedQuery,
   scope: QueryScope,
 ): Promise<unknown> {
+  const meta = queryMetadata(collection);
   const builder = applyQuery(queryUntyped(collection), parsed, scope);
-  if (isNull(parsed.page) && isNull(parsed.perPage)) return builder.findMany();
-  return builder.paginate(parsed.page ?? 1, parsed.perPage ?? LIST_PER_PAGE);
+  if (isNull(parsed.page) && isNull(parsed.perPage)) {
+    const records = await builder.findMany();
+    await scopeTranslations(records, collection, meta, scope);
+    return records;
+  }
+  const page = await builder.paginate(parsed.page ?? 1, parsed.perPage ?? LIST_PER_PAGE);
+  await scopeTranslations(page.records, collection, meta, scope);
+  return page;
+}
+
+/**
+ * Narrows each record's `_translations` to the locales the scope `where` admits it at.
+ *
+ * A scope `where` over translatable fields reads per locale, so a record it admits at `en` may hide at `de`.
+ * That locale never lists, exactly as the translations endpoint promises.
+ * Only a locale-sensitive `where` on a translatable collection probes; anything else returns at once.
+ * A record without an array `_translations`, as under a narrowing `select`, stays untouched.
+ */
+export async function scopeTranslations(
+  records: readonly Record<string, unknown>[],
+  collection: string,
+  meta: CollectionQueryMeta,
+  scope: QueryScope,
+): Promise<void> {
+  const { where } = scope;
+  if (meta.translatable !== true || isUndefined(where) || !localeSensitive(where, meta)) return;
+  const carrying: { record: Record<string, unknown>; uuid: string; held: string[] }[] = [];
+  for (const record of records) {
+    const { UUID, _translations } = record;
+    if (isString(UUID) && isArray<string[]>(_translations)) {
+      carrying.push({ record, uuid: UUID, held: _translations });
+    }
+  }
+  if (isEmpty(carrying)) return;
+  const visible = await visibleLocales(
+    collection,
+    meta,
+    where,
+    carrying.map((entry) => entry.uuid),
+  );
+  for (const { record, uuid, held } of carrying) {
+    record._translations = held.filter((locale) => visible.get(locale)?.has(uuid) === true);
+  }
+}
+
+/**
+ * The `UUID`s among `uuids` the scope `where` admits at each configured locale.
+ * Each locale probes once per chunk, selecting `UUID` alone under `{ where }`.
+ * The scope's `select` would drop the key and its `limit` would cap the probe, so neither rides.
+ */
+export async function visibleLocales(
+  collection: string,
+  meta: CollectionQueryMeta,
+  where: Defined<QueryScope['where']>,
+  uuids: readonly string[],
+): Promise<Map<string, Set<string>>> {
+  const visible = new Map<string, Set<string>>();
+  for (const locale of queryLocales().locales) {
+    const admitted = new Set<string>();
+    const parsed = parseQueryParams({ select: 'UUID', locale }, meta, resolveGuards());
+    for (const batch of chunk(uuids, 900)) {
+      const rows = await applyQuery(
+        queryUntyped(collection).where({ UUID: { in: batch } }),
+        parsed,
+        { where },
+      ).findMany();
+      for (const row of rows) admitted.add(row.UUID as string);
+    }
+    visible.set(locale, admitted);
+  }
+  return visible;
+}
+
+/**
+ * Whether a scope `where` can admit a record at one locale and hide it at another.
+ * A leaf over a companion field reads that locale's value; a `has` or `empty` reaches per-locale rows.
+ * A condition over plain columns alone answers alike at every locale.
+ * An unparsable condition counts as sensitive; the read it scopes has already refused it.
+ */
+function localeSensitive(where: Defined<QueryScope['where']>, meta: CollectionQueryMeta): boolean {
+  const parsed = parseCondition(where);
+  if (!parsed.ok) return true;
+  let sensitive = false;
+  walkCondition(parsed.node, (node) => {
+    if (node.kind === 'has' || node.kind === 'empty') sensitive = true;
+    else if (node.kind === 'compare' && meta.fields[node.path[0]]?.companion === true) {
+      sensitive = true;
+    }
+  });
+  return sensitive;
 }
 
 /**

@@ -97,6 +97,7 @@ export interface DashboardField {
 
   /**
    * How the field stores and reads: a column, a relation, a child table, or a blocks wrapper.
+   * `translations` is the read-only list of locales a translatable collection's record holds.
    */
   kind: FieldQueryMeta['kind'];
 
@@ -230,7 +231,8 @@ export interface DashboardCollection {
   operations: DashboardOperations;
 
   /**
-   * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
+   * Every addressable field in order: the system entries, then the declared fields as authored.
+   * The system entries are `UUID`, `_updatedAt`, and `_translations` on a translatable collection.
    */
   fields: DashboardField[];
 
@@ -586,6 +588,7 @@ function labelOf(name: string, label: unknown): string {
   if (!isUndefined(label)) return resolveMessage(label as Message);
   if (name === 'UUID') return translate('dashboard.fields.uuid.label');
   if (name === '_updatedAt') return translate('dashboard.fields.updatedAt.label');
+  if (name === '_translations') return translate('dashboard.fields.translations.label');
   return toSentenceCase(name);
 }
 
