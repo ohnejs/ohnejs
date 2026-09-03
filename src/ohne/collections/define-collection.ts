@@ -38,6 +38,7 @@ export interface AccessScope<TField extends string = string> extends Omit<
   /**
    * The fields a request may read; a request's own `select` intersects with these, never widening.
    * A field outside them is refused in `where`, `order`, `select`, and `populate`, as an unknown field is.
+   * Naming a `readable: false` field reveals it; the resolver is trusted, as a fluent `select` is.
    * `_translations` names the locales a record is translated in; a translatable collection alone has it.
    */
   select?: (TField | 'UUID' | '_updatedAt' | '_translations')[];
@@ -85,6 +86,7 @@ export interface CollectionEndpoint<
    * A translation copy hands it the values it copies.
    * A returned scope composes into every query the operation runs.
    * Its `where` ANDs in, so an out-of-scope record answers the same `404` a missing one does.
+   * The filter reads the stored row, so a writable scope key lets a body hand the row out of the scope.
    * `select` narrows what a read returns, what an update accepts, and what a write's answered record carries.
    * `true` runs the operation unscoped; `false` refuses it as that identical `404`.
    * Omitted means unscoped.
