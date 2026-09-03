@@ -75,6 +75,11 @@ compile error.
 and once per chain - a query reads one locale. There is no multi-locale read: fetching every
 translation of a record is one query per configured locale.
 
+Which locales a record holds is a read-only system field, `_translations`: the held locales in
+configured order, `[]` when none. Every record of a translatable collection carries it, whichever
+locale you read at, and a `select` that leaves it out skips the probe. It lists, never filters:
+to find untranslated records, read at that locale and test for `null`, as below.
+
 ```ts
 const post = await query('Posts').locale('de').findFirst();
 ```
@@ -126,7 +131,7 @@ await query('Posts')
 That update is also how a translation comes to exist: a matched record without a German entry gets
 one. Fields your input omits fill from their defaults - and a translatable field that is neither
 provided, defaulted, nor nullable fails the call with `required`, since the new entry could not
-satisfy it.
+satisfy it. The answered record's `_translations` lists the locale just written.
 
 An update that touches no translatable field changes nothing about translations: records missing
 one keep missing it.
@@ -169,4 +174,6 @@ German slugs at once.
 ## Over HTTP
 
 The wire mirror carries the locale as a query parameter; see
-[querying over HTTP](../api/url-queries.md#locales).
+[querying over HTTP](../api/url-queries.md#locales). The [collections API](../api/collections.md)
+answers `_translations` on every record, narrowed to the locales the operation's `access` scope
+admits, and `GET /collections/posts/[uuid]/translations` lists the same set for one record.

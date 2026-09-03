@@ -260,8 +260,9 @@ shapes, each defined once under `blocks/`. See [blocks](./blocks.md).
 
 Any top-level field takes `translatable: true` to hold one value per locale - a scalar per locale,
 or a whole item list per locale for composites and `records`. The one exception is an inverse
-`records` field: it follows the owning side's junction. See [translations](./translations.md)
-for the locale set, reading, and writing per locale.
+`records` field: it follows the owning side's junction. A translatable collection also reads
+`_translations`, the locales each record holds, beside `UUID` and `_updatedAt`. See
+[translations](./translations.md) for the locale set, reading, and writing per locale.
 
 ## Dashboard appearance
 
@@ -312,9 +313,10 @@ plus the first eight characters of its `UUID`.
 
 `table` sets the list view's defaults. Its `columns` lists the columns to show, in order, one entry
 per field. An entry is a field name, optionally followed by its widths as `name|width|minWidth`,
-each a plain CSS length or percentage like `320px` or `50%`. `UUID` and `_updatedAt` are valid names
-beside your declared readable fields. Omitted, the list view shows the first four readable fields
-with `_updatedAt` closing the set.
+each a plain CSS length or percentage like `320px` or `50%`. `UUID`, `_updatedAt`, and on a
+translatable collection `_translations` are valid names beside your declared readable fields.
+Omitted, the list view shows the first four readable fields with `_updatedAt` closing the set; a
+translatable collection shows three, then `_translations`.
 
 ```ts
 export default defineCollection({

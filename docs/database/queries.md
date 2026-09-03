@@ -10,8 +10,9 @@ import { query } from 'ohne';
 const posts = await query('Posts').findMany();
 ```
 
-`findMany` returns every record as a full object: your fields, plus the `UUID` primary key and the
-`_updatedAt` timestamp. `findFirst` returns the first match or `undefined`.
+`findMany` returns every record as a full object: your fields, plus the `UUID` primary key, the
+`_updatedAt` timestamp, and on a [translatable](./translations.md) collection the `_translations`
+locale list. `findFirst` returns the first match or `undefined`.
 
 ```ts
 const post = await query('Posts').findFirst();
@@ -191,7 +192,9 @@ rows[0].author; // compile error: not selected
 A [write-only field](./collections.md#write-only-and-locked-fields) inverts the default: no read
 returns it unless your `select` names it explicitly.
 
-`select` accumulates across calls.
+`select` accumulates across calls. `_translations` selects like any field, and it is the one field
+you can neither filter nor order by: a locale list has no order, and a missing translation is a
+`null` you test at its locale.
 
 ## Pagination
 
