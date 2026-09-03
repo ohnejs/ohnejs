@@ -2,10 +2,16 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { OrderDirection } from '../../../../src/ohne/query/ir.ts';
+import type { CollectionQueryMeta } from '../../../../src/ohne/query/metadata.ts';
 import type { UntypedQueryBuilder } from '../../../../src/ohne/query/untyped.ts';
 import type { ParsedQuery } from '../../../../src/ohne/query/wire/parse.ts';
 
-import { applyQuery, applyScope, type QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
+import {
+  applyQuery,
+  applyScope,
+  type QueryScope,
+  scopedMetadata,
+} from '../../../../src/ohne/query/wire/apply.ts';
 
 function recorder(): { builder: UntypedQueryBuilder; calls: string[] } {
   const calls: string[] = [];
@@ -138,5 +144,30 @@ describe('applyScope composes a scope with no wire query', () => {
     const { builder, calls } = recorder();
     strictEqual(applyScope(builder, {}), builder);
     deepStrictEqual(calls, []);
+  });
+});
+
+describe('scopedMetadata hides the fields outside a scope select', () => {
+  const meta = {
+    collection: 'Posts',
+    table: 'posts',
+    compositeUniques: [],
+    fields: {
+      UUID: { kind: 'column', type: 'text' },
+      title: { kind: 'column', type: 'text' },
+      note: { kind: 'column', type: 'text' },
+    },
+  } as unknown as CollectionQueryMeta;
+
+  it('returns the metadata as is without a select', () => {
+    strictEqual(scopedMetadata(meta, { where: { title: 'x' } }), meta);
+  });
+
+  it('marks every field outside the select unreadable, leaving the metadata untouched', () => {
+    const scoped = scopedMetadata(meta, { select: ['title'] });
+    deepStrictEqual(scoped.fields.title, { kind: 'column', type: 'text' });
+    strictEqual(scoped.fields.note?.readable, false);
+    strictEqual(scoped.fields.UUID?.readable, false);
+    strictEqual(meta.fields.note?.readable, undefined);
   });
 });

@@ -37,6 +37,7 @@ export interface AccessScope<TField extends string = string> extends Omit<
 
   /**
    * The fields a request may read; a request's own `select` intersects with these, never widening.
+   * A field outside them is refused in `where`, `order`, `select`, and `populate`, as an unknown field is.
    * `_translations` names the locales a record is translated in; a translatable collection alone has it.
    */
   select?: (TField | 'UUID' | '_updatedAt' | '_translations')[];

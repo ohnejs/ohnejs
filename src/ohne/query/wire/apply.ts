@@ -1,8 +1,9 @@
 import type { LocaleCode } from '../../collections/known-locales.ts';
+import type { CollectionQueryMeta } from '../metadata.ts';
 import type { ConditionInput, UntypedQueryBuilder } from '../untyped.ts';
 import type { ParsedQuery } from './parse.ts';
 
-import { intersection, isNull, isUndefined } from '../../../utils/index.ts';
+import { intersection, isNull, isUndefined, mapValues } from '../../../utils/index.ts';
 
 /**
  * The endpoint-installed scope a wire query composes onto, narrowing what a request may read.
@@ -25,6 +26,7 @@ export interface QueryScope {
 
   /**
    * The fields a request may read; a request's own `select` intersects with these, never widening.
+   * Parsed against `scopedMetadata`, a field outside them is refused wherever a read could address it.
    */
   select?: string[];
 
@@ -74,6 +76,27 @@ export function applyQuery(
   if (!isNull(limit)) builder.limit(limit);
   if (!isNull(parsed.offset)) builder.offset(parsed.offset);
   return builder;
+}
+
+/**
+ * The metadata a scoped wire query parses against: a field outside the scope's `select` reads as hidden.
+ * The parser then refuses it in `where`, `order`, `select`, and `populate` exactly as an unknown field.
+ * A scope without `select` parses against the metadata as is.
+ *
+ * @example
+ * ```ts
+ * const parsed = parseQueryParams(useSearchParams(), scopedMetadata(meta, scope), resolveGuards())
+ * ```
+ */
+export function scopedMetadata(meta: CollectionQueryMeta, scope: QueryScope): CollectionQueryMeta {
+  if (isUndefined(scope.select)) return meta;
+  const visible = new Set(scope.select);
+  return {
+    ...meta,
+    fields: mapValues(meta.fields, (name, entry) =>
+      visible.has(name) ? entry : { ...entry, readable: false as const },
+    ),
+  };
 }
 
 /**
