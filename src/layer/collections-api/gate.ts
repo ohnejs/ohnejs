@@ -1,7 +1,8 @@
 import type {
-  CollectionAPI,
+  AccessContext,
   CollectionEndpoint,
   CollectionMeta,
+  CollectionOperation,
   CollectionQueryMeta,
   MiddlewareKey,
   ParsedQuery,
@@ -11,10 +12,13 @@ import type { Defined, SearchParamValue } from 'ohne/utils';
 
 import {
   applyQuery,
+  endpointOf,
   parseLocaleParam,
   parseQueryParams,
   queryMetadata,
   queryUntyped,
+  readRecordBody,
+  resolveAccess,
   resolveGuards,
   useCollections,
   useEvent,
@@ -24,7 +28,6 @@ import {
 import {
   chunk,
   isArray,
-  isBoolean,
   isEmpty,
   isNull,
   isString,
@@ -42,9 +45,12 @@ import { unknownParamError } from '../../ohne/query/wire/errors.ts';
 import { requireCapability } from '../auth/capabilities.ts';
 
 /**
- * One collections-API operation, as the `api` exposure names it.
+ * An admitted request carries the collection and the operation's endpoint.
+ * A refused one carries the middleware's answer.
  */
-export type CollectionOperation = 'read' | 'create' | 'update' | 'delete';
+export type CollectionAdmission<O extends CollectionOperation = CollectionOperation> =
+  | { ok: true; collection: string; endpoint: CollectionEndpoint<string, O> }
+  | { ok: false; response: unknown };
 
 /**
  * A passed gate carries the resolved collection name and access scope; a failed one the middleware's answer.
@@ -59,7 +65,7 @@ export type CollectionGate =
 export const LIST_PER_PAGE = 20;
 
 /**
- * Resolves a route's collection segment and admits the request into one operation.
+ * Admits a request into one operation of the collection a route segment names.
  *
  * The segment is the collection's kebab-case name.
  * An unknown collection, an unexposed one, and a closed operation all answer the identical `404`.
@@ -69,15 +75,13 @@ export const LIST_PER_PAGE = 20;
  * The operation's named middleware then run in order, exactly as route middleware do.
  * Each records on the event; a returned value answers the request without the operation running.
  * An unknown middleware name throws - a misconfigured exposure is a `500`, never an open door.
- * Last, the operation's `access` resolver runs: `false` answers the identical `404`.
- * The resolved scope rides the gate for the handlers to compose into their queries.
  */
-export async function gateCollection(
+export async function admitCollection<O extends CollectionOperation>(
   segment: string,
-  operation: CollectionOperation,
-): Promise<CollectionGate> {
+  operation: O,
+): Promise<CollectionAdmission<O>> {
   const meta = collectionBySegment(segment);
-  const endpoint = isUndefined(meta) ? undefined : operationOf(meta.collection.api, operation);
+  const endpoint = isUndefined(meta) ? undefined : endpointOf(meta.collection.api, operation);
   if (isUndefined(meta) || isUndefined(endpoint)) throw notFound();
   if (endpoint.public !== true) {
     await requireCapability(`collection.${meta.name}.${operation}`);
@@ -94,7 +98,52 @@ export async function gateCollection(
     const result = await middleware(event);
     if (!isUndefined(result)) return { ok: false, response: result };
   }
-  return { ok: true, collection: meta.name, scope: await resolveScope(endpoint.access) };
+  return { ok: true, collection: meta.name, endpoint };
+}
+
+/**
+ * Admits a request into a read or delete and resolves its `access` scope in one step.
+ * Neither operation carries a write input, so the resolver's context names the operation alone.
+ * A create or update admits, reads its body, and resolves the scope itself, so the resolver judges the input.
+ * `false` answers the identical `404`; the scope rides the gate for the handler to compose.
+ */
+export async function gateCollection(
+  segment: string,
+  operation: 'read' | 'delete',
+): Promise<CollectionGate> {
+  const admitted = await admitCollection(segment, operation);
+  if (!admitted.ok) return admitted;
+  const scope = await accessScope(admitted.endpoint, { operation });
+  return { ok: true, collection: admitted.collection, scope };
+}
+
+/**
+ * Reads a write's JSON body for its `access` resolver, deferring a failure until the verdict is known.
+ * A refused caller answers the identical `404` whatever they sent, so a bad body resolves as an empty write.
+ * The `failure`, when set, is the body's own error for the handler to throw once the verdict admits.
+ */
+export async function readWriteBody(): Promise<{
+  input: Record<string, unknown>;
+  failure: unknown;
+}> {
+  try {
+    return { input: await readRecordBody(), failure: undefined };
+  } catch (failure) {
+    return { input: {}, failure };
+  }
+}
+
+/**
+ * Resolves an endpoint's `access` for one context, answering a refusal as the identical `404`.
+ * A misconfigured scope throws, so it is a `500`, never an open door.
+ */
+export async function accessScope<O extends CollectionOperation>(
+  endpoint: CollectionEndpoint<string, O>,
+  context: AccessContext<O>,
+): Promise<QueryScope> {
+  const scope = await resolveAccess(endpoint, context);
+  if (scope === false) throw notFound();
+  return scope;
 }
 
 /**
@@ -262,36 +311,4 @@ function collectionBySegment(segment: string): CollectionMeta | undefined {
     }
   }
   return segments.get(segment);
-}
-
-/**
- * Resolves an operation's `access` verdict into the scope the handlers compose.
- * `false` refuses as the identical `404`; `true`, like an omitted resolver, runs unscoped.
- * An empty `select` throws: the read path cannot express a zero-field record, so it would widen.
- * A misconfigured scope is a `500`, never an open door.
- */
-async function resolveScope(access: CollectionEndpoint['access']): Promise<QueryScope> {
-  const verdict = isUndefined(access) ? true : await access();
-  if (verdict === false) throw notFound();
-  if (verdict === true) return {};
-  if (!isUndefined(verdict.select) && verdict.select.length === 0) {
-    throw ohneError(
-      'An `access` scope resolved an empty `select`; return `false` to refuse the operation instead',
-    );
-  }
-  return verdict;
-}
-
-/**
- * Resolves one operation's endpoint options from the `api` exposure, or `undefined` when closed.
- * The `'public'` shorthand resolves to `{ public: true }`, so the gate reads one shape.
- */
-function operationOf(
-  api: boolean | CollectionAPI | undefined,
-  operation: CollectionOperation,
-): CollectionEndpoint | undefined {
-  if (isBoolean(api) || isUndefined(api)) return api === true ? {} : undefined;
-  const value = api[operation];
-  if (isBoolean(value) || isUndefined(value)) return value === true ? {} : undefined;
-  return value === 'public' ? { public: true } : value;
 }

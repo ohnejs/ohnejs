@@ -15,6 +15,7 @@ import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { isEmpty } from '../../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -62,6 +63,22 @@ useCollections().register('CpPlain', {
   name: 'CpPlain',
   collection: { api: { update: 'public' }, fields: { label: field('text') } },
 });
+const copyContexts: unknown[] = [];
+useCollections().register('CpJudged', {
+  name: 'CpJudged',
+  collection: {
+    api: {
+      update: {
+        public: true,
+        access: ({ input }) => (
+          copyContexts.push({ input }),
+          isEmpty(input) || { select: ['title'] }
+        ),
+      },
+    },
+    fields: { title: field('text', { translatable: true }) },
+  },
+});
 useCollections().register('CpGuarded', {
   name: 'CpGuarded',
   collection: { api: { update: true }, fields: { title: field('text', { translatable: true }) } },
@@ -93,6 +110,7 @@ const hooked = (
   await queryUntyped('CpHooked').createOrThrow({ title: 'Base', shared: 'keep', slug: 'orig' })
 ).UUID as string;
 const plain = (await queryUntyped('CpPlain').createOrThrow({ label: 'flat' })).UUID as string;
+const judged = (await queryUntyped('CpJudged').createOrThrow({ title: 'Judge' })).UUID as string;
 
 const ROUTE: Route = {
   method: 'POST',
@@ -196,5 +214,18 @@ describe('POST /collections/[collection]/[uuid]/translations/copy', () => {
       (await call({ collection: 'cp-guarded', uuid: postA }, {}, '?locale=de')).status,
       401,
     );
+  });
+});
+
+describe('copy access context', () => {
+  it('resolves update access twice: an empty input to reach the source, then the copy', async () => {
+    const { status, body } = await call(
+      { collection: 'cp-judged', uuid: judged },
+      {},
+      '?locale=de',
+    );
+    strictEqual(status, 200);
+    deepStrictEqual(copyContexts, [{ input: {} }, { input: { title: 'Judge' } }]);
+    deepStrictEqual(body, { title: 'Judge' });
   });
 });

@@ -82,6 +82,7 @@ useCollections().register('AccessGate', {
   collection: {
     api: {
       read: { public: true, access: async () => !isNull(await useUser()) },
+      create: { access: () => false },
       update: { access: () => false },
     },
     fields: { title: field('text') },
@@ -105,6 +106,40 @@ useCollections().register('AccessBlocked', {
       },
     },
     fields: { title: field('text') },
+  },
+});
+
+const contexts: unknown[] = [];
+const noteContext = (context: unknown): true => (contexts.push(context), true);
+useCollections().register('AccessContexts', {
+  name: 'AccessContexts',
+  collection: {
+    api: {
+      read: { public: true, access: noteContext },
+      create: { public: true, access: noteContext },
+      update: { public: true, access: noteContext },
+      delete: { public: true, access: noteContext },
+    },
+    fields: { title: field('text') },
+  },
+});
+useCollections().register('AccessPosts', {
+  name: 'AccessPosts',
+  collection: {
+    api: {
+      update: {
+        public: true,
+        access: async ({ input }) => {
+          const user = await useUser();
+          if (isNull(user)) return false;
+          const me = user.UUID;
+          return 'author' in input
+            ? { where: { author: me } }
+            : { where: { or: [{ author: me }, { editor: me }] } };
+        },
+      },
+    },
+    fields: { title: field('text'), author: field('text'), editor: field('text') },
   },
 });
 
@@ -143,6 +178,12 @@ const writerNote = await seed('AccessNotes', { title: 'Writer note', owner: writ
 const otherNote = await seed('AccessNotes', { title: 'Other note', owner: other.uuid });
 const draft = await seed('AccessDrafts', { title: 'Draft', note: 'hidden' });
 const gateRow = await seed('AccessGate', { title: 'Open' });
+const contextRow = await seed('AccessContexts', { title: 'Ctx' });
+const writerPost = await seed('AccessPosts', {
+  title: 'Post',
+  author: writer.uuid,
+  editor: other.uuid,
+});
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
   return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
@@ -189,6 +230,8 @@ async function call(
 const notes = { collection: 'access-notes' };
 const drafts = { collection: 'access-drafts' };
 const gate = { collection: 'access-gate' };
+const contextual = { collection: 'access-contexts' };
+const posts = { collection: 'access-posts' };
 
 function titlesOf(body: unknown): unknown[] {
   return (body as Record<string, unknown>[]).map((record) => record.title);
@@ -301,5 +344,65 @@ describe('verdicts', () => {
   it('500s an empty scope select instead of widening the read', async () => {
     const { status } = await call(ROUTES.list, { collection: 'access-empty' }, anonymous);
     strictEqual(status, 500);
+  });
+});
+
+describe('context', () => {
+  it('hands a create and an update the body, a read and a delete the operation alone', async () => {
+    contexts.length = 0;
+    await call(ROUTES.create, contextual, anonymous, { body: { title: 'New' } });
+    await call(ROUTES.patch, { ...contextual, uuid: contextRow }, anonymous, {
+      body: { title: 'Ctx 2' },
+    });
+    await call(ROUTES.read, { ...contextual, uuid: contextRow }, anonymous);
+    await call(ROUTES.list, contextual, anonymous);
+    await call(ROUTES.query, contextual, anonymous, { body: {} });
+    await call(ROUTES.del, { ...contextual, uuid: contextRow }, anonymous);
+    deepStrictEqual(contexts, [
+      { operation: 'create', input: { title: 'New' } },
+      { operation: 'update', input: { title: 'Ctx 2' } },
+      { operation: 'read' },
+      { operation: 'read' },
+      { operation: 'read' },
+      { operation: 'delete' },
+    ]);
+  });
+
+  it('reads the body after the guard, so a refused request never parses one', async () => {
+    const refused = await call(ROUTES.create, notes, anonymous, { body: 'not a record' });
+    strictEqual(refused.status, 401);
+    const malformed = await call(ROUTES.create, notes, writer.token, { body: 'not a record' });
+    strictEqual(malformed.status, 400);
+  });
+
+  it('answers a refused caller the identical 404 whatever the params or body carry', async () => {
+    const sent = { body: 'not a record', qs: '?locale=de' };
+    const unknown = await call(
+      ROUTES.patch,
+      { collection: 'no-such', uuid: gateRow },
+      admin.token,
+      sent,
+    );
+    const patch = await call(ROUTES.patch, { ...gate, uuid: gateRow }, admin.token, sent);
+    const create = await call(ROUTES.create, gate, admin.token, sent);
+    strictEqual(patch.status, 404);
+    strictEqual(create.status, 404);
+    deepStrictEqual(patch.body, unknown.body);
+    deepStrictEqual(create.body, unknown.body);
+  });
+
+  it('lets a rule judge the write: an editor edits the post but never reassigns its author', async () => {
+    const target = { ...posts, uuid: writerPost };
+    const edit = await call(ROUTES.patch, target, other.token, { body: { title: 'Edited' } });
+    strictEqual(edit.status, 200);
+    const reassign = await call(ROUTES.patch, target, other.token, {
+      body: { author: other.uuid },
+    });
+    strictEqual(reassign.status, 404);
+    const handover = await call(ROUTES.patch, target, writer.token, {
+      body: { author: other.uuid },
+    });
+    strictEqual(handover.status, 200);
+    strictEqual((handover.body as Record<string, unknown>).author, other.uuid);
   });
 });

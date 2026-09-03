@@ -3,9 +3,9 @@ import {
   blockQueryMetadata,
   type Capability,
   type CollectionAPI,
-  type CollectionEndpoint,
   type DashboardMenuLink,
   defineHandler,
+  endpointOf,
   type FieldInstance,
   type FieldQueryMeta,
   isRecordLabelTemplate,
@@ -19,7 +19,6 @@ import {
   useRoles,
 } from 'ohne';
 import {
-  isBoolean,
   isEmpty,
   isJSONValue,
   isNull,
@@ -488,26 +487,12 @@ function describeOperation(
   user: User,
 ): DashboardOperation | null {
   const endpoint = endpointOf(api, operation);
-  if (isNull(endpoint)) return null;
+  if (isUndefined(endpoint)) return null;
   const open = endpoint.public === true;
   return {
     allowed: open || userCan(user, `collection.${collection}.${operation}` as Capability),
     public: open,
   };
-}
-
-/**
- * Resolves one operation's endpoint options from the `api` exposure, or `null` when closed.
- * Mirrors the collections-API gate, which keeps its resolution private.
- */
-function endpointOf(
-  api: boolean | CollectionAPI | undefined,
-  operation: keyof DashboardOperations,
-): CollectionEndpoint | null {
-  if (isBoolean(api) || isUndefined(api)) return api === true ? {} : null;
-  const value = api[operation];
-  if (isBoolean(value) || isUndefined(value)) return value === true ? {} : null;
-  return value === 'public' ? { public: true } : value;
 }
 
 /**
