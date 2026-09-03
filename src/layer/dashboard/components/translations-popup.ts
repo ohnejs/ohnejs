@@ -194,11 +194,11 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     deleting.value = false;
     if (gone) {
       toast(t('dashboard.translations.deleted'), { type: 'success' });
-      void fetchExisting();
       options.onDeleted?.(code);
     } else {
       toast(t('dashboard.translations.deleteFailed'), { type: 'error' });
     }
+    void fetchExisting();
   };
 
   const actions = (code: string): Child[] => {
@@ -366,9 +366,8 @@ async function requestCopy(segment: string, uuid: string, locale: string): Promi
 }
 
 /**
- * Requests the server-side delete of the record's translation at `locale`.
- * Resolves whether the translation is gone: any `2xx`, and a `404` that means it already was.
- * Retries once on a busy `503`.
+ * Requests the server-side delete of the record's translation at `locale`, retrying once on a busy `503`.
+ * Resolves whether the delete landed; a `404` is a locale outside the caller's scope as often as a gone one.
  */
 async function requestDelete(segment: string, uuid: string, locale: string): Promise<boolean> {
   const send = (): Promise<Response> =>
@@ -379,7 +378,7 @@ async function requestDelete(segment: string, uuid: string, locale: string): Pro
       await sleep(1000);
       response = await send();
     }
-    return response.ok || response.status === 404;
+    return response.ok;
   } catch {
     return false;
   }

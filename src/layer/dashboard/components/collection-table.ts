@@ -380,10 +380,10 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     deleteBusy = false;
     if (gone) {
       queueToast(t('dashboard.deleted', { count: 1 }), { type: 'success' });
-      refresh();
     } else {
       toast(t('dashboard.deletedPartial', { count: 0, failed: 1 }), { type: 'error' });
     }
+    refresh();
   };
 
   const allUUIDs = async (): Promise<string[]> => {
@@ -802,8 +802,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 }
 
 /**
- * Deletes one record, retrying once on a busy `503`.
- * Resolves whether the record is gone: any `2xx`, and a `404` that means it already was.
+ * Deletes one record, retrying once on a busy `503`, and resolves whether the delete landed.
+ * A `404` is a row outside the caller's delete scope as often as a vanished one, so it never counts.
  */
 async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
   const send = (): Promise<Response> => api(`DELETE /collections/${segment}/${uuid}`);
@@ -813,7 +813,7 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
       await sleep(1000);
       response = await send();
     }
-    return response.ok || response.status === 404;
+    return response.ok;
   } catch {
     return false;
   }
