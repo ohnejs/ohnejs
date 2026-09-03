@@ -298,11 +298,45 @@ describe('field scoping', () => {
     deepStrictEqual(read.body, { title: 'Draft' });
   });
 
-  it('never widens past the scope for a request naming only out-of-scope fields', async () => {
-    const { body } = await call(ROUTES.read, { ...drafts, uuid: draft }, anonymous, {
-      qs: '?select=note',
+  it('refuses a field outside the scope select wherever the request names it', async () => {
+    const refusals: [Route, Record<string, string>, string, string][] = [
+      [ROUTES.read, { ...drafts, uuid: draft }, '?select=note', 'select[0]'],
+      [ROUTES.list, drafts, '?where={note:{startsWith:hid}}', 'where.note'],
+      [ROUTES.list, drafts, '?order=[-note]', 'order[0]'],
+      [ROUTES.list, drafts, '?where={UUID:{startsWith:a}}', 'where.UUID'],
+    ];
+    for (const [r, params, qs, path] of refusals) {
+      const { status, body } = await call(r, params, anonymous, { qs });
+      strictEqual(status, 400, qs);
+      deepStrictEqual((body as { data: unknown }).data, { code: 'invalidField', path });
+    }
+    const hiddenValue = await call(ROUTES.list, drafts, anonymous, {
+      qs: '?where={note:{startsWith:0}}',
     });
-    deepStrictEqual(body, { title: 'Draft' });
+    const absentValue = await call(ROUTES.list, drafts, anonymous, {
+      qs: '?where={nope:{startsWith:0}}',
+    });
+    strictEqual((hiddenValue.body as { message: string }).message, 'query.invalidValue');
+    strictEqual((absentValue.body as { message: string }).message, 'query.invalidValue');
+    const posted = await call(ROUTES.query, drafts, anonymous, {
+      body: { where: { note: { startsWith: 'hid' } } },
+    });
+    strictEqual(posted.status, 400);
+  });
+
+  it('suggests nothing for a near miss of a scope-hidden name', async () => {
+    const { body } = await call(ROUTES.list, drafts, anonymous, {
+      qs: '?where={notes:{startsWith:h}}',
+    });
+    strictEqual((body as { message: string }).message, 'query.invalidField');
+  });
+
+  it('still filters and sorts by fields inside the scope select', async () => {
+    const { status, body } = await call(ROUTES.list, drafts, anonymous, {
+      qs: '?where={title:{startsWith:Dr}}&order=[title]',
+    });
+    strictEqual(status, 200);
+    deepStrictEqual(body, [{ title: 'Draft' }]);
   });
 
   it('422s a key the collection cannot take before the scope narrows the rest', async () => {

@@ -5,6 +5,7 @@ import {
   queryMetadata,
   queryUntyped,
   resolveGuards,
+  scopedMetadata,
 } from 'ohne';
 import { isUndefined } from 'ohne/utils';
 
@@ -24,7 +25,11 @@ export default defineHandler(async ({ params }) => {
   const gate = await gateCollection(params.collection, 'read');
   if (!gate.ok) return gate.response;
   const meta = queryMetadata(gate.collection);
-  const parsed = parseQueryParams(recordParams(), meta, resolveGuards());
+  const parsed = parseQueryParams(
+    recordParams(),
+    scopedMetadata(meta, gate.scope),
+    resolveGuards(),
+  );
   const record = await applyQuery(
     queryUntyped(gate.collection).where({ UUID: params.uuid }),
     parsed,
