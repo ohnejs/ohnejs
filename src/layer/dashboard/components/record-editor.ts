@@ -37,13 +37,19 @@ import {
   isString,
   isUndefined,
   onCleanup,
+  parseSearchParams,
   ref,
   sleep,
   stringifySearchParams,
   untracked,
 } from 'ohne/utils';
 
-import { activeContentLocale, contentLocale } from './content-language-switcher.ts';
+import { SYSTEM_FIELDS } from './collection-table-state.ts';
+import {
+  activeContentLocale,
+  contentLocale,
+  effectiveContentLocale,
+} from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History, unsavedChanges } from './history.ts';
@@ -128,6 +134,7 @@ css`
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
+ * A `?locale=` on the URL switches the content locale once and strips itself, so a link opens one locale.
  */
 export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
   const t = useT();
@@ -142,9 +149,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   const readOnly = !create && !canUpdate;
   const showFooter = create || canCreate || canUpdate || canDelete;
 
-  const formFields = collection.fields.filter(
-    (field) => field.name !== 'UUID' && field.name !== '_updatedAt',
-  );
+  const formFields = collection.fields.filter((field) => !SYSTEM_FIELDS.has(field.name));
 
   const history = new History({
     omit: collection.fields
@@ -213,11 +218,26 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     state.value = 'ready';
     settleHash();
   };
+  const applyLinkedLocale = (): void => {
+    const params = parseSearchParams(location.search);
+    const linked = params.locale;
+    if (!isString(linked)) return;
+    const listed = untracked(dashboardMeta)?.locales.includes(linked) ?? false;
+    if (listed && linked !== untracked(effectiveContentLocale)) contentLocale.value = linked;
+    const query = stringifySearchParams({ ...params, locale: undefined });
+    window.history.replaceState(
+      null,
+      '',
+      location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
+    );
+  };
+
   if (create) {
     // Untracked: a tracked seed read would subscribe the whole page region to the first keystroke.
     history.push(untracked(currentState) ?? {});
     settleHash();
   } else {
+    if (collection.translatable) applyLinkedLocale();
     void load();
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);

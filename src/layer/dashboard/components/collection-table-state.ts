@@ -20,6 +20,12 @@ const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
 const DEFAULT_MIN_WIDTH = '256px';
 
 /**
+ * The system field names a collection carries beside its declared fields.
+ * `_translations` exists on a translatable collection alone.
+ */
+export const SYSTEM_FIELDS: ReadonlySet<string> = new Set(['UUID', '_updatedAt', '_translations']);
+
+/**
  * The slice of `DashboardField` the column resolver reads.
  * A structural subset, so this module stays free of the browser-only dashboard types.
  */
@@ -210,6 +216,7 @@ function columnEntry(name: string, width?: string, minWidth?: string): string {
  * Resolves the table's columns.
  *
  * Without a `spec`, the first four declared readable fields become columns, `_updatedAt` closing the set.
+ * A translatable collection takes three declared fields, then `_translations`, then `_updatedAt`.
  * A `spec` lists columns as `name|width|minWidth` entries.
  * An unknown, unreadable, or repeated name warns and is skipped.
  * A missing width keeps the `256px` minimum.
@@ -218,6 +225,7 @@ function columnEntry(name: string, width?: string, minWidth?: string): string {
  * @example
  * ```ts
  * resolveTableColumns(fields)                         // -> first 4 declared fields + _updatedAt
+ * resolveTableColumns(translatable)                   // -> first 3 + _translations + _updatedAt
  * resolveTableColumns(fields, ['title|320px', 'age']) // -> title at 320px, age at min 256px
  * ```
  */
@@ -228,26 +236,23 @@ export function resolveTableColumns(
   const columns: TableColumnSpec[] = [];
 
   if (isUndefined(spec) || isEmpty(spec)) {
-    const declared = fields.filter(
-      (field) => field.readable && field.name !== 'UUID' && field.name !== '_updatedAt',
-    );
-    for (const field of declared.slice(0, 4)) {
-      columns.push({
-        name: field.name,
-        label: field.label,
-        sortable: sortableOf(field),
-        minWidth: DEFAULT_MIN_WIDTH,
-      });
+    const auto = (
+      field: TableFieldMeta,
+      sortable: TableColumnSpec['sortable'],
+    ): TableColumnSpec => ({
+      name: field.name,
+      label: field.label,
+      sortable,
+      minWidth: DEFAULT_MIN_WIDTH,
+    });
+    const declared = fields.filter((field) => field.readable && !SYSTEM_FIELDS.has(field.name));
+    const translations = fields.find((field) => field.name === '_translations');
+    for (const field of declared.slice(0, isUndefined(translations) ? 4 : 3)) {
+      columns.push(auto(field, sortableOf(field)));
     }
+    if (!isUndefined(translations)) columns.push(auto(translations, false));
     const updatedAt = fields.find((field) => field.name === '_updatedAt');
-    if (!isUndefined(updatedAt)) {
-      columns.push({
-        name: updatedAt.name,
-        label: updatedAt.label,
-        sortable: 'numeric',
-        minWidth: DEFAULT_MIN_WIDTH,
-      });
-    }
+    if (!isUndefined(updatedAt)) columns.push(auto(updatedAt, 'numeric'));
   } else {
     for (const { field, width, minWidth } of parseColumnEntries(spec, fields)) {
       const column: TableColumnSpec = {

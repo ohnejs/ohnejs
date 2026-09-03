@@ -3,6 +3,7 @@ import {
   type Child,
   type DashboardCollection,
   type DashboardField,
+  dashboardMeta,
   dimMark,
   fieldTypeFor,
   h,
@@ -10,7 +11,9 @@ import {
   seedLabel,
   useDashboardLanguage,
 } from 'ohne/dashboard';
-import { hasKey, isEmpty, isNumber, isString, isUndefined } from 'ohne/utils';
+import { hasKey, isEmpty, isNumber, isString, isUndefined, untracked } from 'ohne/utils';
+
+import { translationsCell } from './translations-cell.ts';
 
 /**
  * One record row, as the collections API answers it.
@@ -58,10 +61,22 @@ const DATE_OPTIONS: Record<DateVariant, Intl.DateTimeFormatOptions> = {
 const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
 /**
- * The collection's readable fields, the candidates every table surface offers.
+ * The fields a table surface resolves its columns from.
+ * `_translations` stays out while one locale is configured: nothing translates, so the column says nothing.
+ * The discovery data is read untracked, so a constructor may call this.
+ */
+export function columnFields(collection: DashboardCollection): DashboardField[] {
+  const translates = collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
+  return translates
+    ? collection.fields
+    : collection.fields.filter((field) => field.name !== '_translations');
+}
+
+/**
+ * The collection's readable column fields, the candidates every table surface offers.
  */
 export function readableFields(collection: DashboardCollection): DashboardField[] {
-  return collection.fields.filter((field) => field.readable);
+  return columnFields(collection).filter((field) => field.readable);
 }
 
 /**
@@ -110,8 +125,10 @@ export function seedLabels(collection: DashboardCollection, records: readonly Ta
 
 /**
  * The cell's display content: system fields render specially, the rest through their field type.
+ * The `_translations` matrix renders static here; the collection table links its chips itself.
  */
 export function displayFor(field: DashboardField, row: TableRecord): Child {
+  if (field.name === '_translations') return translationsCell(row, { canUpdate: false });
   if (field.name === '_updatedAt') {
     return () => {
       const value = row['_updatedAt'];

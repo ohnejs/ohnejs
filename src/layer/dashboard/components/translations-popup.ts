@@ -68,6 +68,12 @@ export interface TranslationsPopupOptions {
   onDeleted?(locale: string): void;
 
   /**
+   * Called after a locale's translation copies in, with the target locale.
+   * A view showing the record's held locales refreshes here, since the target now holds one.
+   */
+  onCopied?(locale: string): void;
+
+  /**
    * Called when the popup asks to close, with its animated close function.
    * The caller awaits it and then disposes the region that created the popup.
    */
@@ -158,6 +164,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     if (outcome.kind === 'saved') {
       toast(t('dashboard.translations.copied'), { type: 'success' });
       void fetchExisting();
+      options.onCopied?.(code);
       return;
     }
     if (outcome.kind === 'invalid') {

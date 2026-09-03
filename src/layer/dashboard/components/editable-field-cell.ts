@@ -1,4 +1,5 @@
 import {
+  attachTooltip,
   button,
   type Child,
   css,
@@ -6,12 +7,13 @@ import {
   type DashboardField,
   h,
   icon,
+  type IconName,
   type TableCell,
   type TableColumns,
   useT,
   when,
 } from 'ohne/dashboard';
-import { effect, isNull, isUndefined, ref } from 'ohne/utils';
+import { effect, isNull, isUndefined, onCleanup, ref } from 'ohne/utils';
 
 import {
   editQueryParam,
@@ -83,6 +85,12 @@ export interface EditableFieldCellOptions {
    * Called with the answered record after the popup saves, so the host can replace its row.
    */
   onUpdated?(record: Record<string, unknown>): void;
+
+  /**
+   * A host action in place of the field edit: the hover button's glyph, its tooltip, and the click.
+   * The single-field popup never mounts, and the `edit` query parameter never opens it.
+   */
+  action?: { icon: IconName; tooltip: () => string; onClick(): void };
 }
 
 css`
@@ -128,33 +136,40 @@ css`
  * Clicking sets the `edit=<field>:<id>` query parameter.
  * While the parameter names this cell, the single-field edit popup mounts.
  * A read-only field opens in view mode.
+ * An `action` swaps the edit for the host's own button, and the popup never mounts.
  */
 export function editableFieldCell(
   content: Child | (() => Child),
   options: EditableFieldCellOptions,
 ): HTMLElement {
   const t = useT();
+  const { action } = options;
   const position = options.editButtonPosition ?? 'relative';
   const resolved = ref<'absolute' | 'relative'>(position === 'auto' ? 'relative' : position);
   const hidden = options.hideActions === true && options.force !== true;
   const rowID = String(options.cell.row.id);
   const open = ref(false);
 
-  effect(() => {
-    const [fieldName, id] = editQueryParam();
-    if (fieldName === options.field.name && id === rowID) open.value = true;
-  });
+  if (isUndefined(action)) {
+    effect(() => {
+      const [fieldName, id] = editQueryParam();
+      if (fieldName === options.field.name && id === rowID) open.value = true;
+    });
+  }
 
-  const editButton = button(icon(options.editable ? 'pencil' : 'list-search'), {
+  const editButton = button(icon(action?.icon ?? (options.editable ? 'pencil' : 'list-search')), {
     size: -3,
     variant: 'outline',
-    onClick: () => setEditQueryParam([options.field.name, rowID]),
+    onClick: () =>
+      isUndefined(action) ? setEditQueryParam([options.field.name, rowID]) : action.onClick(),
   });
-  effect(() => {
-    editButton.title = t(
-      options.editable ? 'dashboard.editFieldValue' : 'dashboard.viewFieldValue',
-    );
-  });
+  onCleanup(
+    attachTooltip(editButton, () =>
+      isUndefined(action)
+        ? t(options.editable ? 'dashboard.editFieldValue' : 'dashboard.viewFieldValue')
+        : action.tooltip(),
+    ),
+  );
 
   const root = h(
     'div',

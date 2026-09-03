@@ -61,6 +61,9 @@
     },
     "updatedAt": {
       "label": "Updated"
+    },
+    "translations": {
+      "label": "Translations"
     }
   },
   "filter": {
@@ -225,11 +228,15 @@
     "deleted": "Translation deleted",
     "deleteFailed": "An error occurred while deleting the translation",
     "edit": "Edit translation",
+    "editLocale": "Edit the `{locale}` translation",
+    "missingLocale": "No `{locale}` translation",
     "new": "New translation",
+    "newLocale": "New `{locale}` translation",
     "selected": "selected",
     "title": "Translations",
     "translate": "Translate",
-    "view": "View translation"
+    "view": "View translation",
+    "viewLocale": "View the `{locale}` translation"
   },
   "unreachable": "The server cannot be reached",
   "unsavedChanges": {

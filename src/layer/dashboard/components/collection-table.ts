@@ -42,11 +42,13 @@ import {
   type Ref,
   ref,
   sleep,
+  stringifySearchParams,
   uniqueArray,
   untracked,
 } from 'ohne/utils';
 
 import {
+  columnFields,
   DEFAULT_ORDER,
   displayFor,
   loadPage,
@@ -71,6 +73,7 @@ import { activeContentLocale } from './content-language-switcher.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
 import { filterPopup } from './filter-popup.ts';
 import { sortingPopup } from './sorting-popup.ts';
+import { translationsCell, type TranslationsCellOptions } from './translations-cell.ts';
 import { translationsPopup } from './translations-popup.ts';
 
 css`
@@ -175,8 +178,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const declared = collection.table?.columns;
   const source = isUndefined(state.columns) || isEmpty(state.columns) ? declared : state.columns;
-  const specs = resolveTableColumns(collection.fields, source);
-  const defaultEntries = serializeTableColumns(resolveTableColumns(collection.fields, declared));
+  const fields = columnFields(collection);
+  const specs = resolveTableColumns(fields, source);
+  const defaultEntries = serializeTableColumns(resolveTableColumns(fields, declared));
   const currentEntries = serializeTableColumns(specs);
   const columnsDirty = !deepEqual(currentEntries, defaultEntries);
   const columns: TableColumns = {};
@@ -191,7 +195,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   }
 
   const fieldByName = (name: string): DashboardField | undefined =>
-    collection.fields.find((field) => field.name === name);
+    fields.find((field) => field.name === name);
 
   const data = ref<TableRow<TableColumns>[]>([]);
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
@@ -466,7 +470,28 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     cell: (payload) => {
       const field = fieldByName(String(payload.key));
       if (isUndefined(field)) return h('div');
-      return editableFieldCell(displayFor(field, payload.row as TableRecord), {
+      const row = payload.row as TableRecord;
+      if (field.name === '_translations') {
+        const rowID = String(payload.row.id);
+        const chips: TranslationsCellOptions = { canUpdate };
+        if (isString(payload.row.id)) {
+          chips.href = (code) => `${rowHref(rowID)}?${stringifySearchParams({ locale: code })}`;
+        }
+        return editableFieldCell(translationsCell(row, chips), {
+          cell: payload,
+          collection,
+          field,
+          editable: false,
+          action: {
+            icon: 'language',
+            tooltip: () => t('dashboard.translations.translate'),
+            onClick: () => {
+              translationsUUID.value = rowID;
+            },
+          },
+        });
+      }
+      return editableFieldCell(displayFor(field, row), {
         cell: payload,
         collection,
         field,
@@ -724,6 +749,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         uuid,
         currentlyEditing: () => t('dashboard.translations.selected'),
         showEditCurrent: true,
+        onCopied: () => refresh(),
         onDeleted: () => refresh(),
         onClose: (close) =>
           void close().then(() => {

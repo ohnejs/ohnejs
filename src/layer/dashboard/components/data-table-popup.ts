@@ -45,6 +45,7 @@ import {
 } from 'ohne/utils';
 
 import {
+  columnFields,
   DEFAULT_ORDER,
   displayFor,
   loadPage,
@@ -181,10 +182,11 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   };
 
   const declared = collection.table?.columns;
-  const defaultEntries = serializeTableColumns(resolveTableColumns(collection.fields, declared));
+  const fields = columnFields(collection);
+  const defaultEntries = serializeTableColumns(resolveTableColumns(fields, declared));
   const specs = (): TableColumnSpec[] => {
     const source = isUndefined(state.columns) || isEmpty(state.columns) ? declared : state.columns;
-    return resolveTableColumns(collection.fields, source);
+    return resolveTableColumns(fields, source);
   };
 
   const whereDirty = computed(() => {

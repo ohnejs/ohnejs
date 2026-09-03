@@ -61,6 +61,9 @@
     },
     "updatedAt": {
       "label": "Aktualisiert"
+    },
+    "translations": {
+      "label": "Übersetzungen"
     }
   },
   "filter": {
@@ -225,11 +228,15 @@
     "deleted": "Übersetzung gelöscht",
     "deleteFailed": "Beim Löschen der Übersetzung ist ein Fehler aufgetreten",
     "edit": "Übersetzung bearbeiten",
+    "editLocale": "Übersetzung `{locale}` bearbeiten",
+    "missingLocale": "Keine Übersetzung `{locale}`",
     "new": "Neue Übersetzung",
+    "newLocale": "Neue Übersetzung `{locale}`",
     "selected": "ausgewählt",
     "title": "Übersetzungen",
     "translate": "Übersetzen",
-    "view": "Übersetzung ansehen"
+    "view": "Übersetzung ansehen",
+    "viewLocale": "Übersetzung `{locale}` ansehen"
   },
   "unreachable": "Der Server ist nicht erreichbar",
   "unsavedChanges": {

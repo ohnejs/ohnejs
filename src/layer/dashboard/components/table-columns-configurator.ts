@@ -19,6 +19,7 @@ import { effect, first, isNull, isNumber, isUndefined, type Ref, ref, untracked 
 import {
   editableTableColumns,
   serializeTableColumnEdits,
+  SYSTEM_FIELDS,
   type TableColumnEdit,
 } from './collection-table-state.ts';
 import { actionButton } from './item-actions.ts';
@@ -76,14 +77,12 @@ export function tableColumnsConfigurator(options: TableColumnsConfiguratorOption
     options.onCommit(serializeTableColumnEdits(next));
   };
 
-  // The excluded pair stays selectable, but a new column prefers the fields the default set draws from.
+  // The system fields stay selectable, but a new column prefers the fields the default set draws from.
   const freeField = (): DashboardField | undefined => {
     const free = options
       .fields()
       .filter((field) => items.value.every((item) => item.name !== field.name));
-    return (
-      free.find((field) => field.name !== 'UUID' && field.name !== '_updatedAt') ?? first(free)
-    );
+    return free.find((field) => !SYSTEM_FIELDS.has(field.name)) ?? first(free);
   };
 
   const addColumn = (index?: number): void => {

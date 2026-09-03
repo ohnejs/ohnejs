@@ -31,6 +31,13 @@ const FIELDS: TableFieldMeta[] = [
   field('sections', { kind: 'childMany', logicalType: undefined }),
 ];
 
+const TRANSLATABLE: TableFieldMeta[] = [
+  field('UUID'),
+  field('_updatedAt', { logicalType: 'integer' }),
+  field('_translations', { kind: 'translations', logicalType: undefined }),
+  ...FIELDS.slice(2),
+];
+
 describe('parseTableState', () => {
   it('reads defaults from an empty search', () => {
     deepStrictEqual(parseTableState('', DEFAULT_ORDER), {
@@ -185,6 +192,30 @@ describe('resolveTableColumns', () => {
   it('does not sort composite kinds', () => {
     const columns = resolveTableColumns(FIELDS, ['sections']);
     strictEqual(columns[0]?.sortable, false);
+  });
+
+  it('gives a translatable collection three declared fields, then _translations, then _updatedAt', () => {
+    deepStrictEqual(
+      resolveTableColumns(TRANSLATABLE).map((column) => column.name),
+      ['title', 'views', 'published', '_translations', '_updatedAt'],
+    );
+    deepStrictEqual(resolveTableColumns(TRANSLATABLE)[3], {
+      name: '_translations',
+      label: '_translations',
+      sortable: false,
+      minWidth: '256px',
+    });
+  });
+
+  it('resolves _translations from a spec entry, unsortable', () => {
+    const columns = resolveTableColumns(TRANSLATABLE, ['_translations|120px', 'title']);
+    deepStrictEqual(
+      columns.map((column) => [column.name, column.sortable, column.width]),
+      [
+        ['_translations', false, '120px'],
+        ['title', 'text', undefined],
+      ],
+    );
   });
 
   it('skips write-only fields in the default set', () => {

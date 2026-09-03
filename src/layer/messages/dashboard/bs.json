@@ -61,6 +61,9 @@
     },
     "updatedAt": {
       "label": "Ažurirano"
+    },
+    "translations": {
+      "label": "Prijevodi"
     }
   },
   "filter": {
@@ -225,11 +228,15 @@
     "deleted": "Prijevod obrisan",
     "deleteFailed": "Došlo je do greške pri brisanju prijevoda",
     "edit": "Uredi prijevod",
+    "editLocale": "Uredi prijevod `{locale}`",
+    "missingLocale": "Nema prijevoda `{locale}`",
     "new": "Novi prijevod",
+    "newLocale": "Novi prijevod `{locale}`",
     "selected": "odabrano",
     "title": "Prijevodi",
     "translate": "Prevedi",
-    "view": "Pogledaj prijevod"
+    "view": "Pogledaj prijevod",
+    "viewLocale": "Pogledaj prijevod `{locale}`"
   },
   "unreachable": "Server nije dostupan",
   "unsavedChanges": {
