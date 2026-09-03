@@ -84,6 +84,9 @@ An operation a collection [exposes](../api/collections.md#exposure) is guarded b
 request needs a signed-in user whose capabilities cover `collection.<Name>.<operation>`. No user
 is a `401`, a user without the capability a `403`. An operation marked `'public'` skips the guard.
 
+The guard answers who may run an operation. Which records they reach - only their own posts, only
+published ones - is the operation's [`access`](../api/collections.md#access) option.
+
 ## Guarding your own routes
 
 For your own endpoints, `requireCapability` is the one-line guard. It resolves the signed-in user,

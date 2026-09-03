@@ -192,6 +192,13 @@ own `locale` wins. Locales select content, they do not protect it. `applyQuery` 
 `_translations` as stored; the shipped collection endpoints narrow it further, to the locales a
 scoped `where` admits the record at.
 
+`applyScope` composes the same scope onto a builder with no wire query to replay - the shape for
+a query your route writes itself under an operation's `access`.
+
+The shipped collection endpoints take their scope from the operation's
+[`access`](./collections.md#access) option, so a collection declares the rule once and every
+endpoint composes under it.
+
 ## Reading from a POST body
 
 A query long enough to strain a URL travels the same grammar as a JSON body. `readQueryBody` reads

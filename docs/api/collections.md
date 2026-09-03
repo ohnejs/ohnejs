@@ -122,20 +122,175 @@ export default defineCollection({
 });
 ```
 
-An operation is `true` (guarded), `'public'` (open to anyone), or an object with two options.
+An operation is `true` (guarded), `'public'` (open to anyone), or an object with three options.
 `public: true` is the object spelling of `'public'`, and `middleware` names
 [middleware](./middleware.md) to run after the guard, in order, after the global ones. A
-middleware that returns a value answers the request, and the operation never runs.
+middleware that returns a value answers the request, and the operation never runs. `access`
+narrows the operation to the records and fields a request may reach; it has
+[its own section](#access).
 
-The two options compose: `{ public: true, middleware: ['require-auth'] }` skips the capability
-guard but still requires a signed-in user - any account, no role needed.
+`public` and `middleware` compose: `{ public: true, middleware: ['require-auth'] }` skips the
+capability guard but still requires a signed-in user - any account, no role needed.
 
 `read` covers all three read endpoints. An unknown collection, an unexposed one, and a closed
 operation all answer the identical `404`, so the API never reveals what exists.
 
-## Scoping a read
+## Access
 
-The shipped endpoints serve records as they are. To constrain what every request sees - only
-published posts, only the caller's own rows - register a [`query:filter` hook](./hooks.md), or
-override the route file and compose your own scope with `applyQuery`; the
-[URL query guide](./url-queries.md#scoping-an-endpoint) shows the pattern.
+The guard decides whether a caller may run an operation at all. `access` decides which records and
+fields the operation reaches. It is a function on the operation, run once per request after the
+guard and the middleware, and what it returns composes into every query the operation runs:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohne';
+import { useUser } from 'ohne/auth';
+
+export default defineCollection({
+  api: {
+    read: 'public',
+    update: {
+      access: async () => {
+        const user = await useUser();
+        return user ? { where: { author: user.UUID } } : false;
+      },
+    },
+  },
+  fields: {
+    title: field('text'),
+    author: field('record', { collection: 'Users' }),
+  },
+});
+```
+
+Anyone reads posts. A signed-in user updates only the posts they authored: the `where` ANDs onto
+the update, so a `PATCH` on someone else's post answers the same `404` a missing record does. There
+is no `403` to tell an out-of-scope record from an absent one, so the API never reveals what the
+caller cannot reach.
+
+`access` returns one of three things. `true` runs the operation unscoped, exactly as if the option
+were omitted. `false` refuses it as that identical `404`. A scope object narrows it.
+
+### The scope
+
+`where` is a filter in the object form the URL grammar's [`where`](./url-queries.md#filtering)
+takes, keyed to the collection's fields. Every request is ANDed under it: a request can filter
+further, never escape.
+
+`select` names the fields the request may reach. A read returns those fields, and a request's own
+`select` intersects with them - it narrows, never widens. On an update the same list bounds the
+body: only fields inside it write, and the answered record carries the scoped fields alone.
+
+`limit` caps the rows a list read returns; the request's own `limit` can only lower it. `locale` is
+the locale a read uses when the request names none - a default, not a wall.
+
+A `read` scope shapes all three read endpoints. An `update` or `delete` scope decides which rows
+the write may touch: a row outside `where` answers `404` as if it did not exist. The filter reads
+the row as stored, so a body may carry a row out of the scope - an author handing a post to someone
+else. Keep a field inside the scope with `select`, or lock it with `writable: false` as the next
+example does. A create has no rows yet, so only the verdict applies - return `true` or `false`.
+
+A `where` over translatable fields matches per locale, so it can admit a record at `en` and hide it
+at `de`. The endpoints then narrow the record's `_translations` to the admitted locales; a `where`
+over plain fields answers alike everywhere and costs no extra read.
+
+### Who is asking
+
+`access` receives a context naming the `operation`. The caller is not in it: the caller is
+ambient, and `useUser`, `requireUser`, and `userCan` from `ohne/auth` read the request exactly as
+they do in a [handler](../auth/authentication.md#reading-the-current-user). That keeps a rule
+ordinary code. Here the author, any listed editor, or the author's manager may edit, only the
+author may delete, only the author hands a post to someone else, and a `posts.manage` capability
+bypasses the editing rule:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohne';
+import { requireUser, useUser, userCan } from 'ohne/auth';
+
+export default defineCollection({
+  api: {
+    read: true,
+    create: {
+      access: async ({ input }) => {
+        const me = (await requireUser()).UUID;
+        return !('author' in input) || input.author === me;
+      },
+    },
+    update: {
+      access: async ({ input }) => {
+        const user = await requireUser();
+        if (userCan(user, 'posts.manage')) return true;
+        const me = user.UUID;
+        if ('author' in input) return { where: { author: me } };
+        return {
+          where: {
+            or: [
+              { author: me },
+              { editors: { has: { UUID: me } } },
+              { author: { has: { manager: me } } },
+            ],
+          },
+        };
+      },
+    },
+    delete: { access: async () => ({ where: { author: (await requireUser()).UUID } }) },
+  },
+  fields: {
+    title: field('text'),
+    author: field('record', {
+      collection: 'Users',
+      default: async () => (await useUser())?.UUID ?? null,
+    }),
+    editors: field('records', { collection: 'Users' }),
+  },
+});
+```
+
+`manager` is a `record` field to `Users` that your own `Users` collection declares. The `has`
+clauses read through the relations: `editors` is a `records` field, so `has` matches a listed
+editor, and `author` reaches the author's own `manager`.
+
+Name a bypass outside the `collection.` prefix. `collection.Posts.*` covers every name under it,
+`collection.Posts.manage` included, so a role meant for plain editing would hold the bypass too.
+
+`author` defaults to the ambient user, so a create that leaves it out carries its creator, and
+the create rule lets a body name only the caller - that is how a create gets its owner, since the
+scope has no row to filter yet. An update naming `author` narrows to the author's own rows, so an
+editor's attempt to reassign answers `404`. Lock the field with `writable: false` instead when
+nobody may change it.
+
+### The write input
+
+A create or update carries `input` in the context: the JSON body as the request sent it, before
+validation. A rule can judge the write itself, not only the row it lands on - the example above
+lets only the author reassign `author`, and `input.status === 'published'` is how a rule asks for
+a manager before a post goes live. A read or delete carries no input; its context names the
+operation alone, so one function serves every slot by branching on `operation`.
+
+The translation copy resolves `update` twice: with an empty input to reach the source record,
+then with the values it is about to write.
+
+### Your own routes
+
+`access` belongs to the shipped endpoints; a query in your own route is trusted and unscoped. To
+hold a route to the same policy, open the query through `queryScoped` from `ohne/auth`. It runs
+the guard and the resolver exactly as the collections API does - a closed operation or a `false`
+verdict is a `404`, a missing user `401`, a missing capability `403` - and returns a builder to
+query through. A read carries the whole scope; an update or delete ANDs the scope's `where` in,
+exactly as the shipped endpoints do. The builder speaks the object grammar the URL `where` takes:
+
+```ts
+// api/drafts.get.ts
+import { defineHandler } from 'ohne';
+import { queryScoped } from 'ohne/auth';
+
+export default defineHandler(async () => {
+  const posts = await queryScoped('Posts', 'read');
+  return posts.where({ status: 'draft' }).findMany();
+});
+```
+
+A create or update takes the intended input as its third argument, so the rule judges it. The
+operation's own middleware do not run here; your route carries its own. A rule that must reach
+every read in the process, shipped or not, is a [`query:filter` hook](./hooks.md).
