@@ -58,8 +58,9 @@ export interface DashboardField {
 
   /**
    * How the field stores and reads: a column, a relation, a child table, or a blocks wrapper.
+   * `translations` is the read-only list of locales a translatable collection's record holds.
    */
-  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks';
+  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks' | 'translations';
 
   /**
    * The storage primitive of the field's column; column-bearing kinds (`column`, `record`) only.
@@ -191,7 +192,8 @@ export interface DashboardCollection {
   operations: DashboardOperations;
 
   /**
-   * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
+   * Every addressable field in order: the system entries, then the declared fields as authored.
+   * The system entries are `UUID`, `_updatedAt`, and `_translations` on a translatable collection.
    */
   fields: DashboardField[];
 
