@@ -66,6 +66,12 @@ A relation filters with `has`, re-scoped to the target's fields, and `empty` for
 ?where={tags:{empty:true}}
 ```
 
+Through the shipped collection endpoints, a conditioned `has` reaches into the target collection
+only as far as the caller's own read of it would: a target the caller cannot read matches nothing,
+a target's read scope narrows which of its rows match, and a target field outside that scope is
+refused exactly as a field that does not exist. A bare `has` or `empty` tests the parent's own
+link and never crosses.
+
 A [blocks](../database/blocks.md#querying) field takes the same pair; a conditioned `has` scope
 opens with a bare `block` equality naming the type its siblings probe:
 
@@ -151,6 +157,12 @@ the next level, the same grammar all the way down:
 A spec carrying any key other than `select` and `populate` is a `400` with the code
 `invalidShape`; an empty `select` is `emptySelect` at its path. A populated relation must be
 named in its level's `select` when one is set, or it silently drops.
+
+Through the shipped collection endpoints, a populated relation hydrates only what the caller's own
+read of the target would return: a `record` into a collection the caller cannot read comes back
+`null`, a `records` element from one drops, and a target's read scope narrows the rows and the
+fields at every level. Your own endpoint gets the same by parsing through `parseWireQuery` with a
+reach resolver; a plain `parseQueryParams` read crosses into its targets unscoped.
 
 Depth and size are bounded by two [guards](#guards): `maxPopulateDepth` (default `2`, so
 `comments.author` works out of the box) and `maxPopulate` (default `20` nodes in total). Depth

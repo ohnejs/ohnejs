@@ -187,6 +187,11 @@ answered record carries the scoped fields alone.
 `limit` caps the rows a list read returns; the request's own `limit` can only lower it. `locale` is
 the locale a read uses when the request names none - a default, not a wall.
 
+A `read` scope also reaches through relations. When another collection's endpoint populates or
+probes this one, this collection's own `read` exposure, guard, and scope decide what comes back:
+nothing from a collection the caller cannot read, only the admitted rows and fields otherwise. The
+target's own middleware run too; one that answers makes the target unreachable.
+
 A `read` scope shapes all three read endpoints. An `update` or `delete` scope decides which rows
 the write may touch: a row outside `where` answers `404` as if it did not exist. The filter reads
 the row as stored, so a body may carry a row out of the scope - an author handing a post to someone
