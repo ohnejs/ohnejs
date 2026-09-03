@@ -1,11 +1,11 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { OrderDirection } from '../../../../src/ohne/query/ir.ts';
 import type { UntypedQueryBuilder } from '../../../../src/ohne/query/untyped.ts';
 import type { ParsedQuery } from '../../../../src/ohne/query/wire/parse.ts';
 
-import { applyQuery, type QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
+import { applyQuery, applyScope, type QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
 
 function recorder(): { builder: UntypedQueryBuilder; calls: string[] } {
   const calls: string[] = [];
@@ -124,5 +124,19 @@ describe('applyQuery scopes the locale', () => {
     const { builder, calls } = recorder();
     applyQuery(builder, query({ locale: 'de' }), { locale: 'en' });
     deepStrictEqual(calls, ['locale:de']);
+  });
+});
+
+describe('applyScope composes a scope with no wire query', () => {
+  it('applies the locale, filter, fields, and cap as they are', () => {
+    const { builder, calls } = recorder();
+    applyScope(builder, { locale: 'de', where: { owner: 'u1' }, select: ['title'], limit: 50 });
+    deepStrictEqual(calls, ['locale:de', 'where:{"owner":"u1"}', 'select:title', 'limit:50']);
+  });
+
+  it('touches nothing under an empty scope', () => {
+    const { builder, calls } = recorder();
+    strictEqual(applyScope(builder, {}), builder);
+    deepStrictEqual(calls, []);
   });
 });

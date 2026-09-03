@@ -9,6 +9,11 @@ import { validateCollectionDefinition } from './validate-collection.ts';
 export type { IconName } from '../../utils/icon/icon-name.ts';
 
 /**
+ * One collections-API operation, as the `api` exposure names it.
+ */
+export type CollectionOperation = 'read' | 'create' | 'update' | 'delete';
+
+/**
  * The condition form an `access` scope's `where` takes, keyed to the collection's declared fields.
  * Keys complete to the field names; values follow the condition-object grammar every `where` reads.
  * `and` and `or` group, and their nested conditions stay open-keyed.
@@ -38,9 +43,22 @@ export interface AccessScope<TField extends string = string> extends Omit<
 }
 
 /**
+ * What an `access` resolver learns about the request it scopes.
+ * A create or update carries `input`, the write the caller intends, unverified.
+ * A read or delete has no input, so its context names the operation alone.
+ */
+export type AccessContext<TOperation extends CollectionOperation = CollectionOperation> =
+  TOperation extends 'create' | 'update'
+    ? { operation: TOperation; input: Record<string, unknown> }
+    : { operation: TOperation };
+
+/**
  * Options of one exposed collection-API operation.
  */
-export interface CollectionEndpoint<TField extends string = string> {
+export interface CollectionEndpoint<
+  TField extends string = string,
+  TOperation extends CollectionOperation = CollectionOperation,
+> {
   /**
    * Opens the operation to anonymous requests, skipping the capability guard.
    * Pair it with `middleware: ['require-auth']` to require a signed-in user without a capability.
@@ -61,6 +79,9 @@ export interface CollectionEndpoint<TField extends string = string> {
 
   /**
    * Resolves the operation's per-request scope, once the guard and the middleware have passed.
+   * The context names the operation; a create or update carries `input`, the write the caller intends.
+   * The collections API hands it the JSON body, or an empty write when the body fails to read.
+   * A translation copy hands it the values it copies.
    * A returned scope composes into every query the operation runs.
    * Its `where` ANDs in, so an out-of-scope record answers the same `404` a missing one does.
    * `select` narrows what a read returns, what an update accepts, and what a write's answered record carries.
@@ -79,10 +100,18 @@ export interface CollectionEndpoint<TField extends string = string> {
    *       return user ? { where: { owner: user.UUID } } : false
    *     },
    *   },
+   *   update: {
+   *     access: async ({ input }) => {
+   *       const user = await requireUser()
+   *       return 'owner' in input ? { where: { owner: user.UUID } } : true
+   *     },
+   *   },
    * }
    * ```
    */
-  access?: () => AccessScope<TField> | boolean | Promise<AccessScope<TField> | boolean>;
+  access?: (
+    context: AccessContext<TOperation>,
+  ) => AccessScope<TField> | boolean | Promise<AccessScope<TField> | boolean>;
 }
 
 /**
@@ -98,7 +127,7 @@ export interface CollectionAPI<TField extends string = string> {
    * @default
    * false
    */
-  read?: boolean | 'public' | CollectionEndpoint<TField>;
+  read?: boolean | 'public' | CollectionEndpoint<TField, 'read'>;
 
   /**
    * Opens `POST /collections/<name>` - creating a record.
@@ -106,7 +135,7 @@ export interface CollectionAPI<TField extends string = string> {
    * @default
    * false
    */
-  create?: boolean | 'public' | CollectionEndpoint<TField>;
+  create?: boolean | 'public' | CollectionEndpoint<TField, 'create'>;
 
   /**
    * Opens `PATCH /collections/<name>/<uuid>` - updating one record.
@@ -114,7 +143,7 @@ export interface CollectionAPI<TField extends string = string> {
    * @default
    * false
    */
-  update?: boolean | 'public' | CollectionEndpoint<TField>;
+  update?: boolean | 'public' | CollectionEndpoint<TField, 'update'>;
 
   /**
    * Opens `DELETE /collections/<name>/<uuid>` - deleting one record.
@@ -122,7 +151,7 @@ export interface CollectionAPI<TField extends string = string> {
    * @default
    * false
    */
-  delete?: boolean | 'public' | CollectionEndpoint<TField>;
+  delete?: boolean | 'public' | CollectionEndpoint<TField, 'delete'>;
 }
 
 /**

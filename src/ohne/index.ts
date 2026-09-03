@@ -15,6 +15,7 @@ export * from './codegen/generate-roles.ts';
 export * from './codegen/generate-routes.ts';
 export * from './codegen/prune-codegen.ts';
 export * from './codegen/scan-layer-augmentations.ts';
+export * from './collections/access.ts';
 export * from './collections/collect-collections.ts';
 export * from './collections/define-collection.ts';
 export * from './collections/known-collections.ts';

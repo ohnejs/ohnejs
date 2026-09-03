@@ -77,6 +77,24 @@ export function applyQuery(
 }
 
 /**
+ * Composes an endpoint scope onto a builder, with no wire query to replay.
+ * The scope's locale, filter, fields, and row cap apply as they are.
+ * The counterpart of `applyQuery` for a query app code writes itself under an operation's `access`.
+ *
+ * @example
+ * ```ts
+ * const posts = await applyScope(queryUntyped('Posts'), { where: { published: true } }).findMany()
+ * ```
+ */
+export function applyScope(builder: UntypedQueryBuilder, scope: QueryScope): UntypedQueryBuilder {
+  if (!isUndefined(scope.locale)) builder.locale(scope.locale);
+  if (!isUndefined(scope.where)) builder.where(scope.where);
+  if (!isUndefined(scope.select)) builder.select(...scope.select);
+  if (!isUndefined(scope.limit)) builder.limit(scope.limit);
+  return builder;
+}
+
+/**
  * The fields the read narrows to: the scope's when the request names none, else their intersection.
  * An empty intersection keeps the scope, so a request that names only out-of-scope fields never widens.
  */
