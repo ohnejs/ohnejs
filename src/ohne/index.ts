@@ -142,6 +142,7 @@ export * from './query/wire/body.ts';
 export type { WireErrorCode, WireErrorData } from './query/wire/errors.ts';
 export * from './query/wire/guards.ts';
 export * from './query/wire/parse.ts';
+export * from './query/wire/reach.ts';
 export * from './query/wire/write-input.ts';
 export * from './roles/collect-roles.ts';
 export * from './roles/define-role.ts';

@@ -1,5 +1,5 @@
 import type { Transaction } from '../database/adapter.ts';
-import type { OrderDirection } from './ir.ts';
+import type { OrderDirection, TargetReach } from './ir.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
 import type { QueryGuards } from './wire/guards.ts';
@@ -215,6 +215,19 @@ export interface UntypedQueryBuilder {
    * ```
    */
   whereAny(build: WhereGroupBuild): this;
+
+  /**
+   * Installs a wire read's own condition and its reach into every collection it crosses.
+   * The condition compiles under the reach: a conditioned `has` into an unreachable target matches nothing.
+   * A populate hydrates only what the target's reach admits, narrowed to the fields it names.
+   * A collection the reach never names reaches nothing, so a read fails closed.
+   * A write terminal ANDs the condition in unscoped; the reach narrows reads alone.
+   * @example
+   * ```ts
+   * queryUntyped('Posts').wire({ author: { has: { name: 'Ada' } } }, new Map([['Users', false]]))
+   * ```
+   */
+  wire(condition: ConditionInput | null, reach: ReadonlyMap<string, TargetReach>): this;
 
   /**
    * Narrows the read to the named top-level fields, accumulating across calls.

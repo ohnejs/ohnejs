@@ -14,7 +14,7 @@ import { queryMetadata } from '../metadata.ts';
 import { assertBoundParams } from '../sql/fragment.ts';
 import { compileLimit, compileOrder } from '../sql/order.ts';
 import { compileSelect } from '../sql/select.ts';
-import { compileWhere } from '../sql/where.ts';
+import { compileReadWhere } from '../sql/where.ts';
 import { hydrateScope } from './hydrate.ts';
 import { applyPopulate, populatedSelect } from './loaders/populate.ts';
 import { resolveIR } from './resolve-ir.ts';
@@ -71,8 +71,8 @@ export function compileReadTail(
 ): SQLFragment {
   const parts: string[] = [];
   const params: SQLValue[] = [];
-  if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect, locale);
+  const where = compileReadWhere(ir, meta, dialect, locale);
+  if (!isNull(where)) {
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }

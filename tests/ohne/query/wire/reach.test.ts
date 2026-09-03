@@ -1,0 +1,341 @@
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { describe, it } from 'node:test';
+
+import type { QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
+import type { SearchParamValue } from '../../../../src/utils/index.ts';
+
+import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
+import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
+import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
+import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import { field } from '../../../../src/ohne/fields/field.ts';
+import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
+import { freezeIR, type TargetReach } from '../../../../src/ohne/query/ir.ts';
+import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
+import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { applyQuery } from '../../../../src/ohne/query/wire/apply.ts';
+import { resolveGuards } from '../../../../src/ohne/query/wire/guards.ts';
+import { parseWireQuery } from '../../../../src/ohne/query/wire/reach.ts';
+
+useLayers().add({
+  path: '/reach-test',
+  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
+
+useCollections().register('WrAuthors', {
+  name: 'WrAuthors',
+  collection: {
+    fields: {
+      name: field('text'),
+      secret: field('text'),
+      active: field('boolean'),
+      boss: field('record', { collection: 'WrAuthors' }),
+    },
+  },
+});
+useCollections().register('WrTags', {
+  name: 'WrTags',
+  collection: { fields: { label: field('text') } },
+});
+useCollections().register('WrPosts', {
+  name: 'WrPosts',
+  collection: {
+    fields: {
+      title: field('text'),
+      author: field('record', { collection: 'WrAuthors' }),
+      tags: field('records', { collection: 'WrTags' }),
+    },
+  },
+});
+useCollections().register('WrNotes', {
+  name: 'WrNotes',
+  collection: {
+    fields: { title: field('text', { translatable: true }), views: field('integer') },
+  },
+});
+
+const dialect = new SQLiteDialect();
+const db = await dialect.connect(':memory:');
+registerDialect(dialect);
+registerDatabase(db);
+await syncDatabase(db, dialect, {
+  desired: buildDesiredSchema(useCollections(), useFields() as never),
+});
+
+const authors = queryUntyped('WrAuthors');
+const ada = (await authors.createOrThrow({ name: 'Ada', secret: 's1', active: true }))
+  .UUID as string;
+const bob = (await authors.createOrThrow({ name: 'Bob', secret: 's2', active: false, boss: ada }))
+  .UUID as string;
+const cy = (await authors.createOrThrow({ name: 'Cy', secret: 's3', active: true, boss: bob }))
+  .UUID as string;
+const news = (await queryUntyped('WrTags').createOrThrow({ label: 'news' })).UUID as string;
+const misc = (await queryUntyped('WrTags').createOrThrow({ label: 'misc' })).UUID as string;
+await queryUntyped('WrPosts').createOrThrow({ title: 'By Ada', author: ada, tags: [news] });
+await queryUntyped('WrPosts').createOrThrow({ title: 'By Bob', author: bob, tags: [news, misc] });
+await queryUntyped('WrPosts').createOrThrow({ title: 'By Cy', author: cy, tags: [misc] });
+const noteA = (await queryUntyped('WrNotes').createOrThrow({ title: 'Note', views: 1 })).UUID;
+await queryUntyped('WrNotes').createOrThrow({ title: 'Other', views: 2 });
+
+const meta = queryMetadata('WrPosts');
+const guards = resolveGuards();
+
+type Answers = Record<string, QueryScope | false>;
+
+function resolver(answers: Answers): {
+  resolve: (collection: string) => Promise<QueryScope | false>;
+  asked: string[];
+} {
+  const asked: string[] = [];
+  return {
+    asked,
+    resolve: (collection) => {
+      asked.push(collection);
+      return Promise.resolve(answers[collection] ?? false);
+    },
+  };
+}
+
+async function read(
+  params: Record<string, SearchParamValue>,
+  answers: Answers,
+): Promise<Record<string, unknown>[]> {
+  const parsed = await parseWireQuery(params, meta, guards, resolver(answers).resolve);
+  return applyQuery(queryUntyped('WrPosts').orderBy('title', 'asc'), parsed).findMany();
+}
+
+function pathOf(error: unknown): string | undefined {
+  return (error as { data?: { path?: string } }).data?.path;
+}
+
+function messageOf(error: unknown): string | undefined {
+  return (error as { message?: string }).message;
+}
+
+describe('parseWireQuery resolves the reach of every crossed collection', () => {
+  it('asks once per collection a populate or conditioned has crosses into', async () => {
+    const { resolve, asked } = resolver({ WrAuthors: {}, WrTags: {} });
+    const parsed = await parseWireQuery(
+      {
+        populate: ['author', { tags: { select: ['label'] } }],
+        where: { author: { has: { name: 'Ada' } } },
+      },
+      meta,
+      guards,
+      resolve,
+    );
+    deepStrictEqual(asked.sort(), ['WrAuthors', 'WrTags']);
+    deepStrictEqual([...(parsed.reach?.keys() ?? [])].sort(), ['WrAuthors', 'WrTags']);
+  });
+
+  it('asks nothing and carries no reach when the query crosses no collection', async () => {
+    const { resolve, asked } = resolver({});
+    const parsed = await parseWireQuery(
+      { where: { title: { startsWith: 'By' } } },
+      meta,
+      guards,
+      resolve,
+    );
+    deepStrictEqual(asked, []);
+    strictEqual(parsed.reach, undefined);
+  });
+
+  it('refuses a target field outside its reach select, and every field of an unreachable target', async () => {
+    await rejects(
+      parseWireQuery(
+        { populate: [{ author: { select: ['secret'] } }] },
+        meta,
+        guards,
+        resolver({ WrAuthors: { select: ['name'] } }).resolve,
+      ),
+      (error) => pathOf(error) === 'populate[0].author.select[0]',
+    );
+    await rejects(
+      parseWireQuery(
+        { where: { author: { has: { name: 'Ada' } } } },
+        meta,
+        guards,
+        resolver({ WrAuthors: false }).resolve,
+      ),
+      (error) => pathOf(error) === 'where.author.name',
+    );
+  });
+
+  it('names nothing about an unreachable target: a near miss and a wrong type read as unknown', async () => {
+    const unreachable = resolver({ WrAuthors: false }).resolve;
+    await rejects(
+      parseWireQuery({ where: { author: { has: { secre: 'x' } } } }, meta, guards, unreachable),
+      (error) => messageOf(error) === 'query.invalidField',
+    );
+    await rejects(
+      parseWireQuery({ where: { author: { has: { active: 'x' } } } }, meta, guards, unreachable),
+      (error) => messageOf(error) === 'query.invalidField',
+    );
+    await rejects(
+      parseWireQuery({ populate: [{ author: { select: ['secre'] } }] }, meta, guards, unreachable),
+      (error) => messageOf(error) === 'query.invalidField',
+    );
+  });
+
+  it('leaves a malformed populate or where for the parse to refuse, resolving nothing', async () => {
+    const { resolve, asked } = resolver({ WrAuthors: {} });
+    await rejects(parseWireQuery({ populate: [{ author: 5 }] }, meta, guards, resolve));
+    await rejects(parseWireQuery({ where: '{' }, meta, guards, resolve));
+    deepStrictEqual(asked, ['WrAuthors']);
+  });
+});
+
+describe('a wire read composes under its reach', () => {
+  it('hydrates nothing from an unreachable target and drops its records elements', async () => {
+    const rows = await read({ populate: ['author', 'tags'] }, { WrAuthors: false, WrTags: false });
+    deepStrictEqual(
+      rows.map((row) => [row.author, row.tags]),
+      [
+        [null, []],
+        [null, []],
+        [null, []],
+      ],
+    );
+  });
+
+  it('hydrates a target under its reach condition and select', async () => {
+    const rows = await read(
+      { populate: ['author'] },
+      { WrAuthors: { where: { active: true }, select: ['name'] } },
+    );
+    deepStrictEqual(
+      rows.map((row) => row.author),
+      [{ name: 'Ada' }, null, { name: 'Cy' }],
+    );
+  });
+
+  it('keeps a reach condition whole when it probes a relation itself', async () => {
+    const rows = await read(
+      { populate: ['author'] },
+      { WrAuthors: { where: { boss: { has: { name: 'Ada' } } }, select: ['name'] } },
+    );
+    deepStrictEqual(
+      rows.map((row) => row.author),
+      [null, { name: 'Bob' }, null],
+    );
+  });
+
+  it('matches a conditioned has only through the rows the reach admits', async () => {
+    const answers: Answers = { WrAuthors: { where: { active: true } } };
+    const admitted = await read(
+      { where: { author: { has: { name: { startsWith: 'B' } } } } },
+      answers,
+    );
+    deepStrictEqual(admitted, []);
+    const reached = await read(
+      { where: { author: { has: { name: { startsWith: 'A' } } } } },
+      answers,
+    );
+    deepStrictEqual(
+      reached.map((row) => row.title),
+      ['By Ada'],
+    );
+  });
+
+  it('probes a records relation through the reach as well', async () => {
+    const answers: Answers = { WrTags: { where: { label: 'misc' } } };
+    const cut = await read({ where: { tags: { has: { label: 'news' } } } }, answers);
+    deepStrictEqual(cut, []);
+    const admitted = await read({ where: { tags: { has: { label: 'misc' } } } }, answers);
+    deepStrictEqual(
+      admitted.map((row) => row.title),
+      ['By Bob', 'By Cy'],
+    );
+  });
+
+  it('counts and paginates under the same reach as the row read', async () => {
+    const parsed = await parseWireQuery(
+      { where: { author: { has: { name: 'Ada' } } } },
+      meta,
+      guards,
+      resolver({ WrAuthors: { where: { active: false } } }).resolve,
+    );
+    const page = await applyQuery(queryUntyped('WrPosts'), parsed).paginate(1, 10);
+    deepStrictEqual([page.total, page.records], [0, []]);
+    strictEqual(await applyQuery(queryUntyped('WrPosts'), parsed).count(), 0);
+  });
+
+  it('leaves a bare has and the trusted scope untouched by the reach', async () => {
+    const parsed = await parseWireQuery(
+      { where: { author: { has: true } }, populate: ['author'] },
+      meta,
+      guards,
+      resolver({ WrAuthors: false }).resolve,
+    );
+    const rows = await applyQuery(queryUntyped('WrPosts').orderBy('title', 'asc'), parsed, {
+      where: { author: { has: { name: 'Bob' } } },
+    }).findMany();
+    deepStrictEqual(
+      rows.map((row) => [row.title, row.author]),
+      [['By Bob', null]],
+    );
+  });
+
+  it('fails closed on a target the reach never named', async () => {
+    const rows = await queryUntyped('WrPosts')
+      .wire({ author: { has: { name: 'Ada' } } }, new Map())
+      .populate('tags')
+      .findMany();
+    deepStrictEqual(rows, []);
+    const populated = await queryUntyped('WrPosts')
+      .wire(null, new Map())
+      .populate('tags')
+      .findMany();
+    deepStrictEqual(
+      populated.map((row) => row.tags),
+      [[], [], []],
+    );
+  });
+
+  it('plucks a column under a wire condition over a translatable field', async () => {
+    const plucked = await queryUntyped('WrNotes')
+      .wire({ title: { startsWith: 'N' } }, new Map())
+      .pluck('UUID');
+    deepStrictEqual(plucked, [noteA]);
+  });
+
+  it('folds the wire condition into a write, unscoped', async () => {
+    const parsed = await parseWireQuery(
+      { where: { title: 'By Cy' }, populate: ['tags'] },
+      meta,
+      guards,
+      resolver({ WrTags: false }).resolve,
+    );
+    const updated = await applyQuery(queryUntyped('WrPosts'), parsed).updateOrThrow({
+      title: 'By Cy!',
+    });
+    deepStrictEqual(
+      updated.map((row) => row.title),
+      ['By Cy!'],
+    );
+    await queryUntyped('WrPosts').where({ title: 'By Cy!' }).updateOrThrow({ title: 'By Cy' });
+  });
+
+  it('freezes each reach entry inside a frozen IR', () => {
+    const reach = new Map<string, TargetReach>([
+      ['WrAuthors', { condition: null, select: ['name'] }],
+      ['WrTags', false],
+    ]);
+    const ir = freezeIR({
+      collection: 'WrPosts',
+      conditions: [],
+      select: null,
+      order: [],
+      limit: null,
+      offset: null,
+      populate: [],
+      locale: null,
+      wire: { condition: null, reach },
+    });
+    ok(Object.isFrozen(ir.wire));
+    ok(Object.isFrozen(ir.wire?.reach.get('WrAuthors')));
+    ok(Object.isFrozen((ir.wire?.reach.get('WrAuthors') || {}).select));
+  });
+});

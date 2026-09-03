@@ -47,6 +47,7 @@ export interface QueryScope {
  *
  * The parsed query drives the same untyped methods the fluent builder narrows, so both paths compile alike.
  * The locale applies first, the request's choice over the scope's, then the filters replay.
+ * A query `parseWireQuery` parsed carries its reach, installed so every crossed read composes under it.
  * The terminal stays with the caller, which pins `findMany`/`paginate`/... and runs it.
  * It reads `parsed.page`/`parsed.perPage` when it paginates.
  * Returns the builder for the terminal to run.
@@ -67,7 +68,11 @@ export function applyQuery(
   const locale = parsed.locale ?? scope.locale;
   if (!isUndefined(locale)) builder.locale(locale);
   if (!isUndefined(scope.where)) builder.where(scope.where);
-  if (!isNull(parsed.where)) builder.where(parsed.where);
+  if (isUndefined(parsed.reach)) {
+    if (!isNull(parsed.where)) builder.where(parsed.where);
+  } else {
+    builder.wire(parsed.where, parsed.reach);
+  }
   const select = composeSelect(scope.select, parsed.select);
   if (!isNull(select)) builder.select(...select);
   for (const { field, direction } of parsed.order) builder.orderBy(field, direction);

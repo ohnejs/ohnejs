@@ -3,6 +3,7 @@ import type { QueryIR } from '../ir.ts';
 
 import { isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { readCondition } from '../ir.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { assertBoundParams } from '../sql/fragment.ts';
@@ -34,7 +35,7 @@ export async function pluck(ir: QueryIR, field: string): Promise<unknown[]> {
   const tail = compileReadTail(ir, meta, dialect, locale);
   const from = compileFrom(
     meta,
-    { fields: [field], condition: ir.condition, order: ir.order },
+    { fields: [field], condition: readCondition(ir), order: ir.order },
     locale,
     dialect,
   );

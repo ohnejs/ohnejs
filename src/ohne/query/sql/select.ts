@@ -4,6 +4,7 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { SQLFragment } from './fragment.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
+import { readCondition } from '../ir.ts';
 import { compileFrom } from './from.ts';
 
 /**
@@ -63,7 +64,7 @@ export function compileSelect(
   const columns = fetched.map((entry) => dialect.quote(entry.column)).join(', ');
   const from = compileFrom(
     meta,
-    { fields: fetched.map((entry) => entry.name), condition: ir.condition, order: ir.order },
+    { fields: fetched.map((entry) => entry.name), condition: readCondition(ir), order: ir.order },
     locale,
     dialect,
   );

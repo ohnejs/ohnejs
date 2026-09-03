@@ -44,6 +44,31 @@ export interface PopulateNode {
 }
 
 /**
+ * The read reach of one collection a wire query crosses into.
+ * `false` reaches nothing: a populate hydrates no target and a conditioned `has` matches no row.
+ * A scope ANDs its `condition` into the target read and bounds the fields a populate carries by `select`.
+ */
+export type TargetReach =
+  | false
+  | { readonly condition: ConditionNode | null; readonly select: readonly string[] | null };
+
+/**
+ * The untrusted half of a wire read: the request's own condition and its reach into every crossed collection.
+ * The condition compiles under the reach, so a conditioned `has` reads only what its target admits.
+ */
+export interface WireReach {
+  /**
+   * The request's `where`, or `null` when it names none.
+   */
+  condition: ConditionNode | null;
+
+  /**
+   * The reach into every collection the request populates or probes, keyed by collection name.
+   */
+  reach: ReadonlyMap<string, TargetReach>;
+}
+
+/**
  * The immutable snapshot a terminal compiles and executes from.
  *
  * A builder accumulates plain state and freezes it into this shape when a terminal runs.
@@ -91,12 +116,19 @@ export interface QueryIR {
    * Every locale-scoped table access resolves it through `effectiveLocale`.
    */
   locale: string | null;
+
+  /**
+   * A wire read's untrusted condition and reach, or `null` on a trusted read.
+   */
+  wire: WireReach | null;
 }
 
 /**
  * Freezes builder state into an immutable `QueryIR`, folding the accumulated conditions into one node.
  * Sibling conditions AND together; an empty set is `null`, a single condition stands alone.
- * Every subtree freezes as a copy - condition, order, populate - so mutating the IR throws at any depth.
+ * Every subtree freezes as a copy - condition, order, populate, wire.
+ * Mutating the IR therefore throws at any depth.
+ * The reach map is read-only by type; its entries freeze as copies like everything else.
  */
 export function freezeIR(state: {
   collection: string;
@@ -107,6 +139,7 @@ export function freezeIR(state: {
   offset: number | null;
   populate: readonly PopulateNode[];
   locale: string | null;
+  wire: WireReach | null;
 }): QueryIR {
   const condition = isEmpty(state.conditions)
     ? null
@@ -125,7 +158,26 @@ export function freezeIR(state: {
     offset: state.offset,
     populate: Object.freeze(state.populate.map(freezePopulateNode)),
     locale: state.locale,
+    wire: isNull(state.wire)
+      ? null
+      : Object.freeze({
+          condition: isNull(state.wire.condition)
+            ? null
+            : freezeConditionNode(state.wire.condition),
+          reach: freezeReach(state.wire.reach),
+        }),
   });
+}
+
+/**
+ * Every condition a read applies: its trusted condition ANDed with a wire read's own.
+ * For deciding a statement's shape; the compiler keeps the two apart to scope the wire half.
+ */
+export function readCondition(ir: QueryIR): ConditionNode | null {
+  const wire = isNull(ir.wire) ? null : ir.wire.condition;
+  if (isNull(ir.condition)) return wire;
+  if (isNull(wire)) return ir.condition;
+  return { kind: 'and', nodes: [ir.condition, wire] };
 }
 
 /**
@@ -182,4 +234,23 @@ function freezePopulateNode(node: PopulateNode): PopulateNode {
     select: isNull(node.select) ? null : Object.freeze([...node.select]),
     children: Object.freeze(node.children.map(freezePopulateNode)),
   });
+}
+
+/**
+ * Freezes each reach entry as a copy, so a frozen IR holds no target scope a caller could still edit.
+ */
+function freezeReach(reach: ReadonlyMap<string, TargetReach>): ReadonlyMap<string, TargetReach> {
+  const frozen = new Map<string, TargetReach>();
+  for (const [collection, entry] of reach) {
+    frozen.set(
+      collection,
+      entry === false
+        ? false
+        : Object.freeze({
+            condition: isNull(entry.condition) ? null : freezeConditionNode(entry.condition),
+            select: isNull(entry.select) ? null : Object.freeze([...entry.select]),
+          }),
+    );
+  }
+  return frozen;
 }

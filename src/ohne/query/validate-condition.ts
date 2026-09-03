@@ -8,6 +8,12 @@ import { blockQueryMetadata, queryMetadata } from './metadata.ts';
 import { allowedOperators, type QueryOperator } from './operators.ts';
 
 /**
+ * Resolves a collection's query metadata by name, the lookup a walk hops relations through.
+ * The wire path hands in one that hides what a request's reach into each target withholds.
+ */
+export type MetadataOf = (collection: string) => CollectionQueryMeta;
+
+/**
  * A single applicability failure a condition leaf carries, the shape both callers render.
  *
  * The fluent path throws it as an `ohneError` naming the field.
@@ -72,10 +78,11 @@ export function checkCondition(
   meta: CollectionQueryMeta,
   prefix: readonly string[] = [],
   untrusted = false,
+  metaOf: MetadataOf = queryMetadata,
 ): ConditionProblem | null {
   if (node.kind === 'and' || node.kind === 'or') {
     for (const child of node.nodes) {
-      const problem = checkCondition(child, meta, prefix, untrusted);
+      const problem = checkCondition(child, meta, prefix, untrusted, metaOf);
       if (!isNull(problem)) return problem;
     }
     return null;
@@ -117,13 +124,14 @@ export function checkCondition(
   }
   if (node.kind === 'has' && !isNull(node.condition)) {
     if (field.kind === 'blocks') {
-      return checkBlocksHas(node.condition, field, name, meta, prefix, untrusted);
+      return checkBlocksHas(node.condition, field, name, meta, prefix, untrusted, metaOf);
     }
     return checkCondition(
       node.condition,
-      targetScope(field, name, meta),
+      targetScope(field, name, meta, metaOf),
       [...prefix, name],
       untrusted,
+      metaOf,
     );
   }
   return null;
@@ -151,6 +159,7 @@ function checkBlocksHas(
   meta: CollectionQueryMeta,
   prefix: readonly string[],
   untrusted: boolean,
+  metaOf: MetadataOf,
 ): ConditionProblem | null {
   const split = splitBlockHas(condition);
   if (!split.ok) {
@@ -181,6 +190,7 @@ function checkBlocksHas(
     blockScope(split.block, name, meta),
     [...prefix, name],
     untrusted,
+    metaOf,
   );
 }
 
@@ -247,9 +257,10 @@ export function targetScope(
   field: FieldQueryMeta,
   name: string,
   meta: CollectionQueryMeta,
+  metaOf: MetadataOf = queryMetadata,
 ): CollectionQueryMeta {
   if (field.kind === 'record' || field.kind === 'records') {
-    return queryMetadata(field.target as string);
+    return metaOf(field.target as string);
   }
   return {
     collection: `${meta.collection}.${name}`,

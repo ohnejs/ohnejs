@@ -1,8 +1,9 @@
 import type { ConditionNode, SearchParamValue } from '../../../utils/index.ts';
 import type { HTTPError } from '../../http/http-error.ts';
-import type { OrderDirection, OrderEntry } from '../ir.ts';
+import type { OrderDirection, OrderEntry, TargetReach } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ConditionInput, PopulateSpec, PopulateSubQuery } from '../untyped.ts';
+import type { MetadataOf } from '../validate-condition.ts';
 import type { QueryGuards } from './guards.ts';
 
 import {
@@ -116,6 +117,12 @@ export interface ParsedQuery {
    * The validated content locale the query reads, or `null` for the default.
    */
   locale: string | null;
+
+  /**
+   * The read reach into every collection the query populates or probes, set by `parseWireQuery`.
+   * Absent on a plain parse, whose reads cross into targets unscoped.
+   */
+  reach?: ReadonlyMap<string, TargetReach>;
 }
 
 const KNOWN_PARAMS = new Set([
@@ -156,16 +163,17 @@ export function parseQueryParams(
   params: Record<string, SearchParamValue>,
   meta: CollectionQueryMeta,
   guards: QueryGuards,
+  metaOf: MetadataOf = queryMetadata,
 ): ParsedQuery {
   for (const key of Object.keys(params)) {
     if (!KNOWN_PARAMS.has(key)) throw unknownParamError(key);
   }
   const window = parseWindow(params, guards);
   return Object.freeze({
-    where: parseWhere(params.where, meta, guards, windowBoundParams(window)),
+    where: parseWhere(params.where, meta, guards, windowBoundParams(window), metaOf),
     select: parseSelect(params.select, meta, guards),
     order: parseOrder(params.order, meta, guards),
-    populate: parsePopulate(params.populate, meta, guards),
+    populate: parsePopulate(params.populate, meta, guards, metaOf),
     ...window,
     locale: parseLocaleParam(params.locale, meta),
   });
@@ -181,14 +189,15 @@ function parseWhere(
   meta: CollectionQueryMeta,
   guards: QueryGuards,
   reserved: number,
+  metaOf: MetadataOf,
 ): ConditionInput | null {
   if (isUndefined(value)) return null;
   const parsed = parseCondition(value);
   if (!parsed.ok) throw conditionShapeError(parsed.error);
-  const problem = checkCondition(parsed.node, meta, [], true);
+  const problem = checkCondition(parsed.node, meta, [], true, metaOf);
   if (!isNull(problem)) throw problemError(problem);
   enforceGuards(parsed.node, guards, reserved);
-  checkValues(parsed.node, meta, []);
+  checkValues(parsed.node, meta, [], metaOf);
   return value as ConditionInput;
 }
 
@@ -270,9 +279,10 @@ function checkValues(
   node: ConditionNode,
   meta: CollectionQueryMeta,
   prefix: readonly string[],
+  metaOf: MetadataOf,
 ): void {
   if (node.kind === 'and' || node.kind === 'or') {
-    for (const child of node.nodes) checkValues(child, meta, prefix);
+    for (const child of node.nodes) checkValues(child, meta, prefix, metaOf);
     return;
   }
   if (node.kind === 'empty') return;
@@ -284,11 +294,11 @@ function checkValues(
     if (field.kind === 'blocks') {
       const split = splitBlockHas(node.condition);
       if (split.ok && !isNull(split.rest)) {
-        checkValues(split.rest, blockScope(split.block, name, meta), path);
+        checkValues(split.rest, blockScope(split.block, name, meta), path, metaOf);
       }
       return;
     }
-    checkValues(node.condition, targetScope(field, name, meta), path);
+    checkValues(node.condition, targetScope(field, name, meta, metaOf), path, metaOf);
     return;
   }
   if (isUndefined(node.value)) return;
@@ -390,9 +400,10 @@ function parsePopulate(
   value: SearchParamValue | undefined,
   meta: CollectionQueryMeta,
   guards: QueryGuards,
+  metaOf: MetadataOf,
 ): (string | PopulateSpec)[] {
   if (isUndefined(value)) return [];
-  return parsePopulateLevel(toArray(value), meta, 'populate', 1, guards, { nodes: 0 });
+  return parsePopulateLevel(toArray(value), meta, 'populate', 1, guards, { nodes: 0 }, metaOf);
 }
 
 /**
@@ -407,6 +418,7 @@ function parsePopulateLevel(
   depth: number,
   guards: QueryGuards,
   budget: { nodes: number },
+  metaOf: MetadataOf,
 ): (string | PopulateSpec)[] {
   if (depth > guards.maxPopulateDepth) {
     throw limitError('populateTooDeep', path, guards.maxPopulateDepth);
@@ -428,7 +440,15 @@ function parsePopulateLevel(
       const specPath = `${path}[${index}].${field}`;
       const fieldMeta = populatedRelation(field, specPath, meta);
       registerPopulateField(bare, field, false, specPath);
-      normalized[field] = parsePopulateSpec(spec, fieldMeta, specPath, depth, guards, budget);
+      normalized[field] = parsePopulateSpec(
+        spec,
+        fieldMeta,
+        specPath,
+        depth,
+        guards,
+        budget,
+        metaOf,
+      );
     }
     return normalized;
   });
@@ -446,12 +466,13 @@ function parsePopulateSpec(
   depth: number,
   guards: QueryGuards,
   budget: { nodes: number },
+  metaOf: MetadataOf,
 ): PopulateSubQuery {
   if (!isPlainObject(spec)) throw invalidSpecError(path);
   for (const key of Object.keys(spec)) {
     if (key !== 'select' && key !== 'populate') throw invalidSpecError(path);
   }
-  const target = queryMetadata(fieldMeta.target as string);
+  const target = metaOf(fieldMeta.target as string);
   const normalized: PopulateSubQuery = {};
   if (!isUndefined(spec.select)) {
     const fields = toStringList(spec.select as SearchParamValue, `${path}.select`);
@@ -478,6 +499,7 @@ function parsePopulateSpec(
       depth + 1,
       guards,
       budget,
+      metaOf,
     );
   }
   return normalized;

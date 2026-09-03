@@ -18,7 +18,7 @@ import type { CreateOutcome } from './write/create.ts';
 
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { freezeIR, type QueryIR } from './ir.ts';
+import { freezeIR, type QueryIR, readCondition, type TargetReach, type WireReach } from './ir.ts';
 import { checkQueryLocale } from './locale.ts';
 import { addPopulateEntries } from './populate.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
@@ -47,6 +47,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private limitValue: number | null = null;
   private offsetValue: number | null = null;
   private localeValue: string | null = null;
+  private wireState: WireReach | null = null;
   private joinedTx?: Transaction;
   readonly guardOverrides: Partial<QueryGuards> = {};
   private readonly meta: CollectionQueryMeta;
@@ -62,6 +63,14 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   whereAny(build: WhereGroupBuild): this {
     this.conditions.push(orGroup(build, this.meta));
+    return this;
+  }
+
+  wire(condition: ConditionInput | null, reach: ReadonlyMap<string, TargetReach>): this {
+    this.wireState = {
+      condition: isNull(condition) ? null : toConditionNode(condition, this.meta),
+      reach,
+    };
     return this;
   }
 
@@ -230,7 +239,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
    * The typed `ReadyQuery` state already gates this, so the throw catches only an untyped caller.
    */
   private requireCondition(operation: 'update' | 'delete' | 'deleteTranslation'): ConditionNode {
-    const condition = this.freeze().condition;
+    const condition = readCondition(this.freeze());
     if (isNull(condition)) {
       throw ohneError({
         title: `Cannot \`${operation}\` without a filter`,
@@ -256,6 +265,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       offset: this.offsetValue,
       populate: this.populateNodes,
       locale: this.localeValue,
+      wire: this.wireState,
     });
   }
 }

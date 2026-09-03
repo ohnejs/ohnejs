@@ -3,11 +3,12 @@ import type { QueryIR } from '../ir.ts';
 
 import { isNull, isUndefined } from '../../../utils/index.ts';
 import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { readCondition } from '../ir.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
 import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom } from '../sql/from.ts';
-import { compileWhere } from '../sql/where.ts';
+import { compileReadWhere } from '../sql/where.ts';
 import { resolveIR } from './resolve-ir.ts';
 
 /**
@@ -18,11 +19,11 @@ export async function count(ir: QueryIR): Promise<number> {
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
   const locale = effectiveLocale(ir.locale);
-  const from = compileFrom(meta, { condition: ir.condition }, locale, dialect);
+  const from = compileFrom(meta, { condition: readCondition(ir) }, locale, dialect);
   const parts = [`SELECT COUNT(*) AS "count" ${from.sql}`];
   const params: SQLValue[] = [...from.params];
-  if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect, locale);
+  const where = compileReadWhere(ir, meta, dialect, locale);
+  if (!isNull(where)) {
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }
@@ -39,11 +40,11 @@ export async function exists(ir: QueryIR): Promise<boolean> {
   const meta = queryMetadata(ir.collection);
   const dialect = useDialect();
   const locale = effectiveLocale(ir.locale);
-  const from = compileFrom(meta, { condition: ir.condition }, locale, dialect);
+  const from = compileFrom(meta, { condition: readCondition(ir) }, locale, dialect);
   const parts = [`SELECT 1 ${from.sql}`];
   const params: SQLValue[] = [...from.params];
-  if (!isNull(ir.condition)) {
-    const where = compileWhere(ir.condition, meta, dialect, locale);
+  const where = compileReadWhere(ir, meta, dialect, locale);
+  if (!isNull(where)) {
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }

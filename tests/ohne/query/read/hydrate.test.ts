@@ -370,6 +370,7 @@ describe('readable: false', () => {
       offset: null,
       populate: [],
       locale: null,
+      wire: null,
     };
     const rows = await readRows(ir, true);
     strictEqual(rows.length, 2);

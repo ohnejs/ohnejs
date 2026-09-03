@@ -1,6 +1,7 @@
 import type { CompareOperator, ConditionNode } from '../../../utils/index.ts';
 import type { SQLValue } from '../../database/adapter.ts';
 import type { Dialect, ListMembershipOperator, LogicalType } from '../../database/dialect.ts';
+import type { QueryIR, TargetReach } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
 import { isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
@@ -29,13 +30,15 @@ interface WhereScope {
 }
 
 /**
- * The per-compile state: the `_subN` alias counter and the effective locale.
+ * The per-compile state: the `_subN` alias counter, the effective locale, and the wire reach in force.
  * Every companion join and locale-scoped table binds the locale.
  * One counter threads the whole tree, so nested and self-referential relations never share an alias.
+ * `reach` is set only while a wire read's own condition compiles; a trusted condition compiles under `null`.
  */
 interface CompileContext {
   n: number;
   locale: string;
+  reach: ReadonlyMap<string, TargetReach> | null;
 }
 
 /**
@@ -57,7 +60,42 @@ export function compileWhere(
   dialect: Dialect,
   locale: string,
 ): SQLFragment {
-  const scope: WhereScope = {
+  return compileNode(node, rootScope(meta, dialect), dialect, { n: 0, locale, reach: null });
+}
+
+/**
+ * Compiles a read's `WHERE`: its trusted condition, then a wire read's own condition under its reach.
+ * The two AND together; `null` when the read has neither.
+ * The reach applies to the wire half alone, so a scope's own `has` probes stay whole.
+ */
+export function compileReadWhere(
+  ir: QueryIR,
+  meta: CollectionQueryMeta,
+  dialect: Dialect,
+  locale: string,
+): SQLFragment | null {
+  const wire = isNull(ir.wire) ? null : ir.wire.condition;
+  if (isNull(ir.condition) && isNull(wire)) return null;
+  const scope = rootScope(meta, dialect);
+  const ctx: CompileContext = { n: 0, locale, reach: null };
+  const parts: SQLFragment[] = [];
+  if (!isNull(ir.condition)) parts.push(compileNode(ir.condition, scope, dialect, ctx));
+  if (!isNull(wire) && !isNull(ir.wire)) {
+    ctx.reach = ir.wire.reach;
+    parts.push(compileNode(wire, scope, dialect, ctx));
+  }
+  if (parts.length === 1) return parts[0];
+  return {
+    sql: parts.map((part) => `(${part.sql})`).join(' AND '),
+    params: parts.flatMap((part) => part.params),
+  };
+}
+
+/**
+ * The top-level scope: bare column references over the main table and its companion.
+ */
+function rootScope(meta: CollectionQueryMeta, dialect: Dialect): WhereScope {
+  return {
     fields: meta.fields,
     self: dialect.quote(meta.table),
     ...(isUndefined(meta.companionTable)
@@ -65,7 +103,6 @@ export function compileWhere(
       : { companionSelf: dialect.quote(meta.companionTable) }),
     qualified: false,
   };
-  return compileNode(node, scope, dialect, { n: 0, locale });
 }
 
 /**
@@ -232,9 +269,11 @@ function recordExists(
   dialect: Dialect,
   ctx: CompileContext,
 ): SQLFragment {
-  const alias = dialect.quote(nextAlias(ctx));
   const target = queryMetadata(field.target as string);
-  const companion = companionJoin(target, alias, condition, dialect, ctx);
+  const reach = probeReach(target, ctx);
+  if (reach === false) return rawFragment('1 = 0');
+  const alias = dialect.quote(nextAlias(ctx));
+  const companion = companionJoin(target, alias, withReach(condition, reach), dialect, ctx);
   const from = {
     sql: `${dialect.quote(target.table)} ${alias}${companion.sql}`,
     params: companion.params,
@@ -248,7 +287,7 @@ function recordExists(
     qualified: true,
     ...(isUndefined(companion.companionSelf) ? {} : { companionSelf: companion.companionSelf }),
   };
-  return existsFragment(from, correlation, condition, inner, dialect, ctx);
+  return existsFragment(from, correlation, condition, inner, dialect, ctx, reach);
 }
 
 /**
@@ -278,10 +317,12 @@ function recordsExists(
   if (isNull(condition)) {
     return existsFragment(rawFragment(junctionFrom), correlation, null, scope, dialect, ctx);
   }
-  const targetAlias = dialect.quote(nextAlias(ctx));
   const target = queryMetadata(field.target as string);
+  const reach = probeReach(target, ctx);
+  if (reach === false) return rawFragment('1 = 0');
+  const targetAlias = dialect.quote(nextAlias(ctx));
   const join = `JOIN ${dialect.quote(target.table)} ${targetAlias} ON ${targetAlias}.${dialect.quote('UUID')} = ${junction}.${dialect.quote(targetLink)}`;
-  const companion = companionJoin(target, targetAlias, condition, dialect, ctx);
+  const companion = companionJoin(target, targetAlias, withReach(condition, reach), dialect, ctx);
   const from = { sql: `${junctionFrom} ${join}${companion.sql}`, params: companion.params };
   const inner: WhereScope = {
     fields: target.fields,
@@ -289,7 +330,45 @@ function recordsExists(
     qualified: true,
     ...(isUndefined(companion.companionSelf) ? {} : { companionSelf: companion.companionSelf }),
   };
-  return existsFragment(from, correlation, condition, inner, dialect, ctx);
+  return existsFragment(from, correlation, condition, inner, dialect, ctx, reach);
+}
+
+/**
+ * A wire read's reach into a conditioned probe's target.
+ * `null` when the compile is trusted or the reach carries no condition.
+ * `false` cuts the probe off: a target the read cannot reach, or never resolved, matches no row.
+ */
+function probeReach(
+  target: CollectionQueryMeta,
+  ctx: CompileContext,
+): ConditionNode | false | null {
+  if (isNull(ctx.reach)) return null;
+  const reach = ctx.reach.get(target.collection);
+  if (isUndefined(reach) || reach === false) return false;
+  return reach.condition;
+}
+
+/**
+ * The probe's condition with its reach ANDed in, the shape a companion-join decision reads.
+ */
+function withReach(condition: ConditionNode, reach: ConditionNode | null): ConditionNode {
+  return isNull(reach) ? condition : { kind: 'and', nodes: [condition, reach] };
+}
+
+/**
+ * Compiles a reach condition as the trusted scope it is, with the wire reach lifted for its subtree.
+ */
+function compileTrusted(
+  node: ConditionNode,
+  scope: WhereScope,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment {
+  const { reach } = ctx;
+  ctx.reach = null;
+  const fragment = compileNode(node, scope, dialect, ctx);
+  ctx.reach = reach;
+  return fragment;
 }
 
 /**
@@ -424,6 +503,7 @@ function existsFragment(
   inner: WhereScope,
   dialect: Dialect,
   ctx: CompileContext,
+  reach: ConditionNode | null = null,
 ): SQLFragment {
   if (isNull(condition)) {
     return {
@@ -432,9 +512,11 @@ function existsFragment(
     };
   }
   const cond = compileNode(condition, inner, dialect, ctx);
+  const scoped = isNull(reach) ? null : compileTrusted(reach, inner, dialect, ctx);
+  const tail = isNull(scoped) ? '' : ` AND (${scoped.sql})`;
   return {
-    sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql} AND ${cond.sql})`,
-    params: [...from.params, ...correlation.params, ...cond.params],
+    sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql} AND ${cond.sql}${tail})`,
+    params: [...from.params, ...correlation.params, ...cond.params, ...(scoped?.params ?? [])],
   };
 }
 

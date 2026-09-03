@@ -656,6 +656,7 @@ async function readMatched(
         offset: null,
         populate: [],
         locale,
+        wire: null,
       },
       keepHidden,
     );

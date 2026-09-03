@@ -181,6 +181,7 @@ async function attemptCreate(
     offset: null,
     populate: [],
     locale,
+    wire: null,
   });
   const record = rows[0];
   if (isUndefined(record)) {
