@@ -174,18 +174,18 @@ The tag must name a configured content locale - anything else is a `400` with th
 
 The URL is untrusted; your endpoint is not. `applyQuery` takes an optional scope that the request
 composes under but can never escape. A scoped `where` ANDs onto every request, a scoped `select`
-intersects (a request narrows, never widens), and a scoped `limit` caps the request's own:
+intersects (a request narrows, never widens), and a scoped `limit` caps the request's own. Parse
+against `scopedMetadata` so the fields outside the scope are hidden from the URL as well:
 
 ```ts
-applyQuery(queryUntyped('Posts'), parsed, {
-  where: { published: true },
-  select: ['title', 'body', 'author'],
-  limit: 100,
-}).findMany();
+const scope = { where: { published: true }, select: ['title', 'body', 'author'], limit: 100 };
+const parsed = parseQueryParams(useSearchParams(), scopedMetadata(meta, scope), resolveGuards());
+applyQuery(queryUntyped('Posts'), parsed, scope).findMany();
 ```
 
 Now `GET /posts` only ever reads published posts, only the three named fields, and at most 100 rows,
-whatever the URL asks for.
+whatever the URL asks for. A hidden field named in `where`, `order`, `select`, or `populate` is
+refused exactly as a field that does not exist, so the URL cannot filter or sort by it either.
 
 A scoped `locale` is a default, not a wall: it applies when the request names none, and a request's
 own `locale` wins. Locales select content, they do not protect it. `applyQuery` answers

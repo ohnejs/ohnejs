@@ -178,8 +178,10 @@ takes, keyed to the collection's fields. Every request is ANDed under it: a requ
 further, never escape.
 
 `select` names the fields the request may reach. A read returns those fields, and a request's own
-`select` intersects with them - it narrows, never widens. On an update the same list bounds the
-body: only fields inside it write, and the answered record carries the scoped fields alone.
+`select` narrows within them. A field outside them is refused in `where`, `order`, `select`, and
+`populate` exactly as a field that does not exist - `UUID` included, so name it when clients
+address rows. On an update the same list bounds the body: only fields inside it write, and the
+answered record carries the scoped fields alone.
 
 `limit` caps the rows a list read returns; the request's own `limit` can only lower it. `locale` is
 the locale a read uses when the request names none - a default, not a wall.
