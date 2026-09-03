@@ -4,8 +4,11 @@ import type {
   CollectionMeta,
   CollectionOperation,
   CollectionQueryMeta,
+  Event,
   MiddlewareKey,
   ParsedQuery,
+  PopulateSpec,
+  PopulateSubQuery,
   QueryScope,
 } from 'ohne';
 import type { Defined, SearchParamValue } from 'ohne/utils';
@@ -30,10 +33,12 @@ import {
   isArray,
   isEmpty,
   isNull,
+  isPlainObject,
   isString,
   isUndefined,
   parseCondition,
   pick,
+  toArray,
   toKebabCase,
   walkCondition,
 } from 'ohne/utils';
@@ -42,7 +47,8 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { unknownParamError } from '../../ohne/query/wire/errors.ts';
-import { requireCapability } from '../auth/capabilities.ts';
+import { requireCapability, userCan } from '../auth/capabilities.ts';
+import { useUser } from '../auth/use-user.ts';
 
 /**
  * An admitted request carries the collection and the operation's endpoint.
@@ -86,19 +92,33 @@ export async function admitCollection<O extends CollectionOperation>(
   if (endpoint.public !== true) {
     await requireCapability(`collection.${meta.name}.${operation}`);
   }
+  const response = await runMiddleware(endpoint, meta.name);
+  if (!isUndefined(response)) return { ok: false, response };
+  return { ok: true, collection: meta.name, endpoint };
+}
+
+/**
+ * Runs an endpoint's named middleware in order, exactly as route middleware do.
+ * The first value one returns is the answer; `undefined` means every middleware passed.
+ * Each records on the event; an unknown name throws - a misconfigured exposure is a `500`, never an open door.
+ */
+async function runMiddleware(
+  endpoint: Pick<CollectionEndpoint, 'middleware'>,
+  collection: string,
+): Promise<unknown> {
   const event = useEvent();
   for (const name of endpoint.middleware ?? []) {
     const middleware = useMiddleware().get(name);
     if (isUndefined(middleware)) {
       throw ohneError(
-        `Collection \`${meta.name}\` names unknown middleware \`${name}\` in its \`api\` exposure`,
+        `Collection \`${collection}\` names unknown middleware \`${name}\` in its \`api\` exposure`,
       );
     }
     event.appliedMiddleware.push(name as MiddlewareKey);
     const result = await middleware(event);
-    if (!isUndefined(result)) return { ok: false, response: result };
+    if (!isUndefined(result)) return result;
   }
-  return { ok: true, collection: meta.name, endpoint };
+  return undefined;
 }
 
 /**
@@ -114,7 +134,25 @@ export async function gateCollection(
   const admitted = await admitCollection(segment, operation);
   if (!admitted.ok) return admitted;
   const scope = await accessScope(admitted.endpoint, { operation });
+  if (operation === 'read') requestReaches().set(admitted.collection, Promise.resolve(scope));
   return { ok: true, collection: admitted.collection, scope };
+}
+
+/**
+ * The caller's read reach into a collection a wire query crosses into, memoized per request.
+ * A closed read, a guarded one the caller lacks the capability for, and a `false` verdict reach nothing.
+ * The target's named middleware run as its own read would run them; one that answers makes it unreachable.
+ * A read gate seeds its own collection's reach, so a self-crossing read resolves its scope once.
+ * The shipped read endpoints hand this to `parseWireQuery`, so a populate or `has` never widens a read.
+ */
+export function readReach(collection: string): Promise<QueryScope | false> {
+  const memo = requestReaches();
+  let reach = memo.get(collection);
+  if (isUndefined(reach)) {
+    reach = resolveReadReach(collection);
+    memo.set(collection, reach);
+  }
+  return reach;
 }
 
 /**
@@ -161,11 +199,11 @@ export async function listRecords(
   const builder = applyQuery(queryUntyped(collection), parsed, scope);
   if (isNull(parsed.page) && isNull(parsed.perPage)) {
     const records = await builder.findMany();
-    await scopeTranslations(records, collection, meta, scope);
+    await scopeTranslations(records, collection, meta, scope, parsed.populate);
     return records;
   }
   const page = await builder.paginate(parsed.page ?? 1, parsed.perPage ?? LIST_PER_PAGE);
-  await scopeTranslations(page.records, collection, meta, scope);
+  await scopeTranslations(page.records, collection, meta, scope, parsed.populate);
   return page;
 }
 
@@ -176,15 +214,46 @@ export async function listRecords(
  * That locale never lists, exactly as the translations endpoint promises.
  * Only a locale-sensitive `where` on a translatable collection probes; anything else returns at once.
  * A record without an array `_translations`, as under a narrowing `select`, stays untouched.
+ * The populated targets under `populate` narrow the same way, each under the caller's reach into it.
  */
 export async function scopeTranslations(
   records: readonly Record<string, unknown>[],
   collection: string,
   meta: CollectionQueryMeta,
   scope: QueryScope,
+  populate: readonly (string | PopulateSpec)[] = [],
 ): Promise<void> {
   const { where } = scope;
-  if (meta.translatable !== true || isUndefined(where) || !localeSensitive(where, meta)) return;
+  if (meta.translatable === true && !isUndefined(where) && localeSensitive(where, meta)) {
+    await narrowTranslations(records, collection, meta, where);
+  }
+  for (const entry of populate) {
+    const specs: [string, PopulateSubQuery][] = isString(entry)
+      ? [[entry, {}]]
+      : Object.entries(entry);
+    for (const [field, spec] of specs) {
+      const target = meta.fields[field]?.target;
+      if (!isString(target)) continue;
+      const reach = await readReach(target);
+      if (reach === false) continue;
+      const targets = records
+        .flatMap((record) => toArray(record[field] ?? []))
+        .filter(isPlainObject);
+      if (isEmpty(targets)) continue;
+      await scopeTranslations(targets, target, queryMetadata(target), reach, spec.populate ?? []);
+    }
+  }
+}
+
+/**
+ * Narrows the records' `_translations` by probing which locales the scope `where` admits each at.
+ */
+async function narrowTranslations(
+  records: readonly Record<string, unknown>[],
+  collection: string,
+  meta: CollectionQueryMeta,
+  where: Defined<QueryScope['where']>,
+): Promise<void> {
   const carrying: { record: Record<string, unknown>; uuid: string; held: string[] }[] = [];
   for (const record of records) {
     const { UUID, _translations } = record;
@@ -291,6 +360,38 @@ export function recordParams(): Record<string, SearchParamValue> {
  */
 export function assertNoParams(): void {
   for (const key of Object.keys(useSearchParams())) throw unknownParamError(key);
+}
+
+/**
+ * Each request's resolved reaches, so one collection's read resolves once however often a query crosses it.
+ */
+const reaches = new WeakMap<Event, Map<string, Promise<QueryScope | false>>>();
+
+/**
+ * The current request's reach memo, created on first use.
+ */
+function requestReaches(): Map<string, Promise<QueryScope | false>> {
+  const event = useEvent();
+  let memo = reaches.get(event);
+  if (isUndefined(memo)) {
+    memo = new Map();
+    reaches.set(event, memo);
+  }
+  return memo;
+}
+
+/**
+ * Resolves the caller's read reach into one collection through the same rules the read gate applies.
+ */
+async function resolveReadReach(collection: string): Promise<QueryScope | false> {
+  const endpoint = endpointOf(useCollections().get(collection)?.collection.api, 'read');
+  if (isUndefined(endpoint)) return false;
+  if (endpoint.public !== true) {
+    const user = await useUser();
+    if (isNull(user) || !userCan(user, `collection.${collection}.read`)) return false;
+  }
+  if (!isUndefined(await runMiddleware(endpoint, collection))) return false;
+  return resolveAccess(endpoint, { operation: 'read' });
 }
 
 /**

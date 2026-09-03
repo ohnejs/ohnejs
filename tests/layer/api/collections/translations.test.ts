@@ -62,6 +62,13 @@ useCollections().register('TrOwned', {
     fields: { title: field('text', { translatable: true }), owner: field('text') },
   },
 });
+useCollections().register('TrLinks', {
+  name: 'TrLinks',
+  collection: {
+    api: { read: 'public' },
+    fields: { label: field('text'), scoped: field('record', { collection: 'TrScoped' }) },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -103,6 +110,8 @@ const hidden = (await queryUntyped('TrScoped').createOrThrow({ title: 'Hidden', 
 const owned = (await queryUntyped('TrOwned').createOrThrow({ title: 'Mine', owner: 'me' }))
   .UUID as string;
 await queryUntyped('TrOwned').locale('de').where({ UUID: owned }).updateOrThrow({ title: 'Meins' });
+const linked = (await queryUntyped('TrLinks').createOrThrow({ label: 'L', scoped: openAtEN }))
+  .UUID as string;
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
   return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
@@ -231,5 +240,15 @@ describe('`_translations` under an access scope', () => {
     });
     deepStrictEqual(heldBy(body), { [owned]: ['en', 'de'] });
     strictEqual(queries, 2);
+  });
+});
+
+describe('populated targets under a reach', () => {
+  it("narrows a populated target's _translations to the locales its scope admits", async () => {
+    const url = `http://x.test/collections/tr-links/${linked}?populate=[scoped]`;
+    const { status, body } = await send(RECORD, url, { collection: 'tr-links', uuid: linked });
+    strictEqual(status, 200);
+    const scoped = (body as { scoped: { _translations: string[] } }).scoped;
+    deepStrictEqual(scoped._translations, ['en']);
   });
 });

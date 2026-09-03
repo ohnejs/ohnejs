@@ -143,6 +143,27 @@ useCollections().register('AccessPosts', {
   },
 });
 
+useCollections().register('AccessSecrets', {
+  name: 'AccessSecrets',
+  collection: { fields: { secret: field('text') } },
+});
+useCollections().register('AccessLinks', {
+  name: 'AccessLinks',
+  collection: {
+    api: { read: 'public' },
+    fields: {
+      label: field('text'),
+      target: field('record', { collection: 'AccessSecrets' }),
+      targets: field('records', { collection: 'AccessSecrets' }),
+      note: field('record', { collection: 'AccessNotes' }),
+      draft: field('record', { collection: 'AccessDrafts' }),
+      who: field('record', { collection: 'Users' }),
+      self: field('record', { collection: 'AccessLinks' }),
+      blocked: field('record', { collection: 'AccessBlocked' }),
+    },
+  },
+});
+
 useMiddleware().register('access-block', () => unauthorized());
 
 const dialect = new SQLiteDialect();
@@ -179,6 +200,18 @@ const otherNote = await seed('AccessNotes', { title: 'Other note', owner: other.
 const draft = await seed('AccessDrafts', { title: 'Draft', note: 'hidden' });
 const gateRow = await seed('AccessGate', { title: 'Open' });
 const contextRow = await seed('AccessContexts', { title: 'Ctx' });
+const secretRow = await seed('AccessSecrets', { secret: 'top-secret' });
+const link = await seed('AccessLinks', {
+  label: 'Link',
+  target: secretRow,
+  targets: [secretRow],
+  note: writerNote,
+  draft,
+  who: writer.uuid,
+});
+const outer = await seed('AccessLinks', { label: 'Outer', self: link });
+const blockedRow = await seed('AccessBlocked', { title: 'Blocked' });
+const gated = await seed('AccessLinks', { label: 'Gated', blocked: blockedRow });
 const writerPost = await seed('AccessPosts', {
   title: 'Post',
   author: writer.uuid,
@@ -231,6 +264,7 @@ const notes = { collection: 'access-notes' };
 const drafts = { collection: 'access-drafts' };
 const gate = { collection: 'access-gate' };
 const contextual = { collection: 'access-contexts' };
+const links = { collection: 'access-links' };
 const posts = { collection: 'access-posts' };
 
 function titlesOf(body: unknown): unknown[] {
@@ -448,5 +482,112 @@ describe('context', () => {
     });
     strictEqual(handover.status, 200);
     strictEqual((handover.body as Record<string, unknown>).author, other.uuid);
+  });
+});
+
+describe('reach', () => {
+  const record = (body: unknown): Record<string, unknown> => body as Record<string, unknown>;
+
+  it('hydrates nothing from a collection the caller cannot read', async () => {
+    const { status, body } = await call(ROUTES.read, { ...links, uuid: link }, anonymous, {
+      qs: '?populate=[target,targets,who,note]',
+    });
+    strictEqual(status, 200);
+    strictEqual(record(body).label, 'Link');
+    strictEqual(record(body).target, null);
+    deepStrictEqual(record(body).targets, []);
+    strictEqual(record(body).who, null);
+    strictEqual(record(body).note, null);
+  });
+
+  it("hydrates a target as far as the caller's own read of it reaches", async () => {
+    const asWriter = await call(ROUTES.read, { ...links, uuid: link }, writer.token, {
+      qs: '?populate=[note,who]',
+    });
+    strictEqual((record(asWriter.body).note as Record<string, unknown>).owner, writer.uuid);
+    strictEqual(record(asWriter.body).who, null);
+    const asAdmin = await call(ROUTES.read, { ...links, uuid: link }, admin.token, {
+      qs: '?populate=[who]',
+    });
+    strictEqual((record(asAdmin.body).who as Record<string, unknown>).email, 'writer@example.com');
+  });
+
+  it('narrows a populated target to its reach select and refuses a field outside it', async () => {
+    const { body } = await call(ROUTES.read, { ...links, uuid: link }, anonymous, {
+      qs: '?populate=[draft]',
+    });
+    deepStrictEqual(record(body).draft, { title: 'Draft 2' });
+    const refused = await call(ROUTES.read, { ...links, uuid: link }, anonymous, {
+      qs: '?populate=[{draft:{select:[note]}}]',
+    });
+    strictEqual(refused.status, 400);
+    deepStrictEqual(record(refused.body).data, {
+      code: 'invalidField',
+      path: 'populate[0].draft.select[0]',
+    });
+  });
+
+  it('names nothing about a target the caller cannot read, whatever the URL probes', async () => {
+    for (const qs of [
+      '?where={target:{has:{secre:{startsWith:top}}}}',
+      '?where={target:{has:{secret:{atLeast:1}}}}',
+      '?populate=[{target:{select:[secre]}}]',
+    ]) {
+      const { status, body } = await call(ROUTES.list, links, anonymous, { qs });
+      strictEqual(status, 400, qs);
+      strictEqual(record(body).message, 'query.invalidField', qs);
+    }
+  });
+
+  it("runs the target's middleware for the reach: one that answers makes it unreachable", async () => {
+    accessResolutions = 0;
+    const { status, body } = await call(ROUTES.read, { ...links, uuid: gated }, anonymous, {
+      qs: '?populate=[blocked]',
+    });
+    strictEqual(status, 200);
+    strictEqual(record(body).blocked, null);
+    strictEqual(accessResolutions, 0);
+  });
+
+  it('reaches through a second level under the same rules', async () => {
+    const { body } = await call(ROUTES.read, { ...links, uuid: outer }, writer.token, {
+      qs: '?populate=[{self:{populate:[target,note]}}]',
+    });
+    const self = record(body).self as Record<string, unknown>;
+    strictEqual(self.label, 'Link');
+    strictEqual(self.target, null);
+    strictEqual((self.note as Record<string, unknown>).owner, writer.uuid);
+  });
+
+  it('probes a target only through the rows and fields the caller reaches', async () => {
+    const hidden = await call(ROUTES.list, links, anonymous, {
+      qs: '?where={target:{has:{secret:{startsWith:top}}}}',
+    });
+    strictEqual(hidden.status, 400);
+    deepStrictEqual(record(hidden.body).data, {
+      code: 'invalidField',
+      path: 'where.target.secret',
+    });
+    const bare = await call(ROUTES.list, links, anonymous, { qs: '?where={target:{has:true}}' });
+    deepStrictEqual(titlesOf(bare.body).length, 1);
+
+    const outside = await call(ROUTES.list, links, other.token, {
+      qs: '?where={note:{has:{title:{startsWith:Writer}}}}',
+    });
+    deepStrictEqual(outside.body, []);
+    const inside = await call(ROUTES.list, links, writer.token, {
+      qs: '?where={note:{has:{title:{startsWith:Writer}}}}',
+    });
+    strictEqual((inside.body as unknown[]).length, 1);
+
+    const scoped = await call(ROUTES.list, links, anonymous, {
+      qs: '?where={draft:{has:{note:{startsWith:hid}}}}',
+    });
+    strictEqual(scoped.status, 400);
+    deepStrictEqual(record(scoped.body).data, { code: 'invalidField', path: 'where.draft.note' });
+    const visible = await call(ROUTES.list, links, anonymous, {
+      qs: '?where={draft:{has:{title:{startsWith:Dr}}}}',
+    });
+    strictEqual((visible.body as unknown[]).length, 1);
   });
 });

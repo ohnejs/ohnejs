@@ -26,6 +26,10 @@ usePrinter().configure({ stream: { write: () => true } });
 
 useCollections().register('CrudAuthors', {
   name: 'CrudAuthors',
+  collection: { api: { read: 'public' }, fields: { name: field('text') } },
+});
+useCollections().register('CrudHidden', {
+  name: 'CrudHidden',
   collection: { fields: { name: field('text') } },
 });
 useCollections().register('CrudPosts', {
@@ -326,7 +330,7 @@ describe('gate', () => {
 
   it('answers identical 404 bodies for unknown, unexposed, and closed', async () => {
     const unknown = await call(ROUTES.list, { collection: 'crud-nope' });
-    const unexposed = await call(ROUTES.list, { collection: 'crud-authors' });
+    const unexposed = await call(ROUTES.list, { collection: 'crud-hidden' });
     const closed = await call(ROUTES.create, { collection: 'crud-closed' });
     strictEqual(unknown.status, 404);
     strictEqual(unexposed.status, 404);

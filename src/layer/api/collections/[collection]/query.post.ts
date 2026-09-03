@@ -1,13 +1,18 @@
 import {
   defineHandler,
-  parseQueryParams,
+  parseWireQuery,
   queryMetadata,
   readQueryBody,
   resolveGuards,
   scopedMetadata,
 } from 'ohne';
 
-import { assertNoParams, gateCollection, listRecords } from '../../../collections-api/gate.ts';
+import {
+  assertNoParams,
+  gateCollection,
+  listRecords,
+  readReach,
+} from '../../../collections-api/gate.ts';
 
 /**
  * `POST /collections/[collection]/query`
@@ -20,10 +25,11 @@ export default defineHandler(async ({ params }) => {
   const gate = await gateCollection(params.collection, 'read');
   if (!gate.ok) return gate.response;
   assertNoParams();
-  const parsed = parseQueryParams(
+  const parsed = await parseWireQuery(
     await readQueryBody(),
     scopedMetadata(queryMetadata(gate.collection), gate.scope),
     resolveGuards(),
+    readReach,
   );
   return listRecords(gate.collection, parsed, gate.scope);
 });
