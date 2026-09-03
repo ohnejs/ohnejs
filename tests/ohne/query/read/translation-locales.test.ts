@@ -124,3 +124,27 @@ describe('translationLocales', () => {
     await rejects(() => translationLocales('TLPlain', 'missing'));
   });
 });
+
+describe('`_translations` reads through the same probe', () => {
+  it('answers per row what translationLocales answers for one record', async () => {
+    const uuid = await create('TLPosts', { title: 'Twin', views: 9 });
+    await translate(uuid, 'fr', 'Jumeau');
+    const record = await queryUntyped('TLPosts').where({ UUID: uuid }).findFirst();
+    deepStrictEqual(record?._translations, ['en', 'fr']);
+    deepStrictEqual(record?._translations, await translationLocales('TLPosts', uuid));
+  });
+
+  it('drops a locale deleteTranslation removed and lists derived-only holdings', async () => {
+    const uuid = await create('TLPosts', { title: 'Gone', views: 10 });
+    await translate(uuid, 'de', 'Weg');
+    await queryUntyped('TLPosts').locale('de').where({ UUID: uuid }).deleteTranslation();
+    const post = await queryUntyped('TLPosts')
+      .where({ UUID: uuid })
+      .select('_translations')
+      .findFirst();
+    deepStrictEqual(post, { _translations: ['en'] });
+    const note = await create('TLNotes', { name: 'twin', sections: [{ heading: 'S' }] });
+    const read = await queryUntyped('TLNotes').where({ UUID: note }).findFirst();
+    deepStrictEqual(read?._translations, ['en']);
+  });
+});

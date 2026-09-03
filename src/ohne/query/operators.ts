@@ -30,6 +30,7 @@ const operatorCache = new WeakMap<FieldQueryMeta, ReadonlySet<QueryOperator>>();
  * `isNull` requires nullability or a companion column.
  * A missing translation reads `null` whatever the option says.
  * `includes*` requires a column flagged `jsonList`.
+ * A `translations` entry takes nothing: it is read-only, addressed by `select` and `pluck` alone.
  */
 export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
   const cached = operatorCache.get(meta);
@@ -54,6 +55,7 @@ function computeOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
       'empty',
     ]);
   }
+  if (meta.kind === 'translations') return new Set<QueryOperator>();
   if (meta.kind !== 'column') return new Set<QueryOperator>(['has', 'empty']);
 
   const operators: QueryOperator[] = [];

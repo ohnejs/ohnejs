@@ -111,3 +111,14 @@ describe('allowedOperators', () => {
     });
   }
 });
+
+describe('allowedOperators on the translations entry', () => {
+  it('admits nothing: the entry is read-only, addressed by select and pluck alone', () => {
+    const entry: FieldQueryMeta = {
+      kind: 'translations',
+      nullable: false,
+      tables: ['Posts__translations'],
+    };
+    deepStrictEqual([...allowedOperators(entry)], []);
+  });
+});

@@ -1,12 +1,12 @@
-import { intersection, isUndefined } from '../../../utils/index.ts';
-import { useDatabase, useDialect } from '../../database/use-database.ts';
+import { useDialect } from '../../database/use-database.ts';
 import { ohneError } from '../../error/ohne-error.ts';
-import { queryLocales } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { loadTranslations } from './loaders/translations.ts';
 
 /**
  * Lists the locales at which one record holds a translation, in the configured locale order.
  *
+ * A one-record read of `_translations`, through the loader every row read hydrates the field with.
  * A locale holds a translation when any row exists for the record there.
  * The probe spans the companion table and every owned locale-scoped derived table.
  * Rows at a locale the configuration no longer names never surface.
@@ -22,22 +22,6 @@ export async function translationLocales(collection: string, uuid: string): Prom
       ],
     });
   }
-  const dialect = useDialect();
-  const database = useDatabase();
-  const tables = [
-    ...(isUndefined(meta.companionTable) ? [] : [meta.companionTable]),
-    ...Object.values(meta.fields)
-      .filter((field) => field.localeScoped === true && field.inverse !== true)
-      .map((field) => field.table as string),
-  ];
-  const held = new Set<string>();
-  for (const table of tables) {
-    const rows = await database.query<{ _localeCode: string }>(
-      `SELECT DISTINCT ${dialect.quote('_localeCode')} FROM ${dialect.quote(table)} ` +
-        `WHERE ${dialect.quote('_parentUUID')} = ?`,
-      [uuid],
-    );
-    for (const row of rows) held.add(row._localeCode);
-  }
-  return intersection(queryLocales().locales, [...held]);
+  const held = await loadTranslations(meta.fields._translations, [uuid], useDialect());
+  return held[uuid] ?? [];
 }

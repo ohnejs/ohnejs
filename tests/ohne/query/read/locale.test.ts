@@ -173,6 +173,7 @@ describe('locale views', () => {
     strictEqual(typeof _updatedAt, 'number');
     deepStrictEqual(rest, {
       UUID: second,
+      _translations: ['en'],
       title: null,
       subtitle: null,
       views: 50,

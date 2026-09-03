@@ -32,7 +32,8 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - `dashboard` must be an object holding only `icon`, `recordLabel`, and `table`.
  * - `dashboard.icon` must name an icon the vendored set carries.
  * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
- * - `dashboard.table.columns` must be a non-empty list naming distinct, readable, declared fields.
+ * - `dashboard.table.columns` must be a non-empty list naming distinct, readable fields.
+ * - A column is a declared field, `UUID`, `_updatedAt`, or `_translations` beside a translatable field.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -186,10 +187,7 @@ function validateCopyTranslation(
       ],
     });
   }
-  const translatable = Object.values(fields).some(
-    (instance) => instance.options.translatable === true,
-  );
-  if (!translatable) {
+  if (!hasTranslatableField(fields)) {
     throw ohneError({
       title: '`copyTranslation` needs a translatable field',
       body: [
@@ -198,6 +196,13 @@ function validateCopyTranslation(
       ],
     });
   }
+}
+
+/**
+ * Whether any declared field is `translatable`, the rule that makes the collection itself translatable.
+ */
+function hasTranslatableField(fields: Record<string, FieldInstance>): boolean {
+  return Object.values(fields).some((instance) => instance.options.translatable === true);
 }
 
 /**
@@ -304,6 +309,7 @@ const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
  * Rejects a malformed `dashboard.table` declaration.
  * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
  * An entry fails naming no field, an unknown or write-only field, a repeat, or an invalid width.
+ * `_translations` is known only beside a translatable field, so elsewhere it is the unknown-field failure.
  */
 function validateTable(
   table: unknown,
@@ -340,7 +346,12 @@ function validateTable(
       ],
     });
   }
-  const known = new Set([...Object.keys(fields), 'UUID', '_updatedAt']);
+  const known = new Set([
+    ...Object.keys(fields),
+    'UUID',
+    '_updatedAt',
+    ...(hasTranslatableField(fields) ? ['_translations'] : []),
+  ]);
   const seen = new Set<string>();
   for (const entry of columns) {
     const [name = '', ...widths] = entry.split('|').map((part) => part.trim());
@@ -354,7 +365,9 @@ function validateTable(
       throw ohneError({
         title: `\`dashboard.table.columns\` references unknown field \`${name}\``,
         body: [
-          `No field \`${name}\` is declared${scope}, and it is not \`UUID\` or \`_updatedAt\`.`,
+          name === '_translations'
+            ? `No field${scope} is \`translatable\`, so there are no translations to list.`
+            : `No field \`${name}\` is declared${scope}, and it is not \`UUID\` or \`_updatedAt\`.`,
         ],
       });
     }

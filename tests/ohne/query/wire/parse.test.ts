@@ -724,3 +724,22 @@ describe('the GET and POST transports converge on one parsed query', () => {
     });
   }
 });
+
+describe('`_translations` over the wire', () => {
+  it('is selectable', () => {
+    deepStrictEqual(parseLocalized('select=[_translations]').select, ['_translations']);
+  });
+
+  it('cannot order, populate, or filter', () => {
+    deepStrictEqual(localizedFailure('order=[_translations]'), {
+      code: 'invalidField',
+      path: 'order[0]',
+    });
+    deepStrictEqual(localizedFailure('populate=[_translations]'), {
+      code: 'invalidField',
+      path: 'populate[0]',
+    });
+    strictEqual(localizedFailure('where={_translations:en}').code, 'invalidField');
+    strictEqual(localizedFailure('where={_translations:{includes:en}}').code, 'invalidField');
+  });
+});

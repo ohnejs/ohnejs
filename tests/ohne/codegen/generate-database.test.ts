@@ -348,6 +348,9 @@ describe('generateDatabase', () => {
       ),
     );
     ok(shared.includes("posts: { records: 'Posts' };"));
+    ok(shared.includes("    _translations: 'en'[];"));
+    ok(shared.includes('    _translations: { translations: true };'));
+    strictEqual(shared.split('_translations').length - 1, 2);
 
     ok(shared.includes('    title: string | null;'));
     ok(shared.includes('    teaser: string | null;'));

@@ -147,7 +147,7 @@ describe('subselect exactness', () => {
   it('keeps the whole record when the callback names no subselect', async () => {
     const record = await first().populate('author').findFirst();
     const author = record?.author as Record<string, unknown>;
-    deepStrictEqual(Object.keys(author), ['UUID', '_updatedAt', 'name', 'email']);
+    deepStrictEqual(Object.keys(author), ['UUID', '_updatedAt', '_translations', 'name', 'email']);
   });
 });
 

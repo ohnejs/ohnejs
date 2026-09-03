@@ -32,8 +32,9 @@ export interface AccessScope<TField extends string = string> extends Omit<
 
   /**
    * The fields a request may read; a request's own `select` intersects with these, never widening.
+   * `_translations` names the locales a record is translated in; a translatable collection alone has it.
    */
-  select?: (TField | 'UUID' | '_updatedAt')[];
+  select?: (TField | 'UUID' | '_updatedAt' | '_translations')[];
 }
 
 /**
@@ -144,16 +145,21 @@ export interface CompositeIndex<TField extends string = string> {
 }
 
 /**
+ * The system fields a `table.columns` entry may name beside the declared ones.
+ * `_translations` exists on a translatable collection alone; naming it elsewhere fails at boot.
+ */
+type TableSystemField = 'UUID' | '_updatedAt' | '_translations';
+
+/**
  * One `table.columns` entry: a field name, optionally followed by its CSS widths.
  * The parts are `name`, `width`, and `minWidth`, separated by `|`; both widths are optional.
  * Spaces around a separator are trimmed, so `title | 320px` and `title|320px` are the same entry.
  */
 export type TableColumnEntry<TField extends string = string> =
   | TField
-  | 'UUID'
-  | '_updatedAt'
-  | `${TField | 'UUID' | '_updatedAt'}|${string}`
-  | `${TField | 'UUID' | '_updatedAt'} | ${string}`;
+  | TableSystemField
+  | `${TField | TableSystemField}|${string}`
+  | `${TField | TableSystemField} | ${string}`;
 
 /**
  * A collection's record-label declaration.
@@ -171,7 +177,9 @@ export interface CollectionTable<TField extends string = string> {
   /**
    * The columns the list view shows, in order, one entry per column.
    * A width is a plain CSS length or percentage; `minWidth` falls back to `256px` without a width.
+   * A translatable collection may also name `_translations`, the locales each record is translated in.
    * Omitted, the table shows the first four readable fields with `_updatedAt` closing the set.
+   * A translatable collection shows three instead, then `_translations`, then `_updatedAt`.
    *
    * @example
    * ```ts

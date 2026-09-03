@@ -126,6 +126,11 @@ const UUID_QUERY_ENTRY = '{ scalar: string; id: true }';
 const UPDATED_AT_QUERY_ENTRY = '{ scalar: number }';
 
 /**
+ * The `_translations` entry a translatable collection carries in its query-field table.
+ */
+const TRANSLATIONS_QUERY_ENTRY = '{ translations: true }';
+
+/**
  * The operations every collection contributes a `collection.<Name>.<operation>` capability for.
  */
 const CAPABILITY_OPERATIONS = ['read', 'create', 'update', 'delete'] as const;
@@ -141,6 +146,12 @@ const RECORD_UUID_DOC =
  */
 const UPDATED_AT_DOC =
   'When this record was last updated, as a Unix timestamp in milliseconds.\nMaintained automatically.';
+
+/**
+ * The doc a translatable collection's read-shape `_translations` carries.
+ */
+const TRANSLATIONS_DOC =
+  'The locales holding a translation of this record, in configured order.\nNo write accepts it.';
 
 /**
  * The doc a composite item's `UUID` carries in a read shape.
@@ -261,11 +272,16 @@ async function writeShared(
     imports,
     resolveText,
   };
+  const translatable = translatableCollections(collections, context);
+  const translations = translationsType(locales);
   const members = collections.map((collection) => ({
     name: collection.name,
     fields: [
       { name: 'UUID', type: 'string', doc: jsdocBlock(RECORD_UUID_DOC) },
       { name: '_updatedAt', type: 'number', doc: jsdocBlock(UPDATED_AT_DOC) },
+      ...(translatable.has(collection.name)
+        ? [{ name: '_translations', type: translations, doc: jsdocBlock(TRANSLATIONS_DOC) }]
+        : []),
       ...fieldShapesOf(
         { subject: `Collection \`${collection.name}\``, file: collection.file },
         collection.collection.fields,
@@ -288,6 +304,9 @@ async function writeShared(
     fields: [
       { name: 'UUID', type: UUID_QUERY_ENTRY },
       { name: '_updatedAt', type: UPDATED_AT_QUERY_ENTRY },
+      ...(translatable.has(collection.name)
+        ? [{ name: '_translations', type: TRANSLATIONS_QUERY_ENTRY }]
+        : []),
       ...queryFieldsOf(
         { subject: `Collection \`${collection.name}\``, file: collection.file },
         collection.collection.fields,
@@ -476,6 +495,39 @@ async function writeShared(
   });
   code.line('}');
   return write(dir, code);
+}
+
+/**
+ * The names of the collections holding a translatable field, by the rule the runtime metadata applies.
+ * The declared fields alone decide: an inverse junction never declares the option itself.
+ */
+function translatableCollections(
+  collections: readonly CollectedCollection[],
+  context: EmissionContext,
+): Set<string> {
+  const names = collections
+    .filter(({ name, file, collection }) =>
+      Object.entries(collection.fields).some(
+        ([field, instance]) =>
+          resolveEmissionStorage(
+            { subject: `Collection \`${name}\``, file },
+            field,
+            instance,
+            context,
+          ).options.translatable === true,
+      ),
+    )
+    .map((collection) => collection.name);
+  return new Set(names);
+}
+
+/**
+ * The read type of `_translations`: a list over the configured locale codes.
+ * A lone locale stays bare; several union inside parentheses, as a blocks list does.
+ */
+function translationsType(locales: readonly string[]): string {
+  const codes = locales.map((locale) => literalString(locale));
+  return codes.length === 1 ? `${codes[0] as string}[]` : `(${codes.join(' | ')})[]`;
 }
 
 /**

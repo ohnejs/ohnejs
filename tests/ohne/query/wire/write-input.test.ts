@@ -180,3 +180,24 @@ describe('checkWriteInput', () => {
     strictEqual(isValidationError(new Error('Validation failed: token')), false);
   });
 });
+
+useCollections().register('WIArticles', {
+  name: 'WIArticles',
+  collection: { fields: { title: field('text', { translatable: true }) } },
+});
+
+describe('`_translations` in a write body', () => {
+  it('is an unknown field on create and update', () => {
+    const articleFields = queryMetadata('WIArticles').fields;
+    for (const operation of ['create', 'update'] as const) {
+      let caught: unknown;
+      try {
+        checkWriteInput({ title: 't', _translations: ['en'] }, articleFields, operation);
+      } catch (error) {
+        caught = error;
+      }
+      if (!isValidationError(caught)) throw new Error('expected a ValidationError');
+      deepStrictEqual(caught.errors, { _translations: 'validation.unknownField' });
+    }
+  });
+});

@@ -578,3 +578,39 @@ describe('queryMetadata field flags', () => {
     strictEqual(fields.blob!.jsonList, undefined);
   });
 });
+
+describe('the `_translations` entry', () => {
+  it('follows the system pair on a translatable collection, its tables companion first', () => {
+    const fields = queryMetadata('QLocArticles').fields;
+    deepStrictEqual(Object.keys(fields).slice(0, 4), [
+      'UUID',
+      '_updatedAt',
+      '_translations',
+      'title',
+    ]);
+    deepStrictEqual(plain(fields._translations), {
+      kind: 'translations',
+      nullable: false,
+      tables: [
+        'QLocArticles__translations',
+        'QLocArticles_tags',
+        'QLocArticles_meta',
+        'QLocArticles_sections',
+      ],
+    });
+  });
+
+  it('lists derived tables alone for a collection without a companion', () => {
+    deepStrictEqual(plain(queryMetadata('QLocGalleries').fields._translations), {
+      kind: 'translations',
+      nullable: false,
+      tables: ['QLocGalleries_slides'],
+    });
+  });
+
+  it('is absent from a plain collection, an inverse-only view, and every block', () => {
+    strictEqual('_translations' in queryMetadata('QPosts').fields, false);
+    strictEqual('_translations' in queryMetadata('QLocTags').fields, false);
+    strictEqual('_translations' in blockQueryMetadata('QHero').fields, false);
+  });
+});

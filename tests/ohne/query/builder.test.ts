@@ -456,6 +456,14 @@ export async function blocks(): Promise<void> {
   });
 }
 
+export async function translations(): Promise<void> {
+  const rows = await query('Posts').select('_translations').findMany();
+  const held: ('en' | 'de')[] = rows.flatMap((row) => row._translations);
+  const plucked: ('en' | 'de')[][] = await query('Posts').pluck('_translations');
+  void held;
+  void plucked;
+}
+
 export async function locales(): Promise<void> {
   const rows = await query('Posts').locale('de').findMany();
   const localized = rows[0]!;
@@ -512,6 +520,12 @@ query('Posts').populate('author', (a) => a.populate('name'));
 query('Posts').populate('author', (a) => a.limit(1));
 // @ts-expect-error a non-relation field has no callback form either
 query('Posts').populate('title', (a) => a);
+// @ts-expect-error _translations has no equality shorthand
+query('Posts').where('_translations', ['en']);
+// @ts-expect-error _translations cannot be ordered
+query('Posts').orderBy('_translations');
+// @ts-expect-error _translations is not a relation
+query('Posts').populate('_translations');
 // @ts-expect-error unknown collection
 query('Nope');
 // @ts-expect-error update is not available before a filter narrows the query

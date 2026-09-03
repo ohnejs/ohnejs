@@ -49,6 +49,12 @@ export interface QueryFieldMeta {
   localeScoped?: true;
 
   /**
+   * Marks the translatable collection's `_translations` entry: the locales holding a translation.
+   * It carries no `scalar`, so `select` and `pluck` alone address it.
+   */
+  translations?: true;
+
+  /**
    * The target collection of a `record` foreign key, by name.
    */
   record?: string;

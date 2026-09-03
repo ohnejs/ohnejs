@@ -423,7 +423,7 @@ export type WhereBuild<M extends QueryFieldMeta> = (w: WhereFieldFresh<M>) => Wh
 
 /**
  * The equality shorthand's value type: the field's scalar, or `never` where a scalar cannot compare.
- * `records`, composite, and blocks fields have no shorthand (use `has`).
+ * `records`, composite, and blocks fields have no shorthand (use `has`); `_translations` has none at all.
  * `null` is never a value (use `isNull`).
  */
 type EqValue<M extends QueryFieldMeta> = M extends { records: string }
@@ -432,11 +432,13 @@ type EqValue<M extends QueryFieldMeta> = M extends { records: string }
     ? never
     : M extends { blocks: string }
       ? never
-      : [ScalarOf<M>] extends [never]
-        ? unknown
-        : ScalarOf<M> extends string | number | boolean
-          ? ScalarOf<M>
-          : never;
+      : M extends { translations: true }
+        ? never
+        : [ScalarOf<M>] extends [never]
+          ? unknown
+          : ScalarOf<M> extends string | number | boolean
+            ? ScalarOf<M>
+            : never;
 
 /**
  * The `where` and `whereAny` filter methods over a field table `F`, each returning `Target`.

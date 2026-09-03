@@ -7,6 +7,7 @@ import { groupBy, isNull, isUndefined } from '../../../utils/index.ts';
 import { loadBlocks } from './loaders/blocks.ts';
 import { loadChildRows } from './loaders/child.ts';
 import { loadJunction } from './loaders/records.ts';
+import { loadTranslations } from './loaders/translations.ts';
 
 /**
  * A resolver from a parent `UUID` to one field's hydrated value, precomputed over the whole rowset.
@@ -18,7 +19,7 @@ type FieldResolver = (parent: string) => unknown;
  *
  * `fields` is a collection's fields or a composite's subfields.
  * `driverRows` are the rows read from that scope's table, each carrying its fetched columns and `UUID`.
- * Column-less fields - `records` relations, composites, and `blocks` lists - load in parallel, batched.
+ * Column-less fields - relations, composites, `blocks` lists, `_translations` - load in parallel, batched.
  * Composites recurse into their own subfields, so nesting hydrates to any depth.
  * `locale` scopes the locale-scoped derived tables; nested tables scope through their parent chain.
  * Each field lands in declaration order; `select` narrows which assemble.
@@ -83,20 +84,22 @@ export async function deserializeColumn(
 
 /**
  * Whether a field's value lives outside its scope's table:
- * a `records` relation, a child composite, or a `blocks` list.
+ * a `records` relation, a child composite, a `blocks` list, or the `translations` probe.
  */
 function isColumnless(field: FieldQueryMeta): boolean {
   return (
     field.kind === 'records' ||
     field.kind === 'childOne' ||
     field.kind === 'childMany' ||
-    field.kind === 'blocks'
+    field.kind === 'blocks' ||
+    field.kind === 'translations'
   );
 }
 
 /**
  * Loads one column-less field over the rowset, returning a resolver from parent `UUID` to its value.
  * A `records` resolves to an ordered `UUID[]`; a `blocks` to its ordered `{ block, UUID, fields }` items.
+ * A `translations` resolves to the locales holding the record, in configured order, spanning every locale.
  * A composite recurses, regrouping its rows by parent.
  */
 async function resolveColumnless(
@@ -106,6 +109,10 @@ async function resolveColumnless(
   locale: string,
   keepHidden: boolean,
 ): Promise<FieldResolver> {
+  if (field.kind === 'translations') {
+    const held = await loadTranslations(field, parents, dialect);
+    return (parent) => held[parent] ?? [];
+  }
   if (field.kind === 'records') {
     const links = await loadJunction(field, parents, dialect, locale);
     return (parent) => links[parent] ?? [];

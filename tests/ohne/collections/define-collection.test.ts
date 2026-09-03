@@ -557,3 +557,24 @@ describe('defineCollection', () => {
     );
   });
 });
+
+describe('table columns and `_translations`', () => {
+  it('admits `_translations` beside a translatable field', () => {
+    const definition = defineCollection({
+      fields: { title: field('text', { translatable: true }) },
+      dashboard: { table: { columns: ['_translations | 160px', 'title'] } },
+    });
+    deepStrictEqual(definition.dashboard?.table, { columns: ['_translations | 160px', 'title'] });
+  });
+
+  it('rejects `_translations` on a collection without a translatable field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { table: { columns: ['_translations'] } },
+        }),
+      /unknown field `_translations`/,
+    );
+  });
+});

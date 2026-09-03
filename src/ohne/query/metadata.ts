@@ -36,8 +36,9 @@ export interface FieldQueryMeta {
    * How the field stores and reads.
    * A plain column, a `record` reference, a `records` relation, a child table, or a blocks wrapper.
    * `childOne` holds one child row per parent, `childMany` many.
+   * `translations` is the read-only locale list of a translatable collection, probed from its `tables`.
    */
-  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks';
+  kind: 'column' | 'record' | 'records' | 'childOne' | 'childMany' | 'blocks' | 'translations';
 
   /**
    * The registered field type, carrying the pipeline hooks; absent on the system entries.
@@ -53,7 +54,7 @@ export interface FieldQueryMeta {
   /**
    * Whether the field's value shape admits `null`.
    * Column kinds read the resolved option, `forceNullable` folded.
-   * `childOne` is always nullable; `records` and `childMany` never are.
+   * `childOne` is always nullable; `records`, `childMany`, and `translations` never are.
    */
   nullable: boolean;
 
@@ -122,6 +123,12 @@ export interface FieldQueryMeta {
   table?: string;
 
   /**
+   * The locale-scoped tables a `translations` entry probes: the companion, then every owned derived table.
+   * Their rows carry `_parentUUID` and `_localeCode`; a record holds a locale when any table lists it there.
+   */
+  tables?: readonly string[];
+
+  /**
    * The child table's own fields, its item `UUID` included; child kinds only.
    */
   subfields?: Record<string, FieldQueryMeta>;
@@ -171,7 +178,8 @@ export interface CollectionQueryMeta {
   table: string;
 
   /**
-   * Every addressable field in order: `UUID`, `_updatedAt`, then the declared fields as authored.
+   * Every addressable field in order: the system entries, then the declared fields as authored.
+   * The system entries are `UUID`, `_updatedAt`, and `_translations` on a translatable collection.
    */
   fields: Record<string, FieldQueryMeta>;
 
@@ -331,17 +339,28 @@ function uuidEntry(): FieldQueryMeta {
  * Builds one collection's metadata: the system entries, then the declared fields in order.
  * A field marked `companion` raises the companion table; any owned locale marker raises `translatable`.
  * An inverse view into a locale-scoped junction does not: the owner's option is not this collection's.
+ * A translatable collection seeds `_translations`, its `tables` the companion then every owned scoped table.
  */
 function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
+  const declared: Record<string, FieldQueryMeta> = Object.create(null);
+  addFieldEntries(declared, meta.collection.fields, meta.name, `collection \`${meta.name}\``);
+  const entries = Object.values(declared);
+  const companion = entries.some((field) => field.companion === true);
+  const tables = [
+    ...(companion ? [companionTableName(meta.name)] : []),
+    ...entries
+      .filter((field) => field.localeScoped === true && field.inverse !== true)
+      .map((field) => field.table as string),
+  ];
+  const translatable = tables.length > 0;
   const fields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
     UUID: uuidEntry(),
     _updatedAt: { kind: 'column', nullable: false, logicalType: 'integer', column: '_updatedAt' },
+    ...(translatable
+      ? { _translations: { kind: 'translations', nullable: false, tables: Object.freeze(tables) } }
+      : {}),
+    ...declared,
   });
-  addFieldEntries(fields, meta.collection.fields, meta.name, `collection \`${meta.name}\``);
-  const entries = Object.values(fields);
-  const companion = entries.some((field) => field.companion === true);
-  const translatable =
-    companion || entries.some((field) => field.localeScoped === true && field.inverse !== true);
   const compositeUniques = (meta.collection.compositeIndexes ?? [])
     .filter((entry) => entry.unique === true)
     .map((entry) => ({
