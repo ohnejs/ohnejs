@@ -134,8 +134,28 @@ export default defineRole({
 await requireCapability('billing.export');
 ```
 
-Prefix a [layer](../project/layers.md)'s capabilities with its name and they cannot collide with
-an app's own.
+A custom name needs no declaration to work, but nothing types it: codegen derives the known names
+from your collections alone, so `billing.export` does not autocomplete. Declare it yourself with
+the same `declare module` the other extension points take, in any file your `tsconfig.json`
+includes:
+
+```ts
+// capabilities.ts
+declare module 'ohne' {
+  interface KnownCapabilities {
+    'billing.read': true;
+    'billing.export': true;
+  }
+}
+```
+
+Both names now complete in `defineRole`, `requireCapability`, and `userCan`, beside the generated
+ones. The union stays open, so a name you did not declare still typechecks; the declaration buys
+completion, not rejection. A [layer](../project/layers.md) declares its names the same way, and
+codegen carries every `declare module 'ohne'` file a stacked layer ships into the app's type
+program.
+
+Prefix a layer's capabilities with its name and they cannot collide with an app's own.
 
 ## Roles across layers
 
