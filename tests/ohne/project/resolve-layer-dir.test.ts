@@ -4,7 +4,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { resolveLayerDir } from '../../../src/ohne/index.ts';
+import {
+  parseLayerSpecifier,
+  resolveLayerDir,
+  resolveLayerSubpath,
+} from '../../../src/ohne/index.ts';
+
+describe('parseLayerSpecifier', () => {
+  it('splits a scoped name from its subpath', () => {
+    deepStrictEqual(parseLayerSpecifier('@acme/kit/auth'), {
+      name: '@acme/kit',
+      subpath: './auth',
+    });
+  });
+
+  it('splits a plain name from a nested subpath', () => {
+    deepStrictEqual(parseLayerSpecifier('ohne/layers/uploads'), {
+      name: 'ohne',
+      subpath: './layers/uploads',
+    });
+  });
+
+  it('yields the root subpath for a bare name', () => {
+    deepStrictEqual(parseLayerSpecifier('@acme/base'), { name: '@acme/base', subpath: '.' });
+    deepStrictEqual(parseLayerSpecifier('ohne'), { name: 'ohne', subpath: '.' });
+  });
+});
 
 describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
   let root: string;
@@ -25,6 +50,11 @@ describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
 
     kit = writePackage('@acme/kit', { './auth': './auth/ohne.config.ts' });
     writePackage('@acme/wild', { './*': './*/ohne.config.ts' });
+    writePackage('@acme/conditional', {
+      './auth': { types: './auth/ohne.config.ts', default: './auth/ohne.config.ts' },
+    });
+    writePackage('@acme/nested', { './*': { node: { import: './*/ohne.config.ts' } } });
+    writePackage('@acme/typed', { './auth': { types: './auth/ohne.config.ts' } });
   });
 
   after(() => {
@@ -44,11 +74,59 @@ describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
     deepStrictEqual(await resolveLayerDir('@acme/wild/blog', app), join(wild, 'blog'));
   });
 
+  it('unwraps a conditional exports target', async () => {
+    const conditional = realpathSync(join(app, 'node_modules/@acme/conditional'));
+    deepStrictEqual(
+      await resolveLayerDir('@acme/conditional/auth', app),
+      join(conditional, 'auth'),
+    );
+  });
+
+  it('unwraps nested conditions behind an exports wildcard', async () => {
+    const nested = realpathSync(join(app, 'node_modules/@acme/nested'));
+    deepStrictEqual(await resolveLayerDir('@acme/nested/blog', app), join(nested, 'blog'));
+  });
+
   it('returns null when the package is not installed', async () => {
     deepStrictEqual(await resolveLayerDir('@acme/missing', app), null);
   });
 
   it('returns null when the subpath is not exported', async () => {
     deepStrictEqual(await resolveLayerDir('@acme/kit/ghost', app), null);
+  });
+
+  it('returns null when the only condition is types', async () => {
+    deepStrictEqual(await resolveLayerDir('@acme/typed/auth', app), null);
+  });
+});
+
+describe('resolveLayerSubpath', { skip: process.platform === 'win32' }, () => {
+  let root: string;
+
+  before(() => {
+    root = mkdtempSync(join(tmpdir(), 'ohne-resolve-layer-subpath-'));
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({
+        name: 'app',
+        exports: { './uploads': { default: './uploads/ohne.config.ts' } },
+      }),
+    );
+  });
+
+  after(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('resolves the root subpath to the root itself', async () => {
+    deepStrictEqual(await resolveLayerSubpath(root, '.'), root);
+  });
+
+  it('resolves an exported subpath to its config directory', async () => {
+    deepStrictEqual(await resolveLayerSubpath(root, './uploads'), join(root, 'uploads'));
+  });
+
+  it('returns null when the subpath is not exported', async () => {
+    deepStrictEqual(await resolveLayerSubpath(root, './ghost'), null);
   });
 });

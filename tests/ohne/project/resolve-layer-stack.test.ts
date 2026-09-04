@@ -10,6 +10,7 @@ interface LayerSpec {
   name: string;
   deps?: string[];
   layers?: string[];
+  exports?: unknown;
 }
 
 describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
@@ -24,7 +25,7 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     const dependencies = Object.fromEntries((spec.deps ?? []).map((dep) => [dep, '*']));
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: spec.name, type: 'module', dependencies }),
+      JSON.stringify({ name: spec.name, type: 'module', dependencies, exports: spec.exports }),
     );
     const config = spec.layers ? { layers: spec.layers } : {};
     writeFileSync(join(dir, 'ohne.config.ts'), `export default ${JSON.stringify(config)}\n`);
@@ -136,5 +137,37 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     link(consumer, 'kit2');
 
     await rejects(() => resolveLayerStack(consumer), /Layer `kit2\/ghost` cannot be used/);
+  });
+
+  it('resolves a subpath of the app itself through its own exports, once', async () => {
+    const consumer = join(root, 'self-app');
+    const uploads = join(consumer, 'uploads');
+    mkdirSync(uploads, { recursive: true });
+    writeManifest(consumer, {
+      name: 'self-app',
+      layers: ['self-app/uploads'],
+      exports: {
+        './uploads': { types: './uploads/ohne.config.ts', default: './uploads/ohne.config.ts' },
+      },
+    });
+    writeFileSync(
+      join(uploads, 'ohne.config.ts'),
+      `export default ${JSON.stringify({ layers: ['self-app'] })}\n`,
+    );
+
+    const stack = await resolveLayerStack(consumer);
+    deepStrictEqual(
+      stack.map((layer) => layer.name),
+      ['self-app/uploads', 'self-app'],
+    );
+    deepStrictEqual(stack[0].dir, uploads);
+  });
+
+  it('throws when the app lists a subpath it does not export', async () => {
+    const consumer = join(root, 'self-ghost');
+    mkdirSync(consumer, { recursive: true });
+    writeManifest(consumer, { name: 'self-ghost', layers: ['self-ghost/ghost'], exports: {} });
+
+    await rejects(() => resolveLayerStack(consumer), /Layer `self-ghost\/ghost` cannot be used/);
   });
 });

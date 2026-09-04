@@ -5,7 +5,7 @@ import { isNull, isUndefined, last, relativePath } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
-import { resolveLayerDir } from './resolve-layer-dir.ts';
+import { parseLayerSpecifier, resolveLayerDir, resolveLayerSubpath } from './resolve-layer-dir.ts';
 import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
 
 /**
@@ -35,6 +35,8 @@ export interface ResolvedLayer extends OhneLayer {
  * Only the layers reached this way are stacked - an installed layer no one lists is left out.
  * Names resolve to directories through `resolveOhneLayers`, the app's ohne dependency closure.
  * A name carrying a subpath (`@acme/kit/auth`) resolves through the package's `exports`.
+ * The package may already be in the closure, the app itself included.
+ * An app can therefore list a layer its own `package.json` exports.
  *
  * The graph is walked depth-first in post-order, so a layer is emitted before the layers that list it.
  * A layer shared by several entries is emitted once, ahead of them all.
@@ -80,28 +82,31 @@ export async function resolveLayerStack(
       defaults: {},
       strategies: {},
     };
-    for (const name of config.input.layers ?? []) {
-      const known = dirByName.get(name);
-      const dir = known ?? (await resolveLayerDir(name, layer.dir));
+    for (const specifier of config.input.layers ?? []) {
+      const { name, subpath } = parseLayerSpecifier(specifier);
+      const root = dirByName.get(name);
+      const dir = isUndefined(root)
+        ? await resolveLayerDir(specifier, layer.dir)
+        : await resolveLayerSubpath(root, subpath);
       if (isNull(dir)) {
         throw ohneError({
-          title: `Layer \`${name}\` cannot be used`,
+          title: `Layer \`${specifier}\` cannot be used`,
           body: [
-            `\`${name}\` is not installed, or its package does not export it as a layer.`,
+            `\`${specifier}\` is not installed, or its package does not export it as a layer.`,
             `It is listed by \`${layer.name}\`.`,
           ],
         });
       }
-      if (isUndefined(known) && !(await isOhneProject(dir))) {
+      if (dir !== root && !(await isOhneProject(dir))) {
         throw ohneError({
-          title: `Layer \`${name}\` cannot be used`,
+          title: `Layer \`${specifier}\` cannot be used`,
           body: [
-            `\`${name}\` resolved to \`${relativePath(process.cwd(), dir)}\`, which has no \`ohne.config.ts\`.`,
+            `\`${specifier}\` resolved to \`${relativePath(process.cwd(), dir)}\`, which has no \`ohne.config.ts\`.`,
             `It is listed by \`${layer.name}\`.`,
           ],
         });
       }
-      await walk({ name, dir });
+      await walk({ name: specifier, dir });
     }
     stack.push({ ...layer, ...config });
   }
