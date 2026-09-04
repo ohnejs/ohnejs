@@ -50,6 +50,8 @@ export { when } from './render/when.ts';
 export { defineDashboardPage } from './router/define-dashboard-page.ts';
 export { navigate, setNavigationGuard, useRoute } from './router/router.ts';
 export type { DashboardPage, RouteContext } from './router/router.ts';
+export { apiUpload } from './runtime/api-upload.ts';
+export type { UploadBody, UploadOptions } from './runtime/api-upload.ts';
 export { api, setUnauthorizedHandler } from './runtime/api.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';

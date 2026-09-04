@@ -36,6 +36,33 @@ const author = await response.json();
 
 The id's method wins over `init.method`, so the route id alone decides how the request is sent.
 
+## Uploading with progress
+
+`fetch` cannot tell you how much of a body has gone out, so `apiUpload` sends one over
+`XMLHttpRequest` instead. It takes the same route id, the bytes - a `File` is a `Blob`, so a picked
+or dropped file passes as is - and calls `onProgress` as they leave. It resolves the same
+`Response` `api` would:
+
+```ts
+import { apiUpload } from 'ohne/dashboard';
+import { ref } from 'ohne/utils';
+
+const percent = ref(0);
+
+async function send(file: File): Promise<void> {
+  const response = await apiUpload(`POST /avatars?name=${encodeURIComponent(file.name)}`, file, {
+    headers: { 'content-type': file.type },
+    onProgress: (loaded, total) => (percent.value = Math.round((loaded / total) * 100)),
+  });
+  const avatar = await response.json();
+}
+```
+
+The body arrives raw; on the server, `readRawBody` from [the request](../api/request.md#the-body)
+reads it. The base URL, the credentials, and the session check are the ones `api` applies; a
+bare-path id uploads with `POST`. Pass a `signal` to cancel: the promise rejects with an
+`AbortError`, as `fetch` does.
+
 ## Typed route ids
 
 `pnpm exec ohne prepare` generates `.ohne/browser/routes.ts`, which fills `KnownAPIRoutes` with

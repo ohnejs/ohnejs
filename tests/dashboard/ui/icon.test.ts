@@ -4,6 +4,29 @@ import { describe, it } from 'node:test';
 
 import { iconShape } from '../../../src/ohne/dashboard/icon-shapes.ts';
 
+const MEDIA = [
+  'alert-triangle',
+  'arrows-move',
+  'circle-off',
+  'cloud-upload',
+  'download',
+  'external-link',
+  'file',
+  'file-upload',
+  'focus-2',
+  'folder-open',
+  'folder-plus',
+  'forbid',
+  'library-photo',
+  'music',
+  'photo',
+  'photo-off',
+  'photo-up',
+  'replace',
+  'upload',
+  'video',
+];
+
 /**
  * The inlined table, read as text rather than imported.
  * `src/dashboard/ui/icon.ts` is browser code that touches `document`, so a Node test cannot load it.
@@ -28,5 +51,10 @@ describe('the icons the dashboard inlines', () => {
     for (const [name, shape] of inlinedShapes()) {
       ok(iconShape(name) === shape, `inlined \`${name}\` has drifted from the vendored set`);
     }
+  });
+
+  it('holds the media set, so the uploads chrome paints with the first frame', () => {
+    const inlined = inlinedShapes();
+    for (const name of MEDIA) ok(inlined.has(name), `\`${name}\` is not inlined`);
   });
 });

@@ -1,21 +1,9 @@
 import type { APIRouteID } from './known-api-routes.ts';
 
-import { isNull } from '../../utils/is/is-null.ts';
-import { parseRouteID } from '../../utils/route/parse-route-id.ts';
+import { handleUnauthorized, requestTarget } from './_request.ts';
 import { dashboardConfig } from './config.ts';
 
-let unauthorizedHandler: (() => void) | null = null;
-
-/**
- * Installs the handler `api` calls when a non-auth route answers `401`, or uninstalls it with `null`.
- * A signed-in dashboard reaching a `401` means the session expired.
- * The layer's login popup registers here to reopen sign-in in place.
- * Every `/auth/` route is excluded: their `401`s are answers, not expiries.
- * The anonymous session probe and a wrong login both speak through their own surfaces.
- */
-export function setUnauthorizedHandler(handler: (() => void) | null): void {
-  unauthorizedHandler = handler;
-}
+export { setUnauthorizedHandler } from './_request.ts';
 
 /**
  * Fetches a route from the API the dashboard is configured for.
@@ -38,12 +26,10 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
  * ```
  */
 export async function api(route: APIRouteID, init?: RequestInit): Promise<Response> {
-  const { method, path } = parseRouteID(route);
+  const { method, path, url } = requestTarget(dashboardConfig().apiURL, route);
   const request: RequestInit = { credentials: 'include', ...init };
   if (method) request.method = method;
-  const response = await fetch(`${dashboardConfig().apiURL}${path}`, request);
-  if (response.status === 401 && !path.startsWith('/auth/') && !isNull(unauthorizedHandler)) {
-    unauthorizedHandler();
-  }
+  const response = await fetch(url, request);
+  handleUnauthorized(response.status, path);
   return response;
 }
