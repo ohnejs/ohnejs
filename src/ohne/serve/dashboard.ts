@@ -17,6 +17,7 @@ import {
   isUndefined,
   joinPath,
   jsonForScript,
+  last,
   MAX_PORT,
   normalizeBasePath,
   type PageRoute,
@@ -26,6 +27,7 @@ import {
 } from '../../utils/index.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
 import { buildDashboardPageManifest } from '../dashboard/build-dashboard-page-manifest.ts';
+import { collectDashboardBoot } from '../dashboard/collect-dashboard-boot.ts';
 import { collectDashboardPages } from '../dashboard/collect-dashboard-pages.ts';
 import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
 import { iconShape } from '../dashboard/icon-shapes.ts';
@@ -112,8 +114,8 @@ const MODULE_ROOTS = ['dashboard', 'utils'].map((dir) => resolvePath(dir, SRC_RO
  * Boots the dashboard server for the project rooted at `from` and starts serving it.
  *
  * Resolves the layer stack, then serves a single-page shell on every navigation.
- * The shell injects the dashboard page manifest, scanned per request, plus an importmap.
- * It then boots the client kernel.
+ * The shell injects the page manifest and the boot file URLs, both scanned per request, plus an importmap.
+ * It then boots the client kernel, which runs every boot file before the router starts.
  * The framework kernel is served under `/m/`, each layer's dashboard modules under `/m/app/`.
  * Both are type-stripped to JavaScript: the dashboard is a pure SPA with no build step.
  *
@@ -128,7 +130,8 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
 
   const layers = stackedLayers();
   const appRoots = dashboardRoots(layers);
-  await warnMissingTSConfig(appRoots[0], from);
+  const app = last(layers);
+  if (!isUndefined(app)) await warnMissingTSConfig(appRoots[0], app.dir);
   const apiURL = resolveAPIURL();
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
@@ -137,6 +140,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
+      (await collectDashboardBoot(layers)).map((boot) => `${APP_MODULE_BASE}/${boot.module}`),
       defaultLanguage,
       reload,
     );
@@ -172,6 +176,9 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   return http;
 }
 
+/**
+ * A `GET` route the dashboard server registers itself, with no backing file or layer.
+ */
 function synthetic(pattern: string, handler: Route['handler']): Route {
   return { method: 'GET', pattern, file: '', layer: '', handler };
 }
@@ -202,6 +209,10 @@ function serveIcon({ params }: HandlerContext): string | undefined {
   return shape;
 }
 
+/**
+ * Serves one framework kernel module from `src`, type-stripped.
+ * Only the dashboard and utils subtrees are reachable; any other path, escaped or not, is a `404`.
+ */
 function serveModule({ params }: HandlerContext): Promise<string | Uint8Array | undefined> {
   const resolved = safeResolve(SRC_ROOT, params.path);
   if (isNull(resolved) || !MODULE_ROOTS.some((root) => isPathInside(resolved, root))) {
@@ -236,6 +247,9 @@ function liveReload(routes: Route[]): void {
   });
 }
 
+/**
+ * The API base URL the browser calls: `API_URL`, else `dashboard.apiURL`, else derived from `api`.
+ */
 function resolveAPIURL(): string {
   const api = useConfig().api;
   const host = useEnv().get('HOST') ?? api.host ?? 'localhost';
@@ -246,25 +260,38 @@ function resolveAPIURL(): string {
   );
 }
 
-async function warnMissingTSConfig(dashboardDir: string, from: string): Promise<void> {
+/**
+ * Warns when the app's dashboard directory exists without a `tsconfig.json`, printing one to create.
+ * Every path in it is relative to the dashboard directory, so a nested `dirs.dashboard` still resolves.
+ * The `app/*` entry names `node_modules/ohne` by path, not the resolved framework layer directory.
+ * The resolved directory is a realpath, which under pnpm is a version-pinned store path.
+ */
+async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promise<void> {
   if (!(await exists(dashboardDir))) return;
   if (await exists(joinPath(dashboardDir, 'tsconfig.json'))) return;
 
-  const codegen = await codegenDir(from);
+  const codegen = await codegenDir(appDir);
   if (isNull(codegen)) return;
 
   const buckets = relativePath(dashboardDir, codegen);
+  const framework = relativePath(
+    dashboardDir,
+    joinPath(appDir, 'node_modules/ohne/src/layer/dashboard'),
+  );
   usePrinter().warnBlock({
     title: 'Dashboard has no `tsconfig.json`',
     body: [
       'Without it the editor lacks DOM types and the generated types for dashboard code.',
       'Create a `tsconfig.json` inside it with:',
-      `{\n  "extends": "ohne/tsconfig.browser.json",\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
+      `{\n  "extends": "ohne/tsconfig.browser.json",\n  "compilerOptions": {\n    "paths": { "app/*": ["./*", "${framework}/*"] }\n  },\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
     ],
     path: relativePath(process.cwd(), dashboardDir),
   });
 }
 
+/**
+ * The canonical form of `messages.defaultLanguage`; an invalid tag fails the boot.
+ */
 function resolveDefaultLanguage(): string {
   const configured = useConfig().messages.defaultLanguage;
   const canonical = canonicalizeLanguage(configured);
@@ -277,13 +304,17 @@ function resolveDefaultLanguage(): string {
   return canonical;
 }
 
+/**
+ * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
+ */
 function shellDocument(
   apiURL: string,
   pages: PageRoute[],
+  boot: string[],
   defaultLanguage: string,
   reload: boolean,
 ): string {
-  const config = jsonForScript({ apiURL, pages, defaultLanguage });
+  const config = jsonForScript({ apiURL, pages, boot, defaultLanguage });
   const reloadClient = reload
     ? `\n    <script type="module" src="${MODULE_BASE}/dashboard/runtime/reload-client.ts"></script>`
     : '';
@@ -314,6 +345,9 @@ function shellDocument(
 `;
 }
 
+/**
+ * Starts listening and resolves with the bound address, rejecting when the port cannot be taken.
+ */
 function listen(server: Server, port: number, host?: string): Promise<AddressInfo> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error): void => reject(error);

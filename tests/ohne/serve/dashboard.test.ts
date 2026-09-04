@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 
 import { rejects, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,6 +51,12 @@ describe('serveDashboard', () => {
   async function serve(name: string): Promise<number> {
     http = await serveDashboard(makeApp(name));
     return (http.server.address() as AddressInfo).port;
+  }
+
+  function writeBoot(dir: string, name: string, mark: string): void {
+    const file = join(dir, 'dashboard', 'boot', name);
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, `export const mark = ${JSON.stringify(mark)};\n`);
   }
 
   function captureWarnings(): string[] {
@@ -254,6 +260,10 @@ describe('serveDashboard', () => {
     strictEqual(out.includes('Dashboard has no tsconfig.json'), true);
     strictEqual(out.includes('"extends": "ohne/tsconfig.browser.json"'), true);
     strictEqual(
+      out.includes('"paths": { "app/*": ["./*", "../node_modules/ohne/src/layer/dashboard/*"] }'),
+      true,
+    );
+    strictEqual(
       out.includes('"include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]'),
       true,
     );
@@ -263,13 +273,15 @@ describe('serveDashboard', () => {
     const dir = makeApp('tsconfig-dirs');
     writeFileSync(
       join(dir, 'ohne.config.ts'),
-      "export default { dirs: { dashboard: 'ui', codegen: 'generated' } }\n",
+      "export default { dirs: { dashboard: 'src/ui', codegen: 'generated' } }\n",
     );
-    mkdirSync(join(dir, 'ui'));
+    mkdirSync(join(dir, 'src', 'ui'), { recursive: true });
     const buf = captureWarnings();
     http = await serveDashboard(dir);
 
-    strictEqual(buf.join('').includes('"../generated/shared/**/*.ts"'), true);
+    const out = buf.join('');
+    strictEqual(out.includes('"../../generated/shared/**/*.ts"'), true);
+    strictEqual(out.includes('"../../node_modules/ohne/src/layer/dashboard/*"'), true);
   });
 
   it('does not warn when the dashboard tsconfig exists or the folder is absent', async () => {
@@ -299,6 +311,47 @@ describe('serveDashboard', () => {
     const mod = await req(port, '/m/app/pages/users/[id].ts');
     strictEqual(mod.status, 200);
     strictEqual(mod.headers['content-type'], 'text/javascript; charset=utf-8');
+  });
+
+  it('lists a boot file in the config and serves its module under /m/app', async () => {
+    const dir = makeApp('app-boot');
+    writeBoot(dir, 'fields.ts', 'app:fields');
+    writeBoot(dir, '_shared.ts', 'app:shared');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+
+    strictEqual((await req(port, '/')).body.includes('"boot":["/m/app/boot/fields.ts"]'), true);
+
+    const mod = await req(port, '/m/app/boot/fields.ts');
+    strictEqual(mod.status, 200);
+    strictEqual(mod.headers['content-type'], 'text/javascript; charset=utf-8');
+  });
+
+  it('lists layer boot files furthest-first and serves a shared path from the closer layer', async () => {
+    const base = makeApp('base');
+    writeBoot(base, 'slots.ts', 'base:slots');
+    writeBoot(base, 'fields.ts', 'base:fields');
+    const dir = makeApp('app-boot-layers');
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'app', type: 'module', dependencies: { base: '*' } }),
+    );
+    writeFileSync(join(dir, 'ohne.config.ts'), "export default { layers: ['base'] }\n");
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
+    writeBoot(dir, 'theme.ts', 'app:theme');
+    writeBoot(dir, 'fields.ts', 'app:fields');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+
+    strictEqual(
+      (await req(port, '/')).body.includes(
+        '"boot":["/m/app/boot/fields.ts","/m/app/boot/slots.ts","/m/app/boot/theme.ts"]',
+      ),
+      true,
+    );
+    strictEqual((await req(port, '/m/app/boot/fields.ts')).body.includes('app:fields'), true);
+    strictEqual((await req(port, '/m/app/boot/slots.ts')).body.includes('base:slots'), true);
   });
 
   it('blocks path traversal out of the app module root', async () => {

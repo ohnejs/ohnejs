@@ -104,6 +104,33 @@ The group's own `label` is its heading; omit it for a list without one. Both lab
 Collections you list nowhere trail in a final unlabeled group, and a group left with no row drops.
 Omit `menu` and the sidebar lists every accessible collection in one unlabeled group.
 
+## Boot files
+
+A dashboard boot file is a `.ts` file at the top level of `dashboard/boot/`. It runs once when the
+dashboard loads, by being imported: whatever its module body does happens before the first page
+renders. Use it for registrations the pages rely on - a field type, a piece of UI mounted for the
+whole dashboard.
+
+```ts
+// dashboard/boot/rating.ts
+import { registerFieldType } from 'ohne/dashboard';
+
+registerFieldType('rating', {
+  display: ({ value }) => () => '★'.repeat(Number(value() ?? 0)),
+});
+```
+
+There is nothing to export and nothing to call - importing the file is the whole mechanism.
+
+Within one `boot/` directory, every top-level `.ts` file runs, sorted naturally by name - `2-`
+before `10-` - and each file finishes before the next starts. Nested files are ignored, and a
+`_`-prefixed file is a helper: skipped, free to be imported by the others. An `index.ts` takes
+over: when present it is the only file that runs, and it orders the rest by importing them itself.
+
+Across [layers](../project/layers.md), the furthest layer boots first, so a base layer's field types
+are registered when your boot files run. A boot file's identity is its path: your `boot/fields.ts`
+replaces a layer's `boot/fields.ts` and runs in its place.
+
 ## What a page may import
 
 The shell injects an import map with exactly three entries:
@@ -114,7 +141,10 @@ The shell injects an import map with exactly three entries:
 
 Relative imports work too. Either way, name the full file, extension included - the browser
 resolves URLs, not packages. `app/` merges every layer's dashboard directory, closest layer first,
-so an app file shadows a layer's file at the same path.
+so an app file shadows a layer's file at the same path. The same merge lets a layer import another
+layer's dashboard files by their `app/` path - `app/components/shell.ts` resolves wherever in the
+stack the file lives. For the editor to follow, the tsconfig `paths` entry lists your own directory
+first, then each stacked layer's dashboard directory; see [type checking](#type-checking).
 
 That map is the whole boundary: the server serves only the dashboard runtime and the utils, never
 the Node framework, so browser code cannot import server code - `ohne` is not in the map, and
@@ -139,10 +169,15 @@ program. The scaffold's root `tsconfig.json` excludes `dashboard/`; the director
 ```json
 {
   "extends": "ohne/tsconfig.browser.json",
+  "compilerOptions": {
+    "paths": { "app/*": ["./*", "../node_modules/ohne/src/layer/dashboard/*"] }
+  },
   "include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]
 }
 ```
 
-`ohne/tsconfig.browser.json` brings the DOM lib; the two `../.ohne` globs bring the generated
-types - the typed `api` route ids and message keys. The dashboard server warns at boot when the
-file is missing, printing exactly this content.
+`ohne/tsconfig.browser.json` brings the DOM lib. `paths` resolves `app/` imports the way the server
+does: your own directory first, then each stacked layer's dashboard directory - add one entry per
+layer you list. The two `../.ohne` globs bring the generated types - the typed `api` route ids and
+message keys. The dashboard server warns at boot when the file is missing, printing this content
+with the paths adjusted to your `dirs`.

@@ -23,7 +23,9 @@ autocomplete in the list; a fresh name codegen has not seen yet is still accepte
 
 A name can carry a subpath. `@acme/kit/auth` resolves through the package's `exports`; the
 exported file is by convention that layer's `ohne.config.ts`, and its directory is the layer. One
-package can ship several layers as exported subfolders.
+package can ship several layers as exported subfolders. The package can be one already in your
+stack, your own app included: an app named `acme` whose `package.json` exports `./uploads` can list
+`acme/uploads`. A conditional target resolves as Node would, through `node`, `import`, or `default`.
 
 A listed layer that cannot be used - the package is not installed, the subpath is not exported, or
 the directory has no `ohne.config.ts` - fails the boot with an error naming the layer and who
@@ -55,6 +57,9 @@ The pieces then merge by identity, and the closer layer wins:
 
 - **Routes** - identity is method plus pattern: a closer `GET /posts` replaces a further one.
 - **Dashboard pages** - identity is the page's pattern.
+- **Dashboard boot files** - identity is the file's path under the dashboard directory: a closer
+  `boot/fields.ts` replaces a further one and runs in its place. See
+  [boot files](../dashboard/pages.md#boot-files).
 - **Messages** - identity is one key in one language. Merging is per key, never per file, so
   overriding one key leaves the rest of a layer's catalog in place.
 - **Collections, blocks, and field types** - identity is the name; the closer definition replaces
