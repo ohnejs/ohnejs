@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto';
 
+import { hmac } from './hmac.ts';
+
 /**
  * Computes the base64url HMAC-SHA256 tag for `value` under `secret`.
  * A non-empty `context` is folded into a derived key first, so the tag is bound to that context.
@@ -15,5 +17,5 @@ import { createHmac } from 'node:crypto';
  */
 export function hmacTag(value: string, secret: string, context: string): string {
   const key = context ? createHmac('sha256', secret).update(context).digest() : secret;
-  return createHmac('sha256', key).update(value).digest('base64url');
+  return hmac(value, key);
 }
