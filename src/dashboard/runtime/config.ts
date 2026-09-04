@@ -18,6 +18,12 @@ export interface DashboardConfig {
   pages: PageRoute[];
 
   /**
+   * Served URLs of every layer's dashboard boot files, in run order.
+   * The kernel imports each in turn before the router starts.
+   */
+  boot: string[];
+
+  /**
    * Default message language, a canonical BCP-47 tag.
    * `useDashboardLanguage` starts here, and the messages endpoint falls back to it.
    * Narrows to the generated language union once codegen has run.
