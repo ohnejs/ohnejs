@@ -23,10 +23,9 @@ import {
   untracked,
 } from 'ohne/utils';
 
-// The layer's field types must register on every signed-in page, not only where the sheet loads.
-import './cells.ts';
 import { header } from './header.ts';
 import { loginPopup } from './login-popup.ts';
+import { shellSlots } from './shell-slots.ts';
 import { sidebar } from './sidebar.ts';
 import { unsavedChangesGuard } from './unsaved-changes.ts';
 import { wrapper } from './wrapper.ts';
@@ -253,6 +252,7 @@ css`
  * The hamburger, a left-edge swipe, Escape, and a click on the receded main area all toggle it.
  * Tab cycles inside header and sidebar while it is open.
  * The sidebar's scroll position and expanded state persist across navigations.
+ * The `global` slot renderers mount beside the page column while signed in, so they never recede with it.
  */
 export function shell(content: () => Child, options: ShellOptions = {}): Child {
   effect(() => {
@@ -262,13 +262,10 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
       navigate(`/login?${stringifySearchParams({ next: location.pathname })}`);
     }
   });
+  const signedIn = (): boolean => !isNullish(sessionUser());
   const root = base([
-    wrapper(
-      when(
-        () => !isNullish(sessionUser()),
-        () => layout(content, options),
-      ),
-    ),
+    wrapper(when(signedIn, () => layout(content, options))),
+    when(signedIn, () => shellSlots('global').map((render) => render())),
     unsavedChangesGuard(),
     loginPopup(),
   ]);

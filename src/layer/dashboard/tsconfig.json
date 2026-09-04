@@ -1,4 +1,7 @@
 {
   "extends": "../../../tsconfig.browser.json",
+  "compilerOptions": {
+    "paths": { "app/*": ["./*"] }
+  },
   "include": ["**/*.ts", "../../../.ohne/shared/**/*.ts", "../../../.ohne/browser/**/*.ts"]
 }

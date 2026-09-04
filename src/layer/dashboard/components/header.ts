@@ -4,6 +4,7 @@ import { effect } from 'ohne/utils';
 import { contentLanguageSwitcher } from './content-language-switcher.ts';
 import { headerDropdownMenu } from './header-dropdown-menu.ts';
 import { logoMark } from './logo.ts';
+import { shellSlots } from './shell-slots.ts';
 
 /**
  * Options for `header`.
@@ -91,7 +92,7 @@ css`
 /**
  * The header row.
  * It holds the home logo link, the under-`1024px` hamburger, and the right-side cluster.
- * The cluster is the content-language switcher and the kebab user menu.
+ * The cluster is the content-language switcher, the `header` slot renderers, and the kebab user menu.
  * The hamburger renders accented while the sidebar overlay is expanded, outline otherwise.
  */
 export function header(options: HeaderOptions): HTMLElement {
@@ -119,6 +120,12 @@ export function header(options: HeaderOptions): HTMLElement {
     'div',
     { class: 'o-header-container o-has-sidebar' },
     h('div', { class: 'o-header-left' }, home, menuButton),
-    h('div', { class: 'o-header-right' }, contentLanguageSwitcher(), headerDropdownMenu()),
+    h(
+      'div',
+      { class: 'o-header-right' },
+      contentLanguageSwitcher(),
+      shellSlots('header').map((render) => render()),
+      headerDropdownMenu(),
+    ),
   );
 }
