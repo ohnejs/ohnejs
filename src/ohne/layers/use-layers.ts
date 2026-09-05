@@ -1,9 +1,22 @@
 import type { Config } from './config.ts';
+import type { LayerCodegen } from './define-layer.ts';
 
 import { createLayerRegistry, type LayerRegistry } from '../../utils/index.ts';
 import { BASE_STRATEGIES } from './config.ts';
 
-const registry: LayerRegistry<Config> = createLayerRegistry<Config>({
+/**
+ * What a registered layer carries besides its config.
+ * `loadLayers` fills it from each layer's `ohne.layer.ts`; a layer added by hand may leave it out.
+ */
+export interface LayerExtras {
+  /**
+   * Files the layer generates into the app's codegen directory.
+   * `generateLayerCodegen` writes them once the stack has loaded.
+   */
+  codegen?: LayerCodegen[];
+}
+
+const registry: LayerRegistry<Config, LayerExtras> = createLayerRegistry<Config, LayerExtras>({
   strategies: BASE_STRATEGIES,
 });
 
@@ -20,6 +33,7 @@ const registry: LayerRegistry<Config> = createLayerRegistry<Config>({
  * Override per-field via `setStrategy`; the framework seeds `BASE_STRATEGIES` at creation.
  *
  * Extend the typed shape via `declare module 'ohne'`.
+ * Each layer also carries `LayerExtras`: the `codegen` its `ohne.layer.ts` declares.
  *
  * @example
  * ```ts
@@ -38,6 +52,6 @@ const registry: LayerRegistry<Config> = createLayerRegistry<Config>({
  * layers.resolve() // -> { tags: ['custom', 'core'] }
  * ```
  */
-export function useLayers(): LayerRegistry<Config> {
+export function useLayers(): LayerRegistry<Config, LayerExtras> {
   return registry;
 }

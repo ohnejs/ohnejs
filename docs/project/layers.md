@@ -158,6 +158,8 @@ plain objects combine per key and everything else is replaced by the closer laye
 - `'replace'` - the closer value wins entirely; a layer that omits the key still inherits it.
 - `'own'` - never inherited: each layer's value applies to that layer alone.
 - `'defaults'` - recurse into objects per key and arrays per index; the longer side fills the rest.
+- `'assign'` - objects merge one level: keys union, the closer layer's value replaces per key without
+  recursing into it; non-objects behave like `'replace'`.
 - `'concat'` - arrays only: the closer layer's items first, then the lower layers'.
 - `'concat-unique'` - `'concat'`, then duplicates are dropped.
 
@@ -165,3 +167,57 @@ The augmentation reaches consumers on its own: codegen finds every file in a sta
 contains `declare module 'ohne'` and imports it into the app's type program, so your keys
 autocomplete in a consuming `ohne.config.ts` exactly like the built-ins. Values the layer sets for
 itself still belong in its `ohne.config.ts` - `ohne.layer.ts` describes only what it owns.
+
+## Generating files
+
+A layer can also write into the consuming app's codegen directory. Declare the files under
+`codegen` in `ohne.layer.ts`: each entry names a bucket, a file, and a `code` function that returns
+the content. `code` runs once the whole stack has loaded, so it can read the merged config - the way
+to type something only the app's own `ohne.config.ts` decides.
+
+```ts
+// ohne.layer.ts
+import { defineLayer, useConfig } from 'ohne';
+
+declare module 'ohne' {
+  interface Config {
+    blog?: {
+      categories?: string[];
+    };
+  }
+}
+
+export default defineLayer({
+  defaults: { blog: { categories: [] } },
+  codegen: [
+    {
+      bucket: 'node',
+      file: 'blog-categories.ts',
+      code: () =>
+        [
+          "import type {} from '@acme/blog';",
+          '',
+          "declare module '@acme/blog' {",
+          '  interface KnownCategories {',
+          ...useConfig().blog.categories.map((name) => `    ${name}: true;`),
+          '  }',
+          '}',
+          '',
+        ].join('\n'),
+    },
+  ],
+});
+```
+
+`KnownCategories` is an interface the layer exports empty. The generated file fills it with the
+app's values, so a field typed `keyof KnownCategories` autocompletes the categories that app
+configured - the same way ohne types messages and collections.
+
+The file lands in the app's codegen directory, `.ohne/node/blog-categories.ts` by default, with the
+ohne banner on its first line. It is rewritten only when its content changes and pruned once the
+layer stops declaring it.
+
+`bucket` picks which TypeScript program sees the file: `node` for `ohne` augmentations and server
+types, `browser` for `ohne/dashboard` ones, `shared` for pure types both include. `file` is a plain
+`.ts` name inside the bucket. Two entries in the stack cannot claim the same one; the error names
+both layers.

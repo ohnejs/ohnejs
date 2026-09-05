@@ -9,6 +9,7 @@ import {
 } from '../../../utils/index.ts';
 import { generateBrowserTSConfig } from '../../codegen/generate-browser-tsconfig.ts';
 import { generateDatabase } from '../../codegen/generate-database.ts';
+import { generateLayerCodegen } from '../../codegen/generate-layer-codegen.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
 import { generateMessages } from '../../codegen/generate-messages.ts';
 import { generateMiddleware } from '../../codegen/generate-middleware.ts';
@@ -61,6 +62,7 @@ export const prepareCommand = defineCommand({
           generateMessages(cwd),
           generateDatabase(cwd),
           generateRoles(cwd),
+          generateLayerCodegen(cwd),
         ])
       )
         .flat()

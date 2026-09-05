@@ -18,6 +18,7 @@ import { bootLayers } from '../boot/boot-layers.ts';
 import { bannerVersion, codegenDir } from '../codegen/codegen-dir.ts';
 import { generateBrowserTSConfig } from '../codegen/generate-browser-tsconfig.ts';
 import { generateDatabase } from '../codegen/generate-database.ts';
+import { generateLayerCodegen } from '../codegen/generate-layer-codegen.ts';
 import { generateLayerName } from '../codegen/generate-layer-name.ts';
 import { generateMessages } from '../codegen/generate-messages.ts';
 import { generateMiddleware } from '../codegen/generate-middleware.ts';
@@ -90,6 +91,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
         generateMessages(from),
         generateDatabase(from),
         generateRoles(from),
+        generateLayerCodegen(from),
       ])
     )
       .flat()

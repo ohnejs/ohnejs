@@ -8,7 +8,7 @@ import { useLayers } from './use-layers.ts';
 /**
  * Resolves the layer stack and registers it into `useLayers`, replacing any prior stack.
  *
- * Each layer registers its own `input`, `defaults`, and `strategies`, furthest-first.
+ * Each layer registers its own `input`, `defaults`, `strategies`, and `codegen`, furthest-first.
  * Closer layers override and the app wins.
  * The framework `DEFAULTS` merge into the furthest layer's own defaults, flooring the whole stack.
  * Any layer is still free to override them.
@@ -44,6 +44,7 @@ export async function loadLayers(
       name: layer.name,
       input: layer.input,
       defaults: i === 0 ? merge(DEFAULTS, layer.defaults) : layer.defaults,
+      codegen: layer.codegen,
     });
   });
   return stack;

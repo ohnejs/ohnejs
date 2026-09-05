@@ -1,6 +1,6 @@
 import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
-import type { LayerDefinition } from '../layers/define-layer.ts';
+import type { LayerCodegen, LayerDefinition } from '../layers/define-layer.ts';
 
 import { exists, importDefault } from '../../utils/fs/index.ts';
 import { joinPath } from '../../utils/index.ts';
@@ -8,7 +8,7 @@ import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
 
 /**
  * A directory's config, split by ownership.
- * `input` is what the project sets; `defaults` and `strategies` are what it owns.
+ * `input` is what the project sets; `defaults`, `strategies`, and `codegen` are what it owns.
  */
 export interface LayerConfig {
   /**
@@ -25,6 +25,11 @@ export interface LayerConfig {
    * Merge strategies from the project's `ohne.layer.ts`, or `{}` when there is none.
    */
   strategies: LayerStrategies;
+
+  /**
+   * Codegen entries from the project's `ohne.layer.ts`, or `[]` when there is none.
+   */
+  codegen: LayerCodegen[];
 }
 
 /**
@@ -46,7 +51,7 @@ export interface LayerLoadOptions {
  *
  * This is the shallow read the cascade walks on - it reads one directory, never merges.
  * Returns `null` when the directory has no `ohne.config.ts`: it is not an ohne project.
- * `ohne.layer.ts` is optional; its absence yields empty `defaults` and `strategies`.
+ * `ohne.layer.ts` is optional; its absence yields empty `defaults`, `strategies`, and `codegen`.
  * A config that fails to import propagates, so a syntax error in it is not swallowed.
  *
  * Pass `fresh` to re-import past the module cache, so an edited config is read again.
@@ -54,7 +59,7 @@ export interface LayerLoadOptions {
  * @example
  * ```ts
  * await readLayerConfig('/srv/app')
- * // -> { input: { layers: ['@acme/base'] }, defaults: {}, strategies: {} }
+ * // -> { input: { layers: ['@acme/base'] }, defaults: {}, strategies: {}, codegen: [] }
  *
  * await readLayerConfig('/srv/not-a-layer') // -> null
  * ```
@@ -74,5 +79,10 @@ export async function readLayerConfig(
     ? await importDefault<LayerDefinition>(layerFile, { fresh })
     : null;
 
-  return { input, defaults: layer?.defaults ?? {}, strategies: layer?.strategies ?? {} };
+  return {
+    input,
+    defaults: layer?.defaults ?? {},
+    strategies: layer?.strategies ?? {},
+    codegen: layer?.codegen ?? [],
+  };
 }

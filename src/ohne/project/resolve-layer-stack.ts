@@ -1,5 +1,6 @@
 import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
+import type { LayerCodegen } from '../layers/define-layer.ts';
 
 import { isNull, isUndefined, last, relativePath } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
@@ -26,6 +27,11 @@ export interface ResolvedLayer extends OhneLayer {
    * Merge strategies the layer owns, from its `ohne.layer.ts`, or `{}` when it ships none.
    */
   strategies: LayerStrategies;
+
+  /**
+   * Files the layer generates, from its `ohne.layer.ts`, or `[]` when it ships none.
+   */
+  codegen: LayerCodegen[];
 }
 
 /**
@@ -82,6 +88,7 @@ export async function resolveLayerStack(
       input: {},
       defaults: {},
       strategies: {},
+      codegen: [],
     };
     for (const specifier of config.input.layers ?? []) {
       const { name, subpath } = parseLayerSpecifier(specifier);
