@@ -22,6 +22,7 @@ import type { UploadRecord } from '../../uploads/types.ts';
 
 import { runBatched } from './_batch.ts';
 import { useUploadsT } from './_messages.ts';
+import { versionedURL } from './media-details-state.ts';
 import {
   DEFAULT_ORDER,
   MEDIA_REFRESH,
@@ -158,9 +159,11 @@ export function resolveUploadURL(record: UploadRecord): string | undefined {
 
 /**
  * The absolute URL an image tile shows: the signed `thumbnail` when a service renders one, else the original.
+ * `_updatedAt` rides along as a version, so a replaced file's tile refetches instead of showing cached bytes.
  */
 export function previewURL(record: UploadRecord): string {
-  return new URL(record.thumbnail ?? record.url ?? '', dashboardConfig().apiURL).href;
+  const url = new URL(record.thumbnail ?? record.url ?? '', dashboardConfig().apiURL).href;
+  return versionedURL(url, record._updatedAt);
 }
 
 /**
