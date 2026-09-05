@@ -47,6 +47,12 @@ export interface MediaFileTileOptions {
   onPick?(record: UploadRecord, event: MouseEvent): void;
 
   /**
+   * Called on a plain click to open the file's details over the live page, instead of following the link.
+   * `onPick` and multiple selection take precedence.
+   */
+  onDetails?(record: UploadRecord): void;
+
+  /**
    * Tightens the corner captions, for a smaller tile.
    *
    * @default
@@ -240,7 +246,9 @@ export function detailsHref(record: UploadRecord, bare: boolean): string {
 }
 
 /**
- * The click a file tile's link takes: a plain click picks or toggles instead of following the link.
+ * The click a file tile's link takes.
+ * A plain click picks, toggles, or opens the details through `onDetails` instead of following the link.
+ * Following the link re-renders the page through the router, so a modified click alone still does that.
  */
 export function fileTileClick(
   record: () => UploadRecord,
@@ -248,7 +256,9 @@ export function fileTileClick(
   event: MouseEvent,
 ): void {
   const multiple = options.selectionMode === 'multiple';
-  if (!(options.onPick || multiple) || event.metaKey || event.ctrlKey || event.shiftKey) return;
+  const opens = options.onPick || multiple ? undefined : options.onDetails;
+  if (!(options.onPick || multiple || opens) || event.metaKey || event.ctrlKey || event.shiftKey)
+    return;
   event.preventDefault();
   if (options.disabled?.().value) return;
   const current = record();
@@ -257,6 +267,7 @@ export function fileTileClick(
     if (options.view.isSelected(current.UUID)) options.view.deselect(current);
     else options.view.select(current);
   }
+  opens?.(current);
 }
 
 /**

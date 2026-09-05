@@ -219,6 +219,7 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
           selectionMode: mode,
           disabled,
           onPick: options.onPick,
+          onDetails: options.actions?.onDetails,
         });
 
   const checkboxEl = (): HTMLElement => {
