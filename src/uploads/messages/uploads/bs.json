@@ -1,0 +1,166 @@
+{
+  "dashboard": {
+    "abort": "Prekini",
+    "aborted": "Prekinuto",
+    "bytes": "{count, plural, one {# bajt} few {# bajta} other {# bajtova}}",
+    "completed": "Završeno",
+    "copied": "Kopirano",
+    "copyURL": "Kopiraj URL",
+    "deleteConfirm": "Da li zaista želite obrisati `{name}`?",
+    "deleteFolderNote": "Brisanje foldera briše i sve što se nalazi u njemu.",
+    "deleteSelectedConfirm": "Da li zaista želite obrisati {count, plural, one {# stavku} few {# stavke} other {# stavki}}?",
+    "deleted": "{count, plural, one {# stavka obrisana} few {# stavke obrisane} other {# stavki obrisano}}",
+    "description": "Opis",
+    "details": "Detalji",
+    "dimensions": "Dimenzije",
+    "download": "Preuzmi",
+    "dropToUpload": "Ispustite datoteke bilo gdje da ih postavite",
+    "failed": "Neuspješno",
+    "file": "Datoteka",
+    "fileName": "Naziv datoteke",
+    "fileNameHint": "Naziv datoteke bit će pretvoren u format prikladan za URL (npr. `My File` postaje `my-file`).",
+    "fileNamePlaceholder": "npr. my-file",
+    "fileNotFound": "Datoteka nije pronađena",
+    "fileReplaced": "Datoteka zamijenjena",
+    "fileSize": "Veličina datoteke",
+    "fileType": "Tip datoteke",
+    "fileURL": "URL datoteke",
+    "files": "Datoteke",
+    "focalPoint": "Fokusna tačka",
+    "focalPointHint": "Kliknite na sliku da postavite fokusnu tačku.",
+    "folder": "Folder",
+    "folderCreateFailed": "Došlo je do greške pri kreiranju foldera",
+    "folderCreated": "Folder `{name}` je kreiran",
+    "folderEmpty": "Folder je prazan",
+    "folderName": "Naziv foldera",
+    "folderNameHint": "Naziv foldera bit će pretvoren u format prikladan za URL (npr. `My Folder` postaje `my-folder`).",
+    "folderNamePlaceholder": "npr. my-folder",
+    "folders": "Folderi",
+    "hide": "Sakrij",
+    "image": "Slika",
+    "imageNotFound": "Slika nije pronađena",
+    "itemsConflict": "Neke stavke već postoje na odredištu",
+    "media": "Mediji",
+    "mediaLibrary": "Medijska biblioteka",
+    "move": "Premjesti",
+    "moveConflictConfirm": "{count, plural, one {# stavka već postoji na odredištu i bit će preskočena.} few {# stavke već postoje na odredištu i bit će preskočene.} other {# stavki već postoji na odredištu i bit će preskočeno.}} Premjestiti ostatak?",
+    "moveInto": "Premjesti u `{directory}`",
+    "moveTo": "Premjesti u",
+    "moved": "{count, plural, one {# stavka premještena} few {# stavke premještene} other {# stavki premješteno}}",
+    "name": "Naziv",
+    "newFolder": "Novi folder",
+    "noDescription": "Bez opisa",
+    "noFolders": "Nema foldera u koje se odabir može premjestiti",
+    "noPermission": "Nemate dozvolu za pristup medijskoj biblioteci",
+    "noUploads": "Nema pronađenih datoteka",
+    "notAllowedHere": "Ovdje nije dozvoljeno",
+    "nothingSelected": "Ništa nije odabrano",
+    "openInNewTab": "Otvori u novoj kartici",
+    "pending": "Na čekanju",
+    "pixels": "{width} x {height} piksela",
+    "rename": "Preimenuj",
+    "renameFailed": "Došlo je do greške pri preimenovanju",
+    "renameFile": "Preimenuj datoteku",
+    "renameFolder": "Preimenuj folder",
+    "renamed": "`{from}` preimenovano u `{to}`",
+    "replace": "Zamijeni",
+    "replaceFile": "Zamijeni datoteku",
+    "rootFolder": "Korijenski folder",
+    "searchByName": "Pretraži po nazivu",
+    "selectFile": "Odaberi datoteku",
+    "selectImage": "Odaberi sliku",
+    "selected": "{count, plural, one {# stavka odabrana} few {# stavke odabrane} other {# stavki odabrano}}",
+    "subfolder": "Novi podfolder",
+    "upload": "Postavi",
+    "uploadHistory": "Historija postavljanja",
+    "uploadedBy": "Postavio",
+    "uploadedOn": "Postavljeno",
+    "uploading": "Postavljanje"
+  },
+  "errors": {
+    "contentMismatch": "Sadržaj datoteke je `{detected}`, a ne `{type}`",
+    "extensionChange": "Ekstenzija datoteke se ne može mijenjati",
+    "fileTooLarge": "Datoteka može imati najviše `{max}`",
+    "fileTooSmall": "Datoteka mora imati najmanje `{min}`",
+    "folderIntoItself": "Folder se ne može premjestiti u samog sebe",
+    "maxHeight": "Slika može biti visoka najviše `{max}` piksela",
+    "maxWidth": "Slika može biti široka najviše `{max}` piksela",
+    "minHeight": "Slika mora biti visoka najmanje `{min}` piksela",
+    "minWidth": "Slika mora biti široka najmanje `{min}` piksela",
+    "notAFile": "Ovo je folder, a ne datoteka",
+    "notAnImage": "Datoteka nije slika",
+    "notSVG": "Datoteka nije SVG slika",
+    "typeNotAllowed": "Tip datoteke `{type}` nije dozvoljen"
+  },
+  "fields": {
+    "kind": {
+      "label": "Vrsta",
+      "description": "Da li je ovaj zapis datoteka ili folder."
+    },
+    "directory": {
+      "label": "Folder",
+      "description": "Putanja foldera u kojem se ovaj zapis nalazi, prazna u korijenu."
+    },
+    "name": {
+      "label": "Naziv",
+      "description": "Naziv unutar foldera, kao slug; datoteka zadržava svoju ekstenziju malim slovima."
+    },
+    "type": {
+      "label": "Tip",
+      "description": "Tip medija, izveden iz ekstenzije datoteke; folder ga nema."
+    },
+    "size": {
+      "label": "Veličina",
+      "description": "Veličina pohranjene datoteke u bajtima; folder je nema."
+    },
+    "hash": {
+      "label": "Hash",
+      "description": "SHA-256 hash pohranjenih bajtova; služi kao ETag i otkriva duplikate."
+    },
+    "width": {
+      "label": "Širina",
+      "description": "Širina slike u pikselima, s primijenjenom EXIF orijentacijom."
+    },
+    "height": {
+      "label": "Visina",
+      "description": "Visina slike u pikselima, s primijenjenom EXIF orijentacijom."
+    },
+    "description": {
+      "label": "Opis",
+      "description": "Alternativni tekst prikazan svugdje gdje se datoteka pojavljuje, po jeziku."
+    },
+    "focalX": {
+      "label": "Fokusna tačka X",
+      "description": "Horizontalni položaj oko kojeg se slika izrezuje, od 0 lijevo do 1 desno."
+    },
+    "focalY": {
+      "label": "Fokusna tačka Y",
+      "description": "Vertikalni položaj oko kojeg se slika izrezuje, od 0 gore do 1 dolje."
+    },
+    "author": {
+      "label": "Postavio",
+      "description": "Korisnik koji je postavio datoteku ili kreirao folder."
+    },
+    "uploadedAt": {
+      "label": "Postavljeno",
+      "description": "Kada je datoteka postavljena ili folder kreiran."
+    }
+  },
+  "journal": {
+    "op": {
+      "label": "Operacija",
+      "description": "Efekat na pohrani koji treba izvršiti, premještanje ili brisanje."
+    },
+    "from": {
+      "label": "Od",
+      "description": "Putanja na koju se efekat odnosi; za folder sve ispod njega."
+    },
+    "to": {
+      "label": "Do",
+      "description": "Odredište premještanja; prazno pri brisanju."
+    }
+  },
+  "menu": {
+    "media": "Mediji"
+  }
+}

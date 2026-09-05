@@ -1,0 +1,865 @@
+import { loadPage } from 'app/components/collection-table-data.ts';
+import { activeContentLocale } from 'app/components/content-language-switcher.ts';
+import { historyButtons } from 'app/components/history-buttons.ts';
+import { History, unsavedChanges } from 'app/components/history.ts';
+import {
+  api,
+  apiUpload,
+  attachTooltip,
+  button,
+  type ButtonOptions,
+  type Child,
+  createFieldForm,
+  css,
+  dashboardMeta,
+  fallbackLabel,
+  field,
+  type FieldForm,
+  fieldLabel,
+  fieldMessage,
+  h,
+  icon,
+  type IconName,
+  labelOf,
+  numberInput,
+  popup,
+  type Popup,
+  type PopupClose,
+  type Props,
+  tab,
+  tabs,
+  textInput,
+  toast,
+  useDashboardLanguage,
+  useHotkeys,
+  useRoute,
+  when,
+} from 'ohne/dashboard';
+import {
+  effect,
+  first,
+  formatBytes,
+  hasKey,
+  isEmpty,
+  isNull,
+  isString,
+  isUndefined,
+  onCleanup,
+  parseSearchParams,
+  ref,
+  type Ref,
+  sleep,
+  stringifySearchParams,
+  untracked,
+} from 'ohne/utils';
+
+import type { UploadRecord } from '../../uploads/types.ts';
+
+import { useUploadsT } from './_messages.ts';
+import { readWireError } from './_wire-error.ts';
+import {
+  type DetailsState,
+  type DetailsTab,
+  detailsPatch,
+  detailsStateOf,
+  focalPercent,
+  focalPointAt,
+  formatUploadedOn,
+  isSmallPreview,
+  previewKindOf,
+  versionedURL,
+} from './media-details-state.ts';
+import { mediaFileName } from './media-file-name.ts';
+import {
+  confirmDeleteUploads,
+  refreshMedia,
+  resolveUploadURL,
+  uploadsCollection,
+  uploadsPermissions,
+} from './media-library-data.ts';
+
+/**
+ * Options for `mediaDetailsPopup`.
+ */
+export interface MediaDetailsPopupOptions {
+  /**
+   * Called with the answered record after a save or a replaced file.
+   */
+  onUpdated?(record: UploadRecord): void;
+
+  /**
+   * Called with the record once the footer's Delete has removed it.
+   */
+  onDeleted?(record: UploadRecord): void;
+
+  /**
+   * Called when the popup asks to close, with its animated close function.
+   * The caller awaits it and then disposes the region that created the popup.
+   */
+  onClose(close: PopupClose): void;
+}
+
+type WriteOutcome =
+  | { kind: 'saved'; record: UploadRecord }
+  | { kind: 'invalid'; errors: Readonly<Record<string, string>>; message: string }
+  | { kind: 'gone' }
+  | { kind: 'unreachable' }
+  | { kind: 'writeFailed' };
+
+const JSON_HEADERS = { 'content-type': 'application/json' };
+
+const OCTET_STREAM = 'application/octet-stream';
+
+const COPIED_FOR = 2000;
+
+const COMPACT_FOOTER_WIDTH = 480;
+
+const CHECKER_LIGHT =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA5SURBVHgB7dGxEQAgDELRxDHYfzVYIzoChYXnQf3vNTTJKWMAnKxWXV7AgC+APWdOKMnJckrAP8ENTFgK0Z64q28AAAAASUVORK5CYII=';
+
+const CHECKER_DARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA/SURBVHgB7dOhEQAgDAPAwGFrmAEGYP+dMB0AVoio6PUSnXuTS1v7PBBxv0wNHcERKDADONgHmE2qp1EElgQ/ufgHd9nZw0oAAAAASUVORK5CYII=';
+
+const detailsSignal = ref(0);
+
+css`
+  .o-media-details-fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-inline-size: auto;
+  }
+
+  .o-media-details {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .o-media-details-preview {
+    flex: 1;
+    width: 16rem;
+  }
+
+  .o-media-details-preview-centered {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .o-media-details-preview > * {
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid hsl(var(--ohne-border));
+    border-radius: calc(var(--ohne-radius) - 0.125rem);
+  }
+
+  .o-media-details-preview * {
+    display: block;
+  }
+
+  .o-media-details-preview-image {
+    background-image: url('${CHECKER_LIGHT}');
+    background-color: hsl(var(--ohne-background));
+    transition: var(--ohne-transition);
+    transition-property: box-shadow;
+  }
+
+  .dark .o-media-details-preview-image {
+    background-image: url('${CHECKER_DARK}');
+  }
+
+  .o-media-details-image-frame {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .o-media-details-focal-surface .o-media-details-image-frame {
+    cursor: crosshair;
+  }
+
+  .o-media-details-focal-blank {
+    width: 3.25rem;
+  }
+
+  .o-media-details-focal-marker {
+    position: absolute;
+    font-size: 1.5rem;
+    line-height: 0;
+    color: #fff;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+  }
+
+  .o-media-details-fields {
+    flex-shrink: 0;
+    width: 20rem;
+  }
+
+  .o-media-details-fields:only-child {
+    width: 100%;
+  }
+
+  .o-media-details-fields .ohne-tabs-content:not(:first-child) {
+    margin-top: 0.75rem;
+  }
+
+  .o-media-details-field a {
+    text-decoration: none;
+  }
+
+  .o-media-details-field + .o-media-details-field {
+    margin-top: 1rem;
+  }
+
+  .o-media-details-field .ohne-field-label {
+    margin-bottom: 0.25em;
+    color: hsl(var(--ohne-muted-foreground));
+  }
+
+  .o-media-details-url {
+    --ohne-padding: 0.5rem;
+    position: relative;
+    margin-top: 0.5em;
+  }
+
+  .o-media-details-url-code {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: calc(var(--ohne-padding) - 0.0625rem) var(--ohne-padding);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--ohne-foreground) / 0.25) transparent;
+    background-color: hsl(var(--ohne-card));
+    border-width: 1px;
+    border-radius: var(--ohne-radius);
+    outline: none;
+    font-family: var(--ohne-font-mono);
+    font-size: calc((1rem + var(--ohne-size) * 0.125rem) - 0.0625rem);
+    white-space: nowrap;
+  }
+
+  .o-media-details-url-copy {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    z-index: 1;
+    display: none;
+    min-width: 0;
+    max-height: calc(100% - 1em);
+    aspect-ratio: 1;
+  }
+
+  .o-media-details-url:hover .o-media-details-url-copy {
+    --ohne-background: var(--ohne-card);
+    display: inline-flex;
+  }
+
+  @media (max-width: 600px) {
+    .o-media-details {
+      flex-direction: column;
+    }
+
+    .o-media-details-preview,
+    .o-media-details-fields {
+      width: 100%;
+    }
+  }
+`;
+
+/**
+ * Reads the `details` query parameter, reactively: the deep-linked file's `UUID`, or `undefined`.
+ * Both `setDetailsQueryParam` writes and full navigations refresh the read.
+ */
+export function detailsQueryParam(): string | undefined {
+  useRoute();
+  void detailsSignal.value;
+  const value = parseSearchParams(location.search).details;
+  return isString(value) ? value : undefined;
+}
+
+/**
+ * Writes the `details` query parameter into history, or removes it when `uuid` is `null`.
+ * It deliberately bypasses the router: the popup opens over the LIVE page, and the grid is not rebuilt.
+ * Removing an absent parameter is a no-op, so a stale close never pushes an entry.
+ */
+export function setDetailsQueryParam(uuid: string | null): void {
+  const params = parseSearchParams(location.search);
+  if (isNull(uuid) && isUndefined(params.details)) return;
+  const query = stringifySearchParams({ ...params, details: uuid ?? undefined });
+  history.pushState(
+    null,
+    '',
+    location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
+  );
+  detailsSignal.value += 1;
+}
+
+/**
+ * Loads one upload by `UUID`, its `description` read at `locale`.
+ * Resolves `null` when no such row exists and `undefined` when the read failed.
+ */
+export async function loadUpload(
+  uuid: string,
+  locale?: string,
+): Promise<UploadRecord | null | undefined> {
+  const body: Record<string, unknown> = { where: { UUID: uuid }, page: 1, perPage: 1 };
+  if (!isUndefined(locale)) body.locale = locale;
+  const page = await loadPage('uploads', body);
+  if (isUndefined(page)) return undefined;
+  const [first] = page.records;
+  return isUndefined(first) ? null : (first as unknown as UploadRecord);
+}
+
+/**
+ * The file details popup, deep-linked by `?details=<uuid>`.
+ *
+ * A displayable image or a playable video previews on the left; the tabs sit beside it.
+ * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
+ * Description edits the alt text at the content locale with undo and redo over a `History`.
+ * Clicking an image preview sets the focal point, shown as a marker and saved with the description.
+ * Cmd/Ctrl+S saves and closes; a `422` lands on the control and raises the tab's error bubble.
+ * Closing is dirty-guarded through the `unsavedChanges` prompt.
+ * The footer deletes after confirmation and replaces the file's bytes through a hidden file input.
+ * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
+ */
+export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPopupOptions): Popup {
+  const t = useUploadsT();
+  const language = useDashboardLanguage();
+  const collection = uploadsCollection();
+  const { canUpdate, canDelete } = uploadsPermissions();
+  const preview = previewKindOf(record);
+  const image = preview === 'image';
+  const current = ref(record);
+  const busy = ref(false);
+  const activeTab = ref<DetailsTab>('details');
+  const unplaced = ref('');
+  const seed = detailsStateOf(record);
+  const focal = ref<Pick<DetailsState, 'focalX' | 'focalY'>>({
+    focalX: seed.focalX,
+    focalY: seed.focalY,
+  });
+  const edits = new History<DetailsState>().push(seed);
+  const descriptionField = collection?.fields.find((entry) => entry.name === 'description');
+
+  const buildForm = (state: DetailsState): FieldForm | undefined =>
+    isUndefined(descriptionField)
+      ? undefined
+      : createFieldForm(
+          [descriptionField],
+          { description: state.description },
+          {
+            mode: 'edit',
+            path: '',
+            readOnly: !canUpdate,
+            readOnlyRows: true,
+            language: () => activeContentLocale() ?? language.value,
+            onInput: () => {
+              const state = currentState();
+              if (!isUndefined(state)) void edits.pushDebounced(state);
+            },
+          },
+        );
+  const form = ref(buildForm(seed));
+  onCleanup(() => form.value?.dispose());
+  onCleanup(() => edits.clear());
+
+  const currentState = (): DetailsState | undefined => {
+    const reading = form.value?.read();
+    if (!isUndefined(reading?.errors)) return undefined;
+    const value = (reading?.value ?? {}) as Partial<DetailsState>;
+    return {
+      description: hasKey(value, 'description')
+        ? (value.description ?? null)
+        : current.value.description,
+      ...focal.value,
+    };
+  };
+
+  const restore = (state: DetailsState): void => {
+    form.value?.dispose();
+    form.value = buildForm(state);
+    focal.value = { focalX: state.focalX, focalY: state.focalY };
+  };
+
+  const setFocal = (focalX: number | null, focalY: number | null): void => {
+    focal.value = { focalX, focalY };
+    const state = currentState();
+    if (!isUndefined(state)) edits.push(state);
+  };
+
+  const errored = (): boolean => (form.value?.errored() ?? false) || unplaced.value !== '';
+
+  const save = async (): Promise<void> => {
+    if (busy.value || !canUpdate) return;
+    const reading = form.value?.read();
+    if (!isUndefined(reading?.errors)) {
+      form.value?.focusError();
+      return;
+    }
+    const state = currentState();
+    if (isUndefined(state)) return;
+    busy.value = true;
+    const outcome = await writeDetails(
+      current.value.UUID,
+      detailsPatch(state, image),
+      activeContentLocale(),
+    );
+    busy.value = false;
+    if (outcome.kind === 'saved') {
+      const next = detailsStateOf(outcome.record);
+      current.value = outcome.record;
+      form.value?.rebase({ description: next.description });
+      focal.value = { focalX: next.focalX, focalY: next.focalY };
+      edits.push(next).setOriginalState(next);
+      unplaced.value = '';
+      refreshMedia();
+      toast(t('dashboard.saved'), { type: 'success' });
+      options.onUpdated?.(outcome.record);
+      void close(true);
+      return;
+    }
+    if (outcome.kind === 'invalid') {
+      unplaced.value = isEmpty(outcome.errors)
+        ? outcome.message
+        : (form.value?.setErrors(outcome.errors) ?? outcome.message);
+      toast(
+        t('dashboard.foundErrors', { count: Math.max(1, Object.keys(outcome.errors).length) }),
+        {
+          type: 'error',
+        },
+      );
+      return;
+    }
+    if (outcome.kind === 'gone') {
+      toast(t('dashboard.record.gone'), { type: 'error' });
+      void close(true);
+      return;
+    }
+    toast(t(outcome.kind === 'unreachable' ? 'dashboard.unreachable' : 'dashboard.writeFailed'), {
+      type: 'error',
+    });
+  };
+
+  const remove = async (): Promise<void> => {
+    if (busy.value) return;
+    await confirmDeleteUploads([current.value]);
+    const still = await loadUpload(current.value.UUID, activeContentLocale());
+    if (isNull(still)) {
+      options.onDeleted?.(current.value);
+      void close(true);
+    }
+  };
+
+  const fileInput = h('input', {
+    hidden: true,
+    type: 'file',
+    accept: record.type ?? undefined,
+    onChange: () => {
+      const [file] = fileInput.files ?? [];
+      fileInput.value = '';
+      if (!isUndefined(file)) void replace(file);
+    },
+  }) as HTMLInputElement;
+
+  const replace = async (file: File): Promise<void> => {
+    busy.value = true;
+    try {
+      const response = await apiUpload(`POST /uploads/${current.value.UUID}/replace`, file, {
+        headers: { 'content-type': file.type || OCTET_STREAM },
+      });
+      if (response.ok) {
+        current.value = (await response.json()) as UploadRecord;
+        refreshMedia();
+        toast(t('uploads.dashboard.fileReplaced'), { type: 'success' });
+        options.onUpdated?.(current.value);
+      } else {
+        toast((await readWireError(response)).message, { type: 'error' });
+      }
+    } catch {
+      toast(t('dashboard.unreachable'), { type: 'error' });
+    } finally {
+      busy.value = false;
+    }
+  };
+
+  const close = async (force = false): Promise<void> => {
+    if (force || !edits.isDirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+      edits.clear();
+      options.onClose(handle.close);
+    }
+  };
+
+  const url = (): string => resolveUploadURL(current.value) ?? '';
+  const src = (): string => versionedURL(url(), current.value._updatedAt);
+  const hasFocal = (): boolean => !isNull(focal.value.focalX) && !isNull(focal.value.focalY);
+
+  const imageFrame = (): HTMLElement => {
+    const props: Props = { alt: () => current.value.description ?? '', src, draggable: 'false' };
+    if (canUpdate) {
+      props.onClick = (event: MouseEvent) => {
+        const { focalX, focalY } = focalPointAt(
+          event.offsetX,
+          event.offsetY,
+          img.clientWidth,
+          img.clientHeight,
+        );
+        setFocal(focalX, focalY);
+      };
+    }
+    const img = h('img', props);
+    const marker = when(hasFocal, () =>
+      h(
+        'span',
+        {
+          class: 'o-media-details-focal-marker',
+          style: () =>
+            `left: ${focalPercent(focal.value.focalX ?? 0)}; top: ${focalPercent(focal.value.focalY ?? 0)}`,
+        },
+        icon('focus-2'),
+      ),
+    );
+    return h('span', { class: 'o-media-details-image-frame' }, img, canUpdate ? marker : null);
+  };
+
+  const previewEl =
+    preview === 'image'
+      ? h(
+          'div',
+          {
+            class: () =>
+              'o-media-details-preview' +
+              (isSmallPreview(current.value) ? ' o-media-details-preview-centered' : ''),
+          },
+          canUpdate
+            ? h(
+                'div',
+                { class: 'o-media-details-preview-image o-media-details-focal-surface' },
+                imageFrame(),
+              )
+            : h(
+                'a',
+                { href: url, target: '_blank', class: 'o-media-details-preview-image' },
+                imageFrame(),
+              ),
+        )
+      : preview === 'video'
+        ? h(
+            'div',
+            { class: 'o-media-details-preview' },
+            h('video', { src, controls: true, playsinline: true }),
+          )
+        : null;
+
+  const row = (label: () => string, ...content: Child[]): HTMLElement =>
+    h(
+      'div',
+      { class: 'o-media-details-field' },
+      fieldLabel(h('span', { class: 'ohne-label' }, label)),
+      ...content,
+    );
+
+  const authorRow = (): Child => {
+    const author = record.author;
+    if (isNull(author)) return null;
+    const target = collection?.fields.find((entry) => entry.name === 'author')?.target ?? 'Users';
+    const users = untracked(dashboardMeta)?.collections.find((entry) => entry.name === target);
+    const label = (): string => labelOf(target, author) ?? fallbackLabel(author);
+    const readable = !isUndefined(users) && users.operations.read?.allowed === true;
+    return row(
+      () => t('uploads.dashboard.uploadedBy'),
+      readable
+        ? h('a', { href: `/collections/${users.segment}/${author}`, target: '_blank' }, label)
+        : h('div', null, label),
+    );
+  };
+
+  const urlRow = (): HTMLElement => {
+    const copied = ref(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const copy = button(() => icon(copied.value ? 'clipboard-check' : 'clipboard'), {
+      size: -2,
+      variant: 'outline',
+      class: 'o-media-details-url-copy',
+      onClick: () =>
+        void navigator.clipboard
+          ?.writeText(url())
+          .then(() => {
+            copied.value = true;
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+              copied.value = false;
+            }, COPIED_FOR);
+          })
+          .catch(() => undefined),
+    });
+    onCleanup(() => clearTimeout(timer));
+    onCleanup(
+      attachTooltip(
+        copy,
+        () => t(copied.value ? 'uploads.dashboard.copied' : 'uploads.dashboard.copyURL'),
+        { hideOnClick: false },
+      ),
+    );
+    return h(
+      'div',
+      { class: 'o-media-details-url' },
+      h('code', { class: 'o-media-details-url-code', tabindex: '-1' }, url),
+      copy,
+    );
+  };
+
+  const detailsPanel = (): Child => [
+    row(
+      () => t('uploads.dashboard.uploadedOn'),
+      h('div', null, () => formatUploadedOn(language.value, current.value.uploadedAt)),
+    ),
+    authorRow(),
+    row(
+      () => t('uploads.dashboard.fileType'),
+      h('div', null, () => current.value.type ?? ''),
+    ),
+    row(
+      () => t('uploads.dashboard.fileSize'),
+      h(
+        'div',
+        null,
+        () => formatBytes(current.value.size ?? 0),
+        ' ',
+        h(
+          'span',
+          { class: 'ohne-muted' },
+          () => `(${t('uploads.dashboard.bytes', { count: current.value.size ?? 0 })})`,
+        ),
+      ),
+    ),
+    when(
+      () => image && !isNull(current.value.width) && !isNull(current.value.height),
+      () =>
+        row(
+          () => t('uploads.dashboard.dimensions'),
+          h('div', null, () =>
+            t('uploads.dashboard.pixels', {
+              width: current.value.width ?? 0,
+              height: current.value.height ?? 0,
+            }),
+          ),
+        ),
+    ),
+    row(() => t('uploads.dashboard.fileURL'), urlRow()),
+  ];
+
+  const focalRow = (): HTMLElement => {
+    const clear = button(icon('x'), {
+      variant: 'outline',
+      onClick: () => setFocal(null, null),
+    });
+    onCleanup(attachTooltip(clear, () => t('dashboard.clear')));
+    const percentX = ref(0);
+    const percentY = ref(0);
+    effect(() => {
+      percentX.value = Math.round((focal.value.focalX ?? 0) * 100);
+      percentY.value = Math.round((focal.value.focalY ?? 0) * 100);
+    });
+    const axis = (model: Ref<number>): HTMLElement =>
+      numberInput(model, {
+        min: 0,
+        max: 100,
+        suffix: '%',
+        autoWidth: true,
+        disabled: () => !canUpdate,
+        onCommit: () => setFocal(percentX.value / 100, percentY.value / 100),
+      });
+    const blank = (): HTMLElement =>
+      h(
+        'span',
+        { class: 'o-media-details-focal-blank' },
+        textInput(ref(''), { placeholder: '-', disabled: () => true }),
+      );
+    const times = (): HTMLElement => h('span', { class: 'ohne-muted' }, '×');
+    return field([
+      fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.focalPoint'))),
+      h(
+        'div',
+        { class: 'o-media-details-focal ohne-row' },
+        when(
+          hasFocal,
+          () => [axis(percentX), times(), axis(percentY)],
+          () => [blank(), times(), blank()],
+        ),
+        when(
+          () => canUpdate && hasFocal(),
+          () => clear,
+        ),
+      ),
+      canUpdate ? fieldMessage(() => t('uploads.dashboard.focalPointHint')) : null,
+    ]);
+  };
+
+  const descriptionPanel = (): Child => [
+    form.value?.render(),
+    image ? focalRow() : null,
+    when(
+      () => unplaced.value !== '',
+      () => fieldMessage(() => unplaced.value, { error: () => true }),
+    ),
+  ];
+
+  const detailsLabel = (): string => t('uploads.dashboard.details');
+  const descriptionLabel = (): string => t('uploads.dashboard.description');
+  const tabsEl = tabs<DetailsTab>(
+    () => [tab('details', detailsPanel), tab('description', descriptionPanel)],
+    {
+      list: () => [
+        { name: 'details', label: detailsLabel },
+        {
+          name: 'description',
+          label: descriptionLabel,
+          bubble: errored()
+            ? {
+                content: '1',
+                tooltip: t('dashboard.foundErrors', { count: 1 }),
+                variant: 'destructive',
+              }
+            : undefined,
+        },
+      ],
+      active: () => activeTab.value,
+      onChange: (next) => {
+        activeTab.value = next;
+      },
+    },
+  );
+
+  const title = mediaFileName(() => current.value.name, { title: true });
+  title.classList.add('ohne-medium');
+  const headerClose = button(icon('x'), {
+    size: -2,
+    variant: 'ghost',
+    class: 'ohne-ml-auto',
+    onClick: () => void close(),
+  });
+  effect(() => {
+    headerClose.title = t('dashboard.close');
+  });
+
+  const compact = ref(false);
+  const footerButton = (glyph: IconName, label: () => string, options: ButtonOptions): Child =>
+    when(
+      () => compact.value,
+      () => {
+        const el = button(icon(glyph), options);
+        onCleanup(attachTooltip(el, label));
+        return el;
+      },
+      () => button([h('span', null, label), icon(glyph)], options),
+    );
+  const deleteButton = footerButton('trash-x', () => t('dashboard.delete'), {
+    variant: 'outline',
+    destructiveHover: true,
+    disabled: () => busy.value,
+    onClick: () => void remove(),
+  });
+  const replaceButton = footerButton('replace', () => t('uploads.dashboard.replaceFile'), {
+    variant: 'outline',
+    disabled: () => busy.value,
+    onClick: () => fileInput.click(),
+  });
+  const saveButton = button(() => t('dashboard.save'), {
+    variant: 'primary',
+    class: 'ohne-ml-auto',
+    disabled: () => busy.value,
+    onClick: () => void save(),
+  });
+  const closeButton = button(() => t('dashboard.close'), {
+    variant: 'outline',
+    class: 'ohne-ml-auto',
+    onClick: () => void close(),
+  });
+
+  const footerEl = h(
+    'div',
+    { class: 'ohne-row' },
+    canDelete ? deleteButton : null,
+    canUpdate ? [replaceButton, fileInput] : null,
+    canUpdate ? historyButtons(edits, (state) => restore(state as DetailsState)) : null,
+    when(
+      () => edits.isDirty.value,
+      () => saveButton,
+      () => closeButton,
+    ),
+  );
+  const footerSize = new ResizeObserver((entries) => {
+    compact.value = (first(entries)?.contentRect.width ?? Infinity) < COMPACT_FOOTER_WIDTH;
+  });
+  footerSize.observe(footerEl);
+  onCleanup(() => footerSize.disconnect());
+
+  const handle = popup(
+    h(
+      'fieldset',
+      { class: 'o-media-details-fieldset', disabled: () => busy.value },
+      h(
+        'div',
+        { class: 'o-media-details' },
+        previewEl,
+        h('div', { class: 'o-media-details-fields' }, tabsEl),
+      ),
+    ),
+    {
+      size: -1,
+      width: isNull(preview) ? '32rem' : '64rem',
+      fullHeight: 'auto',
+      header: h('div', { class: 'ohne-row' }, title, headerClose),
+      footer: footerEl,
+      onClose: () => void close(),
+    },
+  );
+
+  if (canUpdate) {
+    const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
+    setTimeout(() => {
+      hotkeys.isListening.value = true;
+      hotkeys.listen('save', (event) => {
+        event.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) active.blur();
+        setTimeout(() => void save());
+      });
+    });
+  }
+
+  return handle;
+}
+
+/**
+ * Sends the details `PATCH`, retrying once on a busy `503`, exactly as a collection's field write.
+ * A given `locale` rides the URL, so the description lands at that content locale.
+ */
+async function writeDetails(
+  uuid: string,
+  body: Record<string, unknown>,
+  locale?: string,
+): Promise<WriteOutcome> {
+  const suffix = isUndefined(locale) ? '' : `?${stringifySearchParams({ locale })}`;
+  const send = (): Promise<Response> =>
+    api(`PATCH /uploads/${uuid}${suffix}`, { headers: JSON_HEADERS, body: JSON.stringify(body) });
+  try {
+    let response = await send();
+    if (response.status === 503) {
+      await sleep(1000);
+      response = await send();
+    }
+    if (response.ok) return { kind: 'saved', record: (await response.json()) as UploadRecord };
+    if (response.status === 422) {
+      const { errors, message } = await readWireError(response);
+      return { kind: 'invalid', errors, message };
+    }
+    if (response.status === 404) return { kind: 'gone' };
+    return { kind: 'writeFailed' };
+  } catch {
+    return { kind: 'unreachable' };
+  }
+}

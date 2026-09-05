@@ -35,6 +35,10 @@
       "default": "./src/dashboard/index.ts"
     },
     "./register": "./src/ohne/runtime/register.js",
+    "./uploads": {
+      "types": "./src/uploads/index.ts",
+      "default": "./src/uploads/index.ts"
+    },
     "./utils": {
       "types": "./src/utils/index.ts",
       "default": "./src/utils/index.ts"
@@ -89,7 +93,7 @@
     "serve:api": "node src/ohne/cli/bin.js serve api",
     "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
     "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test \"tests/**/*.test.ts\"",
-    "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json && tsc -p src/layer/dashboard/tsconfig.json",
+    "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json && tsc -p src/layer/dashboard/tsconfig.json && tsc -p src/uploads/dashboard/tsconfig.json",
     "vendor:icons": "node scripts/vendor-icons.ts"
   },
   "devDependencies": {

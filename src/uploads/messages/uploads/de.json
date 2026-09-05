@@ -1,0 +1,166 @@
+{
+  "dashboard": {
+    "abort": "Abbrechen",
+    "aborted": "Abgebrochen",
+    "bytes": "{count, plural, one {# Byte} other {# Bytes}}",
+    "completed": "Abgeschlossen",
+    "copied": "Kopiert",
+    "copyURL": "URL kopieren",
+    "deleteConfirm": "`{name}` wirklich löschen?",
+    "deleteFolderNote": "Beim Löschen eines Ordners wird auch alles darin gelöscht.",
+    "deleteSelectedConfirm": "Wirklich {count, plural, one {# Element} other {# Elemente}} löschen?",
+    "deleted": "{count, plural, one {# Element gelöscht} other {# Elemente gelöscht}}",
+    "description": "Beschreibung",
+    "details": "Details",
+    "dimensions": "Abmessungen",
+    "download": "Herunterladen",
+    "dropToUpload": "Dateien zum Hochladen irgendwo ablegen",
+    "failed": "Fehlgeschlagen",
+    "file": "Datei",
+    "fileName": "Dateiname",
+    "fileNameHint": "Der Dateiname wird in ein URL-freundliches Format umgewandelt (z. B. wird aus `My File` `my-file`).",
+    "fileNamePlaceholder": "z. B. my-file",
+    "fileNotFound": "Datei nicht gefunden",
+    "fileReplaced": "Datei ersetzt",
+    "fileSize": "Dateigröße",
+    "fileType": "Dateityp",
+    "fileURL": "Datei-URL",
+    "files": "Dateien",
+    "focalPoint": "Fokuspunkt",
+    "focalPointHint": "Klicke auf das Bild, um den Fokuspunkt zu setzen.",
+    "folder": "Ordner",
+    "folderCreateFailed": "Beim Erstellen des Ordners ist ein Fehler aufgetreten",
+    "folderCreated": "Ordner `{name}` wurde erstellt",
+    "folderEmpty": "Der Ordner ist leer",
+    "folderName": "Ordnername",
+    "folderNameHint": "Der Ordnername wird in ein URL-freundliches Format umgewandelt (z. B. wird aus `My Folder` `my-folder`).",
+    "folderNamePlaceholder": "z. B. my-folder",
+    "folders": "Ordner",
+    "hide": "Ausblenden",
+    "image": "Bild",
+    "imageNotFound": "Bild nicht gefunden",
+    "itemsConflict": "Einige Elemente existieren am Ziel bereits",
+    "media": "Medien",
+    "mediaLibrary": "Medienbibliothek",
+    "move": "Verschieben",
+    "moveConflictConfirm": "{count, plural, one {# Element existiert am Ziel bereits und wird übersprungen.} other {# Elemente existieren am Ziel bereits und werden übersprungen.}} Den Rest verschieben?",
+    "moveInto": "Nach `{directory}` verschieben",
+    "moveTo": "Verschieben nach",
+    "moved": "{count, plural, one {# Element verschoben} other {# Elemente verschoben}}",
+    "name": "Name",
+    "newFolder": "Neuer Ordner",
+    "noDescription": "Keine Beschreibung",
+    "noFolders": "Es gibt keine Ordner, in die die Auswahl verschoben werden kann",
+    "noPermission": "Du hast keine Berechtigung, auf die Medienbibliothek zuzugreifen",
+    "noUploads": "Keine Uploads gefunden",
+    "notAllowedHere": "Hier nicht erlaubt",
+    "nothingSelected": "Nichts ausgewählt",
+    "openInNewTab": "In neuem Tab öffnen",
+    "pending": "Ausstehend",
+    "pixels": "{width} x {height} Pixel",
+    "rename": "Umbenennen",
+    "renameFailed": "Beim Umbenennen ist ein Fehler aufgetreten",
+    "renameFile": "Datei umbenennen",
+    "renameFolder": "Ordner umbenennen",
+    "renamed": "`{from}` in `{to}` umbenannt",
+    "replace": "Ersetzen",
+    "replaceFile": "Datei ersetzen",
+    "rootFolder": "Stammordner",
+    "searchByName": "Nach Namen suchen",
+    "selectFile": "Datei auswählen",
+    "selectImage": "Bild auswählen",
+    "selected": "{count, plural, one {# Element ausgewählt} other {# Elemente ausgewählt}}",
+    "subfolder": "Neuer Unterordner",
+    "upload": "Hochladen",
+    "uploadHistory": "Upload-Verlauf",
+    "uploadedBy": "Hochgeladen von",
+    "uploadedOn": "Hochgeladen am",
+    "uploading": "Wird hochgeladen"
+  },
+  "errors": {
+    "contentMismatch": "Der Dateiinhalt ist `{detected}`, nicht `{type}`",
+    "extensionChange": "Die Dateiendung kann nicht geändert werden",
+    "fileTooLarge": "Die Datei darf höchstens `{max}` groß sein",
+    "fileTooSmall": "Die Datei muss mindestens `{min}` groß sein",
+    "folderIntoItself": "Ein Ordner kann nicht in sich selbst verschoben werden",
+    "maxHeight": "Das Bild darf höchstens `{max}` Pixel hoch sein",
+    "maxWidth": "Das Bild darf höchstens `{max}` Pixel breit sein",
+    "minHeight": "Das Bild muss mindestens `{min}` Pixel hoch sein",
+    "minWidth": "Das Bild muss mindestens `{min}` Pixel breit sein",
+    "notAFile": "Dies ist ein Ordner, keine Datei",
+    "notAnImage": "Die Datei ist kein Bild",
+    "notSVG": "Die Datei ist kein SVG-Bild",
+    "typeNotAllowed": "Der Dateityp `{type}` ist nicht erlaubt"
+  },
+  "fields": {
+    "kind": {
+      "label": "Art",
+      "description": "Ob dieser Datensatz eine Datei oder ein Ordner ist."
+    },
+    "directory": {
+      "label": "Ordner",
+      "description": "Der Pfad des Ordners, in dem dieser Datensatz liegt, im Stammverzeichnis leer."
+    },
+    "name": {
+      "label": "Name",
+      "description": "Der Name innerhalb des Ordners, als Slug; eine Datei behält ihre Endung in Kleinbuchstaben."
+    },
+    "type": {
+      "label": "Typ",
+      "description": "Der Medientyp, abgeleitet aus der Dateiendung; ein Ordner hat keinen."
+    },
+    "size": {
+      "label": "Größe",
+      "description": "Die Größe der gespeicherten Datei in Bytes; ein Ordner hat keine."
+    },
+    "hash": {
+      "label": "Hash",
+      "description": "Der SHA-256-Hash der gespeicherten Bytes; er dient als ETag und deckt Duplikate auf."
+    },
+    "width": {
+      "label": "Breite",
+      "description": "Die Breite des Bildes in Pixeln, mit angewendeter EXIF-Ausrichtung."
+    },
+    "height": {
+      "label": "Höhe",
+      "description": "Die Höhe des Bildes in Pixeln, mit angewendeter EXIF-Ausrichtung."
+    },
+    "description": {
+      "label": "Beschreibung",
+      "description": "Der Alternativtext, der überall erscheint, wo die Datei gezeigt wird, je Sprache."
+    },
+    "focalX": {
+      "label": "Fokuspunkt X",
+      "description": "Die horizontale Position, um die das Bild zugeschnitten wird, von 0 links bis 1 rechts."
+    },
+    "focalY": {
+      "label": "Fokuspunkt Y",
+      "description": "Die vertikale Position, um die das Bild zugeschnitten wird, von 0 oben bis 1 unten."
+    },
+    "author": {
+      "label": "Hochgeladen von",
+      "description": "Der Benutzer, der die Datei hochgeladen oder den Ordner erstellt hat."
+    },
+    "uploadedAt": {
+      "label": "Hochgeladen am",
+      "description": "Wann die Datei hochgeladen oder der Ordner erstellt wurde."
+    }
+  },
+  "journal": {
+    "op": {
+      "label": "Vorgang",
+      "description": "Der auszuführende Speichereffekt, ein Verschieben oder ein Löschen."
+    },
+    "from": {
+      "label": "Von",
+      "description": "Der Pfad, auf den sich der Effekt bezieht; bei einem Ordner alles darunter."
+    },
+    "to": {
+      "label": "Nach",
+      "description": "Das Ziel eines Verschiebens; beim Löschen leer."
+    }
+  },
+  "menu": {
+    "media": "Medien"
+  }
+}

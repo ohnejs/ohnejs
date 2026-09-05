@@ -47,6 +47,15 @@ you a typed query builder for reads and writes.
 - [The database](./database/engine.md) - the SQLite engine, connections, and raw SQL.
 - [Cluster locks](./database/with-lock.md) - run work exactly once across instances.
 
+## Uploads
+
+An optional layer for files: storage behind a pluggable backend, an `Uploads` collection, upload
+and serve routes, media fields, and the dashboard's Media page.
+
+- [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
+- [Media fields](./uploads/fields.md) - reference uploads from your collections.
+- [Image variants](./uploads/images.md) - signed URLs an image service renders on demand.
+
 ## HTTP API
 
 Define endpoints as files. Handlers read the request and return a value ohne serializes for you.

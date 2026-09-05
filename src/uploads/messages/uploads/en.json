@@ -1,0 +1,166 @@
+{
+  "dashboard": {
+    "abort": "Abort",
+    "aborted": "Aborted",
+    "bytes": "{count, plural, one {# byte} other {# bytes}}",
+    "completed": "Completed",
+    "copied": "Copied",
+    "copyURL": "Copy URL",
+    "deleteConfirm": "Are you sure you want to delete `{name}`?",
+    "deleteFolderNote": "Deleting a folder also deletes everything inside it.",
+    "deleteSelectedConfirm": "Are you sure you want to delete {count, plural, one {# item} other {# items}}?",
+    "deleted": "Deleted {count, plural, one {# item} other {# items}}",
+    "description": "Description",
+    "details": "Details",
+    "dimensions": "Dimensions",
+    "download": "Download",
+    "dropToUpload": "Drop files anywhere to upload",
+    "failed": "Failed",
+    "file": "File",
+    "fileName": "File name",
+    "fileNameHint": "The file name will be converted to a URL-friendly format (e.g., `My File` becomes `my-file`).",
+    "fileNamePlaceholder": "e.g. my-file",
+    "fileNotFound": "File not found",
+    "fileReplaced": "File replaced",
+    "fileSize": "File size",
+    "fileType": "File type",
+    "fileURL": "File URL",
+    "files": "Files",
+    "focalPoint": "Focal point",
+    "focalPointHint": "Click the image to set the focal point.",
+    "folder": "Folder",
+    "folderCreateFailed": "An error occurred while creating the folder",
+    "folderCreated": "Folder `{name}` has been created",
+    "folderEmpty": "Folder is empty",
+    "folderName": "Folder name",
+    "folderNameHint": "The folder name will be converted to a URL-friendly format (e.g., `My Folder` becomes `my-folder`).",
+    "folderNamePlaceholder": "e.g. my-folder",
+    "folders": "Folders",
+    "hide": "Hide",
+    "image": "Image",
+    "imageNotFound": "Image not found",
+    "itemsConflict": "Some items already exist at the destination",
+    "media": "Media",
+    "mediaLibrary": "Media library",
+    "move": "Move",
+    "moveConflictConfirm": "{count, plural, one {# item already exists} other {# items already exist}} at the destination and will be skipped. Move the rest?",
+    "moveInto": "Move into `{directory}`",
+    "moveTo": "Move to",
+    "moved": "Moved {count, plural, one {# item} other {# items}}",
+    "name": "Name",
+    "newFolder": "New folder",
+    "noDescription": "No description",
+    "noFolders": "There are no folders to move the selection to",
+    "noPermission": "You do not have permission to access the media library",
+    "noUploads": "No uploads found",
+    "notAllowedHere": "Not allowed here",
+    "nothingSelected": "Nothing selected",
+    "openInNewTab": "Open in new tab",
+    "pending": "Pending",
+    "pixels": "{width} x {height} pixels",
+    "rename": "Rename",
+    "renameFailed": "An error occurred while renaming",
+    "renameFile": "Rename file",
+    "renameFolder": "Rename folder",
+    "renamed": "Renamed `{from}` to `{to}`",
+    "replace": "Replace",
+    "replaceFile": "Replace file",
+    "rootFolder": "Root folder",
+    "searchByName": "Search by name",
+    "selectFile": "Select file",
+    "selectImage": "Select image",
+    "selected": "{count, plural, one {# item selected} other {# items selected}}",
+    "subfolder": "New subfolder",
+    "upload": "Upload",
+    "uploadHistory": "Upload history",
+    "uploadedBy": "Uploaded by",
+    "uploadedOn": "Uploaded on",
+    "uploading": "Uploading"
+  },
+  "errors": {
+    "contentMismatch": "The file content is `{detected}`, not `{type}`",
+    "extensionChange": "The file extension cannot change",
+    "fileTooLarge": "The file must be at most `{max}`",
+    "fileTooSmall": "The file must be at least `{min}`",
+    "folderIntoItself": "A folder cannot be moved into itself",
+    "maxHeight": "The image must be at most `{max}` pixels tall",
+    "maxWidth": "The image must be at most `{max}` pixels wide",
+    "minHeight": "The image must be at least `{min}` pixels tall",
+    "minWidth": "The image must be at least `{min}` pixels wide",
+    "notAFile": "This is a folder, not a file",
+    "notAnImage": "The file is not an image",
+    "notSVG": "The file is not an SVG image",
+    "typeNotAllowed": "File type `{type}` is not allowed"
+  },
+  "fields": {
+    "kind": {
+      "label": "Kind",
+      "description": "Whether this row is a file or a folder."
+    },
+    "directory": {
+      "label": "Folder",
+      "description": "The path of the folder this row lives in, empty at the root."
+    },
+    "name": {
+      "label": "Name",
+      "description": "The name within its folder, slugified; a file keeps its extension in lowercase."
+    },
+    "type": {
+      "label": "Type",
+      "description": "The media type, derived from the file extension; a folder has none."
+    },
+    "size": {
+      "label": "Size",
+      "description": "The size of the stored file in bytes; a folder has none."
+    },
+    "hash": {
+      "label": "Hash",
+      "description": "The SHA-256 hash of the stored bytes; it serves as the ETag and reveals duplicates."
+    },
+    "width": {
+      "label": "Width",
+      "description": "The width of the image in pixels, with its EXIF orientation applied."
+    },
+    "height": {
+      "label": "Height",
+      "description": "The height of the image in pixels, with its EXIF orientation applied."
+    },
+    "description": {
+      "label": "Description",
+      "description": "The alt text shown wherever the file is presented, per language."
+    },
+    "focalX": {
+      "label": "Focal point X",
+      "description": "The horizontal position the image is cropped around, from 0 at the left to 1 at the right."
+    },
+    "focalY": {
+      "label": "Focal point Y",
+      "description": "The vertical position the image is cropped around, from 0 at the top to 1 at the bottom."
+    },
+    "author": {
+      "label": "Uploaded by",
+      "description": "The user who uploaded the file or created the folder."
+    },
+    "uploadedAt": {
+      "label": "Uploaded at",
+      "description": "When the file was uploaded or the folder was created."
+    }
+  },
+  "journal": {
+    "op": {
+      "label": "Operation",
+      "description": "The storage effect to run, a move or a delete."
+    },
+    "from": {
+      "label": "From",
+      "description": "The path the effect applies to; for a folder, everything beneath it."
+    },
+    "to": {
+      "label": "To",
+      "description": "The destination of a move; empty for a delete."
+    }
+  },
+  "menu": {
+    "media": "Media"
+  }
+}
