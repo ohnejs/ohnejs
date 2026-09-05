@@ -111,6 +111,91 @@ describe('withDefaults', () => {
     });
   });
 
+  describe("strategy 'assign'", () => {
+    const strategies = { variants: 'assign' } as const;
+
+    it('unions keys across both sides', () => {
+      deepStrictEqual(
+        withDefaults(
+          { variants: { card: { width: 400 } } },
+          { variants: { thumbnail: { width: 320 } } },
+          { strategies },
+        ),
+        { variants: { card: { width: 400 }, thumbnail: { width: 320 } } },
+      );
+    });
+
+    it('replaces per key without recursing into the value', () => {
+      deepStrictEqual(
+        withDefaults(
+          { variants: { thumbnail: { width: 200 } } },
+          { variants: { thumbnail: { width: 320, height: 320, format: 'webp' } } },
+          { strategies },
+        ),
+        { variants: { thumbnail: { width: 200 } } },
+      );
+    });
+
+    it('fills a key whose input value is undefined', () => {
+      deepStrictEqual(
+        withDefaults(
+          { variants: { thumbnail: undefined } as { thumbnail?: { width: number } } },
+          { variants: { thumbnail: { width: 320 } } },
+          { strategies },
+        ),
+        { variants: { thumbnail: { width: 320 } } },
+      );
+    });
+
+    it('ignores strategies on paths beneath the assigned object', () => {
+      deepStrictEqual(
+        withDefaults(
+          { variants: { thumbnail: { width: 200 } } },
+          { variants: { thumbnail: { width: 320, height: 320 } } },
+          { strategies: { variants: 'assign', 'variants.thumbnail': 'defaults' } },
+        ),
+        { variants: { thumbnail: { width: 200 } } },
+      );
+    });
+
+    it('replaces arrays wholesale', () => {
+      deepStrictEqual(withDefaults({ variants: ['a'] }, { variants: ['b', 'c'] }, { strategies }), {
+        variants: ['a'],
+      });
+    });
+
+    it('replaces primitives, falling back when input is undefined', () => {
+      deepStrictEqual(withDefaults({ variants: 1 }, { variants: 2 }, { strategies }), {
+        variants: 1,
+      });
+      deepStrictEqual(withDefaults({} as { variants?: number }, { variants: 2 }, { strategies }), {
+        variants: 2,
+      });
+    });
+
+    it('drops poisoned keys from either side', () => {
+      const malicious = JSON.parse('{"variants": {"__proto__": {"polluted": true}}}');
+      const result = withDefaults({ variants: { a: 1 } }, malicious, { strategies }) as {
+        variants: Record<string, unknown>;
+      };
+      strictEqual(Object.getPrototypeOf(result.variants), Object.prototype);
+      strictEqual('polluted' in result.variants, false);
+      deepStrictEqual(result, { variants: { a: 1 } });
+    });
+
+    it('stacks three layers: every name survives, the closest definition wins', () => {
+      const base = { variants: { thumbnail: { width: 320, height: 320 }, hero: { width: 1200 } } };
+      const middle = { variants: { thumbnail: { width: 200 } } };
+      const top = { variants: { card: { width: 400 } } };
+      deepStrictEqual(
+        withDefaults(top, withDefaults(middle, base, { strategies }), { strategies }),
+        {
+          variants: { card: { width: 400 }, thumbnail: { width: 200 }, hero: { width: 1200 } },
+        },
+      );
+    });
+  });
+
   describe("strategy 'defaults'", () => {
     it('recurses into arrays by index, longer side fills the rest', () => {
       deepStrictEqual(

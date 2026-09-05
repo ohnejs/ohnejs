@@ -98,14 +98,15 @@ export interface Layer<C extends object> {
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies are shared between per-layer and cross-layer merges.
  * Results are cached and invalidated on `add`, `remove`, `clear`, or `setStrategy`.
+ * `X` names extra fields a spec carries; they pass through to the layer unread.
  */
-export interface LayerRegistry<C extends object> {
+export interface LayerRegistry<C extends object, X extends object = object> {
   /**
    * Appends a layer.
    * Closer than every layer added before it.
    * Throws when a layer is already registered at `spec.path`.
    */
-  add(spec: LayerSpec<C>): void;
+  add(spec: LayerSpec<C> & X): void;
 
   /**
    * Removes the layer registered at `path`.
@@ -123,7 +124,7 @@ export interface LayerRegistry<C extends object> {
    * Returns every registered layer in insertion order, with cumulative `resolved` filled in.
    * Base layer first, closest layer last.
    */
-  layers(): readonly Layer<C>[];
+  layers(): readonly (Layer<C> & X)[];
 
   /**
    * Sets the merge strategy at `path` for both per-layer and cross-layer merges.
@@ -165,6 +166,7 @@ export interface LayerRegistry<C extends object> {
  * Creates a typed layer registry.
  *
  * Each layer is stored as `{ path, name, defaults, input, resolved }`.
+ * Extra fields a spec carries, typed by `X`, pass through to the layer untouched.
  * `resolved` folds the layer via `withDefaults` using the registry's strategies.
  * Closer layers win; base layers fill.
  *
@@ -190,13 +192,13 @@ export interface LayerRegistry<C extends object> {
  * registry.resolve() // -> { tags: ['user'], routes: [] }
  * ```
  */
-export function createLayerRegistry<C extends object>(
+export function createLayerRegistry<C extends object, X extends object = object>(
   options?: LayerRegistryOptions,
-): LayerRegistry<C> {
-  const specs: LayerSpec<C>[] = [];
+): LayerRegistry<C, X> {
+  const specs: (LayerSpec<C> & X)[] = [];
   const seed: LayerStrategies = { ...options?.strategies };
   let strategies: LayerStrategies = { ...seed };
-  let cached: Layer<C>[] | null = null;
+  let cached: (Layer<C> & X)[] | null = null;
   const version = ref(0);
 
   function invalidate(): void {
@@ -204,16 +206,16 @@ export function createLayerRegistry<C extends object>(
     version.value++;
   }
 
-  function ensureFresh(): Layer<C>[] {
+  function ensureFresh(): (Layer<C> & X)[] {
     if (!isNull(cached)) return cached;
-    const result: Layer<C>[] = [];
+    const result: (Layer<C> & X)[] = [];
     let cumulative: Partial<C> | undefined;
     for (const spec of specs) {
       const defaults: Partial<C> = spec.defaults ?? {};
       const input: Partial<C> = spec.input ?? {};
       const own = withDefaults(input, defaults, { strategies });
       cumulative = isUndefined(cumulative) ? own : withDefaults(own, cumulative, { strategies });
-      result.push({ path: spec.path, name: spec.name, defaults, input, resolved: cumulative });
+      result.push({ ...spec, defaults, input, resolved: cumulative });
     }
     cached = result;
     return result;

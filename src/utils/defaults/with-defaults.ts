@@ -10,10 +10,18 @@ import { isUndefined } from '../is/is-undefined.ts';
  * - `'replace'` - input wins entirely; defaults are discarded, but a missing input still falls back.
  * - `'own'` - input wins entirely and never falls back; an absent input leaves the key absent.
  * - `'defaults'` - recurse into objects (per key) and arrays (per index); longer side fills the rest.
+ * - `'assign'` - objects merge one level: keys union, input wins per key, values are not recursed into.
+ *   Non-objects behave like `'replace'`.
  * - `'concat'` - arrays only: `[...input, ...defaults]`. No-op on non-arrays.
  * - `'concat-unique'` - same as `'concat'`, then deduped via `uniqueArray`.
  */
-export type WithDefaultsStrategy = 'replace' | 'own' | 'defaults' | 'concat' | 'concat-unique';
+export type WithDefaultsStrategy =
+  | 'replace'
+  | 'own'
+  | 'defaults'
+  | 'assign'
+  | 'concat'
+  | 'concat-unique';
 
 /**
  * Options for `withDefaults`.
@@ -66,6 +74,13 @@ export interface WithDefaultsOptions {
  *   { strategies: { items: 'defaults' } }
  * )
  * // -> { items: [{ name: 'A', kind: 'x' }, { kind: 'y' }] }
+ *
+ * withDefaults(
+ *   { variants: { thumbnail: { width: 200 } } },
+ *   { variants: { thumbnail: { width: 320, height: 320 }, hero: { width: 1200 } } },
+ *   { strategies: { variants: 'assign' } }
+ * )
+ * // -> { variants: { thumbnail: { width: 200 }, hero: { width: 1200 } } }
  * ```
  */
 export function withDefaults<T>(input: T, defaults: undefined, options?: WithDefaultsOptions): T;
@@ -94,7 +109,15 @@ function apply(
 ): unknown {
   const strategy = strategies.get(path);
 
-  if (strategy === 'replace') {
+  if (strategy === 'assign' && isPlainObject(input) && isPlainObject(defaults)) {
+    const result: Record<string, unknown> = {};
+    for (const key of unionKeys(input, defaults)) {
+      result[key] = isUndefined(input[key]) ? defaults[key] : input[key];
+    }
+    return result;
+  }
+
+  if (strategy === 'replace' || strategy === 'assign') {
     return isUndefined(input) ? defaults : input;
   }
 
@@ -112,10 +135,7 @@ function apply(
 
   if (isPlainObject(input) && isPlainObject(defaults)) {
     const result: Record<string, unknown> = {};
-    const keys = new Set<string>();
-    for (const k of Object.keys(input)) if (!POISONED.has(k)) keys.add(k);
-    for (const k of Object.keys(defaults)) if (!POISONED.has(k)) keys.add(k);
-    for (const key of keys) {
+    for (const key of unionKeys(input, defaults)) {
       const childPath = path === '' ? key : `${path}.${key}`;
       if (strategies.get(childPath) === 'own' && isUndefined(input[key])) continue;
       result[key] = apply(input[key], defaults[key], childPath, strategies);
@@ -131,6 +151,13 @@ function apply(
   }
 
   return input;
+}
+
+function unionKeys(input: Record<string, unknown>, defaults: Record<string, unknown>): Set<string> {
+  const keys = new Set<string>();
+  for (const k of Object.keys(input)) if (!POISONED.has(k)) keys.add(k);
+  for (const k of Object.keys(defaults)) if (!POISONED.has(k)) keys.add(k);
+  return keys;
 }
 
 function normaliseStrategies(
