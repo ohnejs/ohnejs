@@ -11,7 +11,13 @@ silenceFirstStripWarning();
 
 registerHooks({
   load(url, context, nextLoad) {
-    if (!url.includes('/node_modules/') || !TYPESCRIPT.test(url) || DECLARATION.test(url)) {
+    // A fresh reload imports with a `?v=` query, so the tests run on the pathname alone.
+    const { pathname } = new URL(url);
+    if (
+      !pathname.includes('/node_modules/') ||
+      !TYPESCRIPT.test(pathname) ||
+      DECLARATION.test(pathname)
+    ) {
       return nextLoad(url, context);
     }
     const source = readFileSync(fileURLToPath(url), 'utf8');
