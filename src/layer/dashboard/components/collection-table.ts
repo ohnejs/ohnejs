@@ -13,6 +13,7 @@ import {
   hasModifierKey,
   icon,
   isEditingText,
+  lastNavigation,
   navigate,
   openDialog,
   overlayCount,
@@ -152,7 +153,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
 
   const remembered = tableMemory.get(segment) ?? '';
-  const redirected = location.search === '' && remembered !== '';
+  const redirected = location.search === '' && remembered !== '' && lastNavigation() !== 'popstate';
   if (redirected) {
     queueMicrotask(() => navigate(location.pathname + remembered, { replace: true }));
   } else {
