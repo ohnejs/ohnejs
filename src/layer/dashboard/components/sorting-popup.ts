@@ -8,8 +8,9 @@ import {
   type Popup,
   useHotkeys,
   useT,
+  when,
 } from 'ohne/dashboard';
-import { computed, effect, ref } from 'ohne/utils';
+import { computed, deepEqual, effect, ref } from 'ohne/utils';
 
 import { unsavedChanges } from './history.ts';
 import { orderBy } from './order-by.ts';
@@ -27,6 +28,11 @@ export interface SortingPopupOptions {
    * The current order: ohne order strings, a leading `-` meaning descending.
    */
   order: readonly string[];
+
+  /**
+   * The default order entries the restore button returns to.
+   */
+  defaults: readonly string[];
 
   /**
    * Called with the rebuilt order strings on Apply.
@@ -49,13 +55,14 @@ css`
 /**
  * The table sorting popup: the `orderBy` builder inside the apply-or-discard shell.
  * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * A restore button reverts to the defaults; Apply hands the current entries either way.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function sortingPopup(options: SortingPopupOptions): Popup {
   const t = useT();
   const current = ref<string[]>([...options.order]);
-  const baseline = JSON.stringify(options.order);
-  const dirty = computed(() => JSON.stringify(current.value) !== baseline);
+  const dirty = computed(() => !deepEqual(current.value, [...options.order]));
+  const isDefault = computed(() => deepEqual(current.value, [...options.defaults]));
 
   const apply = (): void => {
     options.onApply([...current.value]);
@@ -79,6 +86,17 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
   effect(() => {
     closeButton.title = t('dashboard.close');
   });
+
+  const restoreButton = when(
+    () => !isDefault.value,
+    () =>
+      button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
+        variant: 'outline',
+        onClick: () => {
+          current.value = [...options.defaults];
+        },
+      }),
+  );
 
   const applyButton = button(() => t('dashboard.apply'), {
     variant: 'outline',
@@ -109,7 +127,7 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
         h('span', { class: 'o-sorting-popup-title' }, () => t('dashboard.sort.title')),
         closeButton,
       ),
-      footer: h('div', { class: 'ohne-justify-between' }, applyButton),
+      footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
       onClose: () => guardedClose(),
     },
   );

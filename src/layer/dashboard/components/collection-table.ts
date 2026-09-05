@@ -726,6 +726,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       sortingPopup({
         fields: () => sortableFields(collection),
         order: state.order,
+        defaults: DEFAULT_ORDER,
         onApply: (order) => {
           pending = order;
           apply = true;

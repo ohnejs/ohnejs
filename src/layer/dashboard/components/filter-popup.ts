@@ -34,6 +34,7 @@ import {
   type ConditionObject,
   effect,
   first,
+  isEmpty,
   isUndefined,
   jsonClone,
   naturalCompare,
@@ -192,6 +193,7 @@ css`
  * Condition groups nest with a toggleable and/or relation; the top level carries its own over all members.
  * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`.
  * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * A restore button clears every condition, the default; Apply then hands `undefined`.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function filterPopup(options: FilterPopupOptions): Popup {
@@ -207,9 +209,18 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     void version.value;
     return JSON.stringify(currentWhere() ?? null) !== baseline;
   });
+  const isDefault = computed(() => {
+    void version.value;
+    return isEmpty(root.items);
+  });
 
   const commit = (): void => {
     version.value += 1;
+  };
+
+  const restore = (): void => {
+    Object.assign(root, filterFromWhere(undefined));
+    commit();
   };
 
   const filterOf = (field: DashboardField): FieldFilter | undefined => fieldTypeFor(field).filter;
@@ -229,7 +240,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     return {
       key: filterKey(),
       field: field.name,
-      operator: filter.operators(field)[0] ?? 'eq',
+      operator: first(filter.operators(field)) ?? 'eq',
       value: filter.seed(field),
     };
   };
@@ -328,7 +339,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         group.items[index] = {
           key: filterKey(),
           field: field.name,
-          operator: valid.includes(node.operator) ? node.operator : (valid[0] ?? 'eq'),
+          operator: valid.includes(node.operator) ? node.operator : (first(valid) ?? 'eq'),
           value: filter.seed(field),
         };
         commit();
@@ -505,10 +516,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
       'div',
       { class: 'ohne-row' },
       when(
-        () => {
-          void version.value;
-          return root.items.length > 0;
-        },
+        () => !isDefault.value,
         () => [
           relationToggle(
             () => {
@@ -553,6 +561,15 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     closeButton.title = t('dashboard.close');
   });
 
+  const restoreButton = when(
+    () => !isDefault.value,
+    () =>
+      button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
+        variant: 'outline',
+        onClick: restore,
+      }),
+  );
+
   const applyButton = button(() => t('dashboard.apply'), {
     variant: 'outline',
     class: 'ohne-ml-auto',
@@ -577,7 +594,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
       h('span', { class: 'o-filter-popup-title' }, options.title),
       closeButton,
     ),
-    footer: h('div', { class: 'ohne-justify-between' }, applyButton),
+    footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
     onClose: () => void guardedClose(),
   });
 

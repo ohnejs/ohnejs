@@ -570,6 +570,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       sortingPopup({
         fields: () => sortableFields(collection),
         order: state.order,
+        defaults: DEFAULT_ORDER,
         onApply: (order) => {
           pending = order;
           apply = true;
