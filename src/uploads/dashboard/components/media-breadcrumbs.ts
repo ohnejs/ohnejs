@@ -34,11 +34,14 @@ css`
     font-weight: 500;
   }
 
+  .o-media-breadcrumbs a {
+    text-decoration: none;
+  }
+
   .o-media-breadcrumb {
     position: relative;
     display: flex;
     width: auto;
-    text-decoration: none;
   }
 
   .o-media-breadcrumb:not(.o-media-breadcrumb-active),
