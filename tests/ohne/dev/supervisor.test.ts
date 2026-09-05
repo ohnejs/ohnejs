@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 import { dev, type DevServer } from '../../../src/ohne/dev/supervisor.ts';
 import { useEnv, useLayers, usePrinter, useShutdown } from '../../../src/ohne/index.ts';
+// A layer under node_modules is TypeScript too; the dev binary installs this hook before anything else.
+import '../../../src/ohne/runtime/register.js';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
@@ -314,6 +316,30 @@ describe('dev', () => {
       }
     },
   );
+
+  it('restarts the dashboard when a config change stacks a new layer', TIMEOUT, async () => {
+    const dashPort = await freePort();
+    const app = writeProject('layer-added', 0);
+    const config = (layers: string) =>
+      `export default { ${layers}api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`;
+    writeFileSync(join(app, 'ohne.config.ts'), config(''));
+    writeRoute(app, 'health.ts');
+
+    const extra = join(app, 'node_modules', 'extra');
+    mkdirSync(join(extra, 'dashboard', 'pages'), { recursive: true });
+    writeFileSync(join(extra, 'package.json'), JSON.stringify({ name: 'extra', type: 'module' }));
+    writeFileSync(join(extra, 'ohne.config.ts'), 'export default {}\n');
+    writeFileSync(join(extra, 'dashboard', 'pages', 'extra.ts'), 'export default () => null\n');
+
+    const server = await dev(app, { entry: BIN });
+    servers.push(server);
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+    strictEqual(await get(dashPort, '/m/app/pages/extra.ts'), 404);
+
+    writeFileSync(join(app, 'ohne.config.ts'), config("layers: ['extra'], "));
+    await waitFor(async () => (await get(dashPort, '/m/app/pages/extra.ts')) === 200);
+    ok((await getBody(dashPort, '/')).includes('/m/app/pages/extra.ts'));
+  });
 
   it('honors a configured `dashboard.apiURL` over the derived URL', TIMEOUT, async () => {
     const dashPort = await freePort();

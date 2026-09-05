@@ -67,7 +67,8 @@ export interface DevOptions {
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
  *
  * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
- * The dashboard child reads its modules from disk per request, so it never respawns.
+ * The dashboard child reads its modules from disk per request, so a file change never respawns it.
+ * A config change does: the child resolved the layer stack at boot, and a listed layer may have changed.
  * A change in a dashboard directory tells its browsers to reload over the dev live-reload stream.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
@@ -164,6 +165,7 @@ export async function dev(
   }
 
   async function runCycle(batch: Set<string>): Promise<void> {
+    const configChanged = [...batch].some((path) => config.affectedBy(path));
     try {
       await regen(batch);
     } catch (error) {
@@ -172,6 +174,7 @@ export async function dev(
       return;
     }
     if (closed) return;
+    if (configChanged && wantDashboard) await restartDashboard();
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
     if (reloadable.length < batch.size) dashboard?.reload();
     if (!reloadable.some(isSource) && !reloadable.some((path) => messages.affectedBy(path))) return;
@@ -249,6 +252,17 @@ export async function dev(
     }
   }
 
+  /**
+   * Stops the dashboard child and starts a fresh one, so it resolves the layer stack again.
+   * Its browsers reconnect to the live-reload stream and reload themselves on that reconnect.
+   */
+  async function restartDashboard(): Promise<void> {
+    const previous = dashboard;
+    dashboard = null;
+    await previous?.stop();
+    if (!closed) await startDashboard();
+  }
+
   function onCrash(): void {
     api = null;
     park();
@@ -282,6 +296,9 @@ export async function dev(
   }
 }
 
+/**
+ * Whether a changed file is API source, the kind of change that respawns the API child.
+ */
 function isSource(path: string): boolean {
   return SOURCE.has(extname(path));
 }

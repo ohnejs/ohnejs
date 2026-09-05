@@ -57,7 +57,8 @@ to `ohne.config.ts` regenerates everything, since config decides what everything
 watch covers every layer in the stack, not just your app: a linked workspace layer reloads like
 your own code, and only installed dependencies are skipped.
 
-The dashboard child never restarts: it reads its modules from disk per request, so a change under
+The dashboard child restarts only on a config change, since the layer stack it serves is decided
+there; otherwise it reads its modules from disk per request, so a change under
 a dashboard directory just tells the connected browsers to reload, over a live-reload stream the
 dev run injects into the page.
 
