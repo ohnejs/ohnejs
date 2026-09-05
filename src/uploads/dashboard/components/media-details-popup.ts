@@ -921,16 +921,19 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   });
 
   const hotkeys = canUpdate
-    ? useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false })
+    ? useHotkeys({
+        allowInOverlays: true,
+        allowWhileTyping: ['undo', 'redo'],
+        target: () => handle.root,
+        listen: false,
+      })
     : undefined;
   const footerEl = h(
     'div',
     { class: 'ohne-row' },
     canDelete ? deleteButton : null,
     canUpdate ? [replaceButton, fileInput] : null,
-    isUndefined(hotkeys)
-      ? null
-      : historyButtons(edits, (state) => restore(state as DetailsState), hotkeys),
+    isUndefined(hotkeys) ? null : historyButtons(edits, restore, hotkeys),
     when(
       () => edits.isDirty.value,
       () => saveButton,
