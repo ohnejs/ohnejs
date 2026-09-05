@@ -16,6 +16,7 @@
     "download": "Herunterladen",
     "dropToUpload": "Dateien zum Hochladen irgendwo ablegen",
     "failed": "Fehlgeschlagen",
+    "uploadFailed": "Upload fehlgeschlagen",
     "file": "Datei",
     "fileName": "Dateiname",
     "fileNameHint": "Der Dateiname wird in ein URL-freundliches Format umgewandelt (z. B. wird aus `My File` `my-file`).",

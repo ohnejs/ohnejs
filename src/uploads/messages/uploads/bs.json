@@ -16,6 +16,7 @@
     "download": "Preuzmi",
     "dropToUpload": "Ispustite datoteke bilo gdje da ih postavite",
     "failed": "Neuspješno",
+    "uploadFailed": "Otpremanje nije uspjelo",
     "file": "Datoteka",
     "fileName": "Naziv datoteke",
     "fileNameHint": "Naziv datoteke bit će pretvoren u format prikladan za URL (npr. `My File` postaje `my-file`).",

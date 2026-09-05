@@ -163,6 +163,9 @@ css`
   }
 
   .o-media-details-preview-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     background-image: url('${CHECKER_LIGHT}');
     background-color: hsl(var(--ohne-background));
     transition: var(--ohne-transition);

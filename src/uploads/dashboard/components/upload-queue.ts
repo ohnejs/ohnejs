@@ -1,4 +1,4 @@
-import { apiUpload, dispatchTrigger } from 'ohne/dashboard';
+import { apiUpload, dispatchTrigger, toast } from 'ohne/dashboard';
 import { isPlainObject, isString } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -9,12 +9,13 @@ import type {
   UploadTask,
 } from './upload-queue-state.ts';
 
+import { useUploadsT } from './_messages.ts';
 import { MEDIA_REFRESH } from './media-library-state.ts';
 import { createUploadQueue } from './upload-queue-state.ts';
 
 const OCTET_STREAM = 'application/octet-stream';
 
-const queue = createUploadQueue(send);
+const queue = createUploadQueue(send, { onSettle: announce });
 
 /**
  * Every queued upload, newest batch first.
@@ -47,6 +48,18 @@ export async function uploadFiles(items: readonly UploadItem[]): Promise<void> {
   if (items.length === 0) return;
   await queue.enqueue(items);
   dispatchTrigger(MEDIA_REFRESH);
+}
+
+/**
+ * Toasts a failed upload with its reason, so nobody has to open the bell to learn why.
+ * A completed upload stays quiet: the grid and the bell already show it.
+ */
+function announce(task: UploadTask): void {
+  if (task.status !== 'failed') return;
+  toast(useUploadsT()('uploads.dashboard.uploadFailed'), {
+    type: 'error',
+    description: task.error,
+  });
 }
 
 /**

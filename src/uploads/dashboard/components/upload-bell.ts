@@ -231,7 +231,9 @@ function bell(): HTMLElement {
 
     const detail = (): string => {
       const current = task();
-      if (current.status === 'failed') return current.error ?? t('uploads.dashboard.failed');
+      if (current.status === 'failed') {
+        return current.error?.replaceAll('`', '') ?? t('uploads.dashboard.failed');
+      }
       if (current.status === 'aborted') return t('uploads.dashboard.aborted');
       return formatBytes(current.size);
     };

@@ -16,6 +16,7 @@
     "download": "Download",
     "dropToUpload": "Drop files anywhere to upload",
     "failed": "Failed",
+    "uploadFailed": "Upload failed",
     "file": "File",
     "fileName": "File name",
     "fileNameHint": "The file name will be converted to a URL-friendly format (e.g., `My File` becomes `my-file`).",
