@@ -55,7 +55,7 @@ export const unsavedChanges: UnsavedChanges = { history: null, prompt: undefined
  * Data history manager with undo and redo functionality.
  * States are deep-cloned in and out, compared as JSON with the `omit` keys stripped.
  */
-export class History<T extends Record<string, unknown> = Record<string, unknown>> {
+export class History<T extends object = Record<string, unknown>> {
   protected states: T[] = [];
   protected omit: string[];
   protected currentIndex = -1;

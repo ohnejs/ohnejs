@@ -21,7 +21,7 @@ export interface HistoryScroll {
 /**
  * Renderless scroll pinning across undo and redo re-renders.
  *
- * It listens for the `undo` and `redo` hotkeys through `useHotkeys({ allowInOverlays: true })`.
+ * It listens for the `undo` and `redo` hotkeys on `document`, in overlays and while typing alike.
  * Its listeners fire alongside the `historyButtons` ones.
  * On each trigger it records the current scroll offset.
  * For 250 milliseconds it then forcibly reverts any scroll change, so DOM-reflow jumps cannot move the view.
@@ -30,7 +30,7 @@ export interface HistoryScroll {
  * Create it inside a reactive region; the hotkey listener and the pinning effect die with it.
  */
 export function historyScrollState(scroll: HistoryScroll): null {
-  const { listen } = useHotkeys({ allowInOverlays: true });
+  const { listen } = useHotkeys({ allowInOverlays: true, allowWhileTyping: ['undo', 'redo'] });
   let pinnedY = 0;
   let stopWatcher: (() => void) | null = null;
 

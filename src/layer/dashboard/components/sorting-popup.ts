@@ -12,7 +12,8 @@ import {
 } from 'ohne/dashboard';
 import { computed, deepEqual, effect, ref } from 'ohne/utils';
 
-import { unsavedChanges } from './history.ts';
+import { historyButtons } from './history-buttons.ts';
+import { History, unsavedChanges } from './history.ts';
 import { orderBy } from './order-by.ts';
 
 /**
@@ -54,6 +55,7 @@ css`
 
 /**
  * The table sorting popup: the `orderBy` builder inside the apply-or-discard shell.
+ * Every change pushes onto a `History`; undo and redo step through it by button or hotkey.
  * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
  * A restore button reverts to the defaults; Apply hands the current entries either way.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
@@ -61,8 +63,16 @@ css`
 export function sortingPopup(options: SortingPopupOptions): Popup {
   const t = useT();
   const current = ref<string[]>([...options.order]);
+  const history = new History<{ order: string[] }>({ watchUnsavedChanges: false }).push({
+    order: [...options.order],
+  });
   const dirty = computed(() => !deepEqual(current.value, [...options.order]));
   const isDefault = computed(() => deepEqual(current.value, [...options.defaults]));
+
+  const commit = (order: string[]): void => {
+    current.value = order;
+    history.push({ order });
+  };
 
   const apply = (): void => {
     options.onApply([...current.value]);
@@ -92,9 +102,7 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: () => {
-          current.value = [...options.defaults];
-        },
+        onClick: () => commit([...options.defaults]),
       }),
   );
 
@@ -109,14 +117,10 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
     applyButton.classList.toggle('ohne-button-outline', !changed);
   });
 
+  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
+
   const handle = popup(
-    orderBy({
-      model: () => current.value,
-      fields: options.fields,
-      onCommit: (order) => {
-        current.value = order;
-      },
-    }),
+    orderBy({ model: () => current.value, fields: options.fields, onCommit: commit }),
     {
       size: -1,
       width: '50rem',
@@ -127,12 +131,23 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
         h('span', { class: 'o-sorting-popup-title' }, () => t('dashboard.sort.title')),
         closeButton,
       ),
-      footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
+      footer: h(
+        'div',
+        { class: 'ohne-justify-between' },
+        historyButtons(
+          history,
+          (state) => {
+            current.value = state.order;
+          },
+          hotkeys,
+        ),
+        restoreButton,
+        applyButton,
+      ),
       onClose: () => guardedClose(),
     },
   );
 
-  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
   setTimeout(() => {
     hotkeys.isListening.value = true;
     hotkeys.listen('save', (event) => {

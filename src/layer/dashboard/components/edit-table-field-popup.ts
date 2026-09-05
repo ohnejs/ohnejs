@@ -253,6 +253,13 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     saveButton.classList.toggle('ohne-button-outline', !dirty);
   });
 
+  const hotkeys = useHotkeys({
+    allowInOverlays: true,
+    allowWhileTyping: ['undo', 'redo'],
+    target: () => handle.root,
+    listen: false,
+  });
+
   const handle = popup(
     h('fieldset', { class: 'o-edit-field-fields', disabled: () => busy.value }, () =>
       form.value.render(),
@@ -270,12 +277,15 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       ),
       footer: disabled
         ? undefined
-        : h('div', { class: 'ohne-justify-between' }, historyButtons(history, restore), saveButton),
+        : h(
+            'div',
+            { class: 'ohne-justify-between' },
+            historyButtons(history, restore, hotkeys),
+            saveButton,
+          ),
       onClose: () => void guardedClose(),
     },
   );
-
-  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
 
   if (!disabled) {
     setTimeout(() => {

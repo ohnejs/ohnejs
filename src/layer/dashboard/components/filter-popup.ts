@@ -43,7 +43,8 @@ import {
   ref,
 } from 'ohne/utils';
 
-import { unsavedChanges } from './history.ts';
+import { historyButtons } from './history-buttons.ts';
+import { History, unsavedChanges } from './history.ts';
 import { actionButton } from './item-actions.ts';
 
 /**
@@ -191,6 +192,8 @@ css`
  *
  * Each condition picks a field, an operator valid for its storage primitive, and a typed value input.
  * Condition groups nest with a toggleable and/or relation; the top level carries its own over all members.
+ * Every committed change pushes the tree onto a `History`; undo and redo step through it.
+ * The rows read their nodes through `each`'s accessors, so a restored tree updates them in place.
  * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`.
  * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
  * A restore button clears every condition, the default; Apply then hands `undefined`.
@@ -202,6 +205,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
   const version = ref(0);
   const initial: FilterModel = filterFromWhere(options.where);
   const root: FilterGroup = { key: filterKey(), relation: initial.relation, items: initial.items };
+  const history = new History<FilterModel>({ watchUnsavedChanges: false }).push(initial);
   const currentWhere = (): ConditionObject | undefined =>
     filterToWhere({ relation: root.relation, items: root.items });
   const baseline = JSON.stringify(currentWhere() ?? null);
@@ -216,9 +220,15 @@ export function filterPopup(options: FilterPopupOptions): Popup {
 
   const commit = (): void => {
     version.value += 1;
+    history.push({ relation: root.relation, items: root.items });
   };
 
-  const restore = (): void => {
+  const restore = (state: FilterModel): void => {
+    Object.assign(root, state);
+    version.value += 1;
+  };
+
+  const clear = (): void => {
     Object.assign(root, filterFromWhere(undefined));
     commit();
   };
@@ -295,25 +305,25 @@ export function filterPopup(options: FilterPopupOptions): Popup {
       t(relation() === 'and' ? 'dashboard.filter.allMustMatch' : 'dashboard.filter.anyMustMatch'),
     );
 
-  const valueInput = (node: FilterCondition, inputID: string): Child => {
-    const field = fieldByName(node.field);
+  const valueInput = (node: () => FilterCondition, inputID: string): Child => {
+    const field = fieldByName(node().field);
     const filter = isUndefined(field) ? undefined : filterOf(field);
     if (isUndefined(field) || isUndefined(filter)) return null;
     return filter.input({
       field,
       operator: () => {
         void version.value;
-        return node.operator;
+        return node().operator;
       },
       value: () => {
         void version.value;
-        return node.value;
+        return node().value;
       },
       set: (next) => {
-        node.value = next;
+        node().value = next;
       },
       commit: (next) => {
-        if (!isUndefined(next)) node.value = next;
+        if (!isUndefined(next)) node().value = next;
         commit();
       },
       inputID,
@@ -321,12 +331,12 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     });
   };
 
-  const conditionRow = (group: FilterGroup, node: FilterCondition): Child => {
+  const conditionRow = (group: () => FilterGroup, node: () => FilterCondition): Child => {
     const inputID = `${id}-${++sequence}`;
     const fieldModel: Ref<Primitive> = {
       get value() {
         void version.value;
-        return node.field;
+        return node().field;
       },
       set value(next) {
         const field = fieldByName(String(next));
@@ -334,12 +344,13 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         const filter = filterOf(field);
         if (isUndefined(filter)) return;
         const valid = filter.operators(field);
-        const index = group.items.indexOf(node);
+        const items = group().items;
+        const index = items.indexOf(node());
         if (index === -1) return;
-        group.items[index] = {
+        items[index] = {
           key: filterKey(),
           field: field.name,
-          operator: valid.includes(node.operator) ? node.operator : (first(valid) ?? 'eq'),
+          operator: valid.includes(node().operator) ? node().operator : (first(valid) ?? 'eq'),
           value: filter.seed(field),
         };
         commit();
@@ -348,10 +359,10 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     const operatorModel: Ref<Primitive> = {
       get value() {
         void version.value;
-        return node.operator;
+        return node().operator;
       },
       set value(next) {
-        node.operator = next as FilterOperator;
+        node().operator = next as FilterOperator;
         commit();
       },
     };
@@ -377,7 +388,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
           select(
             operatorModel,
             (): SelectChoice[] => {
-              const field = fieldByName(node.field);
+              const field = fieldByName(node().field);
               const filter = isUndefined(field) ? undefined : filterOf(field);
               if (isUndefined(field) || isUndefined(filter)) return [];
               return filter.operators(field).map((operator) => ({
@@ -408,7 +419,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     return control;
   };
 
-  const addButtons = (group: FilterGroup): Child =>
+  const addButtons = (group: () => FilterGroup): Child =>
     h(
       'div',
       { class: 'ohne-row' },
@@ -416,27 +427,31 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         variant: 'outline',
         class: 'o-where-filters-large-button',
         disabled: () => fieldChoices().length === 0,
-        onClick: () => addCondition(group),
+        onClick: () => addCondition(group()),
       }),
       smallAddButton(
         'plus',
         () => t('dashboard.filter.addCondition'),
-        () => addCondition(group),
+        () => addCondition(group()),
       ),
       button([icon('copy-plus'), h('span', null, () => t('dashboard.filter.conditionGroup'))], {
         variant: 'outline',
         class: 'o-where-filters-large-button',
         disabled: () => fieldChoices().length === 0,
-        onClick: () => addGroup(group),
+        onClick: () => addGroup(group()),
       }),
       smallAddButton(
         'copy-plus',
         () => t('dashboard.filter.addConditionGroup'),
-        () => addGroup(group),
+        () => addGroup(group()),
       ),
     );
 
-  const itemHeader = (group: FilterGroup, node: () => FilterNode, index: () => number): Child =>
+  const itemHeader = (
+    group: () => FilterGroup,
+    node: () => FilterNode,
+    index: () => number,
+  ): Child =>
     h(
       'div',
       { class: 'ohne-row o-where-filters-row' },
@@ -454,32 +469,35 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         actionButton(
           'copy',
           () => t('dashboard.filter.duplicate'),
-          () => duplicate(group, index()),
+          () => duplicate(group(), index()),
         ),
         actionButton(
           'trash',
           () => t('dashboard.delete'),
-          () => remove(group, index()),
+          () => remove(group(), index()),
           { destructiveHover: true },
         ),
       ),
     );
 
-  function groupBody(group: FilterGroup): Child {
+  function groupBody(group: () => FilterGroup): Child {
     return h(
       'div',
       { class: 'o-where-filters' },
       each(
         () => {
           void version.value;
-          return group.items.slice();
+          return group().items.slice();
         },
         (node) => node.key,
         (node, index) => {
-          const current = node();
-          const row = card('items' in current ? groupCard(current) : conditionRow(group, current), {
-            header: itemHeader(group, node, index),
-          });
+          // A key never changes kind, so the accessor narrows once for the row's lifetime.
+          const row = card(
+            'items' in node()
+              ? groupCard(node as () => FilterGroup)
+              : conditionRow(group, node as () => FilterCondition),
+            { header: itemHeader(group, node, index) },
+          );
           row.classList.add('o-where-filters-item');
           return row;
         },
@@ -488,7 +506,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     );
   }
 
-  function groupCard(group: FilterGroup): Child {
+  function groupCard(group: () => FilterGroup): Child {
     return card(groupBody(group), {
       header: h(
         'div',
@@ -496,16 +514,16 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         relationToggle(
           () => {
             void version.value;
-            return group.relation;
+            return group().relation;
           },
           () => {
-            group.relation = group.relation === 'and' ? 'or' : 'and';
+            group().relation = group().relation === 'and' ? 'or' : 'and';
             commit();
           },
         ),
         relationText(() => {
           void version.value;
-          return group.relation;
+          return group().relation;
         }),
       ),
     });
@@ -566,7 +584,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: restore,
+        onClick: clear,
       }),
   );
 
@@ -581,8 +599,13 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     applyButton.classList.toggle('ohne-button-outline', !changed);
   });
 
-  const filtersCard = card(groupBody(root), { header: rootHeader() });
+  const filtersCard = card(
+    groupBody(() => root),
+    { header: rootHeader() },
+  );
   filtersCard.classList.add('o-where-filters-card');
+
+  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
 
   const handle = popup(filtersCard, {
     size: -1,
@@ -594,11 +617,16 @@ export function filterPopup(options: FilterPopupOptions): Popup {
       h('span', { class: 'o-filter-popup-title' }, options.title),
       closeButton,
     ),
-    footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
+    footer: h(
+      'div',
+      { class: 'ohne-justify-between' },
+      historyButtons(history, restore, hotkeys),
+      restoreButton,
+      applyButton,
+    ),
     onClose: () => void guardedClose(),
   });
 
-  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
   setTimeout(() => {
     hotkeys.isListening.value = true;
     hotkeys.listen('save', (event) => {

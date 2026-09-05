@@ -1,7 +1,7 @@
 import type { Hotkeys } from 'ohne/dashboard';
 
 import { attachTooltip, button, h, icon, useHotkeys, useT } from 'ohne/dashboard';
-import { isUndefined, onCleanup } from 'ohne/utils';
+import { isNull, isUndefined, onCleanup } from 'ohne/utils';
 
 import type { History } from './history.ts';
 
@@ -11,30 +11,32 @@ import type { History } from './history.ts';
  * Two outline buttons, disabled while `canUndo`/`canRedo` say so.
  * Each carries a live tooltip showing the action label and the remaining step count.
  * The pair also binds the `undo` and `redo` hotkeys on `hotkeys`.
- * By default that is a fresh `useHotkeys({ allowInOverlays: true })` listening on `document`.
+ * By default that is a fresh `useHotkeys({ allowInOverlays: true, allowWhileTyping: ['undo', 'redo'] })`.
+ * It listens on `document`.
  * A popup passes its own root-targeted instance, since keydowns stop at a popup root.
- * Cmd/Ctrl+Z and its redo counterpart keep working while an overlay is open.
+ * The strokes fire while typing too, so the history owns undo and redo over the browser's text undo.
  * `restore` receives the state returned by `history.undo()`/`history.redo()`, only when one came back.
+ * Focus on an element with an `id` returns to that `id` afterwards, with the caret at the end of its text.
+ * A `restore` that rebuilds its controls thus keeps the user in the field they were editing.
  * Create it inside a reactive region; the hotkey listener and tooltips die with it.
  */
-export function historyButtons(
-  history: History,
-  restore: (state: Record<string, unknown>) => void,
-  hotkeys: Hotkeys = useHotkeys({ allowInOverlays: true }),
+export function historyButtons<T extends object>(
+  history: History<T>,
+  restore: (state: T) => void,
+  hotkeys: Hotkeys = useHotkeys({ allowInOverlays: true, allowWhileTyping: ['undo', 'redo'] }),
 ): HTMLElement {
   const t = useT();
 
-  const undo = (event?: KeyboardEvent): void => {
+  const step = (state: T | undefined, event?: KeyboardEvent): void => {
     event?.preventDefault();
-    const state = history.undo();
-    if (!isUndefined(state)) restore(state);
+    if (isUndefined(state)) return;
+    const focused = document.activeElement?.id ?? '';
+    restore(state);
+    if (focused !== '') setTimeout(() => refocus(focused));
   };
 
-  const redo = (event?: KeyboardEvent): void => {
-    event?.preventDefault();
-    const state = history.redo();
-    if (!isUndefined(state)) restore(state);
-  };
+  const undo = (event?: KeyboardEvent): void => step(history.undo(), event);
+  const redo = (event?: KeyboardEvent): void => step(history.redo(), event);
 
   hotkeys.listen('undo', undo);
   hotkeys.listen('redo', redo);
@@ -64,4 +66,19 @@ export function historyButtons(
   );
 
   return h('div', { class: 'o-history-buttons ohne-row' }, undoButton, redoButton);
+}
+
+/**
+ * Focuses the element with `id`, placing the caret at the end of an input's or textarea's text.
+ */
+function refocus(id: string): void {
+  const el = document.getElementById(id);
+  if (isNull(el)) return;
+  el.focus();
+  if (
+    (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+    !isNull(el.selectionStart)
+  ) {
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
 }

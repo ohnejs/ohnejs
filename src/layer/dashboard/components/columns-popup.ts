@@ -12,7 +12,8 @@ import {
 } from 'ohne/dashboard';
 import { computed, deepEqual, effect, ref } from 'ohne/utils';
 
-import { unsavedChanges } from './history.ts';
+import { historyButtons } from './history-buttons.ts';
+import { History, unsavedChanges } from './history.ts';
 import { tableColumnsConfigurator } from './table-columns-configurator.ts';
 
 /**
@@ -54,6 +55,7 @@ css`
 
 /**
  * The table columns popup: the `tableColumnsConfigurator` inside the apply-or-discard shell.
+ * Every change pushes onto a `History`; undo and redo step through it by button or hotkey.
  * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
  * A restore button reverts to the defaults; Apply hands `undefined` when the edit equals them.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
@@ -61,8 +63,16 @@ css`
 export function columnsPopup(options: ColumnsPopupOptions): Popup {
   const t = useT();
   const current = ref<string[]>([...options.current]);
+  const history = new History<{ columns: string[] }>({ watchUnsavedChanges: false }).push({
+    columns: [...options.current],
+  });
   const dirty = computed(() => !deepEqual(current.value, [...options.current]));
   const isDefault = computed(() => deepEqual(current.value, [...options.defaults]));
+
+  const commit = (columns: string[]): void => {
+    current.value = columns;
+    history.push({ columns });
+  };
 
   const apply = (): void => {
     options.onApply(isDefault.value ? undefined : [...current.value]);
@@ -92,9 +102,7 @@ export function columnsPopup(options: ColumnsPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: () => {
-          current.value = [...options.defaults];
-        },
+        onClick: () => commit([...options.defaults]),
       }),
   );
 
@@ -109,13 +117,13 @@ export function columnsPopup(options: ColumnsPopupOptions): Popup {
     applyButton.classList.toggle('ohne-button-outline', !changed);
   });
 
+  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
+
   const handle = popup(
     tableColumnsConfigurator({
       model: () => current.value,
       fields: options.fields,
-      onCommit: (columns) => {
-        current.value = columns;
-      },
+      onCommit: commit,
     }),
     {
       size: -1,
@@ -127,12 +135,23 @@ export function columnsPopup(options: ColumnsPopupOptions): Popup {
         h('span', { class: 'o-columns-popup-title' }, () => t('dashboard.columns.title')),
         closeButton,
       ),
-      footer: h('div', { class: 'ohne-justify-between' }, restoreButton, applyButton),
+      footer: h(
+        'div',
+        { class: 'ohne-justify-between' },
+        historyButtons(
+          history,
+          (state) => {
+            current.value = state.columns;
+          },
+          hotkeys,
+        ),
+        restoreButton,
+        applyButton,
+      ),
       onClose: () => guardedClose(),
     },
   );
 
-  const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
   setTimeout(() => {
     hotkeys.isListening.value = true;
     hotkeys.listen('save', (event) => {
