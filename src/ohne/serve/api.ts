@@ -69,6 +69,7 @@ declare module 'ohne' {
  * The database connects and its schema syncs before the server is built, so a failed sync never serves.
  * The server is built from that table, started, and wired to graceful shutdown through `onShutdown`.
  * Once it is listening, the `server:ready` hook runs before readiness is announced.
+ * A hook that throws drains the server and rethrows, so a half-booted process exits instead of serving.
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.
  * With an IPC parent, it signals `'ready'` after the funnel is watching, so a supervisor can drive reloads.
  *
@@ -153,9 +154,15 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   onShutdown(() => closeDatabases());
 
   const address = await listen(http.server, port, host);
+  try {
+    await applyHook('server:ready', { host: host ?? 'localhost', port: address.port });
+  } catch (error) {
+    await useShutdown().run({ deadline: offToUndefined(config.deadline) });
+    // An open IPC channel keeps the loop alive, so the drained process would never exit.
+    process.disconnect?.();
+    throw error;
+  }
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
-
-  await applyHook('server:ready', { host: host ?? 'localhost', port: address.port });
 
   usePrinter().success(`API ready at \`http://${host ?? 'localhost'}:${address.port}\``);
   process.send?.('ready');

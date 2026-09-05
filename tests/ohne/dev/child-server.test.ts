@@ -11,6 +11,7 @@ import {
   type ServeChild,
   spawnServeChild,
 } from '../../../src/ohne/dev/child-server.ts';
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const TIMEOUT = { timeout: 20_000 };
@@ -40,6 +41,7 @@ describe('spawnServeChild', () => {
 
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-child-server-'));
+    useEnv().set('SILENT', true);
   });
 
   after(() => {
@@ -77,6 +79,20 @@ describe('spawnServeChild', () => {
     const child = spawnServeChild(app, 'api', { entry: BIN });
     children.push(child);
     await rejects(child.ready);
+  });
+
+  it('rejects ready and kills a child that never signals ready', TIMEOUT, async () => {
+    const app = writeProject('boot-hang');
+    mkdirSync(join(app, 'boot'), { recursive: true });
+    writeFileSync(
+      join(app, 'boot', 'hang.ts'),
+      'setInterval(() => {}, 60_000)\nawait new Promise(() => {})\n',
+    );
+
+    const child = spawnServeChild(app, 'api', { entry: BIN, readyTimeout: 500 });
+    children.push(child);
+    await rejects(child.ready, /did not signal ready within `500ms`/);
+    await child.stop();
   });
 
   it('calls onExit when a ready child exits on its own', TIMEOUT, async () => {

@@ -65,6 +65,7 @@ export interface DevOptions {
  *
  * Codegen failures and child crashes never tear the supervisor down.
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
+ * A child that never signals ready is killed after a minute and parks the supervisor the same way.
  *
  * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
  * The dashboard child reads its modules from disk per request, so a file change never respawns it.

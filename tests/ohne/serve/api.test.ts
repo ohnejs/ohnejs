@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { request } from 'node:http';
-import { createServer } from 'node:net';
+import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -79,6 +79,17 @@ function header(port: number, path: string, name: string): Promise<string | unde
     );
     req.on('error', reject);
     req.end();
+  });
+}
+
+function refused(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ host: 'localhost', port });
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('error', () => resolve(true));
   });
 }
 
@@ -357,6 +368,23 @@ describe('serveAPI', () => {
 
     strictEqual(scope.__ohneServeReady?.host, 'localhost');
     strictEqual(scope.__ohneServeReady?.port, port);
+  });
+
+  it('drains the server when the server:ready hook throws', async () => {
+    const dir = serveable('ready-throws');
+    writeFileSync(
+      join(dir, 'boot', 'index.ts'),
+      "import { hook } from 'ohne';\n" +
+        "hook('server:ready', (info) => {\n" +
+        '  globalThis.__ohneServeReady = info;\n' +
+        "  throw new Error('warm-up failed');\n" +
+        '});\n',
+    );
+
+    await rejects(() => serveAPI(dir), /warm-up failed/);
+
+    ok(scope.__ohneServeReady);
+    strictEqual(await refused(scope.__ohneServeReady.port), true);
   });
 
   it('runs the schema:synced hook once with a clean first-sync report', async () => {

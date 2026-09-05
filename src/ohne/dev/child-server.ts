@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 
-import { isUndefined } from '../../utils/index.ts';
+import { formatDuration, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { reportError } from '../error/report-error.ts';
 
 /**
  * Which backend a serve child runs, as the `ohne serve <backend>` subcommand.
@@ -17,7 +18,8 @@ export type ServeBackend = 'api' | 'dashboard';
 export interface ServeChild {
   /**
    * Resolves when the child signals `'ready'` after it is listening.
-   * Rejects if the child exits before ever signalling ready, which is a boot failure.
+   * Rejects if the child exits before ever signalling ready, a boot failure the child reports itself.
+   * Also rejects once `readyTimeout` passes: the child is killed and this process reports the failure.
    */
   ready: Promise<void>;
 
@@ -76,6 +78,15 @@ export interface SpawnServeChildOptions {
   killTimeout?: number;
 
   /**
+   * Milliseconds to wait for the `'ready'` signal before the boot counts as failed.
+   * On expiry the child is killed and `ready` rejects, so a hung boot never stalls the supervisor.
+   *
+   * @default
+   * 60000
+   */
+  readyTimeout?: number;
+
+  /**
    * CLI entry to run, as `node <entry> serve <backend>`.
    *
    * @default
@@ -90,6 +101,7 @@ export interface SpawnServeChildOptions {
 }
 
 const KILL_TIMEOUT = 10_000;
+const READY_TIMEOUT = 60_000;
 
 /**
  * Spawns `ohne serve <backend>` as a supervised child and returns handles to its lifecycle.
@@ -97,6 +109,7 @@ const KILL_TIMEOUT = 10_000;
  * The child runs the real CLI entry with an IPC channel; the `api` backend also gets `SKIP_CODEGEN=1`.
  * The supervisor owns codegen; the child only serves.
  * `ready` settles the boot outcome; `stop` drains or kills it.
+ * A child that neither readies nor exits within `readyTimeout` is killed and counts as a boot failure.
  * `process.execArgv` is forwarded so node flags carry over, minus `--inspect*` to avoid a port clash.
  */
 export function spawnServeChild(
@@ -104,7 +117,13 @@ export function spawnServeChild(
   backend: ServeBackend,
   options: SpawnServeChildOptions = {},
 ): ServeChild {
-  const { port, onExit, killTimeout = KILL_TIMEOUT, entry = process.argv[1] } = options;
+  const {
+    port,
+    onExit,
+    killTimeout = KILL_TIMEOUT,
+    readyTimeout = READY_TIMEOUT,
+    entry = process.argv[1],
+  } = options;
 
   const env = {
     ...process.env,
@@ -121,6 +140,7 @@ export function spawnServeChild(
   let readied = false;
   let commanded = false;
   let gone = false;
+  let stopping: Promise<void> | undefined;
   let markReady: () => void;
   let failBoot: (error: Error) => void;
   let markGone: () => void;
@@ -132,9 +152,19 @@ export function spawnServeChild(
     markGone = resolve;
   });
 
+  const bootTimer = setTimeout(() => {
+    const error = ohneError(
+      `\`${backend}\` child did not signal ready within \`${formatDuration(readyTimeout)}\``,
+    );
+    reportError(error);
+    failBoot(error);
+    void stop();
+  }, readyTimeout);
+
   child.on('message', (message) => {
     if (message === 'ready') {
       readied = true;
+      clearTimeout(bootTimer);
       markReady();
     }
   });
@@ -145,6 +175,7 @@ export function spawnServeChild(
 
   child.once('exit', (code, signal) => {
     gone = true;
+    clearTimeout(bootTimer);
     markGone();
     if (commanded) return;
     if (readied) onExit?.({ code, signal });
@@ -156,12 +187,15 @@ export function spawnServeChild(
       );
   });
 
-  let stopping: Promise<void> | undefined;
   return {
     ready,
-    stop: () => (stopping ??= drain()),
+    stop,
     reload: () => send('reload'),
   };
+
+  function stop(): Promise<void> {
+    return (stopping ??= drain());
+  }
 
   async function drain(): Promise<void> {
     commanded = true;
