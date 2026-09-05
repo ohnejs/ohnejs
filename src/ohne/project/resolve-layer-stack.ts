@@ -6,7 +6,7 @@ import { ohneError } from '../error/ohne-error.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
 import { parseLayerSpecifier, resolveLayerDir, resolveLayerSubpath } from './resolve-layer-dir.ts';
-import { type OhneLayer, resolveOhneLayers } from './resolve-ohne-layers.ts';
+import { type OhneLayer, resolveOhnePackages } from './resolve-ohne-layers.ts';
 
 /**
  * A layer in the resolved stack, paired with its own config, split by ownership.
@@ -33,9 +33,9 @@ export interface ResolvedLayer extends OhneLayer {
  *
  * The app's `layers` name the layers it extends; each of those names its own, and so on.
  * Only the layers reached this way are stacked - an installed layer no one lists is left out.
- * Names resolve to directories through `resolveOhneLayers`, the app's ohne dependency closure.
+ * Names resolve to directories through `resolveOhnePackages`, the app's dependency closure.
  * A name carrying a subpath (`@acme/kit/auth`) resolves through the package's `exports`.
- * The package may already be in the closure, the app itself included.
+ * The package need not be a layer itself, and the app itself counts.
  * An app can therefore list a layer its own `package.json` exports.
  *
  * The graph is walked depth-first in post-order, so a layer is emitted before the layers that list it.
@@ -63,10 +63,11 @@ export async function resolveLayerStack(
   from: string = process.cwd(),
   options: LayerLoadOptions = {},
 ): Promise<ResolvedLayer[]> {
-  const closure = await resolveOhneLayers(from);
+  const packages = await resolveOhnePackages(from);
+  const closure = packages.filter((pkg) => pkg.layer);
   if (closure.length === 0) return [];
 
-  const dirByName = new Map(closure.map((layer) => [layer.name, layer.dir]));
+  const dirByName = new Map(packages.map((pkg) => [pkg.name, pkg.dir]));
   const stack: ResolvedLayer[] = [];
   const visited = new Set<string>();
 
@@ -97,7 +98,7 @@ export async function resolveLayerStack(
           ],
         });
       }
-      if (dir !== root && !(await isOhneProject(dir))) {
+      if (!(await isOhneProject(dir))) {
         throw ohneError({
           title: `Layer \`${specifier}\` cannot be used`,
           body: [

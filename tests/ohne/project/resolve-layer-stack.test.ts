@@ -126,6 +126,32 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     );
   });
 
+  it('resolves a subpath of a package reached only through another layer', async () => {
+    const consumer = join(root, 'deep-app');
+    mkdirSync(consumer, { recursive: true });
+    writeManifest(consumer, { name: 'deep-app', deps: ['mid'], layers: ['mid', 'kit3/auth'] });
+
+    const kit = join(store, 'kit3');
+    mkdirSync(join(kit, 'auth'), { recursive: true });
+    writeFileSync(
+      join(kit, 'package.json'),
+      JSON.stringify({
+        name: 'kit3',
+        type: 'module',
+        exports: { './auth': './auth/ohne.config.ts' },
+      }),
+    );
+    writeFileSync(join(kit, 'auth', 'ohne.config.ts'), 'export default {}\n');
+    writeLayer({ name: 'mid', deps: ['kit3'] });
+    link(consumer, 'mid');
+
+    const stack = await resolveLayerStack(consumer);
+    deepStrictEqual(
+      stack.map((layer) => layer.name),
+      ['mid', 'kit3/auth', 'deep-app'],
+    );
+  });
+
   it('throws when a listed subpath is not exported', async () => {
     const consumer = join(root, 'bad-subpath');
     mkdirSync(consumer, { recursive: true });
