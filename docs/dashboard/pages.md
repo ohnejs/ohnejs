@@ -63,6 +63,10 @@ navigate('/authors/42');
 The most specific matching route wins, and a page's module loads on demand the first time its
 route matches. An unmatched path renders the dashboard's not-found page.
 
+`lastNavigation()` tells a page how it was reached: the initial `load`, a `navigate` call or a
+clicked link, or `popstate` for the back and forward buttons. A page that restores a remembered
+view when its URL arrives bare checks it first, so going back still lands on the bare view.
+
 ## The sidebar
 
 A page is reachable by URL the moment its file exists. To give it a row in the sidebar, list it

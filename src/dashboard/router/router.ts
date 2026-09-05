@@ -32,11 +32,18 @@ interface Active extends MatchedRoute {
   component: DashboardPage;
 }
 
+/**
+ * How the current location was reached.
+ * The initial `load`, a `navigate` call or an intercepted link, or `popstate` for back and forward.
+ */
+export type NavigationCause = 'load' | 'navigate' | 'popstate';
+
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 let token = 0;
 let guard: ((target: string) => boolean) | null = null;
 let rendered = '';
+let cause: NavigationCause = 'load';
 
 /**
  * Starts the client router: it renders the matched page for the current URL into `container`.
@@ -55,6 +62,7 @@ export async function startRouter(
       history.pushState(null, '', rendered);
       return;
     }
+    cause = 'popstate';
     void render();
   });
   document.addEventListener('click', interceptLink);
@@ -72,7 +80,23 @@ export function navigate(path: string, options?: { replace?: boolean }): void {
   if (!isNull(guard) && !guard(path)) return;
   if (options?.replace === true) history.replaceState(null, '', path);
   else history.pushState(null, '', path);
+  cause = 'navigate';
   void render();
+}
+
+/**
+ * How the current location was reached, so a page can tell a fresh visit from back and forward.
+ * A page that restores a remembered view on a bare URL checks this, since back must land on the bare view.
+ *
+ * @example
+ * ```ts
+ * if (location.search === '' && remembered !== '' && lastNavigation() !== 'popstate') {
+ *   navigate(location.pathname + remembered, { replace: true })
+ * }
+ * ```
+ */
+export function lastNavigation(): NavigationCause {
+  return cause;
 }
 
 /**
@@ -102,15 +126,25 @@ export function useRoute(): RouteContext | null {
   return active.value;
 }
 
+/**
+ * The active page rendered for its route, or the not-found page when no route matched.
+ */
 function view(): Child {
   const route = active.value;
   return isNull(route) ? notFound() : route.component(route);
 }
 
+/**
+ * The dashboard's own not-found page.
+ */
 function notFound(): Child {
   return h('h1', null, 'Not found');
 }
 
+/**
+ * Matches the current location, loads its page module on demand, and publishes it as the active route.
+ * A render superseded by a newer navigation publishes nothing, so a slow module never wins over a later page.
+ */
 async function render(): Promise<void> {
   const mine = ++token;
   rendered = location.pathname + location.search + location.hash;
@@ -132,6 +166,10 @@ async function render(): Promise<void> {
   active.value = { ...match, component: module.default };
 }
 
+/**
+ * Turns a plain left-click on a same-origin link into a client navigation.
+ * Modified clicks, links with a target or a download, and hash-only changes keep the browser's behaviour.
+ */
 function interceptLink(event: MouseEvent): void {
   if (
     event.defaultPrevented ||
