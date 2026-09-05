@@ -304,6 +304,33 @@ describe('per-route limits', () => {
     );
   });
 
+  it('answers an over-cap body with 413 carrying the cors policy headers', async () => {
+    useMiddleware().registerGlobal(
+      'global-cors',
+      cors({ origin: 'https://app.example.com', credentials: true }),
+    );
+    await withServer(
+      [
+        makeRoute(
+          'POST',
+          '/upload',
+          defineHandler(() => 'ok', { maxBodySize: 8 }),
+        ),
+      ],
+      async (base) => {
+        const res = await fetch(`${base}/upload`, {
+          method: 'POST',
+          headers: { origin: 'https://app.example.com' },
+          body: 'x'.repeat(64),
+        });
+        strictEqual(res.status, 413);
+        strictEqual(res.headers.get('access-control-allow-origin'), 'https://app.example.com');
+        strictEqual(res.headers.get('access-control-allow-credentials'), 'true');
+        await res.body?.cancel();
+      },
+    );
+  });
+
   it('lets a route handlerTimeout override opt out of the global deadline', async () => {
     await withServer(
       [

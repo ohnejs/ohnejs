@@ -126,7 +126,7 @@ export interface CreateServerOptions {
 
   /**
    * Largest request body to accept, as a `parseBytes` value.
-   * An over-cap `Content-Length` is refused with `413` before any body is read.
+   * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
    * A body that overruns mid-stream aborts with the same `413`.
    * Omitted leaves the body size unbounded.
    *
@@ -317,15 +317,14 @@ async function handle(
     const match = router.match(method, url.pathname);
 
     const overrides = match.type === 'matched' ? routeLimits(match.route.handler) : undefined;
-    const request = toRequest(req, {
-      url,
-      maxBodySize: limit(overrides?.maxBodySize, limits.maxBodySize),
-    });
+    const maxBodySize = limit(overrides?.maxBodySize, limits.maxBodySize);
+    const request = toRequest(req, { url, maxBodySize });
 
     if (match.type === 'matched' || match.type === 'options') {
       const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
       const params = match.type === 'matched' ? match.params : {};
       const dispatched = await dispatch(route, request, url, params, {
+        maxBodySize,
         handlerTimeout: limit(overrides?.handlerTimeout, limits.handlerTimeout),
         waitUntilTimeout: limit(overrides?.waitUntilTimeout, limits.waitUntilTimeout),
         ip: clientIP(req, trustProxy),

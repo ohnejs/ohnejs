@@ -169,6 +169,29 @@ describe('dispatch', () => {
     deepStrictEqual(await response.json(), { ok: true });
   });
 
+  it('refuses an over-cap Content-Length with 413 before the handler runs', async () => {
+    let handlerRan = false;
+    const route = makeRoute('/', () => {
+      handlerRan = true;
+      return 'ok';
+    });
+    const request = new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-length': '64' },
+      body: 'x'.repeat(64),
+    });
+    const { response } = await dispatch(route, request, url(), {}, { maxBodySize: 8 });
+    strictEqual(response.status, 413);
+    strictEqual(handlerRan, false);
+  });
+
+  it('lets a body with no Content-Length reach the handler under maxBodySize', async () => {
+    const route = makeRoute('/', async () => (await useEvent().request.text()).toUpperCase());
+    const request = new Request('http://localhost/', { method: 'POST', body: 'hello' });
+    const { response } = await dispatch(route, request, url(), {}, { maxBodySize: 8 });
+    strictEqual(await response.text(), 'HELLO');
+  });
+
   it('maps an unexpected throw to a generic 500 without leaking it', async () => {
     const route = makeRoute('/', () => {
       throw new Error('db exploded');

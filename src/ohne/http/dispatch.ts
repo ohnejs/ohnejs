@@ -3,14 +3,21 @@ import type { MiddlewareKey } from '../middleware/known-middleware.ts';
 import type { Handler, Route } from '../routes/route.ts';
 import type { Event, EventContext } from './event.ts';
 
-import { errorMessage, isUndefined, withTimeout } from '../../utils/index.ts';
+import {
+  coerceToNumber,
+  errorMessage,
+  isNull,
+  isNumber,
+  isUndefined,
+  withTimeout,
+} from '../../utils/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isBusyError } from '../query/write/busy.ts';
 import { isReferenceViolation, isValidationError } from '../query/write/errors.ts';
-import { conflict, HTTPError, unprocessable } from './http-error.ts';
+import { conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
 import { resolveMessage, translate } from './translate.ts';
@@ -88,6 +95,14 @@ export interface Dispatched {
  */
 export interface DispatchOptions {
   /**
+   * Largest request body to accept, in bytes.
+   * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
+   * The response headers the middleware set, a CORS policy's among them, ride along on the refusal.
+   * Omitted skips the check.
+   */
+  maxBodySize?: number;
+
+  /**
    * Milliseconds to let middleware and the handler run before giving up with a `503`.
    * Distinct from the socket-level `requestTimeout`: this bounds the work, not the connection.
    * Omitted lets the handler run without a deadline.
@@ -119,6 +134,7 @@ export interface DispatchOptions {
  * The `middleware:resolve` hook may filter or reorder that combined list first.
  * Records each on `event.appliedMiddleware` as it runs, then runs the handler.
  * A middleware that returns a value short-circuits, and the handler never runs.
+ * When `maxBodySize` is set, an over-cap `Content-Length` is refused with `413` before the handler runs.
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
  * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
@@ -180,6 +196,7 @@ export async function dispatch(
         if (!isUndefined(result))
           return toResponse(await resolveResult(result, event), event.response);
       }
+      if (exceedsBodySize(request, options.maxBodySize)) throw payloadTooLarge();
       const result = await (route.handler as Handler)({ params });
       return toResponse(await resolveResult(result, event), event.response);
     } catch (error) {
@@ -255,6 +272,12 @@ async function resolveErrorResponse(
   const callbacks = useHooks().get('error:response');
   if (isUndefined(callbacks) || callbacks.length === 0) return response;
   return applyHook('error:response', response, error, event);
+}
+
+function exceedsBodySize(request: Request, max: number | undefined): boolean {
+  if (isNull(request.body) || isUndefined(max)) return false;
+  const length = coerceToNumber(request.headers.get('content-length'));
+  return isNumber(length) && length > max;
 }
 
 async function drain(background: Promise<unknown>[]): Promise<void> {

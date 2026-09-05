@@ -104,26 +104,6 @@ describe('toRequest', () => {
     );
   });
 
-  it('refuses an over-cap Content-Length with 413 before reading', async () => {
-    await withServer(
-      async (req, res) => {
-        try {
-          toRequest(req, { maxBodySize: 4 });
-          await sendResponse(res, new Response(null, { status: 200 }));
-        } catch (error) {
-          await sendResponse(
-            res,
-            new Response(null, { status: error instanceof HTTPError ? error.status : 500 }),
-          );
-        }
-      },
-      async (base) => {
-        const res = await fetch(base, { method: 'POST', body: 'hello world' });
-        strictEqual(res.status, 413);
-      },
-    );
-  });
-
   it('aborts a streamed body that overruns the cap with 413', async () => {
     await withServer(
       async (req, res) => {

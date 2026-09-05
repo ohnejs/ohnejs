@@ -466,7 +466,7 @@ export interface Config {
 
     /**
      * Largest request body to accept, as a `parseBytes` value (bytes as a number, or a string like `'1mb'`).
-     * An over-cap `Content-Length` is refused with `413` before any body is read.
+     * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
      * A body that overruns mid-stream aborts with the same `413`.
      * `false` leaves the body size unbounded.
      *

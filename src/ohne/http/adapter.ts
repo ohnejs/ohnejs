@@ -3,7 +3,7 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { isArray, isNull, isUndefined } from '../../utils/index.ts';
+import { first, isArray, isNull, isUndefined } from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
@@ -39,7 +39,8 @@ export interface ToRequestOptions {
 
   /**
    * Largest request body to accept, in bytes.
-   * An over-cap `Content-Length` throws `413` before any body is read; an overrun aborts mid-stream.
+   * The streamed body is metered, so an overrun aborts mid-flight with `413`.
+   * The `Content-Length` pre-check lives in `dispatch`, after the middleware.
    * Omitted leaves the body size unbounded.
    */
   maxBodySize?: number;
@@ -71,9 +72,9 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  * Every other method streams the body via `Readable.toWeb` with `duplex: 'half'`.
  * The body flows on demand with backpressure rather than buffering.
  *
- * When `maxBodySize` is set, an over-cap `Content-Length` throws `413` before any body is read.
- * The streamed body is metered too, so a chunked or under-reported body aborts mid-flight with `413`.
+ * When `maxBodySize` is set, the streamed body is metered, so an overrun aborts mid-flight with `413`.
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
+ * The `Content-Length` pre-check lives in `dispatch`, so a policy middleware's headers reach the `413`.
  *
  * This is the only inbound place Node internals are touched.
  */
@@ -91,14 +92,6 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
 
   const { maxBodySize } = options;
   const bodyless = method === 'GET' || method === 'HEAD';
-  if (
-    !bodyless &&
-    !isUndefined(maxBodySize) &&
-    Number(req.headers['content-length']) > maxBodySize
-  ) {
-    throw payloadTooLarge();
-  }
-
   let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
   if (!isNull(body) && !isUndefined(maxBodySize)) body = meterBody(body, maxBodySize);
 
@@ -151,7 +144,7 @@ function forwardedOrigin(headers: IncomingHttpHeaders): { proto?: string; host?:
 
 function firstToken(value: string | string[] | undefined): string | undefined {
   if (isUndefined(value)) return undefined;
-  const raw = isArray(value) ? value[0] : value;
+  const raw = isArray(value) ? first(value) : value;
   const token = raw?.split(',')[0]?.trim();
   return token ? token : undefined;
 }
