@@ -242,6 +242,7 @@ css`
  * Tab is trapped inside.
  * Escape defers a timeout so inner widgets can `preventDefault` first, and never closes while typing.
  * Like the overlay click, it only ever CALLS `onClose` - the popup unmounts nothing itself.
+ * Once `close()` has run, neither trigger calls `onClose` again while the popup animates out.
  * Focus re-anchors to the root whenever it falls to `body` while the popup is topmost.
  * Create it inside a reactive region and dispose that region after `close()` resolves.
  * The cleanup removes the root and releases the overlay depth.
@@ -268,8 +269,10 @@ export function popup(
   let overlay: OverlayHandle | undefined;
   let releaseTrap: (() => void) | undefined;
   let disposed = false;
+  let closing = false;
 
   const close: PopupClose = async () => {
+    closing = true;
     overlay?.undim();
     visible.value = false;
     await sleep(duration);
@@ -299,7 +302,9 @@ export function popup(
 
   const overlayEl = h('div', {
     class: 'ohne-popup-overlay',
-    onClick: () => options.onClose?.(close),
+    onClick: () => {
+      if (!closing) options.onClose?.(close);
+    },
   });
 
   const classes =
@@ -334,7 +339,7 @@ export function popup(
 
   const onEscapeKey = (event: KeyboardEvent): void => {
     setTimeout(() => {
-      if (!event.defaultPrevented && !isEditingText()) options.onClose?.(close);
+      if (!closing && !event.defaultPrevented && !isEditingText()) options.onClose?.(close);
     });
   };
 

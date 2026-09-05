@@ -1,5 +1,7 @@
 import type { KeyStroke } from '../../utils/keys/key-stroke.ts';
 
+import { isNull } from '../../utils/is/is-null.ts';
+
 /**
  * A named keyboard shortcut the dashboard understands.
  * The bindings are fixed.
@@ -35,7 +37,7 @@ export interface HotkeyContext {
 
   /**
    * Whether focus sits in a text-editing element.
-   * Everything except `save` stands down while the user types.
+   * Everything except `save` and the `allowWhileTyping` actions stands down while the user types.
    */
   editing: boolean;
 
@@ -44,6 +46,15 @@ export interface HotkeyContext {
    * Only `save` fires regardless, so Cmd/Ctrl+S always reaches its handler.
    */
   disabled: boolean;
+
+  /**
+   * Actions that keep firing while `editing`, on top of `save`.
+   * A `History`-backed form lists `undo` and `redo`, so its history wins over the browser's text undo.
+   *
+   * @default
+   * []
+   */
+  allowWhileTyping?: readonly HotkeyAction[];
 }
 
 /**
@@ -51,6 +62,7 @@ export interface HotkeyContext {
  * `delete` and `close` come first, then the platform gate, then the letter.
  * The gate is Command on mac and Control elsewhere, never with Alt or the other modifier.
  * `save` alone ignores `editing` and `disabled`; on non-mac `Ctrl+Shift+Z` is deliberately nothing.
+ * The `allowWhileTyping` actions ignore `editing` as well, but never `disabled`.
  *
  * @example
  * ```ts
@@ -61,30 +73,30 @@ export interface HotkeyContext {
  * ```
  */
 export function matchHotkey(stroke: KeyStroke, context: HotkeyContext): HotkeyAction | null {
+  const action = resolveAction(stroke, context.mac, !context.disabled);
+  if (isNull(action) || !context.editing || action === 'save') return action;
+  return (context.allowWhileTyping ?? []).includes(action) ? action : null;
+}
+
+function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAction | null {
   const letter = stroke.key.toLowerCase();
-  const idle = !context.editing && !context.disabled;
   const bare = !stroke.meta && !stroke.alt && !stroke.ctrl && !stroke.shift;
 
   if (
     idle &&
     (((stroke.key === 'Delete' || stroke.key === 'Backspace') && bare) ||
-      (context.mac &&
-        letter === 'd' &&
-        stroke.ctrl &&
-        !stroke.meta &&
-        !stroke.alt &&
-        !stroke.shift))
+      (mac && letter === 'd' && stroke.ctrl && !stroke.meta && !stroke.alt && !stroke.shift))
   ) {
     return 'delete';
   }
   if (idle && stroke.key === 'Escape' && bare) return 'close';
-  if (context.mac && (!stroke.meta || stroke.alt || stroke.ctrl)) return null;
-  if (!context.mac && (!stroke.ctrl || stroke.alt || stroke.meta)) return null;
+  if (mac && (!stroke.meta || stroke.alt || stroke.ctrl)) return null;
+  if (!mac && (!stroke.ctrl || stroke.alt || stroke.meta)) return null;
 
   if (letter === 'y') return stroke.shift || !idle ? null : 'redo';
   if (letter === 'z') {
     if (!idle) return null;
-    return context.mac && stroke.shift ? 'redo' : stroke.shift ? null : 'undo';
+    return mac && stroke.shift ? 'redo' : stroke.shift ? null : 'undo';
   }
   if (letter === 'k') return !stroke.shift && idle ? 'search' : null;
   if (letter === 'a') return !stroke.shift && idle ? 'selectAll' : null;

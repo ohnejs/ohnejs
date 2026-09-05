@@ -58,6 +58,15 @@ export interface HotkeysOptions {
   allowInOverlays?: boolean;
 
   /**
+   * Actions that keep firing while focus sits in a text-editing element; `save` always does.
+   * A `History`-backed form lists `undo` and `redo`, so its history wins over the browser's text undo.
+   *
+   * @default
+   * []
+   */
+  allowWhileTyping?: HotkeyAction[];
+
+  /**
    * Whether to start listening immediately.
    * Overlay code passes `false` and resumes once its surface is mounted.
    *
@@ -84,6 +93,7 @@ export interface HotkeysOptions {
  * While any overlay is open, only instances with `allowInOverlays` at exactly that depth fire.
  * The `ohne-no-interaction` body class mutes everything.
  * `save` alone pierces both gates and text editing, so Cmd/Ctrl+S always lands.
+ * The `allowWhileTyping` actions pierce text editing as well.
  * Created inside a reactive scope, the listener detaches when the scope disposes.
  * Standalone instances must `pause` themselves.
  *
@@ -100,6 +110,7 @@ export interface HotkeysOptions {
 export function useHotkeys(options: HotkeysOptions = {}): Hotkeys {
   const isListening = ref(options.listen ?? true);
   const allowInOverlays = ref(options.allowInOverlays ?? false);
+  const allowWhileTyping = options.allowWhileTyping ?? [];
   const listeners = new Map<HotkeyAction, ((event: KeyboardEvent) => void)[]>();
   const mac = isMac();
 
@@ -120,6 +131,7 @@ export function useHotkeys(options: HotkeysOptions = {}): Hotkeys {
       mac,
       editing: isEditingText(),
       disabled,
+      allowWhileTyping,
     });
     if (action) listeners.get(action)?.forEach((callback) => callback(keyboard));
   };

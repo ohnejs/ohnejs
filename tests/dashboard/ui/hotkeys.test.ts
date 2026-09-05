@@ -109,3 +109,19 @@ describe('hotkey labels', () => {
     strictEqual(hotkeyLabels(false).redo, 'Ctrl + Y');
   });
 });
+
+describe('hotkeys while typing', () => {
+  it('stands down while typing unless the action is allowed', () => {
+    const typing = context({ editing: true });
+    strictEqual(matchHotkey(stroke('z', { ctrl: true }), typing), null);
+    strictEqual(matchHotkey(stroke('y', { ctrl: true }), typing), null);
+    strictEqual(matchHotkey(stroke('s', { ctrl: true }), typing), 'save');
+
+    const allowed = context({ editing: true, allowWhileTyping: ['undo', 'redo'] });
+    strictEqual(matchHotkey(stroke('z', { ctrl: true }), allowed), 'undo');
+    strictEqual(matchHotkey(stroke('y', { ctrl: true }), allowed), 'redo');
+    strictEqual(matchHotkey(stroke('a', { ctrl: true }), allowed), null);
+    strictEqual(matchHotkey(stroke('Backspace'), allowed), null);
+    strictEqual(matchHotkey(stroke('z', { ctrl: true }), { ...allowed, disabled: true }), null);
+  });
+});
