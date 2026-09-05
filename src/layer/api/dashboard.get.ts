@@ -36,7 +36,7 @@ import type { User } from '../auth/types.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
 import { resolveMessage, translate } from '../../ohne/http/translate.ts';
-import { userCan } from '../auth/capabilities.ts';
+import { userCan, userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
 
 /**
@@ -338,6 +338,12 @@ export interface DashboardMeta {
   roles: string[];
 
   /**
+   * The capabilities the signed-in user holds, the union of their roles' grants.
+   * Wildcards stay as declared, so a client matches with `hasCapability` rather than by equality.
+   */
+  capabilities: Capability[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];
@@ -415,6 +421,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     collections,
     blocks: describeBlocks(collections),
     roles: useRoles().keys(),
+    capabilities: userCapabilities(user),
     locales,
     defaultLocale,
   };

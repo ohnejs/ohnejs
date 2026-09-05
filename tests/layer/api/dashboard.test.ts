@@ -307,6 +307,16 @@ describe('access', () => {
   });
 });
 
+describe('capabilities', () => {
+  it('ships the capabilities the user holds, wildcards as declared', async () => {
+    deepStrictEqual((await call(user)).body.capabilities, [
+      'collection.DashNotes.*',
+      'collection.DashOwners.read',
+    ]);
+    deepStrictEqual((await call(admin)).body.capabilities, ['*']);
+  });
+});
+
 describe('operations', () => {
   it('carries the per-operation verdicts', async () => {
     const { body } = await call(user);
