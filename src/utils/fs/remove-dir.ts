@@ -1,9 +1,9 @@
 import { rm } from 'node:fs/promises';
 
 /**
- * Removes the directory at `path` along with its entire contents.
+ * Removes the file or directory at `path`, a directory along with its entire contents.
  *
- * Silent if the directory does not exist.
+ * Silent if nothing exists there.
  * Throws on permission errors.
  *
  * @example
