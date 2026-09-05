@@ -298,6 +298,12 @@ export interface DashboardMeta {
   roles: string[];
 
   /**
+   * The capabilities the signed-in user holds, the union of their roles' grants.
+   * Wildcards stay as declared, so a client matches with `hasCapability` rather than by equality.
+   */
+  capabilities: string[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];
