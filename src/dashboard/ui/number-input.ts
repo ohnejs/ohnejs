@@ -11,6 +11,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { icon } from './icon.ts';
+import { mirrorWidth } from './mirror-width.ts';
 import './tokens.ts';
 
 /**
@@ -93,7 +94,7 @@ export interface NumberInputOptions {
   name?: string;
 
   /**
-   * Sizes the input to its content, measured through a hidden mirror span.
+   * Sizes the box to its content and suffix, measured through a hidden mirror span.
    *
    * @default
    * false
@@ -174,6 +175,11 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .ohne-number-auto-width {
+    flex-shrink: 0;
+    width: fit-content;
+  }
+
   .ohne-number-icon {
     position: absolute;
     top: 50%;
@@ -233,11 +239,8 @@ css`
     position: absolute;
     bottom: 0;
     left: 0;
-    display: inline-flex;
     width: auto;
     height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
     white-space: pre;
     visibility: hidden;
   }
@@ -293,7 +296,7 @@ function leadingZeros(value: number, width: number): string {
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display.
  *
- * With `autoWidth` the input hugs its content, measured through a hidden mirror span.
+ * With `autoWidth` the box hugs its content and suffix, measured through a hidden mirror span.
  * It re-measures whenever the span's border box changes.
  *
  * @example
@@ -439,13 +442,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       { class: 'ohne-number-input ohne-number-input-shadow' },
       () => stringified.value || options.placeholder,
     );
-    // The border box, not the client rect: an overlay's entrance transform scales what a rect reports.
-    const observer = new ResizeObserver(([entry]) => {
-      const size = entry?.borderBoxSize[0];
-      if (!isUndefined(size)) input.style.width = `${size.inlineSize}px`;
-    });
-    observer.observe(shadow);
-    onCleanup(() => observer.disconnect());
+    mirrorWidth(input, shadow);
   }
 
   const dragButton = (): HTMLElement => {
@@ -476,7 +473,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       h(
         'button',
         {
-          disabled: () => options.max !== undefined && model.value >= options.max,
+          disabled: () => !isUndefined(options.max) && model.value >= options.max,
           tabindex: '-1',
           type: 'button',
           class: 'ohne-raw',
@@ -487,7 +484,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       h(
         'button',
         {
-          disabled: () => options.min !== undefined && model.value <= options.min,
+          disabled: () => !isUndefined(options.min) && model.value <= options.min,
           tabindex: '-1',
           type: 'button',
           class: 'ohne-raw',

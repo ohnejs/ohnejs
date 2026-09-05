@@ -1,10 +1,13 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { coerceToString } from '../../utils/coerce/coerce-to-string.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { mirrorWidth } from './mirror-width.ts';
 import './tokens.ts';
 
 /**
@@ -88,6 +91,14 @@ export interface TextInputOptions {
   autofocus?: boolean;
 
   /**
+   * Sizes the box to its content, measured through a hidden mirror span.
+   *
+   * @default
+   * false
+   */
+  autoWidth?: boolean;
+
+  /**
    * Content rendered inside the border box, before the input.
    */
   prefix?: Child | (() => Child);
@@ -141,6 +152,12 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .ohne-input-auto-width {
+    position: relative;
+    flex-shrink: 0;
+    width: fit-content;
+  }
+
   .ohne-input-numeric {
     font-variant-numeric: tabular-nums;
   }
@@ -165,6 +182,16 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .ohne-input-shadow {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: 0;
+    white-space: pre;
+    visibility: hidden;
+  }
+
   .ohne-input > .ohne-button {
     --ohne-size: calc(var(--ohne-base-size) - 1);
     width: calc(2em + 0.125rem);
@@ -187,6 +214,7 @@ css`
  * Typing writes into the model; writing the model updates the input.
  * Escape blurs the input without bubbling, and double-clicks stop at the box.
  * `ohne-input-numeric` on the box renders the value in tabular numerals.
+ * With `autoWidth` the box hugs its content, measured through a hidden mirror span.
  *
  * @example
  * ```ts
@@ -204,7 +232,7 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
     minlength: options.minLength,
     name: options.name,
     placeholder: options.placeholder,
-    spellcheck: String(options.spellcheck ?? false),
+    spellcheck: coerceToString(options.spellcheck ?? false),
     type: options.type ?? 'text',
     class: 'ohne-input-control',
   }) as HTMLInputElement;
@@ -228,11 +256,23 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
   batchedEffect(() => {
     if (input.value !== model.value) input.value = model.value;
   });
+  let shadow: HTMLElement | null = null;
+  if (options.autoWidth) {
+    const placeholder = (): string | undefined =>
+      isFunction(options.placeholder) ? options.placeholder() : options.placeholder;
+    shadow = h(
+      'span',
+      { class: 'ohne-input-control ohne-input-shadow' },
+      () => model.value || placeholder(),
+    );
+    mirrorWidth(input, shadow);
+  }
   return h(
     'div',
     {
       class: () =>
         'ohne-input' +
+        (options.autoWidth ? ' ohne-input-auto-width' : '') +
         (options.error?.() ? ' ohne-input-has-errors' : '') +
         (options.disabled?.() ? ' ohne-input-disabled' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
@@ -240,6 +280,7 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
     },
     options.prefix,
     input,
+    shadow,
     options.suffix,
   );
 }
