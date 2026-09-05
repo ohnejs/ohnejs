@@ -126,6 +126,7 @@ export * from './keys/stroke-from-readline-key.ts';
 export * from './media-type/parse-media-type.ts';
 export * from './merge/merge.ts';
 export * from './mime/media-category.ts';
+export * from './mime/media-type-matches.ts';
 export * from './mime/media-types-compatible.ts';
 export * from './mime/mime-type-for.ts';
 export * from './mime/sniff-media-type.ts';
