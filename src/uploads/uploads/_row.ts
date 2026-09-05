@@ -11,7 +11,7 @@ import { decorateUpload } from './decorate.ts';
 /**
  * An `Uploads` row as the query layer returns it, before `decorateUpload` adds `path` and `url`.
  */
-export type UploadRow = Omit<UploadRecord, 'path' | 'url' | 'thumbnail'>;
+export type UploadRow = Omit<UploadRecord, 'path' | 'url' | 'variants'>;
 
 /**
  * Reads one row by `UUID`, on `tx` when the caller holds one, or throws the `404`.

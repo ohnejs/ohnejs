@@ -28,6 +28,11 @@ uploads: {
   maxFileSize: '128mb',
   types: '*',
   cache: { noCache: true },
+  images: {
+    variants: {
+      thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
+    },
+  },
 },
 ```
 
@@ -42,7 +47,8 @@ uploads: {
   every use, so a renamed or replaced file is never stale.
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
   the storage. Omitted, the API serves every file itself.
-- `images` - the image service that renders resized variants; see
+- `images` - the image service that renders resized variants, and the named variants every image
+  read carries. `url` has no default; without it every image URL points at the original. See
   [image variants](./images.md).
 
 `storage` and `url` are each layer's own: a dependency cannot point your uploads at its storage.
@@ -87,14 +93,15 @@ for images, `description` as its alt text per content locale, and `focalX` and `
 row records its `author` and `uploadedAt`.
 
 Every read is decorated. `path` joins the location, `url` is where a file's bytes are served from,
-and `thumbnail` is a small signed variant when an [image service](./images.md) is configured. A
-folder carries `path` alone:
+and `variants` holds one signed URL per named variant when an [image service](./images.md) is
+configured. A folder carries `path` alone:
 
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();
 
 upload.path; // -> 'photos/2024/sunset.jpg'
 upload.url; // -> '/uploads/photos/2024/sunset.jpg'
+upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/2024/sunset.jpg'
 ```
 
 Only `read` is exposed over the collections API. Every write goes through the routes below or the

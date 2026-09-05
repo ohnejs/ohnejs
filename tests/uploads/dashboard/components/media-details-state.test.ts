@@ -11,6 +11,7 @@ import {
   formatUploadedOn,
   isSmallPreview,
   previewKindOf,
+  variantTokens,
   versionedURL,
 } from '../../../../src/uploads/dashboard/components/media-details-state.ts';
 
@@ -113,6 +114,24 @@ describe('versionedURL', () => {
   it('appends the version as a query parameter', () => {
     strictEqual(versionedURL('/uploads/a.jpg', 7), '/uploads/a.jpg?v=7');
     strictEqual(versionedURL('/uploads/a.jpg?w=100', 7), '/uploads/a.jpg?w=100&v=7');
+  });
+});
+
+describe('variantTokens', () => {
+  it('reads the segment right before the path', () => {
+    strictEqual(
+      variantTokens(
+        'https://img.test/sig/w_320,h_320,fit_inside,f_webp/photos/a.jpg',
+        'photos/a.jpg',
+      ),
+      'w_320,h_320,fit_inside,f_webp',
+    );
+    strictEqual(variantTokens('https://img.test/sig/w_320/a.jpg', 'a.jpg'), 'w_320');
+  });
+
+  it('answers nothing when the URL does not end with the path', () => {
+    strictEqual(variantTokens('https://img.test/sig/w_320/other.jpg', 'photos/a.jpg'), '');
+    strictEqual(variantTokens('https://img.test/sig/w_320/xphotos/a.jpg', 'photos/a.jpg'), '');
   });
 });
 

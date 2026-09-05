@@ -1,4 +1,4 @@
-import { clamp, isNull, isUndefined } from 'ohne/utils';
+import { basename, clamp, isNull, isUndefined } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -7,7 +7,7 @@ import { isDisplayableImage } from './media-library-state.ts';
 /**
  * The tabs of the details popup.
  */
-export type DetailsTab = 'details' | 'description';
+export type DetailsTab = 'details' | 'description' | 'variants';
 
 /**
  * What the details popup previews: a displayable image, a playable video, or nothing.
@@ -152,6 +152,23 @@ export function detailsPatch(state: DetailsState, image: boolean): Record<string
  */
 export function versionedURL(url: string, version: number): string {
   return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
+}
+
+/**
+ * The transform tokens of a variant URL: the segment right before `/` + `path`.
+ * `''` when the URL does not end with `/` + `path`.
+ *
+ * @example
+ * ```ts
+ * variantTokens('https://img.test/sig/w_320,f_webp/photos/a.jpg', 'photos/a.jpg') // -> 'w_320,f_webp'
+ * variantTokens('https://img.test/sig/w_320,f_webp/other.jpg', 'photos/a.jpg')    // -> ''
+ * ```
+ */
+export function variantTokens(url: string, path: string): string {
+  const tail = `/${path}`;
+  if (!url.endsWith(tail)) return '';
+  const head = url.slice(0, -tail.length);
+  return basename(head);
 }
 
 /**

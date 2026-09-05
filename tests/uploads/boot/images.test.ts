@@ -1,4 +1,4 @@
-import { match, strictEqual } from 'node:assert';
+import { match, rejects, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
@@ -44,5 +44,13 @@ describe('the images boot file', () => {
     });
     useEnv().set('IMAGES_SECRET', 'secret');
     strictEqual(await readyOutput(), '');
+  });
+
+  it('fails on an invalid variant, naming it', async () => {
+    useLayers().add({
+      path: '/images-boot-test',
+      input: { uploads: { images: { variants: { Hero: { width: 800 } } } } },
+    });
+    await rejects(readyOutput(), /Invalid image variant `Hero`/);
   });
 });

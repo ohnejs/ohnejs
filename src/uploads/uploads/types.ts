@@ -89,8 +89,8 @@ export interface UploadRecord {
   url?: string;
 
   /**
-   * A signed image service URL for a small preview.
+   * One signed image service URL per configured variant, keyed by name.
    * Present only for an optimizable image when a service is configured.
    */
-  thumbnail?: string;
+  variants?: Record<string, string>;
 }

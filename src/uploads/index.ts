@@ -3,6 +3,7 @@ export * from './config.ts';
 export * from './images/image-url.ts';
 export * from './images/sign.ts';
 export * from './images/transforms.ts';
+export * from './images/variants.ts';
 export * from './storage/adapter.ts';
 export * from './storage/fs.ts';
 export * from './storage/journal.ts';

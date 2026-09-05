@@ -1,13 +1,23 @@
-import { isNullish, isUndefined, mimeTypeFor, parseMediaType } from 'ohne/utils';
+import {
+  isNullish,
+  isString,
+  isUndefined,
+  mapValues,
+  mimeTypeFor,
+  parseMediaType,
+} from 'ohne/utils';
 
 import type { UploadLocation } from '../uploads/path.ts';
 import type { ImageTransforms } from './transforms.ts';
+import type { ImageVariantName } from './variants.ts';
 
+import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
 import { uploadPath } from '../uploads/path.ts';
 import { uploadURL } from '../uploads/url.ts';
 import { imageSecrets, signImageVariant } from './sign.ts';
 import { stringifyImageTransforms } from './transforms.ts';
+import { resolveImageVariant } from './variants.ts';
 
 /**
  * An upload an image URL is built for: its location, and what the row knows about the image.
@@ -20,7 +30,7 @@ export interface ImageSource extends UploadLocation {
   type?: string | null;
 
   /**
-   * The focal point's horizontal position, fed to the service when the transforms name no position.
+   * The focal point's horizontal position, fed to the service when a `cover` fit names no position.
    */
   focalX?: number | null;
 
@@ -42,16 +52,6 @@ export const OPTIMIZABLE_IMAGE_TYPES: readonly string[] = [
   'image/svg+xml',
 ];
 
-/**
- * The transforms behind every `thumbnail`: fits within a 320 pixel square, encoded as WebP.
- */
-export const THUMBNAIL_TRANSFORMS: ImageTransforms = {
-  width: 320,
-  height: 320,
-  fit: 'inside',
-  format: 'webp',
-};
-
 const TRAILING_SLASHES = /\/+$/;
 
 /**
@@ -72,19 +72,25 @@ export function isOptimizableImage(type: string): boolean {
  * Without both, every image URL points at the original.
  */
 export function hasImageService(): boolean {
-  return !isUndefined(useUploadsConfig().images) && imageSecrets().length > 0;
+  return !isUndefined(useUploadsConfig().images.url) && imageSecrets().length > 0;
 }
 
 /**
  * The signed image service URL of a variant, or the original's URL when there is nothing to render.
  *
+ * `variant` is a configured name, ad hoc transforms for trusted server code, or nothing for the original.
+ * An unknown name throws, with or without a service, so a typo surfaces in every environment.
  * The original is answered when no service is configured or when the transforms ask for nothing.
  * It is also answered for a type the service does not render.
- * A focal point stored on the upload fills the position when the transforms name none.
+ * A focal point stored on the upload fills the position when a `cover` fit names none.
+ * Other fits never crop, so they carry no position.
  * The signature covers `{transforms}/{path}` under the first `IMAGES_SECRET`; see `docs/uploads/images.md`.
  *
  * @example
  * ```ts
+ * imageURL(upload, 'thumbnail')
+ * // -> 'https://img.example.com/XxABa.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
+ *
  * imageURL(upload, { width: 800, format: 'webp' })
  * // -> 'https://img.example.com/2Obrt.../w_800,f_webp/photos/sunset.jpg'
  *
@@ -92,10 +98,14 @@ export function hasImageService(): boolean {
  * // -> '/uploads/photos/sunset.jpg'
  * ```
  */
-export function imageURL(upload: ImageSource, transforms: ImageTransforms = {}): string {
+export function imageURL(
+  upload: ImageSource,
+  variant: ImageVariantName | ImageTransforms = {},
+): string {
+  const transforms = isString(variant) ? resolveImageVariant(variant) : variant;
   const { images } = useUploadsConfig();
   const [secret] = imageSecrets();
-  if (isUndefined(images) || isUndefined(secret)) return uploadURL(upload);
+  if (isUndefined(images.url) || isUndefined(secret)) return uploadURL(upload);
   const type = upload.type ?? mimeTypeFor(upload.name) ?? '';
   if (!isOptimizableImage(type)) return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
@@ -106,43 +116,58 @@ export function imageURL(upload: ImageSource, transforms: ImageTransforms = {}):
 }
 
 /**
- * A `srcset` over `widths`, one signed variant per width with a `w` descriptor.
+ * A `srcset` over `entries`, one signed variant per entry with its `width` as the `w` descriptor.
+ * An entry is a configured name or ad hoc transforms; one without a `width` throws.
  *
  * @example
  * ```ts
- * imageSrcSet(upload, [400, 800])
- * // -> 'https://img.test/.../w_400/sunset.jpg 400w, https://img.test/.../w_800/sunset.jpg 800w'
+ * imageSrcSet(upload, ['card', 'cardWide'])
+ * // -> 'https://img.test/.../w_400,f_webp/a.jpg 400w, https://img.test/.../w_800,f_webp/a.jpg 800w'
  * ```
  */
 export function imageSrcSet(
   upload: ImageSource,
-  widths: readonly number[],
-  transforms: ImageTransforms = {},
+  entries: readonly (ImageVariantName | ImageTransforms)[],
 ): string {
-  return widths
-    .map((width) => `${imageURL(upload, { ...transforms, width })} ${width}w`)
-    .join(', ');
+  return entries.map((entry) => srcSetEntry(upload, entry)).join(', ');
 }
 
 /**
- * The signed URL of an upload's thumbnail, the small preview the dashboard grid shows.
- * Falls back to the original exactly as `imageURL` does.
+ * One signed URL per configured variant, keyed by name: what decoration emits as `variants`.
+ * Each URL falls back to the original exactly as `imageURL` does.
  *
  * @example
  * ```ts
- * thumbnailURL(upload) // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
+ * imageVariantURLs(upload)
+ * // -> { thumbnail: 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg' }
  * ```
  */
-export function thumbnailURL(upload: ImageSource): string {
-  return imageURL(upload, THUMBNAIL_TRANSFORMS);
+export function imageVariantURLs(upload: ImageSource): Record<string, string> {
+  return mapValues(useUploadsConfig().images.variants, (_, transforms) =>
+    imageURL(upload, transforms),
+  );
 }
 
 /**
- * The transforms with the upload's focal point filled in when they name no position of their own.
+ * One `srcset` candidate: the entry's signed URL and its `width` as the descriptor.
+ */
+function srcSetEntry(upload: ImageSource, entry: ImageVariantName | ImageTransforms): string {
+  const transforms = isString(entry) ? resolveImageVariant(entry) : entry;
+  if (isUndefined(transforms.width)) {
+    const subject = isString(entry) ? `Image variant \`${entry}\`` : 'A `srcset` entry';
+    throw ohneError(`${subject} has no \`width\`, which the \`w\` descriptor needs`);
+  }
+  return `${imageURL(upload, transforms)} ${transforms.width}w`;
+}
+
+/**
+ * The transforms with the upload's focal point filled in when a `cover` fit names no position of its own.
  */
 function withFocalPoint(upload: ImageSource, transforms: ImageTransforms): ImageTransforms {
+  const { fit, focalPoint, position } = transforms;
+  if (!isUndefined(fit) && fit !== 'cover') return transforms;
+  if (!isUndefined(focalPoint) || !isUndefined(position)) return transforms;
   const { focalX, focalY } = upload;
-  if (!isUndefined(transforms.focalPoint) || !isUndefined(transforms.position)) return transforms;
   if (isNullish(focalX) || isNullish(focalY)) return transforms;
   return { ...transforms, focalPoint: { x: focalX, y: focalY } };
 }

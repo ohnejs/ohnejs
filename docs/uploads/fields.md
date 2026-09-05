@@ -53,21 +53,27 @@ field, or at `field[2]` for the third item of a list, with a message such as
 ## Reading
 
 Populate the field to get the upload's record, decorated with `url` and, when an
-[image service](./images.md) is configured, `thumbnail`:
+[image service](./images.md) is configured, `variants`:
 
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();
 
 post.cover.url; // -> '/uploads/photos/sunset.jpg'
+post.cover.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 ```
 
-For a page of your own, build a variant with `imageURL` or a `srcset` with `imageSrcSet`:
+For a page of your own, build a variant with `imageURL` or a `srcset` with `imageSrcSet`, from a
+[named variant](./images.md#named-variants) or ad hoc transforms:
 
 ```ts
 import { imageSrcSet, imageURL } from 'ohne/uploads';
 
-const src = imageURL(post.cover, { width: 1200, format: 'webp' });
-const srcset = imageSrcSet(post.cover, [600, 1200, 2400], { format: 'webp' });
+const src = imageURL(post.cover, 'thumbnail');
+const srcset = imageSrcSet(post.cover, [
+  { width: 600, format: 'webp' },
+  { width: 1200, format: 'webp' },
+  { width: 2400, format: 'webp' },
+]);
 ```
 
 Both fall back to the original's URL without a service, so a template needs no branch.

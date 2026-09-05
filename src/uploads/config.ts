@@ -1,7 +1,9 @@
-import type { CacheControlOptions } from 'ohne/utils';
+import type { CacheControlOptions, LayerStrategies } from 'ohne/utils';
 
 import { useConfig, useEnv } from 'ohne';
 import { withDefaults } from 'ohne/utils';
+
+import type { ImageTransforms } from './images/transforms.ts';
 
 declare module 'ohne' {
   interface Config {
@@ -61,14 +63,24 @@ declare module 'ohne' {
       publicURL?: string;
 
       /**
-       * The image optimization service that answers signed variant URLs.
-       * Omitted, every image URL points at the original.
+       * The image optimization service that answers signed variant URLs, and the variants it renders.
        */
       images?: {
         /**
          * The service origin, the prefix of every variant URL.
+         * Omitted, every image URL points at the original and no record carries `variants`.
          */
-        url: string;
+        url?: string;
+
+        /**
+         * Named transform presets, each a set of `ImageTransforms`.
+         * A name is a camelCase identifier; `thumbnail` ships, and an app redefines it by name.
+         * A redefinition replaces the preset whole, so it inherits nothing from the layer beneath.
+         *
+         * @default
+         * { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } }
+         */
+        variants?: Record<string, ImageTransforms>;
       };
     };
   }
@@ -128,13 +140,18 @@ export interface ResolvedUploadsConfig {
   publicURL?: string;
 
   /**
-   * The image optimization service, when one is configured.
+   * The image optimization service and the named variants it renders.
    */
-  images?: {
+  images: {
     /**
-     * The service origin.
+     * The service origin, when one is configured.
      */
-    url: string;
+    url?: string;
+
+    /**
+     * The named transform presets, the shipped `thumbnail` included.
+     */
+    variants: Record<string, ImageTransforms>;
   };
 }
 
@@ -148,20 +165,30 @@ export const UPLOADS_DEFAULTS = {
   maxFileSize: '128mb',
   types: '*',
   cache: { noCache: true },
+  images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
 } satisfies ResolvedUploadsConfig;
+
+/**
+ * How the uploads keys merge, keyed by their path under `Config.uploads`.
+ * `cache` replaces, so a configured policy never inherits the default `no-cache`.
+ * `images.variants` assigns, so names union across layers and a redefined preset inherits nothing.
+ * The layer's `ohne.layer.ts` declares the same strategies for the stack, prefixed with `uploads.`.
+ */
+export const UPLOADS_STRATEGIES: LayerStrategies = {
+  cache: 'replace',
+  'images.variants': 'assign',
+};
 
 useEnv().define('UPLOADS_URL', { default: undefined, flag: 'value' });
 useEnv().define('IMAGES_SECRET', { default: undefined });
 
 /**
  * Returns the resolved uploads settings, `Config.uploads` merged over the layer defaults.
- * `cache` replaces rather than merges, so a configured policy never inherits the default `no-cache`.
+ * The merge follows `UPLOADS_STRATEGIES`, so it reads the same whether or not the layer stack is loaded.
  * Valid wherever config is, so the routes, helpers, and storage read one consistent shape.
  */
 export function useUploadsConfig(): ResolvedUploadsConfig {
-  const uploads = useConfig().uploads ?? {};
-  return {
-    ...withDefaults(uploads, UPLOADS_DEFAULTS),
-    cache: uploads.cache ?? UPLOADS_DEFAULTS.cache,
-  };
+  return withDefaults(useConfig().uploads ?? {}, UPLOADS_DEFAULTS, {
+    strategies: UPLOADS_STRATEGIES,
+  });
 }

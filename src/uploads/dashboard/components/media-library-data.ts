@@ -158,12 +158,12 @@ export function resolveUploadURL(record: UploadRecord): string | undefined {
 }
 
 /**
- * The absolute URL an image tile shows: the signed `thumbnail` when a service renders one, else the original.
+ * The absolute URL an image tile shows: the `thumbnail` variant when there is one, else the original.
  * `_updatedAt` rides along as a version, so a replaced file's tile refetches instead of showing cached bytes.
  */
 export function previewURL(record: UploadRecord): string {
-  const url = new URL(record.thumbnail ?? record.url ?? '', dashboardConfig().apiURL).href;
-  return versionedURL(url, record._updatedAt);
+  const source = record.variants?.thumbnail ?? record.url ?? '';
+  return versionedURL(new URL(source, dashboardConfig().apiURL).href, record._updatedAt);
 }
 
 /**

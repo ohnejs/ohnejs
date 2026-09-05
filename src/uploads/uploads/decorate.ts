@@ -1,12 +1,12 @@
 import { isNumber, isString } from 'ohne/utils';
 
-import { hasImageService, isOptimizableImage, thumbnailURL } from '../images/image-url.ts';
+import { hasImageService, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
 import { uploadPath } from './path.ts';
 import { uploadURL } from './url.ts';
 
 /**
  * Adds `path` and `url` to an `Uploads` record in place.
- * Adds `thumbnail` too when the image service can render one.
+ * Adds `variants` too, one signed URL per configured variant, when the image service can render them.
  * A folder gets `path` alone: it has no bytes to serve.
  * A record whose `select` dropped `directory` or `name` is left untouched.
  *
@@ -26,7 +26,7 @@ export function decorateUpload(record: Record<string, unknown>): void {
   record.url = uploadURL({ directory, name });
   const { type, focalX, focalY } = record;
   if (isString(type) && isOptimizableImage(type) && hasImageService()) {
-    record.thumbnail = thumbnailURL({
+    record.variants = imageVariantURLs({
       directory,
       name,
       type,

@@ -54,6 +54,7 @@
     "noPermission": "You do not have permission to access the media library",
     "noUploads": "No uploads found",
     "notAllowedHere": "Not allowed here",
+    "notRendered": "Not rendered",
     "nothingSelected": "Nothing selected",
     "openInNewTab": "Open in new tab",
     "pending": "Pending",
@@ -75,7 +76,8 @@
     "uploadHistory": "Upload history",
     "uploadedBy": "Uploaded by",
     "uploadedOn": "Uploaded on",
-    "uploading": "Uploading"
+    "uploading": "Uploading",
+    "variants": "Variants"
   },
   "errors": {
     "contentMismatch": "The file content is `{detected}`, not `{type}`",

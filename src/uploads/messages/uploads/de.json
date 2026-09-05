@@ -54,6 +54,7 @@
     "noPermission": "Du hast keine Berechtigung, auf die Medienbibliothek zuzugreifen",
     "noUploads": "Keine Uploads gefunden",
     "notAllowedHere": "Hier nicht erlaubt",
+    "notRendered": "Nicht gerendert",
     "nothingSelected": "Nichts ausgewählt",
     "openInNewTab": "In neuem Tab öffnen",
     "pending": "Ausstehend",
@@ -75,7 +76,8 @@
     "uploadHistory": "Upload-Verlauf",
     "uploadedBy": "Hochgeladen von",
     "uploadedOn": "Hochgeladen am",
-    "uploading": "Wird hochgeladen"
+    "uploading": "Wird hochgeladen",
+    "variants": "Varianten"
   },
   "errors": {
     "contentMismatch": "Der Dateiinhalt ist `{detected}`, nicht `{type}`",

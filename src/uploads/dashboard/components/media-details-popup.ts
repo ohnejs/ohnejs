@@ -28,6 +28,7 @@ import {
   type Props,
   tab,
   tabs,
+  type TabsListItem,
   textInput,
   toast,
   useDashboardLanguage,
@@ -36,14 +37,17 @@ import {
   when,
 } from 'ohne/dashboard';
 import {
+  coerceToNumber,
   effect,
   first,
   formatBytes,
   hasKey,
   isEmpty,
   isNull,
+  isNumber,
   isString,
   isUndefined,
+  naturalCompare,
   onCleanup,
   parseSearchParams,
   ref,
@@ -67,6 +71,7 @@ import {
   formatUploadedOn,
   isSmallPreview,
   previewKindOf,
+  variantTokens,
   versionedURL,
 } from './media-details-state.ts';
 import { mediaFileName } from './media-file-name.ts';
@@ -255,6 +260,59 @@ css`
     display: inline-flex;
   }
 
+  .o-media-details-variant {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .o-media-details-variant + .o-media-details-variant {
+    margin-top: 0.75rem;
+  }
+
+  .o-media-details-variant-preview {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    align-items: center;
+    width: 6rem;
+    height: 6rem;
+    overflow: hidden;
+    border: 1px solid hsl(var(--ohne-border));
+    border-radius: calc(var(--ohne-radius) - 0.125rem);
+  }
+
+  .o-media-details-variant-preview img {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .o-media-details-variant-missing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-align: center;
+    color: hsl(var(--ohne-muted-foreground));
+  }
+
+  .o-media-details-variant-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .o-media-details-variant-info code {
+    font-family: var(--ohne-font-mono);
+    font-size: 0.875em;
+    overflow-wrap: anywhere;
+  }
+
   @media (max-width: 600px) {
     .o-media-details {
       flex-direction: column;
@@ -317,6 +375,8 @@ export async function loadUpload(
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
+ * Variants lists every named image variant with its tokens, rendered size, byte size, and a copy button.
+ * That tab exists only while the record carries `variants`.
  * Pressing or dragging on an image preview places the focal point.
  * The point shows as a marker and saves with the description.
  * Cmd/Ctrl+S saves and closes; a `422` lands on the control and raises the tab's error bubble.
@@ -581,16 +641,16 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     );
   };
 
-  const urlRow = (): HTMLElement => {
+  const copyButton = (target: () => string, className?: string): HTMLElement => {
     const copied = ref(false);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const copy = button(() => icon(copied.value ? 'clipboard-check' : 'clipboard'), {
       size: -2,
       variant: 'outline',
-      class: 'o-media-details-url-copy',
+      class: className,
       onClick: () =>
         void navigator.clipboard
-          ?.writeText(url())
+          ?.writeText(target())
           .then(() => {
             copied.value = true;
             clearTimeout(timer);
@@ -608,13 +668,16 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         { hideOnClick: false },
       ),
     );
-    return h(
+    return copy;
+  };
+
+  const urlRow = (): HTMLElement =>
+    h(
       'div',
       { class: 'o-media-details-url' },
       h('code', { class: 'o-media-details-url-code', tabindex: '-1' }, url),
-      copy,
+      copyButton(url, 'o-media-details-url-copy'),
     );
-  };
 
   const detailsPanel = (): Child => [
     row(
@@ -703,25 +766,104 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     ),
   ];
 
+  const variantRow = (name: string, variantURL: string): HTMLElement => {
+    const failed = ref(false);
+    const loaded = ref(false);
+    const bytes = ref('');
+    const img = h('img', {
+      src: variantURL,
+      alt: name,
+      onLoad: () => {
+        loaded.value = true;
+      },
+      onError: () => {
+        failed.value = true;
+      },
+    }) as HTMLImageElement;
+    void fetch(variantURL, { method: 'HEAD' })
+      .then((response) => {
+        const size = coerceToNumber(response.headers.get('content-length'));
+        if (response.ok && isNumber(size) && size > 0) bytes.value = formatBytes(size);
+      })
+      .catch(() => undefined);
+    return h(
+      'div',
+      { class: 'o-media-details-variant' },
+      h(
+        'a',
+        {
+          href: variantURL,
+          target: '_blank',
+          class: 'o-media-details-variant-preview o-media-details-preview-image ohne-raw',
+        },
+        when(
+          () => failed.value,
+          () =>
+            h(
+              'span',
+              { class: 'o-media-details-variant-missing' },
+              icon('photo-off'),
+              h('span', null, () => t('uploads.dashboard.notRendered')),
+            ),
+          () => img,
+        ),
+      ),
+      h(
+        'div',
+        { class: 'o-media-details-variant-info' },
+        h('strong', { class: 'ohne-medium ohne-truncate' }, name),
+        h('code', null, variantTokens(variantURL, current.value.path)),
+        when(
+          () => loaded.value,
+          () =>
+            h('span', { class: 'ohne-muted' }, () =>
+              t('uploads.dashboard.pixels', { width: img.naturalWidth, height: img.naturalHeight }),
+            ),
+        ),
+        when(
+          () => bytes.value !== '',
+          () => h('span', { class: 'ohne-muted' }, () => bytes.value),
+        ),
+      ),
+      copyButton(() => variantURL),
+    );
+  };
+
+  const variantsPanel = (): Child =>
+    Object.entries(current.value.variants ?? {})
+      .sort(([a], [b]) => naturalCompare(a, b))
+      .map(([name, variantURL]) => variantRow(name, variantURL));
+
   const detailsLabel = (): string => t('uploads.dashboard.details');
   const descriptionLabel = (): string => t('uploads.dashboard.description');
+  const variantsLabel = (): string => t('uploads.dashboard.variants');
   const tabsEl = tabs<DetailsTab>(
-    () => [tab('details', detailsPanel), tab('description', descriptionPanel)],
+    () => [
+      tab('details', detailsPanel),
+      tab('description', descriptionPanel),
+      tab('variants', variantsPanel),
+    ],
     {
-      list: () => [
-        { name: 'details', label: detailsLabel },
-        {
-          name: 'description',
-          label: descriptionLabel,
-          bubble: errored()
-            ? {
-                content: '1',
-                tooltip: t('dashboard.foundErrors', { count: 1 }),
-                variant: 'destructive',
-              }
-            : undefined,
-        },
-      ],
+      list: () => {
+        const items: TabsListItem<DetailsTab>[] = [
+          { name: 'details', label: detailsLabel },
+          {
+            name: 'description',
+            label: descriptionLabel,
+            bubble: errored()
+              ? {
+                  content: '1',
+                  tooltip: t('dashboard.foundErrors', { count: 1 }),
+                  variant: 'destructive',
+                }
+              : undefined,
+          },
+        ];
+        if (!isUndefined(current.value.variants)) {
+          items.push({ name: 'variants', label: variantsLabel });
+        }
+        return items;
+      },
       active: () => activeTab.value,
       onChange: (next) => {
         activeTab.value = next;

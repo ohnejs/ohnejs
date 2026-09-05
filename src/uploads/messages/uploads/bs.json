@@ -54,6 +54,7 @@
     "noPermission": "Nemate dozvolu za pristup medijskoj biblioteci",
     "noUploads": "Nema pronađenih datoteka",
     "notAllowedHere": "Ovdje nije dozvoljeno",
+    "notRendered": "Nije renderovano",
     "nothingSelected": "Ništa nije odabrano",
     "openInNewTab": "Otvori u novoj kartici",
     "pending": "Na čekanju",
@@ -75,7 +76,8 @@
     "uploadHistory": "Historija postavljanja",
     "uploadedBy": "Postavio",
     "uploadedOn": "Postavljeno",
-    "uploading": "Postavljanje"
+    "uploading": "Postavljanje",
+    "variants": "Varijante"
   },
   "errors": {
     "contentMismatch": "Sadržaj datoteke je `{detected}`, a ne `{type}`",

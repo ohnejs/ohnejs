@@ -26,7 +26,7 @@ describe('decorateUpload', () => {
     deepStrictEqual(noDirectory, { name: 'sunset.jpg' });
   });
 
-  it('never sets thumbnail', () => {
+  it('never sets variants without a service', () => {
     const record: Record<string, unknown> = { directory: '', name: 'a.png', type: 'image/png' };
     decorateUpload(record);
     deepStrictEqual(Object.keys(record).sort(), ['directory', 'name', 'path', 'type', 'url']);
