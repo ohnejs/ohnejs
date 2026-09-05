@@ -1,5 +1,5 @@
 import { css, each, h } from 'ohne/dashboard';
-import { ref, untracked } from 'ohne/utils';
+import { isEmpty, ref, untracked } from 'ohne/utils';
 
 import { useUploadsT } from './_messages.ts';
 import { moveUploads } from './media-library-data.ts';
@@ -151,7 +151,7 @@ export function mediaBreadcrumbs(options: MediaBreadcrumbsOptions): HTMLElement 
   return h(
     'div',
     { class: 'o-media-breadcrumbs' },
-    () => link('', t('uploads.dashboard.media'), crumbs().length === 0),
+    () => link('', t('uploads.dashboard.media'), isEmpty(crumbs())),
     each(
       crumbs,
       (crumb) => crumb.path,

@@ -1,5 +1,5 @@
 import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohne/dashboard';
-import { onCleanup, type Ref, untracked } from 'ohne/utils';
+import { isEmpty, onCleanup, type Ref, untracked } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -307,8 +307,7 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
       tile,
       when(() => selectable && !disabled().value, checkboxEl),
       when(
-        () =>
-          mode === 'none' && canDelete && view.selection.value.length === 0 && !disabled().value,
+        () => mode === 'none' && canDelete && isEmpty(view.selection.value) && !disabled().value,
         deleteButton,
       ),
     ),
