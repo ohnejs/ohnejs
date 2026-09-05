@@ -176,10 +176,8 @@ css`
 
   .o-media-details-focal-surface .o-media-details-image-frame {
     cursor: crosshair;
-  }
-
-  .o-media-details-focal-blank {
-    width: 3.25rem;
+    touch-action: none;
+    user-select: none;
   }
 
   .o-media-details-focal-marker {
@@ -292,7 +290,7 @@ export function setDetailsQueryParam(uuid: string | null): void {
   history.pushState(
     null,
     '',
-    location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
+    location.pathname + (isEmpty(query) ? '' : `?${query}`) + location.hash,
   );
   detailsSignal.value += 1;
 }
@@ -319,7 +317,8 @@ export async function loadUpload(
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
- * Clicking an image preview sets the focal point, shown as a marker and saved with the description.
+ * Pressing or dragging on an image preview places the focal point.
+ * The point shows as a marker and saves with the description.
  * Cmd/Ctrl+S saves and closes; a `422` lands on the control and raises the tab's error bubble.
  * Closing is dirty-guarded through the `unsavedChanges` prompt.
  * The footer deletes after confirmation and replaces the file's bytes through a hidden file input.
@@ -384,10 +383,13 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     focal.value = { focalX: state.focalX, focalY: state.focalY };
   };
 
-  const setFocal = (focalX: number | null, focalY: number | null): void => {
-    focal.value = { focalX, focalY };
+  const recordFocal = (): void => {
     const state = currentState();
     if (!isUndefined(state)) edits.push(state);
+  };
+  const setFocal = (focalX: number | null, focalY: number | null): void => {
+    focal.value = { focalX, focalY };
+    recordFocal();
   };
 
   const errored = (): boolean => (form.value?.errored() ?? false) || unplaced.value !== '';
@@ -499,15 +501,18 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const imageFrame = (): HTMLElement => {
     const props: Props = { alt: () => current.value.description ?? '', src, draggable: 'false' };
     if (canUpdate) {
-      props.onClick = (event: MouseEvent) => {
-        const { focalX, focalY } = focalPointAt(
-          event.offsetX,
-          event.offsetY,
-          img.clientWidth,
-          img.clientHeight,
-        );
-        setFocal(focalX, focalY);
+      const place = (event: PointerEvent): void => {
+        focal.value = focalPointAt(event.offsetX, event.offsetY, img.clientWidth, img.clientHeight);
       };
+      props.onPointerdown = (event: PointerEvent) => {
+        if (event.button !== 0) return;
+        img.setPointerCapture(event.pointerId);
+        place(event);
+      };
+      props.onPointermove = (event: PointerEvent) => {
+        if (img.hasPointerCapture(event.pointerId)) place(event);
+      };
+      props.onLostpointercapture = recordFocal;
     }
     const img = h('img', props);
     const marker = when(hasFocal, () =>
@@ -558,7 +563,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       'div',
       { class: 'o-media-details-field' },
       fieldLabel(h('span', { class: 'ohne-label' }, label)),
-      ...content,
+      h('div', { class: 'ohne-truncate' }, ...content),
     );
 
   const authorRow = (): Child => {
@@ -572,7 +577,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       () => t('uploads.dashboard.uploadedBy'),
       readable
         ? h('a', { href: `/collections/${users.segment}/${author}`, target: '_blank' }, label)
-        : h('div', null, label),
+        : label,
     );
   };
 
@@ -614,25 +619,21 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const detailsPanel = (): Child => [
     row(
       () => t('uploads.dashboard.uploadedOn'),
-      h('div', null, () => formatUploadedOn(language.value, current.value.uploadedAt)),
+      () => formatUploadedOn(language.value, current.value.uploadedAt),
     ),
     authorRow(),
     row(
       () => t('uploads.dashboard.fileType'),
-      h('div', null, () => current.value.type ?? ''),
+      () => current.value.type ?? '',
     ),
     row(
       () => t('uploads.dashboard.fileSize'),
+      () => formatBytes(current.value.size ?? 0),
+      ' ',
       h(
-        'div',
-        null,
-        () => formatBytes(current.value.size ?? 0),
-        ' ',
-        h(
-          'span',
-          { class: 'ohne-muted' },
-          () => `(${t('uploads.dashboard.bytes', { count: current.value.size ?? 0 })})`,
-        ),
+        'span',
+        { class: 'ohne-muted' },
+        () => `(${t('uploads.dashboard.bytes', { count: current.value.size ?? 0 })})`,
       ),
     ),
     when(
@@ -640,12 +641,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       () =>
         row(
           () => t('uploads.dashboard.dimensions'),
-          h('div', null, () =>
+          () =>
             t('uploads.dashboard.pixels', {
               width: current.value.width ?? 0,
               height: current.value.height ?? 0,
             }),
-          ),
         ),
     ),
     row(() => t('uploads.dashboard.fileURL'), urlRow()),
@@ -673,12 +673,8 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         onCommit: () => setFocal(percentX.value / 100, percentY.value / 100),
       });
     const blank = (): HTMLElement =>
-      h(
-        'span',
-        { class: 'o-media-details-focal-blank' },
-        textInput(ref(''), { placeholder: '-', disabled: () => true }),
-      );
-    const times = (): HTMLElement => h('span', { class: 'ohne-muted' }, '×');
+      textInput(ref(''), { placeholder: '-', autoWidth: true, disabled: () => true });
+    const times = (): HTMLElement => h('span', { class: 'ohne-muted ohne-shrink-0' }, '×');
     return field([
       fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.focalPoint'))),
       h(

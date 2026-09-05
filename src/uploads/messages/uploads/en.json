@@ -27,7 +27,7 @@
     "fileURL": "File URL",
     "files": "Files",
     "focalPoint": "Focal point",
-    "focalPointHint": "Click the image to set the focal point.",
+    "focalPointHint": "Click or drag on the image to set the focal point.",
     "folder": "Folder",
     "folderCreateFailed": "An error occurred while creating the folder",
     "folderCreated": "Folder `{name}` has been created",

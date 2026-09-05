@@ -27,7 +27,7 @@
     "fileURL": "URL datoteke",
     "files": "Datoteke",
     "focalPoint": "Fokusna tačka",
-    "focalPointHint": "Kliknite na sliku da postavite fokusnu tačku.",
+    "focalPointHint": "Kliknite ili povucite po slici da postavite fokusnu tačku.",
     "folder": "Folder",
     "folderCreateFailed": "Došlo je do greške pri kreiranju foldera",
     "folderCreated": "Folder `{name}` je kreiran",

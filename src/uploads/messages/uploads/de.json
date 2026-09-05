@@ -27,7 +27,7 @@
     "fileURL": "Datei-URL",
     "files": "Dateien",
     "focalPoint": "Fokuspunkt",
-    "focalPointHint": "Klicke auf das Bild, um den Fokuspunkt zu setzen.",
+    "focalPointHint": "Klicke auf das Bild oder ziehe darüber, um den Fokuspunkt zu setzen.",
     "folder": "Ordner",
     "folderCreateFailed": "Beim Erstellen des Ordners ist ein Fehler aufgetreten",
     "folderCreated": "Ordner `{name}` wurde erstellt",
