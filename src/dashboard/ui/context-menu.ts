@@ -2,11 +2,10 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 import type { Placement } from './floater-place.ts';
 
+import { first } from '../../utils/array/first.ts';
 import { last } from '../../utils/array/last.ts';
-import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
-import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
@@ -30,7 +29,7 @@ export interface ContextMenuOptions {
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
-   * Omitted inherits `--ohne-size` from the nearest ancestor.
+   * Omitted inherits `--ohne-size` from `root`'s ancestors.
    */
   size?: number;
 }
@@ -41,6 +40,8 @@ export interface ContextMenuOptions {
 export interface ContextMenu {
   /**
    * The root element to insert into the tree.
+   * It stays empty: the panel mounts on `document.body`.
+   * Its place in the tree resolves the hosting popup and the inherited `--ohne-size`.
    */
   root: HTMLElement;
 
@@ -64,18 +65,13 @@ export interface ContextMenu {
 
 const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-start', 'top-end'];
 
-css`
-  .ohne-context-menu-floating {
-    position: fixed;
-  }
-`;
-
 /**
  * The right-click and long-press menu.
  *
- * An invisible fixed anchor parks at the trigger event's pointer coordinates.
- * While `event` holds one, a dropdown mounts on it: the roomiest corner wins, clamped to the viewport.
- * While open, the page loses pointer events outside the menu's host (`.ohne-popup` ancestor or `body`).
+ * While `event` holds one, the panel mounts on `document.body` at the event's pointer coordinates.
+ * A `container-type` or transformed ancestor of `root` therefore cannot displace it.
+ * The roomiest corner wins, clamped to the viewport.
+ * While open, the page loses pointer events outside the host: `root`'s `.ohne-popup` ancestor, else `body`.
  * Arrows and Tab cycle the focus through `.ohne-dropdown-item` elements.
  * Escape closes without closing a hosting popup, and any outside press closes.
  * A second right-click closes too; its new coordinates land only on the third.
@@ -95,26 +91,15 @@ export function contextMenu(
   content: Child | (() => Child),
   options: ContextMenuOptions = {},
 ): ContextMenu {
-  const anchor = h('div', {
-    class: 'ohne-context-menu-floating',
-    style: () => {
-      const current = event.value;
-      const top =
-        current && 'clientY' in current ? current.clientY : (current?.touches[0]?.clientY ?? 0);
-      const left =
-        current && 'clientY' in current ? current.clientX : (current?.touches[0]?.clientX ?? 0);
-      return `top: ${top}px; left: ${left}px;`;
-    },
-  });
-
   const close = (): void => {
     event.value = null;
   };
 
-  const itemHeight = (): number => {
+  const sizeOf = (): number =>
+    options.size ?? (Number(getComputedStyle(root).getPropertyValue('--ohne-size')) || 0);
+
+  const itemHeight = (size: number): number => {
     const base = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const inherited = Number(getComputedStyle(root).getPropertyValue('--ohne-size')) || 0;
-    const size = options.size ?? inherited;
     return 2 * (base + size * 0.125 * base);
   };
 
@@ -122,11 +107,12 @@ export function contextMenu(
     const placement = ref<Placement>('bottom-start');
     const isMounted = ref(false);
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const size = sizeOf();
     let host: HTMLElement | null = null;
 
     const inner = h('div', { class: 'ohne-dropdown-inner' }, content);
     const panel = scrollable(inner, {
-      autoScroll: itemHeight(),
+      autoScroll: itemHeight(size),
       class: 'ohne-dropdown-scrollable',
     });
     const floating = h(
@@ -138,8 +124,7 @@ export function contextMenu(
           (isMounted.value ? ' ohne-dropdown-mounted' : '') +
           ` ohne-dropdown-${placement.value}`,
         style:
-          'position: fixed; left: 0; top: 0;' +
-          (isUndefined(options.size) ? '' : ` --ohne-size: ${options.size};`) +
+          `position: fixed; left: 0; top: 0; --ohne-size: ${size};` +
           ' --ohne-background: var(--ohne-primary);' +
           ' --ohne-foreground: var(--ohne-primary-foreground);',
         onKeydown: (keyboard: KeyboardEvent) => {
@@ -148,11 +133,13 @@ export function contextMenu(
       },
       panel,
     );
+    document.body.append(floating);
 
     const update = (): void => {
-      const rect = anchor.getBoundingClientRect();
+      const trigger = event.value;
+      const point = trigger instanceof MouseEvent ? trigger : trigger?.touches[0];
       const input = {
-        reference: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        reference: { x: point?.clientX ?? 0, y: point?.clientY ?? 0, width: 0, height: 0 },
         viewport: {
           width: document.documentElement.clientWidth,
           height: document.documentElement.clientHeight,
@@ -192,7 +179,7 @@ export function contextMenu(
     const focusNext = (): void => {
       const order = items();
       const index = order.findIndex((item) => item === document.activeElement);
-      (order[index + 1] ?? order[0])?.focus();
+      (order[index + 1] ?? first(order))?.focus();
     };
 
     const onHostKeydown = (keyboard: KeyboardEvent): void => {
@@ -216,6 +203,12 @@ export function contextMenu(
       }
     };
 
+    const onPanelKeydown = (keyboard: KeyboardEvent): void => {
+      if (keyboard.target instanceof HTMLElement && floating.contains(keyboard.target)) {
+        onHostKeydown(keyboard);
+      }
+    };
+
     const onHostPress = (press: Event): void => {
       if (press.target instanceof HTMLElement && !floating.contains(press.target)) close();
     };
@@ -223,7 +216,6 @@ export function contextMenu(
     const stops: (() => void)[] = [];
     let disposed = false;
     const observer = new ResizeObserver(update);
-    observer.observe(anchor);
     observer.observe(floating);
     window.addEventListener('scroll', update, { capture: true, passive: true });
     window.addEventListener('resize', update);
@@ -237,12 +229,8 @@ export function contextMenu(
       if (disposed) return;
       document.body.classList.add('ohne-no-interaction');
       setTimeout(() => floating.focus());
-      let parent = floating.parentElement;
-      while (parent && parent.nodeName !== 'BODY' && !parent.classList.contains('ohne-popup')) {
-        parent = parent.parentElement;
-      }
-      host = parent;
-      host?.classList.add('ohne-allow-interaction');
+      host = root.closest<HTMLElement>('.ohne-popup') ?? document.body;
+      host.classList.add('ohne-allow-interaction');
       setTimeout(() => {
         const target = host;
         if (disposed || !target) return;
@@ -254,6 +242,10 @@ export function contextMenu(
           target.removeEventListener('click', onHostPress);
           target.removeEventListener('contextmenu', onHostPress);
         });
+        if (target.contains(floating)) return;
+        // A popup host traps Tab at `document` capture, so the panel's keys are claimed at `window` first.
+        window.addEventListener('keydown', onPanelKeydown, { capture: true });
+        stops.push(() => window.removeEventListener('keydown', onPanelKeydown, { capture: true }));
       });
       update();
     });
@@ -267,6 +259,7 @@ export function contextMenu(
       document.body.classList.remove('ohne-no-interaction');
       host?.classList.remove('ohne-allow-interaction');
       for (const stop of stops) stop();
+      floating.remove();
       setTimeout(() => {
         previous?.focus();
         if (document.activeElement?.nodeName === 'BODY' && host && host.nodeName !== 'BODY') {
@@ -275,13 +268,12 @@ export function contextMenu(
       });
     });
 
-    return floating;
+    return null;
   };
 
   const root = h(
     'div',
     { class: 'ohne-context-menu' },
-    anchor,
     when(() => event.value, buildDropdown),
   );
 
