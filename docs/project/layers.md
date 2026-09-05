@@ -19,7 +19,8 @@ export default defineConfig({
 
 Add the package to your `package.json` dependencies, then name it in `layers`. Installing alone
 does nothing - only a listed layer stacks. Once codegen has run, installed layer names
-autocomplete in the list; a fresh name codegen has not seen yet is still accepted.
+autocomplete in the list, the layers a package exports as subpaths included; a fresh name codegen
+has not seen yet is still accepted.
 
 A name can carry a subpath. `@acme/kit/auth` resolves through the package's `exports`; the
 exported file is by convention that layer's `ohne.config.ts`, and its directory is the layer. One

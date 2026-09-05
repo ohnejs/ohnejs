@@ -29,6 +29,68 @@ export interface OhneLayer {
 }
 
 /**
+ * A package in the app's dependency closure, whether or not its root is a layer.
+ */
+export interface OhnePackage extends OhneLayer {
+  /**
+   * Whether the package root holds an `ohne.config.ts`, making the package itself a layer.
+   * The app is always one, so its own content is never skipped.
+   */
+  layer: boolean;
+}
+
+/**
+ * Resolves every package in the current app's dependency closure, in registration order.
+ *
+ * The closure runs furthest-first: a package is positioned before the packages that depend on it.
+ * The app itself comes last.
+ * Non-ohne packages are kept, since one may export layers as subpaths without being a layer itself.
+ * `resolveOhneLayers` is this list reduced to the layers.
+ * The root's dev dependencies count; a transitive package's do not.
+ *
+ * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
+ * Returns `[]` when no `package.json` is found.
+ *
+ * @example
+ * ```ts
+ * await resolveOhnePackages()
+ * // -> [
+ * //      { name: 'ohne', dir: '...', layer: true },
+ * //      { name: '@acme/kit', dir: '...', layer: false },
+ * //      { name: 'app', dir: '...', layer: true },
+ * //    ]
+ * ```
+ */
+export async function resolveOhnePackages(from: string = process.cwd()): Promise<OhnePackage[]> {
+  const manifestPath = await findUp('package.json', from);
+  if (isNull(manifestPath)) return [];
+
+  const rootManifest = (await readJSON<Manifest>(manifestPath)) ?? {};
+  const appDir = dirname(manifestPath);
+  const packages: OhnePackage[] = [];
+  const visited = new Set<string>();
+  visited.add(normalizePath(await realpath(appDir)));
+
+  await walk(appDir, depNames(rootManifest, true));
+  packages.push({ name: rootManifest.name ?? basename(appDir), dir: appDir, layer: true });
+  return packages;
+
+  async function walk(base: string, names: string[]): Promise<void> {
+    for (const name of names) {
+      const dir = await resolveModuleDir(name, base);
+      if (isNull(dir) || visited.has(dir)) continue;
+      visited.add(dir);
+
+      const manifest = await readJSON<Manifest>(joinPath(dir, 'package.json'));
+      if (isNull(manifest)) continue;
+
+      await walk(dir, depNames(manifest, false));
+      packages.push({ name: manifest.name ?? name, dir, layer: await isOhneProject(dir) });
+    }
+  }
+}
+
+/**
  * Resolves the ordered layer stack for the current ohne app.
  *
  * The stack runs furthest-first: a layer is positioned before the layers that depend on it.
@@ -57,34 +119,13 @@ export interface OhneLayer {
  * ```
  */
 export async function resolveOhneLayers(from: string = process.cwd()): Promise<OhneLayer[]> {
-  const manifestPath = await findUp('package.json', from);
-  if (isNull(manifestPath)) return [];
-
-  const rootManifest = (await readJSON<Manifest>(manifestPath)) ?? {};
-  const appDir = dirname(manifestPath);
-  const layers: OhneLayer[] = [];
-  const visited = new Set<string>();
-  visited.add(normalizePath(await realpath(appDir)));
-
-  await walk(appDir, depNames(rootManifest, true));
-  layers.push({ name: rootManifest.name ?? basename(appDir), dir: appDir });
-  return layers;
-
-  async function walk(base: string, names: string[]): Promise<void> {
-    for (const name of names) {
-      const dir = await resolveModuleDir(name, base);
-      if (isNull(dir) || visited.has(dir)) continue;
-      visited.add(dir);
-
-      const manifest = await readJSON<Manifest>(joinPath(dir, 'package.json'));
-      if (isNull(manifest)) continue;
-
-      await walk(dir, depNames(manifest, false));
-      if (await isOhneProject(dir)) layers.push({ name: manifest.name ?? name, dir });
-    }
-  }
+  const packages = await resolveOhnePackages(from);
+  return packages.filter((pkg) => pkg.layer).map(({ name, dir }) => ({ name, dir }));
 }
 
+/**
+ * The dependency names a manifest declares, dev dependencies included only when asked.
+ */
 function depNames(manifest: Manifest, includeDev: boolean): string[] {
   const groups = [
     manifest.dependencies,

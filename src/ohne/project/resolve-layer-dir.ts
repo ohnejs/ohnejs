@@ -8,6 +8,7 @@ import {
   joinPath,
   normalizePath,
 } from '../../utils/index.ts';
+import { isOhneProject } from './is-ohne-project.ts';
 
 /**
  * A layer specifier split into the package it names and the `exports` subpath within it.
@@ -96,9 +97,41 @@ export async function resolveLayerSubpath(root: string, subpath: string): Promis
   if (subpath === '.') return root;
 
   const manifest = await readJSON<{ exports?: unknown }>(joinPath(root, 'package.json'));
-  const target = resolveExports(manifest?.exports, subpath);
-  if (isNull(target)) return null;
-  return normalizePath(dirname(joinPath(root, target)));
+  return subpathDir(root, manifest?.exports, subpath);
+}
+
+/**
+ * Lists the `exports` subpaths of the package at `root` that are layers of their own, as specifiers.
+ * An exact subpath counts when its target's directory holds an `ohne.config.ts` and is not the root itself.
+ * A `*` pattern and the `.` root never count.
+ *
+ * @example
+ * ```ts
+ * await resolveLayerSubpaths('/srv/app/node_modules/@acme/kit', '@acme/kit') // -> ['@acme/kit/auth']
+ * ```
+ */
+export async function resolveLayerSubpaths(root: string, name: string): Promise<string[]> {
+  const manifest = await readJSON<{ exports?: unknown }>(joinPath(root, 'package.json'));
+  const exports = manifest?.exports;
+  if (!isObject(exports)) return [];
+
+  const base = normalizePath(root);
+  const specifiers: string[] = [];
+  for (const subpath of Object.keys(exports)) {
+    if (!subpath.startsWith('./') || subpath.includes('*')) continue;
+    const dir = subpathDir(root, exports, subpath);
+    if (isNull(dir) || dir === base || !(await isOhneProject(dir))) continue;
+    specifiers.push(`${name}/${subpath.slice(2)}`);
+  }
+  return specifiers;
+}
+
+/**
+ * The directory an `exports` subpath's target lives in, absolute and normalized, or `null` when unexported.
+ */
+function subpathDir(root: string, exports: unknown, subpath: string): string | null {
+  const target = resolveExports(exports, subpath);
+  return isNull(target) ? null : normalizePath(dirname(joinPath(root, target)));
 }
 
 /**

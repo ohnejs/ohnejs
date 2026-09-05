@@ -9,6 +9,8 @@ import { resolveDependencyLayerNames } from '../../../src/ohne/index.ts';
 interface PackageSpec {
   name: string;
   ohne?: boolean;
+  subLayers?: string[];
+  exports?: Record<string, unknown>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -21,9 +23,13 @@ describe('resolveDependencyLayerNames', () => {
 
   function writePackage(at: string, spec: PackageSpec): void {
     mkdirSync(at, { recursive: true });
-    const { ohne, ...manifest } = spec;
+    const { ohne, subLayers, ...manifest } = spec;
     writeFileSync(join(at, 'package.json'), JSON.stringify(manifest));
     if (ohne) writeFileSync(join(at, 'ohne.config.ts'), '');
+    for (const sub of subLayers ?? []) {
+      mkdirSync(join(at, sub), { recursive: true });
+      writeFileSync(join(at, sub, 'ohne.config.ts'), '');
+    }
   }
 
   function writeDep(spec: PackageSpec): void {
@@ -38,10 +44,33 @@ describe('resolveDependencyLayerNames', () => {
     writePackage(app, {
       name: 'app',
       ohne: true,
-      dependencies: { a: '*', plain: '*' },
+      subLayers: ['extra'],
+      exports: { '.': './index.ts', './extra': './extra/ohne.config.ts' },
+      dependencies: { a: '*', plain: '*', kit: '*', 'only-sub': '*' },
       devDependencies: { d: '*' },
       peerDependencies: { p: '*' },
       optionalDependencies: { opt: '*' },
+    });
+
+    // only-sub: not a layer at its root, but it exports one.
+    writeDep({
+      name: 'only-sub',
+      subLayers: ['blog'],
+      exports: { './blog': './blog/ohne.config.ts' },
+    });
+
+    // kit: ohne, and exports two subfolders, of which only auth is a layer; the pattern is ignored.
+    writeDep({
+      name: 'kit',
+      ohne: true,
+      subLayers: ['auth'],
+      exports: {
+        '.': { types: './index.ts', default: './index.ts' },
+        './auth': { types: './auth/index.ts', default: './auth/index.ts' },
+        './types': './types/index.ts',
+        './config': './ohne.config.ts',
+        './*': './*',
+      },
     });
 
     // a: ohne, pulls b transitively, and a dev dep that must NOT be followed.
@@ -63,7 +92,28 @@ describe('resolveDependencyLayerNames', () => {
   });
 
   it('collects every ohne layer across all dependency kinds, in registration order', async () => {
-    deepStrictEqual(await resolveDependencyLayerNames(app), ['b', 'a', 'c', 'p', 'opt', 'd']);
+    deepStrictEqual(await resolveDependencyLayerNames(app), [
+      'b',
+      'a',
+      'c',
+      'kit',
+      'kit/auth',
+      'only-sub/blog',
+      'p',
+      'opt',
+      'd',
+      'app/extra',
+    ]);
+  });
+
+  it('lists a subpath layer only for an exported directory holding an ohne.config.ts', async () => {
+    const names = await resolveDependencyLayerNames(app);
+    deepStrictEqual(names.includes('kit/types'), false);
+    deepStrictEqual(names.includes('kit/config'), false);
+    deepStrictEqual(
+      names.some((name) => name.includes('*')),
+      false,
+    );
   });
 
   it('does not follow transitive dev dependencies', async () => {
