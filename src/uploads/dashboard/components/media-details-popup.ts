@@ -775,12 +775,17 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     onClick: () => void close(),
   });
 
+  const hotkeys = canUpdate
+    ? useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false })
+    : undefined;
   const footerEl = h(
     'div',
     { class: 'ohne-row' },
     canDelete ? deleteButton : null,
     canUpdate ? [replaceButton, fileInput] : null,
-    canUpdate ? historyButtons(edits, (state) => restore(state as DetailsState)) : null,
+    isUndefined(hotkeys)
+      ? null
+      : historyButtons(edits, (state) => restore(state as DetailsState), hotkeys),
     when(
       () => edits.isDirty.value,
       () => saveButton,
@@ -814,8 +819,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     },
   );
 
-  if (canUpdate) {
-    const hotkeys = useHotkeys({ allowInOverlays: true, target: () => handle.root, listen: false });
+  if (!isUndefined(hotkeys)) {
     setTimeout(() => {
       hotkeys.isListening.value = true;
       hotkeys.listen('save', (event) => {
