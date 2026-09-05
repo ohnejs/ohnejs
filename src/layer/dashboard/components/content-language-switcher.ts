@@ -55,6 +55,22 @@ css`
   }
 `;
 
+const contexts: (() => boolean)[] = [];
+
+/**
+ * Declares a page family that edits translatable content.
+ * The header shows the content-language switcher while `matches` reports `true`, read reactively.
+ * Collection pages need no registration; they qualify through their collection.
+ *
+ * @example
+ * ```ts
+ * registerTranslatableContext(() => useRoute()?.path.startsWith('/media') === true)
+ * ```
+ */
+export function registerTranslatableContext(matches: () => boolean): void {
+  contexts.push(matches);
+}
+
 /**
  * The header's content-language dropdown.
  * It renders only while the discovery data lists more than one locale and the page is translatable.
@@ -72,9 +88,16 @@ export function contentLanguageSwitcher(): Child {
 /**
  * Whether the current page edits translatable content, reactively.
  * The collection pages qualify while their collection declares translatable fields.
- * The flag derives from the route, since only those pages carry one.
+ * Any other page qualifies through a `registerTranslatableContext` matcher.
  */
 function translatableContext(): boolean {
+  return collectionContext() || contexts.some((matches) => matches());
+}
+
+/**
+ * Whether the route is a collection page whose collection declares translatable fields.
+ */
+function collectionContext(): boolean {
   const segment = useRoute()?.params.collection;
   if (isUndefined(segment)) return false;
   const meta = dashboardMeta();
