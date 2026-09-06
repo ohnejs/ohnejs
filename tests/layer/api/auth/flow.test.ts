@@ -1,6 +1,7 @@
 import { deepStrictEqual, doesNotMatch, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { User } from '../../../../src/layer/auth/types.ts';
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 
 import loginHandler from '../../../../src/layer/api/auth/login.post.ts';
@@ -8,8 +9,12 @@ import logoutHandler from '../../../../src/layer/api/auth/logout.post.ts';
 import meHandler from '../../../../src/layer/api/auth/me.get.ts';
 import SessionsCollection from '../../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../../src/layer/collections/Users.ts';
+import datePatternField from '../../../../src/layer/fields/date-pattern.ts';
+import languageField from '../../../../src/layer/fields/language.ts';
+import localeField from '../../../../src/layer/fields/locale.ts';
 import passwordField from '../../../../src/layer/fields/password.ts';
 import rolesField from '../../../../src/layer/fields/roles.ts';
+import timezoneField from '../../../../src/layer/fields/timezone.ts';
 import requireAuthMiddleware from '../../../../src/layer/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -33,6 +38,10 @@ useLayers().add({ path: '/auth-flow-test', input: { auth: { password: { cost: 10
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
@@ -100,6 +109,20 @@ async function login(email: string, password: string, remember?: boolean): Promi
   return call(ROUTES.login, { json: { email, password, remember } });
 }
 
+function defaults(UUID: string, email: string): User {
+  return {
+    UUID,
+    email,
+    roles: [],
+    dashboardLanguage: null,
+    contentLanguage: null,
+    timezone: null,
+    dateFormat: 'LL',
+    timeFormat: 'LTS',
+    smartClipboard: false,
+  };
+}
+
 async function assertSessionLifetime(userUUID: string, lifetime: string): Promise<void> {
   const row = await db.queryOne<{ expiresAt: number }>(
     'SELECT "expiresAt" FROM "Sessions" WHERE "user" = ?',
@@ -115,10 +138,9 @@ describe('auth flow', () => {
     await createUser('Ada@Example.com', 'correct horse');
     const response = await login('ADA@example.com', 'correct horse');
     strictEqual(response.status, 200);
-    const user = (await response.json()) as { UUID: string; email: string; roles: string[] };
-    strictEqual(user.email, 'ada@example.com');
+    const user = (await response.json()) as User;
     match(user.UUID, /^[0-9a-f]{8}-[0-9a-f]{4}-/);
-    deepStrictEqual(user.roles, []);
+    deepStrictEqual(user, defaults(user.UUID, 'ada@example.com'));
 
     const setCookie = response.headers.getSetCookie()[0];
     match(setCookie, /HttpOnly/);
@@ -157,8 +179,11 @@ describe('auth flow', () => {
     const session = await login('mesh@example.com', 'correct horse');
     const pair = cookiePair(session);
     const token = pair.slice('session='.length);
+    const { UUID } = (await session.json()) as User;
 
-    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 200);
+    const me = await call(ROUTES.me, { cookie: pair });
+    strictEqual(me.status, 200);
+    deepStrictEqual(await me.json(), defaults(UUID, 'mesh@example.com'));
     strictEqual((await call(ROUTES.me, { bearer: token })).status, 200);
     strictEqual((await call(ROUTES.me)).status, 401);
   });

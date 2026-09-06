@@ -3,7 +3,13 @@
   "invalidEmail": "Gib eine gültige E-Mail-Adresse ein",
   "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
   "invalidRoles": "Rollen müssen eine Liste von Rollennamen sein",
+  "invalidTimezone": "Ungültige Zeitzone `{timezone}`",
   "unknownRole": "Unbekannte Rolle `{role}`",
+  "unknownLanguage": "Unbekannte Sprache `{language}`",
+  "unknownLocale": "Unbekannte Locale `{locale}`",
+  "timezone": {
+    "auto": "Auto (Geräteeinstellungen)"
+  },
   "users": {
     "email": {
       "label": "E-Mail",
@@ -16,6 +22,30 @@
     "roles": {
       "label": "Rollen",
       "description": "Die Rollennamen dieses Benutzers. Die Berechtigungen aller Rollen werden vereinigt."
+    },
+    "dashboardLanguage": {
+      "label": "Dashboard-Sprache",
+      "description": "Sprache der Dashboard-Benutzeroberfläche."
+    },
+    "contentLanguage": {
+      "label": "Inhaltssprache",
+      "description": "Sprache für Inhalts-Einträge und Seiten."
+    },
+    "timezone": {
+      "label": "Zeitzone",
+      "description": "Zeitzone, die für die Anzeige von Datum und Uhrzeit verwendet wird."
+    },
+    "dateFormat": {
+      "label": "Datumsformat",
+      "tokens": "|||\n|-|-|\n|`YY`|Zweistelliges Jahr (z.B. 23)|\n|`YYYY`|Vierstelliges Jahr (z.B. 2023)|\n|`M`|Der Monat, beginnend bei 1 (z.B. 1-12)|\n|`MM`|Der Monat, 2-stellig (z.B. 01-12)|\n|`MMM`|Der abgekürzte Monatsname (z.B. Jan-Dez)|\n|`MMMM`|Der vollständige Monatsname (z.B. Januar-Dezember)|\n|`D`|Der Tag des Monats (z.B. 1-31)|\n|`DD`|Der Tag des Monats, 2-stellig (z.B. 01-31)|\n|`d`|Der Wochentag, mit Sonntag als 0 (z.B. 0-6)|\n|`dd`|Die Minimalbezeichnung des Wochentags (z.B. So-Sa)|\n|`ddd`|Die Kurzbezeichnung des Wochentags (z.B. Son-Sam)|\n|`dddd`|Die Bezeichnung des Wochentags (z.B. Sonntag-Samstag)|\n|`Q`|Quartal (z.B. 1-4)|\n|`Do`|Tag des Monats mit Ordinalzahl (z.B. 1. 2. ... 31.)|\n|`w`|Kalenderwoche (z.B. 1 2 ... 52 53)|\n|`ww`|Kalenderwoche, 2-stellig (z.B. 01 02 ... 52 53)|\n|`W`|ISO-Kalenderwoche (z.B. 1 2 ... 52 53)|\n|`WW`|ISO-Kalenderwoche, 2-stellig (z.B. 01 02 ... 52 53)|\n|`wo`|Kalenderwoche mit Ordinalzahl (z.B. 1. 2. ... 52. 53.)|\n|`L`|Lokalisiertes Datum, 2-stellig (z.B. 24.02.2025)|\n|`l`|Lokalisiertes Datum, 1-stellig (z.B. 24.2.2025)|\n|`LL`|Lokalisiertes Datum, lang (z.B. 24. Februar 2025)|\n|`ll`|Lokalisiertes Datum, kurz (z.B. 24. Feb. 2025)|\n|`[...]`|Maskierte Zeichen (z.B. [Jahr])|"
+    },
+    "timeFormat": {
+      "label": "Zeitformat",
+      "tokens": "|||\n|-|-|\n|`H`|Die Stunde (z.B. 0-23)|\n|`HH`|Die Stunde, 2-stellig (z.B. 00-23)|\n|`h`|Die Stunde im 12-Stunden-Format (z.B. 1-12)|\n|`hh`|Die Stunde im 12-Stunden-Format, 2-stellig (z.B. 01-12)|\n|`m`|Die Minute (z.B. 0-59)|\n|`mm`|Die Minute, 2-stellig (z.B. 00-59)|\n|`s`|Die Sekunde (z.B. 0-59)|\n|`ss`|Die Sekunde, 2-stellig (z.B. 00-59)|\n|`SSS`|Die Millisekunde, 3-stellig (z.B. 000-999)|\n|`Z`|Die UTC-Verschiebung, ±HH:mm (z.B. +05:00)|\n|`ZZ`|Die UTC-Verschiebung, ±HHmm (z.B. +0500)|\n|`A`|AM PM|\n|`a`|am pm|\n|`k`|Die Stunde, beginnend bei 1 (z.B. 1-24)|\n|`kk`|Die Stunde, 2-stellig, beginnend bei 1 (z.B. 01-24)|\n|`z`|Abgekürzte Zeitzonenbezeichnung (z.B. MEZ)|\n|`zzz`|Ausgeschriebene Zeitzonenbezeichnung (z.B. Mitteleuropäische Zeit)|\n|`LT`|Lokalisierte Zeit ohne Sekunden (z.B. 20:30)|\n|`LTS`|Lokalisierte Zeit mit Sekunden (z.B. 20:30:25)|\n|`[...]`|Maskierte Zeichen (z.B. [Stunden])|"
+    },
+    "smartClipboard": {
+      "label": "Intelligente Zwischenablage",
+      "description": "Hintergrund-Zwischenablageüberwachung für sofortige Einfügebereitschaft. Diese Funktion fordert die Berechtigung des Browsers an, auf deine Zwischenablage zuzugreifen."
     }
   },
   "sessions": {

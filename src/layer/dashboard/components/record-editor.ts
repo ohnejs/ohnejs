@@ -163,7 +163,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       path: '',
       readOnlyRows: true,
       readOnly,
-      language: () => activeContentLocale() ?? useDashboardLanguage().value,
+      language: () => useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);

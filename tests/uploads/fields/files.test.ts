@@ -2,8 +2,12 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import UsersCollection from '../../../src/layer/collections/Users.ts';
+import datePatternField from '../../../src/layer/fields/date-pattern.ts';
+import languageField from '../../../src/layer/fields/language.ts';
+import localeField from '../../../src/layer/fields/locale.ts';
 import passwordField from '../../../src/layer/fields/password.ts';
 import rolesField from '../../../src/layer/fields/roles.ts';
+import timezoneField from '../../../src/layer/fields/timezone.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
@@ -20,6 +24,10 @@ usePrinter().configure({ stream: { write: () => true } });
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useFields().register('files', { name: 'files', fieldType: filesField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Uploads', { name: 'Uploads', collection: UploadsCollection });

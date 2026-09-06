@@ -112,9 +112,11 @@ function installForm(): HTMLElement {
         revealed.value = !revealed.value;
       },
     });
-    control.title = t(
-      revealed.value ? 'dashboard.login.hidePassword' : 'dashboard.login.showPassword',
-    );
+    effect(() => {
+      control.title = t(
+        revealed.value ? 'dashboard.login.hidePassword' : 'dashboard.login.showPassword',
+      );
+    });
     control.tabIndex = -1;
     return control;
   };

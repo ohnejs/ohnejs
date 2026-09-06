@@ -1,9 +1,24 @@
 {
+  "account": {
+    "appDefault": "App-Standard",
+    "confirmSignOutOtherDevices": "Möchtest du dich wirklich von allen anderen Geräten abmelden? Deine aktuelle Sitzung bleibt aktiv.",
+    "noAccess": "Du hast keinen Zugriff auf die Seite `{page}`",
+    "preview": "Vorschau",
+    "signedOut": "Abgemeldet",
+    "signOutOtherDevices": "Von allen anderen Geräten abmelden",
+    "title": "Mein Konto"
+  },
   "actions": "Aktionen",
   "addBlock": "Block hinzufügen",
   "addItem": "Eintrag hinzufügen",
   "apply": "Anwenden",
   "applyCount": "Anwenden ({count})",
+  "calendar": {
+    "clear": "Leeren",
+    "nextMonth": "Nächster Monat",
+    "previousMonth": "Vorheriger Monat",
+    "selectDate": "Datum auswählen"
+  },
   "cancel": "Abbrechen",
   "clear": "Leeren",
   "clearSearch": "Suche leeren",
@@ -42,6 +57,7 @@
   },
   "enable": "Aktivieren",
   "field": {
+    "hideDescription": "Beschreibung ausblenden",
     "hidePassword": "Passwort verbergen",
     "locked": "Dieses Feld kann nicht bearbeitet werden",
     "missing": {
@@ -50,6 +66,7 @@
     },
     "noEditor": "Dieser Wert kann hier nicht bearbeitet werden und bleibt beim Speichern unverändert",
     "revert": "Zurücksetzen",
+    "showDescription": "Beschreibung anzeigen",
     "showPassword": "Passwort anzeigen",
     "translatable": "Dieses Feld speichert je Sprache einen eigenen Wert",
     "unchanged": "unverändert",
@@ -103,6 +120,7 @@
     "contentLanguage": "Inhaltssprache",
     "darkMode": "Dunkler Modus",
     "lightMode": "Heller Modus",
+    "myAccount": "Mein Konto",
     "openUserMenu": "Benutzermenü öffnen",
     "switchedContentLanguage": "Inhaltssprache auf `{language}` umgestellt",
     "toggleSidebar": "Seitenleiste umschalten"

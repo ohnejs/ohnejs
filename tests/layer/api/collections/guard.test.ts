@@ -12,8 +12,12 @@ import queryPost from '../../../../src/layer/api/collections/[collection]/query.
 import { hashSessionToken } from '../../../../src/layer/auth/_token.ts';
 import SessionsCollection from '../../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../../src/layer/collections/Users.ts';
+import datePatternField from '../../../../src/layer/fields/date-pattern.ts';
+import languageField from '../../../../src/layer/fields/language.ts';
+import localeField from '../../../../src/layer/fields/locale.ts';
 import passwordField from '../../../../src/layer/fields/password.ts';
 import rolesField from '../../../../src/layer/fields/roles.ts';
+import timezoneField from '../../../../src/layer/fields/timezone.ts';
 import requireAuthMiddleware from '../../../../src/layer/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -36,6 +40,10 @@ useLayers().add({ path: '/guard-test', input: { auth: { password: { cost: 1024 }
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 useMiddleware().register('require-auth', requireAuthMiddleware);

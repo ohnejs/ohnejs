@@ -8,6 +8,7 @@ import {
   endpointOf,
   type FieldInstance,
   type FieldQueryMeta,
+  isExpandableDescription,
   isRecordLabelTemplate,
   type LogicalType,
   type Message,
@@ -16,6 +17,7 @@ import {
   useBlocks,
   useCollections,
   useConfig,
+  useMessages,
   useRoles,
 } from 'ohne';
 import {
@@ -26,16 +28,19 @@ import {
   isString,
   isUndefined,
   naturalCompare,
+  pick,
   templateFields,
   toKebabCase,
   toSentenceCase,
+  uniqueArray,
 } from 'ohne/utils';
 
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
-import { resolveMessage, translate } from '../../ohne/http/translate.ts';
+import { defaultLanguage, resolveMessage, translate } from '../../ohne/http/translate.ts';
+import { accountFields } from '../auth/account-fields.ts';
 import { userCan, userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
 
@@ -112,9 +117,37 @@ export interface DashboardField {
   label: string;
 
   /**
-   * The field's description, resolved in the request's language; absent when none is declared.
+   * The field's plain description, resolved in the request's language.
+   * Absent when none is declared, or when the declared one is expandable.
    */
   description?: string;
+
+  /**
+   * The field's description when it starts collapsed behind a toggle; absent for the plain form.
+   * Every string is resolved in the request's language; an omitted toggle label takes the catalog's.
+   */
+  expandable?: {
+    /**
+     * The content, shown once expanded.
+     * Markdown is supported.
+     */
+    text: string;
+
+    /**
+     * The toggle's label while the content is collapsed.
+     */
+    showLabel: string;
+
+    /**
+     * The toggle's label while the content is expanded.
+     */
+    hideLabel: string;
+
+    /**
+     * Whether the content starts expanded.
+     */
+    expanded: boolean;
+  };
 
   /**
    * The empty-input hint, resolved in the request's language; absent when none is declared.
@@ -352,6 +385,18 @@ export interface DashboardMeta {
    * The locale an unspecified read or write addresses.
    */
   defaultLocale: string;
+
+  /**
+   * The languages the message catalogs define: the default language first, the rest in natural order.
+   * The dashboard language setting picks from this list.
+   */
+  languages: string[];
+
+  /**
+   * The `Users` fields the signed-in user edits on the account page, described in form order.
+   * The `auth:account-fields` hook decides the list; an empty list hides the page.
+   */
+  accountFields: DashboardField[];
 }
 
 declare module 'ohne' {
@@ -386,6 +431,8 @@ const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
  * A collection appears when it is exposed and the user may run at least one of its operations.
  * Operations carry their verdicts, so the dashboard disables what the capability guard would refuse.
  * Fields carry the metadata a sheet needs: type, kind, flags, labels resolved in the request's language.
+ * `languages` lists the catalog languages the dashboard language setting offers, the default first.
+ * `accountFields` describes the `Users` fields the account page edits, as `auth:account-fields` allows.
  * No signed-in user is a `401`.
  */
 export default defineHandler(async (): Promise<DashboardMeta> => {
@@ -424,8 +471,27 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     capabilities: userCapabilities(user),
     locales,
     defaultLocale,
+    languages: catalogLanguages(),
+    accountFields: await describeAccountFields(user),
   };
 });
+
+/**
+ * The catalog languages: the default first, the rest in natural order.
+ */
+function catalogLanguages(): string[] {
+  return uniqueArray([defaultLanguage(), ...useMessages().keys().sort(naturalCompare)]);
+}
+
+/**
+ * Describes the `Users` fields the account page edits, in allowlist order; none without a `Users` collection.
+ */
+async function describeAccountFields(user: User): Promise<DashboardField[]> {
+  const users = useCollections().get('Users');
+  if (isUndefined(users)) return [];
+  const allowed = pick(queryMetadata('Users').fields, await accountFields(user));
+  return describeFields(allowed, users.collection.fields);
+}
 
 /**
  * Describes every block type the listed collections can reach, following `allow` to closure.
@@ -535,8 +601,16 @@ function describeField(
     immutable: meta.immutable === true,
   };
   if (!isUndefined(meta.logicalType)) field.logicalType = meta.logicalType;
-  if (!isUndefined(options.description)) {
-    field.description = resolveMessage(options.description as Message);
+  const { description } = options;
+  if (isExpandableDescription(description)) {
+    field.expandable = {
+      text: resolveMessage(description.text),
+      showLabel: resolveMessage(description.showLabel ?? 'dashboard.field.showDescription'),
+      hideLabel: resolveMessage(description.hideLabel ?? 'dashboard.field.hideDescription'),
+      expanded: description.expanded ?? false,
+    };
+  } else if (!isUndefined(description)) {
+    field.description = resolveMessage(description as Message);
   }
   if (!isUndefined(options.placeholder)) {
     field.placeholder = resolveMessage(options.placeholder as Message);

@@ -31,6 +31,39 @@ export interface User {
    * The capabilities of every held role union; resolve them with `userCapabilities`.
    */
   roles: RoleName[];
+
+  /**
+   * The language the dashboard renders in, as a canonical BCP-47 tag like `de-AT`.
+   * `null` leaves the dashboard on the app's default language.
+   */
+  dashboardLanguage: string | null;
+
+  /**
+   * The content locale the dashboard opens records in, one of the configured `collections.locales`.
+   * `null` leaves it on the default locale.
+   */
+  contentLanguage: string | null;
+
+  /**
+   * The IANA time zone the dashboard displays and edits instants in, like `Europe/Berlin`.
+   * `null` leaves it on the device's own time zone.
+   */
+  timezone: string | null;
+
+  /**
+   * The pattern the dashboard formats dates with, like `YYYY-MM-DD`.
+   */
+  dateFormat: string;
+
+  /**
+   * The pattern the dashboard formats times with, like `HH:mm:ss`.
+   */
+  timeFormat: string;
+
+  /**
+   * Whether the dashboard watches the clipboard in the background, so a copied record pastes at once.
+   */
+  smartClipboard: boolean;
 }
 
 /**

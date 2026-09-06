@@ -11,8 +11,12 @@ import dashboardGet, {
 import { hashSessionToken } from '../../../src/layer/auth/_token.ts';
 import SessionsCollection from '../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../src/layer/collections/Users.ts';
+import datePatternField from '../../../src/layer/fields/date-pattern.ts';
+import languageField from '../../../src/layer/fields/language.ts';
+import localeField from '../../../src/layer/fields/locale.ts';
 import passwordField from '../../../src/layer/fields/password.ts';
 import rolesField from '../../../src/layer/fields/roles.ts';
+import timezoneField from '../../../src/layer/fields/timezone.ts';
 import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -65,6 +69,10 @@ useLayers().add({
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
@@ -78,12 +86,18 @@ useMessages().register('en', {
   'dashboard.fields.uuid.label': 'UUID',
   'dashboard.fields.updatedAt.label': 'Updated',
   'dashboard.fields.translations.label': 'Translations',
+  'dashboard.field.showDescription': 'Show description',
+  'dashboard.field.hideDescription': 'Hide description',
+  'auth.users.timezone.label': 'Time zone',
   'dash.owners.name.label': 'Owner name',
   'dash.kinds.title.placeholder': 'Short name',
+  'dash.kinds.help.text': 'Long help',
   'dash.blocks.hero.label': 'Hero section',
   'dash.menu.reports': 'Reports',
   'dashMenu.tools': '{n, plural, one {# tool} other {# tools}}',
 });
+useMessages().register('de', { 'auth.users.timezone.label': 'Zeitzone' });
+useMessages().register('bs', { 'auth.users.timezone.label': 'Vremenska zona' });
 
 useCollections().register('DashNotes', {
   name: 'DashNotes',
@@ -206,7 +220,9 @@ useCollections().register('DashKinds', {
       status: field('select', { choices: ['draft', { value: 'live', label: 'Published' }] }),
       tags: field('multiSelect', { choices: ['a', 'b'], max: 2 }),
       day: field('date', { min: '2024-01-01', nullable: true }),
+      when: field('dateTime', { nullable: true }),
       flag: field('boolean', { display: 'switch' }),
+      help: field('text', { nullable: true, description: { text: 'dash.kinds.help.text' } }),
     },
   },
 });
@@ -241,10 +257,14 @@ const route: Route = {
   handler: dashboardGet as AnyHandler,
 };
 
-async function call(bearer: string | null): Promise<{ status: number; body: DashboardMeta }> {
+async function call(
+  bearer: string | null,
+  language?: string,
+): Promise<{ status: number; body: DashboardMeta }> {
   const url = 'http://x.test/dashboard';
   const headers = new Headers();
   if (bearer !== null) headers.set('Authorization', `Bearer ${bearer}`);
+  if (language !== undefined) headers.set('Accept-Language', language);
   const request = new Request(url, { headers });
   const { response } = await dispatch(route, request, new URL(url), {});
   return { status: response.status, body: (await response.json()) as DashboardMeta };
@@ -444,6 +464,7 @@ describe('fields', () => {
     });
     deepStrictEqual(kinds.tags?.options, { choices: ['a', 'b'], max: 2 });
     deepStrictEqual(kinds.day?.options, { min: '2024-01-01' });
+    deepStrictEqual(kinds.when?.options, { relativeTime: false });
     deepStrictEqual(kinds.flag?.options, { display: 'switch' });
     deepStrictEqual(kinds.title?.options, { allowEmpty: false, max: 40, multiline: false });
     const notes = keyBy(collection(body, 'DashNotes').fields, (entry) => entry.name);
@@ -457,6 +478,19 @@ describe('fields', () => {
     const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
     strictEqual(kinds.title?.placeholder, 'Short name');
     strictEqual(kinds.status?.placeholder, undefined);
+  });
+
+  it('describes an expandable description with the catalog toggle labels, collapsed', async () => {
+    const { body } = await call(user);
+    const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
+    deepStrictEqual(kinds.help?.expandable, {
+      text: 'Long help',
+      showLabel: 'Show description',
+      hideLabel: 'Hide description',
+      expanded: false,
+    });
+    strictEqual(kinds.help?.description, undefined);
+    strictEqual(kinds.title?.expandable, undefined);
   });
 
   it('describes composite subfields, the item UUID included', async () => {
@@ -602,6 +636,51 @@ describe('locales', () => {
     const { body } = await call(user);
     deepStrictEqual(body.locales, ['en', 'de']);
     strictEqual(body.defaultLocale, 'en');
+  });
+});
+
+describe('languages', () => {
+  it('lists the default language first, the rest in natural order', async () => {
+    deepStrictEqual((await call(user)).body.languages, ['en', 'bs', 'de']);
+  });
+});
+
+describe('accountFields', () => {
+  it('describes the default allowlist in form order, the password write-only', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(
+      body.accountFields.map((entry) => entry.name),
+      [
+        'contentLanguage',
+        'dashboardLanguage',
+        'timezone',
+        'dateFormat',
+        'timeFormat',
+        'smartClipboard',
+        'password',
+      ],
+    );
+    const fields = keyBy(body.accountFields, (entry) => entry.name);
+    strictEqual(fields.password?.readable, false);
+    strictEqual(fields.password?.required, true);
+    strictEqual(fields.dateFormat?.expandable?.expanded, false);
+    strictEqual(fields.dateFormat?.description, undefined);
+  });
+
+  it('resolves the labels in the request language', async () => {
+    const english = keyBy((await call(user)).body.accountFields, (entry) => entry.name);
+    const german = keyBy((await call(user, 'de')).body.accountFields, (entry) => entry.name);
+    strictEqual(english.timezone?.label, 'Time zone');
+    strictEqual(german.timezone?.label, 'Zeitzone');
+  });
+
+  it('follows the auth:account-fields hook, an empty list describing nothing', async () => {
+    hook('auth:account-fields', () => []);
+    try {
+      deepStrictEqual((await call(user)).body.accountFields, []);
+    } finally {
+      useHooks().delete('auth:account-fields');
+    }
   });
 });
 

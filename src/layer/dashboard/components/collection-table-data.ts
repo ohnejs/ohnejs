@@ -1,17 +1,20 @@
 import {
   api,
+  attachTooltip,
   type Child,
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
   dimMark,
   fieldTypeFor,
+  formatDateTime,
+  formatRelative,
   h,
   joinLabel,
   seedLabel,
   useDashboardLanguage,
 } from 'ohne/dashboard';
-import { hasKey, isEmpty, isNumber, isString, isUndefined, untracked } from 'ohne/utils';
+import { hasKey, isEmpty, isNumber, isString, onCleanup, untracked } from 'ohne/utils';
 
 import { translationsCell } from './translations-cell.ts';
 
@@ -32,11 +35,6 @@ export interface QueryPage {
 }
 
 /**
- * The `_updatedAt` renderings: time-only for today, short date otherwise, medium for the tooltip.
- */
-type DateVariant = 'time' | 'short' | 'full';
-
-/**
  * The fixed page size every collection table surface reads with.
  */
 export const PER_PAGE = 50;
@@ -51,14 +49,6 @@ export const DEFAULT_ORDER: readonly string[] = ['-_updatedAt'];
  * The list page owns the entries; the record picker only seeds its first view from them.
  */
 export const tableMemory = new Map<string, string>();
-
-const DATE_OPTIONS: Record<DateVariant, Intl.DateTimeFormatOptions> = {
-  time: { timeStyle: 'short' },
-  short: { dateStyle: 'short', timeStyle: 'short' },
-  full: { dateStyle: 'medium', timeStyle: 'short' },
-};
-
-const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
 /**
  * The fields a table surface resolves its columns from.
@@ -126,6 +116,7 @@ export function seedLabels(collection: DashboardCollection, records: readonly Ta
 /**
  * The cell's display content: system fields render specially, the rest through their field type.
  * The `_translations` matrix renders static here; the collection table links its chips itself.
+ * `_updatedAt` reads relative to now, ticking, with the instant in the user's formats as its tooltip.
  */
 export function displayFor(field: DashboardField, row: TableRecord): Child {
   if (field.name === '_translations') return translationsCell(row, { canUpdate: false });
@@ -133,13 +124,10 @@ export function displayFor(field: DashboardField, row: TableRecord): Child {
     return () => {
       const value = row['_updatedAt'];
       if (!isNumber(value)) return dimMark('-');
-      const language = useDashboardLanguage().value;
-      const variant: DateVariant = isToday(value) ? 'time' : 'short';
-      return h(
-        'span',
-        { class: 'ohne-truncate', title: dateFormat(language, 'full').format(value) },
-        dateFormat(language, variant).format(value),
-      );
+      // A function child, so a clock tick patches the text alone and never rebuilds the element mid-hover.
+      const element = h('span', { class: 'ohne-truncate' }, () => formatRelative(value));
+      onCleanup(attachTooltip(element, () => formatDateTime(value)));
+      return element;
     };
   }
   if (field.name === 'UUID') {
@@ -154,30 +142,4 @@ export function displayFor(field: DashboardField, row: TableRecord): Child {
     value: () => row[field.name],
     language: () => useDashboardLanguage().value,
   });
-}
-
-/**
- * Whether the timestamp falls on the viewer's local today.
- */
-function isToday(timestamp: number): boolean {
-  const date = new Date(timestamp);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
-
-/**
- * The memoized `_updatedAt` formatter for `language` in `variant`.
- */
-function dateFormat(language: string, variant: DateVariant): Intl.DateTimeFormat {
-  const key = `${language} ${variant}`;
-  let format = dateFormats.get(key);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, DATE_OPTIONS[variant]);
-    dateFormats.set(key, format);
-  }
-  return format;
 }

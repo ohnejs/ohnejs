@@ -5,8 +5,12 @@ import type { MemoryStorage } from './_storage.ts';
 import { hashSessionToken } from '../../src/layer/auth/_token.ts';
 import SessionsCollection from '../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../src/layer/collections/Users.ts';
+import datePatternField from '../../src/layer/fields/date-pattern.ts';
+import languageField from '../../src/layer/fields/language.ts';
+import localeField from '../../src/layer/fields/locale.ts';
 import passwordField from '../../src/layer/fields/password.ts';
 import rolesField from '../../src/layer/fields/roles.ts';
+import timezoneField from '../../src/layer/fields/timezone.ts';
 import { useCollections } from '../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../src/ohne/database/schema/desired.ts';
@@ -45,6 +49,10 @@ useLayers().add({
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 useCollections().register('Uploads', { name: 'Uploads', collection: UploadsCollection });

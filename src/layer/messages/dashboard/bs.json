@@ -1,9 +1,24 @@
 {
+  "account": {
+    "appDefault": "Zadano u aplikaciji",
+    "confirmSignOutOtherDevices": "Da li zaista želite da se odjavite sa svih drugih uređaja? Vaša trenutna sesija ostaje aktivna.",
+    "noAccess": "Nemate pristup stranici `{page}`",
+    "preview": "Pretpregled",
+    "signedOut": "Odjavljeno",
+    "signOutOtherDevices": "Odjavi se sa svih drugih uređaja",
+    "title": "Moj račun"
+  },
   "actions": "Radnje",
   "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
   "apply": "Primijeni",
   "applyCount": "Primijeni ({count})",
+  "calendar": {
+    "clear": "Očisti",
+    "nextMonth": "Sljedeći mjesec",
+    "previousMonth": "Prethodni mjesec",
+    "selectDate": "Odaberi datum"
+  },
   "cancel": "Otkaži",
   "clear": "Očisti",
   "clearSearch": "Očisti pretragu",
@@ -42,6 +57,7 @@
   },
   "enable": "Omogući",
   "field": {
+    "hideDescription": "Sakrij opis",
     "hidePassword": "Sakrij lozinku",
     "locked": "Ovo polje se ne može uređivati",
     "missing": {
@@ -50,6 +66,7 @@
     },
     "noEditor": "Ova vrijednost se ovdje ne može uređivati i ostaje nepromijenjena pri spremanju",
     "revert": "Vrati",
+    "showDescription": "Prikaži opis",
     "showPassword": "Prikaži lozinku",
     "translatable": "Ovo polje čuva zasebnu vrijednost za svaki jezik",
     "unchanged": "nepromijenjeno",
@@ -103,6 +120,7 @@
     "contentLanguage": "Jezik sadržaja",
     "darkMode": "Tamni režim",
     "lightMode": "Svijetli režim",
+    "myAccount": "Moj račun",
     "openUserMenu": "Otvori korisnički meni",
     "switchedContentLanguage": "Jezik sadržaja promijenjen na `{language}`",
     "toggleSidebar": "Prikaži ili sakrij bočnu traku"

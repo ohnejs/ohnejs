@@ -1,6 +1,7 @@
 import {
   api,
   attachTooltip,
+  badge,
   card,
   type Child,
   css,
@@ -9,10 +10,11 @@ import {
   dashboardMeta,
   each,
   fallbackLabel,
+  formatDateTime,
+  formatRelative,
   h,
   icon,
   joinLabel,
-  useDashboardLanguage,
   useT,
   when,
 } from 'ohne/dashboard';
@@ -55,16 +57,6 @@ interface Bucket {
 }
 
 const PAGE_SIZE = 20;
-
-const UNIT_STEPS: readonly [Intl.RelativeTimeFormatUnit, number][] = [
-  ['year', 31536000],
-  ['month', 2592000],
-  ['day', 86400],
-  ['hour', 3600],
-  ['minute', 60],
-];
-
-const timeFormats = new Map<string, Intl.RelativeTimeFormat>();
 
 css`
   .o-overview-recent {
@@ -143,7 +135,13 @@ css`
     box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
   }
 
+  .o-overview-recent-row .ohne-badge {
+    max-width: 35%;
+  }
+
   .o-overview-recent-time {
+    /* positioned after the stretched link, so the pointer reaches the tooltip */
+    position: relative;
     flex-shrink: 0;
     color: hsl(var(--ohne-muted-foreground));
     font-size: 0.75rem;
@@ -181,7 +179,8 @@ css`
 /**
  * The Recent edits widget.
  * The most recently updated records across every readable collection.
- * Each row links to its record page, with a relative time and a label-plus-collection tooltip.
+ * Each row links to its record page, with its collection in a badge and a relative time, ticking.
+ * The time's tooltip is the instant in the user's date and time formats and zone.
  * Each readable collection answers the body-query `POST` ordered by `-_updatedAt`.
  * The collections merge newest first, one page at a time.
  * `Load more` extends the feed and hides once every collection has run out.
@@ -279,16 +278,18 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
 }
 
 /**
- * One list row: the record link stretched over the row, and the relative time with its tooltip.
+ * One list row: the collection badge, the record link stretched over the row, and the relative time.
+ * The badge caps at a share of the row, so a long collection name truncates before it pushes the time off.
  */
 function recentRow(entry: () => RecentEdit): Child {
   const time = h('span', { class: 'o-overview-recent-time' }, () =>
-    relativeTime(entry().updatedAt, useDashboardLanguage().value),
+    formatRelative(entry().updatedAt),
   );
-  onCleanup(attachTooltip(time, () => `${entry().label} - ${entry().collectionLabel}`));
+  onCleanup(attachTooltip(time, () => formatDateTime(entry().updatedAt)));
   return h(
     'li',
     { class: 'o-overview-recent-row' },
+    badge(() => entry().collectionLabel, { size: -2, color: 'secondary' }),
     h(
       'a',
       {
@@ -396,28 +397,4 @@ async function fillBucket(bucket: Bucket): Promise<void> {
   } catch {
     bucket.done = true;
   }
-}
-
-/**
- * The elapsed time in words, formatted through `Intl`.
- */
-function relativeTime(timestamp: number, language: string): string {
-  const format = formatFor(language);
-  const seconds = Math.round((timestamp - Date.now()) / 1000);
-  for (const [unit, size] of UNIT_STEPS) {
-    if (Math.abs(seconds) >= size) return format.format(Math.trunc(seconds / size), unit);
-  }
-  return format.format(seconds, 'second');
-}
-
-/**
- * The memoized relative time formatter for `language`.
- */
-function formatFor(language: string): Intl.RelativeTimeFormat {
-  let format = timeFormats.get(language);
-  if (isUndefined(format)) {
-    format = new Intl.RelativeTimeFormat(language, { numeric: 'auto' });
-    timeFormats.set(language, format);
-  }
-  return format;
 }

@@ -371,7 +371,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
               },
             },
           );
-          item.title = t('dashboard.select');
+          effect(() => {
+            item.title = t('dashboard.select');
+          });
           return item;
         };
         const deselectItem = (): HTMLElement => {
@@ -384,7 +386,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
               },
             },
           );
-          item.title = t('dashboard.deselect');
+          effect(() => {
+            item.title = t('dashboard.deselect');
+          });
           return item;
         };
         const openItem = dropdownItem(
@@ -398,7 +402,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
             onClick: () => close(),
           },
         );
-        openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
+        effect(() => {
+          openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
+        });
         const menu = dropdown(
           [
             when(() => multiple && selected.value[row.id] === true, deselectItem, selectItem),

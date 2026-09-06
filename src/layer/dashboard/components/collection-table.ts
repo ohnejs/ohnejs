@@ -511,7 +511,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
             href,
             onClick: () => close(),
           });
-      openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
       const translateItem = canTranslate
         ? dropdownItem(
             [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
@@ -523,7 +522,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
             },
           )
         : null;
-      if (translateItem) translateItem.title = t('dashboard.translations.translate');
       const deleteItem = canDelete
         ? dropdownItem([icon('trash-x'), h('span', null, () => t('dashboard.delete'))], {
             destructive: true,
@@ -533,7 +531,11 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
             },
           })
         : null;
-      if (deleteItem) deleteItem.title = t('dashboard.delete');
+      effect(() => {
+        openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
+        if (translateItem) translateItem.title = t('dashboard.translations.translate');
+        if (deleteItem) deleteItem.title = t('dashboard.delete');
+      });
       const menu = dropdown(
         [
           openItem,
@@ -552,7 +554,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
                   },
                 },
               );
-              item.title = t('dashboard.deselect');
+              effect(() => {
+                item.title = t('dashboard.deselect');
+              });
               return item;
             },
             () => {
@@ -566,7 +570,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
                   },
                 },
               );
-              item.title = t('dashboard.select');
+              effect(() => {
+                item.title = t('dashboard.select');
+              });
               return item;
             },
           ),

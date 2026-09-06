@@ -46,7 +46,7 @@ export function loginPopup(): Child {
       });
       popup(
         loginForm({
-          header: field(
+          header: field(() =>
             alert(
               h('p', null, () => t('dashboard.session.expiredBody')),
               {

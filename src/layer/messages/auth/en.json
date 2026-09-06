@@ -3,7 +3,13 @@
   "invalidEmail": "Enter a valid email address",
   "invalidCredentials": "Incorrect email or password",
   "invalidRoles": "Roles must be a list of role names",
+  "invalidTimezone": "Invalid time zone `{timezone}`",
   "unknownRole": "Unknown role `{role}`",
+  "unknownLanguage": "Unknown language `{language}`",
+  "unknownLocale": "Unknown locale `{locale}`",
+  "timezone": {
+    "auto": "Auto (device settings)"
+  },
   "users": {
     "email": {
       "label": "Email",
@@ -16,6 +22,30 @@
     "roles": {
       "label": "Roles",
       "description": "The role names this user holds. The capabilities of every held role union."
+    },
+    "dashboardLanguage": {
+      "label": "Dashboard language",
+      "description": "Language of the dashboard interface."
+    },
+    "contentLanguage": {
+      "label": "Content language",
+      "description": "Language used in content entries and pages."
+    },
+    "timezone": {
+      "label": "Time zone",
+      "description": "Time zone used for date and time display."
+    },
+    "dateFormat": {
+      "label": "Date format",
+      "tokens": "|||\n|-|-|\n|`YY`|Two-digit year (e.g. 23)|\n|`YYYY`|Four-digit year (e.g. 2023)|\n|`M`|The month, beginning at 1 (e.g. 1-12)|\n|`MM`|The month, 2-digits (e.g. 01-12)|\n|`MMM`|The abbreviated month name (e.g. Jan-Dec)|\n|`MMMM`|The full month name (e.g. January-December)|\n|`D`|The day of the month (e.g. 1-31)|\n|`DD`|The day of the month, 2-digits (e.g. 01-31)|\n|`d`|The day of the week, with Sunday as 0 (e.g. 0-6)|\n|`dd`|The min name of the day of the week (e.g. Su-Sa)|\n|`ddd`|The short name of the day of the week (e.g. Sun-Sat)|\n|`dddd`|The name of the day of the week (e.g. Sunday-Saturday)|\n|`Q`|Quarter (e.g. 1-4)|\n|`Do`|Day of Month with ordinal (e.g. 1st 2nd ... 31st)|\n|`w`|Week of year (e.g. 1 2 ... 52 53)|\n|`ww`|Week of year, 2-digits (e.g. 01 02 ... 52 53)|\n|`W`|ISO Week of year (e.g. 1 2 ... 52 53)|\n|`WW`|ISO Week of year, 2-digits (e.g. 01 02 ... 52 53)|\n|`wo`|Week of year with ordinal (e.g. 1st 2nd ... 52nd 53rd)|\n|`L`|Localized date, 2-digits (e.g. 02/24/2025)|\n|`l`|Localized date, 1-digit (e.g. 2/24/2025)|\n|`LL`|Localized date, long (e.g. February 24, 2025)|\n|`ll`|Localized date, short (e.g. Feb 24, 2025)|\n|`[...]`|Escaped characters (e.g. [Year])|"
+    },
+    "timeFormat": {
+      "label": "Time format",
+      "tokens": "|||\n|-|-|\n|`H`|The hour (e.g. 0-23)|\n|`HH`|The hour, 2-digits (e.g. 00-23)|\n|`h`|The hour, 12-hour clock (e.g. 1-12)|\n|`hh`|The hour, 12-hour clock, 2-digits (e.g. 01-12)|\n|`m`|The minute (e.g. 0-59)|\n|`mm`|The minute, 2-digits (e.g. 00-59)|\n|`s`|The second (e.g. 0-59)|\n|`ss`|The second, 2-digits (e.g. 00-59)|\n|`SSS`|The millisecond, 3-digits (e.g. 000-999)|\n|`Z`|The offset from UTC, ±HH:mm (e.g. +05:00)|\n|`ZZ`|The offset from UTC, ±HHmm (e.g. +0500)|\n|`A`|AM PM|\n|`a`|am pm|\n|`k`|The hour, beginning at 1 (e.g. 1-24)|\n|`kk`|The hour, 2-digits, beginning at 1 (e.g. 01-24)|\n|`z`|Abbreviated named offset (e.g. GMT+1)|\n|`zzz`|Unabbreviated named offset (e.g. Central European Standard Time)|\n|`LT`|Localized time without seconds (e.g. 8:30 PM)|\n|`LTS`|Localized time with seconds (e.g. 8:30:25 PM)|\n|`[...]`|Escaped characters (e.g. [Hours])|"
+    },
+    "smartClipboard": {
+      "label": "Smart clipboard",
+      "description": "Background clipboard monitoring for instant paste readiness. This feature will request browser permission to access your clipboard."
     }
   },
   "sessions": {

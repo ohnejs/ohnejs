@@ -1,15 +1,20 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import { hashSessionToken } from '../../../src/layer/auth/_token.ts';
+import { toUser, userColumns } from '../../../src/layer/auth/_user.ts';
 import { useSession } from '../../../src/layer/auth/use-session.ts';
 import { useUser } from '../../../src/layer/auth/use-user.ts';
 import SessionsCollection from '../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../src/layer/collections/Users.ts';
+import datePatternField from '../../../src/layer/fields/date-pattern.ts';
+import languageField from '../../../src/layer/fields/language.ts';
+import localeField from '../../../src/layer/fields/locale.ts';
 import passwordField from '../../../src/layer/fields/password.ts';
 import rolesField from '../../../src/layer/fields/roles.ts';
+import timezoneField from '../../../src/layer/fields/timezone.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
@@ -29,6 +34,10 @@ useLayers().add({ path: '/use-user-test', input: { auth: { password: { cost: 102
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
+useFields().register('language', { name: 'language', fieldType: languageField });
+useFields().register('locale', { name: 'locale', fieldType: localeField });
+useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
+useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 useCollections().register('OwnedNotes', {
@@ -71,7 +80,7 @@ function route(pattern: string, handler: AnyHandler): Route {
 }
 
 const WHO = route('/who', async () => ({
-  user: (await useUser())?.UUID ?? null,
+  user: await useUser(),
   session: (await useSession())?.user ?? null,
 }));
 const CREATE = route('/create', () => queryUntyped('OwnedNotes').createOrThrow({ title: 'in' }));
@@ -95,9 +104,19 @@ describe('useUser and useSession', () => {
     strictEqual(await useSession(), null);
   });
 
-  it('resolve the session user inside a request', async () => {
+  it('resolve the session user inside a request, settings at their defaults', async () => {
     const who = await call(WHO, token);
-    strictEqual(who.user, uuid);
+    deepStrictEqual(who.user, {
+      UUID: uuid,
+      email: 'owner@example.com',
+      roles: [],
+      dashboardLanguage: null,
+      contentLanguage: null,
+      timezone: null,
+      dateFormat: 'LL',
+      timeFormat: 'LTS',
+      smartClipboard: false,
+    });
     strictEqual(who.session, uuid);
     strictEqual((await call(WHO, null)).user, null);
   });
@@ -106,5 +125,38 @@ describe('useUser and useSession', () => {
     strictEqual((await call(CREATE, token)).owner, uuid);
     const seeded = await queryUntyped('OwnedNotes').createOrThrow({ title: 'seed' });
     strictEqual(seeded.owner, null);
+  });
+});
+
+describe('toUser', () => {
+  it('projects a record that lacks the settings columns onto the defaults', () => {
+    deepStrictEqual(
+      toUser({ UUID: 'u', email: 'u@example.com', roles: ['admin'], password: 'x' }),
+      {
+        UUID: 'u',
+        email: 'u@example.com',
+        roles: ['admin'],
+        dashboardLanguage: null,
+        contentLanguage: null,
+        timezone: null,
+        dateFormat: 'LL',
+        timeFormat: 'LTS',
+        smartClipboard: false,
+      },
+    );
+  });
+
+  it('names every declared user column for a read', () => {
+    deepStrictEqual(userColumns(), [
+      'UUID',
+      'email',
+      'roles',
+      'dashboardLanguage',
+      'contentLanguage',
+      'timezone',
+      'dateFormat',
+      'timeFormat',
+      'smartClipboard',
+    ]);
   });
 });

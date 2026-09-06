@@ -6,6 +6,7 @@ import type { User } from '../../../src/layer/auth/types.ts';
 
 import '../_fixture.ts';
 import '../../../src/uploads/boot/hooks.ts';
+import { toUser } from '../../../src/layer/auth/_user.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
@@ -38,8 +39,8 @@ useRoles().register('boot-viewer', {
   role: { capabilities: ['collection.Users.read'] },
 });
 
-const admin: User = { UUID: 'u-admin', email: 'admin@example.com', roles: ['uploads-admin'] };
-const viewer: User = { UUID: 'u-viewer', email: 'viewer@example.com', roles: ['boot-viewer'] };
+const admin = toUser({ UUID: 'u-admin', email: 'admin@example.com', roles: ['uploads-admin'] });
+const viewer = toUser({ UUID: 'u-viewer', email: 'viewer@example.com', roles: ['boot-viewer'] });
 
 const usersRow = { to: '/collections/users', label: 'Users' };
 const uploadsRow = { to: '/collections/uploads', label: 'Uploads', icon: 'library-photo' as const };

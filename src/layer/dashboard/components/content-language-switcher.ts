@@ -8,13 +8,16 @@ import {
   dropdownItem,
   h,
   icon,
+  sessionUser,
   toast,
+  updateSessionUser,
   useDashboardLanguage,
   useRoute,
   useT,
   when,
 } from 'ohne/dashboard';
 import {
+  capitalize,
   effect,
   formatLocaleCode,
   isNull,
@@ -22,20 +25,17 @@ import {
   onCleanup,
   ref,
   type Ref,
+  untracked,
 } from 'ohne/utils';
-
-const STORAGE_KEY = 'ohne:content-locale';
 
 /**
  * The content locale the dashboard edits records in, shared app-wide.
  * Distinct from the interface language: it addresses translatable field values.
  * `undefined` means the app's default locale; the switcher writes chosen codes here.
- * The preference persists in `localStorage`.
+ * The user record holds the preference: the session seeds the ref, and the switcher persists each change.
  * The record editor and the single-field edit popup resolve field values through it.
  */
-export const contentLocale: Ref<string | undefined> = ref<string | undefined>(
-  localStorage.getItem(STORAGE_KEY) ?? undefined,
-);
+export const contentLocale: Ref<string | undefined> = ref<string | undefined>(undefined);
 
 /**
  * The validated content locale, reactively: the chosen code while the discovery data lists it.
@@ -76,7 +76,7 @@ export function registerTranslatableContext(matches: () => boolean): void {
  * It renders only while the discovery data lists more than one locale and the page is translatable.
  * Pages where translation means nothing carry no switcher.
  * The button shows the active locale's formatted code; picking another persists it and toasts.
- * The choice persists locally.
+ * The choice lands on the user record; an unreachable server toasts, and the choice holds for the session.
  */
 export function contentLanguageSwitcher(): Child {
   return when(
@@ -111,21 +111,17 @@ function switcher(): HTMLElement {
   const t = useT();
   const open = ref(false);
 
-  let preferred = localStorage.getItem(STORAGE_KEY);
+  let preferred = untracked(() => sessionUser()?.contentLanguage ?? null);
   effect(() => {
-    const locale = contentLocale.value;
-    if (isUndefined(locale)) {
-      if (!isNull(preferred)) {
-        preferred = null;
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      return;
-    }
-    if (locale !== preferred) {
-      preferred = locale;
-      localStorage.setItem(STORAGE_KEY, locale);
+    const locale = contentLocale.value ?? null;
+    if (locale === preferred) return;
+    preferred = locale;
+    if (!isNull(locale)) {
       toast(t('dashboard.header.switchedContentLanguage', { language: formatLocaleCode(locale) }));
     }
+    void updateSessionUser({ contentLanguage: locale }).then((outcome) => {
+      if (outcome.kind === 'unreachable') toast(t('dashboard.unreachable'), { type: 'error' });
+    });
   });
 
   const chevron = icon('chevron-down');
@@ -197,12 +193,13 @@ export function effectiveContentLocale(): string {
 
 /**
  * The locale's display name in the dashboard's interface language, falling back to the code.
+ * The name is capitalized, since some languages spell their own name lowercase.
  * The discovery data carries only codes.
  */
 export function localeName(code: string): string {
   try {
-    return (
-      new Intl.DisplayNames([useDashboardLanguage().value], { type: 'language' }).of(code) ?? code
+    return capitalize(
+      new Intl.DisplayNames([useDashboardLanguage().value], { type: 'language' }).of(code) ?? code,
     );
   } catch {
     return code;

@@ -159,7 +159,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       renderUUID: true,
       readOnly: disabled,
       readOnlyRows: true,
-      language: () => activeContentLocale() ?? useDashboardLanguage().value,
+      language: () => useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);

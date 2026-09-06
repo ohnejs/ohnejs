@@ -1,9 +1,24 @@
 {
+  "account": {
+    "appDefault": "App default",
+    "confirmSignOutOtherDevices": "Are you sure you want to sign out from all other devices? Your current session will remain active.",
+    "noAccess": "You do not have access to the page `{page}`",
+    "preview": "Preview",
+    "signedOut": "Signed out",
+    "signOutOtherDevices": "Sign out from all other devices",
+    "title": "My account"
+  },
   "actions": "Actions",
   "addBlock": "Add block",
   "addItem": "Add item",
   "apply": "Apply",
   "applyCount": "Apply ({count})",
+  "calendar": {
+    "clear": "Clear",
+    "nextMonth": "Next month",
+    "previousMonth": "Previous month",
+    "selectDate": "Select date"
+  },
   "cancel": "Cancel",
   "clear": "Clear",
   "clearSearch": "Clear search",
@@ -42,6 +57,7 @@
   },
   "enable": "Enable",
   "field": {
+    "hideDescription": "Hide description",
     "hidePassword": "Hide password",
     "locked": "This field cannot be edited",
     "missing": {
@@ -50,6 +66,7 @@
     },
     "noEditor": "This value cannot be edited here and is saved unchanged",
     "revert": "Revert",
+    "showDescription": "Show description",
     "showPassword": "Show password",
     "translatable": "This field stores a separate value for each language",
     "unchanged": "unchanged",
@@ -103,6 +120,7 @@
     "contentLanguage": "Content language",
     "darkMode": "Dark mode",
     "lightMode": "Light mode",
+    "myAccount": "My account",
     "openUserMenu": "Open user menu",
     "switchedContentLanguage": "Switched content language to `{language}`",
     "toggleSidebar": "Toggle sidebar"

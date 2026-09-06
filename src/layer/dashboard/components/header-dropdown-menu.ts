@@ -1,5 +1,6 @@
 import {
   button,
+  dashboardMeta,
   dropdown,
   dropdownItem,
   h,
@@ -15,7 +16,8 @@ import { effect, ref } from 'ohne/utils';
  * The header's kebab user menu.
  * The trigger turns primary while the dropdown is open.
  * One group toggles the color mode against the resolved OS-aware mode.
- * A rule separates it from the destructive sign-out, a link to the logout page.
+ * A rule separates it from the account link and the destructive sign-out, a link to the logout page.
+ * The account link shows only while the discovery data lists account fields.
  */
 export function headerDropdownMenu(): HTMLElement {
   const t = useT();
@@ -30,8 +32,8 @@ export function headerDropdownMenu(): HTMLElement {
       open.value = true;
     },
   });
-  trigger.title = t('dashboard.header.openUserMenu');
   effect(() => {
+    trigger.title = t('dashboard.header.openUserMenu');
     trigger.classList.toggle('ohne-button-primary', open.value);
     trigger.classList.toggle('ohne-button-outline', !open.value);
   });
@@ -67,6 +69,17 @@ export function headerDropdownMenu(): HTMLElement {
               );
             },
             h('hr'),
+            when(
+              () => (dashboardMeta()?.accountFields.length ?? 0) > 0,
+              () =>
+                dropdownItem(
+                  [icon('user'), h('span', null, () => t('dashboard.header.myAccount'))],
+                  {
+                    href: '/account',
+                    onClick: close,
+                  },
+                ),
+            ),
             dropdownItem([icon('logout'), h('span', null, () => t('dashboard.signOut'))], {
               href: '/logout',
               destructive: true,

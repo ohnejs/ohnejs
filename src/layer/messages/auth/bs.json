@@ -3,7 +3,13 @@
   "invalidEmail": "Unesite ispravnu email adresu",
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",
+  "invalidTimezone": "Nevažeća vremenska zona `{timezone}`",
   "unknownRole": "Nepoznata uloga `{role}`",
+  "unknownLanguage": "Nepoznat jezik `{language}`",
+  "unknownLocale": "Nepoznat lokalitet `{locale}`",
+  "timezone": {
+    "auto": "Automatski (postavke uređaja)"
+  },
   "users": {
     "email": {
       "label": "Email",
@@ -16,6 +22,30 @@
     "roles": {
       "label": "Uloge",
       "description": "Nazivi uloga koje ovaj korisnik ima. Sposobnosti svih uloga se objedinjuju."
+    },
+    "dashboardLanguage": {
+      "label": "Jezik dashboarda",
+      "description": "Jezik korisničkog interfejsa dashboarda."
+    },
+    "contentLanguage": {
+      "label": "Jezik sadržaja",
+      "description": "Jezik koji se koristi u sadržajnim zapisima i stranicama."
+    },
+    "timezone": {
+      "label": "Vremenska zona",
+      "description": "Vremenska zona koja se koristi za prikaz datuma i vremena."
+    },
+    "dateFormat": {
+      "label": "Format datuma",
+      "tokens": "|||\n|-|-|\n|`YY`|Dvocifrena godina (npr. 23)|\n|`YYYY`|Četverocifrena godina (npr. 2023)|\n|`M`|Mjesec, počevši od 1 (npr. 1-12)|\n|`MM`|Mjesec, dvocifreno (npr. 01-12)|\n|`MMM`|Skraćeni naziv mjeseca (npr. jan-dec)|\n|`MMMM`|Puni naziv mjeseca (npr. januar-decembar)|\n|`D`|Dan u mjesecu (npr. 1-31)|\n|`DD`|Dan u mjesecu, dvocifreno (npr. 01-31)|\n|`d`|Dan u sedmici, nedjelja je 0 (npr. 0-6)|\n|`dd`|Najkraći naziv dana u sedmici (npr. ne-su)|\n|`ddd`|Kratki naziv dana u sedmici (npr. ned-sub)|\n|`dddd`|Naziv dana u sedmici (npr. nedjelja-subota)|\n|`Q`|Kvartal (npr. 1-4)|\n|`Do`|Dan u mjesecu s rednim brojem (npr. 1. 2. ... 31.)|\n|`w`|Sedmica u godini (npr. 1 2 ... 52 53)|\n|`ww`|Sedmica u godini, dvocifreno (npr. 01 02 ... 52 53)|\n|`W`|ISO sedmica u godini (npr. 1 2 ... 52 53)|\n|`WW`|ISO sedmica u godini, dvocifreno (npr. 01 02 ... 52 53)|\n|`wo`|Sedmica u godini s rednim brojem (npr. 1. 2. ... 52. 53.)|\n|`L`|Lokalizovani datum, dvocifreno (npr. 24. 02. 2025.)|\n|`l`|Lokalizovani datum, jednocifreno (npr. 24. 2. 2025.)|\n|`LL`|Lokalizovani datum, dugi (npr. 24. februar 2025.)|\n|`ll`|Lokalizovani datum, kratki (npr. 24. feb 2025.)|\n|`[...]`|Doslovni znakovi (npr. [Godina])|"
+    },
+    "timeFormat": {
+      "label": "Format vremena",
+      "tokens": "|||\n|-|-|\n|`H`|Sat (npr. 0-23)|\n|`HH`|Sat, dvocifreno (npr. 00-23)|\n|`h`|Sat, 12-satni format (npr. 1-12)|\n|`hh`|Sat, 12-satni format, dvocifreno (npr. 01-12)|\n|`m`|Minuta (npr. 0-59)|\n|`mm`|Minuta, dvocifreno (npr. 00-59)|\n|`s`|Sekunda (npr. 0-59)|\n|`ss`|Sekunda, dvocifreno (npr. 00-59)|\n|`SSS`|Milisekunda, trocifreno (npr. 000-999)|\n|`Z`|Pomak od UTC-a, ±HH:mm (npr. +05:00)|\n|`ZZ`|Pomak od UTC-a, ±HHmm (npr. +0500)|\n|`A`|AM PM|\n|`a`|am pm|\n|`k`|Sat, počevši od 1 (npr. 1-24)|\n|`kk`|Sat, dvocifreno, počevši od 1 (npr. 01-24)|\n|`z`|Skraćeni naziv vremenske zone (npr. CET)|\n|`zzz`|Puni naziv vremenske zone (npr. Centralnoevropsko standardno vrijeme)|\n|`LT`|Lokalizovano vrijeme bez sekundi (npr. 20:30)|\n|`LTS`|Lokalizovano vrijeme sa sekundama (npr. 20:30:25)|\n|`[...]`|Doslovni znakovi (npr. [Sati])|"
+    },
+    "smartClipboard": {
+      "label": "Pametni međuspremnik",
+      "description": "Praćenje međuspremnika u pozadini za trenutnu spremnost lijepljenja. Ova funkcija će zatražiti dozvolu preglednika za pristup vašem međuspremniku."
     }
   },
   "sessions": {
