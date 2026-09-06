@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:net';
 import { after, describe, it } from 'node:test';
 
 import { resolveDevPorts } from '../../../src/ohne/dev/resolve-ports.ts';
+import { freePort } from '../../../src/utils/net/index.ts';
 
 const servers: Server[] = [];
 after(() => {
@@ -17,12 +18,12 @@ function listen(port: number): Promise<Server> {
   });
 }
 
-function free(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = createServer();
-    probe.once('error', () => resolve(false));
-    probe.listen(port, () => probe.close(() => resolve(true)));
-  });
+/**
+ * Freeness as `freePort` defines it, so a port another process half-holds on loopback is never picked.
+ * A wildcard-only probe would call such a port free and the scan under test would step past it.
+ */
+async function free(port: number): Promise<boolean> {
+  return (await freePort(port, { attempts: 1 }).catch(() => 0)) === port;
 }
 
 /**
