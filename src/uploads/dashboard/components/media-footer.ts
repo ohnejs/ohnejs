@@ -1,3 +1,4 @@
+import { clearSelectionButton } from 'app/components/clear-selection-button.ts';
 import { readableFields, sortableFields } from 'app/components/collection-table-data.ts';
 import { filterPopup } from 'app/components/filter-popup.ts';
 import { sortingPopup } from 'app/components/sorting-popup.ts';
@@ -5,7 +6,6 @@ import {
   attachTooltip,
   bubble,
   button,
-  type Child,
   css,
   field,
   fieldLabel,
@@ -110,18 +110,9 @@ css`
     font-weight: 500;
   }
 
-  .o-media-footer-clear .ohne-button-bubble {
-    display: none;
-  }
-
   @container (max-width: 767px) {
-    .o-media-footer-has-selection .ohne-pagination,
-    .o-media-footer-count {
+    .o-media-footer-has-selection .ohne-pagination {
       display: none;
-    }
-
-    .o-media-footer-clear .ohne-button-bubble {
-      display: flex;
     }
 
     .o-media-footer > .ohne-row {
@@ -190,18 +181,11 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     glyph: IconName,
     tooltip: () => string,
     onClick: () => void,
-    extras: {
-      variant?: 'accent' | 'destructive' | 'outline';
-      dirty?: () => boolean;
-      bubble?: () => Child;
-      class?: string;
-    } = {},
+    extras: { variant?: 'accent' | 'destructive' | 'outline'; dirty?: () => boolean } = {},
   ): HTMLElement => {
     const el = button(icon(glyph), {
       variant: extras.variant ?? 'outline',
-      class: extras.class,
-      bubble:
-        extras.bubble ?? (extras.dirty ? () => (extras.dirty?.() ? bubble() : null) : undefined),
+      bubble: extras.dirty ? () => (extras.dirty?.() ? bubble() : null) : undefined,
       onClick,
     });
     if (extras.dirty) {
@@ -216,10 +200,6 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     return el;
   };
 
-  const countEl = h('span', { class: 'o-media-footer-count ohne-muted ohne-shrink-0' }, () =>
-    t('uploads.dashboard.selected', { count: selectionCount() }),
-  );
-
   const deleteButton = (): HTMLElement =>
     iconButton(
       'trash-x',
@@ -229,16 +209,7 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     );
 
   const clearButton = (): HTMLElement =>
-    iconButton(
-      'square-off',
-      () => t('dashboard.clearSelection'),
-      () => view.clearSelection(),
-      {
-        variant: 'accent',
-        class: 'o-media-footer-clear',
-        bubble: () => bubble(() => selectionCount()),
-      },
-    );
+    clearSelectionButton(selectionCount, () => view.clearSelection());
 
   const moveButton = (): HTMLElement =>
     iconButton(
@@ -445,7 +416,6 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     h(
       'div',
       { class: 'ohne-row ohne-ml-auto' },
-      when(hasSelection, () => countEl),
       when(() => hasSelection() && canDelete, deleteButton),
       when(hasSelection, clearButton),
       when(() => hasSelection() && canUpdate && !isUndefined(options.onMove), moveButton),
