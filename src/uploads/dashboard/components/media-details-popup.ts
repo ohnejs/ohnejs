@@ -988,9 +988,9 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const footerEl = h(
     'div',
     { class: 'ohne-row' },
+    isUndefined(hotkeys) ? null : historyButtons(edits, restore, hotkeys),
     canDelete ? deleteButton : null,
     canUpdate ? [replaceButton, fileInput] : null,
-    isUndefined(hotkeys) ? null : historyButtons(edits, restore, hotkeys),
     when(
       () => edits.isDirty.value,
       () => saveButton,
