@@ -7,6 +7,7 @@ import { css } from '../../render/css.ts';
  * `border: 0 solid hsl(var(--ohne-border))` sits on everything.
  * A component sets only a border width and inherits the themed color.
  * Plain anchors and buttons get link chrome through `:is()`; a component opts out with `ohne-raw`.
+ * Opting out drops the browser's own anchor underline too, so a raw anchor carrying text reads plain.
  * Icons ship `stroke-width` 2 and are globally thinned to 1.5; `ohne-stroke-2` reverts.
  */
 css`
@@ -61,6 +62,10 @@ css`
     text-decoration: underline;
     transition: var(--ohne-transition);
     transition-property: color;
+  }
+
+  :is(a, button).ohne-raw {
+    text-decoration: none;
   }
 
   :is(a, button):not(.ohne-raw):hover {
