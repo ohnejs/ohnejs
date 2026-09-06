@@ -31,7 +31,8 @@ export interface EnvSpec<T> {
  *
  * Each var is registered with `define`, gets a parser and a default, and can be read with `get`.
  * Reads consult an in-memory override first, then `process.env`, then the default.
- * Overrides are set with `set` and cleared with `unset` - `process.env` is never mutated.
+ * Overrides are set with `set` and cleared with `unset`; neither touches `process.env`.
+ * `fill` is the one method that writes to `process.env`, and only the names it lacks.
  */
 export interface EnvRegistry<E extends object> {
   /**
@@ -78,6 +79,15 @@ export interface EnvRegistry<E extends object> {
   has<K extends keyof E & string>(name: K): boolean;
 
   /**
+   * Fills `process.env` from `values`, the one method that writes to it.
+   * A name `process.env` lacks is set; a name already present, an empty string included, keeps its value.
+   * Names a previous `fill` wrote are removed first, so a repeat call mirrors the new values exactly.
+   * An `effect` or `computed` that read `process.env` through `get` or `has` re-runs.
+   * Returns the names it set, in `values` order.
+   */
+  fill(values: Record<string, string>): readonly string[];
+
+  /**
    * Returns every defined var name in registration order.
    */
   names(): readonly (keyof E & string)[];
@@ -98,7 +108,7 @@ interface Slot {
  *
  * `get` returns the override (if any), then the parsed `process.env` value (if any), then the default.
  * `set` stores an in-memory override; `unset` clears it.
- * `process.env` is read but never mutated.
+ * `fill` writes the names `process.env` lacks; `set` and `unset` never touch it.
  *
  * @example
  * ```ts
@@ -113,11 +123,16 @@ interface Slot {
  * env.get('SILENT') // -> true (override wins)
  * env.unset('SILENT')
  * env.get('SILENT') // -> false (or parsed process.env.SILENT)
+ *
+ * env.fill({ PORT: '4000' }) // -> ['PORT'], when process.env.PORT was unset
+ * env.get('PORT')            // -> 4000
  * ```
  */
 export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
   const specs = new Map<string, EnvSpec<unknown>>();
   const slots = new Map<string, Ref<Slot>>();
+  const version = ref(0);
+  let filled: readonly string[] = [];
 
   function slot(name: string): Ref<Slot> {
     let s = slots.get(name);
@@ -138,6 +153,7 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
       if (s.has) return s.value as never;
       const spec = specs.get(name);
       if (isUndefined(spec)) throw new Error(`Env var not defined: ${name}`);
+      void version.value;
       const raw = process.env[name];
       if (isUndefined(raw)) return spec.default as never;
       return (isUndefined(spec.parse) ? raw : spec.parse(raw, name)) as never;
@@ -161,7 +177,21 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
     },
     has(name) {
       if (slot(name).value.has) return true;
+      void version.value;
       return !isUndefined(process.env[name]);
+    },
+    fill(values) {
+      for (const name of filled) delete process.env[name];
+      const applied: string[] = [];
+      for (const [name, value] of Object.entries(values)) {
+        if (!isUndefined(process.env[name])) continue;
+        process.env[name] = value;
+        applied.push(name);
+      }
+      const changed = filled.length > 0 || applied.length > 0;
+      filled = applied;
+      if (changed) version.value++;
+      return applied;
     },
     names() {
       return [...specs.keys()] as unknown as readonly (keyof E & string)[];

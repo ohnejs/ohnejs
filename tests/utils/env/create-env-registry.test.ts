@@ -272,6 +272,99 @@ describe('createEnvRegistry', () => {
       strictEqual(runs, 2);
     });
 
+    it('`fill` writes only the names `process.env` lacks and returns them in order', () => {
+      process.env['STR'] = 'shell';
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      deepStrictEqual(env.fill({ STR: 'file', NUM: '1', BOOL: 'true' }), ['NUM', 'BOOL']);
+      strictEqual(process.env['STR'], 'shell');
+      strictEqual(env.get('NUM'), 1);
+      strictEqual(env.get('BOOL'), true);
+    });
+
+    it('`fill` keeps an empty string already in `process.env`', () => {
+      process.env['STR'] = '';
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      deepStrictEqual(env.fill({ STR: 'file' }), []);
+      strictEqual(process.env['STR'], '');
+    });
+
+    it('a repeat `fill` removes what the previous one wrote before applying the new values', () => {
+      process.env['STR'] = 'shell';
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.fill({ STR: 'file', NUM: '1', INT: '2' });
+      deepStrictEqual(env.fill({ NUM: '3' }), ['NUM']);
+      strictEqual(process.env['STR'], 'shell');
+      strictEqual(process.env['NUM'], '3');
+      strictEqual(process.env['INT'], undefined);
+      env.fill({});
+      strictEqual(process.env['NUM'], undefined);
+    });
+
+    it('`fill` fills a name that was never defined', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      deepStrictEqual(env.fill({ STR: 'file' }), ['STR']);
+      strictEqual(process.env['STR'], 'file');
+    });
+
+    it('an effect reading `get` through `process.env` re-runs on `fill`', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      let last = '';
+      effect(() => {
+        last = env.get('STR');
+      });
+      strictEqual(last, 'fallback');
+      env.fill({ STR: 'file' });
+      strictEqual(last, 'file');
+      env.fill({});
+      strictEqual(last, 'fallback');
+    });
+
+    it('an effect reading `has` flips on `fill`', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      let present = false;
+      effect(() => {
+        present = env.has('STR');
+      });
+      strictEqual(present, false);
+      env.fill({ STR: 'file' });
+      strictEqual(present, true);
+      env.fill({});
+      strictEqual(present, false);
+    });
+
+    it('a `fill` that changes nothing does not re-run an effect', () => {
+      process.env['STR'] = 'shell';
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      let runs = 0;
+      effect(() => {
+        env.get('STR');
+        runs++;
+      });
+      env.fill({ STR: 'file' });
+      strictEqual(runs, 1);
+    });
+
+    it('an override still wins after `fill`, and its reader does not re-run', () => {
+      const env = createEnvRegistry<SampleEnv>();
+      defineAll(env);
+      env.set('STR', 'override');
+      let runs = 0;
+      let last = '';
+      effect(() => {
+        last = env.get('STR');
+        runs++;
+      });
+      env.fill({ STR: 'file' });
+      strictEqual(last, 'override');
+      strictEqual(runs, 1);
+    });
+
     it('`has` inside an effect re-runs on `set` and `unset`', () => {
       const env = createEnvRegistry<SampleEnv>();
       defineAll(env);
