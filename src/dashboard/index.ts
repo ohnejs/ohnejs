@@ -2,6 +2,7 @@ import './fields/builtin/index.ts';
 
 export { cellEditor } from './fields/cell-editor.ts';
 export type { CellEditorOptions } from './fields/cell-editor.ts';
+export { watchOSClipboard } from './fields/clipboard.ts';
 export { createFieldForm, scopedErrors } from './fields/field-form.ts';
 export type { FieldForm, FieldFormOptions } from './fields/field-form.ts';
 export { describeControl, fieldRow } from './fields/field-row.ts';
@@ -53,8 +54,17 @@ export type { DashboardPage, NavigationCause, RouteContext } from './router/rout
 export { apiUpload } from './runtime/api-upload.ts';
 export type { UploadBody, UploadOptions } from './runtime/api-upload.ts';
 export { api, setUnauthorizedHandler } from './runtime/api.ts';
+export { useNow } from './runtime/clock.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
+export {
+  dateTimePreferences,
+  formatDate,
+  formatDateTime,
+  formatRelative,
+  formatTime,
+} from './runtime/date-time.ts';
+export type { DateTimePreferences } from './runtime/date-time.ts';
 export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
 export { dashboardMeta, invalidateDashboardMeta } from './runtime/meta.ts';
 export { setDocumentTitle } from './runtime/title.ts';
@@ -69,8 +79,8 @@ export type {
   DashboardOperations,
   DashboardTable,
 } from './runtime/meta.ts';
-export { login, logout, sessionUser } from './runtime/session.ts';
-export type { LoginOutcome, SessionUser } from './runtime/session.ts';
+export { login, logout, sessionUser, updateSessionUser } from './runtime/session.ts';
+export type { LoginOutcome, SessionUser, UpdateOutcome } from './runtime/session.ts';
 export { alert } from './ui/alert.ts';
 export type { AlertOptions } from './ui/alert.ts';
 export { badge } from './ui/badge.ts';

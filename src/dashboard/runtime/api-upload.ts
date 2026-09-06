@@ -1,7 +1,9 @@
 import type { APIRouteID } from './known-api-routes.ts';
 
-import { handleUnauthorized, requestTarget } from './_request.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
+import { handleUnauthorized, requestTarget, withAcceptLanguage } from './_request.ts';
 import { dashboardConfig } from './config.ts';
+import { useDashboardLanguage } from './use-dashboard-language.ts';
 
 /**
  * The bytes `apiUpload` sends, sent whole as the request body.
@@ -40,6 +42,7 @@ const NULL_BODY_STATUSES = new Set([204, 205, 304]);
  * `fetch` cannot report upload progress, so the request rides on `XMLHttpRequest` under `api`'s policy.
  * The route id's method sends the request; a bare path uploads with `POST`.
  * The path is appended to the base URL, credentials flow, and a `401` outside `/auth/` calls the handler.
+ * `Accept-Language` names the dashboard language unless `headers` sets one.
  * Resolves a `Response` built from the answer, so it reads exactly like one from `api`.
  * Rejects like `fetch`: a `TypeError` when the request never completes, the signal's reason on abort.
  *
@@ -61,15 +64,19 @@ export function apiUpload(
   body: UploadBody,
   options: UploadOptions = {},
 ): Promise<Response> {
-  const { onProgress, signal, headers = {} } = options;
+  const { onProgress, signal, headers } = options;
   if (signal?.aborted) return Promise.reject(signal.reason);
   const { method = 'POST', path, url } = requestTarget(dashboardConfig().apiURL, route);
+  // Untracked: an upload started inside a render must not subscribe that region to the language.
+  const language = untracked(() => useDashboardLanguage().value);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
     xhr.withCredentials = true;
     xhr.responseType = 'arraybuffer';
-    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    for (const [name, value] of withAcceptLanguage(headers, language)) {
+      xhr.setRequestHeader(name, value);
+    }
     const abort = (): void => xhr.abort();
     signal?.addEventListener('abort', abort);
     if (onProgress) {

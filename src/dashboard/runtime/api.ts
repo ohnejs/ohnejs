@@ -1,7 +1,9 @@
 import type { APIRouteID } from './known-api-routes.ts';
 
-import { handleUnauthorized, requestTarget } from './_request.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
+import { handleUnauthorized, requestTarget, withAcceptLanguage } from './_request.ts';
 import { dashboardConfig } from './config.ts';
+import { useDashboardLanguage } from './use-dashboard-language.ts';
 
 export { setUnauthorizedHandler } from './_request.ts';
 
@@ -10,6 +12,7 @@ export { setUnauthorizedHandler } from './_request.ts';
  * The `route` is a root-relative path, optionally prefixed with a method (`GET /authors/[id]`).
  * A leading method overrides `init.method`; the rest is the path appended to the base URL.
  * Requests carry credentials, so the session cookie flows to the API; `init.credentials` overrides.
+ * They also carry `Accept-Language` for the dashboard language, so answers speak it; a given one wins.
  * Returns the raw `Response`; the caller decides how to read it.
  *
  * @example
@@ -27,7 +30,13 @@ export { setUnauthorizedHandler } from './_request.ts';
  */
 export async function api(route: APIRouteID, init?: RequestInit): Promise<Response> {
   const { method, path, url } = requestTarget(dashboardConfig().apiURL, route);
-  const request: RequestInit = { credentials: 'include', ...init };
+  // Untracked: a fetch started inside a render must not subscribe that region to the language.
+  const language = untracked(() => useDashboardLanguage().value);
+  const request: RequestInit = {
+    credentials: 'include',
+    ...init,
+    headers: withAcceptLanguage(init?.headers, language),
+  };
   if (method) request.method = method;
   const response = await fetch(url, request);
   handleUnauthorized(response.status, path);

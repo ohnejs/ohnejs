@@ -5,6 +5,7 @@ import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
+import { formatTime } from '../../runtime/date-time.ts';
 import { parseTime } from '../../ui/time-model.ts';
 import { time as timeInput } from '../../ui/time.ts';
 import { describeControl } from '../field-row.ts';
@@ -31,6 +32,7 @@ function storedClock(value: unknown): number | null {
 /**
  * The `time` field type: cell display, form control, and filter.
  * The wire value is an `HH:MM:SS` time of day; the segment input edits it as ms within the day.
+ * The cell formats the clock in the user's time format; a malformed value shows as its raw text, dim.
  * The input has no empty state, so the model seeds `00:00:00` when the stored value is nullish.
  * The control stays pristine until touched; an untouched nullish base wires `null` on a nullable field.
  */
@@ -39,7 +41,10 @@ export const timeType: FieldType = {
     return () => {
       const current = value();
       if (isNullish(current)) return dimMark('-');
-      const text = String(current as string);
+      const raw = String(current as string);
+      const clock = parseTime(raw);
+      if (Number.isNaN(clock)) return dimMark(raw);
+      const text = formatTime(clock);
       return h('span', { class: 'ohne-truncate', title: text }, text);
     };
   },

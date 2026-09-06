@@ -4,44 +4,54 @@ import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
+import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
+import { dateTimePreferences, formatDateTime, formatRelative } from '../../runtime/date-time.ts';
 import { calendar } from '../../ui/calendar.ts';
+import { attachTooltip } from '../../ui/tooltip.ts';
+import { calendarLabels } from '../_calendar-labels.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
-const formats = new Map<string, Intl.DateTimeFormat>();
-
 /**
- * The memoized instant formatter for `language`, rendering in the viewer's own zone.
- * Cells render per row, and constructing an `Intl.DateTimeFormat` is the expensive part.
+ * The zone a calendar opens in: the field's pinned zone, else the user's, else the device's.
+ * The user's zone is read untracked, since every account save rewrites the user record.
+ * A tracked read would rebuild the control on each save and drop its edits.
  */
-function formatInstant(language: string, timestamp: number): string {
-  let format = formats.get(language);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
-    formats.set(language, format);
-  }
-  return format.format(timestamp);
+function calendarZone(pinned: string | undefined): string {
+  return pinned ?? untracked(() => dateTimePreferences().timeZone) ?? 'local';
 }
 
 /**
  * The `dateTime` field type: cell display, form control, and filter.
  * The wire value is epoch milliseconds; the calendar edits it straight through, no conversion.
- * The cell and the control format the instant in the dashboard language, in the viewer's own zone.
+ * The cell shows the instant in the user's date and time formats, its relative wording as a tooltip.
+ * The field's `relativeTime` option swaps the two: relative text, absolute tooltip.
+ * The field's `timezone` option pins the zone; omitted, the user's zone applies, then the device's.
+ * The control's handle stays absolute either way, since it edits an instant.
  * The control stays pristine until touched.
  * A cleared control writes `null` on a nullable field and omits the field otherwise.
  */
 export const dateTimeType: FieldType = {
-  display({ value, language }) {
+  display({ field, value }) {
+    const zone = field.options?.timezone as string | undefined;
+    const relativeTime = field.options?.relativeTime === true;
     return () => {
       const current = value();
       if (isNullish(current)) return dimMark('-');
-      const text = formatInstant(language(), current as number);
-      return h('span', { class: 'ohne-truncate', title: text }, text);
+      const instant = current as number;
+      const absolute = (): string => formatDateTime(instant, zone);
+      const relative = (): string => formatRelative(instant);
+      // A function child, so a clock tick patches the text alone and never rebuilds the element mid-hover.
+      const element = h('span', { class: 'ohne-truncate' }, relativeTime ? relative : absolute);
+      onCleanup(attachTooltip(element, relativeTime ? absolute : relative));
+      return element;
     };
   },
   control({ field, initial, path, disabled, language, onInput }) {
+    const zone = field.options?.timezone as string | undefined;
     let base = initial;
     const stamp = ref(isNumber(base) ? base : null);
     const touched = ref(false);
@@ -62,8 +72,9 @@ export const dateTimeType: FieldType = {
 
     const element = calendar(model, {
       withTime: true,
-      timezone: 'local',
-      formatter: (timestamp) => formatInstant(language(), timestamp),
+      timezone: calendarZone(zone),
+      formatter: (timestamp) => formatDateTime(timestamp, zone),
+      labels: calendarLabels(language()),
       placeholder: field.placeholder,
       min: field.options?.min as number | string | undefined,
       max: field.options?.max as number | string | undefined,
@@ -112,7 +123,8 @@ export const dateTimeType: FieldType = {
   filter: {
     operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
     seed: () => Date.now(),
-    input({ value, commit, language, inputID }) {
+    input({ field, value, commit, language, inputID }) {
+      const zone = field.options?.timezone as string | undefined;
       const model: Ref<number | null> = {
         get value() {
           return Number(value());
@@ -123,8 +135,9 @@ export const dateTimeType: FieldType = {
       };
       return calendar(model, {
         withTime: true,
-        timezone: 'local',
-        formatter: (timestamp) => formatInstant(language(), timestamp),
+        timezone: calendarZone(zone),
+        formatter: (timestamp) => formatDateTime(timestamp, zone),
+        labels: calendarLabels(language()),
         clearable: false,
         id: inputID,
         name: inputID,

@@ -1,5 +1,7 @@
 import type { Child } from '../render/insert.ts';
 
+import { last } from '../../utils/array/last.ts';
+import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { h } from '../render/h.ts';
 import './tokens.ts';
@@ -42,7 +44,12 @@ export function prose(content: Child, options: ProseOptions = {}): HTMLElement {
 
 const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
 const FENCE = /```\w*\n?([\s\S]*?)```/g;
+const SEPARATOR_CELL = /^:?-+:?$/;
 
+/**
+ * Builds the node for one inline token: bold, code, or a link.
+ * A link whose URL is not `http(s)` stays literal text.
+ */
 function inlineNode(token: RegExpExecArray): Node {
   if (!isUndefined(token[1])) {
     const strong = document.createElement('strong');
@@ -64,6 +71,9 @@ function inlineNode(token: RegExpExecArray): Node {
   return anchor;
 }
 
+/**
+ * Renders `text` through the inline grammar into `target`, one `br` per line break.
+ */
 function renderInline(target: Node, text: string): void {
   text.split('\n').forEach((line, index) => {
     if (index > 0) target.appendChild(document.createElement('br'));
@@ -79,6 +89,61 @@ function renderInline(target: Node, text: string): void {
   });
 }
 
+/**
+ * Splits a pipe row into trimmed cells, dropping the leading edge and an empty trailing edge.
+ */
+function rowCells(line: string): string[] {
+  const cells = line.split('|').map((cell) => cell.trim());
+  cells.shift();
+  if (last(cells) === '') cells.pop();
+  return cells;
+}
+
+/**
+ * Whether a block is a pipe table: every line starts with `|` and the second is a separator row.
+ */
+function isTable(lines: string[]): boolean {
+  if (lines.length < 2 || !lines.every((line) => line.startsWith('|'))) return false;
+  const separator = rowCells(lines[1]!);
+  return !isEmpty(separator) && separator.every((cell) => SEPARATOR_CELL.test(cell));
+}
+
+/**
+ * Renders one table row, each cell through the inline grammar.
+ */
+function renderRow(cells: string[], tag: 'th' | 'td'): HTMLElement {
+  const row = document.createElement('tr');
+  for (const cell of cells) {
+    const element = document.createElement(tag);
+    renderInline(element, cell);
+    row.appendChild(element);
+  }
+  return row;
+}
+
+/**
+ * Renders a pipe table.
+ * A header whose every cell is empty renders no `thead`, so a `|||` row hides the header.
+ */
+function renderTable(target: HTMLElement, lines: string[]): void {
+  const table = document.createElement('table');
+  const [header = [], , ...rows] = lines.map(rowCells);
+  if (header.some((cell) => cell !== '')) {
+    const head = document.createElement('thead');
+    head.appendChild(renderRow(header, 'th'));
+    table.appendChild(head);
+  }
+  if (!isEmpty(rows)) {
+    const body = document.createElement('tbody');
+    for (const row of rows) body.appendChild(renderRow(row, 'td'));
+    table.appendChild(body);
+  }
+  target.appendChild(table);
+}
+
+/**
+ * Renders the blocks of `text`, split on blank lines, as blockquotes, tables, and paragraphs.
+ */
 function renderBlocks(target: HTMLElement, text: string): void {
   for (const block of text.split(/\n{2,}/)) {
     const trimmed = block.trim();
@@ -90,6 +155,8 @@ function renderBlocks(target: HTMLElement, text: string): void {
       renderInline(paragraph, lines.map((line) => line.replace(/^> ?/, '')).join('\n'));
       quote.appendChild(paragraph);
       target.appendChild(quote);
+    } else if (isTable(lines)) {
+      renderTable(target, lines);
     } else {
       const paragraph = document.createElement('p');
       renderInline(paragraph, trimmed);
@@ -100,8 +167,10 @@ function renderBlocks(target: HTMLElement, text: string): void {
 
 /**
  * Renders markdown-lite `text` into `target` as constructed DOM nodes.
- * The grammar covers paragraphs, ```` ``` ```` code fences, `>` blockquotes, and `**bold**`.
- * It also covers backticked code, `[label](https://url)` links opening in a new tab, and line breaks.
+ * The grammar covers paragraphs, ```` ``` ```` code fences, `>` blockquotes, and `|` pipe tables.
+ * Inline, it covers `**bold**`, backticked code, `[label](https://url)` links in a new tab, and breaks.
+ * A pipe table needs a `|-|-|` separator as its second line.
+ * A `|||` header row renders no `thead`.
  * `markdown: false` renders the text as-is.
  *
  * Content never reaches `innerHTML`, so server-provided strings stay inert.

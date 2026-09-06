@@ -6,7 +6,9 @@ import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
+import { formatDate } from '../../runtime/date-time.ts';
 import { calendar } from '../../ui/calendar.ts';
+import { calendarLabels } from '../_calendar-labels.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
@@ -41,37 +43,22 @@ function storedTimestamp(value: unknown): number | null {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-const formats = new Map<string, Intl.DateTimeFormat>();
-
-/**
- * The memoized day formatter for `language`, applied to a UTC-midnight timestamp.
- * Cells render per row, and constructing an `Intl.DateTimeFormat` is the expensive part.
- */
-function formatDay(language: string, timestamp: number): string {
-  let format = formats.get(language);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeZone: 'UTC' });
-    formats.set(language, format);
-  }
-  return format.format(timestamp);
-}
-
 /**
  * The `date` field type: cell display, form control, and filter.
  * The wire value is a `YYYY-MM-DD` day; the calendar edits its UTC-midnight timestamp.
- * The cell formats the day in the dashboard language; a malformed value shows as its raw text, dim.
+ * The cell formats the day in the user's date format; a malformed value shows as its raw text, dim.
  * The control stays pristine until touched.
  * A cleared control writes `null` on a nullable field and omits the field otherwise.
  */
 export const dateType: FieldType = {
-  display({ value, language }) {
+  display({ value }) {
     return () => {
       const current = value();
       if (isNullish(current)) return dimMark('-');
       const raw = String(current as string);
       const timestamp = dayTimestamp(raw);
       if (Number.isNaN(timestamp)) return dimMark(raw);
-      const text = formatDay(language(), timestamp);
+      const text = formatDate(timestamp);
       return h('span', { class: 'ohne-truncate', title: text }, text);
     };
   },
@@ -96,7 +83,8 @@ export const dateType: FieldType = {
 
     const element = calendar(model, {
       timezone: 'UTC',
-      formatter: (timestamp) => formatDay(language(), timestamp),
+      formatter: formatDate,
+      labels: calendarLabels(language()),
       placeholder: field.placeholder,
       min: field.options?.min as string | undefined,
       max: field.options?.max as string | undefined,
@@ -159,7 +147,8 @@ export const dateType: FieldType = {
       };
       return calendar(model, {
         timezone: 'UTC',
-        formatter: (timestamp) => formatDay(language(), timestamp),
+        formatter: formatDate,
+        labels: calendarLabels(language()),
         clearable: false,
         id: inputID,
         name: inputID,

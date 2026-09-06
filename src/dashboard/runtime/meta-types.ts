@@ -73,9 +73,37 @@ export interface DashboardField {
   label: string;
 
   /**
-   * The field's description, resolved in the request's language; absent when none is declared.
+   * The field's plain description, resolved in the request's language.
+   * Absent when none is declared, or when the declared one is expandable.
    */
   description?: string;
+
+  /**
+   * The field's description when it starts collapsed behind a toggle; absent for the plain form.
+   * Every string is resolved in the request's language; an omitted toggle label takes the catalog's.
+   */
+  expandable?: {
+    /**
+     * The content, shown once expanded.
+     * Markdown is supported.
+     */
+    text: string;
+
+    /**
+     * The toggle's label while the content is collapsed.
+     */
+    showLabel: string;
+
+    /**
+     * The toggle's label while the content is expanded.
+     */
+    hideLabel: string;
+
+    /**
+     * Whether the content starts expanded.
+     */
+    expanded: boolean;
+  };
 
   /**
    * The empty-input hint, resolved in the request's language; absent when none is declared.
@@ -312,4 +340,16 @@ export interface DashboardMeta {
    * The locale an unspecified read or write addresses.
    */
   defaultLocale: string;
+
+  /**
+   * The languages the message catalogs define: the default language first, the rest in natural order.
+   * The dashboard language setting picks from this list.
+   */
+  languages: string[];
+
+  /**
+   * The `Users` fields the signed-in user edits on the account page, described in form order.
+   * The `auth:account-fields` hook decides the list; an empty list hides the page.
+   */
+  accountFields: DashboardField[];
 }

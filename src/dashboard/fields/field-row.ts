@@ -4,6 +4,7 @@ import type { DashboardField } from '../runtime/meta-types.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
+import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
@@ -12,6 +13,7 @@ import { fieldLabel } from '../ui/field-label.ts';
 import { fieldMessage } from '../ui/field-message.ts';
 import { field } from '../ui/field.ts';
 import { icon } from '../ui/icon.ts';
+import { renderProse } from '../ui/prose.ts';
 import { attachTooltip } from '../ui/tooltip.ts';
 import { controlIDs } from './field-type.ts';
 
@@ -139,6 +141,40 @@ css`
   .ohne-fieldrow-revert:is(:hover, :focus-visible) .ohne-fieldrow-dot {
     opacity: 0;
   }
+
+  .ohne-field-description-toggle {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0;
+    border-radius: min(var(--ohne-radius), 0.125rem);
+    background: none;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .ohne-field-description-toggle > svg {
+    margin-top: 0.0825rem;
+    transition: var(--ohne-transition);
+    transition-property: transform;
+  }
+
+  .ohne-field-description-toggle:focus-visible {
+    box-shadow:
+      0 0 0 0.125rem hsl(var(--ohne-background)),
+      0 0 0 0.25rem hsl(var(--ohne-ring)),
+      0 0 #0000;
+    outline: 0.125rem solid transparent;
+    outline-offset: 0.125rem;
+  }
+
+  .ohne-field-description-expanded > svg {
+    transform: rotate(90deg);
+  }
+
+  .ohne-field-description-content {
+    margin: 0.25rem 0 0 calc(1em + 0.0625rem + 0.25rem);
+  }
 `;
 
 /**
@@ -161,7 +197,7 @@ export function describeControl(
   element.id = ids.input;
   element.setAttribute('aria-labelledby', ids.label);
   // The error paragraph reuses the description id, so the reference also serves errored controls.
-  if (!isUndefined(field.description) || !isUndefined(error)) {
+  if (!isUndefined(field.description) || !isUndefined(field.expandable) || !isUndefined(error)) {
     element.setAttribute('aria-describedby', ids.description);
   }
   if (!isUndefined(error)) {
@@ -178,13 +214,16 @@ export function describeControl(
  * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
  * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
  * The pattern mirrors the macOS close button, which shows its cross over the document-edited dot.
- * The message under the control shows the description muted, or the error destructive in its place.
+ * The message under the control shows the description as prose, or the error destructive in its place.
+ * An expandable description sits behind a chevron toggle that reads its show or hide label.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.
  */
 export function fieldRow(options: FieldRowOptions, control: Child): Child {
   const t = useT();
   const ids = controlIDs(options.path);
   const failure = (): string => options.error?.() ?? '';
+  // Declared outside the message region, so an error swap keeps the toggle's state.
+  const expanded = ref(options.field.expandable?.expanded ?? false);
 
   const languageMark = (): HTMLElement => {
     const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('language'));
@@ -245,17 +284,50 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     { required: options.field.required },
   );
 
+  const proseBlock = (text: string, className = 'ohne-prose'): HTMLElement => {
+    const flow = h('div', { class: className, id: ids.description });
+    renderProse(flow, text);
+    return flow;
+  };
+
+  const expandableDescription = (expandable: NonNullable<DashboardField['expandable']>): Child => [
+    h(
+      'button',
+      {
+        type: 'button',
+        class: () =>
+          `ohne-field-description-toggle ohne-raw${expanded.value ? ' ohne-field-description-expanded' : ''}`,
+        'aria-expanded': () => String(expanded.value),
+        onClick: () => {
+          expanded.value = !expanded.value;
+        },
+      },
+      icon('chevron-right'),
+      h('span', null, () => (expanded.value ? expandable.hideLabel : expandable.showLabel)),
+    ),
+    when(
+      () => expanded.value,
+      () => proseBlock(expandable.text, 'ohne-prose ohne-field-description-content'),
+    ),
+  ];
+
+  const described =
+    !isUndefined(options.field.description) || !isUndefined(options.field.expandable);
+
   const message =
-    isUndefined(options.error) && isUndefined(options.field.description)
+    isUndefined(options.error) && !described
       ? null
       : when(
-          () => failure() !== '' || !isUndefined(options.field.description),
+          () => failure() !== '' || described,
           () =>
             fieldMessage(
               () => {
                 const current = failure();
                 if (current !== '') return h('p', { id: ids.description }, current);
-                return h('p', { id: ids.description }, options.field.description);
+                const { description, expandable } = options.field;
+                if (!isUndefined(expandable)) return expandableDescription(expandable);
+                if (!isUndefined(description)) return proseBlock(description);
+                return null;
               },
               { error: () => failure() !== '' },
             ),

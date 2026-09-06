@@ -62,3 +62,20 @@ export function isSessionExpiry(status: number, path: string): boolean {
 export function handleUnauthorized(status: number, path: string): void {
   if (isSessionExpiry(status, path) && !isNull(unauthorizedHandler)) unauthorizedHandler();
 }
+
+/**
+ * The request headers with `Accept-Language` set to `language`, unless the caller already set one.
+ * Takes every form `fetch` accepts: a `Headers`, a `[name, value]` list, a record, or nothing.
+ * Answers a fresh `Headers`; a given instance stays untouched.
+ *
+ * @example
+ * ```ts
+ * withAcceptLanguage(undefined, 'de').get('accept-language')                    // -> 'de'
+ * withAcceptLanguage({ 'Accept-Language': 'en' }, 'de').get('accept-language') // -> 'en'
+ * ```
+ */
+export function withAcceptLanguage(headers: RequestInit['headers'], language: string): Headers {
+  const merged = new Headers(headers);
+  if (!merged.has('accept-language')) merged.set('accept-language', language);
+  return merged;
+}

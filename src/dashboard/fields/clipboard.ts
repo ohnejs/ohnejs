@@ -1,7 +1,9 @@
 import { isArray } from '../../utils/is/is-array.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { deepOmit } from '../../utils/object/deep-omit.ts';
+import { effect } from '../../utils/reactive/effect.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 
 /**
@@ -75,4 +77,50 @@ export function isClipboardData(value: unknown): value is ClipboardData {
  */
 export function stripUUIDs(value: unknown): unknown {
   return deepOmit(value, ['UUID']);
+}
+
+/**
+ * Keeps `clipboardData` in step with the OS clipboard while `enabled()` reads true.
+ * An effect over `enabled`: on true it reads at once and on every window focus, on false it detaches.
+ * A read parses the clipboard text as JSON and stores it when it is a `ClipboardData` payload.
+ * Every failure is swallowed: a denied permission, foreign text, a browser without the API.
+ * Returns the stop, which ends the effect and detaches the listener.
+ *
+ * @example
+ * ```ts
+ * watchOSClipboard(() => sessionUser()?.smartClipboard === true)
+ * ```
+ */
+export function watchOSClipboard(enabled: () => boolean): () => void {
+  const read = (): void => {
+    void readOSClipboard();
+  };
+  let watching = false;
+  const watch = (on: boolean): void => {
+    if (on === watching) return;
+    watching = on;
+    if (on) {
+      read();
+      window.addEventListener('focus', read);
+    } else {
+      window.removeEventListener('focus', read);
+    }
+  };
+  const stop = effect(() => watch(enabled()));
+  return () => {
+    stop();
+    watch(false);
+  };
+}
+
+/**
+ * Reads the OS clipboard into `clipboardData` when it holds a dashboard payload; anything else is ignored.
+ */
+async function readOSClipboard(): Promise<void> {
+  try {
+    const text = await navigator.clipboard?.readText();
+    if (isUndefined(text)) return;
+    const parsed: unknown = JSON.parse(text);
+    if (isClipboardData(parsed)) clipboardData.value = parsed;
+  } catch {}
 }

@@ -1,6 +1,6 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
-import type { Timezone, ZonedDate } from './calendar-date.ts';
+import type { ZonedDate } from './calendar-date.ts';
 import type { IconName } from './icon.ts';
 
 import { withDefaults } from '../../utils/defaults/with-defaults.ts';
@@ -160,9 +160,9 @@ export interface CalendarOptions {
    * The IANA time zone the calendar displays dates in, or `'local'` for the environment's zone.
    *
    * @default
-   * 'UTC'
+   * 'local'
    */
-  timezone?: Timezone | 'local';
+  timezone?: string;
 
   /**
    * Formats the selected timestamp for display in the handle.

@@ -1,5 +1,4 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
-import type { Timezone } from './calendar-date.ts';
 import type { CalendarLabels } from './calendar.ts';
 import type { IconName } from './icon.ts';
 
@@ -47,9 +46,9 @@ export interface CalendarRangeOptions {
    * The IANA time zone the calendars display dates in, or `'local'` for the environment's zone.
    *
    * @default
-   * 'UTC'
+   * 'local'
    */
-  timezone?: Timezone | 'local';
+  timezone?: string;
 
   /**
    * Formats the selected timestamps for display in the handles.

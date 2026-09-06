@@ -6,6 +6,7 @@ import {
   isSessionExpiry,
   requestTarget,
   setUnauthorizedHandler,
+  withAcceptLanguage,
 } from '../../../src/dashboard/runtime/_request.ts';
 
 describe('requestTarget', () => {
@@ -63,5 +64,38 @@ describe('handleUnauthorized', () => {
     setUnauthorizedHandler(null);
     handleUnauthorized(401, '/collections/posts');
     strictEqual(calls, 1);
+  });
+});
+
+describe('withAcceptLanguage', () => {
+  it('sets the language on a record', () => {
+    const headers = withAcceptLanguage({ 'content-type': 'application/json' }, 'de');
+    strictEqual(headers.get('accept-language'), 'de');
+    strictEqual(headers.get('content-type'), 'application/json');
+  });
+
+  it('sets the language on a tuple list', () => {
+    const headers = withAcceptLanguage([['content-type', 'application/json']], 'de');
+    strictEqual(headers.get('accept-language'), 'de');
+    strictEqual(headers.get('content-type'), 'application/json');
+  });
+
+  it('sets the language on a fresh copy of a Headers instance', () => {
+    const given = new Headers({ 'content-type': 'application/json' });
+    const headers = withAcceptLanguage(given, 'de');
+    strictEqual(headers.get('accept-language'), 'de');
+    strictEqual(headers.get('content-type'), 'application/json');
+    strictEqual(given.has('accept-language'), false);
+  });
+
+  it('sets the language when no headers are given', () => {
+    strictEqual(withAcceptLanguage(undefined, 'de').get('accept-language'), 'de');
+  });
+
+  it('keeps a language the caller set, in any letter case', () => {
+    strictEqual(withAcceptLanguage({ 'Accept-Language': 'en' }, 'de').get('accept-language'), 'en');
+    strictEqual(withAcceptLanguage([['ACCEPT-LANGUAGE', 'bs']], 'de').get('accept-language'), 'bs');
+    const given = new Headers({ 'accept-language': 'en-GB' });
+    strictEqual(withAcceptLanguage(given, 'de').get('accept-language'), 'en-GB');
   });
 });
