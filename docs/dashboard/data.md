@@ -152,8 +152,10 @@ fallback chain on the server, exactly as [messages](../i18n/messages.md) describ
 ## Switching the language
 
 `useDashboardLanguage` returns the ref the dashboard renders messages in - one singleton for the
-whole page. It starts at the configured default language, and writing a new tag re-renders every
-`useT` string in place:
+whole page. It starts at the configured default language, takes the signed-in user's
+[dashboard language](./account.md) once the session resolves, and writing a new tag re-renders
+every `useT` string in place. `api()` sends the active language as `Accept-Language`, so labels
+and messages the server resolves arrive in the same language:
 
 ```ts
 import { h, useDashboardLanguage } from 'ohne/dashboard';

@@ -14,25 +14,56 @@ the pieces to build it, covered in [creating accounts](#creating-accounts).
 
 ## The endpoints
 
-Three routes cover the sign-in flow. Each speaks JSON.
+Five routes cover the sign-in flow and the account. Each speaks JSON.
 
 ```bash
 # Sign in. Returns the user and sets the session cookie.
-POST /auth/login   { "email": "ada@example.com", "password": "correct horse", "remember": true }
-# -> 200 { "UUID": "…", "email": "ada@example.com", "roles": [] }
+POST  /auth/login   { "email": "ada@example.com", "password": "correct horse", "remember": true }
+# -> 200 the user
 
 # Sign out. Deletes the session and clears the cookie.
-POST /auth/logout
+POST  /auth/logout
 # -> 200 { "ok": true }
 
+# Sign out every other session of the account, keeping this one.
+POST  /auth/logout/others
+# -> 200 { "ok": true }, or 401 when signed out
+
 # The signed-in user, read from the session cookie.
-GET  /auth/me
-# -> 200 { "UUID": "…", "email": "ada@example.com", "roles": [] }, or 401 when signed out
+GET   /auth/me
+# -> 200 the user, or 401 when signed out
+
+# Update the signed-in user's own settings. A partial body; unknown keys are a 422.
+PATCH /auth/me      { "timezone": "Europe/Berlin", "dateFormat": "DD.MM.YYYY" }
+# -> 200 the user, 422 with per-field messages, or 401 when signed out
+```
+
+The user is one shape everywhere: `UUID`, `email`, the [role names](./roles.md), and the
+[account settings](../dashboard/account.md) - `dashboardLanguage`, `contentLanguage`, `timezone`,
+`dateFormat`, `timeFormat`, and `smartClipboard`. A response never carries the password hash.
+
+```json
+{
+  "UUID": "…",
+  "email": "ada@example.com",
+  "roles": [],
+  "dashboardLanguage": null,
+  "contentLanguage": null,
+  "timezone": "Europe/Berlin",
+  "dateFormat": "DD.MM.YYYY",
+  "timeFormat": "LTS",
+  "smartClipboard": false
+}
 ```
 
 The email is stored trimmed and lowercased, so `Ada@Example.com` and `ada@example.com` are the same
-account, and `login` matches either. A response never carries the password hash - only `UUID`,
-`email`, and the [role names](./roles.md) cross the wire.
+account, and `login` matches either.
+
+`PATCH /auth/me` accepts the fields the `auth:account-fields` hook allows, by default the six
+settings and `password`. The write runs through the field pipeline, so a bad time zone or a blank
+format answers `422` exactly as a collection write would, and a new password is hashed before it is
+stored. Changing the password asks for no confirmation of the current one. `email` and `roles` are
+not accepted: an administrator changes those through the `Users` collection.
 
 `remember` asks for a lasting session. Omit it and the sign-in counts as not remembered, so a
 scripted client that never sends it gets the shorter lifetime described under [sessions](#sessions).
@@ -103,8 +134,8 @@ export default defineHandler(async () => {
 });
 ```
 
-Both read the session once per request and carry only `UUID`, `email`, and `roles`, so their result
-is safe to return as-is. To ask what the user may do, not just who they are, see
+Both read the session once per request and answer the public user shape, never the password hash,
+so their result is safe to return as-is. To ask what the user may do, not just who they are, see
 [roles and capabilities](./roles.md).
 
 ### Protecting routes with middleware

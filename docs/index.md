@@ -96,6 +96,8 @@ the browser as type-stripped JavaScript.
 - [Rendering](./dashboard/rendering.md) - `h`, `mount`, `each`, `when`, and the router.
 - [Reactivity](./dashboard/reactivity.md) - `ref`, `computed`, and `effect`.
 - [Data in the dashboard](./dashboard/data.md) - the typed `api()` fetch helper and translations.
+- [Account settings](./dashboard/account.md) - each user's language, time zone, date and time
+  formats, and smart clipboard.
 
 ## Production
 
