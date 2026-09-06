@@ -250,7 +250,8 @@ export function mediaActionsRegistry(): MediaActions {
  * A directory or query change reloads with a short debounce; the `media:refresh` trigger reloads in place.
  * A folder that no longer exists sends the view to the root.
  * After every load the page's selection clears, so a moved or deleted row never lingers as selected.
- * Shift ranges the checkbox selection, Escape clears, and Delete deletes.
+ * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
+ * Escape clears, and Delete deletes.
  * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
  * A right-click opens the record's context menu: open, rename, move, details, and delete.
  * Empty folders say so once the read has answered.

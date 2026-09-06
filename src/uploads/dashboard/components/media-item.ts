@@ -1,5 +1,5 @@
 import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohne/dashboard';
-import { isEmpty, onCleanup, type Ref, untracked } from 'ohne/utils';
+import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -183,6 +183,7 @@ css`
  * With update permission the tile drags.
  * The drag selects it, shows the moving ghost, and arms the drop targets.
  * The checkbox toggles the selection, ranging from the last pick while the range modifier is held.
+ * Once something is selected, a Shift-click on the tile's link ranges too, instead of following it.
  * A right-click hands the record to `onContextMenu`.
  */
 export function mediaItem(record: () => UploadRecord, options: MediaItemOptions): HTMLElement {
@@ -279,7 +280,17 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
 
   const root = h(
     'div',
-    { class: () => 'o-media-item' + (selected() ? ' o-media-item-selected' : '') },
+    {
+      class: () => 'o-media-item' + (selected() ? ' o-media-item-selected' : ''),
+      onClick: (event: MouseEvent) => {
+        const link = event.target instanceof Element ? event.target.closest('a') : null;
+        if (isNull(link) || !event.shiftKey || !selectable || disabled().value) return;
+        if (isEmpty(view.selection.value)) return;
+        event.preventDefault();
+        if (selected()) view.deselect(record(), true);
+        else view.select(record(), true);
+      },
+    },
     h(
       'div',
       {
