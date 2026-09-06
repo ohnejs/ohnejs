@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { UploadRecord } from '../../../../src/uploads/uploads/types.ts';
@@ -8,7 +8,6 @@ import {
   detailsStateOf,
   focalPercent,
   focalPointAt,
-  formatUploadedOn,
   isSmallPreview,
   previewKindOf,
   variantTokens,
@@ -132,14 +131,5 @@ describe('variantTokens', () => {
   it('answers nothing when the URL does not end with the path', () => {
     strictEqual(variantTokens('https://img.test/sig/w_320/other.jpg', 'photos/a.jpg'), '');
     strictEqual(variantTokens('https://img.test/sig/w_320/xphotos/a.jpg', 'photos/a.jpg'), '');
-  });
-});
-
-describe('formatUploadedOn', () => {
-  it('formats date and time in the language', () => {
-    const text = formatUploadedOn('en', Date.UTC(2024, 0, 15, 12));
-    ok(text.includes('2024'));
-    ok(text.includes('Jan'));
-    ok(/\d:\d\d/.test(text));
   });
 });

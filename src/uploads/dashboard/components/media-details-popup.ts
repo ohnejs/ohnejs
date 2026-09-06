@@ -17,6 +17,8 @@ import {
   type FieldForm,
   fieldLabel,
   fieldMessage,
+  formatDateTime,
+  formatRelative,
   h,
   icon,
   type IconName,
@@ -68,7 +70,6 @@ import {
   detailsStateOf,
   focalPercent,
   focalPointAt,
-  formatUploadedOn,
   isSmallPreview,
   previewKindOf,
   variantTokens,
@@ -387,6 +388,7 @@ export async function loadUpload(
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
  * It opens on Details unless `tab` names another.
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
+ * The upload time reads in the user's formats, its relative wording beside it.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
  * Variants lists every named image variant with its tokens, rendered size, byte size, and a copy button.
  * That tab exists only while the record carries `variants`.
@@ -634,13 +636,19 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
           )
         : null;
 
-  const row = (label: () => string, ...content: Child[]): HTMLElement =>
+  const labeled = (label: () => string, value: HTMLElement): HTMLElement =>
     h(
       'div',
       { class: 'o-media-details-field' },
       fieldLabel(h('span', { class: 'ohne-label' }, label)),
-      h('div', { class: 'ohne-truncate' }, ...content),
+      value,
     );
+
+  const row = (label: () => string, ...content: Child[]): HTMLElement =>
+    labeled(label, h('div', { class: 'ohne-truncate' }, ...content));
+
+  const wrappingRow = (label: () => string, ...content: Child[]): HTMLElement =>
+    labeled(label, h('div', null, ...content));
 
   const authorRow = (): Child => {
     const author = record.author;
@@ -696,9 +704,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     );
 
   const detailsPanel = (): Child => [
-    row(
+    wrappingRow(
       () => t('uploads.dashboard.uploadedOn'),
-      () => formatUploadedOn(language.value, current.value.uploadedAt),
+      () => formatDateTime(current.value.uploadedAt),
+      ' ',
+      h('span', { class: 'ohne-muted' }, () => `(${formatRelative(current.value.uploadedAt)})`),
     ),
     authorRow(),
     row(

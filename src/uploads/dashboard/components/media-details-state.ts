@@ -1,4 +1,4 @@
-import { basename, clamp, isNull, isUndefined } from 'ohne/utils';
+import { basename, clamp, isNull } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -45,8 +45,6 @@ export const PLAYABLE_VIDEO_TYPES: ReadonlySet<string> = new Set([
 
 // An image no larger than this centers in the preview instead of spanning it.
 const SMALL_PREVIEW = 480;
-
-const formats = new Map<string, Intl.DateTimeFormat>();
 
 /**
  * What the popup previews for a record, `null` when the type neither displays nor plays.
@@ -169,24 +167,6 @@ export function variantTokens(url: string, path: string): string {
   if (!url.endsWith(tail)) return '';
   const head = url.slice(0, -tail.length);
   return basename(head);
-}
-
-/**
- * An upload instant as date and time in `language`, in the viewer's own zone.
- * The formatter per language is memoized, since constructing one is the expensive part.
- *
- * @example
- * ```ts
- * formatUploadedOn('en', Date.UTC(2024, 0, 15, 12)) // -> 'Jan 15, 2024, 1:00 PM'
- * ```
- */
-export function formatUploadedOn(language: string, timestamp: number): string {
-  let format = formats.get(language);
-  if (isUndefined(format)) {
-    format = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
-    formats.set(language, format);
-  }
-  return format.format(timestamp);
 }
 
 /**
