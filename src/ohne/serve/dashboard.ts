@@ -94,10 +94,10 @@ const IMPORTMAP = jsonForScript({
 });
 
 /**
- * The favicon: the dashboard logo's lowercase `o` mark as an inline SVG data URI.
+ * The favicon: the ohne mark at rest, the solid dot, as an inline SVG data URI.
  * The fills are the foundation's foreground colours, light and dark, so the tab icon matches the UI.
  */
-const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><style>text{font:600 40px system-ui;fill:%23260d1c}@media(prefers-color-scheme:dark){text{fill:%23fafafa}}</style><text x='16' y='27' text-anchor='middle'>o</text></svg>`;
+const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><style>circle{fill:%23260d1c}@media(prefers-color-scheme:dark){circle{fill:%23fafafa}}</style><circle cx='24' cy='24' r='18'/></svg>`;
 
 /**
  * The framework `src` directory, the root the client modules are served from.
