@@ -55,7 +55,11 @@ import {
 import {
   createMediaView,
   directoryFromParam,
+  type MediaGroup,
+  type MediaGroupField,
+  groupUploads,
   MEDIA_REFRESH,
+  mediaGroupField,
   mediaPath,
   type MediaQuery,
   type MediaSelectionMode,
@@ -138,6 +142,34 @@ css`
     gap: 0.75rem;
   }
 
+  .o-media-group + .o-media-group {
+    margin-top: 1.25rem;
+  }
+
+  .o-media-group-label {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: block;
+    margin-bottom: 0.25rem;
+    padding: 0.25rem 0;
+    background-color: hsl(var(--ohne-background));
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: calc(1em + 0.5rem);
+    text-transform: uppercase;
+  }
+
+  /* A path keeps its own case: unlike the taxonomy labels, it names something case-sensitive. */
+  .o-media-group-label-path {
+    text-transform: none;
+  }
+
+  .o-media-group:first-child .o-media-group-label {
+    margin-top: -0.25rem;
+  }
+
   .o-media-empty {
     flex: 1;
     display: flex;
@@ -211,6 +243,10 @@ export function mediaActionsRegistry(): MediaActions {
 /**
  * The media grid: one tile per record of the view's page, folders and files in read order.
  *
+ * Sorting by kind, media type, or folder splits the page into runs under sticky labels.
+ * Only a folder has no media type, so that run reads `Folders` under either field.
+ * A folder path label keeps its own case; the rest read as uppercase headings.
+ * Every other order renders one plain grid.
  * A directory or query change reloads with a short debounce; the `media:refresh` trigger reloads in place.
  * A folder that no longer exists sends the view to the root.
  * After every load the page's selection clears, so a moved or deleted row never lingers as selected.
@@ -373,6 +409,24 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     void confirmDeleteUploads(view.selection.value);
   });
 
+  const field = (): MediaGroupField | undefined => mediaGroupField(view.query.value.order);
+  const groups = (): MediaGroup[] => {
+    const grouping = field();
+    const records = view.uploads.value;
+    return isUndefined(grouping)
+      ? [{ key: '', records: [...records] }]
+      : groupUploads(records, grouping);
+  };
+  const labelClass = (grouping: MediaGroupField): string =>
+    'o-media-group-label' + (grouping === 'directory' ? ' o-media-group-label-path' : '');
+  const groupLabel = (grouping: MediaGroupField, key: string): string => {
+    if (grouping === 'kind') {
+      return t(key === 'folder' ? 'uploads.dashboard.folders' : 'uploads.dashboard.files');
+    }
+    if (grouping === 'directory') return key === '' ? t('uploads.dashboard.rootFolder') : key;
+    return key === '' ? t('uploads.dashboard.folders') : key;
+  };
+
   return h(
     'div',
     {
@@ -381,30 +435,46 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     when(
       () => view.uploads.value.length > 0 || !view.ready.value,
       () =>
-        h(
-          'div',
-          { class: 'o-media-grid' },
-          each(
-            () => view.uploads.value,
-            (record) => record.UUID,
-            (record) =>
-              mediaItem(record, {
-                view,
-                permissions,
-                selectionMode: mode,
-                showPathTooltip: showPathTooltips,
-                disabled: options.disabled,
-                onPick: options.onPick,
-                actions,
-                onContextMenu: isNull(menu)
-                  ? undefined
-                  : (target, event) => {
-                      menuRecord = target;
-                      menu.onContextMenu(event);
-                    },
-                rangeKey: () => shift,
-              }),
-          ),
+        each(
+          groups,
+          (group) => group.key,
+          (group) =>
+            h(
+              'div',
+              { class: 'o-media-group' },
+              () => {
+                const grouping = field();
+                if (isUndefined(grouping)) return null;
+                return h('span', { class: labelClass(grouping) }, () =>
+                  groupLabel(grouping, group().key),
+                );
+              },
+              h(
+                'div',
+                { class: 'o-media-grid' },
+                each(
+                  () => group().records,
+                  (record) => record.UUID,
+                  (record) =>
+                    mediaItem(record, {
+                      view,
+                      permissions,
+                      selectionMode: mode,
+                      showPathTooltip: showPathTooltips,
+                      disabled: options.disabled,
+                      onPick: options.onPick,
+                      actions,
+                      onContextMenu: isNull(menu)
+                        ? undefined
+                        : (target, event) => {
+                            menuRecord = target;
+                            menu.onContextMenu(event);
+                          },
+                      rangeKey: () => shift,
+                    }),
+                ),
+              ),
+            ),
         ),
       () =>
         h(

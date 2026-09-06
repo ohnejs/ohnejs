@@ -8,7 +8,9 @@ import {
   createMediaView,
   DEFAULT_ORDER,
   directoryFromParam,
+  groupUploads,
   isDisplayableImage,
+  mediaGroupField,
   mediaPath,
   movePlan,
   pruneDescendants,
@@ -276,5 +278,52 @@ describe('isDisplayableImage', () => {
     strictEqual(isDisplayableImage({ ...sunset, type: 'image/tiff' }), false);
     strictEqual(isDisplayableImage({ ...sunset, type: 'video/mp4' }), false);
     strictEqual(isDisplayableImage(photos), false);
+  });
+});
+
+describe('mediaGroupField', () => {
+  it('takes the primary order field when the grid groups by it', () => {
+    strictEqual(mediaGroupField(['-kind', 'name']), 'kind');
+    strictEqual(mediaGroupField(['type']), 'type');
+    strictEqual(mediaGroupField(['-directory', 'name']), 'directory');
+  });
+
+  it('ignores an order the grid does not group by', () => {
+    strictEqual(mediaGroupField([]), undefined);
+    strictEqual(mediaGroupField(['name', 'kind']), undefined);
+    strictEqual(mediaGroupField(['-size']), undefined);
+  });
+});
+
+describe('groupUploads', () => {
+  it('runs neighbours sharing the field value into one group', () => {
+    deepStrictEqual(
+      groupUploads([photos, archive, sunset, dusk], 'kind').map(({ key, records }) => [
+        key,
+        uuids(records),
+      ]),
+      [
+        ['folder', [photos.UUID, archive.UUID]],
+        ['file', [sunset.UUID, dusk.UUID]],
+      ],
+    );
+  });
+
+  it('keys a null value as the empty string', () => {
+    deepStrictEqual(
+      groupUploads([photos, sunset], 'type').map(({ key }) => key),
+      ['', 'image/png'],
+    );
+  });
+
+  it('opens a new group for every run, so an unsorted list never merges', () => {
+    deepStrictEqual(
+      groupUploads([photos, sunset, archive], 'kind').map(({ key }) => key),
+      ['folder', 'file', 'folder'],
+    );
+  });
+
+  it('answers nothing for an empty page', () => {
+    deepStrictEqual(groupUploads([], 'directory'), []);
   });
 });

@@ -6,6 +6,7 @@ import {
   isPlainObject,
   isString,
   isUndefined,
+  last,
   ref,
   type ConditionObject,
   type Ref,
@@ -66,6 +67,26 @@ export interface MediaPagination {
  * How the library selects: `none` on the media page, `single` and `multiple` inside the picker.
  */
 export type MediaSelectionMode = 'none' | 'single' | 'multiple';
+
+/**
+ * The order fields whose leading position splits the grid into labelled groups.
+ */
+export type MediaGroupField = 'kind' | 'type' | 'directory';
+
+/**
+ * One run of the loaded page: the records that share a value of the grouping field.
+ */
+export interface MediaGroup {
+  /**
+   * The shared value, `''` where the field is null: a folder's `type`, the root's `directory`.
+   */
+  key: string;
+
+  /**
+   * The records of the run, in read order.
+   */
+  records: UploadRecord[];
+}
 
 /**
  * One breadcrumb segment of a folder path.
@@ -212,6 +233,8 @@ export const PER_PAGE = 50;
  * `kind` sorts `file` before `folder`, so descending puts folders first.
  */
 export const DEFAULT_ORDER: readonly string[] = ['-kind', 'name'];
+
+const GROUP_FIELDS: readonly MediaGroupField[] = ['kind', 'type', 'directory'];
 
 /**
  * The image types a browser renders in an `<img>`; any other image file shows the file tile.
@@ -368,6 +391,49 @@ export function breadcrumbsOf(directory: string): MediaBreadcrumb[] {
   if (directory === '') return [];
   const segments = directory.split('/');
   return segments.map((name, index) => ({ name, path: segments.slice(0, index + 1).join('/') }));
+}
+
+/**
+ * The field a page groups under: the primary order field, when the grid labels runs of it.
+ * Every other order groups nothing, so the whole page reads as one plain run.
+ *
+ * @example
+ * ```ts
+ * mediaGroupField(['-kind', 'name']) // -> 'kind'
+ * mediaGroupField(['type'])          // -> 'type'
+ * mediaGroupField(['name'])          // -> undefined
+ * mediaGroupField([])                // -> undefined
+ * ```
+ */
+export function mediaGroupField(order: readonly string[]): MediaGroupField | undefined {
+  const primary = first(order);
+  if (isUndefined(primary)) return undefined;
+  const name = primary.startsWith('-') ? primary.slice(1) : primary;
+  return GROUP_FIELDS.find((field) => field === name);
+}
+
+/**
+ * Splits `records` into runs of neighbours sharing their `field` value, in read order.
+ * The read already ordered by `field`, so one run is one group; a null value keys as `''`.
+ *
+ * @example
+ * ```ts
+ * groupUploads([photos, sunset, dusk], 'kind')
+ * // -> [{ key: 'folder', records: [photos] }, { key: 'file', records: [sunset, dusk] }]
+ * ```
+ */
+export function groupUploads(
+  records: readonly UploadRecord[],
+  field: MediaGroupField,
+): MediaGroup[] {
+  const groups: MediaGroup[] = [];
+  for (const record of records) {
+    const key = record[field] ?? '';
+    const open = last(groups);
+    if (!isUndefined(open) && open.key === key) open.records.push(record);
+    else groups.push({ key, records: [record] });
+  }
+  return groups;
 }
 
 /**
