@@ -250,7 +250,8 @@ export function mediaActionsRegistry(): MediaActions {
  * A directory or query change reloads with a short debounce; the `media:refresh` trigger reloads in place.
  * A folder that no longer exists sends the view to the root.
  * After every load the page's selection clears, so a moved or deleted row never lingers as selected.
- * Shift ranges the checkbox selection, Cmd/Ctrl+A selects the page, Escape clears, and Delete deletes.
+ * Shift ranges the checkbox selection, Escape clears, and Delete deletes.
+ * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
  * A right-click opens the record's context menu: open, rename, move, details, and delete.
  * Empty folders say so once the read has answered.
  */
@@ -393,11 +394,12 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
 
   const hotkeys = useHotkeys(options.hotkeys);
   hotkeys.listen('selectAll', (event) => {
-    if (mode === 'single' || !(canUpdate || canDelete) || view.uploads.value.length === 0) return;
+    if (mode === 'single' || !(canUpdate || canDelete)) return;
+    const candidates = view.uploads.value.filter(selectable);
+    if (candidates.length === 0) return;
     event.preventDefault();
-    for (const record of view.uploads.value) {
-      if (selectable(record) && !view.isSelected(record.UUID)) view.select(record);
-    }
+    if (candidates.every((record) => view.isSelected(record.UUID))) view.clearSelection();
+    else for (const record of candidates) view.select(record);
   });
   hotkeys.listen('close', (event) => {
     if (view.selection.value.length === 0) return;
