@@ -750,11 +750,9 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       () =>
         row(
           () => t('uploads.dashboard.dimensions'),
-          () =>
-            t('uploads.dashboard.pixels', {
-              width: current.value.width ?? 0,
-              height: current.value.height ?? 0,
-            }),
+          () => `${current.value.width ?? 0} x ${current.value.height ?? 0}`,
+          ' ',
+          h('span', { class: 'ohne-muted' }, () => t('uploads.dashboard.pixels')),
         ),
     ),
     row(() => t('uploads.dashboard.fileURL'), urlRow()),
@@ -878,8 +876,12 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         when(
           () => loaded.value,
           () =>
-            h('span', { class: 'ohne-muted' }, () =>
-              t('uploads.dashboard.pixels', { width: img.naturalWidth, height: img.naturalHeight }),
+            h(
+              'span',
+              null,
+              () => `${img.naturalWidth} x ${img.naturalHeight}`,
+              ' ',
+              h('span', { class: 'ohne-muted' }, () => t('uploads.dashboard.pixels')),
             ),
         ),
       ),

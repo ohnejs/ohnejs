@@ -59,7 +59,7 @@
     "nothingSelected": "Nothing selected",
     "openInNewTab": "Open in new tab",
     "pending": "Pending",
-    "pixels": "{width} x {height} pixels",
+    "pixels": "pixels",
     "rename": "Rename",
     "renameFailed": "An error occurred while renaming",
     "renameFile": "Rename file",
