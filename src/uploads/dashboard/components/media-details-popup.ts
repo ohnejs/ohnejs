@@ -275,7 +275,7 @@ css`
 
   .o-media-details-variant {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.625rem;
     align-items: center;
   }
 
@@ -316,14 +316,34 @@ css`
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 0.125rem;
     min-width: 0;
+    font-size: 0.8125rem;
+  }
+
+  .o-media-details-variant-info > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .o-media-details-variant-info strong {
+    margin-bottom: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
   }
 
   .o-media-details-variant-info code {
     font-family: var(--ohne-font-mono);
     font-size: 0.875em;
-    overflow-wrap: anywhere;
+  }
+
+  .o-media-details-variant-copy {
+    display: none;
+  }
+
+  .o-media-details-variant:hover .o-media-details-variant-copy {
+    display: flex;
   }
 
   @media (max-width: 600px) {
@@ -390,7 +410,7 @@ export async function loadUpload(
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
  * The upload time reads in the user's formats, its relative wording beside it.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
- * Variants lists every named image variant with its tokens, rendered size, byte size, and a copy button.
+ * Variants lists every named image variant with its tokens, byte size, rendered size, and a copy button.
  * That tab exists only while the record carries `variants`.
  * Pressing or dragging on an image preview places the focal point.
  * The point shows as a marker and saves with the description.
@@ -793,9 +813,10 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   ];
 
   const variantRow = (name: string, variantURL: string): HTMLElement => {
+    const tokens = variantTokens(variantURL, current.value.path);
     const failed = ref(false);
     const loaded = ref(false);
-    const bytes = ref('');
+    const bytes = ref(0);
     const img = h('img', {
       src: variantURL,
       alt: name,
@@ -809,7 +830,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     void fetch(variantURL, { method: 'HEAD' })
       .then((response) => {
         const size = coerceToNumber(response.headers.get('content-length'));
-        if (response.ok && isNumber(size) && size > 0) bytes.value = formatBytes(size);
+        if (response.ok && isNumber(size) && size > 0) bytes.value = size;
       })
       .catch(() => undefined);
     return h(
@@ -837,8 +858,23 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       h(
         'div',
         { class: 'o-media-details-variant-info' },
-        h('strong', { class: 'ohne-medium ohne-truncate' }, name),
-        h('code', null, variantTokens(variantURL, current.value.path)),
+        h('strong', null, name),
+        h('code', { class: 'ohne-muted', title: tokens }, tokens),
+        when(
+          () => bytes.value > 0,
+          () =>
+            h(
+              'span',
+              null,
+              () => formatBytes(bytes.value),
+              ' ',
+              h(
+                'span',
+                { class: 'ohne-muted' },
+                () => `(${t('uploads.dashboard.bytes', { count: bytes.value })})`,
+              ),
+            ),
+        ),
         when(
           () => loaded.value,
           () =>
@@ -846,12 +882,8 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
               t('uploads.dashboard.pixels', { width: img.naturalWidth, height: img.naturalHeight }),
             ),
         ),
-        when(
-          () => bytes.value !== '',
-          () => h('span', { class: 'ohne-muted' }, () => bytes.value),
-        ),
       ),
-      copyButton(() => variantURL),
+      copyButton(() => variantURL, 'o-media-details-variant-copy'),
     );
   };
 
