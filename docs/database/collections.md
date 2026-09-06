@@ -104,7 +104,8 @@ Three types cover moments and calendar values, each stored in the form that matc
 - `time` is a time of day, stored as `HH:MM:SS` text. `HH:MM` input is accepted and stored with
   `:00` seconds.
 - `dateTime` is an instant, stored as epoch milliseconds - the same representation `_updatedAt`
-  uses. The dashboard renders it in the viewer's own timezone.
+  uses. The dashboard renders it in the viewer's own
+  [time zone setting](../dashboard/account.md), unless the field pins one.
 
 ```ts
 fields: {
@@ -117,6 +118,18 @@ fields: {
 All three take `min` and `max` bounds in their own value form; `dateTime` also accepts ISO 8601
 strings there. Because `date` and `time` store fixed-width ISO text, comparisons and sorting work
 in calendar and clock order without any parsing.
+
+`dateTime` takes two display options on top. `relativeTime: true` shows the instant as elapsed
+time, like "2 hours ago", with the exact date on hover - the way the `Updated` column already
+reads. `timezone` pins an IANA zone for the field's cells and calendar, for an instant that belongs
+to one place whoever is looking:
+
+```ts
+fields: {
+  lastSeenAt: field('dateTime', { relativeTime: true }),
+  departsAt: field('dateTime', { timezone: 'Asia/Tokyo' }),
+}
+```
 
 ## Write-only and locked fields
 
@@ -277,6 +290,21 @@ fields: {
     label: 'app.slug.label',
     description: 'Lowercase words joined by hyphens.',
     placeholder: 'my-first-post',
+  }),
+}
+```
+
+A description renders as markdown: bold, code, links, and pipe tables. A long one can start
+collapsed behind a "Show description" toggle - pass an object with `text` instead of a string.
+`showLabel` and `hideLabel` replace the toggle's labels, and `expanded: true` opens it from the
+start:
+
+```ts
+fields: {
+  cron: field('text', {
+    description: {
+      text: 'Five fields, space-separated.\n\n|Field|Range|\n|-|-|\n|minute|0-59|\n|hour|0-23|',
+    },
   }),
 }
 ```
