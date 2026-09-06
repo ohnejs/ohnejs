@@ -134,6 +134,8 @@ export * from './mutex/mutex.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
 export * from './number/clamp.ts';
+export * from './number/ease-in-out-cubic.ts';
+export * from './number/smoothstep.ts';
 export * from './object/deep-equal.ts';
 export * from './object/deep-omit.ts';
 export * from './object/has-key.ts';
