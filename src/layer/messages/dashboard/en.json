@@ -69,7 +69,7 @@
     "showDescription": "Show description",
     "showPassword": "Show password",
     "translatable": "This field stores a separate value for each language",
-    "unchanged": "unchanged",
+    "unchanged": "(unchanged)",
     "unique": "Unique"
   },
   "fields": {

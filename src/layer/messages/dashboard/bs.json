@@ -69,7 +69,7 @@
     "showDescription": "Prikaži opis",
     "showPassword": "Prikaži lozinku",
     "translatable": "Ovo polje čuva zasebnu vrijednost za svaki jezik",
-    "unchanged": "nepromijenjeno",
+    "unchanged": "(nepromijenjeno)",
     "unique": "Jedinstveno"
   },
   "fields": {

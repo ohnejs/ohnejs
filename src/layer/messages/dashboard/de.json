@@ -69,7 +69,7 @@
     "showDescription": "Beschreibung anzeigen",
     "showPassword": "Passwort anzeigen",
     "translatable": "Dieses Feld speichert je Sprache einen eigenen Wert",
-    "unchanged": "unverändert",
+    "unchanged": "(unverändert)",
     "unique": "Eindeutig"
   },
   "fields": {
