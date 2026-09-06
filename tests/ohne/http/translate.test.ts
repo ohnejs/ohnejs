@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { translate } from '../../../src/ohne/http/translate.ts';
+import { defaultLanguage, translate } from '../../../src/ohne/http/translate.ts';
 import {
   type Event,
   loadLayers,
@@ -94,5 +94,20 @@ describe('translate', () => {
   it('returns the key when it is absent from every language', async () => {
     await setup({ en: { 'api.http.notFound': 'Not Found' } });
     strictEqual(translate('does.not.exist'), 'does.not.exist');
+  });
+});
+
+describe('defaultLanguage', () => {
+  afterEach(() => {
+    for (const layer of useLayers().layers()) useLayers().remove(layer.path);
+  });
+
+  it('is `en` when the config sets none', () => {
+    strictEqual(defaultLanguage(), 'en');
+  });
+
+  it('canonicalizes the configured tag', () => {
+    useLayers().add({ path: '/app', input: { messages: { defaultLanguage: 'DE-at' } } });
+    strictEqual(defaultLanguage(), 'de-AT');
   });
 });

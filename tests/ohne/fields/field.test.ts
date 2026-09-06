@@ -2,7 +2,11 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
-import { field, resolveFieldOptions } from '../../../src/ohne/fields/field.ts';
+import {
+  field,
+  isExpandableDescription,
+  resolveFieldOptions,
+} from '../../../src/ohne/fields/field.ts';
 import { option } from '../../../src/ohne/fields/option.ts';
 
 describe('field', () => {
@@ -130,5 +134,15 @@ describe('resolveFieldOptions', () => {
       default: undefined,
     });
     strictEqual('default' in resolved, false);
+  });
+});
+
+describe('isExpandableDescription', () => {
+  it('tells the expandable object form from a plain message', () => {
+    strictEqual(isExpandableDescription({ text: 'Long help' }), true);
+    strictEqual(isExpandableDescription({ text: 'field.help', expanded: true }), true);
+    strictEqual(isExpandableDescription({ key: 'field.help' }), false);
+    strictEqual(isExpandableDescription('Short help'), false);
+    strictEqual(isExpandableDescription(undefined), false);
   });
 });

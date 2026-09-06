@@ -69,6 +69,12 @@ describe('generateMessages', () => {
     strictEqual(shared.includes('export interface GeneratedLanguages {'), true);
     strictEqual(shared.includes('de: true;'), true);
     strictEqual(shared.includes('en: true;'), true);
+    strictEqual(
+      shared.includes(
+        'export type GeneratedLanguage = [keyof GeneratedLanguages] extends [never] ? string : keyof GeneratedLanguages;',
+      ),
+      true,
+    );
 
     const node = bucket(paths, 'node');
     strictEqual(node.includes("import { useMessages } from 'ohne';"), true);
@@ -157,7 +163,9 @@ describe('generateMessages', () => {
       `${BANNER}\n` +
         'export interface GeneratedMessages {}\n' +
         '\n' +
-        'export interface GeneratedLanguages {}\n',
+        'export interface GeneratedLanguages {}\n' +
+        '\n' +
+        'export type GeneratedLanguage = [keyof GeneratedLanguages] extends [never] ? string : keyof GeneratedLanguages;\n',
     );
     strictEqual(
       bucket(paths, 'node'),

@@ -102,6 +102,20 @@ export function activeLanguage(): string {
   return useAcceptsLanguages(offered) ?? fallback;
 }
 
+/**
+ * Resolves the app's default language as a canonical BCP-47 tag: `messages.defaultLanguage`, or `en`.
+ * A configured tag that does not canonicalize is answered as written, so a bad config stays visible.
+ *
+ * @example
+ * ```ts
+ * defaultLanguage() // -> 'en'
+ * ```
+ */
+export function defaultLanguage(): string {
+  const configured = useConfig().messages?.defaultLanguage ?? DEFAULTS.messages.defaultLanguage;
+  return canonicalizeLanguage(configured) ?? configured;
+}
+
 function lookup(key: string, language: string): { template: string; language: string } | undefined {
   const catalogs = useMessages().all();
   for (const lang of uniqueArray([...languageFallbacks(language), defaultLanguage()])) {
@@ -109,11 +123,6 @@ function lookup(key: string, language: string): { template: string; language: st
     if (!isUndefined(template)) return { template, language: lang };
   }
   return undefined;
-}
-
-function defaultLanguage(): string {
-  const configured = useConfig().messages?.defaultLanguage ?? DEFAULTS.messages.defaultLanguage;
-  return canonicalizeLanguage(configured) ?? configured;
 }
 
 function astOf(template: string): MessageAST {

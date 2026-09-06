@@ -6,7 +6,7 @@ import type { KnownFieldOptions } from './known-field-options.ts';
 import type { FieldTypeName, KnownFields } from './known-fields.ts';
 import type { AnyOptionDef, ResolveOptions, ResolvedOptions } from './option.ts';
 
-import { isUndefined } from '../../utils/index.ts';
+import { hasKey, isPlainObject, isUndefined } from '../../utils/index.ts';
 
 /**
  * The storage options every field accepts.
@@ -178,6 +178,43 @@ export interface ValueOptions<
 }
 
 /**
+ * A field description that starts collapsed behind a toggle.
+ * For long help, like a table of format tokens, that would crowd the form when always shown.
+ */
+export interface ExpandableDescription {
+  /**
+   * The content, shown once expanded.
+   * Markdown is supported.
+   * Pass a message key to translate it per the viewer's language.
+   */
+  text: Message;
+
+  /**
+   * The toggle's label while the content is collapsed.
+   *
+   * @default
+   * 'dashboard.field.showDescription'
+   */
+  showLabel?: Message;
+
+  /**
+   * The toggle's label while the content is expanded.
+   *
+   * @default
+   * 'dashboard.field.hideDescription'
+   */
+  hideLabel?: Message;
+
+  /**
+   * Whether the content starts expanded.
+   *
+   * @default
+   * false
+   */
+  expanded?: boolean;
+}
+
+/**
  * The presentation metadata every field accepts, shown for the field in the dashboard.
  * Every field kind carries them, relations and composites included.
  */
@@ -195,8 +232,9 @@ export interface PresentationOptions {
    * Markdown is supported.
    * Pass a message key to translate it per the viewer's language.
    * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
+   * An `ExpandableDescription` object starts it collapsed behind a toggle, for long help.
    */
-  description?: Message;
+  description?: Message | ExpandableDescription;
 
   /**
    * The hint an empty dashboard input shows for this field.
@@ -333,4 +371,19 @@ export function resolveFieldOptions<TOptions extends Record<string, AnyOptionDef
   }
   if (fieldType.forceNullable === true) resolved.nullable = true;
   return resolved as ResolvedOptions<TOptions> & ResolvedFieldOptions;
+}
+
+/**
+ * Whether a `description` option is the expandable object form, rather than a plain message.
+ * Takes `unknown`, so a resolved `options` record checks a member without a cast.
+ *
+ * @example
+ * ```ts
+ * isExpandableDescription({ text: 'Long help' }) // -> true
+ * isExpandableDescription({ key: 'field.help' }) // -> false
+ * isExpandableDescription('Short help')          // -> false
+ * ```
+ */
+export function isExpandableDescription(value: unknown): value is ExpandableDescription {
+  return isPlainObject(value) && hasKey(value, 'text');
 }

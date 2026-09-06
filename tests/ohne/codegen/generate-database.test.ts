@@ -239,6 +239,7 @@ describe('generateDatabase', () => {
         "  gallerySlider: { type: 'text', options: {} },\n" +
         "  intro: { type: 'text', options: { label: 'The intro', translatable: true } },\n" +
         "  tagline: { type: 'text', options: { label: 'promo.tag' } },\n" +
+        "  notes: { type: 'text', options: { label: 'Notes', description: { text: 'Editor notes.', expanded: true } } },\n" +
         "  sections: { type: 'repeater', options: { fields: { heading: { type: 'text', options: {} } } } },\n" +
         "  banner: { type: 'blocks', options: { allow: ['Hero'] } },\n" +
         '} };\n',
@@ -256,6 +257,8 @@ describe('generateDatabase', () => {
     ok(shared.includes(' * The intro.'));
     ok(shared.includes(' * Tagline!'));
     ok(!shared.includes('Tagline!.'));
+    ok(shared.includes(' * Editor notes.'));
+    ok(!shared.includes(' * Notes.'));
 
     // The resolved-config bullets, in the agreed vocabulary.
     ok(shared.includes(' * - Type: `text`'));

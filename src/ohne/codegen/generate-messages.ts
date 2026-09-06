@@ -29,6 +29,7 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
  *
  * Emits one file per codegen bucket, so the server and dashboard share a single source of truth.
  * `shared/messages.ts` types every key as `GeneratedMessages` and every language as `GeneratedLanguages`.
+ * `GeneratedLanguage` is the union of those languages, or `string` when there are none.
  * `node/messages.ts` augments `ohne` and registers each catalog.
  * `browser/messages.ts` augments `ohne/dashboard`.
  * Both augmentations only `extends` the shared types, so the key body is written once, never per target.
@@ -63,6 +64,7 @@ export async function generateMessages(from: string = process.cwd()): Promise<st
 
 /**
  * Writes `shared/messages.ts`: the pure `GeneratedMessages` and `GeneratedLanguages` types.
+ * `GeneratedLanguage` follows: the union of the language tags, or `string` when there are none.
  * It holds no runtime and references no module, so both the node and browser programs include it.
  */
 async function writeShared(
@@ -81,6 +83,10 @@ async function writeShared(
     code,
     'export interface GeneratedLanguages',
     languages.map((language) => `${propertyKey(language)}: true;`),
+  );
+  code.line();
+  code.line(
+    'export type GeneratedLanguage = [keyof GeneratedLanguages] extends [never] ? string : keyof GeneratedLanguages;',
   );
   return write(dir, code);
 }

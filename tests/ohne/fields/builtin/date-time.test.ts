@@ -2,6 +2,7 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { dateTime } from '../../../../src/ohne/fields/builtin/date-time.ts';
+import { resolveFieldOptions } from '../../../../src/ohne/fields/field.ts';
 
 type Ctx = Parameters<NonNullable<typeof dateTime.validators>[number]>[1];
 
@@ -51,5 +52,22 @@ describe('dateTime bounds', () => {
     );
     strictEqual(bounds(1000, ctx({ min: 1000 })), undefined);
     strictEqual(bounds(0, ctx()), undefined);
+  });
+});
+
+describe('dateTime resolved options', () => {
+  it('resolves `relativeTime` to its default and leaves `timezone` absent', () => {
+    const resolved = resolveFieldOptions(dateTime, {});
+    strictEqual(resolved.relativeTime, false);
+    strictEqual('timezone' in resolved, false);
+  });
+
+  it('keeps a passed `relativeTime` and `timezone`', () => {
+    const resolved = resolveFieldOptions(dateTime, {
+      relativeTime: true,
+      timezone: 'Europe/Berlin',
+    });
+    strictEqual(resolved.relativeTime, true);
+    strictEqual(resolved.timezone, 'Europe/Berlin');
   });
 });

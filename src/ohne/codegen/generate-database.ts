@@ -49,7 +49,7 @@ import { resolveLocales } from '../collections/resolve-locales.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
-import { resolveFieldOptions } from '../fields/field.ts';
+import { isExpandableDescription, resolveFieldOptions } from '../fields/field.ts';
 import {
   type FieldStorageKind,
   resolveFieldStorage,
@@ -944,6 +944,7 @@ function blockArm(block: string, generated: string, uuidLine: string | null): st
 /**
  * Builds one field's documentation block: its headline, a rule, then a bullet list of resolved facts.
  * The headline is the field's `description`, else its `label`, else its name sentence-cased.
+ * An expandable description contributes its `text`.
  * `nested` drops the translatability line, which only a top-level collection field can carry.
  */
 function fieldDocOf(
@@ -955,8 +956,9 @@ function fieldDocOf(
 ): string {
   const { fieldType } = registeredType(owner, instance.type, context);
   const { options, kind } = resolveFieldStorage(name, instance, fieldType);
+  const { description } = instance.options;
   const headline = withPeriod(
-    context.resolveText(instance.options.description) ??
+    context.resolveText(isExpandableDescription(description) ? description.text : description) ??
       context.resolveText(instance.options.label) ??
       toSentenceCase(name),
   );

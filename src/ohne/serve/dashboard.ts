@@ -322,7 +322,7 @@ function shellDocument(
     ? `\n    <script type="module" src="${MODULE_BASE}/dashboard/runtime/reload-client.ts"></script>`
     : '';
   return `<!doctype html>
-<html lang="en">
+<html lang="${defaultLanguage}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
