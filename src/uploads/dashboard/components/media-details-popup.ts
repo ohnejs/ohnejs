@@ -88,6 +88,15 @@ import {
  */
 export interface MediaDetailsPopupOptions {
   /**
+   * The tab the popup opens on.
+   * `'variants'` falls back to details on a record carrying none.
+   *
+   * @default
+   * 'details'
+   */
+  tab?: DetailsTab;
+
+  /**
    * Called with the answered record after a save or a replaced file.
    */
   onUpdated?(record: UploadRecord): void;
@@ -376,6 +385,7 @@ export async function loadUpload(
  * The file details popup, deep-linked by `?details=<uuid>`.
  *
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
+ * It opens on Details unless `tab` names another.
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
  * Variants lists every named image variant with its tokens, rendered size, byte size, and a copy button.
@@ -396,7 +406,10 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const image = preview === 'image';
   const current = ref(record);
   const busy = ref(false);
-  const activeTab = ref<DetailsTab>('details');
+  const requestedTab = options.tab ?? 'details';
+  const activeTab = ref<DetailsTab>(
+    requestedTab === 'variants' && isUndefined(record.variants) ? 'details' : requestedTab,
+  );
   const unplaced = ref('');
   const seed = detailsStateOf(record);
   const focal = ref<Pick<DetailsState, 'focalX' | 'focalY'>>({

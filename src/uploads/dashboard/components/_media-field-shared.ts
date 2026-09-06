@@ -15,6 +15,7 @@ import {
 import { isNull, isUndefined, onCleanup, type Ref, ref, untracked } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
+import type { DetailsTab } from './media-details-state.ts';
 import type { MediaItemDisabled } from './media-image-item.ts';
 
 import { runBatched } from './_batch.ts';
@@ -55,6 +56,14 @@ export interface HiddenFileInputOptions {
  * Options for `detailsHost`.
  */
 export interface DetailsHostOptions {
+  /**
+   * The tab the popup opens on, read once per open.
+   *
+   * @default
+   * 'details'
+   */
+  tab?(): DetailsTab;
+
   /**
    * Called with the record once the popup's Delete has removed it; the control drops its link.
    */
@@ -205,6 +214,7 @@ export function detailsHost(
       const record = untracked(() => target.value);
       if (isNull(record)) return null;
       mediaDetailsPopup(record, {
+        tab: untracked(() => options.tab?.()),
         onUpdated: (updated) => mediaRecords.seed(updated),
         onDeleted: options.onDeleted,
         onClose: (close) =>

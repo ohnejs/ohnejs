@@ -24,6 +24,7 @@ import {
 } from 'ohne/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
+import type { DetailsTab } from './media-details-state.ts';
 
 import {
   detailsHost,
@@ -140,6 +141,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
     const routed = ref('');
     const pickerOpen = ref(false);
     const details = ref<UploadRecord | null>(null);
+    const detailsTab = ref<DetailsTab>('details');
     let memory: MediaPickerMemory | undefined;
 
     const baseUUID = (): string | null => (isString(base) ? base : null);
@@ -158,7 +160,8 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
       memory ??= createPickerMemory(untracked(record)?.directory);
       pickerOpen.value = true;
     };
-    const openDetails = (linked: UploadRecord): void => {
+    const openDetails = (linked: UploadRecord, tab: DetailsTab = 'details'): void => {
+      detailsTab.value = tab;
       details.value = linked;
     };
     const describe = (el: HTMLElement): HTMLElement => {
@@ -231,7 +234,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
         {
           type: 'button',
           class: 'o-media-field-description ohne-truncate ohne-raw',
-          onClick: () => openDetails(linked),
+          onClick: () => openDetails(linked, 'description'),
         },
         inner,
         icon('pencil'),
@@ -298,7 +301,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
           },
         };
       }),
-      detailsHost(details, { onDeleted: () => set(null) }),
+      detailsHost(details, { tab: () => detailsTab.value, onDeleted: () => set(null) }),
     );
 
     return {
