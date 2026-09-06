@@ -149,7 +149,8 @@ css`
     font-size: 0.875rem;
   }
 
-  .o-media-item-name-text {
+  /* Two classes deep, so it outranks the base underline on links and buttons. */
+  .o-media-item .o-media-item-name-text {
     display: flex;
     min-width: 0;
     text-decoration: none;
