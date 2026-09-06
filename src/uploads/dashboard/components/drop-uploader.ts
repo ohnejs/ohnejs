@@ -1,4 +1,13 @@
-import { acquireOverlay, css, h, icon, type OverlayHandle, useRoute, when } from 'ohne/dashboard';
+import {
+  acquireOverlay,
+  css,
+  h,
+  icon,
+  type OverlayHandle,
+  raiseToTopLayer,
+  useRoute,
+  when,
+} from 'ohne/dashboard';
 import { isNull, isUndefined, joinPath, onCleanup, parseDuration, ref } from 'ohne/utils';
 
 import type { UploadItem } from './upload-queue-state.ts';
@@ -10,7 +19,6 @@ import { uploadFiles } from './upload-queue.ts';
 css`
   .o-upload-drop {
     position: fixed;
-    z-index: 100000;
     top: 0;
     left: 0;
     width: 100dvw;
@@ -186,6 +194,7 @@ export function dropUploader(): HTMLElement {
     );
     // A forced layout at opacity 0 first, so lifting the class fades the panel in instead of snapping.
     queueMicrotask(() => {
+      raiseToTopLayer(el);
       void el.offsetWidth;
       if (dragging) visible.value = true;
     });
