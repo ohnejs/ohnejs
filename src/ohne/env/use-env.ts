@@ -67,8 +67,9 @@ registry.define('FORCE_SYNC', { default: false, parse: boolEnv, flag: 'boolean' 
  * Returns the process-wide env registry for `Env`.
  *
  * Resolution order: in-memory override, then `process.env`, then the spec's `default`.
+ * `loadProjectEnv` fills `process.env` from the project's `.env` where the environment set nothing.
  * Use `set` to override a value for the current process (tests, runtime tweaks).
- * `process.env` is not mutated.
+ * `set` never touches `process.env`.
  * Augment `Env` via `declare module 'ohne'` to add typed fields, then `define` them on first call.
  *
  * @example

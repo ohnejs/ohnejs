@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -131,6 +131,7 @@ describe('dev', () => {
     useShutdown().clear();
     useLayers().clear();
     useEnv().unset('SILENT');
+    useEnv().fill({});
   });
 
   it('serves routes and reloads when a route file is added', TIMEOUT, async () => {
@@ -149,6 +150,54 @@ describe('dev', () => {
 
     await server.close();
     await waitFor(async () => (await get(port, '/health')) === -1);
+  });
+
+  it('reloads the API child when `.env` changes, and again when it goes', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('dotenv', port);
+    writeFileSync(
+      join(app, 'api', 'greet.ts'),
+      "export default () => process.env['OHNE_TEST_GREETING'] ?? 'missing'\n",
+    );
+    writeFileSync(join(app, '.env'), 'OHNE_TEST_GREETING=hi\n');
+
+    const server = await dev(app, { entry: BIN, dashboard: false });
+    servers.push(server);
+    await waitFor(async () => (await getBody(port, '/greet')) === 'hi');
+
+    writeFileSync(join(app, '.env'), 'OHNE_TEST_GREETING=hello\n');
+    await waitFor(async () => (await getBody(port, '/greet')) === 'hello');
+
+    unlinkSync(join(app, '.env'));
+    await waitFor(async () => (await getBody(port, '/greet')) === 'missing');
+  });
+
+  it('parks on a malformed `.env` and recovers on the next save', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('bad-dotenv', port);
+    writeFileSync(
+      join(app, 'api', 'greet.ts'),
+      "export default () => process.env['OHNE_TEST_GREETING'] ?? 'missing'\n",
+    );
+
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    try {
+      const server = await dev(app, { entry: BIN, dashboard: false });
+      servers.push(server);
+      await waitFor(async () => (await getBody(port, '/greet')) === 'missing');
+
+      out.length = 0;
+      writeFileSync(join(app, '.env'), 'NOEQUALS\n');
+      await waitFor(async () => out.join('').includes('Could not load .env'));
+      ok(out.join('').includes('Waiting for changes'));
+
+      writeFileSync(join(app, '.env'), 'OHNE_TEST_GREETING=back\n');
+      await waitFor(async () => (await getBody(port, '/greet')) === 'back');
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
   });
 
   it('drains a child mid-respawn when close is called before it is ready', TIMEOUT, async () => {

@@ -93,7 +93,8 @@ messages. `dashboard/` is excluded because dashboard code is browser code, check
 TypeScript program when you add one.
 
 `.gitignore` keeps the generated and the local out of the repository: `.ohne/` is regenerated on
-demand, `.data/` holds the SQLite database (`.data/ohne.db` by default), and `.env` holds secrets.
+demand, `.data/` holds the SQLite database (`.data/ohne.db` by default), and `.env` holds secrets,
+which every command reads at start - see [the `.env` file](../project/env.md#the-env-file).
 
 ## First run
 

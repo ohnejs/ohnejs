@@ -41,6 +41,7 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { version } from '../meta/version.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { loadProjectEnv } from '../project/load-project-env.ts';
 import { useRoutes } from '../routes/use-routes.ts';
 
 declare module 'ohne' {
@@ -74,9 +75,11 @@ declare module 'ohne' {
  * With an IPC parent, it signals `'ready'` after the funnel is watching, so a supervisor can drive reloads.
  *
  * Port and host come from `Config.api`, overridden by the `PORT` and `HOST` env vars when set.
+ * The `.env` at `from` fills the environment first, so every config and boot file sees it.
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
 export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer> {
+  await loadProjectEnv(from);
   await loadLayers(from);
   await bootLayers();
 

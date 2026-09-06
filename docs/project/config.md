@@ -194,7 +194,9 @@ A handful of env vars override their config counterpart whenever they are set:
 - `DEBUG` - `printer.debug`.
 
 Each is also a CLI flag - the kebab-case of its name, so `FORCE_SYNC` is `--force-sync` - and the
-flag wins over the env var for that run. The full list of built-ins lives in [env](./env.md).
+flag wins over the env var for that run. A variable set in the project's `.env` counts as set too:
+it fills what the process environment lacks and beats config the same way. The full list of
+built-ins lives in [env](./env.md), the file in [the `.env` file](./env.md#the-env-file).
 
 ## Own vs inherited keys
 

@@ -24,6 +24,7 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  * Each built-in is also a CLI flag - the kebab-case of its name, so `FORCE_SYNC` is `--force-sync`.
  * A booleanish var is a switch (`--force-sync` / `--no-force-sync`); the rest take a value (`--host x`).
  * The flag wins over the env var for that run.
+ * Values come from the process environment, which the project's `.env` fills where the shell set nothing.
  *
  * @example
  * ```ts

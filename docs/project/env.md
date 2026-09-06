@@ -47,9 +47,35 @@ the environment is where it runs, so a set variable wins:
 PORT=4000 pnpm exec ohne serve api
 ```
 
-For any one read, the order is: CLI flag, then the environment variable, then the config field,
-then the built-in default. A set variable is a decision, not a fallback - `SILENT=0` overrides
-`printer: { silent: true }` even though `0` is the "off" value.
+For any one read, the order is: CLI flag, then the process environment, then the project `.env`,
+then the config field, then the built-in default. A set variable is a decision, not a fallback -
+`SILENT=0` overrides `printer: { silent: true }` even though `0` is the "off" value.
+
+## The `.env` file
+
+A `.env` next to `ohne.config.ts` holds the variables you would rather not type into the shell,
+secrets first among them. Every command reads it before anything else runs:
+
+```sh
+DATABASE=.data/dev.db
+COOKIE_SECRET=a-long-random-value
+```
+
+The file fills gaps and never overrides. A variable the shell, your host, or CI already set keeps
+its value, so `PORT=5000 pnpm dev` beats a `PORT` in the file, and a host that injects secrets
+needs no file at all. Against config it counts as set, exactly as a shell variable would.
+
+There is one file and no layering - no `.env.local`, no `.env.production`. In production, set the
+real environment and ship no file. The code path is the same; the file is simply absent.
+
+Lines are `KEY=value`. A `#` after whitespace starts a comment, double quotes interpret `\n` and
+may span lines, and single quotes are literal. A malformed line refuses to run, naming the file.
+With `DEBUG=1`, startup lists the names the file applied - a name missing from that list was
+already set by the environment.
+
+`ohne dev` reloads the file on every change and restarts both servers, so an edit takes effect
+without a restart. `PORT` is the exception: it seeds the ports when `dev` starts. `ohne init`
+already gitignores the file.
 
 ## Flags
 
@@ -108,7 +134,7 @@ its variables the same way; its boot files run before the app's.
 ## Overriding in code
 
 `set` places an in-memory override that wins over the process environment; `unset` clears it.
-`process.env` is never mutated, so nothing leaks between tests:
+`set` never touches `process.env`, so nothing leaks between tests:
 
 ```ts
 useEnv().set('SILENT', true);

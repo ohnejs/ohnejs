@@ -20,10 +20,12 @@ import { pruneCodegen } from '../../codegen/prune-codegen.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
+import { loadProjectEnv } from '../../project/load-project-env.ts';
 
 /**
  * The `ohne prepare` command.
  * Runs every codegen for the project at `--cwd`, writing the generated types into its codegen dir.
+ * The project `.env` is read first, so a config that reads the environment sees it.
  * Files an earlier run left behind are pruned, so the dir holds exactly the current output.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
@@ -50,6 +52,7 @@ export const prepareCommand = defineCommand({
       return;
     }
 
+    await loadProjectEnv(cwd);
     const { result: written, ms } = await measure(async () => {
       await loadLayers(cwd);
       const files = (

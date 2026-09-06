@@ -18,7 +18,9 @@ prints the root help.
 
 Every command except `init` takes `--cwd`, the project root to operate on, defaulting to the
 current directory. A command refuses to run without an `ohne.config.ts` at that root - the file
-is what makes a directory an ohne project.
+is what makes a directory an ohne project. It also reads a `.env` at that root before doing
+anything else, filling in the variables the shell did not set - see
+[the `.env` file](./env.md#the-env-file).
 
 Registered [env vars](./env.md) surface as flags on every command: the kebab-case of the name, so
 `PORT` is `--port` and `FORCE_SYNC` is `--force-sync`. A boolean var becomes a switch, the rest
@@ -68,6 +70,9 @@ the supervisor waits for changes, and the next successful reload revives it.
 `PORT` seeds the pair: the dashboard takes it and the API takes the next free port, so the whole
 stack moves together. Without it, each side binds its configured port - `9000` and `9001` by
 default - and a port already in use is skipped past with a warning.
+
+A change to `.env` reloads it and restarts both children, so they run with the new values. `PORT`
+is read once, when `dev` starts, so moving the ports takes a fresh `dev`.
 
 ## ohne prepare
 

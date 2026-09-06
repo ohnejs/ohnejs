@@ -115,6 +115,10 @@ Signed cookies sign with the `COOKIE_SECRET` env var - a long random value. With
 throws rather than sign under a blank key, so set it before the app needs it. See
 [reading the request](../api/request.md).
 
+Set it in the process environment, or in a `.env` at the project root on a single-host deploy. The
+file fills what the environment lacks and never overrides it, so a value the platform injects
+always wins. See [the `.env` file](../project/env.md#the-env-file).
+
 ## Graceful shutdown
 
 `SIGTERM` and `SIGINT` funnel into one ordered drain: stop accepting, wait for in-flight requests

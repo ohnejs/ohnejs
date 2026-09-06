@@ -1,4 +1,6 @@
-import { debounce, extname, isNull, normalizeBasePath } from '../../utils/index.ts';
+import { watch } from 'node:fs';
+
+import { debounce, extname, isNull, joinPath, normalizeBasePath } from '../../utils/index.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { useEnv } from '../env/use-env.ts';
 import { reportError } from '../error/report-error.ts';
@@ -8,6 +10,7 @@ import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { loadProjectEnv } from '../project/load-project-env.ts';
 import { type ServeChild, spawnServeChild } from './child-server.ts';
 import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
@@ -58,6 +61,8 @@ export interface DevOptions {
 /**
  * Watches the project and reloads `ohne serve api` on every change.
  *
+ * The `.env` at `from` is read first, so the ports resolve from it and both children inherit it.
+ * A `.env` change reloads it here and restarts both children, so they inherit the new values.
  * Owns codegen, then spawns the server as a child with `SKIP_CODEGEN` so the child only serves.
  * The initial build writes the full set and prunes stale files from the codegen dir.
  * A change re-runs the affected codegen, then drains the child and respawns it.
@@ -79,6 +84,7 @@ export async function dev(
   options: DevOptions = {},
 ): Promise<DevServer> {
   const printer = usePrinter();
+  await loadProjectEnv(from);
   await loadLayers(from);
 
   const registry = createRegistryTarget(from);
@@ -135,10 +141,18 @@ export async function dev(
 
   // Watch only after the initial build, so no change can race the first spawn.
   const schedule = debounce(() => void (ticking = tick()), DEBOUNCE);
-  const watch = watchLayers((path) => {
+  const layerWatch = watchLayers((path) => {
     pending.add(path);
     schedule();
   });
+  // The layer watch prunes dotfiles, so the root `.env` needs its own watch.
+  const envFile = joinPath(from, '.env');
+  const envWatch = watch(from, (_event, name) => {
+    if (name !== '.env') return;
+    pending.add(envFile);
+    schedule();
+  });
+  envWatch.on('error', () => envWatch.close());
 
   let closing: Promise<void> | undefined;
   onShutdown(close);
@@ -167,7 +181,9 @@ export async function dev(
 
   async function runCycle(batch: Set<string>): Promise<void> {
     const configChanged = [...batch].some((path) => config.affectedBy(path));
+    const envChanged = batch.has(envFile);
     try {
+      if (envChanged) await loadProjectEnv(from);
       await regen(batch);
     } catch (error) {
       reportError(error);
@@ -175,10 +191,14 @@ export async function dev(
       return;
     }
     if (closed) return;
-    if (configChanged && wantDashboard) await restartDashboard();
+    if ((configChanged || envChanged) && wantDashboard) await restartDashboard();
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
     if (reloadable.length < batch.size) dashboard?.reload();
-    if (!reloadable.some(isSource) && !reloadable.some((path) => messages.affectedBy(path))) return;
+    const reloads =
+      envChanged ||
+      reloadable.some(isSource) ||
+      reloadable.some((path) => messages.affectedBy(path));
+    if (!reloads) return;
     printer.info('__Reloading API...__');
     try {
       await respawn();
@@ -195,7 +215,7 @@ export async function dev(
     const paths = [...batch];
     if (paths.some((path) => config.affectedBy(path))) {
       await config.regen();
-      if (!closed) watch.resync();
+      if (!closed) layerWatch.resync();
       return;
     }
     for (const target of targets) {
@@ -285,7 +305,8 @@ export async function dev(
   async function teardown(): Promise<void> {
     closed = true;
     schedule.cancel();
-    watch.close();
+    layerWatch.close();
+    envWatch.close();
     await ticking?.catch(() => {});
     await respawning?.catch(() => {});
     const running: ServeChild[] = [];

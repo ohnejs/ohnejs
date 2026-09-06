@@ -19,10 +19,12 @@ import { useEnv } from '../../env/use-env.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
+import { loadProjectEnv } from '../../project/load-project-env.ts';
 
 /**
  * The `ohne sync` command.
  * Reconciles the project's database with the schema its code declares, then exits.
+ * The project `.env` is read first, so `DATABASE` and `FORCE_SYNC` may live there.
  * Boot files run first, so layer dialects register; codegen refreshes the database registrations.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  * `--force` authorizes and performs destructive changes, exactly like the `FORCE_SYNC` env.
@@ -55,6 +57,7 @@ export const syncCommand = defineCommand({
       return;
     }
 
+    await loadProjectEnv(cwd);
     const { ms } = await measure(async () => {
       await loadLayers(cwd);
       await bootLayers();

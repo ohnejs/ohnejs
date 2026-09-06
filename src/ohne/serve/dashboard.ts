@@ -49,6 +49,7 @@ import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { loadProjectEnv } from '../project/load-project-env.ts';
 
 /**
  * URL prefix under which the framework's browser modules are served.
@@ -121,10 +122,12 @@ const MODULE_ROOTS = ['dashboard', 'utils'].map((dir) => resolvePath(dir, SRC_RO
  *
  * Port and host come from `Config.dashboard`, overridden by the `PORT` and `HOST` env vars when set.
  * The injected API base URL comes from the `API_URL` env, then `Config.dashboard.apiURL`, then `Config.api`.
+ * The `.env` at `from` fills the environment first, so every config file sees it.
  * The app root is the nearest `package.json` above `from`.
  * The listening socket and the shutdown funnel keep the process alive after this resolves.
  */
 export async function serveDashboard(from: string = process.cwd()): Promise<HTTPServer> {
+  await loadProjectEnv(from);
   await loadLayers(from);
   const config = useConfig().dashboard;
 

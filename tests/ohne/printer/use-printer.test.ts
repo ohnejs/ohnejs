@@ -25,6 +25,7 @@ describe('usePrinter', () => {
     useEnv().unset('DEBUG');
     useEnv().unset('NO_COLOR');
     useEnv().unset('FORCE_COLOR');
+    useEnv().fill({});
   });
 
   it('drops debug calls when no layer enables it', () => {
@@ -112,6 +113,31 @@ describe('usePrinter', () => {
     });
 
     useEnv().set('NO_COLOR', true);
+
+    buf.length = 0;
+    usePrinter().info('hi');
+    ok(!buf.join('').includes(`${ESC}[`));
+  });
+
+  it('drops every call after `.env` fills `SILENT`, and prints again once it is retracted', () => {
+    useEnv().fill({ SILENT: '1' });
+    usePrinter().info('hidden');
+    strictEqual(buf.join(''), '');
+
+    useEnv().fill({});
+    usePrinter().info('shown');
+    ok(buf.join('').includes('shown'));
+  });
+
+  it('strips ANSI after `.env` fills `NO_COLOR` over a manual `color: true`', () => {
+    const ESC = '\x1b';
+    useEnv().unset('NO_COLOR');
+    usePrinter().configure({
+      stream: { write: (s: string) => buf.push(s), isTTY: true },
+      color: true,
+    });
+
+    useEnv().fill({ NO_COLOR: '1' });
 
     buf.length = 0;
     usePrinter().info('hi');

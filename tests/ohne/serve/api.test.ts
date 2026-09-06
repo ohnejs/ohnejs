@@ -39,6 +39,23 @@ const scope = globalThis as typeof globalThis & {
   __ohneSchemaSynced?: GuardReport;
 };
 
+function getBody(port: number, path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: 'localhost', port, path, headers: { connection: 'close' } },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => resolve(body));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 function get(port: number, path: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = request(
@@ -139,6 +156,7 @@ describe('serveAPI', () => {
     useHooks().clear();
     useCollections().clear();
     useEnv().unset('SKIP_CODEGEN');
+    useEnv().fill({});
     scope.__ohneSchemaSynced = undefined;
   });
 
@@ -147,6 +165,25 @@ describe('serveAPI', () => {
     useEnv().unset('DATABASE');
     useEnv().unset('PORT');
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reads the project `.env` without overriding the process environment', async () => {
+    const dir = serveable('dotenv');
+    writeFileSync(join(dir, '.env'), 'OHNE_TEST_GREETING=hi\nOHNE_TEST_KEEP=file\n');
+    writeFileSync(
+      join(dir, 'api', 'env.get.ts'),
+      "import { defineHandler } from 'ohne';\n" +
+        'export default defineHandler(() => ' +
+        "`${process.env['OHNE_TEST_GREETING']}:${process.env['OHNE_TEST_KEEP']}`);\n",
+    );
+    process.env['OHNE_TEST_KEEP'] = 'shell';
+    try {
+      http = await serveAPI(dir);
+      const { port } = http.server.address() as AddressInfo;
+      strictEqual(await getBody(port, '/env'), 'hi:shell');
+    } finally {
+      delete process.env['OHNE_TEST_KEEP'];
+    }
   });
 
   it('boots the layers, then generates the codegen files and prunes stale ones', async () => {

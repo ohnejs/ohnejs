@@ -30,14 +30,23 @@ describe('ohne sync', () => {
     );
   }
 
-  function sync(dir: string, ...flags: string[]): { status: number | null; output: string } {
+  function syncWith(
+    dir: string,
+    extra: Record<string, string>,
+    ...flags: string[]
+  ): { status: number | null; output: string } {
     const env: Record<string, string | undefined> = { ...process.env, NO_COLOR: '1' };
     for (const name of ['DATABASE', 'DB', 'FORCE_SYNC', 'SILENT']) delete env[name];
+    Object.assign(env, extra);
     const result = spawnSync(process.execPath, [MAIN, 'sync', '--cwd', dir, ...flags], {
       encoding: 'utf8',
       env,
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
+  }
+
+  function sync(dir: string, ...flags: string[]): { status: number | null; output: string } {
+    return syncWith(dir, {}, ...flags);
   }
 
   before(() => {
@@ -68,6 +77,30 @@ describe('ohne sync', () => {
     const again = sync(dir);
     strictEqual(again.status, 0);
     match(again.output, /Database synced/);
+  });
+
+  it('reads `DATABASE` from the project `.env`, unless the shell already set it', () => {
+    const dir = makeApp('dotenv');
+    writeNotes(dir);
+    writeFileSync(join(dir, '.env'), 'DATABASE=.data/from-env.db\n');
+
+    strictEqual(sync(dir).status, 0);
+    ok(existsSync(join(dir, '.data', 'from-env.db')));
+
+    strictEqual(syncWith(dir, { DATABASE: '.data/from-shell.db' }).status, 0);
+    ok(existsSync(join(dir, '.data', 'from-shell.db')));
+  });
+
+  it('reports a malformed `.env` through the error funnel', () => {
+    const dir = makeApp('bad-dotenv');
+    writeNotes(dir);
+    writeFileSync(join(dir, '.env'), 'NOEQUALS\n');
+
+    const result = sync(dir);
+    strictEqual(result.status, 1);
+    match(result.output, /Could not load \.env/);
+    match(result.output, /expected "=" after key "NOEQUALS"/);
+    doesNotMatch(result.output, /Database synced/);
   });
 
   it('reports a discard migration sweeping block data, no force involved', () => {
