@@ -98,8 +98,8 @@ export interface PlaceInput {
 
   /**
    * The main-axis gap between reference and floating element.
-   * Applied AFTER the placement choice and the space measurement.
-   * Placement decisions ignore the gap.
+   * Applied after the placement choice, so which side wins ignores the gap.
+   * The available space does account for it: a clamped element still leaves the gap.
    *
    * @default
    * 0
@@ -144,13 +144,11 @@ export interface PlaceResult {
 
   /**
    * The width available before the element would poke past the padded viewport.
-   * Measured at the pre-offset coordinates.
    */
   availableWidth: number;
 
   /**
    * The height available before the element would poke past the padded viewport.
-   * Measured at the pre-offset coordinates.
    */
   availableHeight: number;
 
@@ -313,7 +311,7 @@ function availabilityAt(
 
 /**
  * Computes where a floating element goes.
- * Choose the placement (auto pick or flip), measure the available space, THEN apply the offset.
+ * Choose the placement (auto pick or flip), apply the offset, THEN measure the available space.
  * Finally slide along the cross axis to stay `shiftPadding` from the viewport edge.
  * Pure math over plain rects, so pickers, dropdowns, and tooltips share one engine.
  *
@@ -328,7 +326,7 @@ function availabilityAt(
  *   shiftPadding: 8,
  *   sizePadding: 8,
  * })
- * // -> { x: 10, y: 37, placement: 'bottom-start', availableWidth: 982, availableHeight: 762, ... }
+ * // -> { x: 10, y: 37, placement: 'bottom-start', availableWidth: 982, availableHeight: 755, ... }
  * ```
  */
 export function placeFloating(input: PlaceInput): PlaceResult {
@@ -343,6 +341,12 @@ export function placeFloating(input: PlaceInput): PlaceResult {
       : preferred;
 
   let { x, y } = coordsAt(placement, reference, floating);
+  const side = sideOf(placement);
+  if (side === 'top') y -= offset;
+  else if (side === 'bottom') y += offset;
+  else if (side === 'left') x -= offset;
+  else x += offset;
+
   const { availableWidth, availableHeight } = availabilityAt(
     placement,
     x,
@@ -351,12 +355,6 @@ export function placeFloating(input: PlaceInput): PlaceResult {
     viewport,
     input.sizePadding ?? 0,
   );
-
-  const side = sideOf(placement);
-  if (side === 'top') y -= offset;
-  else if (side === 'bottom') y += offset;
-  else if (side === 'left') x -= offset;
-  else x += offset;
 
   if (isVertical(side)) {
     x = Math.max(shiftPadding, Math.min(x, viewport.width - floating.width - shiftPadding));

@@ -28,7 +28,7 @@ describe('floater placement', () => {
     strictEqual(placed.placement, 'bottom-start');
     strictEqual(placed.x, 10);
     strictEqual(placed.y, 37);
-    strictEqual(placed.availableHeight, 762);
+    strictEqual(placed.availableHeight, 755);
     strictEqual(placed.availableWidth, 982);
   });
 
@@ -82,7 +82,23 @@ describe('floater placement', () => {
   it('measures the clamp space when nothing fits', () => {
     const placed = placeFloating(floaterInput({ floating: { width: 200, height: 900 } }));
     strictEqual(placed.placement, 'bottom-start');
-    strictEqual(placed.availableHeight, 762);
+    strictEqual(placed.availableHeight, 755);
+  });
+
+  it('leaves room for the gap in the space it reports above the reference', () => {
+    const input = floaterInput({
+      reference: { x: 10, y: 700, width: 100, height: 20 },
+      floating: { width: 200, height: 900 },
+    });
+    const measured = placeFloating(input);
+    strictEqual(measured.placement, 'top-start');
+    strictEqual(measured.availableHeight, 685);
+
+    const clamped = placeFloating({
+      ...input,
+      floating: { width: 200, height: measured.availableHeight },
+    });
+    strictEqual(clamped.y, 8);
   });
 });
 

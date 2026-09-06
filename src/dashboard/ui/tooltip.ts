@@ -6,6 +6,7 @@ import { clamp } from '../../utils/number/clamp.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { h } from '../render/h.ts';
 import { placeFloating } from './floater-place.ts';
+import { placeFixed, raiseToTopLayer } from './overlay.ts';
 import './tokens.ts';
 
 /**
@@ -99,7 +100,8 @@ function renderContent(target: HTMLElement, text: string): void {
  * Attaches a tooltip to an element; returns the dispose.
  *
  * Defaults are an arrow, top placement flipping when space is short, a 10px offset, and 320px max width.
- * Show and hide are instant at z-index 99999, any click hides, and touch shows only while holding.
+ * Show and hide are instant, any click hides, and touch shows only while holding.
+ * Every tooltip is raised to the top layer as it appears, so it covers the surface that opened it.
  * The content string speaks markdown-lite: `**bold**`, backticked code, and `<br>` breaks.
  * It renders as constructed text nodes, so caller content never reaches `innerHTML`.
  * A getter as `content` re-renders reactively while visible.
@@ -140,11 +142,12 @@ export function attachTooltip(
     );
     const root = h(
       'div',
-      { class: 'ohne-tooltip-root', style: 'position: fixed; top: 0; left: 0; z-index: 99999;' },
+      { class: 'ohne-tooltip-root', style: 'position: fixed; top: 0; left: 0;' },
       box,
     );
     renderContent(contentEl, initial);
     document.body.append(root);
+    raiseToTopLayer(root);
 
     const update = (): void => {
       const rect = el.getBoundingClientRect();
@@ -159,8 +162,7 @@ export function attachTooltip(
         flip: true,
         offset: options.offset ?? 10,
       });
-      root.style.left = `${placed.x}px`;
-      root.style.top = `${placed.y}px`;
+      placeFixed(root, placed.x, placed.y);
       box.setAttribute('data-placement', placed.placement);
       if (placed.placement.startsWith('top') || placed.placement.startsWith('bottom')) {
         arrowEl.style.top = '';

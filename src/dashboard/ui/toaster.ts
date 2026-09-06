@@ -12,6 +12,7 @@ import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { useRoute } from '../router/router.ts';
 import { icon, type IconName } from './icon.ts';
+import { raiseToTopLayer } from './overlay.ts';
 import { renderProse } from './prose.ts';
 import './tokens.ts';
 
@@ -741,7 +742,8 @@ export function queueToast(message: string, options?: ToastOptions): void {
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.
  *
  * The outlet is a lazy singleton built in a detached scope: every call returns the same element.
- * A screen swap re-parents it instead of rebuilding it.
+ * A screen swap re-parents it instead of rebuilding it, which drops it out of the top layer.
+ * The next toast raises it back; its `z-index` carries the stack in the meantime.
  * A showing toast keeps its DOM, its running timer, and its animation state across navigations.
  *
  * @example
@@ -1016,6 +1018,11 @@ function createToaster(): HTMLElement {
 
   effect(() => {
     if (toasts.value.length <= 1) expanded.value = false;
+  });
+
+  // Re-raised per change, so a toast arriving over an open panel lands on top of it.
+  effect(() => {
+    if (!isEmpty(toasts.value) && list.isConnected) raiseToTopLayer(list);
   });
 
   const onDocumentKeydown = (event: KeyboardEvent): void => {

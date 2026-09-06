@@ -14,7 +14,13 @@ import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { nearestContainer } from './container.ts';
 import { placeFloating } from './floater-place.ts';
-import { FOCUSABLE, lockScroll, listenClickOutside, placeFixed } from './overlay.ts';
+import {
+  FOCUSABLE,
+  lockScroll,
+  listenClickOutside,
+  placeFixed,
+  raiseToTopLayer,
+} from './overlay.ts';
 import './tokens.ts';
 
 /**
@@ -53,16 +59,6 @@ export interface FloaterOptions {
    * Text for the `title` attribute of the handle.
    */
   handleTitle?: string;
-
-  /**
-   * The CSS position of the floating element.
-   * `'fixed'` is right for most cases.
-   * `'absolute'` positions relative to the offset parent, useful inside a scrolling container.
-   *
-   * @default
-   * 'fixed'
-   */
-  strategy?: 'fixed' | 'absolute';
 
   /**
    * A scrollable ancestor locked alongside the window while the floater is open.
@@ -199,7 +195,6 @@ css`
   }
 
   .ohne-floater-floating {
-    z-index: 99997;
     max-width: 100%;
     outline: none;
   }
@@ -235,6 +230,7 @@ css`
  *
  * A full-width handle button toggles a panel positioned by `placeFloating`.
  * Bottom-start is preferred, the roomiest corner wins, 7px gap, 8px viewport padding, clamped to fit.
+ * The panel is raised to the top layer, so a `container-type` or transformed ancestor cannot crop it.
  * While open, the window and an optional container are scroll-locked.
  * Escape closes in the capture phase ahead of everything else; clicks outside and resizes close too.
  * After the overlay transition a focus trap cycles Tab inside the panel.
@@ -250,7 +246,6 @@ css`
 export function floater(content: Child | (() => Child), options: FloaterOptions = {}): Floater {
   const error = options.error ?? ((): boolean => false);
   const disabled = options.disabled ?? ((): boolean => false);
-  const strategy = options.strategy ?? 'fixed';
   const isActive = ref(false);
   const isVisible = ref(false);
   const placement = ref<Placement>('bottom-start');
@@ -307,8 +302,8 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       floating.style.width = `${Math.max(0, placed.availableWidth)}px`;
       clamped = true;
     }
-    if (placed.availableHeight - 8 < container.scrollHeight) {
-      floating.style.height = `${Math.max(0, placed.availableHeight - 8)}px`;
+    if (placed.availableHeight < container.scrollHeight) {
+      floating.style.height = `${Math.max(0, placed.availableHeight)}px`;
       clamped = true;
     }
     if (clamped) {
@@ -317,19 +312,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
         floating: { width: floating.offsetWidth, height: floating.offsetHeight },
       });
     }
-    if (strategy === 'fixed') {
-      placeFixed(floating, placed.x, placed.y);
-    } else {
-      const parent = floating.offsetParent;
-      if (parent instanceof HTMLElement) {
-        const parentRect = parent.getBoundingClientRect();
-        floating.style.left = `${placed.x - parentRect.x - parent.clientLeft + parent.scrollLeft}px`;
-        floating.style.top = `${placed.y - parentRect.y - parent.clientTop + parent.scrollTop}px`;
-      } else {
-        floating.style.left = `${placed.x + window.scrollX}px`;
-        floating.style.top = `${placed.y + window.scrollY}px`;
-      }
-    }
+    placeFixed(floating, placed.x, placed.y);
     placement.value = placed.placement;
   };
 
@@ -341,7 +324,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       {
         tabindex: '-1',
         class: () => `ohne-floater-floating ohne-floater-floating-${placement.value}`,
-        style: `position: ${strategy}; left: 0; top: 0;${
+        style: `position: fixed; left: 0; top: 0;${
           isUndefined(options.size) ? '' : ` --ohne-size: ${options.size};`
         }`,
       },
@@ -415,6 +398,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
     stopKeydown = () => window.removeEventListener('keydown', onKeydown, { capture: true });
     isActive.value = true;
     await nextTick();
+    if (floatingEl) raiseToTopLayer(floatingEl);
     update();
     isVisible.value = true;
     await nextTick();

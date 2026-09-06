@@ -158,7 +158,7 @@ export { icon } from './ui/icon.ts';
 export type { IconName } from './ui/icon.ts';
 export { numberInput } from './ui/number-input.ts';
 export type { NumberInputOptions } from './ui/number-input.ts';
-export { acquireOverlay, FOCUSABLE, overlayCount } from './ui/overlay.ts';
+export { acquireOverlay, FOCUSABLE, overlayCount, raiseToTopLayer } from './ui/overlay.ts';
 export type { OverlayHandle } from './ui/overlay.ts';
 export { paginationPages } from './ui/pagination-pages.ts';
 export { pagination } from './ui/pagination.ts';

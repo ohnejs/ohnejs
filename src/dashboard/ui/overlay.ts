@@ -1,3 +1,5 @@
+import { css } from '../render/css.ts';
+
 let count = 0;
 
 /**
@@ -7,27 +9,49 @@ let count = 0;
 export const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled):not([hidden]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
+// An anonymous layer, so every rule a raised component writes for itself outranks these UA undos.
+css`
+  @layer {
+    [data-ohne-top-layer] {
+      inset: auto;
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+      background: transparent;
+      border: none;
+      color: inherit;
+    }
+  }
+`;
+
+/**
+ * Raises a connected element into the browser's top layer, above the page and outside every clip.
+ * A `container-type`, transform, or filter ancestor is otherwise a fixed panel's containing block.
+ * The panel then takes its origin from that ancestor and crops at the nearest clipping one.
+ * `el` keeps its place in the tree, so inherited values and descendant selectors still reach it.
+ * The top layer stacks by entry, not by `z-index`; raising an already raised element moves it on top.
+ * Leaving the document lowers the element again.
+ *
+ * @example
+ * ```ts
+ * raiseToTopLayer(panel)
+ * ```
+ */
+export function raiseToTopLayer(el: HTMLElement): void {
+  // An attribute, not a class: a reactive `class` binding rewrites the whole list and would drop it.
+  el.setAttribute('data-ohne-top-layer', '');
+  el.setAttribute('popover', 'manual');
+  if (el.matches(':popover-open')) el.hidePopover();
+  el.showPopover();
+}
+
 /**
  * Pins `el` at the viewport coordinates `x`/`y` under `position: fixed`.
- * An ancestor with `container-type`, `transform`, or a filter re-anchors fixed descendants to itself.
- * A zero-size probe beside `el` measures that origin, and the coordinates subtract it.
- * The probe is used instead of `el`'s own rect, so a mount transition's transform cannot skew it.
+ * Only a top-layer element measures that way; one left in the page drifts by its containing block.
  */
 export function placeFixed(el: HTMLElement, x: number, y: number): void {
-  let driftX = 0;
-  let driftY = 0;
-  const parent = el.parentElement;
-  if (parent !== null && parent !== document.body) {
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;';
-    parent.append(probe);
-    const rect = probe.getBoundingClientRect();
-    probe.remove();
-    driftX = rect.x;
-    driftY = rect.y;
-  }
-  el.style.left = `${x - driftX}px`;
-  el.style.top = `${y - driftY}px`;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
 }
 
 /**
@@ -76,8 +100,9 @@ export function overlayCount(): number {
  *
  * The model is a bare counter plus the `ohne-overlay-active` body class.
  * There is no z-index allocation and no body scroll lock.
- * Stacking is a fixed ladder: popups sit at `z-index` 100, with DOM order breaking ties.
- * Floating panels sit at 99997, toasts at 99998, tooltips at 99999.
+ * Popups sit at `z-index` 100, with DOM order breaking ties.
+ * Everything that floats above them - panels, menus, toasts, tooltips - is raised to the top layer.
+ * `raiseToTopLayer` puts them there, and the one raised last paints on top.
  * Closing assumes LIFO order: `undim` acts only when the counter is exactly 1.
  * Overlays closed out of order keep the body dimmed until the last one releases.
  *

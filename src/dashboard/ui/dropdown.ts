@@ -8,7 +8,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { placeFloating } from './floater-place.ts';
-import { placeFixed } from './overlay.ts';
+import { placeFixed, raiseToTopLayer } from './overlay.ts';
 import { type ScrollableHandle, type ScrollableOptions, scrollable } from './scrollable.ts';
 import './tokens.ts';
 
@@ -67,16 +67,6 @@ export interface DropdownOptions {
    * 'start'
    */
   placement?: 'start' | 'end';
-
-  /**
-   * The CSS position of the floating panel.
-   * `'fixed'` is right for most cases.
-   * `'absolute'` positions relative to the offset parent, useful inside a scrolling container.
-   *
-   * @default
-   * 'fixed'
-   */
-  strategy?: 'fixed' | 'absolute';
 
   /**
    * The gap between the panel and its `reference` in pixels.
@@ -173,7 +163,6 @@ export function dropdownContainerOf(el: Element): HTMLElement | null {
 
 css`
   .ohne-dropdown {
-    z-index: 99997;
     display: flex;
     flex-direction: column;
     width: 15em;
@@ -233,6 +222,7 @@ css`
  *
  * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements wins.
  * The height clamps to the available space with an 8px inset.
+ * The panel is raised to the top layer, so a `container-type` or transformed ancestor cannot crop it.
  * The resolved placement drives the pop-in direction class.
  * With `handleControls` on, the page loses pointer events.
  * Focus roves through `.ohne-dropdown-item` rows with wraparound.
@@ -253,7 +243,6 @@ export function dropdown(
   content: Child | (() => Child),
   options: DropdownOptions = {},
 ): DropdownHandle {
-  const strategy = options.strategy ?? 'fixed';
   const handleControls = options.handleControls ?? true;
   const alignment = options.placement ?? 'start';
   const allowedPlacements: Placement[] =
@@ -288,7 +277,7 @@ export function dropdown(
         (isMounted.value ? ' ohne-dropdown-mounted' : '') +
         (options.class ? ` ${options.class}` : ''),
       style:
-        `position: ${strategy}; left: 0; top: 0;` +
+        'position: fixed; left: 0; top: 0;' +
         (isUndefined(options.size) ? '' : ` --ohne-size: ${options.size};`) +
         (options.inheritColors
           ? ''
@@ -338,19 +327,7 @@ export function dropdown(
       ...input,
       floating: { width: root.offsetWidth, height: root.offsetHeight },
     });
-    if (strategy === 'fixed') {
-      placeFixed(root, placed.x, placed.y);
-    } else {
-      const parent = root.offsetParent;
-      if (parent instanceof HTMLElement) {
-        const parentRect = parent.getBoundingClientRect();
-        root.style.left = `${placed.x - parentRect.x - parent.clientLeft + parent.scrollLeft}px`;
-        root.style.top = `${placed.y - parentRect.y - parent.clientTop + parent.scrollTop}px`;
-      } else {
-        root.style.left = `${placed.x + window.scrollX}px`;
-        root.style.top = `${placed.y + window.scrollY}px`;
-      }
-    }
+    placeFixed(root, placed.x, placed.y);
     placement.value = placed.placement;
   };
 
@@ -378,6 +355,7 @@ export function dropdown(
     if (disposed) return;
     prevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     parentContainer = root.parentElement;
+    raiseToTopLayer(root);
     update();
 
     if (handleControls) {

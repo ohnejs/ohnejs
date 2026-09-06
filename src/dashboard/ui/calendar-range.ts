@@ -175,15 +175,6 @@ export interface CalendarRangeOptions {
   labels?: CalendarLabels;
 
   /**
-   * The CSS position of the pickers.
-   * `'fixed'` is right for most cases; `'absolute'` positions inside a scrolling container.
-   *
-   * @default
-   * 'fixed'
-   */
-  strategy?: 'fixed' | 'absolute';
-
-  /**
    * The position of the bracket decorator connecting the two inputs.
    *
    * @default
@@ -307,7 +298,6 @@ export function calendarRange(
     labels: options.labels,
     showSeconds: options.showSeconds,
     startDay: options.startDay,
-    strategy: options.strategy,
     timezone: options.timezone,
     withTime: options.withTime,
   };

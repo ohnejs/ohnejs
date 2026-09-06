@@ -252,15 +252,6 @@ export interface CalendarOptions {
   labels?: CalendarLabels;
 
   /**
-   * The CSS position of the picker.
-   * `'fixed'` is right for most cases; `'absolute'` positions inside a scrolling container.
-   *
-   * @default
-   * 'fixed'
-   */
-  strategy?: 'fixed' | 'absolute';
-
-  /**
    * Called with the settled value when the picker closes, and immediately on clear.
    */
   onCommit?: (value: number | null) => void;
@@ -885,7 +876,6 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     size: options.size,
     error,
     disabled,
-    strategy: options.strategy,
     onEscapeKey: (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();

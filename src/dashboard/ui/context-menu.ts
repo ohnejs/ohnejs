@@ -9,7 +9,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { placeFloating } from './floater-place.ts';
-import { placeFixed } from './overlay.ts';
+import { placeFixed, raiseToTopLayer } from './overlay.ts';
 import { scrollable } from './scrollable.ts';
 // The menu renders `dropdown`'s chrome by hand; re-declaring its styles would re-order them after overrides.
 import './dropdown.ts';
@@ -69,7 +69,7 @@ const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-star
  * The right-click and long-press menu.
  *
  * While `event` holds one, the panel mounts on `document.body` at the event's pointer coordinates.
- * A `container-type` or transformed ancestor of `root` therefore cannot displace it.
+ * It is raised to the top layer, so a `container-type` or transformed ancestor cannot displace it.
  * The roomiest corner wins, clamped to the viewport.
  * While open, the page loses pointer events outside the host: `root`'s `.ohne-popup` ancestor, else `body`.
  * Arrows and Tab cycle the focus through `.ohne-dropdown-item` elements.
@@ -134,6 +134,7 @@ export function contextMenu(
       panel,
     );
     document.body.append(floating);
+    raiseToTopLayer(floating);
 
     const update = (): void => {
       const trigger = event.value;
