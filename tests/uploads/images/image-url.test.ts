@@ -90,9 +90,12 @@ describe('imageURL', () => {
     );
   });
 
-  it('answers the original without a service or without a secret', () => {
+  it('writes unsigned without a secret and answers the original without a service', () => {
     useEnv().unset('IMAGES_SECRET');
-    strictEqual(imageURL(sunset, { width: 800 }), '/uploads/photos/sunset.jpg');
+    strictEqual(
+      imageURL(sunset, { width: 800 }),
+      'https://img.example.com/unsigned/w_800/photos/sunset.jpg',
+    );
     useEnv().set('IMAGES_SECRET', 'secret');
     useLayers().remove('/images-test');
     strictEqual(imageURL(sunset, 'thumbnail'), '/uploads/photos/sunset.jpg');
@@ -144,7 +147,10 @@ describe('imageURL', () => {
     useEnv().unset('IMAGES_SECRET');
     const plain: Record<string, unknown> = { ...sunset };
     decorateUpload(plain);
-    strictEqual(plain.variants, undefined);
+    match(
+      (plain.variants as Record<string, string>).thumbnail,
+      /^https:\/\/img\.example\.com\/unsigned\//,
+    );
   });
 });
 

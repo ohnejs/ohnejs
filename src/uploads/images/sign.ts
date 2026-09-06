@@ -2,6 +2,12 @@ import { useEnv } from 'ohne';
 import { hmac, secureCompare } from 'ohne/utils/crypto';
 
 /**
+ * The signature segment `imageURL` writes when no `IMAGES_SECRET` is set.
+ * A service started unsigned renders it; a signing service answers `403`.
+ */
+export const UNSIGNED_SIGNATURE = 'unsigned';
+
+/**
  * The secrets `IMAGES_SECRET` lists, comma-separated, trimmed, empty entries dropped.
  * The first one signs; a service accepts any, which is how a rotation happens without breaking pages.
  * `[]` when the env var is unset.

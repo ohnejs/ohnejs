@@ -13,8 +13,10 @@ imageURL(upload, { width: 800, format: 'webp' });
 ```
 
 Set `uploads.images.url` in [config](../project/config.md) to the service origin and `IMAGES_SECRET`
-in the environment to the secret you share with it. Without either, `imageURL` returns the
-original file's URL, so a page renders the same either way.
+in the environment to the secret you share with it. Without a URL, `imageURL` returns the original
+file's URL, so a page renders the same either way. Without a secret, the URL carries `unsigned` where
+the signature would go: a service started with `--unsigned` renders it, a signing one refuses it with
+`403`, and ohne warns at boot. That is for your own machine, never for a service others can reach.
 
 ## Named variants
 
@@ -160,7 +162,7 @@ beyond the one variant it names.
    the rest the source path. Answer `404` to fewer than three segments. Ignore the query string,
    for routing and for the cache key, so nobody forces a re-render by varying it.
 2. Verify the signature over the raw `{transforms}/{path}` string before parsing anything. Answer
-   `403` when it does not verify.
+   `403` when it does not verify. An unsigned service, meant for a local machine, skips this step.
 3. Parse the transforms. Answer `400` to an empty segment, an unknown token, an out-of-range value,
    a duplicate, or both `p` and `fp`.
 4. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
@@ -217,6 +219,6 @@ imageSrcSet(upload, [
 
 ## The reference service
 
-ohne ships the protocol; a reference implementation on Node and sharp lives in its own package,
-since sharp is a native dependency and ohne has none. Any implementation that follows the six
+ohne ships the protocol; the reference implementation, `ohne-images`, runs on Node and sharp in its
+own package, since sharp is a native dependency and ohne has none. Any implementation that follows the six
 steps above works, including one behind a CDN or on an edge runtime.

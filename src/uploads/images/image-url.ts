@@ -15,7 +15,7 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
 import { uploadPath } from '../uploads/path.ts';
 import { uploadURL } from '../uploads/url.ts';
-import { imageSecrets, signImageVariant } from './sign.ts';
+import { imageSecrets, signImageVariant, UNSIGNED_SIGNATURE } from './sign.ts';
 import { stringifyImageTransforms } from './transforms.ts';
 import { resolveImageVariant } from './variants.ts';
 
@@ -68,11 +68,11 @@ export function isOptimizableImage(type: string): boolean {
 }
 
 /**
- * Whether variant URLs can be built: `uploads.images.url` is set and `IMAGES_SECRET` holds a secret.
- * Without both, every image URL points at the original.
+ * Whether variant URLs can be built: `uploads.images.url` names a service.
+ * Without one, every image URL points at the original.
  */
 export function hasImageService(): boolean {
-  return !isUndefined(useUploadsConfig().images.url) && imageSecrets().length > 0;
+  return !isUndefined(useUploadsConfig().images.url);
 }
 
 /**
@@ -84,7 +84,8 @@ export function hasImageService(): boolean {
  * It is also answered for a type the service does not render.
  * A focal point stored on the upload fills the position when a `cover` fit names none.
  * Other fits never crop, so they carry no position.
- * The signature covers `{transforms}/{path}` under the first `IMAGES_SECRET`; see `docs/uploads/images.md`.
+ * The signature covers `{transforms}/{path}` under the first `IMAGES_SECRET`.
+ * Without a secret the segment reads `unsigned`, which only an unsigned service renders.
  *
  * @example
  * ```ts
@@ -104,15 +105,18 @@ export function imageURL(
 ): string {
   const transforms = isString(variant) ? resolveImageVariant(variant) : variant;
   const { images } = useUploadsConfig();
-  const [secret] = imageSecrets();
-  if (isUndefined(images.url) || isUndefined(secret)) return uploadURL(upload);
+  if (isUndefined(images.url)) return uploadURL(upload);
   const type = upload.type ?? mimeTypeFor(upload.name) ?? '';
   if (!isOptimizableImage(type)) return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
   if (tokens === '') return uploadURL(upload);
   const path = uploadPath(upload);
   const base = images.url.replace(TRAILING_SLASHES, '');
-  return `${base}/${signImageVariant(tokens, path, secret)}/${tokens}/${path}`;
+  const [secret] = imageSecrets();
+  const signature = isUndefined(secret)
+    ? UNSIGNED_SIGNATURE
+    : signImageVariant(tokens, path, secret);
+  return `${base}/${signature}/${tokens}/${path}`;
 }
 
 /**
