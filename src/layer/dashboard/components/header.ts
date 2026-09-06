@@ -3,7 +3,7 @@ import { effect } from 'ohne/utils';
 
 import { contentLanguageSwitcher } from './content-language-switcher.ts';
 import { headerDropdownMenu } from './header-dropdown-menu.ts';
-import { logoMark } from './logo.ts';
+import { logo } from './logo.ts';
 import { shellSlots } from './shell-slots.ts';
 
 /**
@@ -70,7 +70,7 @@ css`
     filter: brightness(1.5);
   }
 
-  .o-header-logo > .o-mark {
+  .o-header-logo > .o-logo {
     height: 100%;
   }
 
@@ -92,16 +92,26 @@ css`
 /**
  * The header row.
  * It holds the home logo link, the under-`1024px` hamburger, and the right-side cluster.
+ * The logo rests as the dot and unfolds into the wordmark while the link is hovered or focused.
  * The cluster is the content-language switcher, the `header` slot renderers, and the kebab user menu.
  * The hamburger renders accented while the sidebar overlay is expanded, outline otherwise.
  */
 export function header(options: HeaderOptions): HTMLElement {
   const t = useT();
 
+  const mark = logo();
   const home = h(
     'a',
-    { href: '/', title: t('dashboard.goBackHome'), class: 'o-header-logo ohne-raw' },
-    logoMark(),
+    {
+      href: '/',
+      title: t('dashboard.goBackHome'),
+      class: 'o-header-logo ohne-raw',
+      onMouseenter: () => mark.expand(),
+      onMouseleave: () => mark.collapse(),
+      onFocus: () => mark.expand(),
+      onBlur: () => mark.collapse(),
+    },
+    mark.el,
   );
 
   const menuButton = button(icon('menu-2'), {

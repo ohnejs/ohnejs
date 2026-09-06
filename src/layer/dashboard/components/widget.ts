@@ -1,7 +1,7 @@
 import { type Child, css, h, icon, useT, when } from 'ohne/dashboard';
 import { effect, isNull, onCleanup, ref } from 'ohne/utils';
 
-import { logoMark } from './logo.ts';
+import { logo } from './logo.ts';
 
 /**
  * Options for `widget`.
@@ -109,9 +109,9 @@ css`
     border-right: 1px solid var(--o-widget-divider, hsl(210 8% 90.2%));
   }
 
-  .o-widget-logo .o-mark {
-    font-size: 0.875rem;
-    line-height: 1;
+  .o-widget-logo > .o-logo {
+    width: auto;
+    height: 1.125rem;
     opacity: 0.64;
   }
 
@@ -177,7 +177,7 @@ export function widget(options: WidgetOptions = {}): Child {
         hovered.value = false;
       },
     },
-    h('span', { 'aria-hidden': 'true', class: 'o-widget-logo' }, logoMark()),
+    h('span', { 'aria-hidden': 'true', class: 'o-widget-logo' }, logo().el),
     h(
       'a',
       { href: '/', class: 'ohne-raw', title: () => t('dashboard.widget.dashboard') },
