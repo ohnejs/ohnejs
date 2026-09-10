@@ -593,7 +593,8 @@ export interface Config {
      * Each group holds collection names and page links; a group left with no row drops.
      * A collection the viewer cannot reach drops from its group.
      * Accessible collections in no group land in a trailing unlabeled group.
-     * Omitted, the menu lists every accessible collection in one unlabeled group.
+     * Omitted, the menu leads with the overview row, then lists every accessible collection unlabeled.
+     * Declared, it holds only the rows you list: add a link to `/overview` to keep the overview row.
      *
      * @example
      * ```ts
