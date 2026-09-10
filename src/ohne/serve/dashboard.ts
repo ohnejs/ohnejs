@@ -100,6 +100,15 @@ const IMPORTMAP = jsonForScript({
 const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><style>circle{fill:%23260d1c}@media(prefers-color-scheme:dark){circle{fill:%23fafafa}}</style><circle cx='24' cy='24' r='18'/></svg>`;
 
 /**
+ * The background the shell paints before the kernel's stylesheets load, copied from `--ohne-background`.
+ * No stylesheet sets `color-scheme` later, so this is the document's only one.
+ */
+const CANVAS = `
+      :root { color-scheme: light; background: hsl(210 22.2% 96.5%) }
+      .dark { color-scheme: dark; background: hsl(234 16.7% 11.8%) }
+    `;
+
+/**
  * The framework `src` directory, the root the client modules are served from.
  * Resolved from this file's location: `src/ohne/serve` up two is `src`.
  */
@@ -337,6 +346,7 @@ function shellDocument(
         document.documentElement.classList.add(dark ? 'dark' : 'light');
       } catch {}
     </script>
+    <style>${CANVAS}</style>
     <script type="importmap">${IMPORTMAP}</script>
   </head>
   <body>
