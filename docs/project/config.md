@@ -135,7 +135,7 @@ When and how to set these for production is covered in [deployment](../productio
   is derived from `api`; set it when the API sits at a different origin, such as behind a reverse
   proxy.
 - `menu` - the [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Omitted, the sidebar
-  lists every accessible collection in one unlabeled group.
+  leads with the overview row, then lists every accessible collection in one unlabeled group.
 
 ## The database
 

@@ -106,7 +106,9 @@ The group's own `label` is its heading; omit it for a list without one. Both lab
 ```
 
 Collections you list nowhere trail in a final unlabeled group, and a group left with no row drops.
-Omit `menu` and the sidebar lists every accessible collection in one unlabeled group.
+Omit `menu` and the sidebar leads with the overview row, then lists every accessible collection in
+one unlabeled group. A declared `menu` holds only the rows you list, so link to `/overview` yourself
+to keep that row.
 
 ## Boot files
 

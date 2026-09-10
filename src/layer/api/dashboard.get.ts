@@ -3,6 +3,7 @@ import {
   blockQueryMetadata,
   type Capability,
   type CollectionAPI,
+  type DashboardMenuEntry,
   type DashboardMenuLink,
   defineHandler,
   endpointOf,
@@ -416,6 +417,10 @@ declare module 'ohne' {
   }
 }
 
+const DEFAULT_MENU: { label?: Message; items: DashboardMenuEntry[] }[] = [
+  { items: [{ to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' }] },
+];
+
 const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
   record: new Set(['collection', 'onDelete']),
   records: new Set(['collection', 'inverse', 'onDelete']),
@@ -708,11 +713,12 @@ function labelFieldsOf(
  * Configured groups keep their order and drop inaccessible names; the rest trail unlabeled.
  * A named collection is spent on first use, so a later group cannot repeat it.
  * A declared link resolves as authored: the dashboard knows no capability for a page.
+ * `DEFAULT_MENU` stands in for an omitted `dashboard.menu`.
  */
 function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
   const unplaced = new Map(collections.map((collection) => [collection.name, collection]));
   const groups: DashboardMenuGroup[] = [];
-  for (const group of useConfig().dashboard?.menu ?? []) {
+  for (const group of useConfig().dashboard?.menu ?? DEFAULT_MENU) {
     const items: DashboardMenuItem[] = [];
     for (const entry of group.items) {
       if (!isString(entry)) {

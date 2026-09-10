@@ -88,6 +88,7 @@ useMessages().register('en', {
   'dashboard.fields.translations.label': 'Translations',
   'dashboard.field.showDescription': 'Show description',
   'dashboard.field.hideDescription': 'Hide description',
+  'dashboard.overview.title': 'Overview',
   'auth.users.timezone.label': 'Time zone',
   'dash.owners.name.label': 'Owner name',
   'dash.kinds.title.placeholder': 'Short name',
@@ -564,6 +565,37 @@ describe('menu', () => {
     const { menu } = (await call(user)).body;
     deepStrictEqual(menu[0]?.items[1], { to: '/reports', label: 'Reports', icon: 'chart-bar' });
     deepStrictEqual(menu[1], { label: '2 tools', items: [{ to: '/tools', label: 'Tools' }] });
+  });
+
+  it('leads with the overview row when no menu is declared, the collections trailing', async () => {
+    useLayers().add({ path: '/dashboard-test-no-menu', input: { dashboard: {} } });
+    try {
+      const { body } = await call(user);
+      deepStrictEqual(body.menu[0], {
+        label: '',
+        items: [{ to: '/overview', label: 'Overview', icon: 'layout-dashboard' }],
+      });
+      deepStrictEqual(menuPaths(body), [
+        { label: '', items: ['/overview'] },
+        {
+          label: '',
+          items: [
+            '/collections/sessions',
+            '/collections/dash-notes',
+            '/collections/dash-owners',
+            '/collections/dash-public',
+            '/collections/dash-people',
+            '/collections/dash-articles',
+            '/collections/dash-labels',
+            '/collections/dash-pages',
+            '/collections/dash-metrics',
+            '/collections/dash-kinds',
+          ],
+        },
+      ]);
+    } finally {
+      useLayers().remove('/dashboard-test-no-menu');
+    }
   });
 });
 
