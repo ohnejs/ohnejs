@@ -8,6 +8,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { dashboardMeta } from '../runtime/meta.ts';
 import { useT } from '../runtime/use-t.ts';
 import { fieldLabel } from '../ui/field-label.ts';
 import { fieldMessage } from '../ui/field-message.ts';
@@ -277,7 +278,9 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
   const head = fieldLabel(
     [
       name,
-      options.field.translatable ? languageMark() : null,
+      options.field.translatable
+        ? when(() => (dashboardMeta()?.locales.length ?? 0) > 1, languageMark)
+        : null,
       options.locked === true ? lockMark() : null,
       touchedMark(),
     ],
