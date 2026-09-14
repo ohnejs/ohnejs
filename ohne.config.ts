@@ -1,4 +1,4 @@
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   dirs: {

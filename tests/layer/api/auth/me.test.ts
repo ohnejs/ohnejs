@@ -61,7 +61,7 @@ await syncDatabase(db, dialect, {
 });
 
 function route(method: 'GET' | 'POST' | 'PATCH', pattern: string, handler: AnyHandler): Route {
-  return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler };
+  return { method, pattern, file: `${pattern}.ts`, layer: 'ohnejs', handler };
 }
 
 const ROUTES = {

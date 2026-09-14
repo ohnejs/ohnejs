@@ -62,7 +62,7 @@ export interface RecordDeleteContext {
   tx: Transaction;
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs just before a delete removes its rows, inside the transaction, carrying the doomed `UUID`s.

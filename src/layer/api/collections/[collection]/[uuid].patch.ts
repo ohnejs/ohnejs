@@ -1,5 +1,5 @@
-import { checkWriteInput, defineHandler, queryMetadata, queryUntyped } from 'ohne';
-import { isNull, isUndefined, pick } from 'ohne/utils';
+import { checkWriteInput, defineHandler, queryMetadata, queryUntyped } from 'ohnejs';
+import { isNull, isUndefined, pick } from 'ohnejs/utils';
 
 import { notFound } from '../../../../ohne/http/http-error.ts';
 import {

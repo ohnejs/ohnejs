@@ -1,4 +1,4 @@
-import { registerFieldType } from 'ohne/dashboard';
+import { registerFieldType } from 'ohnejs/dashboard';
 
 import { mediaListControl } from './_media-list-control.ts';
 import { mediaDisplay, mediaListDisplay } from './media-field-cells.ts';

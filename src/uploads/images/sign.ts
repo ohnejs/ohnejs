@@ -1,5 +1,5 @@
-import { useEnv } from 'ohne';
-import { hmac, secureCompare } from 'ohne/utils/crypto';
+import { useEnv } from 'ohnejs';
+import { hmac, secureCompare } from 'ohnejs/utils/crypto';
 
 /**
  * The signature segment `imageURL` writes when no `IMAGES_SECRET` is set.

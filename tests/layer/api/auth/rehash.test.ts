@@ -48,7 +48,7 @@ const login: Route = {
   method: 'POST',
   pattern: '/auth/login',
   file: '/auth/login.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler: loginHandler as AnyHandler,
 };
 

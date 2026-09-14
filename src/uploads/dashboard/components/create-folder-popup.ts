@@ -14,8 +14,8 @@ import {
   textInput,
   toast,
   useHotkeys,
-} from 'ohne/dashboard';
-import { effect, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

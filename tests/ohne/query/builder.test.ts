@@ -160,7 +160,7 @@ describe('the typed builder narrows in a consumer app', () => {
       "export default { collections: { locales: ['en', 'de'], defaultLocale: 'en' } };\n",
     );
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
     symlinkSync(
       join(FRAMEWORK, 'node_modules', '@types', 'node'),
       join(app, 'node_modules', '@types', 'node'),
@@ -169,7 +169,7 @@ describe('the typed builder narrows in a consumer app', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
       JSON.stringify({
-        extends: 'ohne/tsconfig.node.json',
+        extends: 'ohnejs/tsconfig.node.json',
         include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
       }),
     );
@@ -177,13 +177,13 @@ describe('the typed builder narrows in a consumer app', () => {
     write(
       app,
       'collections/Users.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         "export default defineCollection({ fields: { name: field('text') } });\n",
     );
     write(
       app,
       'collections/Tags.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({ fields: {\n' +
         "  label: field('text'),\n" +
         "  posts: field('records', { collection: 'Posts', inverse: 'tags' }),\n" +
@@ -192,19 +192,19 @@ describe('the typed builder narrows in a consumer app', () => {
     write(
       app,
       'blocks/Hero.ts',
-      "import { defineBlock, field } from 'ohne';\n" +
+      "import { defineBlock, field } from 'ohnejs';\n" +
         "export default defineBlock({ fields: { title: field('text') } });\n",
     );
     write(
       app,
       'blocks/CTA.ts',
-      "import { defineBlock, field } from 'ohne';\n" +
+      "import { defineBlock, field } from 'ohnejs';\n" +
         "export default defineBlock({ fields: { label: field('text') } });\n",
     );
     write(
       app,
       'collections/Posts.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({ fields: {\n' +
         "  title: field('text'),\n" +
         "  views: field('integer'),\n" +
@@ -255,7 +255,7 @@ describe('the typed builder narrows in a consumer app', () => {
 /**
  * The consumer typing.ts: positive uses that must compile, and `@ts-expect-error` cases that must not.
  */
-const TYPING = `import { query } from 'ohne';
+const TYPING = `import { query } from 'ohnejs';
 
 export async function reads(): Promise<void> {
   const all = await query('Posts').findMany();

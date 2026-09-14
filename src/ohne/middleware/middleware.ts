@@ -44,7 +44,7 @@ export interface MiddlewareMeta {
   layer: string;
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters or reorders the middleware for a request, after globals and the route's selection resolve.

@@ -21,7 +21,7 @@ import type { Middleware } from './middleware.ts';
  * @example
  * ```ts
  * // middleware/global/auth.ts - runs on every request
- * import { defineMiddleware, matchPath, unauthorized } from 'ohne'
+ * import { defineMiddleware, matchPath, unauthorized } from 'ohnejs'
  *
  * export default defineMiddleware((event) => {
  *   if (!matchPath('/admin/**')) return
@@ -34,14 +34,14 @@ import type { Middleware } from './middleware.ts';
  * @example
  * ```ts
  * // middleware/rate-limit.ts - opt-in, named `rate-limit`
- * import { defineMiddleware, tooManyRequests } from 'ohne'
+ * import { defineMiddleware, tooManyRequests } from 'ohnejs'
  *
  * export default defineMiddleware((event) => {
  *   if (overLimit(event.ip)) return tooManyRequests()
  * })
  *
  * // api/search.get.ts - runs the global middleware, plus rate-limit
- * import { defineHandler } from 'ohne'
+ * import { defineHandler } from 'ohnejs'
  *
  * export default defineHandler(() => search(), { middleware: ['rate-limit'] })
  * ```

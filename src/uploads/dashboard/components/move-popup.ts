@@ -8,8 +8,8 @@ import {
   type Popup,
   type PopupClose,
   toast,
-} from 'ohne/dashboard';
-import { effect, isEmpty, isUndefined, joinPath, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isEmpty, isUndefined, joinPath, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

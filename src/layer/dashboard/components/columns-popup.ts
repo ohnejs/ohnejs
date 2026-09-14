@@ -9,8 +9,8 @@ import {
   useHotkeys,
   useT,
   when,
-} from 'ohne/dashboard';
-import { computed, deepEqual, effect, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { computed, deepEqual, effect, ref } from 'ohnejs/utils';
 
 import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';

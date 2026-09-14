@@ -15,7 +15,7 @@ import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
  * Emits `node/layer-name.ts` so `LayerName` resolves to a string-literal union of every layer's name.
  * Falls back to `string` when the closure has no ohne layers.
  *
- * Alongside the union, imports each file in a stacked layer that augments `ohne` via `declare module`.
+ * Alongside the union, imports each file in a stacked layer that augments `ohnejs` via `declare module`.
  * Loading them applies each layer's ambient augmentations (hooks, env, dialects) to the app's type program.
  * This is the type-side counterpart to `bootLayers`, which imports the same stacked layers at runtime.
  * The union spans the whole dependency closure, every layer you may list.
@@ -34,21 +34,21 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
 
   const names = await resolveDependencyLayerNames(from);
   const stack = await resolveLayerStack(from);
-  const layers = stack.slice(0, -1).filter((layer) => layer.name !== 'ohne');
+  const layers = stack.slice(0, -1).filter((layer) => layer.name !== 'ohnejs');
   const files = (
     await Promise.all(layers.map((layer) => scanLayerAugmentations(layer.dir)))
   ).flat();
 
   const code = createCodeBuilder();
   if (files.length === 0) {
-    code.line("import type {} from 'ohne';");
+    code.line("import type {} from 'ohnejs';");
   } else {
     for (const file of files) {
       code.line(`import type {} from ${literalString(importSpecifier(dir, file))};`);
     }
   }
   code.line();
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     if (names.length === 0) {
       code.line('interface KnownLayers {}');

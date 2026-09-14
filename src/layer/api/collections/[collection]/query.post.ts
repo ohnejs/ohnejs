@@ -5,7 +5,7 @@ import {
   readQueryBody,
   resolveGuards,
   scopedMetadata,
-} from 'ohne';
+} from 'ohnejs';
 
 import {
   assertNoParams,

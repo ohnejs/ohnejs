@@ -1,4 +1,4 @@
-import { defineRole } from 'ohne';
+import { defineRole } from 'ohnejs';
 
 /**
  * The `admin` role: the `*` capability covers everything.

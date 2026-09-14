@@ -21,7 +21,7 @@ const route: Route = {
   method: 'GET',
   pattern: '/ping',
   file: 'ping.get.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler: defineHandler(() => ({ ok: true })) as AnyHandler,
 };
 

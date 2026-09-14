@@ -78,8 +78,8 @@ The framework ships no signup endpoint - account creation is where apps differ, 
 
 ```ts
 // api/signup.post.ts
-import { conflict, defineHandler, query, readJSONBody } from 'ohne';
-import { createSession } from 'ohne/auth';
+import { conflict, defineHandler, query, readJSONBody } from 'ohnejs';
+import { createSession } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const { email, password } = await readJSONBody<{ email: string; password: string }>();
@@ -112,8 +112,8 @@ file or a script, there is no session to read, so it resolves to `null` there to
 
 ```ts
 // api/profile.get.ts
-import { defineHandler } from 'ohne';
-import { useUser } from 'ohne/auth';
+import { defineHandler } from 'ohnejs';
+import { useUser } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const user = await useUser();
@@ -125,8 +125,8 @@ When a route requires a user, `requireUser` returns it or throws `401`:
 
 ```ts
 // api/account.get.ts
-import { defineHandler } from 'ohne';
-import { requireUser } from 'ohne/auth';
+import { defineHandler } from 'ohnejs';
+import { requireUser } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const user = await requireUser();
@@ -146,12 +146,12 @@ only for a signed-in request, and it sets `event.context.user` for the handler t
 
 ```ts
 // api/account.get.ts
-import { defineHandler, useEvent } from 'ohne';
+import { defineHandler, useEvent } from 'ohnejs';
 
 export default defineHandler(() => useEvent().context.user, { middleware: ['require-auth'] });
 ```
 
-`event.context.user` is typed once you import from `ohne/auth`. It is optional, since a route without
+`event.context.user` is typed once you import from `ohnejs/auth`. It is optional, since a route without
 the middleware never sets it, but behind `require-auth` it is always present.
 
 For a route that serves both signed-in users and guests, opt into `auth` instead. It loads the user
@@ -178,7 +178,7 @@ expired session is deleted the next time it is presented, so a stale cookie neve
 To manage sessions from your own code, the same helpers the endpoints use are exported:
 
 ```ts
-import { createSession, destroySession, useSession } from 'ohne/auth';
+import { createSession, destroySession, useSession } from 'ohnejs/auth';
 
 await createSession(user.UUID);        // opens a remembered session and writes the cookie
 await createSession(user.UUID, false); // the same, on the transient lifetime
@@ -195,7 +195,7 @@ reads a missing `remember` as `false`.
 The auth settings live under `auth` in [`ohne.config.ts`](../project/config.md):
 
 ```ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   auth: {
@@ -231,11 +231,11 @@ raise the cost, because each stored hash carries the cost it was made with.
 
 ## Rolling your own
 
-The `Users` and `Sessions` collections, the `/auth` routes, and the `ohne/auth` helpers all come
+The `Users` and `Sessions` collections, the `/auth` routes, and the `ohnejs/auth` helpers all come
 from the ohne layer. An app that does not [stack](../project/layers.md) it has none of them, and
 nothing reserves the `Users` name or the `/auth` paths. Build the collection you want, hash with
-`hashPassword` from `ohne/utils/crypto`, and write your own endpoints.
+`hashPassword` from `ohnejs/utils/crypto`, and write your own endpoints.
 
-Two helpers from `ohne/auth` are worth reusing even then. `createSession` and `destroySession` manage
+Two helpers from `ohnejs/auth` are worth reusing even then. `createSession` and `destroySession` manage
 the session cookie for you, and `dummyVerify` spends a real password check's worth of time on your
 login's "no such user" path, so timing cannot reveal which emails have an account.

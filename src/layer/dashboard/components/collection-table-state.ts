@@ -10,7 +10,7 @@ import {
   type SearchParamValue,
   stringifySearchParams,
   toArray,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 const PX_WIDTH = /^[1-9][0-9]*px$/;
 

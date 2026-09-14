@@ -79,13 +79,13 @@ describe('fieldValueType', () => {
   it('rejects an emitType import of a program entry', () => {
     const node = defineField({
       columnType: 'json',
-      emitType: (ctx) => ctx.importType('ohne', 'RoleName'),
+      emitType: (ctx) => ctx.importType('ohnejs', 'RoleName'),
     });
     throws(() => emit(node), /Browser-unsafe type import/);
 
     const browser = defineField({
       columnType: 'json',
-      emitType: (ctx) => ctx.importType('ohne/dashboard', 'KnownMessages'),
+      emitType: (ctx) => ctx.importType('ohnejs/dashboard', 'KnownMessages'),
     });
     throws(() => emit(browser), /Browser-unsafe type import/);
   });

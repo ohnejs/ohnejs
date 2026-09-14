@@ -18,8 +18,8 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
  *
  * Emits one file per codegen bucket, so the server and dashboard share a single source of truth.
  * `shared/routes.ts` types every route id as `GeneratedAPIRoutes`.
- * `node/routes.ts` augments `ohne`'s `KnownRoutes` with handler types and registers each route.
- * `browser/routes.ts` augments `ohne/dashboard`, so `api` can suggest the known route ids.
+ * `node/routes.ts` augments `ohnejs`'s `KnownRoutes` with handler types and registers each route.
+ * `browser/routes.ts` augments `ohnejs/dashboard`, so `api` can suggest the known route ids.
  * Each handler is statically imported from its source file by relative path.
  *
  * Routes are read from each layer's `Config.dirs.api` directory and combined.
@@ -63,19 +63,19 @@ async function writeShared(dir: string, routes: readonly RouteMeta[]): Promise<s
 }
 
 /**
- * Writes `node/routes.ts`: augments `ohne`'s `KnownRoutes` with handler types, registers each route.
+ * Writes `node/routes.ts`: augments `ohnejs`'s `KnownRoutes` with handler types, registers each route.
  */
 async function writeNode(dir: string, routes: readonly RouteMeta[]): Promise<string> {
   const code = createCodeBuilder();
   code.line(
-    routes.length === 0 ? "import type {} from 'ohne';" : "import { useRoutes } from 'ohne';",
+    routes.length === 0 ? "import type {} from 'ohnejs';" : "import { useRoutes } from 'ohnejs';",
   );
   routes.forEach((route, i) => {
     code.line(`import h${i} from ${literalString(importSpecifier(dir, route.file))};`);
   });
   code.line();
 
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     emitInterface(
       code,
@@ -107,15 +107,15 @@ async function writeNode(dir: string, routes: readonly RouteMeta[]): Promise<str
 }
 
 /**
- * Writes `browser/routes.ts`: augments `ohne/dashboard` so `api` narrows its route id to the known set.
+ * Writes `browser/routes.ts`: augments `ohnejs/dashboard` so `api` narrows its route id to the known set.
  * Its shape is constant; it only wires the shared type onto the browser's interface.
  */
 async function writeBrowser(dir: string): Promise<string> {
   const code = createCodeBuilder();
-  code.line("import type {} from 'ohne/dashboard';");
+  code.line("import type {} from 'ohnejs/dashboard';");
   code.line("import type { GeneratedAPIRoutes } from '../shared/routes.ts';");
   code.line();
-  code.line("declare module 'ohne/dashboard' {");
+  code.line("declare module 'ohnejs/dashboard' {");
   code.indent(() => {
     code.line('interface KnownAPIRoutes extends GeneratedAPIRoutes {}');
   });

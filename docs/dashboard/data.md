@@ -10,7 +10,7 @@ fetched from the API on demand.
 `api` takes a route id and returns the raw `Response` - reading the body is yours:
 
 ```ts
-import { api } from 'ohne/dashboard';
+import { api } from 'ohnejs/dashboard';
 
 const response = await api('GET /authors');
 const authors = await response.json();
@@ -44,8 +44,8 @@ or dropped file passes as is - and calls `onProgress` as they leave. It resolves
 `Response` `api` would:
 
 ```ts
-import { apiUpload } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { apiUpload } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 const percent = ref(0);
 
@@ -98,8 +98,8 @@ that reads it:
 
 ```ts
 // dashboard/pages/authors.ts
-import { api, defineDashboardPage, each, h } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 interface Author {
   UUID: string;
@@ -136,7 +136,7 @@ the route returns.
 `t` inside a reactive child so the string stays live:
 
 ```ts
-import { h, useT } from 'ohne/dashboard';
+import { h, useT } from 'ohnejs/dashboard';
 
 const t = useT();
 
@@ -158,7 +158,7 @@ every `useT` string in place. `api()` sends the active language as `Accept-Langu
 and messages the server resolves arrive in the same language:
 
 ```ts
-import { h, useDashboardLanguage } from 'ohne/dashboard';
+import { h, useDashboardLanguage } from 'ohnejs/dashboard';
 
 const language = useDashboardLanguage();
 

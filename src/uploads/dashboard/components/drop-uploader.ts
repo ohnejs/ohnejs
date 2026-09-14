@@ -7,8 +7,8 @@ import {
   raiseToTopLayer,
   useRoute,
   when,
-} from 'ohne/dashboard';
-import { isNull, isUndefined, joinPath, onCleanup, parseDuration, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { isNull, isUndefined, joinPath, onCleanup, parseDuration, ref } from 'ohnejs/utils';
 
 import type { UploadItem } from './upload-queue-state.ts';
 

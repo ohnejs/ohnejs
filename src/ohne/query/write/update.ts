@@ -69,7 +69,7 @@ export interface RecordConditionContext {
   operation: 'update' | 'delete';
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs for each record an update touched, re-read in its final state, inside the transaction.

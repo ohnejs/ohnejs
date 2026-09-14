@@ -10,8 +10,8 @@ import {
   icon,
   navigate,
   when,
-} from 'ohne/dashboard';
-import { effect, formatBytes, onCleanup, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, formatBytes, onCleanup, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadStatus, UploadTask } from './upload-queue-state.ts';
 

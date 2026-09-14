@@ -1,5 +1,5 @@
-import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohne/dashboard';
-import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohne/utils';
+import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohnejs/dashboard';
+import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

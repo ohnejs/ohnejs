@@ -1,5 +1,5 @@
-import { css, h } from 'ohne/dashboard';
-import { isUndefined, ref } from 'ohne/utils';
+import { css, h } from 'ohnejs/dashboard';
+import { isUndefined, ref } from 'ohnejs/utils';
 
 import type { MediaView } from './media-library-state.ts';
 

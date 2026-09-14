@@ -1,4 +1,4 @@
-import { errorMessage, hasKey, mapValues } from 'ohne/utils';
+import { errorMessage, hasKey, mapValues } from 'ohnejs/utils';
 
 import type { ImageTransforms } from './transforms.ts';
 
@@ -14,7 +14,7 @@ import { stringifyImageTransforms } from './transforms.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne/uploads' {
+ * declare module 'ohnejs/uploads' {
  *   interface KnownImageVariants {
  *     thumbnail: true
  *     hero: true

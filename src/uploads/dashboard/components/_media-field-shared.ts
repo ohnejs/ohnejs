@@ -11,8 +11,8 @@ import {
   type IconName,
   toast,
   when,
-} from 'ohne/dashboard';
-import { isNull, isUndefined, onCleanup, type Ref, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { isNull, isUndefined, onCleanup, type Ref, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { DetailsTab } from './media-details-state.ts';

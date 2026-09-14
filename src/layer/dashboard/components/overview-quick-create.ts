@@ -10,8 +10,8 @@ import {
   type IconName,
   useT,
   when,
-} from 'ohne/dashboard';
-import { computed, effect, isUndefined, naturalCompare, onCleanup } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { computed, effect, isUndefined, naturalCompare, onCleanup } from 'ohnejs/utils';
 
 import type { OverviewSearch } from '../pages/overview.ts';
 

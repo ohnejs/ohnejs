@@ -1,5 +1,5 @@
-import { defineCollection, field } from 'ohne';
-import { isEmail } from 'ohne/utils';
+import { defineCollection, field } from 'ohnejs';
+import { isEmail } from 'ohnejs/utils';
 
 import { normalizeEmail } from '../auth/_email.ts';
 
@@ -92,8 +92,8 @@ const users = defineCollection({
  * @example
  * ```ts
  * // collections/Users.ts
- * import { defineCollection, field } from 'ohne'
- * import { usersDefinition } from 'ohne/auth'
+ * import { defineCollection, field } from 'ohnejs'
+ * import { usersDefinition } from 'ohnejs/auth'
  *
  * export default defineCollection({
  *   ...usersDefinition,

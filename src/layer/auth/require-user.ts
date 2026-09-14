@@ -1,5 +1,5 @@
-import { unauthorized } from 'ohne';
-import { isNull } from 'ohne/utils';
+import { unauthorized } from 'ohnejs';
+import { isNull } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 

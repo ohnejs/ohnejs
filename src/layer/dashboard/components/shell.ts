@@ -10,7 +10,7 @@ import {
   sessionUser,
   setNavigationGuard,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   effect,
   isNull,
@@ -21,7 +21,7 @@ import {
   ref,
   stringifySearchParams,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { header } from './header.ts';
 import { loginPopup } from './login-popup.ts';

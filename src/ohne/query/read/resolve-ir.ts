@@ -4,7 +4,7 @@ import { isUndefined } from '../../../utils/index.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the frozen `QueryIR` before a read terminal compiles it, so one scope reaches every read.

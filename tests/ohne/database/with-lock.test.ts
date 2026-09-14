@@ -1,6 +1,6 @@
 import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
-import { useEnv } from 'ohne';
+import { useEnv } from 'ohnejs';
 
 import { connect } from '../../../src/ohne/database/connect.ts';
 import { closeDatabases } from '../../../src/ohne/database/use-database.ts';

@@ -100,7 +100,7 @@ describe('dev', () => {
     const app = join(root, name);
     mkdirSync(join(app, 'api'), { recursive: true });
     mkdirSync(join(app, 'node_modules'), { recursive: true });
-    symlinkSync(REPO, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(REPO, join(app, 'node_modules', 'ohnejs'), 'dir');
     writeFileSync(join(app, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(
       join(app, 'ohne.config.ts'),
@@ -253,7 +253,7 @@ describe('dev', () => {
     const app = writeProject('messages', port);
     writeFileSync(
       join(app, 'api', 'lang.get.ts'),
-      "import { useMessages } from 'ohne'\nexport default () => useMessages().get('en')?.greeting ?? 'missing'\n",
+      "import { useMessages } from 'ohnejs'\nexport default () => useMessages().get('en')?.greeting ?? 'missing'\n",
     );
     mkdirSync(join(app, 'messages'), { recursive: true });
     writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hi' }));

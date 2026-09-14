@@ -5,7 +5,7 @@ a cache rebuild, a cleanup pass. `withLock` runs a function while holding a name
 instance respects.
 
 ```ts
-import { withLock } from 'ohne';
+import { withLock } from 'ohnejs';
 
 await withLock('emails:digest', () => sendDailyDigest());
 ```

@@ -9,7 +9,7 @@ import type { CollectionName } from '../collections/known-collections.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownInserts extends GeneratedInserts {}
  * }
  * ```

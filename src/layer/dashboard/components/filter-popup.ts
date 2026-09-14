@@ -28,7 +28,7 @@ import {
   useHotkeys,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   computed,
   type ConditionObject,
@@ -41,7 +41,7 @@ import {
   onCleanup,
   type Ref,
   ref,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';

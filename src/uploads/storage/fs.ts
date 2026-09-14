@@ -2,8 +2,8 @@ import { createReadStream } from 'node:fs';
 import { cp, open, rename, rmdir } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohne/utils';
-import { ensureDir, exists, removeDir, removeFile, stat } from 'ohne/utils/fs';
+import { dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
+import { ensureDir, exists, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
 import type { StorageAdapter } from './adapter.ts';
 

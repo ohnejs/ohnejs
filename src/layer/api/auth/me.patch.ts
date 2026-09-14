@@ -5,8 +5,8 @@ import {
   queryMetadata,
   queryUntyped,
   readJSONBody,
-} from 'ohne';
-import { isPlainObject, pick } from 'ohne/utils';
+} from 'ohnejs';
+import { isPlainObject, pick } from 'ohnejs/utils';
 
 import type { User } from '../../auth/types.ts';
 

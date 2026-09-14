@@ -1,4 +1,4 @@
-import { clamp, smoothstep } from 'ohne/utils';
+import { clamp, smoothstep } from 'ohnejs/utils';
 
 /**
  * One letter's placement for a frame: the parts of a uniform-scale SVG `matrix` transform.

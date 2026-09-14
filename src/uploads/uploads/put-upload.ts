@@ -1,7 +1,7 @@
-import type { Transaction } from 'ohne';
+import type { Transaction } from 'ohnejs';
 
-import { queryUntyped, useDatabase } from 'ohne';
-import { extname, mediaTypeMatches, mimeTypeFor, parseMediaType } from 'ohne/utils';
+import { queryUntyped, useDatabase } from 'ohnejs';
+import { extname, mediaTypeMatches, mimeTypeFor, parseMediaType } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
 import type { StagedUpload } from './_stage.ts';

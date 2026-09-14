@@ -1,7 +1,7 @@
-import type { Transaction } from 'ohne';
+import type { Transaction } from 'ohnejs';
 
-import { queryUntyped, usePrinter } from 'ohne';
-import { createMutex, errorMessage } from 'ohne/utils';
+import { queryUntyped, usePrinter } from 'ohnejs';
+import { createMutex, errorMessage } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
 import type { StorageAdapter } from './adapter.ts';

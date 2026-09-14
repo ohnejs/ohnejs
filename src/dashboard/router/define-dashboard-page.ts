@@ -10,7 +10,7 @@ import type { DashboardPage } from './router.ts';
  * @example
  * ```ts
  * // dashboard/pages/authors/[id].ts
- * import { defineDashboardPage, h } from 'ohne/dashboard'
+ * import { defineDashboardPage, h } from 'ohnejs/dashboard'
  *
  * export default defineDashboardPage((route) => h('h1', null, route.params.id))
  * ```

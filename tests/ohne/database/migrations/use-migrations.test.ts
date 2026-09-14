@@ -13,9 +13,9 @@ describe('useMigrations', () => {
   afterEach(() => useMigrations().clear());
 
   it('keeps registration order as the execution order', () => {
-    useMigrations().register('ohne/002-second', meta('ohne/002-second'));
+    useMigrations().register('ohnejs/002-second', meta('ohnejs/002-second'));
     useMigrations().register('app/001-first', meta('app/001-first'));
-    deepStrictEqual(useMigrations().keys(), ['ohne/002-second', 'app/001-first']);
+    deepStrictEqual(useMigrations().keys(), ['ohnejs/002-second', 'app/001-first']);
   });
 
   it('overrides on re-registration under the same name', () => {

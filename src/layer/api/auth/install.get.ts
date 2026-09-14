@@ -1,4 +1,4 @@
-import { defineHandler, queryUntyped } from 'ohne';
+import { defineHandler, queryUntyped } from 'ohnejs';
 
 /**
  * `GET /auth/install`

@@ -48,7 +48,7 @@ export interface RecordMutateContext {
   locale: LocaleCode;
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the field errors of a create or update after coercion, before any precheck or write.

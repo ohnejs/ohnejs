@@ -16,8 +16,8 @@ import {
   toast,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isNullish, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isNullish, ref } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { authLogo } from '../components/logo.ts';

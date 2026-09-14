@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { useEnv, useLayers } from 'ohne';
+import { useEnv, useLayers } from 'ohnejs';
 
 import { connect } from '../../../src/ohne/database/connect.ts';
 import { closeDatabases, useDatabase } from '../../../src/ohne/database/use-database.ts';

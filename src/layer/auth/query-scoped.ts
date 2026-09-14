@@ -1,4 +1,9 @@
-import type { AccessContext, CollectionName, CollectionOperation, UntypedQueryBuilder } from 'ohne';
+import type {
+  AccessContext,
+  CollectionName,
+  CollectionOperation,
+  UntypedQueryBuilder,
+} from 'ohnejs';
 
 import {
   applyScope,
@@ -7,8 +12,8 @@ import {
   queryUntyped,
   resolveAccess,
   useCollections,
-} from 'ohne';
-import { isUndefined } from 'ohne/utils';
+} from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import { requireCapability } from './capabilities.ts';
 

@@ -1,6 +1,6 @@
 import { contentLocale } from 'app/components/content-language-switcher.ts';
-import { sessionUser, useDashboardLanguage, watchOSClipboard } from 'ohne/dashboard';
-import { effect, effectScope, isNullish } from 'ohne/utils';
+import { sessionUser, useDashboardLanguage, watchOSClipboard } from 'ohnejs/dashboard';
+import { effect, effectScope, isNullish } from 'ohnejs/utils';
 
 // The seed lands once: a later store answer carrying a stale locale must not undo an in-session choice.
 const seeding = effectScope();

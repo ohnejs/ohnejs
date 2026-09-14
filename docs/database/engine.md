@@ -16,7 +16,7 @@ against your project root, not the directory you launched from. `:memory:` opens
 database that vanishes with the process - handy for a throwaway run:
 
 ```ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   database: { url: '.data/app.db' },
@@ -55,7 +55,7 @@ two name the same one, the closer layer wins.
 has. Statements are parametrized with positional `?` placeholders:
 
 ```ts
-import { useDatabase } from 'ohne';
+import { useDatabase } from 'ohnejs';
 
 const db = useDatabase();
 
@@ -96,7 +96,7 @@ The query builder joins an open transaction with `use`. A [write](./writing.md) 
 it instead of opening its own, so builder writes and raw statements commit or roll back together:
 
 ```ts
-import { query, useDatabase } from 'ohne';
+import { query, useDatabase } from 'ohnejs';
 
 await useDatabase().transaction(async (tx) => {
   const author = await query('Authors').use(tx).createOrThrow({ name: 'Rams' });

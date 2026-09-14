@@ -86,7 +86,7 @@ address and `event.url` reads as plain `http`. List the CIDR ranges your proxies
 their `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` are honored:
 
 ```ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   api: {

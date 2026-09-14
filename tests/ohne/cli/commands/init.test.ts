@@ -45,7 +45,7 @@ describe('ohne init', () => {
     await runCommand(ohne, ['init', dir, '--yes']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     strictEqual(manifest.name, 'widgets');
-    strictEqual(manifest.dependencies.ohne.startsWith('^'), false);
+    strictEqual(manifest.dependencies.ohnejs.startsWith('^'), false);
   });
 
   it('installs the types the base config requires', async () => {
@@ -71,7 +71,7 @@ describe('ohne init', () => {
 
     await runCommand(ohne, ['init', dir, '--yes', '--ohne-path', '../ohne']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    strictEqual(manifest.dependencies.ohne, '../ohne');
+    strictEqual(manifest.dependencies.ohnejs, '../ohne');
   });
 
   it('extends the published base config from tsconfig.json', async () => {
@@ -79,7 +79,7 @@ describe('ohne init', () => {
 
     await runCommand(ohne, ['init', dir, '--yes']);
     const tsconfig = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
-    strictEqual(tsconfig.extends, 'ohne/tsconfig.node.json');
+    strictEqual(tsconfig.extends, 'ohnejs/tsconfig.node.json');
     deepStrictEqual(tsconfig.include, ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts']);
     deepStrictEqual(tsconfig.exclude, ['dashboard']);
   });

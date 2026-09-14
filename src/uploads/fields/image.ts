@@ -1,4 +1,4 @@
-import { defineField, option } from 'ohne';
+import { defineField, option } from 'ohnejs';
 
 import { checkUpload, imageOptions } from './_constraints.ts';
 

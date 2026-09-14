@@ -5,7 +5,7 @@ import {
   mapValues,
   mimeTypeFor,
   parseMediaType,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadLocation } from '../uploads/path.ts';
 import type { ImageTransforms } from './transforms.ts';

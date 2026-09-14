@@ -39,8 +39,8 @@ export async function generateMiddleware(from: string = process.cwd()): Promise<
   const code = createCodeBuilder();
   code.line(
     middleware.length === 0
-      ? "import type {} from 'ohne';"
-      : "import { useMiddleware } from 'ohne';",
+      ? "import type {} from 'ohnejs';"
+      : "import { useMiddleware } from 'ohnejs';",
   );
   indexed.forEach((entry) => {
     code.line(`import m${entry.index} from ${literalString(importSpecifier(dir, entry.file))};`);
@@ -59,7 +59,7 @@ export async function generateMiddleware(from: string = process.cwd()): Promise<
     code.line('}');
   };
 
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     known('KnownMiddleware', indexed);
     known('KnownNamedMiddleware', named);

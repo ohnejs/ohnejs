@@ -9,8 +9,8 @@ import {
   textInput,
   useT,
   when,
-} from 'ohne/dashboard';
-import { computed, effect, isNull, isString, onCleanup, type Ref, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { computed, effect, isNull, isString, onCleanup, type Ref, ref } from 'ohnejs/utils';
 
 import { overviewQuickCreate } from '../components/overview-quick-create.ts';
 import { overviewRecentEdits } from '../components/overview-recent-edits.ts';

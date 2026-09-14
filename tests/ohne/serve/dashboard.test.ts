@@ -220,8 +220,8 @@ describe('serveDashboard', () => {
     const port = await serve('importmap');
     const body = (await req(port, '/')).body;
     strictEqual(body.includes('<script type="importmap">'), true);
-    strictEqual(body.includes('"ohne/dashboard":"/m/dashboard/index.ts"'), true);
-    strictEqual(body.includes('"ohne/utils":"/m/utils/index.ts"'), true);
+    strictEqual(body.includes('"ohnejs/dashboard":"/m/dashboard/index.ts"'), true);
+    strictEqual(body.includes('"ohnejs/utils":"/m/utils/index.ts"'), true);
     strictEqual(body.includes('"app/":"/m/app/"'), true);
   });
 
@@ -258,9 +258,9 @@ describe('serveDashboard', () => {
 
     const out = buf.join('');
     strictEqual(out.includes('Dashboard has no tsconfig.json'), true);
-    strictEqual(out.includes('"extends": "ohne/tsconfig.browser.json"'), true);
+    strictEqual(out.includes('"extends": "ohnejs/tsconfig.browser.json"'), true);
     strictEqual(
-      out.includes('"paths": { "app/*": ["./*", "../node_modules/ohne/src/layer/dashboard/*"] }'),
+      out.includes('"paths": { "app/*": ["./*", "../node_modules/ohnejs/src/layer/dashboard/*"] }'),
       true,
     );
     strictEqual(
@@ -281,7 +281,7 @@ describe('serveDashboard', () => {
 
     const out = buf.join('');
     strictEqual(out.includes('"../../generated/shared/**/*.ts"'), true);
-    strictEqual(out.includes('"../../node_modules/ohne/src/layer/dashboard/*"'), true);
+    strictEqual(out.includes('"../../node_modules/ohnejs/src/layer/dashboard/*"'), true);
   });
 
   it('does not warn when the dashboard tsconfig exists or the folder is absent', async () => {

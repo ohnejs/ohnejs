@@ -1,4 +1,4 @@
-import { base, type Child, css, h } from 'ohne/dashboard';
+import { base, type Child, css, h } from 'ohnejs/dashboard';
 
 import { wrapper } from './wrapper.ts';
 

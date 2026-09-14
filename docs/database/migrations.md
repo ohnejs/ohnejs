@@ -15,7 +15,7 @@ new column takes the values, the old column drops.
 
 ```ts
 // migrations/2026-07-14-draft.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts', field: 'isDraft' },
@@ -63,7 +63,7 @@ the way. `transform` runs once per row; omitted, each value carries unchanged:
 
 ```ts
 // migrations/2026-07-14-draft.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts', field: 'isDraft' },
@@ -88,7 +88,7 @@ tables, the translations table - and constraints recreate under the new name.
 
 ```ts
 // migrations/2026-08-01-articles.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts' },
@@ -100,7 +100,7 @@ A [block](./blocks.md) renames the same way, and every stored reference to the t
 
 ```ts
 // migrations/2026-08-02-banner.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { block: 'Hero' },
@@ -119,7 +119,7 @@ authorization - it never needs force.
 
 ```ts
 // migrations/2026-08-10-drop-legacy.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts', field: 'legacy' },
@@ -142,7 +142,7 @@ holding `NULL`; a backfill satisfies the guard:
 
 ```ts
 // migrations/2026-09-01-category-required.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts', field: 'category', nullable: true },
@@ -160,7 +160,7 @@ locale survives, and that is a switch:
 
 ```ts
 // migrations/2026-10-01-title-per-post.ts
-import { defineMigration } from 'ohne';
+import { defineMigration } from 'ohnejs';
 
 export default defineMigration({
   from: { collection: 'Posts', field: 'title', translatable: true },

@@ -12,8 +12,8 @@ import {
   type TableColumns,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isNull, isUndefined, onCleanup, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isNull, isUndefined, onCleanup, ref } from 'ohnejs/utils';
 
 import {
   editQueryParam,

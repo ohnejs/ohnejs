@@ -1,5 +1,5 @@
-import { query, queryUntyped } from 'ohne';
-import { randomToken } from 'ohne/utils/crypto';
+import { query, queryUntyped } from 'ohnejs';
+import { randomToken } from 'ohnejs/utils/crypto';
 
 import { writeSessionCookie } from './_cookie.ts';
 import { sessionLifetime } from './_lifetime.ts';

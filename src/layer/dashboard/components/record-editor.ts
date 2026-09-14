@@ -27,7 +27,7 @@ import {
   useHotkeys,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   deepEqual,
   effect,
@@ -42,7 +42,7 @@ import {
   sleep,
   stringifySearchParams,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { SYSTEM_FIELDS } from './collection-table-state.ts';
 import {

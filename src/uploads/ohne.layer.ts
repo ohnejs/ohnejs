@@ -1,5 +1,5 @@
-import { defineLayer } from 'ohne';
-import { mapKeys } from 'ohne/utils';
+import { defineLayer } from 'ohnejs';
+import { mapKeys } from 'ohnejs/utils';
 
 import { imageVariantsCodegen } from './codegen/image-variants.ts';
 import { UPLOADS_DEFAULTS, UPLOADS_STRATEGIES } from './config.ts';

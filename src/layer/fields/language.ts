@@ -1,5 +1,5 @@
-import { defineField, type Message, useMessages } from 'ohne';
-import { canonicalizeLanguage } from 'ohne/utils';
+import { defineField, type Message, useMessages } from 'ohnejs';
+import { canonicalizeLanguage } from 'ohnejs/utils';
 
 /**
  * The `language` field type: a dashboard language, stored as its canonical BCP-47 tag.

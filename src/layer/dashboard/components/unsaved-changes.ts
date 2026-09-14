@@ -8,8 +8,8 @@ import {
   popup,
   useT,
   when,
-} from 'ohne/dashboard';
-import { isString, onCleanup, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { isString, onCleanup, ref } from 'ohnejs/utils';
 
 import { unsavedChanges } from './history.ts';
 

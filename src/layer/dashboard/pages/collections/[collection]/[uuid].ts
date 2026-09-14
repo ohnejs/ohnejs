@@ -10,8 +10,8 @@ import {
   setDocumentTitle,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isUndefined } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isUndefined } from 'ohnejs/utils';
 
 import { recordEditor } from '../../../components/record-editor.ts';
 import { shell } from '../../../components/shell.ts';

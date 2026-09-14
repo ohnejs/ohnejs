@@ -40,7 +40,7 @@ describe('generateLayerName', { skip: process.platform === 'win32' }, () => {
     if (spec.augments) {
       writeFileSync(
         join(dir, 'augments.ts'),
-        "import type {} from 'ohne';\ndeclare module 'ohne' {}\n",
+        "import type {} from 'ohnejs';\ndeclare module 'ohnejs' {}\n",
       );
     }
   }
@@ -82,7 +82,7 @@ describe('generateLayerName', { skip: process.platform === 'win32' }, () => {
       `${BANNER}\n` +
         "import type {} from '../../../store/a/augments.ts';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownLayers {\n' +
         "    'a': true;\n" +
         "    'b': true;\n" +
@@ -99,9 +99,9 @@ describe('generateLayerName', { skip: process.platform === 'win32' }, () => {
     strictEqual(
       readFileSync(path!, 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne';\n" +
+        "import type {} from 'ohnejs';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownLayers {\n' +
         "    'a': true;\n" +
         '  }\n' +
@@ -116,9 +116,9 @@ describe('generateLayerName', { skip: process.platform === 'win32' }, () => {
     strictEqual(
       readFileSync(path!, 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne';\n" +
+        "import type {} from 'ohnejs';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownLayers {}\n' +
         '}\n',
     );
@@ -137,7 +137,7 @@ describe('generateLayerName', { skip: process.platform === 'win32' }, () => {
         `${BANNER}\n` +
           "import type {} from '../../../store/a/augments.ts';\n" +
           '\n' +
-          "declare module 'ohne' {\n" +
+          "declare module 'ohnejs' {\n" +
           '  interface KnownLayers {\n' +
           "    'a': true;\n" +
           '  }\n' +

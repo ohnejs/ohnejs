@@ -1,5 +1,5 @@
-import { attachTooltip, css, dimMark, type FieldType, h, icon } from 'ohne/dashboard';
-import { isArray, isNull, isString, isUndefined, onCleanup } from 'ohne/utils';
+import { attachTooltip, css, dimMark, type FieldType, h, icon } from 'ohnejs/dashboard';
+import { isArray, isNull, isString, isUndefined, onCleanup } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

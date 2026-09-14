@@ -1,4 +1,4 @@
-import type { Child } from 'ohne/dashboard';
+import type { Child } from 'ohnejs/dashboard';
 
 /**
  * A place in the signed-in shell a layer renders into.

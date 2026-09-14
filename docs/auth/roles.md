@@ -11,7 +11,7 @@ names a user holds.
 
 ```ts
 // roles/editor.ts
-import { defineRole } from 'ohne';
+import { defineRole } from 'ohnejs';
 
 export default defineRole({
   capabilities: ['collection.Posts.*', 'collection.Tags.read'],
@@ -95,8 +95,8 @@ API does:
 
 ```ts
 // api/publish.post.ts
-import { defineHandler } from 'ohne';
-import { requireCapability } from 'ohne/auth';
+import { defineHandler } from 'ohnejs';
+import { requireCapability } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   await requireCapability('collection.Posts.update');
@@ -109,7 +109,7 @@ To branch instead of reject, `userCan` answers the same question as a boolean, a
 no query runs:
 
 ```ts
-import { requireUser, userCan, userCapabilities } from 'ohne/auth';
+import { requireUser, userCan, userCapabilities } from 'ohnejs/auth';
 
 const user = await requireUser();
 userCan(user, 'collection.Posts.update'); // -> true or false
@@ -123,7 +123,7 @@ carve its own namespace:
 
 ```ts
 // roles/accountant.ts
-import { defineRole } from 'ohne';
+import { defineRole } from 'ohnejs';
 
 export default defineRole({
   capabilities: ['billing.read', 'billing.export'],
@@ -141,7 +141,7 @@ includes:
 
 ```ts
 // capabilities.ts
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownCapabilities {
     'billing.read': true;
     'billing.export': true;

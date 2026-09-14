@@ -1,6 +1,6 @@
 import { activeContentLocale } from 'app/components/content-language-switcher.ts';
-import { type Child, toast, when } from 'ohne/dashboard';
-import { isNull, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohne/utils';
+import { type Child, toast, when } from 'ohnejs/dashboard';
+import { isNull, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { UploadsTranslate } from './_messages.ts';

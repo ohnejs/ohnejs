@@ -1,7 +1,7 @@
-import type { Registry } from 'ohne/utils';
+import type { Registry } from 'ohnejs/utils';
 
-import { useEnv } from 'ohne';
-import { createRegistry, isUndefined } from 'ohne/utils';
+import { useEnv } from 'ohnejs';
+import { createRegistry, isUndefined } from 'ohnejs/utils';
 
 import type { StorageAdapter, StorageFactory } from './adapter.ts';
 

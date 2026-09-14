@@ -55,7 +55,7 @@ export interface OhnePackage extends OhneLayer {
  * ```ts
  * await resolveOhnePackages()
  * // -> [
- * //      { name: 'ohne', dir: '...', layer: true },
+ * //      { name: 'ohnejs', dir: '...', layer: true },
  * //      { name: '@acme/kit', dir: '...', layer: false },
  * //      { name: 'app', dir: '...', layer: true },
  * //    ]
@@ -111,7 +111,7 @@ export async function resolveOhnePackages(from: string = process.cwd()): Promise
  * ```ts
  * await resolveOhneLayers()
  * // -> [
- * //      { name: 'ohne', dir: '...' },
+ * //      { name: 'ohnejs', dir: '...' },
  * //      { name: '@acme/base', dir: '...' },
  * //      { name: '@acme/auth', dir: '...' },
  * //      { name: 'app', dir: '...' },

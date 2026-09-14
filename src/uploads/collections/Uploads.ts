@@ -1,4 +1,4 @@
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
 
@@ -10,7 +10,7 @@ import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
  * Listing a folder is therefore one equality.
  * A folder row holds no bytes: its `type`, `size`, and `hash` stay `null`.
  * A file row's path is also its storage key and its public URL, so moving a file moves its object.
- * The helpers in `ohne/uploads` keep rows and objects in agreement; only `read` is exposed over the API.
+ * The helpers in `ohnejs/uploads` keep rows and objects in agreement; only `read` is exposed over the API.
  * Every read is decorated with `path` and `url`, and with `variants` when an image service is configured.
  */
 const uploads = defineCollection({

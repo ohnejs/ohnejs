@@ -1,5 +1,5 @@
-import { attachTooltip, button, css, icon, type IconName } from 'ohne/dashboard';
-import { onCleanup } from 'ohne/utils';
+import { attachTooltip, button, css, icon, type IconName } from 'ohnejs/dashboard';
+import { onCleanup } from 'ohnejs/utils';
 
 css`
   .o-item-actions {

@@ -7,7 +7,7 @@ page body, a landing layout, an article with embeds between paragraphs.
 
 ```ts
 // blocks/Hero.ts
-import { defineBlock, field } from 'ohne';
+import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   fields: {
@@ -19,7 +19,7 @@ export default defineBlock({
 
 ```ts
 // collections/Pages.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
@@ -39,7 +39,7 @@ fields are ordinary `field(...)` instances - columns, relations, composites, to 
 
 ```ts
 // blocks/Quote.ts
-import { defineBlock, field } from 'ohne';
+import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   fields: {
@@ -58,7 +58,7 @@ it a `label` to say it differently, or to say it in every language you ship:
 
 ```ts
 // blocks/PricingCard.ts
-import { defineBlock, field } from 'ohne';
+import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   label: 'blocks.pricingCard.label',
@@ -222,7 +222,7 @@ field inside that: every level reads and writes through the same shapes.
 
 ```ts
 // blocks/Columns.ts
-import { defineBlock, field } from 'ohne';
+import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   fields: {

@@ -36,9 +36,9 @@ describe('generateResolvedConfig', () => {
       strictEqual(
         readFileSync(path!, 'utf8'),
         `${BANNER}\n` +
-          "import type {} from 'ohne';\n" +
+          "import type {} from 'ohnejs';\n" +
           '\n' +
-          "declare module 'ohne' {\n" +
+          "declare module 'ohnejs' {\n" +
           '  interface ConfigExtensions {\n' +
           '    defaults: {\n' +
           '      dirs: {\n' +
@@ -63,9 +63,9 @@ describe('generateResolvedConfig', () => {
     strictEqual(
       readFileSync(path!, 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne';\n" +
+        "import type {} from 'ohnejs';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface ConfigExtensions {}\n' +
         '}\n',
     );

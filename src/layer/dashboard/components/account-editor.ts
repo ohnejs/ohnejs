@@ -23,8 +23,8 @@ import {
   useHotkeys,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isEmpty, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isEmpty, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
 
 import { contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';

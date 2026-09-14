@@ -52,17 +52,17 @@ describe('serveAPI CORS', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(join(dir, 'ohne.config.ts'), '');
     mkdirSync(join(dir, 'node_modules'));
-    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohnejs'), 'dir');
     mkdirSync(join(dir, 'api'));
     writeFileSync(
       join(dir, 'api', 'ping.get.ts'),
-      "import { defineHandler } from 'ohne';\nexport default defineHandler(() => 'pong');\n",
+      "import { defineHandler } from 'ohnejs';\nexport default defineHandler(() => 'pong');\n",
     );
     if (corsOrigin !== undefined) {
       mkdirSync(join(dir, 'middleware', 'global'), { recursive: true });
       writeFileSync(
         join(dir, 'middleware', 'global', 'cors.ts'),
-        `import { cors } from 'ohne';\nexport default cors({ origin: '${corsOrigin}' });\n`,
+        `import { cors } from 'ohnejs';\nexport default cors({ origin: '${corsOrigin}' });\n`,
       );
     }
     return dir;

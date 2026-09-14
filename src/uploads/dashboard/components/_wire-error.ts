@@ -1,4 +1,4 @@
-import { first, isPlainObject, isString } from 'ohne/utils';
+import { first, isPlainObject, isString } from 'ohnejs/utils';
 
 /**
  * What an error response says: its field errors and the one message worth showing.

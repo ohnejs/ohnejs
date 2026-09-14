@@ -2,7 +2,7 @@ import type { NodeEnv } from '../../utils/env/index.ts';
 
 /**
  * Typed ohne env vars.
- * Add fields by augmenting it from a layer with `declare module 'ohne'`.
+ * Add fields by augmenting it from a layer with `declare module 'ohnejs'`.
  *
  * Built-ins:
  * - `NODE_ENV` - runtime environment; `production` or `test`, else `development`.
@@ -28,7 +28,7 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface Env {
  *     FOO: number
  *   }

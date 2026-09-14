@@ -1,4 +1,4 @@
-import { type MessageParams, type Translate, useT } from 'ohne/dashboard';
+import { type MessageParams, type Translate, useT } from 'ohnejs/dashboard';
 
 /**
  * The translator the uploads dashboard speaks through.

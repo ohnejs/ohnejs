@@ -4,7 +4,7 @@ ohne reads its environment through a typed registry. Every variable is registere
 and a default, so a read returns a typed value, never a raw string:
 
 ```ts
-import { useEnv } from 'ohne';
+import { useEnv } from 'ohnejs';
 
 useEnv().get('PORT');   // number | undefined
 useEnv().get('SILENT'); // boolean
@@ -101,10 +101,10 @@ the runtime spec:
 
 ```ts
 // boot/env.ts
-import { boolEnv, useEnv } from 'ohne';
-import { parseInteger } from 'ohne/utils';
+import { boolEnv, useEnv } from 'ohnejs';
+import { parseInteger } from 'ohnejs/utils';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Env {
     STRIPE_KEY: string | undefined;
     BILLING_DRY_RUN: boolean;

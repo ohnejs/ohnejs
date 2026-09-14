@@ -5,9 +5,9 @@ import {
   queryMetadata,
   readJSONBody,
   useSearchParams,
-} from 'ohne';
-import { requireCapability } from 'ohne/auth';
-import { isNull, isNumber, isPlainObject, isString, isUndefined } from 'ohne/utils';
+} from 'ohnejs';
+import { requireCapability } from 'ohnejs/auth';
+import { isNull, isNumber, isPlainObject, isString, isUndefined } from 'ohnejs/utils';
 
 import type { MoveUploadTarget } from '../../uploads/move-upload.ts';
 import type { UploadRecord } from '../../uploads/types.ts';

@@ -11,7 +11,7 @@ import {
   h,
   icon,
   type Primitive,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   deepEqual,
   effect,
@@ -25,7 +25,7 @@ import {
   onCleanup,
   ref,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

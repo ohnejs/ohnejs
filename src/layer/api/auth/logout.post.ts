@@ -1,4 +1,4 @@
-import { defineHandler } from 'ohne';
+import { defineHandler } from 'ohnejs';
 
 import { destroySession } from '../../auth/destroy-session.ts';
 

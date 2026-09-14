@@ -65,7 +65,7 @@ export async function resolveLayerDir(specifier: string, from: string): Promise<
  * @example
  * ```ts
  * parseLayerSpecifier('@acme/kit/auth') // -> { name: '@acme/kit', subpath: './auth' }
- * parseLayerSpecifier('ohne/uploads')   // -> { name: 'ohne', subpath: './uploads' }
+ * parseLayerSpecifier('ohnejs/uploads') // -> { name: 'ohnejs', subpath: './uploads' }
  * parseLayerSpecifier('@acme/base')     // -> { name: '@acme/base', subpath: '.' }
  * ```
  */

@@ -99,7 +99,13 @@ const sel = await seed('CrudPosts', { title: 'Sel', secret: 'hush', slug: 'sel',
 for (let n = 1; n <= 25; n++) await seed('CrudMany', { n });
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
-  return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
+  return {
+    method,
+    pattern,
+    file: `${pattern}.ts`,
+    layer: 'ohnejs',
+    handler: handler as AnyHandler,
+  };
 }
 
 const ROUTES = {

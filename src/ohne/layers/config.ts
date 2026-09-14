@@ -19,11 +19,11 @@ import type { LayerName } from './layer-name.ts';
 
 /**
  * Typed ohne config.
- * Add fields by augmenting it from a layer with `declare module 'ohne'`.
+ * Add fields by augmenting it from a layer with `declare module 'ohnejs'`.
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface Config {
  *     myFeature: { enabled: boolean }
  *   }
@@ -738,7 +738,7 @@ export interface Config {
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface ConfigExtensions {
  *     defaults: {
  *       myFeature: {

@@ -17,7 +17,7 @@ import {
   useHotkeys,
   useRoute,
   useT,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   effect,
   isNull,
@@ -30,7 +30,7 @@ import {
   sleep,
   stringifySearchParams,
   toArray,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { activeContentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';

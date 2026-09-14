@@ -1,5 +1,5 @@
-import { defineMiddleware, unauthorized } from 'ohne';
-import { isNull } from 'ohne/utils';
+import { defineMiddleware, unauthorized } from 'ohnejs';
+import { isNull } from 'ohnejs/utils';
 
 import { useUser } from '../auth/use-user.ts';
 

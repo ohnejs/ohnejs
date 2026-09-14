@@ -17,7 +17,7 @@ registry.register('sqlite', new SQLiteDialect());
  * @example
  * ```ts
  * // in a dialect layer's boot/ file
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownDialects {
  *     postgres: true
  *   }

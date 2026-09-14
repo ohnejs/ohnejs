@@ -1,5 +1,5 @@
-import { attachTooltip, button, type ButtonOptions, h, icon, when } from 'ohne/dashboard';
-import { onCleanup } from 'ohne/utils';
+import { attachTooltip, button, type ButtonOptions, h, icon, when } from 'ohnejs/dashboard';
+import { onCleanup } from 'ohnejs/utils';
 
 import { useUploadsT } from './_messages.ts';
 import { uploadsPermissions } from './media-library-data.ts';

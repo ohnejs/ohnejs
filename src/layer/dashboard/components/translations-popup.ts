@@ -15,7 +15,7 @@ import {
   toast,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   effect,
   formatLocaleCode,
@@ -24,7 +24,7 @@ import {
   ref,
   sleep,
   stringifySearchParams,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import {
   activeContentLocale,

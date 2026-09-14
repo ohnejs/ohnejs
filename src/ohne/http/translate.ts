@@ -16,7 +16,7 @@ import { useMessages } from '../messages/use-messages.ts';
 import { useAcceptsLanguages } from './use-accepts-languages.ts';
 import { tryUseEvent } from './use-event.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface EventContext {
     /**
      * Active language for the request, as a BCP-47 tag.

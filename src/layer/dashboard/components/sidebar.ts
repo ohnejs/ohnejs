@@ -12,8 +12,8 @@ import {
   type VerticalMenuItemModel,
   verticalMenu,
   when,
-} from 'ohne/dashboard';
-import { isEmpty, isUndefined, withTrailingSlash } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { isEmpty, isUndefined, withTrailingSlash } from 'ohnejs/utils';
 
 css`
   .o-menu-wrapper > * + * {

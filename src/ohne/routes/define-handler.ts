@@ -18,7 +18,7 @@ export type { RouteOptions } from './route-options.ts';
  * @example
  * ```ts
  * // api/authors/[id].get.ts
- * import { defineHandler } from 'ohne'
+ * import { defineHandler } from 'ohnejs'
  *
  * export default defineHandler(({ params }) => ({ id: params.id }))
  * ```
@@ -26,7 +26,7 @@ export type { RouteOptions } from './route-options.ts';
  * @example
  * ```ts
  * // api/search.get.ts - also run `rate-limit`, after the global middleware
- * import { defineHandler } from 'ohne'
+ * import { defineHandler } from 'ohnejs'
  *
  * export default defineHandler(() => search(), { middleware: ['rate-limit'] })
  * ```
@@ -34,7 +34,7 @@ export type { RouteOptions } from './route-options.ts';
  * @example
  * ```ts
  * // api/admin/dashboard.get.ts - every named middleware except `rate-limit`
- * import { defineHandler } from 'ohne'
+ * import { defineHandler } from 'ohnejs'
  *
  * export default defineHandler(() => dashboard(), {
  *   middleware: (available) => available.filter((name) => name !== 'rate-limit'),

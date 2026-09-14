@@ -71,7 +71,13 @@ const writer = await userWith('writer@example.com');
 const other = await userWith('other@example.com');
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
-  return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
+  return {
+    method,
+    pattern,
+    file: `${pattern}.ts`,
+    layer: 'ohnejs',
+    handler: handler as AnyHandler,
+  };
 }
 
 const ROUTES = {

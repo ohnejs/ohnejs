@@ -31,7 +31,7 @@ A handler translates with `useT`:
 
 ```ts
 // api/inbox.get.ts
-import { defineHandler, useT } from 'ohne';
+import { defineHandler, useT } from 'ohnejs';
 
 export default defineHandler(() => {
   const t = useT();

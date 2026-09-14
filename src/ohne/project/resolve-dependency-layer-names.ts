@@ -15,10 +15,10 @@ import { resolveOhnePackages } from './resolve-ohne-layers.ts';
  * @example
  * ```ts
  * await resolveDependencyLayerNames()
- * // -> ['ohne', 'ohne/uploads', '@acme/base', '@acme/auth']
+ * // -> ['ohnejs', 'ohnejs/uploads', '@acme/base', '@acme/auth']
  *
  * await resolveDependencyLayerNames('/srv/lib')
- * // -> ['ohne', 'ohne/uploads']
+ * // -> ['ohnejs', 'ohnejs/uploads']
  * ```
  */
 export async function resolveDependencyLayerNames(from: string = process.cwd()): Promise<string[]> {

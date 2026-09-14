@@ -28,7 +28,7 @@ import {
   useHotkeys,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   computed,
   type ConditionObject,
@@ -46,7 +46,7 @@ import {
   stringifySearchParams,
   uniqueArray,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { clearSelectionButton } from './clear-selection-button.ts';
 import {

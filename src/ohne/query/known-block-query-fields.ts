@@ -10,7 +10,7 @@ import type { QueryFieldMeta } from './known-query-fields.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}
  * }
  * ```

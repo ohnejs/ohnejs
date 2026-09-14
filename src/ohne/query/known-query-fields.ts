@@ -96,7 +96,7 @@ export interface QueryFieldMeta {
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownQueryFields extends GeneratedQueryFields {}
  * }
  * ```

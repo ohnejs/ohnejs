@@ -1,5 +1,5 @@
-import { defineField } from 'ohne';
-import { hashPassword } from 'ohne/utils/crypto';
+import { defineField } from 'ohnejs';
+import { hashPassword } from 'ohnejs/utils/crypto';
 
 import { useAuthConfig } from '../auth/config.ts';
 

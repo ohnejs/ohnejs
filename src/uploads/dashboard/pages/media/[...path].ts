@@ -1,6 +1,6 @@
 import { mediaLibraryPage } from 'app/components/media-library.ts';
 import { shell } from 'app/components/shell.ts';
-import { defineDashboardPage } from 'ohne/dashboard';
+import { defineDashboardPage } from 'ohnejs/dashboard';
 
 /**
  * The media library inside a folder; `path` is the folder's path.

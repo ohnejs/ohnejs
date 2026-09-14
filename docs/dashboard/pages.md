@@ -8,7 +8,7 @@ A page is one file under `dashboard/pages/`, exporting a component:
 
 ```ts
 // dashboard/pages/index.ts
-import { defineDashboardPage, h } from 'ohne/dashboard';
+import { defineDashboardPage, h } from 'ohnejs/dashboard';
 
 export default defineDashboardPage(() => h('h1', null, 'Hello'));
 ```
@@ -38,7 +38,7 @@ already URI-decoded, and `path`, the matched location path.
 
 ```ts
 // dashboard/pages/authors/[id].ts
-import { defineDashboardPage, h } from 'ohne/dashboard';
+import { defineDashboardPage, h } from 'ohnejs/dashboard';
 
 export default defineDashboardPage((route) => h('h1', null, `Author ${route.params.id}`));
 ```
@@ -74,7 +74,7 @@ under `dashboard.menu` in [config](../project/config.md):
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   dashboard: {
@@ -119,7 +119,7 @@ whole dashboard.
 
 ```ts
 // dashboard/boot/rating.ts
-import { registerFieldType } from 'ohne/dashboard';
+import { registerFieldType } from 'ohnejs/dashboard';
 
 registerFieldType('rating', {
   display: ({ value }) => () => '★'.repeat(Number(value() ?? 0)),
@@ -141,8 +141,8 @@ replaces a layer's `boot/fields.ts` and runs in its place.
 
 The shell injects an import map with exactly three entries:
 
-- `ohne/dashboard` - the browser runtime: `defineDashboardPage`, `h`, `api`, `useT`, ...
-- `ohne/utils` - the isomorphic utility barrel, the same one your Node code imports.
+- `ohnejs/dashboard` - the browser runtime: `defineDashboardPage`, `h`, `api`, `useT`, ...
+- `ohnejs/utils` - the isomorphic utility barrel, the same one your Node code imports.
 - `app/` - your dashboard directory, so `app/components/nav.ts` is `dashboard/components/nav.ts`.
 
 Relative imports work too. Either way, name the full file, extension included - the browser
@@ -153,7 +153,7 @@ stack the file lives. For the editor to follow, the tsconfig `paths` entry lists
 first, then each stacked layer's dashboard directory; see [type checking](#type-checking).
 
 That map is the whole boundary: the server serves only the dashboard runtime and the utils, never
-the Node framework, so browser code cannot import server code - `ohne` is not in the map, and
+the Node framework, so browser code cannot import server code - `ohnejs` is not in the map, and
 `useDatabase` has no place in a page. Data crosses over HTTP, through [`api`](./data.md). And
 since the browser fetches modules by URL, everything in the dashboard directory is public.
 
@@ -174,15 +174,15 @@ program. The scaffold's root `tsconfig.json` excludes `dashboard/`; the director
 
 ```json
 {
-  "extends": "ohne/tsconfig.browser.json",
+  "extends": "ohnejs/tsconfig.browser.json",
   "compilerOptions": {
-    "paths": { "app/*": ["./*", "../node_modules/ohne/src/layer/dashboard/*"] }
+    "paths": { "app/*": ["./*", "../node_modules/ohnejs/src/layer/dashboard/*"] }
   },
   "include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]
 }
 ```
 
-`ohne/tsconfig.browser.json` brings the DOM lib. `paths` resolves `app/` imports the way the server
+`ohnejs/tsconfig.browser.json` brings the DOM lib. `paths` resolves `app/` imports the way the server
 does: your own directory first, then each stacked layer's dashboard directory - add one entry per
 layer you list. The two `../.ohne` globs bring the generated types - the typed `api` route ids and
 message keys. The dashboard server warns at boot when the file is missing, printing this content

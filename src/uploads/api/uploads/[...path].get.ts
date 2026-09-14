@@ -6,8 +6,8 @@ import {
   setResponseStatus,
   useRequest,
   useResponse,
-} from 'ohne';
-import { cacheControl, contentDisposition, isNull, isUndefined, parseRange } from 'ohne/utils';
+} from 'ohnejs';
+import { cacheControl, contentDisposition, isNull, isUndefined, parseRange } from 'ohnejs/utils';
 
 import { notFound } from '../../../ohne/http/http-error.ts';
 import { useUploadsConfig } from '../../config.ts';

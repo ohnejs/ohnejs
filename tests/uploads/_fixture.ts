@@ -147,7 +147,13 @@ export const JPEG_HEAD = new Uint8Array([
  * Wraps a handler module's default export as the route the router would build for it.
  */
 export function route(method: HTTPMethod, pattern: string, handler: unknown): Route {
-  return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
+  return {
+    method,
+    pattern,
+    file: `${pattern}.ts`,
+    layer: 'ohnejs',
+    handler: handler as AnyHandler,
+  };
 }
 
 /**

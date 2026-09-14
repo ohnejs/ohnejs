@@ -40,9 +40,9 @@ export async function generateResolvedConfig(from: string = process.cwd()): Prom
     .reduce<Record<string, unknown>>((acc, layer) => merge(acc, layer.defaults), {});
 
   const code = createCodeBuilder();
-  code.line("import type {} from 'ohne';");
+  code.line("import type {} from 'ohnejs';");
   code.line();
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     if (isEmpty(defaults)) {
       code.line('interface ConfigExtensions {}');

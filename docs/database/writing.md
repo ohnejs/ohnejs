@@ -4,7 +4,7 @@
 returns the new record or the reasons it could not be written.
 
 ```ts
-import { query } from 'ohne';
+import { query } from 'ohnejs';
 
 const result = await query('Posts').create({ title: 'Hello', body: '...' });
 ```

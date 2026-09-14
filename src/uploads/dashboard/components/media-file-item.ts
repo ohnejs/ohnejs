@@ -1,5 +1,5 @@
-import { css, h, icon, type IconName, when } from 'ohne/dashboard';
-import { formatBytes, isUndefined, mediaCategory } from 'ohne/utils';
+import { css, h, icon, type IconName, when } from 'ohnejs/dashboard';
+import { formatBytes, isUndefined, mediaCategory } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

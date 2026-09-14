@@ -1,6 +1,6 @@
-import type { Message, ResolvedOptions, Transaction } from 'ohne';
+import type { Message, ResolvedOptions, Transaction } from 'ohnejs';
 
-import { option, queryUntyped } from 'ohne';
+import { option, queryUntyped } from 'ohnejs';
 import {
   formatBytes,
   isArray,
@@ -10,7 +10,7 @@ import {
   mediaTypeMatches,
   parseBytes,
   uniqueArray,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { validationMessage } from '../../ohne/fields/validation-message.ts';
 

@@ -126,15 +126,15 @@ describe('serveAPI', () => {
     return dir;
   }
 
-  // An app whose generated files can resolve the bare `ohne` import, with one route to dispatch.
+  // An app whose generated files can resolve the bare `ohnejs` import, with one route to dispatch.
   function serveable(name: string): string {
     const dir = makeApp(name, `${name}:boot`);
     mkdirSync(join(dir, 'node_modules'));
-    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohnejs'), 'dir');
     mkdirSync(join(dir, 'api'));
     writeFileSync(
       join(dir, 'api', 'ping.get.ts'),
-      "import { defineHandler } from 'ohne';\nexport default defineHandler(() => 'pong');\n",
+      "import { defineHandler } from 'ohnejs';\nexport default defineHandler(() => 'pong');\n",
     );
     return dir;
   }
@@ -172,7 +172,7 @@ describe('serveAPI', () => {
     writeFileSync(join(dir, '.env'), 'OHNE_TEST_GREETING=hi\nOHNE_TEST_KEEP=file\n');
     writeFileSync(
       join(dir, 'api', 'env.get.ts'),
-      "import { defineHandler } from 'ohne';\n" +
+      "import { defineHandler } from 'ohnejs';\n" +
         'export default defineHandler(() => ' +
         "`${process.env['OHNE_TEST_GREETING']}:${process.env['OHNE_TEST_KEEP']}`);\n",
     );
@@ -323,7 +323,7 @@ describe('serveAPI', () => {
     mkdirSync(join(dir, 'collections'));
     writeFileSync(
       join(dir, 'collections', 'Posts.ts'),
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         '  fields: {\n' +
         "    title: field('text', { unique: true }),\n" +
@@ -377,7 +377,7 @@ describe('serveAPI', () => {
     mkdirSync(join(dir, 'middleware', 'global'), { recursive: true });
     writeFileSync(
       join(dir, 'middleware', 'global', 'mark.ts'),
-      "import { defineMiddleware } from 'ohne';\n" +
+      "import { defineMiddleware } from 'ohnejs';\n" +
         'export default defineMiddleware((event) => {\n' +
         "  event.response.headers.set('x-mw', 'ran');\n" +
         '});\n',
@@ -394,7 +394,7 @@ describe('serveAPI', () => {
     const dir = serveable('ready');
     writeFileSync(
       join(dir, 'boot', 'index.ts'),
-      "import { hook } from 'ohne';\n" +
+      "import { hook } from 'ohnejs';\n" +
         "hook('server:ready', (info) => {\n" +
         '  globalThis.__ohneServeReady = info;\n' +
         '});\n',
@@ -411,7 +411,7 @@ describe('serveAPI', () => {
     const dir = serveable('ready-throws');
     writeFileSync(
       join(dir, 'boot', 'index.ts'),
-      "import { hook } from 'ohne';\n" +
+      "import { hook } from 'ohnejs';\n" +
         "hook('server:ready', (info) => {\n" +
         '  globalThis.__ohneServeReady = info;\n' +
         "  throw new Error('warm-up failed');\n" +
@@ -428,7 +428,7 @@ describe('serveAPI', () => {
     const dir = serveable('synced');
     writeFileSync(
       join(dir, 'boot', 'index.ts'),
-      "import { hook } from 'ohne';\n" +
+      "import { hook } from 'ohnejs';\n" +
         "hook('schema:synced', (report) => {\n" +
         '  globalThis.__ohneSchemaSynced = report;\n' +
         '});\n',

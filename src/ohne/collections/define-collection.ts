@@ -435,7 +435,7 @@ export interface AnyCollectionDefinition {
  * @example
  * ```ts
  * // collections/Posts.ts
- * import { defineCollection, field } from 'ohne'
+ * import { defineCollection, field } from 'ohnejs'
  *
  * export default defineCollection({
  *   fields: {

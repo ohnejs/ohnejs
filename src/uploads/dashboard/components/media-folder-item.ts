@@ -1,5 +1,5 @@
-import { css, h, icon } from 'ohne/dashboard';
-import { ref, untracked } from 'ohne/utils';
+import { css, h, icon } from 'ohnejs/dashboard';
+import { ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

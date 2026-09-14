@@ -207,7 +207,7 @@ export interface FieldType<
  * @example
  * ```ts
  * // fields/slug.ts
- * import { defineField } from 'ohne'
+ * import { defineField } from 'ohnejs'
  *
  * export default defineField({
  *   columnType: 'text',

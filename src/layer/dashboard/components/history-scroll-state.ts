@@ -1,5 +1,5 @@
-import { useHotkeys } from 'ohne/dashboard';
-import { debounce, effect, onCleanup } from 'ohne/utils';
+import { useHotkeys } from 'ohnejs/dashboard';
+import { debounce, effect, onCleanup } from 'ohnejs/utils';
 
 /**
  * The scroll surface `historyScrollState` pins.

@@ -17,7 +17,7 @@ describe('ohne sync', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, type: 'module' }));
     writeFileSync(join(dir, 'ohne.config.ts'), '');
     mkdirSync(join(dir, 'node_modules'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohnejs'), 'dir');
     return dir;
   }
 
@@ -25,7 +25,7 @@ describe('ohne sync', () => {
     mkdirSync(join(dir, 'collections'), { recursive: true });
     writeFileSync(
       join(dir, 'collections', 'Notes.ts'),
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         "export default defineCollection({ fields: { body: field('text') } });\n",
     );
   }
@@ -109,12 +109,12 @@ describe('ohne sync', () => {
     mkdirSync(join(dir, 'blocks'), { recursive: true });
     writeFileSync(
       join(dir, 'blocks', 'Hero.ts'),
-      "import { defineBlock, field } from 'ohne';\n" +
+      "import { defineBlock, field } from 'ohnejs';\n" +
         "export default defineBlock({ fields: { title: field('text') } });\n",
     );
     writeFileSync(
       join(dir, 'collections', 'Pages.ts'),
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         "export default defineCollection({ fields: { content: field('blocks') } });\n",
     );
     strictEqual(sync(dir).status, 0);
@@ -130,13 +130,13 @@ describe('ohne sync', () => {
 
     writeFileSync(
       join(dir, 'collections', 'Pages.ts'),
-      "import { defineCollection } from 'ohne';\n" +
+      "import { defineCollection } from 'ohnejs';\n" +
         'export default defineCollection({ fields: {} });\n',
     );
     mkdirSync(join(dir, 'migrations'), { recursive: true });
     writeFileSync(
       join(dir, 'migrations', '001-drop-content.ts'),
-      "import { defineMigration } from 'ohne';\n" +
+      "import { defineMigration } from 'ohnejs';\n" +
         "export default defineMigration({ from: { collection: 'Pages', field: 'content' }, to: null });\n",
     );
 

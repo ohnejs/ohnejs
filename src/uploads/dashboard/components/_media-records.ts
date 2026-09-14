@@ -1,6 +1,6 @@
 import { activeContentLocale } from 'app/components/content-language-switcher.ts';
-import { api, listenTrigger } from 'ohne/dashboard';
-import { effect, isUndefined, untracked } from 'ohne/utils';
+import { api, listenTrigger } from 'ohnejs/dashboard';
+import { effect, isUndefined, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

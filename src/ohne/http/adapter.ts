@@ -9,7 +9,7 @@ import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { payloadTooLarge } from './http-error.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters a response's outgoing headers, the last seam before they are written to the socket.

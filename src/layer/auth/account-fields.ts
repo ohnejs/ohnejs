@@ -1,9 +1,9 @@
-import { applyHook, queryMetadata } from 'ohne';
-import { isUndefined } from 'ohne/utils';
+import { applyHook, queryMetadata } from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the `Users` fields a signed-in user edits on the account page and through `PATCH /auth/me`.

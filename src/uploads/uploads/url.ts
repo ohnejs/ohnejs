@@ -1,5 +1,5 @@
-import { useConfig } from 'ohne';
-import { isUndefined, normalizeBasePath } from 'ohne/utils';
+import { useConfig } from 'ohnejs';
+import { isUndefined, normalizeBasePath } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
 import { type UploadLocation, uploadPath } from './path.ts';

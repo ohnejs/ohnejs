@@ -1,5 +1,5 @@
-import { queryMetadata, type RoleName } from 'ohne';
-import { hasKey } from 'ohne/utils';
+import { queryMetadata, type RoleName } from 'ohnejs';
+import { hasKey } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 

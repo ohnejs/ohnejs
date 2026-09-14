@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownLanguages {
  *     en: true
  *     'de-AT': true

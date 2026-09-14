@@ -26,10 +26,10 @@ The config is one declaration:
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne'],
+  layers: ['ohnejs'],
 });
 ```
 
@@ -54,7 +54,7 @@ A collection is one file under `collections/`, named after it:
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
@@ -83,7 +83,7 @@ Routes are files too. A file under `api/` names its path, and a `.get` suffix bi
 
 ```ts
 // api/posts.get.ts
-import { defineHandler, query } from 'ohne';
+import { defineHandler, query } from 'ohnejs';
 
 export default defineHandler(() => query('Posts').findMany());
 ```
@@ -114,7 +114,7 @@ The POST route reads a JSON body and writes:
 
 ```ts
 // api/posts.post.ts
-import { defineHandler, query, readJSONBody, setResponseStatus } from 'ohne';
+import { defineHandler, query, readJSONBody, setResponseStatus } from 'ohnejs';
 
 export default defineHandler(async () => {
   const input = await readJSONBody<{ title: string; body: string }>();
@@ -171,8 +171,8 @@ Pages follow the same file convention as routes, under `dashboard/pages/`:
 
 ```ts
 // dashboard/pages/index.ts
-import { api, defineDashboardPage, each, h } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 interface Post {
   UUID: string;
@@ -214,7 +214,7 @@ against DOM types, not Node's. Give the dashboard its own `dashboard/tsconfig.js
 
 ```json
 {
-  "extends": "ohne/tsconfig.browser.json",
+  "extends": "ohnejs/tsconfig.browser.json",
   "include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]
 }
 ```

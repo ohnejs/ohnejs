@@ -10,7 +10,7 @@ import type { LiteralUnion } from '../../utils/types/literal-union.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne/dashboard' {
+ * declare module 'ohnejs/dashboard' {
  *   interface KnownAPIRoutes {
  *     'GET /authors/[id]': true
  *   }

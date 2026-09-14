@@ -11,7 +11,7 @@ import {
   icon,
   textInput,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   isNull,
   isNullish,
@@ -21,7 +21,7 @@ import {
   type Ref,
   ref,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { DetailsTab } from './media-details-state.ts';

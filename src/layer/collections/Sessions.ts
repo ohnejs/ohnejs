@@ -1,7 +1,7 @@
-import type { AccessScope } from 'ohne';
+import type { AccessScope } from 'ohnejs';
 
-import { defineCollection, field } from 'ohne';
-import { isNull } from 'ohne/utils';
+import { defineCollection, field } from 'ohnejs';
+import { isNull } from 'ohnejs/utils';
 
 import { useUser } from '../auth/use-user.ts';
 

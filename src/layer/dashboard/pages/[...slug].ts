@@ -7,8 +7,8 @@ import {
   icon,
   setDocumentTitle,
   useT,
-} from 'ohne/dashboard';
-import { effect } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect } from 'ohnejs/utils';
 
 import { shell } from '../components/shell.ts';
 

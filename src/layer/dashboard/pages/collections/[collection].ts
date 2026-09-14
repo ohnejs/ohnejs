@@ -8,8 +8,8 @@ import {
   setDocumentTitle,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isUndefined } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isUndefined } from 'ohnejs/utils';
 
 import { collectionTable } from '../../components/collection-table.ts';
 import { shell } from '../../components/shell.ts';

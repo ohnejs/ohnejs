@@ -1,4 +1,4 @@
-import { defineField, type Message } from 'ohne';
+import { defineField, type Message } from 'ohnejs';
 
 import { queryLocales } from '../../ohne/query/locale.ts';
 

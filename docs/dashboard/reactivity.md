@@ -1,11 +1,11 @@
 # Reactivity
 
-ohne ships a small reactive core in `ohne/utils`: values that know who reads them, and effects that
+ohne ships a small reactive core in `ohnejs/utils`: values that know who reads them, and effects that
 re-run when those values change. It is what makes dashboard pages live, but nothing in it touches
 the DOM - the same primitives run anywhere, server or browser.
 
 ```ts
-import { effect, ref } from 'ohne/utils';
+import { effect, ref } from 'ohnejs/utils';
 
 const count = ref(0);
 
@@ -39,7 +39,7 @@ computed costs nothing. Reading it inside an effect or another computed subscrib
 ref. Its `.value` is read-only.
 
 ```ts
-import { computed, ref } from 'ohne/utils';
+import { computed, ref } from 'ohnejs/utils';
 
 const a = ref(1);
 const b = ref(2);
@@ -89,7 +89,7 @@ count.value = 2; // nothing
 schedules the re-run on a microtask, so many synchronous writes coalesce into one.
 
 ```ts
-import { batchedEffect, ref } from 'ohne/utils';
+import { batchedEffect, ref } from 'ohnejs/utils';
 
 const count = ref(0);
 
@@ -110,7 +110,7 @@ late.
 surrounding effect. It returns whatever the function returns.
 
 ```ts
-import { effect, ref, untracked } from 'ohne/utils';
+import { effect, ref, untracked } from 'ohnejs/utils';
 
 const items = ref(['a', 'b']);
 const page = ref(1);
@@ -132,7 +132,7 @@ computeds, nested scopes - is owned by the scope, and `dispose()` stops it all a
 `onCleanup` registers a teardown callback on the active scope:
 
 ```ts
-import { effect, effectScope, onCleanup, ref } from 'ohne/utils';
+import { effect, effectScope, onCleanup, ref } from 'ohnejs/utils';
 
 const scope = effectScope();
 const count = ref(0);
@@ -153,7 +153,7 @@ scope cascades. Disposal is idempotent, and `onCleanup` outside any scope is a n
 ## Server and browser
 
 The core is plain TypeScript with no DOM and no Node APIs, so a ref behaves identically in a route
-handler, a test, and a dashboard page. In the browser, `ohne/utils` resolves through the served
+handler, a test, and a dashboard page. In the browser, `ohnejs/utils` resolves through the served
 import map - the import line above works unchanged on both sides.
 
 The dashboard renderer is a consumer like any other: `h` wraps every function prop and child in a

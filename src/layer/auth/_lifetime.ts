@@ -1,4 +1,4 @@
-import { parseDuration } from 'ohne/utils';
+import { parseDuration } from 'ohnejs/utils';
 
 import { useAuthConfig } from './config.ts';
 

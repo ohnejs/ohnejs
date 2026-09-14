@@ -10,8 +10,8 @@ import type {
   PopulateSpec,
   PopulateSubQuery,
   QueryScope,
-} from 'ohne';
-import type { Defined, SearchParamValue } from 'ohne/utils';
+} from 'ohnejs';
+import type { Defined, SearchParamValue } from 'ohnejs/utils';
 
 import {
   applyQuery,
@@ -27,7 +27,7 @@ import {
   useEvent,
   useMiddleware,
   useSearchParams,
-} from 'ohne';
+} from 'ohnejs';
 import {
   chunk,
   isArray,
@@ -41,7 +41,7 @@ import {
   toArray,
   toKebabCase,
   walkCondition,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';

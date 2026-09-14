@@ -5,7 +5,7 @@ and returned row is typed from your schema, so a typo or a wrong-typed value is 
 not a runtime surprise.
 
 ```ts
-import { query } from 'ohne';
+import { query } from 'ohnejs';
 
 const posts = await query('Posts').findMany();
 ```

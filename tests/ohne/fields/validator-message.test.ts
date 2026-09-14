@@ -15,7 +15,7 @@ import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { queryMetadata } from '../../../src/ohne/query/metadata.ts';
 import { runRecord } from '../../../src/ohne/query/pipeline/run-record.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownMessages {
     'validatorTest.plain': {};
     'validatorTest.ranged': { max: number };

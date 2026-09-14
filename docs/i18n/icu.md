@@ -2,7 +2,7 @@
 
 ICU MessageFormat is a small grammar for writing translatable strings. One string carries every shape the sentence can take: singular and plural, masculine and feminine, short and long dates. The renderer picks the right shape at runtime from the inputs you pass.
 
-This page teaches the syntax from the ground up. Examples are run through `formatMessage`, imported from `ohne/utils`, but the syntax is identical anywhere ICU is supported.
+This page teaches the syntax from the ground up. Examples are run through `formatMessage`, imported from `ohnejs/utils`, but the syntax is identical anywhere ICU is supported.
 
 It is also the syntax of ohne's [message catalogs](./messages.md) - every value in a catalog is one of these templates.
 
@@ -11,7 +11,7 @@ It is also the syntax of ohne's [message catalogs](./messages.md) - every value 
 The simplest message is a string. No special characters, nothing to render.
 
 ```ts
-import { formatMessage } from 'ohne/utils';
+import { formatMessage } from 'ohnejs/utils';
 
 formatMessage('Welcome back.', undefined, 'en');
 // -> 'Welcome back.'
@@ -260,7 +260,7 @@ strict('Hello, {name}.', {}); // throws: missing parameter `name`
 A realistic message uses several of these at once.
 
 ```ts
-import { createMessageFormatter } from 'ohne/utils';
+import { createMessageFormatter } from 'ohnejs/utils';
 
 const t = createMessageFormatter('en');
 

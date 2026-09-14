@@ -6,8 +6,8 @@ import {
   queryUntyped,
   resolveGuards,
   scopedMetadata,
-} from 'ohne';
-import { isUndefined } from 'ohne/utils';
+} from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import { notFound } from '../../../../ohne/http/http-error.ts';
 import {

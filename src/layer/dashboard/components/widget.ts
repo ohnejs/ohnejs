@@ -1,5 +1,5 @@
-import { type Child, css, h, icon, useT, when } from 'ohne/dashboard';
-import { effect, isNull, onCleanup, ref } from 'ohne/utils';
+import { type Child, css, h, icon, useT, when } from 'ohnejs/dashboard';
+import { effect, isNull, onCleanup, ref } from 'ohnejs/utils';
 
 import { logo } from './logo.ts';
 

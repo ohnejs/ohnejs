@@ -6,7 +6,7 @@ variants and runs no image code: it builds the URL, the service does the work an
 result.
 
 ```ts
-import { imageURL } from 'ohne/uploads';
+import { imageURL } from 'ohnejs/uploads';
 
 imageURL(upload, { width: 800, format: 'webp' });
 // -> 'https://img.example.com/2Obrt.../w_800,f_webp/photos/2024/sunset.jpg'
@@ -25,10 +25,10 @@ each a transforms object:
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne', 'ohne/uploads'],
+  layers: ['ohnejs', 'ohnejs/uploads'],
   uploads: {
     images: {
       url: 'https://img.example.com',
@@ -65,7 +65,7 @@ details popup lists them under Variants.
 In server code, pass the name instead of a transforms object:
 
 ```ts
-import { imageSrcSet, imageURL } from 'ohne/uploads';
+import { imageSrcSet, imageURL } from 'ohnejs/uploads';
 
 imageURL(upload, 'thumbnail'); // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 imageSrcSet(upload, ['card', 'cardWide']); // -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg 640w, ...'
@@ -82,7 +82,7 @@ A service can refuse everything but your variants. `imageVariantTokens` answers 
 string of every name:
 
 ```ts
-import { imageVariantTokens } from 'ohne/uploads';
+import { imageVariantTokens } from 'ohnejs/uploads';
 
 imageVariantTokens();
 // -> { thumbnail: 'w_320,h_320,fit_inside,f_webp', card: 'w_640,h_360,f_webp', cardWide: 'w_1280,h_720,f_webp' }
@@ -199,7 +199,7 @@ rasterizer, so give an uploaded SVG a `viewBox`. Its thumbnail is a WebP raster 
 every one a signed URL with the entry's width as its `w` descriptor:
 
 ```ts
-import { imageSrcSet, imageURL } from 'ohne/uploads';
+import { imageSrcSet, imageURL } from 'ohnejs/uploads';
 
 const src = imageURL(upload, 'card');
 const srcset = imageSrcSet(upload, ['card', 'cardWide']);

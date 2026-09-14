@@ -1,9 +1,9 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
-import { useConfig, useLayers } from 'ohne';
-import { effect } from 'ohne/utils';
+import { useConfig, useLayers } from 'ohnejs';
+import { effect } from 'ohnejs/utils';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Config {
     /**
      * Test: `foo`

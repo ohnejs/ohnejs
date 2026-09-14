@@ -1,8 +1,8 @@
-import type { User } from 'ohne/auth';
+import type { User } from 'ohnejs/auth';
 
-import { hook } from 'ohne';
-import { userCan } from 'ohne/auth';
-import { isEmpty } from 'ohne/utils';
+import { hook } from 'ohnejs';
+import { userCan } from 'ohnejs/auth';
+import { isEmpty } from 'ohnejs/utils';
 
 import type { DashboardMenuGroup, DashboardMenuItem } from '../../layer/api/dashboard.get.ts';
 

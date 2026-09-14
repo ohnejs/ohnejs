@@ -1,7 +1,7 @@
-import type { RouteOptions } from 'ohne';
+import type { RouteOptions } from 'ohnejs';
 
-import { badRequest, useRequest } from 'ohne';
-import { coerceToNumber, isNull, isRealNumber } from 'ohne/utils';
+import { badRequest, useRequest } from 'ohnejs';
+import { coerceToNumber, isNull, isRealNumber } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
 

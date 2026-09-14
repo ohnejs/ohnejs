@@ -77,7 +77,7 @@ describe('generateMessages', () => {
     );
 
     const node = bucket(paths, 'node');
-    strictEqual(node.includes("import { useMessages } from 'ohne';"), true);
+    strictEqual(node.includes("import { useMessages } from 'ohnejs';"), true);
     strictEqual(node.includes('interface KnownMessages extends GeneratedMessages {}'), true);
     strictEqual(node.includes('interface KnownLanguages extends GeneratedLanguages {}'), true);
     strictEqual(node.includes('const messages = useMessages();'), true);
@@ -88,7 +88,7 @@ describe('generateMessages', () => {
     strictEqual(node.includes("'field.minLength': { min: number };"), false);
 
     const browser = bucket(paths, 'browser');
-    strictEqual(browser.includes("declare module 'ohne/dashboard' {"), true);
+    strictEqual(browser.includes("declare module 'ohnejs/dashboard' {"), true);
     strictEqual(browser.includes('interface KnownMessages extends GeneratedMessages {}'), true);
     strictEqual(
       browser.includes('interface DashboardLanguages extends GeneratedLanguages {}'),
@@ -172,7 +172,7 @@ describe('generateMessages', () => {
       `${BANNER}\n` +
         "import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownMessages extends GeneratedMessages {}\n' +
         '  interface KnownLanguages extends GeneratedLanguages {}\n' +
         '}\n',
@@ -180,10 +180,10 @@ describe('generateMessages', () => {
     strictEqual(
       bucket(paths, 'browser'),
       `${BANNER}\n` +
-        "import type {} from 'ohne/dashboard';\n" +
+        "import type {} from 'ohnejs/dashboard';\n" +
         "import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';\n" +
         '\n' +
-        "declare module 'ohne/dashboard' {\n" +
+        "declare module 'ohnejs/dashboard' {\n" +
         '  interface KnownMessages extends GeneratedMessages {}\n' +
         '  interface DashboardLanguages extends GeneratedLanguages {}\n' +
         '}\n',

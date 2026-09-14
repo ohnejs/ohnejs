@@ -15,7 +15,7 @@ import {
   useRoute,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   capitalize,
   effect,
@@ -26,7 +26,7 @@ import {
   ref,
   type Ref,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 /**
  * The content locale the dashboard edits records in, shared app-wide.

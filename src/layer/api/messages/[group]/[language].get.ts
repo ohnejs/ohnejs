@@ -1,4 +1,4 @@
-import { badRequest, defineHandler, notFound, useConfig, useMessages } from 'ohne';
+import { badRequest, defineHandler, notFound, useConfig, useMessages } from 'ohnejs';
 import {
   canonicalizeLanguage,
   isEmpty,
@@ -7,7 +7,7 @@ import {
   languageFallbacks,
   messageGroup,
   uniqueArray,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { translate } from '../../../../ohne/http/translate.ts';
 

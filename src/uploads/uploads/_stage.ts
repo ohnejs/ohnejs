@@ -9,7 +9,7 @@ import {
   sanitizeSVG,
   sniffMediaType,
   uuidv7,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { useStorage } from '../storage/use-storages.ts';
 import { uploadsError } from './_errors.ts';

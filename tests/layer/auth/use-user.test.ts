@@ -76,7 +76,7 @@ await queryUntyped('Sessions').createOrThrow({
 });
 
 function route(pattern: string, handler: AnyHandler): Route {
-  return { method: 'POST', pattern, file: `${pattern}.ts`, layer: 'ohne', handler };
+  return { method: 'POST', pattern, file: `${pattern}.ts`, layer: 'ohnejs', handler };
 }
 
 const WHO = route('/who', async () => ({

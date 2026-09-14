@@ -1,4 +1,4 @@
-import { defineHandler } from 'ohne';
+import { defineHandler } from 'ohnejs';
 
 import type { User } from '../../auth/types.ts';
 

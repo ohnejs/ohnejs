@@ -13,8 +13,17 @@ import {
   structure,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, first, isNull, isNumber, isUndefined, type Ref, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import {
+  effect,
+  first,
+  isNull,
+  isNumber,
+  isUndefined,
+  type Ref,
+  ref,
+  untracked,
+} from 'ohnejs/utils';
 
 import {
   editableTableColumns,

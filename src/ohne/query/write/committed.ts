@@ -29,7 +29,7 @@ export interface RecordCommitted {
   uuids: readonly string[];
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs after a self-owned write commits, for external effects that must never fire on a rollback.

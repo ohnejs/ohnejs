@@ -1,5 +1,5 @@
-import { type Event, query, tryUseEvent } from 'ohne';
-import { isNull, isUndefined } from 'ohne/utils';
+import { type Event, query, tryUseEvent } from 'ohnejs';
+import { isNull, isUndefined } from 'ohnejs/utils';
 
 import type { Session } from './types.ts';
 

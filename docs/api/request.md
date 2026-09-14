@@ -7,7 +7,7 @@ request runs in its own async scope, so any function a handler calls - however d
 
 ```ts
 // api/search.get.ts
-import { defineHandler, useSearchParams } from 'ohne';
+import { defineHandler, useSearchParams } from 'ohnejs';
 
 export default defineHandler(() => {
   const { q } = useSearchParams();
@@ -36,7 +36,7 @@ counterpart, returning `undefined`, for code that runs with or without a request
 it - an auth session, a resolved user. Augment its type from your app with `declare module`:
 
 ```ts
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface EventContext {
     auth: Session;
   }
@@ -64,7 +64,7 @@ becomes `params.id`; a catch-all `[...path]` captures the rest of the path, slas
 
 ```ts
 // api/authors/[id].get.ts, matched against /authors/42
-import { defineHandler, useRouteParams } from 'ohne';
+import { defineHandler, useRouteParams } from 'ohnejs';
 
 export default defineHandler(() => {
   return { id: useRouteParams().id };
@@ -109,7 +109,7 @@ Four readers, one per shape. Each is valid only within a request:
 
 ```ts
 // api/subscribers.post.ts
-import { defineHandler, readJSONBody } from 'ohne';
+import { defineHandler, readJSONBody } from 'ohnejs';
 
 export default defineHandler(async () => {
   const input = await readJSONBody<{ email: string }>();

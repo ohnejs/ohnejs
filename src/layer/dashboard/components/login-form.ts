@@ -12,8 +12,8 @@ import {
   toast,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, ref } from 'ohnejs/utils';
 
 /**
  * Options for `loginForm`.

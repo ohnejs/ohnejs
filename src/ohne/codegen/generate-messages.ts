@@ -30,8 +30,8 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
  * Emits one file per codegen bucket, so the server and dashboard share a single source of truth.
  * `shared/messages.ts` types every key as `GeneratedMessages` and every language as `GeneratedLanguages`.
  * `GeneratedLanguage` is the union of those languages, or `string` when there are none.
- * `node/messages.ts` augments `ohne` and registers each catalog.
- * `browser/messages.ts` augments `ohne/dashboard`.
+ * `node/messages.ts` augments `ohnejs` and registers each catalog.
+ * `browser/messages.ts` augments `ohnejs/dashboard`.
  * Both augmentations only `extends` the shared types, so the key body is written once, never per target.
  *
  * Messages are read from each layer's `Config.dirs.messages` directory and merged per key.
@@ -92,17 +92,17 @@ async function writeShared(
 }
 
 /**
- * Writes `node/messages.ts`: augments `ohne`'s `KnownMessages` and `KnownLanguages`, registers each catalog.
+ * Writes `node/messages.ts`: augments `ohnejs`'s `KnownMessages` and `KnownLanguages`, registers catalogs.
  */
 async function writeNode(dir: string, messages: readonly MessageMeta[]): Promise<string> {
   const code = createCodeBuilder();
   if (messages.length > 0) {
-    code.line("import { useMessages } from 'ohne';");
+    code.line("import { useMessages } from 'ohnejs';");
     code.line();
   }
   code.line("import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';");
   code.line();
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     code.line('interface KnownMessages extends GeneratedMessages {}');
     code.line('interface KnownLanguages extends GeneratedLanguages {}');
@@ -127,15 +127,15 @@ async function writeNode(dir: string, messages: readonly MessageMeta[]): Promise
 }
 
 /**
- * Writes `browser/messages.ts`: augments `ohne/dashboard` for `useT` and `useDashboardLanguage`.
+ * Writes `browser/messages.ts`: augments `ohnejs/dashboard` for `useT` and `useDashboardLanguage`.
  * Its shape is constant; it only wires the shared types onto the browser's interfaces.
  */
 async function writeBrowser(dir: string): Promise<string> {
   const code = createCodeBuilder();
-  code.line("import type {} from 'ohne/dashboard';");
+  code.line("import type {} from 'ohnejs/dashboard';");
   code.line("import type { GeneratedLanguages, GeneratedMessages } from '../shared/messages.ts';");
   code.line();
-  code.line("declare module 'ohne/dashboard' {");
+  code.line("declare module 'ohnejs/dashboard' {");
   code.indent(() => {
     code.line('interface KnownMessages extends GeneratedMessages {}');
     code.line('interface DashboardLanguages extends GeneratedLanguages {}');

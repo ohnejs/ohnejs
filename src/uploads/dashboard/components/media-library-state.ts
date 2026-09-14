@@ -10,7 +10,7 @@ import {
   ref,
   type ConditionObject,
   type Ref,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

@@ -40,7 +40,7 @@ export interface RecordWriteContext {
   tx: Transaction;
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the raw input of a create or update before the pipeline coerces it, inside the transaction.

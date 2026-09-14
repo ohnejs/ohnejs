@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownRoutes {
  *     'GET /authors/[id]': typeof import('../api/authors/[id].get.ts').default
  *   }

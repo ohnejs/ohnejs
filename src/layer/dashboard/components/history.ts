@@ -1,4 +1,4 @@
-import { isUndefined, jsonClone, omit, ref } from 'ohne/utils';
+import { isUndefined, jsonClone, omit, ref } from 'ohnejs/utils';
 
 /**
  * Options for `History`.

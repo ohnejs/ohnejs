@@ -1,5 +1,5 @@
-import { defineDashboardPage, navigate, sessionUser } from 'ohne/dashboard';
-import { effect, isNull, isUndefined } from 'ohne/utils';
+import { defineDashboardPage, navigate, sessionUser } from 'ohnejs/dashboard';
+import { effect, isNull, isUndefined } from 'ohnejs/utils';
 
 /**
  * The home page.

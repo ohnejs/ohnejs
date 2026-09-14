@@ -1,4 +1,4 @@
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 /**
  * The `UploadsJournal` collection: storage effects waiting to run, one row each.

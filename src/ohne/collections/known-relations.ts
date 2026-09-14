@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownRelations {
  *     Posts: { authors: 'Users' };
  *     Users: {};

@@ -27,7 +27,7 @@ const fixtureIndexed = defineField({ columnType: 'text', forceIndex: true });
 
 const fixtureLinked = defineField({ columnType: false });
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownFields {
     fixtureField: typeof fixtureField;
     fixtureIndexed: typeof fixtureIndexed;

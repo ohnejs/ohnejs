@@ -1,4 +1,4 @@
-import { slugify, slugifyFileName } from 'ohne/utils';
+import { slugify, slugifyFileName } from 'ohnejs/utils';
 
 /**
  * The name the server stores a folder under when asked for `name`, `''` when nothing in it can slug.

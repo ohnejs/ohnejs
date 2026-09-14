@@ -18,7 +18,7 @@ import {
   setDocumentTitle,
   useHotkeys,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   debounce,
   effect,
@@ -30,7 +30,7 @@ import {
   ref,
   stringifySearchParams,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

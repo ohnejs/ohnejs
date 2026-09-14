@@ -420,7 +420,7 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * @example
  * ```ts
  * // migrations/2026-07-draft-flag.ts - move a field's column, retyping its values
- * import { defineMigration } from 'ohne'
+ * import { defineMigration } from 'ohnejs'
  *
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'isDraft' },
@@ -432,7 +432,7 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * @example
  * ```ts
  * // migrations/2026-08-articles.ts - rename a collection, every owned table following
- * import { defineMigration } from 'ohne'
+ * import { defineMigration } from 'ohnejs'
  *
  * export default defineMigration({
  *   from: { collection: 'Posts' },
@@ -443,7 +443,7 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * @example
  * ```ts
  * // migrations/2026-09-drop-legacy.ts - discard a field on purpose
- * import { defineMigration } from 'ohne'
+ * import { defineMigration } from 'ohnejs'
  *
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'legacy' },
@@ -465,7 +465,7 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * @example
  * ```ts
  * // migrations/2026-10-title-per-post.ts - turn a translatable field back off
- * import { defineMigration } from 'ohne'
+ * import { defineMigration } from 'ohnejs'
  *
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'title', translatable: true },

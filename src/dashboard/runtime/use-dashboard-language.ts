@@ -10,7 +10,7 @@ import { dashboardConfig } from './config.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne/dashboard' {
+ * declare module 'ohnejs/dashboard' {
  *   interface DashboardLanguages {
  *     en: true
  *     'de-AT': true

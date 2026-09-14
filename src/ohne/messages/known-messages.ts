@@ -9,7 +9,7 @@ import type { LiteralUnion } from '../../utils/index.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownMessages {
  *     'field.minLength': { min: number }
  *     'field.required': {}

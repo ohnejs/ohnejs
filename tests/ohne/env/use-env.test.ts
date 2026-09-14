@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
-import { boolEnv, useEnv } from 'ohne';
-import { effect } from 'ohne/utils';
+import { boolEnv, useEnv } from 'ohnejs';
+import { effect } from 'ohnejs/utils';
 
 const KEYS = [
   'SILENT',

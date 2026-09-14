@@ -1,5 +1,5 @@
-import { defineField } from 'ohne';
-import { isEmpty } from 'ohne/utils';
+import { defineField } from 'ohnejs';
+import { isEmpty } from 'ohnejs/utils';
 
 import { validationMessage } from '../../ohne/fields/validation-message.ts';
 

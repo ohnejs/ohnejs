@@ -5,7 +5,7 @@ method, and the default export handles the request:
 
 ```ts
 // api/authors/[id].get.ts
-import { defineHandler, notFound, query } from 'ohne';
+import { defineHandler, notFound, query } from 'ohnejs';
 
 export default defineHandler(async ({ params }) => {
   const author = await query('Authors').where('UUID', params.id).findFirst();
@@ -49,7 +49,7 @@ A `[name]` segment - in a file or a directory name - matches exactly one URL seg
 
 ```ts
 // api/files/[...path].get.ts
-import { defineHandler } from 'ohne';
+import { defineHandler } from 'ohnejs';
 
 export default defineHandler(({ params }) => params.path);
 ```
@@ -112,7 +112,7 @@ the `Allow` header.
 
 ```ts
 // api/reports.get.ts
-import { defineHandler, query } from 'ohne';
+import { defineHandler, query } from 'ohnejs';
 
 export default defineHandler(() => query('Reports').findMany(), {
   handlerTimeout: '5m',
@@ -134,7 +134,7 @@ replacing it, disable it by glob:
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   disable: {

@@ -630,7 +630,7 @@ function emitUpdateShapes(
 }
 
 /**
- * Writes `node/database.ts`: imports every definition, augments `ohne`, and registers each one.
+ * Writes `node/database.ts`: imports every definition, augments `ohnejs`, and registers each one.
  */
 async function writeNode(
   dir: string,
@@ -652,7 +652,7 @@ async function writeNode(
     migrations.length > 0 ? 'useMigrations' : null,
   ].filter(isString);
   if (uses.length > 0) {
-    code.line(`import { ${uses.join(', ')} } from 'ohne';`);
+    code.line(`import { ${uses.join(', ')} } from 'ohnejs';`);
     code.line();
   }
   collections.forEach((collection, i) => {
@@ -673,7 +673,7 @@ async function writeNode(
     "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCapabilities, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');

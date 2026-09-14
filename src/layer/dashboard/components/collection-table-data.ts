@@ -13,8 +13,8 @@ import {
   joinLabel,
   seedLabel,
   useDashboardLanguage,
-} from 'ohne/dashboard';
-import { hasKey, isEmpty, isNumber, isString, onCleanup, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { hasKey, isEmpty, isNumber, isString, onCleanup, untracked } from 'ohnejs/utils';
 
 import { translationsCell } from './translations-cell.ts';
 

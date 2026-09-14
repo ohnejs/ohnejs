@@ -1,5 +1,5 @@
-import { queryUntyped } from 'ohne';
-import { isUndefined } from 'ohne/utils';
+import { queryUntyped } from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import type { UploadRecord } from './types.ts';
 

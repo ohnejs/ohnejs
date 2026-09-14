@@ -1,5 +1,5 @@
-import { attachTooltip, button, css, h, icon, when } from 'ohne/dashboard';
-import { onCleanup, ref } from 'ohne/utils';
+import { attachTooltip, button, css, h, icon, when } from 'ohnejs/dashboard';
+import { onCleanup, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { TargetDirectory } from './_target-tree.ts';

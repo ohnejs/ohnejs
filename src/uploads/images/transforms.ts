@@ -1,4 +1,4 @@
-import { isInteger, isNull, isRealNumber, isUndefined } from 'ohne/utils';
+import { isInteger, isNull, isRealNumber, isUndefined } from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 

@@ -9,14 +9,14 @@ import {
   dispatchTrigger,
   openDialog,
   toast,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   hasCapability,
   isUndefined,
   parseSearchParams,
   stringifySearchParams,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

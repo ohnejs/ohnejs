@@ -1,4 +1,4 @@
-import { defineLayer } from 'ohne';
+import { defineLayer } from 'ohnejs';
 
 import { AUTH_DEFAULTS } from './src/layer/auth/config.ts';
 

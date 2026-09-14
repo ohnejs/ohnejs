@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownCollections extends GeneratedCollections {}
  * }
  * ```

@@ -1,5 +1,5 @@
-import { css, each, h } from 'ohne/dashboard';
-import { isEmpty, ref, untracked } from 'ohne/utils';
+import { css, each, h } from 'ohnejs/dashboard';
+import { isEmpty, ref, untracked } from 'ohnejs/utils';
 
 import { useUploadsT } from './_messages.ts';
 import { moveUploads } from './media-library-data.ts';

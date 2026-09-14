@@ -5,7 +5,7 @@ optional payload. Throw one from a handler - or return it - and it becomes the r
 
 ```ts
 // api/authors/[id].get.ts
-import { defineHandler, notFound, query } from 'ohne';
+import { defineHandler, notFound, query } from 'ohnejs';
 
 export default defineHandler(async ({ params }) => {
   const author = await query('Authors').where('UUID', params.id).findFirst();
@@ -25,7 +25,7 @@ appears only when you attach one (below).
 
 ## Named constructors
 
-One constructor per common status, each importable from `ohne`:
+One constructor per common status, each importable from `ohnejs`:
 
 ```
 badRequest()           400 Bad Request
@@ -44,7 +44,7 @@ reason phrase is used - `notFound()` answers with `Not Found`. For any other sta
 error directly:
 
 ```ts
-import { HTTPError } from 'ohne';
+import { HTTPError } from 'ohnejs';
 
 throw new HTTPError(418, "I'm a teapot");
 ```

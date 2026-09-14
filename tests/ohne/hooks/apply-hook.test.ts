@@ -4,7 +4,7 @@ import { beforeEach, describe, it } from 'node:test';
 import { applyHook, hook, useHooks } from '../../../src/ohne/index.ts';
 import { sleep } from '../../../src/utils/index.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     noop: (value: string) => string;
     upper: (s: string) => string;

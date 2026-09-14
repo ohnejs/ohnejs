@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownDatabases {
  *     rateLimit: true
  *   }

@@ -141,7 +141,7 @@ const ROUTE: Route = {
   method: 'POST',
   pattern: '/scoped',
   file: '/scoped.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler,
 };
 

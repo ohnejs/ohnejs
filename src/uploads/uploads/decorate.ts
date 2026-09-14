@@ -1,4 +1,4 @@
-import { isNumber, isString } from 'ohne/utils';
+import { isNumber, isString } from 'ohnejs/utils';
 
 import { hasImageService, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
 import { uploadPath } from './path.ts';

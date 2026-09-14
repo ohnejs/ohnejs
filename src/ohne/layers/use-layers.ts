@@ -37,7 +37,7 @@ const registry: LayerRegistry<Config, LayerExtras> = createLayerRegistry<Config,
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface Config {
  *     tags: string[]
  *   }

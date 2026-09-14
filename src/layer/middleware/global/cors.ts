@@ -5,7 +5,7 @@ import {
   type Middleware,
   useConfig,
   useEnv,
-} from 'ohne';
+} from 'ohnejs';
 
 let middleware: Middleware | null = null;
 

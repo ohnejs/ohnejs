@@ -7,10 +7,10 @@ does not need it never carries it.
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne', 'ohne/uploads'],
+  layers: ['ohnejs', 'ohnejs/uploads'],
 });
 ```
 
@@ -67,7 +67,7 @@ take a prefix as well as a file, so a folder is one operation. Register one from
 
 ```ts
 // boot/storage.ts
-import { useStorages } from 'ohne/uploads';
+import { useStorages } from 'ohnejs/uploads';
 
 import { createS3Storage } from '../storage/s3.ts';
 
@@ -146,10 +146,10 @@ records point at that origin and this route stays the origin behind it.
 
 ## In server code
 
-The same operations are functions in `ohne/uploads`, for a route or a boot file of your own:
+The same operations are functions in `ohnejs/uploads`, for a route or a boot file of your own:
 
 ```ts
-import { createFolder, deleteUpload, moveUpload, putUpload, updateUpload } from 'ohne/uploads';
+import { createFolder, deleteUpload, moveUpload, putUpload, updateUpload } from 'ohnejs/uploads';
 
 const upload = await putUpload({ directory: 'imports', name: 'report.pdf', body });
 await updateUpload(upload.UUID, { description: 'Quarterly report' }, { locale: 'de' });

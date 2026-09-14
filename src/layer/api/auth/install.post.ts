@@ -1,4 +1,4 @@
-import { defineHandler, forbidden, queryUntyped, readJSONBody } from 'ohne';
+import { defineHandler, forbidden, queryUntyped, readJSONBody } from 'ohnejs';
 
 import type { User } from '../../auth/types.ts';
 

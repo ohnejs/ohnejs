@@ -1,11 +1,11 @@
-import type { CacheControlOptions, LayerStrategies } from 'ohne/utils';
+import type { CacheControlOptions, LayerStrategies } from 'ohnejs/utils';
 
-import { useConfig, useEnv } from 'ohne';
-import { withDefaults } from 'ohne/utils';
+import { useConfig, useEnv } from 'ohnejs';
+import { withDefaults } from 'ohnejs/utils';
 
 import type { ImageTransforms } from './images/transforms.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Config {
     /**
      * Settings for the uploads layer: where files live, what may be uploaded, and how files are served.

@@ -13,7 +13,7 @@ export type { CodegenBucket } from '../codegen/codegen-dir.ts';
 export interface LayerCodegen {
   /**
    * The bucket the file lands in, which decides the TypeScript program that includes it.
-   * `'node'` for `ohne` augmentations, `'browser'` for `ohne/dashboard` ones, `'shared'` for pure types.
+   * `'node'` for `ohnejs` augmentations, `'browser'` for `ohnejs/dashboard` ones, `'shared'` for pure types.
    */
   bucket: CodegenBucket;
 
@@ -99,7 +99,7 @@ export interface LayerDefinition {
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface Config {
  *     myFeature: { ttl: number; tags: string[] }
  *   }

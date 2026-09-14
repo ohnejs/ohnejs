@@ -17,7 +17,7 @@ import { buildDesiredSchema } from './schema/desired.ts';
 import { syncDatabase } from './schema/sync.ts';
 import { useDatabase } from './use-database.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs after the database schema reconcile commits, carrying the run's `GuardReport`.

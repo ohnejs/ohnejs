@@ -10,7 +10,7 @@ column, a relation, or a nested table. This guide covers the field types; see
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {

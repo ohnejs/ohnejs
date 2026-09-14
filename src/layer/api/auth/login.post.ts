@@ -1,6 +1,6 @@
-import { badRequest, defineHandler, queryUntyped, readJSONBody, unauthorized } from 'ohne';
-import { isString, isUndefined } from 'ohne/utils';
-import { passwordNeedsRehash, verifyPassword } from 'ohne/utils/crypto';
+import { badRequest, defineHandler, queryUntyped, readJSONBody, unauthorized } from 'ohnejs';
+import { isString, isUndefined } from 'ohnejs/utils';
+import { passwordNeedsRehash, verifyPassword } from 'ohnejs/utils/crypto';
 
 import type { User } from '../../auth/types.ts';
 

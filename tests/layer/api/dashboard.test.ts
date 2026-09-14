@@ -35,7 +35,7 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { keyBy } from '../../../src/utils/index.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownMessages {
     'dashMenu.tools': { n: number };
   }
@@ -254,7 +254,7 @@ const route: Route = {
   method: 'GET',
   pattern: '/dashboard',
   file: 'dashboard.get.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler: dashboardGet as AnyHandler,
 };
 

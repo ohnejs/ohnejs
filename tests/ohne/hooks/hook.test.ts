@@ -3,7 +3,7 @@ import { beforeEach, describe, it } from 'node:test';
 
 import { hook, useHooks } from '../../../src/ohne/index.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     greet: () => void;
   }

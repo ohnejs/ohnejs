@@ -1,5 +1,5 @@
-import { css } from 'ohne/dashboard';
-import { clamp, easeInOutCubic, onCleanup } from 'ohne/utils';
+import { css } from 'ohnejs/dashboard';
+import { clamp, easeInOutCubic, onCleanup } from 'ohnejs/utils';
 
 import { LOGO_GLYPHS, LOGO_HEIGHT, LOGO_WELL_X, LOGO_WELL_Y, logoFrame } from './logo-model.ts';
 

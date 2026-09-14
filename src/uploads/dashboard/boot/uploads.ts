@@ -1,6 +1,6 @@
 import { registerTranslatableContext } from 'app/components/content-language-switcher.ts';
 import { registerShellSlot } from 'app/components/shell-slots.ts';
-import { useRoute } from 'ohne/dashboard';
+import { useRoute } from 'ohnejs/dashboard';
 
 import { dropUploader } from '../components/drop-uploader.ts';
 import { uploadsCollection } from '../components/media-library-data.ts';

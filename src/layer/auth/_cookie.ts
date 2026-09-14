@@ -1,5 +1,5 @@
-import { deleteCookie, setCookie, useAuthorization, useCookies } from 'ohne';
-import { isNull, isUndefined } from 'ohne/utils';
+import { deleteCookie, setCookie, useAuthorization, useCookies } from 'ohnejs';
+import { isNull, isUndefined } from 'ohnejs/utils';
 
 import { useAuthConfig } from './config.ts';
 

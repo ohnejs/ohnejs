@@ -1,7 +1,7 @@
-import type { Hotkeys } from 'ohne/dashboard';
+import type { Hotkeys } from 'ohnejs/dashboard';
 
-import { attachTooltip, button, h, icon, useHotkeys, useT } from 'ohne/dashboard';
-import { isNull, isUndefined, onCleanup } from 'ohne/utils';
+import { attachTooltip, button, h, icon, useHotkeys, useT } from 'ohnejs/dashboard';
+import { isNull, isUndefined, onCleanup } from 'ohnejs/utils';
 
 import type { History } from './history.ts';
 

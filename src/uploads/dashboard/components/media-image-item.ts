@@ -1,4 +1,4 @@
-import { attachTooltip, button, css, h, icon, when } from 'ohne/dashboard';
+import { attachTooltip, button, css, h, icon, when } from 'ohnejs/dashboard';
 import {
   formatBytes,
   isNull,
@@ -6,7 +6,7 @@ import {
   onCleanup,
   parseSearchParams,
   stringifySearchParams,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

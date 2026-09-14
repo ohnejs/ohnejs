@@ -1,5 +1,5 @@
-import { attachTooltip, bubble, button, icon, useT } from 'ohne/dashboard';
-import { onCleanup } from 'ohne/utils';
+import { attachTooltip, bubble, button, icon, useT } from 'ohnejs/dashboard';
+import { onCleanup } from 'ohnejs/utils';
 
 /**
  * The footer button that clears a selection: a `square-off` icon carrying the count in its bubble.

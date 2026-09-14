@@ -76,7 +76,7 @@ describe('generateRoutes', () => {
     const paths = await generateRoutes(app);
     const out = readFileSync(bucketFile(paths, 'node'), 'utf8');
 
-    strictEqual(out.includes("import { useRoutes } from 'ohne';"), true);
+    strictEqual(out.includes("import { useRoutes } from 'ohnejs';"), true);
     strictEqual(out.includes('interface KnownRoutes {'), true);
     strictEqual(out.includes("'/health': typeof h0;"), true);
     strictEqual(out.includes("'GET /': typeof h1;"), true);
@@ -181,9 +181,9 @@ describe('generateRoutes', () => {
     strictEqual(
       readFileSync(bucketFile(paths, 'node'), 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne';\n" +
+        "import type {} from 'ohnejs';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownRoutes {}\n' +
         '}\n',
     );
@@ -194,10 +194,10 @@ describe('generateRoutes', () => {
     strictEqual(
       readFileSync(bucketFile(paths, 'browser'), 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne/dashboard';\n" +
+        "import type {} from 'ohnejs/dashboard';\n" +
         "import type { GeneratedAPIRoutes } from '../shared/routes.ts';\n" +
         '\n' +
-        "declare module 'ohne/dashboard' {\n" +
+        "declare module 'ohnejs/dashboard' {\n" +
         '  interface KnownAPIRoutes extends GeneratedAPIRoutes {}\n' +
         '}\n',
     );

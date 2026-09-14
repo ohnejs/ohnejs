@@ -23,7 +23,7 @@ import { toResponse } from './to-response.ts';
 import { resolveMessage, translate } from './translate.ts';
 import { runWithEvent } from './use-event.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters a handler's raw return value before it serializes into a `Response`.

@@ -11,7 +11,7 @@ A collection is one file under `collections/`, named after it:
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {

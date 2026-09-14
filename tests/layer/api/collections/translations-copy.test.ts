@@ -116,7 +116,7 @@ const ROUTE: Route = {
   method: 'POST',
   pattern: '/collections/[collection]/[uuid]/translations/copy',
   file: '/collections/[collection]/[uuid]/translations/copy.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler: copyPost as AnyHandler,
 };
 

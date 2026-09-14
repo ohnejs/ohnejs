@@ -1,7 +1,7 @@
-import type { Transaction } from 'ohne';
+import type { Transaction } from 'ohnejs';
 
-import { queryMetadata, queryUntyped, useDatabase, useDialect } from 'ohne';
-import { extname, isUndefined } from 'ohne/utils';
+import { queryMetadata, queryUntyped, useDatabase, useDialect } from 'ohnejs';
+import { extname, isUndefined } from 'ohnejs/utils';
 
 import type { UploadRecord } from './types.ts';
 

@@ -1,5 +1,5 @@
-import { defineField, type Message, useRoles } from 'ohne';
-import { isArray, isString, isUndefined, uniqueArray } from 'ohne/utils';
+import { defineField, type Message, useRoles } from 'ohnejs';
+import { isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
 
 /**
  * The `roles` field type: a list of role names, stored as a JSON list.

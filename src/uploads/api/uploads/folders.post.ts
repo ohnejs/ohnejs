@@ -1,6 +1,6 @@
-import { badRequest, defineHandler, readJSONBody, setResponseStatus } from 'ohne';
-import { requireCapability } from 'ohne/auth';
-import { isString } from 'ohne/utils';
+import { badRequest, defineHandler, readJSONBody, setResponseStatus } from 'ohnejs';
+import { requireCapability } from 'ohnejs/auth';
+import { isString } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

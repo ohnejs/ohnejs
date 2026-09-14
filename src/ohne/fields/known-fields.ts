@@ -22,7 +22,7 @@ import type { time } from './builtin/time.ts';
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownFields {
  *     slug: typeof import('./fields/slug.ts').default
  *   }

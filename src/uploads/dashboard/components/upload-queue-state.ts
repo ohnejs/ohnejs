@@ -1,4 +1,4 @@
-import { clamp, errorMessage, isUndefined, ref, uuidv7 } from 'ohne/utils';
+import { clamp, errorMessage, isUndefined, ref, uuidv7 } from 'ohnejs/utils';
 
 /**
  * Where one queued upload stands.

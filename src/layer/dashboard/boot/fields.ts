@@ -23,7 +23,7 @@ import {
   textInput,
   timezones,
   useT,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   capitalize,
   deepEqual,
@@ -40,7 +40,7 @@ import {
   ref,
   searchByKeywords,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import { localeName } from '../components/content-language-switcher.ts';
 import '../components/data-table-popup.ts';

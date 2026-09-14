@@ -1,6 +1,6 @@
-import type { LayerCodegen } from 'ohne';
+import type { LayerCodegen } from 'ohnejs';
 
-import { createCodeBuilder, propertyKey } from 'ohne/utils/codegen';
+import { createCodeBuilder, propertyKey } from 'ohnejs/utils/codegen';
 
 import { useUploadsConfig } from '../config.ts';
 
@@ -16,9 +16,9 @@ export const imageVariantsCodegen: LayerCodegen = {
   code() {
     const names = Object.keys(useUploadsConfig().images.variants).sort();
     const code = createCodeBuilder();
-    code.line("import type {} from 'ohne/uploads';");
+    code.line("import type {} from 'ohnejs/uploads';");
     code.line();
-    code.line("declare module 'ohne/uploads' {");
+    code.line("declare module 'ohnejs/uploads' {");
     code.indent(() => {
       if (names.length === 0) {
         code.line('interface KnownImageVariants {}');

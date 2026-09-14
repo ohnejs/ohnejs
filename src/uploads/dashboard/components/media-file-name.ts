@@ -1,5 +1,5 @@
-import { attachTooltip, css, h, when } from 'ohne/dashboard';
-import { isFunction, onCleanup } from 'ohne/utils';
+import { attachTooltip, css, h, when } from 'ohnejs/dashboard';
+import { isFunction, onCleanup } from 'ohnejs/utils';
 
 import { splitFileName } from './media-library-state.ts';
 

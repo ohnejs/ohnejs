@@ -1,5 +1,5 @@
-import { type Capability, forbidden, useRoles } from 'ohne';
-import { hasCapability, uniqueArray } from 'ohne/utils';
+import { type Capability, forbidden, useRoles } from 'ohnejs';
+import { hasCapability, uniqueArray } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 

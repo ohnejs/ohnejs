@@ -1,4 +1,4 @@
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 import { drainJournal } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';

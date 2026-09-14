@@ -25,7 +25,7 @@ export interface RoleDefinition {
  * @example
  * ```ts
  * // roles/editor.ts
- * import { defineRole } from 'ohne'
+ * import { defineRole } from 'ohnejs'
  *
  * export default defineRole({
  *   capabilities: ['collection.Posts.*', 'collection.Tags.read'],

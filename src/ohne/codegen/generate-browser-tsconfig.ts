@@ -18,7 +18,7 @@ const BROWSER_TSCONFIG = fileURLToPath(new URL('../../../tsconfig.browser.json',
  *
  * An editor assigns an open file to the nearest ancestor `tsconfig.json` that includes it.
  * The app's dashboard config covers the bucket but sits beside it, so that walk never finds one.
- * An unclaimed bucket file lands in an inferred project, whose resolution misses `ohne/dashboard`.
+ * An unclaimed bucket file lands in an inferred project, whose resolution misses `ohnejs/dashboard`.
  * The config `extends` the framework's browser tsconfig by absolute path, so it resolves anywhere.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).

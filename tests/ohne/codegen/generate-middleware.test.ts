@@ -73,7 +73,7 @@ describe('generateMiddleware', () => {
     strictEqual(path?.endsWith('/.ohne/node/middleware.ts'), true);
     const out = readFileSync(path!, 'utf8');
 
-    strictEqual(out.includes("import { useMiddleware } from 'ohne';"), true);
+    strictEqual(out.includes("import { useMiddleware } from 'ohnejs';"), true);
     strictEqual(out.includes("import m0 from '../../middleware/global/secure.ts';"), true);
     strictEqual(out.includes("import m1 from '../../packages/a/middleware/10-auth.ts';"), true);
     strictEqual(out.includes("import m2 from '../../middleware/20-locale.ts';"), true);
@@ -121,9 +121,9 @@ describe('generateMiddleware', () => {
     strictEqual(
       readFileSync(path!, 'utf8'),
       `${BANNER}\n` +
-        "import type {} from 'ohne';\n" +
+        "import type {} from 'ohnejs';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownMiddleware {}\n' +
         '  interface KnownNamedMiddleware {}\n' +
         '}\n',

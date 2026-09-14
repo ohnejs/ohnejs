@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownMiddleware {
  *     'auth': typeof import('../middleware/auth.ts').default
  *   }
@@ -33,7 +33,7 @@ export type MiddlewareKey = [keyof KnownMiddleware] extends [never]
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface KnownNamedMiddleware {
  *     'rate-limit': typeof import('../middleware/rate-limit.ts').default
  *   }

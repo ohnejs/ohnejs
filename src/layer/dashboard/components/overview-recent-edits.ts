@@ -17,7 +17,7 @@ import {
   joinLabel,
   useT,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   computed,
   effect,
@@ -29,7 +29,7 @@ import {
   onCleanup,
   ref,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { OverviewSearch } from '../pages/overview.ts';
 

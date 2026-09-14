@@ -1,4 +1,4 @@
-import { slugify, slugifyFileName, uniqueName } from 'ohne/utils';
+import { slugify, slugifyFileName, uniqueName } from 'ohnejs/utils';
 
 /**
  * A row's location: its parent path and its name, the pair the composite unique index covers.

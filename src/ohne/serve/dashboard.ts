@@ -82,13 +82,13 @@ const RELOAD_PATH = `${MODULE_BASE}/dashboard/reload`;
 /**
  * Maps the bare specifiers a dashboard page may import to their served URLs.
  * The result is injected as the shell's importmap.
- * `ohne/utils` serves the full utils barrel.
+ * `ohnejs/utils` serves the full utils barrel.
  * A dashboard page or layer can import any isomorphic util by name.
  */
 const IMPORTMAP = jsonForScript({
   imports: {
-    'ohne/dashboard': `${MODULE_BASE}/dashboard/index.ts`,
-    'ohne/utils': `${MODULE_BASE}/utils/index.ts`,
+    'ohnejs/dashboard': `${MODULE_BASE}/dashboard/index.ts`,
+    'ohnejs/utils': `${MODULE_BASE}/utils/index.ts`,
     'app/': `${APP_MODULE_BASE}/`,
   },
 });
@@ -275,7 +275,7 @@ function resolveAPIURL(): string {
 /**
  * Warns when the app's dashboard directory exists without a `tsconfig.json`, printing one to create.
  * Every path in it is relative to the dashboard directory, so a nested `dirs.dashboard` still resolves.
- * The `app/*` entry names `node_modules/ohne` by path, not the resolved framework layer directory.
+ * The `app/*` entry names `node_modules/ohnejs` by path, not the resolved framework layer directory.
  * The resolved directory is a realpath, which under pnpm is a version-pinned store path.
  */
 async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promise<void> {
@@ -288,14 +288,14 @@ async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promis
   const buckets = relativePath(dashboardDir, codegen);
   const framework = relativePath(
     dashboardDir,
-    joinPath(appDir, 'node_modules/ohne/src/layer/dashboard'),
+    joinPath(appDir, 'node_modules/ohnejs/src/layer/dashboard'),
   );
   usePrinter().warnBlock({
     title: 'Dashboard has no `tsconfig.json`',
     body: [
       'Without it the editor lacks DOM types and the generated types for dashboard code.',
       'Create a `tsconfig.json` inside it with:',
-      `{\n  "extends": "ohne/tsconfig.browser.json",\n  "compilerOptions": {\n    "paths": { "app/*": ["./*", "${framework}/*"] }\n  },\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
+      `{\n  "extends": "ohnejs/tsconfig.browser.json",\n  "compilerOptions": {\n    "paths": { "app/*": ["./*", "${framework}/*"] }\n  },\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
     ],
     path: relativePath(process.cwd(), dashboardDir),
   });

@@ -20,7 +20,7 @@ import {
   useConfig,
   useMessages,
   useRoles,
-} from 'ohne';
+} from 'ohnejs';
 import {
   isEmpty,
   isJSONValue,
@@ -34,7 +34,7 @@ import {
   toKebabCase,
   toSentenceCase,
   uniqueArray,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
@@ -400,7 +400,7 @@ export interface DashboardMeta {
   accountFields: DashboardField[];
 }
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the sidebar menu after `dashboard.menu` resolves, before `GET /dashboard` answers.

@@ -1,5 +1,5 @@
-import { button, css, h, icon, useT } from 'ohne/dashboard';
-import { effect } from 'ohne/utils';
+import { button, css, h, icon, useT } from 'ohnejs/dashboard';
+import { effect } from 'ohnejs/utils';
 
 import { contentLanguageSwitcher } from './content-language-switcher.ts';
 import { headerDropdownMenu } from './header-dropdown-menu.ts';

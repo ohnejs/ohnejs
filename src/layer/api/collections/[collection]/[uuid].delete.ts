@@ -1,5 +1,5 @@
-import { defineHandler, queryUntyped } from 'ohne';
-import { isUndefined } from 'ohne/utils';
+import { defineHandler, queryUntyped } from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import { notFound } from '../../../../ohne/http/http-error.ts';
 import { assertNoParams, gateCollection } from '../../../collections-api/gate.ts';

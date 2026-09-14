@@ -1,7 +1,7 @@
-import { useConfig } from 'ohne';
-import { withDefaults } from 'ohne/utils';
+import { useConfig } from 'ohnejs';
+import { withDefaults } from 'ohnejs/utils';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Config {
     /**
      * Authentication settings for the ohne layer's `Users` sessions.

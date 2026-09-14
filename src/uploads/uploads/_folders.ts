@@ -1,6 +1,6 @@
-import type { Transaction } from 'ohne';
+import type { Transaction } from 'ohnejs';
 
-import { queryUntyped } from 'ohne';
+import { queryUntyped } from 'ohnejs';
 
 import { validationError } from '../../ohne/query/write/errors.ts';
 import { isNotUnique } from './_errors.ts';

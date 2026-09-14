@@ -1,6 +1,6 @@
 import { ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import { useEnv, useLayers, usePrinter } from 'ohne';
+import { useEnv, useLayers, usePrinter } from 'ohnejs';
 
 function capture(): string[] {
   const buf: string[] = [];

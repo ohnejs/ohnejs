@@ -12,7 +12,7 @@ Every request carries mutable response state the serializer reads once the handl
 
 ```ts
 // api/export.get.ts
-import { defineHandler, useResponse } from 'ohne';
+import { defineHandler, useResponse } from 'ohnejs';
 
 export default defineHandler(() => {
   useResponse().headers.set('cache-control', 'no-store');
@@ -24,7 +24,7 @@ export default defineHandler(() => {
 
 ```ts
 // api/subscribers.post.ts
-import { defineHandler, setResponseStatus } from 'ohne';
+import { defineHandler, setResponseStatus } from 'ohnejs';
 
 export default defineHandler(async () => {
   const subscriber = await subscribe();
@@ -42,7 +42,7 @@ standard `Headers`, so `set`, `append`, and `delete` all work.
 
 ```ts
 // api/old-posts.get.ts
-import { defineHandler, sendRedirect } from 'ohne';
+import { defineHandler, sendRedirect } from 'ohnejs';
 
 export default defineHandler(() => sendRedirect('/posts', 301));
 ```
@@ -57,8 +57,8 @@ client's cached copy is still fresh, answer `304` when it is. `etag` computes th
 
 ```ts
 // api/posts.get.ts
-import { defineHandler, isFresh, query, sendNotModified, useResponse } from 'ohne';
-import { etag } from 'ohne/utils/etag';
+import { defineHandler, isFresh, query, sendNotModified, useResponse } from 'ohnejs';
+import { etag } from 'ohnejs/utils/etag';
 
 export default defineHandler(async () => {
   const posts = await query('Posts').findMany();
@@ -78,7 +78,7 @@ export default defineHandler(async () => {
 `cacheControl` builds a `Cache-Control` value from named directives, durations in seconds:
 
 ```ts
-import { cacheControl } from 'ohne/utils';
+import { cacheControl } from 'ohnejs/utils';
 
 useResponse().headers.set('cache-control', cacheControl({ public: true, maxAge: 3600 }));
 // -> 'public, max-age=3600'
@@ -92,7 +92,7 @@ has the file, it throws a `404`:
 
 ```ts
 // api/assets/[...path].get.ts
-import { defineHandler, sendFile } from 'ohne';
+import { defineHandler, sendFile } from 'ohnejs';
 
 export default defineHandler(({ params }) => sendFile(['public'], params.path));
 ```
@@ -122,7 +122,7 @@ you close it or the client disconnects:
 
 ```ts
 // api/clock.get.ts
-import { defineHandler, sendEvents } from 'ohne';
+import { defineHandler, sendEvents } from 'ohnejs';
 
 export default defineHandler(() => {
   const stream = sendEvents({ onClose: () => clearInterval(timer) });
@@ -158,7 +158,7 @@ isolated and logged, never touching the already-sent response:
 
 ```ts
 // api/subscribers.post.ts
-import { defineHandler, waitUntil } from 'ohne';
+import { defineHandler, waitUntil } from 'ohnejs';
 
 export default defineHandler(async () => {
   const subscriber = await subscribe();

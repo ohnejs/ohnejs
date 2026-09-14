@@ -82,7 +82,7 @@ const ROUTE: Route = {
   method: 'DELETE',
   pattern: '/collections/[collection]/[uuid]/translations',
   file: '/collections/[collection]/[uuid]/translations.ts',
-  layer: 'ohne',
+  layer: 'ohnejs',
   handler: translationsDelete as AnyHandler,
 };
 

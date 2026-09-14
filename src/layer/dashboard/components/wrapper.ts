@@ -1,4 +1,4 @@
-import { type Child, css, h } from 'ohne/dashboard';
+import { type Child, css, h } from 'ohnejs/dashboard';
 
 css`
   body {

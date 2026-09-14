@@ -1,5 +1,5 @@
-import { defineHandler, queryMetadata, queryUntyped } from 'ohne';
-import { isUndefined } from 'ohne/utils';
+import { defineHandler, queryMetadata, queryUntyped } from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import { notFound } from '../../../../../ohne/http/http-error.ts';
 import { queryLocales } from '../../../../../ohne/query/locale.ts';

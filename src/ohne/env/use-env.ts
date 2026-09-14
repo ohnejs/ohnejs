@@ -70,7 +70,7 @@ registry.define('FORCE_SYNC', { default: false, parse: boolEnv, flag: 'boolean' 
  * `loadProjectEnv` fills `process.env` from the project's `.env` where the environment set nothing.
  * Use `set` to override a value for the current process (tests, runtime tweaks).
  * `set` never touches `process.env`.
- * Augment `Env` via `declare module 'ohne'` to add typed fields, then `define` them on first call.
+ * Augment `Env` via `declare module 'ohnejs'` to add typed fields, then `define` them on first call.
  *
  * @example
  * ```ts

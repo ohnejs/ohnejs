@@ -8,7 +8,7 @@ import {
   mediaCategory,
   mediaTypeMatches,
   parseBytes,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

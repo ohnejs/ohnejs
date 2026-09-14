@@ -1,4 +1,4 @@
-import { defineDashboardPage } from 'ohne/dashboard';
+import { defineDashboardPage } from 'ohnejs/dashboard';
 
 import { accountEditor } from '../components/account-editor.ts';
 import { shell } from '../components/shell.ts';

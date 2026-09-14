@@ -6,7 +6,7 @@
  * The generated augmentations would narrow those names away, so this file is the one hand-kept mirror.
  * The scanner skips `_`-prefixed files, so it contributes types alone.
  */
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownFields {
     /**
      * A date or time format pattern, like `YYYY-MM-DD`.

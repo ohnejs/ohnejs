@@ -12,8 +12,8 @@ import {
   useRoute,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isNullish, ref, type Ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isNullish, ref, type Ref, untracked } from 'ohnejs/utils';
 
 import { loginForm } from './login-form.ts';
 

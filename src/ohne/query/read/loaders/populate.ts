@@ -23,7 +23,7 @@ import { scopeColumns } from '../../sql/select.ts';
 import { compileWhere } from '../../sql/where.ts';
 import { hydrateScope } from '../hydrate.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters a populate node's freshly batch-read target records before they key back onto their parents.

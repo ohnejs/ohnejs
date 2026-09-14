@@ -6,7 +6,7 @@ the same validation the query builder runs.
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   api: { read: 'public', create: true },
@@ -144,8 +144,8 @@ guard and the middleware, and what it returns composes into every query the oper
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
-import { useUser } from 'ohne/auth';
+import { defineCollection, field } from 'ohnejs';
+import { useUser } from 'ohnejs/auth';
 
 export default defineCollection({
   api: {
@@ -205,7 +205,7 @@ over plain fields answers alike everywhere and costs no extra read.
 ### Who is asking
 
 `access` receives a context naming the `operation`. The caller is not in it: the caller is
-ambient, and `useUser`, `requireUser`, and `userCan` from `ohne/auth` read the request exactly as
+ambient, and `useUser`, `requireUser`, and `userCan` from `ohnejs/auth` read the request exactly as
 they do in a [handler](../auth/authentication.md#reading-the-current-user). That keeps a rule
 ordinary code. Here the author, any listed editor, or the author's manager may edit, only the
 author may delete, only the author hands a post to someone else, and a `posts.manage` capability
@@ -213,8 +213,8 @@ bypasses the editing rule:
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
-import { requireUser, useUser, userCan } from 'ohne/auth';
+import { defineCollection, field } from 'ohnejs';
+import { requireUser, useUser, userCan } from 'ohnejs/auth';
 
 export default defineCollection({
   api: {
@@ -282,7 +282,7 @@ then with the values it is about to write.
 ### Your own routes
 
 `access` belongs to the shipped endpoints; a query in your own route is trusted and unscoped. To
-hold a route to the same policy, open the query through `queryScoped` from `ohne/auth`. It runs
+hold a route to the same policy, open the query through `queryScoped` from `ohnejs/auth`. It runs
 the guard and the resolver exactly as the collections API does - a closed operation or a `false`
 verdict is a `404`, a missing user `401`, a missing capability `403` - and returns a builder to
 query through. A read carries the whole scope; an update or delete ANDs the scope's `where` in,
@@ -290,8 +290,8 @@ exactly as the shipped endpoints do. The builder speaks the object grammar the U
 
 ```ts
 // api/drafts.get.ts
-import { defineHandler } from 'ohne';
-import { queryScoped } from 'ohne/auth';
+import { defineHandler } from 'ohnejs';
+import { queryScoped } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const posts = await queryScoped('Posts', 'read');

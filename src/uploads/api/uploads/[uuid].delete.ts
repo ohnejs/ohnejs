@@ -1,5 +1,5 @@
-import { defineHandler } from 'ohne';
-import { requireCapability } from 'ohne/auth';
+import { defineHandler } from 'ohnejs';
+import { requireCapability } from 'ohnejs/auth';
 
 import { deleteUpload } from '../../uploads/delete-upload.ts';
 

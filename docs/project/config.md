@@ -6,10 +6,10 @@ adds type checking and autocomplete to a plain object:
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne'],
+  layers: ['ohnejs'],
 });
 ```
 
@@ -225,7 +225,7 @@ framework default applies, no matter what any layer set.
 anywhere in app code:
 
 ```ts
-import { useConfig } from 'ohne';
+import { useConfig } from 'ohnejs';
 
 const config = useConfig();
 

@@ -1,4 +1,4 @@
-import { isUndefined, naturalCompare } from 'ohne/utils';
+import { isUndefined, naturalCompare } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

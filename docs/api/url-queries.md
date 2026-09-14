@@ -16,7 +16,7 @@ import {
   queryUntyped,
   resolveGuards,
   useSearchParams,
-} from 'ohne';
+} from 'ohnejs';
 
 export default defineHandler(async () => {
   const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards());
@@ -225,7 +225,7 @@ import {
   queryUntyped,
   readQueryBody,
   resolveGuards,
-} from 'ohne';
+} from 'ohnejs';
 
 export default defineHandler(async () => {
   const parsed = parseQueryParams(await readQueryBody(), queryMetadata('Posts'), resolveGuards());
@@ -253,7 +253,7 @@ A bad query throws a `400` that serializes to a small, stable shape:
 `data.code` is a stable machine string your client can switch on; `data.path` locates the problem in
 the query. An unknown field and an operator a field does not support both collapse to `invalidField`,
 so a URL can never probe which fields your collection has. The complete catalog is the
-`WireErrorCode` type, importable from `ohne`.
+`WireErrorCode` type, importable from `ohnejs`.
 
 ## Guards
 

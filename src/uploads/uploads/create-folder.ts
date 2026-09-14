@@ -1,4 +1,4 @@
-import { queryUntyped, useDatabase } from 'ohne';
+import { queryUntyped, useDatabase } from 'ohnejs';
 
 import type { UploadRecord } from './types.ts';
 

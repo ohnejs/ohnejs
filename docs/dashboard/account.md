@@ -89,8 +89,8 @@ Time tokens:
 | `[...]` | Escaped characters (e.g. [Hours])                                |
 
 The same tokens are available to your own dashboard code through `formatDatePattern` from
-`ohne/utils`, and `formatDateTime`, `formatDate`, `formatTime`, and `formatRelative` from
-`ohne/dashboard` apply the signed-in user's settings for you.
+`ohnejs/utils`, and `formatDateTime`, `formatDate`, `formatTime`, and `formatRelative` from
+`ohnejs/dashboard` apply the signed-in user's settings for you.
 
 ## Where the settings apply
 
@@ -126,7 +126,7 @@ or change it in place:
 
 ```ts
 // boot/account.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('auth:account-fields', (fields) => {
   fields.unshift('displayName');

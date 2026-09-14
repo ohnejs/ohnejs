@@ -1,5 +1,5 @@
-import { apiUpload, dispatchTrigger, toast } from 'ohne/dashboard';
-import { isPlainObject, isString } from 'ohne/utils';
+import { apiUpload, dispatchTrigger, toast } from 'ohnejs/dashboard';
+import { isPlainObject, isString } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type {

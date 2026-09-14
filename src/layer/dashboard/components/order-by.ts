@@ -13,8 +13,8 @@ import {
   type SelectChoice,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, isUndefined, type Ref, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isUndefined, type Ref, ref, untracked } from 'ohnejs/utils';
 
 import { actionButton } from './item-actions.ts';
 

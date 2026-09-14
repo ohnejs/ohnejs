@@ -5,7 +5,7 @@ import {
   resolveGuards,
   scopedMetadata,
   useSearchParams,
-} from 'ohne';
+} from 'ohnejs';
 
 import { gateCollection, listRecords, readReach } from '../../../collections-api/gate.ts';
 

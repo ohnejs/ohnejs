@@ -18,15 +18,15 @@ import { usePrinter } from '../../printer/use-printer.ts';
 
 const run = promisify(execFile);
 
-const CONFIG_FILE = `import { defineConfig } from 'ohne';
+const CONFIG_FILE = `import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne'],
+  layers: ['ohnejs'],
 });
 `;
 
 const TSCONFIG_FILE = `{
-  "extends": "ohne/tsconfig.node.json",
+  "extends": "ohnejs/tsconfig.node.json",
   "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
   "exclude": ["dashboard"]
 }
@@ -210,7 +210,7 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
       prepare: 'ohne prepare',
       typecheck: 'tsc',
     },
-    dependencies: { ohne },
+    dependencies: { ohnejs: ohne },
     devDependencies: { '@types/node': '26.0.0', typescript: '7.0.2' },
     engines: { node: '>=26.0.0' },
   });

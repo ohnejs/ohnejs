@@ -6,7 +6,7 @@ with the handler, or answer the request outright.
 
 ```ts
 // middleware/global/request-id.ts
-import { defineMiddleware } from 'ohne';
+import { defineMiddleware } from 'ohnejs';
 
 export default defineMiddleware((event) => {
   event.response.headers.set('x-request-id', crypto.randomUUID());
@@ -33,7 +33,7 @@ current request's path against one or more patterns:
 
 ```ts
 // middleware/global/auth.ts
-import { defineMiddleware, matchPath, unauthorized } from 'ohne';
+import { defineMiddleware, matchPath, unauthorized } from 'ohnejs';
 
 export default defineMiddleware(async (event) => {
   if (!matchPath('/admin/**')) return;
@@ -58,7 +58,7 @@ Every middleware outside `global/` is named and sits idle until a route opts in 
 
 ```ts
 // middleware/rate-limit.ts
-import { defineMiddleware, tooManyRequests } from 'ohne';
+import { defineMiddleware, tooManyRequests } from 'ohnejs';
 
 export default defineMiddleware((event) => {
   if (overLimit(event.ip)) return tooManyRequests();
@@ -67,7 +67,7 @@ export default defineMiddleware((event) => {
 
 ```ts
 // api/search.get.ts
-import { defineHandler } from 'ohne';
+import { defineHandler } from 'ohnejs';
 
 export default defineHandler(() => search(), { middleware: ['rate-limit'] });
 ```
@@ -106,7 +106,7 @@ decisions; routine selection belongs on the route.
 
 ```ts
 // boot/middleware.ts
-import { hook, matchesPath } from 'ohne';
+import { hook, matchesPath } from 'ohnejs';
 
 hook('middleware:resolve', (names, event) =>
   matchesPath(event.url.pathname, '/public/**')
@@ -128,7 +128,7 @@ To restrict which origins may read responses, mount the `cors` middleware as a g
 
 ```ts
 // middleware/global/cors.ts
-import { cors } from 'ohne';
+import { cors } from 'ohnejs';
 
 export default cors({ origin: ['https://app.example.com'], credentials: true });
 ```

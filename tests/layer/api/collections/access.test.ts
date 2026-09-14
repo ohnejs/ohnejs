@@ -227,7 +227,13 @@ const writerPost = await seed('AccessPosts', {
 });
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
-  return { method, pattern, file: `${pattern}.ts`, layer: 'ohne', handler: handler as AnyHandler };
+  return {
+    method,
+    pattern,
+    file: `${pattern}.ts`,
+    layer: 'ohnejs',
+    handler: handler as AnyHandler,
+  };
 }
 
 const ROUTES = {

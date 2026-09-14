@@ -1,6 +1,6 @@
-import type { Message } from 'ohne';
+import type { Message } from 'ohnejs';
 
-import { isUndefined } from 'ohne/utils';
+import { isUndefined } from 'ohnejs/utils';
 
 import {
   type FieldErrors,

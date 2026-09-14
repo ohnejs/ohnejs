@@ -1,4 +1,4 @@
-import { defineDashboardPage, logout, navigate } from 'ohne/dashboard';
+import { defineDashboardPage, logout, navigate } from 'ohnejs/dashboard';
 
 import { resetLayoutState } from '../components/shell.ts';
 

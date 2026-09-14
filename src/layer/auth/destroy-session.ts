@@ -1,5 +1,5 @@
-import { query } from 'ohne';
-import { isNull } from 'ohne/utils';
+import { query } from 'ohnejs';
+import { isNull } from 'ohnejs/utils';
 
 import { clearSessionCookie, readSessionToken } from './_cookie.ts';
 import { hashSessionToken } from './_token.ts';

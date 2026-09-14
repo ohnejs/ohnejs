@@ -1,4 +1,4 @@
-import type { SearchParamValue } from 'ohne/utils';
+import type { SearchParamValue } from 'ohnejs/utils';
 
 import {
   defineHandler,
@@ -8,8 +8,8 @@ import {
   queryUntyped,
   readRecordBody,
   useCollections,
-} from 'ohne';
-import { first, isEmpty, isNull, isUndefined, pick } from 'ohne/utils';
+} from 'ohnejs';
+import { first, isEmpty, isNull, isUndefined, pick } from 'ohnejs/utils';
 
 import { notFound } from '../../../../../../ohne/http/http-error.ts';
 import { queryLocales } from '../../../../../../ohne/query/locale.ts';

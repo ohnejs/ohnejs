@@ -1,5 +1,5 @@
-import { defineField, type Message } from 'ohne';
-import { isTimezone } from 'ohne/utils';
+import { defineField, type Message } from 'ohnejs';
+import { isTimezone } from 'ohnejs/utils';
 
 /**
  * The `timezone` field type: an IANA time zone name, like `Europe/Berlin`.

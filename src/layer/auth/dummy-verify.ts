@@ -1,4 +1,4 @@
-import { hashPassword, verifyPassword } from 'ohne/utils/crypto';
+import { hashPassword, verifyPassword } from 'ohnejs/utils/crypto';
 
 import { useAuthConfig } from './config.ts';
 

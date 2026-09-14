@@ -1,6 +1,6 @@
-import type { RoleName } from 'ohne';
+import type { RoleName } from 'ohnejs';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface EventContext {
     /**
      * The signed-in user, set by the `auth` and `require-auth` middleware.

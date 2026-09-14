@@ -37,7 +37,7 @@ import {
   useHotkeys,
   useRoute,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   coerceToNumber,
   effect,
@@ -57,7 +57,7 @@ import {
   sleep,
   stringifySearchParams,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

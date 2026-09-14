@@ -8,10 +8,10 @@ messages and API routes.
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne', '@acme/blog'],
+  layers: ['ohnejs', '@acme/blog'],
 });
 ```
 
@@ -40,13 +40,13 @@ earlier one, and your app overrides them all.
 Resolution cascades. Each layer's own config lists the layers it extends, and those load before
 it, so listing `@acme/blog` also stacks whatever the blog layer builds on. A layer reached through
 several entries loads once, beneath every layer that lists it. An app listing
-`['ohne', '@acme/blog']`, where `@acme/blog` itself lists `['ohne']`, resolves to:
+`['ohnejs', '@acme/blog']`, where `@acme/blog` itself lists `['ohnejs']`, resolves to:
 
 ```
-ohne -> @acme/blog -> app
+ohnejs -> @acme/blog -> app
 ```
 
-`ohne` appears once, at the bottom, even though two configs name it.
+`ohnejs` appears once, at the bottom, even though two configs name it.
 
 ## What overrides what
 
@@ -85,7 +85,7 @@ too. The shapes live in [config](./config.md#disabling):
 
 ```ts
 export default defineConfig({
-  layers: ['ohne', '@acme/blog'],
+  layers: ['ohnejs', '@acme/blog'],
   disable: {
     routes: ['GET /admin/**'],
     collections: ['Drafts'],
@@ -110,10 +110,10 @@ consumer can list it.
 
 ```ts
 // ohne.config.ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne'],
+  layers: ['ohnejs'],
 });
 ```
 
@@ -131,9 +131,9 @@ keys.
 
 ```ts
 // ohne.layer.ts
-import { defineLayer } from 'ohne';
+import { defineLayer } from 'ohnejs';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Config {
     blog?: {
       pageSize?: number;
@@ -164,7 +164,7 @@ plain objects combine per key and everything else is replaced by the closer laye
 - `'concat-unique'` - `'concat'`, then duplicates are dropped.
 
 The augmentation reaches consumers on its own: codegen finds every file in a stacked layer that
-contains `declare module 'ohne'` and imports it into the app's type program, so your keys
+contains `declare module 'ohnejs'` and imports it into the app's type program, so your keys
 autocomplete in a consuming `ohne.config.ts` exactly like the built-ins. Values the layer sets for
 itself still belong in its `ohne.config.ts` - `ohne.layer.ts` describes only what it owns.
 
@@ -177,9 +177,9 @@ to type something only the app's own `ohne.config.ts` decides.
 
 ```ts
 // ohne.layer.ts
-import { defineLayer, useConfig } from 'ohne';
+import { defineLayer, useConfig } from 'ohnejs';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Config {
     blog?: {
       categories?: string[];
@@ -217,7 +217,7 @@ The file lands in the app's codegen directory, `.ohne/node/blog-categories.ts` b
 ohne banner on its first line. It is rewritten only when its content changes and pruned once the
 layer stops declaring it.
 
-`bucket` picks which TypeScript program sees the file: `node` for `ohne` augmentations and server
-types, `browser` for `ohne/dashboard` ones, `shared` for pure types both include. `file` is a plain
+`bucket` picks which TypeScript program sees the file: `node` for `ohnejs` augmentations and server
+types, `browser` for `ohnejs/dashboard` ones, `shared` for pure types both include. `file` is a plain
 `.ts` name inside the bucket. Two entries in the stack cannot claim the same one; the error names
 both layers.

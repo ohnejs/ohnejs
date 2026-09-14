@@ -25,12 +25,12 @@ describe('scanLayerAugmentations', () => {
   });
 
   it('returns the .ts files whose text augments the ohne module', async () => {
-    const hooks = write('hooks.ts', "declare module 'ohne' { interface Hooks {} }\n");
-    const env = write('config/env.ts', "declare module 'ohne' { interface Env {} }\n");
+    const hooks = write('hooks.ts', "declare module 'ohnejs' { interface Hooks {} }\n");
+    const env = write('config/env.ts', "declare module 'ohnejs' { interface Env {} }\n");
     write('routes/list.ts', "export default () => 'ok'\n");
-    write('README.md', "declare module 'ohne'\n");
-    write('node_modules/dep/aug.ts', "declare module 'ohne' {}\n");
-    write('.ohne/node/layer-name.ts', "declare module 'ohne' {}\n");
+    write('README.md', "declare module 'ohnejs'\n");
+    write('node_modules/dep/aug.ts', "declare module 'ohnejs' {}\n");
+    write('.ohne/node/layer-name.ts', "declare module 'ohnejs' {}\n");
 
     const files = await scanLayerAugmentations(root);
     deepStrictEqual(files, [env, hooks]);
@@ -42,12 +42,12 @@ describe('scanLayerAugmentations', () => {
 
   it('ignores an unimportable path when the file does not augment', async () => {
     write('plain/notes#draft.ts', 'export const x = 1\n');
-    const hooks = write('plain/hooks.ts', "declare module 'ohne' {}\n");
+    const hooks = write('plain/hooks.ts', "declare module 'ohnejs' {}\n");
     deepStrictEqual(await scanLayerAugmentations(join(root, 'plain')), [hooks]);
   });
 
   it('throws for an augmenting file whose path holds an unimportable character', async () => {
-    write('bad/aug#weird.ts', "declare module 'ohne' {}\n");
+    write('bad/aug#weird.ts', "declare module 'ohnejs' {}\n");
     await rejects(scanLayerAugmentations(join(root, 'bad')), /Unsupported character `#`/);
   });
 });

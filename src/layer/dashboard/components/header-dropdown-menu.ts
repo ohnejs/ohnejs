@@ -9,8 +9,8 @@ import {
   setColorMode,
   useT,
   when,
-} from 'ohne/dashboard';
-import { effect, ref } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, ref } from 'ohnejs/utils';
 
 /**
  * The header's kebab user menu.

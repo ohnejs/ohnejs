@@ -1,5 +1,5 @@
-import { hook, usePrinter } from 'ohne';
-import { isEmpty, isUndefined } from 'ohne/utils';
+import { hook, usePrinter } from 'ohnejs';
+import { isEmpty, isUndefined } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
 import { imageSecrets } from '../images/sign.ts';

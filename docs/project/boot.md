@@ -9,7 +9,7 @@ The most common registration is a [hook](../api/hooks.md):
 
 ```ts
 // boot/ready.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('server:ready', ({ host, port }) => {
   console.log(`accepting connections at http://${host}:${port}`);
@@ -49,11 +49,11 @@ what a dialect drives.
 
 ```ts
 // boot/dialect.ts
-import { useDialects } from 'ohne';
+import { useDialects } from 'ohnejs';
 
 import { PostgresDialect } from '../database/postgres.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownDialects {
     postgres: true;
   }

@@ -1,5 +1,5 @@
-import { css, h, when } from 'ohne/dashboard';
-import { batchedEffect, first, isFunction, isUndefined, onCleanup, ref } from 'ohne/utils';
+import { css, h, when } from 'ohnejs/dashboard';
+import { batchedEffect, first, isFunction, isUndefined, onCleanup, ref } from 'ohnejs/utils';
 
 /**
  * Options for `uploadProgressCircle`.

@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne/dashboard' {
+ * declare module 'ohnejs/dashboard' {
  *   interface KnownMessages {
  *     'field.minLength': { min: number }
  *     'field.required': {}

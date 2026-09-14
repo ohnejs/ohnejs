@@ -1,4 +1,4 @@
-import { queryUntyped, useDatabase } from 'ohne';
+import { queryUntyped, useDatabase } from 'ohnejs';
 
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { readUpload } from './_row.ts';

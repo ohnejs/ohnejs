@@ -54,7 +54,7 @@ describe('generateRoles', () => {
     strictEqual(shared.includes("'shop-manager': true;"), true);
     strictEqual(shared.includes('export type GeneratedRoleName ='), true);
     strictEqual(node.includes("import type { GeneratedRoles } from '../shared/roles.ts';"), true);
-    strictEqual(node.includes("import { useRoles } from 'ohne';"), true);
+    strictEqual(node.includes("import { useRoles } from 'ohnejs';"), true);
     strictEqual(node.includes("import r0 from '../../roles/admin.ts';"), true);
     strictEqual(node.includes("import r1 from '../../roles/shop/manager.ts';"), true);
     strictEqual(node.includes('interface KnownRoles extends GeneratedRoles {}'), true);
@@ -100,7 +100,7 @@ describe('generateRoles', () => {
       `${BANNER}\n` +
         "import type { GeneratedRoles } from '../shared/roles.ts';\n" +
         '\n' +
-        "declare module 'ohne' {\n" +
+        "declare module 'ohnejs' {\n" +
         '  interface KnownRoles extends GeneratedRoles {}\n' +
         '}\n',
     );

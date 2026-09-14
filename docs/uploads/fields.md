@@ -7,7 +7,7 @@ the bounds you declare.
 
 ```ts
 // collections/Posts.ts
-import { defineCollection, field } from 'ohne';
+import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
@@ -66,7 +66,7 @@ For a page of your own, build a variant with `imageURL` or a `srcset` with `imag
 [named variant](./images.md#named-variants) or ad hoc transforms:
 
 ```ts
-import { imageSrcSet, imageURL } from 'ohne/uploads';
+import { imageSrcSet, imageURL } from 'ohnejs/uploads';
 
 const src = imageURL(post.cover, 'thumbnail');
 const srcset = imageSrcSet(post.cover, [

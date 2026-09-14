@@ -30,7 +30,7 @@ import { toResponse } from './to-response.ts';
 import { translate } from './translate.ts';
 import { useResponse } from './use-response.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Fires once a dispatched request finishes: the response written and all `waitUntil` work drained.

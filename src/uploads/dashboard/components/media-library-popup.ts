@@ -11,8 +11,8 @@ import {
   type PopupClose,
   useHotkeys,
   when,
-} from 'ohne/dashboard';
-import { effect, isNullish, isUndefined, nextTick, type Ref, ref, untracked } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isNullish, isUndefined, nextTick, type Ref, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { MediaItemDisabled } from './media-image-item.ts';

@@ -6,11 +6,11 @@ import type { MiddlewareKey } from '../middleware/known-middleware.ts';
  * Empty by default; middleware and integrations fill it - auth session, locale, resolved user.
  * Reached anywhere in a request via `useEvent().context`.
  *
- * Augment it from a layer with `declare module 'ohne'`.
+ * Augment it from a layer with `declare module 'ohnejs'`.
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface EventContext {
  *     auth: Session
  *     locale: string

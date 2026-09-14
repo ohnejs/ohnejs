@@ -4,8 +4,8 @@ import {
   queryMetadata,
   queryUntyped,
   setResponseStatus,
-} from 'ohne';
-import { isNull, isUndefined } from 'ohne/utils';
+} from 'ohnejs';
+import { isNull, isUndefined } from 'ohnejs/utils';
 
 import {
   accessScope,

@@ -75,13 +75,13 @@ export async function generateRoles(
 
   const code = createCodeBuilder();
   code.line("import type { GeneratedRoles } from '../shared/roles.ts';");
-  if (roles.length > 0) code.line("import { useRoles } from 'ohne';");
+  if (roles.length > 0) code.line("import { useRoles } from 'ohnejs';");
   roles.forEach((role, index) => {
     code.line(`import r${index} from ${literalString(importSpecifier(nodeDir, role.file))};`);
   });
   code.line();
 
-  code.line("declare module 'ohne' {");
+  code.line("declare module 'ohnejs' {");
   code.indent(() => {
     code.line('interface KnownRoles extends GeneratedRoles {}');
   });

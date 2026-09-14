@@ -5,8 +5,8 @@ import {
   sessionUser,
   setDocumentTitle,
   useT,
-} from 'ohne/dashboard';
-import { effect, isNullish, isString, parseSearchParams } from 'ohne/utils';
+} from 'ohnejs/dashboard';
+import { effect, isNullish, isString, parseSearchParams } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { loginForm } from '../components/login-form.ts';

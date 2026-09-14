@@ -44,7 +44,7 @@ import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
 import { useRoutes } from '../routes/use-routes.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs once the API server is listening, after the socket accepts and before readiness is announced.

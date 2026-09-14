@@ -66,7 +66,7 @@ export interface AnyBlockDefinition {
  * @example
  * ```ts
  * // blocks/Hero.ts
- * import { defineBlock, field } from 'ohne'
+ * import { defineBlock, field } from 'ohnejs'
  *
  * export default defineBlock({
  *   fields: {

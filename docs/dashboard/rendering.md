@@ -6,8 +6,8 @@ DOM and no re-render - a change patches exactly the text node or attribute it to
 
 ```ts
 // dashboard/pages/index.ts
-import { defineDashboardPage, h } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { defineDashboardPage, h } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 export default defineDashboardPage(() => {
   const count = ref(0);
@@ -96,8 +96,8 @@ nothing left behind keeps reacting.
 `each` renders a keyed list that reconciles in place as the array changes:
 
 ```ts
-import { each, h } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { each, h } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 const todos = ref([
   { id: 1, text: 'buy milk' },
@@ -131,8 +131,8 @@ todos.value = todos.value.map((t) => (t.id === 1 ? { ...t, text: 'buy oat milk' 
 `when` renders a branch by truthiness:
 
 ```ts
-import { h, when } from 'ohne/dashboard';
-import { ref } from 'ohne/utils';
+import { h, when } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 const open = ref(false);
 
@@ -158,7 +158,7 @@ returns a function child, so it drops in wherever a child goes.
 pages for you, so you reach for `mount` only when rendering into a DOM node you own:
 
 ```ts
-import { h, mount } from 'ohne/dashboard';
+import { h, mount } from 'ohnejs/dashboard';
 
 mount(h('h1', null, 'ohne'), document.querySelector('#widget')!);
 ```
@@ -176,7 +176,7 @@ full reload. Three things navigate:
 - the back and forward buttons.
 
 ```ts
-import { h, navigate } from 'ohne/dashboard';
+import { h, navigate } from 'ohnejs/dashboard';
 
 h('button', { onClick: () => navigate('/posts') }, 'Open posts');
 ```
@@ -185,7 +185,7 @@ A page component receives the route context:
 
 ```ts
 // dashboard/pages/posts/[id].ts
-import { defineDashboardPage, h } from 'ohne/dashboard';
+import { defineDashboardPage, h } from 'ohnejs/dashboard';
 
 export default defineDashboardPage((route) => h('h1', null, `Post ${route.params.id}`));
 ```

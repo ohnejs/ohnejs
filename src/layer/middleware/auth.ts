@@ -1,4 +1,4 @@
-import { defineMiddleware } from 'ohne';
+import { defineMiddleware } from 'ohnejs';
 
 import { useUser } from '../auth/use-user.ts';
 

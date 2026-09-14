@@ -19,15 +19,15 @@ describe('parseLayerSpecifier', () => {
   });
 
   it('splits a plain name from a nested subpath', () => {
-    deepStrictEqual(parseLayerSpecifier('ohne/layers/uploads'), {
-      name: 'ohne',
+    deepStrictEqual(parseLayerSpecifier('ohnejs/layers/uploads'), {
+      name: 'ohnejs',
       subpath: './layers/uploads',
     });
   });
 
   it('yields the root subpath for a bare name', () => {
     deepStrictEqual(parseLayerSpecifier('@acme/base'), { name: '@acme/base', subpath: '.' });
-    deepStrictEqual(parseLayerSpecifier('ohne'), { name: 'ohne', subpath: '.' });
+    deepStrictEqual(parseLayerSpecifier('ohnejs'), { name: 'ohnejs', subpath: '.' });
   });
 });
 

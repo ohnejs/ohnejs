@@ -5,8 +5,8 @@ import {
   queryMetadata,
   queryUntyped,
   resolveGuards,
-} from 'ohne';
-import { isEmpty, isUndefined } from 'ohne/utils';
+} from 'ohnejs';
+import { isEmpty, isUndefined } from 'ohnejs/utils';
 
 import { notFound } from '../../../../../ohne/http/http-error.ts';
 import { translationLocales } from '../../../../../ohne/query/read/translation-locales.ts';

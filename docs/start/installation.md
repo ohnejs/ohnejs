@@ -46,14 +46,14 @@ my-app/
 `ohne.config.ts` marks the directory as an ohne project and declares its layers:
 
 ```ts
-import { defineConfig } from 'ohne';
+import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohne'],
+  layers: ['ohnejs'],
 });
 ```
 
-`layers: ['ohne']` makes the framework's own layer the base of your app - its config defaults,
+`layers: ['ohnejs']` makes the framework's own layer the base of your app - its config defaults,
 messages, and dashboard come from there. [Config](../project/config.md) covers every option;
 [layers](../project/layers.md) covers what a layer is.
 
@@ -73,14 +73,14 @@ messages, and dashboard come from there. [Config](../project/config.md) covers e
 
 `dev` is the development server; the two `serve` scripts each run one production backend;
 `prepare` generates the project types (below). `typecheck` is plain `tsc` - the shipped config
-sets `noEmit`, so TypeScript checks and never compiles. The only dependency is `ohne`; TypeScript
+sets `noEmit`, so TypeScript checks and never compiles. The only dependency is `ohnejs`; TypeScript
 and the Node types are dev dependencies.
 
 `tsconfig.json` extends the config ohne ships:
 
 ```json
 {
-  "extends": "ohne/tsconfig.node.json",
+  "extends": "ohnejs/tsconfig.node.json",
   "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
   "exclude": ["dashboard"]
 }

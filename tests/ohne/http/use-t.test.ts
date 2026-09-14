@@ -13,7 +13,7 @@ import {
   useT,
 } from '../../../src/ohne/index.ts';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface KnownMessages {
     greeting: { name: string | number };
     plain: {};

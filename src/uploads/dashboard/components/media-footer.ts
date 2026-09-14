@@ -20,7 +20,7 @@ import {
   textInput,
   useHotkeys,
   when,
-} from 'ohne/dashboard';
+} from 'ohnejs/dashboard';
 import {
   type ConditionObject,
   effect,
@@ -30,7 +30,7 @@ import {
   onCleanup,
   ref,
   untracked,
-} from 'ohne/utils';
+} from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

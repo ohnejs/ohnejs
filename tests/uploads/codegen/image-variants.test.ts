@@ -26,9 +26,9 @@ describe('imageVariantsCodegen', () => {
     strictEqual(
       await imageVariantsCodegen.code(),
       [
-        "import type {} from 'ohne/uploads';",
+        "import type {} from 'ohnejs/uploads';",
         '',
-        "declare module 'ohne/uploads' {",
+        "declare module 'ohnejs/uploads' {",
         '  interface KnownImageVariants {',
         '    hero: true;',
         '    thumbnail: true;',

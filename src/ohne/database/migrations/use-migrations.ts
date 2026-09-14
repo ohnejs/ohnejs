@@ -34,7 +34,7 @@ const registry: Registry<MigrationMeta> = createRegistry<MigrationMeta>();
  * @example
  * ```ts
  * useMigrations().keys()
- * // -> ['ohne/2026-07-draft-flag', 'app/2026-08-articles']
+ * // -> ['ohnejs/2026-07-draft-flag', 'app/2026-08-articles']
  * ```
  */
 export function useMigrations(): Registry<MigrationMeta> {

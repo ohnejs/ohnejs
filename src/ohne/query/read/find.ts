@@ -24,7 +24,7 @@ import { resolveIR } from './resolve-ir.ts';
  */
 export type QueryRecord = Record<string, unknown>;
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the whole assembled rowset once, after hydrate and populate, just before a row read returns.

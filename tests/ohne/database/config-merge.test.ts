@@ -1,6 +1,6 @@
 import { deepStrictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
-import { useConfig, useLayers } from 'ohne';
+import { useConfig, useLayers } from 'ohnejs';
 
 describe('database config merge', () => {
   const added = ['/db-helpers-base', '/db-helpers-app'];

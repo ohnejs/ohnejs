@@ -82,7 +82,7 @@ describe('generateDatabase', () => {
     strictEqual(paths.length, 2);
     const out = readFileSync(paths[1] ?? '', 'utf8');
 
-    ok(out.includes("import { useMigrations } from 'ohne';"));
+    ok(out.includes("import { useMigrations } from 'ohnejs';"));
     ok(out.includes("migrations.register('dep/001-keys', {"));
     ok(out.includes("migrations.register('app/001-posts', {"));
     ok(out.indexOf('dep/001-keys') < out.indexOf('app/001-posts'));
@@ -144,7 +144,7 @@ describe('generateDatabase', () => {
     const paths = await generateDatabase(app);
     const out = readFileSync(paths[1] ?? '', 'utf8');
 
-    ok(out.includes("import { useCollections, useFields } from 'ohne';"));
+    ok(out.includes("import { useCollections, useFields } from 'ohnejs';"));
     ok(out.includes(`import c0 from '../../collections/Posts.ts';`));
     ok(!out.includes('packages/dep/collections'));
     ok(out.includes("collections.register('Posts', { name: 'Posts', collection: c0 });"));
@@ -497,7 +497,7 @@ describe('generateDatabase', () => {
       ),
     );
     ok(node.includes('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}'));
-    ok(node.includes("import { useCollections, useBlocks } from 'ohne';"));
+    ok(node.includes("import { useCollections, useBlocks } from 'ohnejs';"));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes("import b0 from '../../blocks/CTA.ts';"));
     ok(node.includes("blocks.register('CTA', { name: 'CTA', block: b0 });"));
@@ -813,7 +813,7 @@ describe('generateDatabase', () => {
     const app = join(root, 'consumer');
     writePackage(app, 'consumer');
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
     symlinkSync(
       join(FRAMEWORK, 'node_modules', '@types', 'node'),
       join(app, 'node_modules', '@types', 'node'),
@@ -822,14 +822,14 @@ describe('generateDatabase', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
       JSON.stringify({
-        extends: 'ohne/tsconfig.node.json',
+        extends: 'ohnejs/tsconfig.node.json',
         include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
       }),
     );
     write(
       app,
       'fields/status.ts',
-      "import { defineField, option } from 'ohne';\n" +
+      "import { defineField, option } from 'ohnejs';\n" +
         'export default defineField({\n' +
         "  columnType: 'text',\n" +
         "  options: { choices: option<string[]>({ required: true }), initial: option({ default: 'open' }) },\n" +
@@ -839,7 +839,7 @@ describe('generateDatabase', () => {
     write(
       app,
       'fields/labels.ts',
-      "import { defineField } from 'ohne';\n" +
+      "import { defineField } from 'ohnejs';\n" +
         'export default defineField({\n' +
         "  columnType: 'json',\n" +
         '  jsonList: true,\n' +
@@ -850,7 +850,7 @@ describe('generateDatabase', () => {
     write(
       app,
       'collections/People.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         '  fields: {\n' +
         "    name: field('text'),\n" +
@@ -861,7 +861,7 @@ describe('generateDatabase', () => {
     write(
       app,
       'collections/Todos.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         '  fields: {\n' +
         "    title: field('text', { unique: true }),\n" +
@@ -880,9 +880,9 @@ describe('generateDatabase', () => {
     write(
       app,
       'typing.ts',
-      "import type { KnownCollections, KnownInserts, KnownUpdates, PluckValue, QueryRow } from 'ohne';\n" +
+      "import type { KnownCollections, KnownInserts, KnownUpdates, PluckValue, QueryRow } from 'ohnejs';\n" +
         '\n' +
-        "import { query } from 'ohne';\n" +
+        "import { query } from 'ohnejs';\n" +
         '\n' +
         "export function shape(todo: KnownCollections['Todos']): string {\n" +
         '  const labels = todo.checklist.map((item) => (item.done ? item.label : item.label.toUpperCase()));\n' +
@@ -1146,7 +1146,7 @@ describe('generateDatabase', () => {
     const app = join(root, 'relation-typing');
     writePackage(app, 'relation-typing');
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
     symlinkSync(
       join(FRAMEWORK, 'node_modules', '@types', 'node'),
       join(app, 'node_modules', '@types', 'node'),
@@ -1155,20 +1155,20 @@ describe('generateDatabase', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
       JSON.stringify({
-        extends: 'ohne/tsconfig.node.json',
+        extends: 'ohnejs/tsconfig.node.json',
         include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
       }),
     );
     write(
       app,
       'collections/Users.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         "export default defineCollection({ fields: { name: field('text') } });\n",
     );
     write(
       app,
       'collections/Posts.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         '  fields: {\n' +
         "    author: field('record', { collection: 'Users' }),\n" +
@@ -1179,7 +1179,7 @@ describe('generateDatabase', () => {
     write(
       app,
       'collections/Tags.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         "  fields: { posts: field('records', { collection: 'Posts', inverse: 'tags' }) },\n" +
         '});\n',
@@ -1187,7 +1187,7 @@ describe('generateDatabase', () => {
     write(
       app,
       'typing.ts',
-      "import { field } from 'ohne';\n" +
+      "import { field } from 'ohnejs';\n" +
         '\n' +
         "field('record', { collection: 'Users', onDelete: 'cascade' });\n" +
         "field('records', { collection: 'Posts', inverse: 'tags' });\n" +
@@ -1219,7 +1219,7 @@ describe('generateDatabase', () => {
     const app = join(root, 'block-typing');
     writePackage(app, 'block-typing');
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
     symlinkSync(
       join(FRAMEWORK, 'node_modules', '@types', 'node'),
       join(app, 'node_modules', '@types', 'node'),
@@ -1228,14 +1228,14 @@ describe('generateDatabase', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
       JSON.stringify({
-        extends: 'ohne/tsconfig.node.json',
+        extends: 'ohnejs/tsconfig.node.json',
         include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
       }),
     );
     write(
       app,
       'blocks/Hero.ts',
-      "import { defineBlock, field } from 'ohne';\n" +
+      "import { defineBlock, field } from 'ohnejs';\n" +
         'export default defineBlock({\n' +
         "  fields: { title: field('text'), banner: field('blocks', { allow: ['Hero'] }) },\n" +
         '});\n',
@@ -1243,13 +1243,13 @@ describe('generateDatabase', () => {
     write(
       app,
       'blocks/CTA.ts',
-      "import { defineBlock, field } from 'ohne';\n" +
+      "import { defineBlock, field } from 'ohnejs';\n" +
         "export default defineBlock({ fields: { label: field('text') } });\n",
     );
     write(
       app,
       'collections/Pages.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({\n' +
         "  fields: { body: field('blocks'), hero: field('blocks', { allow: ['Hero'] }) },\n" +
         '});\n',
@@ -1257,9 +1257,9 @@ describe('generateDatabase', () => {
     write(
       app,
       'typing.ts',
-      "import type { KnownCollections } from 'ohne';\n" +
+      "import type { KnownCollections } from 'ohnejs';\n" +
         '\n' +
-        "import { field } from 'ohne';\n" +
+        "import { field } from 'ohnejs';\n" +
         '\n' +
         "field('blocks');\n" +
         "field('blocks', { allow: ['Hero'] });\n" +
@@ -1295,7 +1295,7 @@ describe('generateDatabase', () => {
     const app = join(root, 'migration-typing');
     writePackage(app, 'migration-typing');
     mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
-    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohne'), 'dir');
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
     symlinkSync(
       join(FRAMEWORK, 'node_modules', '@types', 'node'),
       join(app, 'node_modules', '@types', 'node'),
@@ -1304,20 +1304,20 @@ describe('generateDatabase', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
       JSON.stringify({
-        extends: 'ohne/tsconfig.node.json',
+        extends: 'ohnejs/tsconfig.node.json',
         include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
       }),
     );
     write(
       app,
       'collections/Todos.ts',
-      "import { defineCollection, field } from 'ohne';\n" +
+      "import { defineCollection, field } from 'ohnejs';\n" +
         "export default defineCollection({ fields: { title: field('text'), done: field('boolean') } });\n",
     );
     write(
       app,
       'typing.ts',
-      "import { defineMigration, type Config, type MoveMigration } from 'ohne';\n" +
+      "import { defineMigration, type Config, type MoveMigration } from 'ohnejs';\n" +
         '\n' +
         'defineMigration({\n' +
         "  from: { collection: 'Todos', field: 'title' },\n" +

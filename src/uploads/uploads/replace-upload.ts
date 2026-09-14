@@ -1,5 +1,5 @@
-import { queryUntyped, useDatabase } from 'ohne';
-import { isUndefined } from 'ohne/utils';
+import { queryUntyped, useDatabase } from 'ohnejs';
+import { isUndefined } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
 import type { UploadRow } from './_row.ts';

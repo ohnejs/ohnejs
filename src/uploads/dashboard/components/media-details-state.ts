@@ -1,4 +1,4 @@
-import { basename, clamp, isNull } from 'ohne/utils';
+import { basename, clamp, isNull } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 

@@ -1,6 +1,6 @@
 /**
  * Typed hook table.
- * Add hooks by augmenting it from a layer with `declare module 'ohne'`.
+ * Add hooks by augmenting it from a layer with `declare module 'ohnejs'`.
  *
  * Name a hook `group:name`, then type it as its callback signature.
  * Both segments are kebab-case, never camelCase: a multi-word name is `record:before-change`.
@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * declare module 'ohne' {
+ * declare module 'ohnejs' {
  *   interface Hooks {
  *     'query:filter': (ir: QueryIR) => void | QueryIR | Promise<void | QueryIR>
  *     'server:ready': (info: { host: string; port: number }) => void | Promise<void>

@@ -8,7 +8,7 @@ fires at every occurrence of its event, request or not.
 
 ```ts
 // boot/ready.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('server:ready', async ({ host, port }) => {
   await warmCache();
@@ -45,7 +45,7 @@ nothing:
 
 ```ts
 // boot/headers.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('response:headers', (headers) => {
   headers.set('X-Frame-Options', 'DENY');
@@ -107,7 +107,7 @@ miss, a refused host, and an off-prefix path never dispatch, so none of them fir
 
 ```ts
 // boot/access-log.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('request:complete', (event) => {
   log.info('request', {
@@ -150,7 +150,7 @@ error outcome never lands here - filter those through `error:response`.
 
 ```ts
 // boot/envelope.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('handler:result', (result) =>
   result instanceof Response ? undefined : { data: result },
@@ -171,7 +171,7 @@ then sees whatever this returns.
 
 ```ts
 // boot/errors.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('error:response', (response, error) => {
   reportToSentry(error);
@@ -191,7 +191,7 @@ skips it - reach for `response:headers` to cover those too.
 
 ```ts
 // boot/no-store.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('response:send', (response, event) => {
   if (event.url.pathname.startsWith('/api/')) {
@@ -209,7 +209,7 @@ nothing, or return a replacement `Headers`; the read-only `response` is there fo
 
 ```ts
 // boot/security-headers.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('response:headers', (headers) => {
   headers.set('X-Frame-Options', 'DENY');
@@ -232,7 +232,7 @@ record, or mutate the passed object in place and return nothing.
 
 ```ts
 // boot/timestamps.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('record:before-change', (input, ctx) => {
   input.updatedAt = new Date().toISOString();
@@ -251,7 +251,7 @@ from `scope.values`.
 
 ```ts
 // boot/validate-events.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('record:validate', (errors, scope, ctx) => {
   if (ctx.collection !== 'Events') return;
@@ -271,7 +271,7 @@ leave it. The `ctx` carries the `collection`, the open `tx`, and the effective `
 
 ```ts
 // boot/index-post.ts
-import { hook, query } from 'ohne';
+import { hook, query } from 'ohnejs';
 
 hook('record:after-create', async (record, ctx) => {
   if (ctx.collection !== 'Posts') return;
@@ -291,7 +291,7 @@ unchanged.
 
 ```ts
 // boot/reindex-post.ts
-import { hook, query } from 'ohne';
+import { hook, query } from 'ohnejs';
 
 hook('record:after-update', async (record, ctx) => {
   if (ctx.collection !== 'Posts') return;
@@ -312,7 +312,7 @@ return the new node, or return nothing to leave the caller's condition as is.
 
 ```ts
 // boot/tenant-writes.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 import { currentTenant } from '../lib/tenant.ts';
 
@@ -339,7 +339,7 @@ never lists the doomed rows.
 
 ```ts
 // boot/cleanup-attachments.ts
-import { hook, query } from 'ohne';
+import { hook, query } from 'ohnejs';
 
 hook('record:before-delete', async (ctx) => {
   if (ctx.collection !== 'Posts') return;
@@ -359,7 +359,7 @@ payload carries the `collection`, the `operation`, and the affected `uuids`.
 
 ```ts
 // boot/webhook.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('record:committed', async ({ collection, operation, uuids }) => {
   if (collection !== 'Posts') return;
@@ -386,7 +386,7 @@ when one exists, and return the rebuilt IR.
 
 ```ts
 // boot/soft-delete.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('query:filter', (ir) => {
   if (ir.collection !== 'Posts') return;
@@ -412,7 +412,7 @@ resolved `ir`.
 
 ```ts
 // boot/redact-users.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('query:records', (records, { collection }) => {
   if (collection !== 'Users') return;
@@ -430,7 +430,7 @@ count after every transform.
 
 ```ts
 // boot/slow-reads.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('query:complete', ({ collection, rowCount, durationMs }) => {
   if (durationMs > 100) {
@@ -449,7 +449,7 @@ filtered `QueryRecord[]`, or nothing to keep every target. The `context` carries
 
 ```ts
 // boot/populate-scope.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('populate:targets', (targets, { collection }) => {
   if (collection !== 'Posts') return;
@@ -473,7 +473,7 @@ dry run, which commits nothing.
 
 ```ts
 // boot/sync-audit.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('schema:synced', async (report) => {
   if (report.deletions.length > 0) {
@@ -497,7 +497,7 @@ dashboard knows no capability for a page - so this is where you scope one:
 
 ```ts
 // boot/menu.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
 hook('dashboard:menu', (menu, { user }) => {
   if (user.roles.includes('admin')) {
@@ -518,9 +518,9 @@ one that returns `void` makes it an action.
 
 ```ts
 // boot/report-hooks.ts
-import { hook } from 'ohne';
+import { hook } from 'ohnejs';
 
-declare module 'ohne' {
+declare module 'ohnejs' {
   interface Hooks {
     'report:filename': (name: string, date: Date) => string;
   }
@@ -534,7 +534,7 @@ their returns, and the final value comes back. An action fires the same way, jus
 result.
 
 ```ts
-import { applyHook } from 'ohne';
+import { applyHook } from 'ohnejs';
 
 const name = await applyHook('report:filename', 'report.csv', new Date());
 // -> '2026-07-21-report.csv'

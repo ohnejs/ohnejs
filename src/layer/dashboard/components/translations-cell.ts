@@ -1,5 +1,5 @@
-import { attachTooltip, css, dashboardMeta, dimMark, h, useT } from 'ohne/dashboard';
-import { formatLocaleCode, isArray, isUndefined, onCleanup } from 'ohne/utils';
+import { attachTooltip, css, dashboardMeta, dimMark, h, useT } from 'ohnejs/dashboard';
+import { formatLocaleCode, isArray, isUndefined, onCleanup } from 'ohnejs/utils';
 
 import { effectiveContentLocale, localeName } from './content-language-switcher.ts';
 
