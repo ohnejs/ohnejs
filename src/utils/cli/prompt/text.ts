@@ -50,7 +50,7 @@ export interface TextOptions {
  * - `home`/`end` (or `ctrl+a`/`ctrl+e`) jump to the ends of the line.
  * - `backspace` and `delete` remove a character; held with `ctrl`/`alt` (or `ctrl+w`) they remove a word.
  * - `ctrl+u` clears to the line start and `ctrl+k` to the line end.
- * - `tab` fills an empty input with the placeholder, and `enter` submits, both fall back to `defaultValue`.
+ * - On an empty input, `tab` fills in `placeholder` or `defaultValue`, and `enter` submits `defaultValue`.
  */
 export function textDefinition(options: TextOptions): PromptDefinition<string> {
   const editor = createLineEditor(options.initialValue ?? '');

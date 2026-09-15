@@ -27,8 +27,7 @@ const ALWAYS_IGNORED = 'node_modules';
 /**
  * Recursively watches a directory tree, calling `onChange` with the absolute path of each change.
  *
- * Native recursive `fs.watch` is not portable (unsupported on Linux).
- * So this walks the tree and watches each directory, picking up new ones as they appear.
+ * Watches each directory in the tree, picking up new ones as they appear.
  * Directories named `node_modules`, dot-prefixed names, and any `ignore` name are skipped.
  * Events inside a skipped directory are not reported.
  *

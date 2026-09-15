@@ -11,7 +11,7 @@ const DYNAMIC_IMPORT = /\bimport\b\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
  * A zero-dep matcher biased to over-capture.
  * A false positive only causes extra rebuilds, while a false negative silently misses a dependency.
  * So it matches inside comments and strings rather than risk dropping a real specifier.
- * A non-literal `import(expr)` widens to whatever literal it can see rather than being skipped.
+ * A computed `import(expr)` is skipped; a template literal is captured verbatim, `${...}` included.
  *
  * @example
  * ```ts

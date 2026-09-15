@@ -42,7 +42,6 @@ export interface JSONCodec<T> {
  * Result of `composeCodecs`.
  * `encode` is a deep-walk value transformer.
  * It exists because `JSON.stringify` runs `toJSON` (e.g. on `Date`) before a replacer sees the raw instance.
- * `reviver` is the standard `JSON.parse` reviver shape.
  */
 export interface ComposedCodecs {
   /**

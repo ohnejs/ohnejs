@@ -5,7 +5,7 @@ import { relativePath } from '../path/relative-path.ts';
  * Resolves the path between them, then makes it import-usable by prefixing `./` when it has no leading dot.
  * A bare `foo.ts` would read as a package specifier, so it becomes `./foo.ts`.
  *
- * Only `%`, `#`, and `?` are percent-encoded: raw, those three break the URL parse a specifier goes through.
+ * Only `%`, `#`, and `?` are percent-encoded: raw, they break the URL parse a specifier goes through.
  * Every other character - brackets, spaces, non-ASCII - stays raw, which Node resolves to the same file.
  * A specifier emitted into a `.ts` file is also read by TypeScript as a file path, which never decodes it.
  * So encoding a character Node handles raw would only make that import unresolvable to the type checker.

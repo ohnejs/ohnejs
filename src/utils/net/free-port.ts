@@ -11,8 +11,6 @@ export interface FreePortOptions {
   /**
    * Host interface to probe, matching the one the server will bind.
    * Omitted probes the wildcard plus both loopback addresses, since a bind without a host serves them all.
-   * A port whose `127.0.0.1` side another process holds would otherwise scan as free.
-   * Its IPv4 traffic would then go to the squatter while IPv6 clients still reach the server.
    */
   host?: string;
 

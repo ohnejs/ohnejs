@@ -3,7 +3,6 @@
  * Empty strings pass through.
  *
  * Inverse of `capitalize`.
- * The tail is untouched, so trailing acronyms keep their casing.
  *
  * @example
  * ```ts

@@ -41,9 +41,7 @@ const SECOND_MS = 1000;
  * Unit names, pluralization, and list joining are delegated to `Intl.DurationFormat`.
  * The result is correct in every locale Node ships CLDR data for.
  *
- * The largest unit is days.
- * Weeks, months, and years are not emitted.
- * Months and years are calendar approximations, and `'52w 1d'` reads worse than `'365d'`.
+ * The largest unit is days, so a year reads as `'365d'`.
  *
  * Fractional input is rounded to the nearest whole millisecond.
  *

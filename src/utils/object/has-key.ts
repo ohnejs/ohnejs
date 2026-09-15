@@ -1,6 +1,5 @@
 /**
  * Checks whether `value` has `key` as an own property.
- * Narrows the type so `value[key]` is accessible after the check.
  *
  * Own-only: inherited names (`toString`, `constructor`, `hasOwnProperty`, ...) return `false`.
  *

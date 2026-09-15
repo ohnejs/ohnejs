@@ -1,8 +1,5 @@
 /**
- * The three canonical Node runtime environments.
- *
- * `NODE_ENV` normalizes to one of these values.
- * `'production'` and `'test'` match exactly; every other value, and unset, is `'development'`.
+ * The canonical Node runtime environments.
  */
 export type NodeEnv = 'production' | 'development' | 'test';
 

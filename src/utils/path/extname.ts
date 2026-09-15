@@ -3,7 +3,6 @@
  * Empty string if the segment has no extension, ends with a slash, or is a dotfile.
  *
  * For segments with multiple dots, only the last extension is returned (e.g. `'archive.tar.gz'` -> `'.gz'`).
- * A dotfile (`'.hidden'`) has no extension.
  * Backslashes are treated as separators.
  *
  * @example

@@ -6,7 +6,6 @@ import { parseMessage } from './parse-message.ts';
 /**
  * Parses `template` and formats it against `params` in `language`.
  * Convenience over `parseMessage` + `formatMessageAST`; parses on every call.
- * Reach for `createMessageFormatter` when rendering one template many times.
  *
  * @example
  * ```ts

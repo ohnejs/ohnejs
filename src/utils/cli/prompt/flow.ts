@@ -7,7 +7,6 @@ const SGR = new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g');
 
 /**
  * The opening line of a flow: a top corner and the title, with inline markup applied.
- * The first thing printed, so it carries no connecting rail.
  *
  * @example
  * ```ts
@@ -19,8 +18,7 @@ export function introLine(title: string, colors: ANSIColors, lead: boolean): str
 }
 
 /**
- * The closing block of a flow: a spacer rail then a bottom corner and the message.
- * Joins to whatever came before, so it leads with the rail.
+ * The closing line of a flow: a bottom corner and the message, with inline markup applied.
  *
  * @example
  * ```ts

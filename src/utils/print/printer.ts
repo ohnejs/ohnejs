@@ -18,11 +18,6 @@ export interface BlockOptions {
   /**
    * Single-line title rendered next to the head glyph.
    * Inline markup is processed: backtick spans highlight, `**bold**` bolds, `__dim__` dims.
-   *
-   * @example
-   * ```ts
-   * print.errorBlock({ title: 'Build failed', body: 'see logs above' })
-   * ```
    */
   title: string;
 
@@ -38,15 +33,7 @@ export interface BlockOptions {
    *
    * @example
    * ```ts
-   * print.infoBlock({
-   *   title: 'Migration applied',
-   *   body: 'first paragraph\n\nsecond paragraph',
-   * })
-   * ```
-   *
-   * @example
-   * ```ts
-   * print.errorBlock({
+   * printer.errorBlock({
    *   title: 'Validation failed',
    *   body: errors.map((e) => `${e.path}: ${e.message}`),
    * })
@@ -64,7 +51,7 @@ export interface BlockOptions {
    *
    * @example
    * ```ts
-   * print.errorBlock({
+   * printer.errorBlock({
    *   title: 'Type error',
    *   body: 'expected string, got number',
    *   path: 'src/foo.ts:42:3',
@@ -88,7 +75,6 @@ export interface PrinterConfig {
 
   /**
    * When `true`, `Printer.debug` and `Printer.debugBlock` emit.
-   * When `false`, debug calls are dropped.
    *
    * @default
    * false
@@ -96,7 +82,6 @@ export interface PrinterConfig {
   debug?: boolean | undefined;
 
   /**
-   * When set, overrides TTY auto-detection.
    * `true` always emits ANSI; `false` strips.
    * Leave unset to fall back to the stream's `isTTY`.
    */
@@ -188,7 +173,6 @@ const GLYPH_CORNER_DASH = '─';
 
 /**
  * Builds an isolated `Printer`.
- * Use this in tests to avoid coupling to env vars or the global stream.
  *
  * @example
  * ```ts

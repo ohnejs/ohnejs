@@ -39,7 +39,6 @@ export interface HashPasswordOptions {
  * The salt is random per call, so the same password hashes differently every time.
  * Recover a yes/no match with `verifyPassword`; the cost parameters travel in the string.
  *
- * scrypt is memory-hard, so the cost resists GPU and ASIC cracking, not just raw CPU.
  * The salt and derived key are base64url-encoded; `$` never appears in that alphabet.
  *
  * @example
@@ -47,7 +46,8 @@ export interface HashPasswordOptions {
  * await hashPassword('hunter2')
  * // -> 'scrypt$32768$8$1$<16-byte salt>$<64-byte hash>', base64url
  *
- * await hashPassword('hunter2', { cost: 65536 }) // a costlier, slower hash
+ * await hashPassword('hunter2', { cost: 65536 })
+ * // -> 'scrypt$65536$8$1$...', a costlier, slower hash
  * ```
  */
 export async function hashPassword(

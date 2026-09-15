@@ -46,9 +46,6 @@ export interface CodeBuilder {
 /**
  * Creates a source-text builder that tracks indentation for you.
  *
- * Append lines with `line`, and nest a region one level deeper with `indent(fn)`.
- * The callback form cannot leave the indent unbalanced.
- *
  * @example
  * ```ts
  * const c = createCodeBuilder()

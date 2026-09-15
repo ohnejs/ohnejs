@@ -158,8 +158,6 @@ export interface MessagePluralNode {
 
 /**
  * One arm of a `plural` or `selectordinal`.
- * `exact` is the parsed `=N` value when the key is `=N`.
- * `null` for keyword cases (`one`, `other`, ...).
  */
 export interface MessagePluralCase {
   /**

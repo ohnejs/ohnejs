@@ -16,7 +16,6 @@ import { renderHelp } from './render-help.ts';
  */
 export interface RunOptions {
   /**
-   * When set, overrides TTY auto-detection.
    * `true` always emits ANSI; `false` strips.
    * Leave unset to fall back to the stream's `isTTY`.
    */

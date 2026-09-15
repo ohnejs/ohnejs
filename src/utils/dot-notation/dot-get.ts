@@ -15,8 +15,6 @@ import { parseDotNotation, segmentAddresses } from './parse-dot-notation.ts';
  * dotGet({ a: { b: [10, 20] } }, 'a.c')    // -> undefined
  * dotGet({ a: null }, 'a.b')               // -> undefined
  * dotGet(new Map([['k', 1]]), 'k')         // -> undefined (Map is a leaf)
- *
- * dotGet<number>({ a: 1 }, 'a')            // -> 1 (typed as number | undefined)
  * ```
  */
 export function dotGet<T = unknown>(value: unknown, path: string): T | undefined {

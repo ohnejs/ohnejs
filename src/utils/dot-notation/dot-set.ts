@@ -8,7 +8,6 @@ import { type DotNotationSegment, parseDotNotation } from './parse-dot-notation.
  * The input is never mutated; only the touched path is cloned (structural sharing).
  *
  * Missing parents are auto-created based on the next segment: `[n]` -> array, `.key` -> object.
- * So `dotSet({}, 'a[0].b', 1)` yields `{ a: [{ b: 1 }] }`.
  *
  * Type mismatches along the path are replaced wholesale to match the path expression's intent.
  * A key segment on a non-plain-object replaces with `{}`.

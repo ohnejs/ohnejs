@@ -98,6 +98,7 @@ export interface Layer<C extends object> {
  * Paths are unique - adding a second layer at the same path throws.
  * Strategies are shared between per-layer and cross-layer merges.
  * Results are cached and invalidated on `add`, `remove`, `clear`, or `setStrategy`.
+ * Calling `layers`, `strategies`, or `resolve` in an `effect` or `computed` subscribes it to invalidation.
  * `X` names extra fields a spec carries; they pass through to the layer unread.
  */
 export interface LayerRegistry<C extends object, X extends object = object> {
@@ -132,21 +133,6 @@ export interface LayerRegistry<C extends object, X extends object = object> {
    *
    * `path` is dot-notation: `'tags'`, `'server.routes'`, `'items[0].tag'`.
    * See `WithDefaultsStrategy` for the available strategies.
-   *
-   * @example
-   * ```ts
-   * const registry = createLayerRegistry<{ tags: string[] }>()
-   *
-   * registry.add({ path: '/base', defaults: { tags: ['core'] } })
-   * registry.add({ path: '/user', input:    { tags: ['custom'] } })
-   *
-   * registry.resolve()
-   * // -> { tags: ['custom'] }
-   *
-   * registry.setStrategy('tags', 'concat-unique')
-   * registry.resolve()
-   * // -> { tags: ['custom', 'core'] }
-   * ```
    */
   setStrategy(path: string, strategy: WithDefaultsStrategy): void;
 
@@ -165,15 +151,9 @@ export interface LayerRegistry<C extends object, X extends object = object> {
 /**
  * Creates a typed layer registry.
  *
- * Each layer is stored as `{ path, name, defaults, input, resolved }`.
  * Extra fields a spec carries, typed by `X`, pass through to the layer untouched.
- * `resolved` folds the layer via `withDefaults` using the registry's strategies.
+ * Each layer's `resolved` folds it via `withDefaults` using the registry's strategies.
  * Closer layers win; base layers fill.
- *
- * Paths are unique - adding a second layer at the same path throws.
- * Strategies apply to per-layer and cross-layer merges alike.
- * Extend them at any time via `setStrategy`.
- * Results are cached and invalidated on `add`, `remove`, `clear`, or `setStrategy`.
  *
  * @example
  * ```ts

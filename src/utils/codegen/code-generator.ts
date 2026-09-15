@@ -27,9 +27,6 @@ export interface CodeGeneratorOptions {
 
 /**
  * A directory-scoped code generator returned by `createCodeGenerator`.
- *
- * `write` only touches files that actually changed and remembers every path it produced.
- * `prune` then deletes whatever it did not produce, leaving only the current output.
  */
 export interface CodeGenerator {
   /**

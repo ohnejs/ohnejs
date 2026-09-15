@@ -7,7 +7,7 @@ import { clamp } from '../number/clamp.ts';
  *
  * @example
  * ```ts
- * try { parseMessage('Hello }'); }
+ * try { parseMessage('Hello }') }
  * catch (e) {
  *   e.position // -> 6
  *   e.line     // -> 1
@@ -56,11 +56,10 @@ export class MessageSyntaxError extends Error {
  *
  * @example
  * ```ts
- * try { formatMessage('{n, number, currency}', { n: 5 }, 'en'); }
+ * try { formatMessage('{n, number, currency}', { n: 5 }, 'en') }
  * catch (e) {
  *   e instanceof MessageFormatError // -> true
- *   e.message
- *   // -> "bare `currency` style requires a code; use `::currency/XXX` skeleton instead"
+ *   e.message                       // -> "bare `currency` style requires a code; ..."
  * }
  * ```
  */

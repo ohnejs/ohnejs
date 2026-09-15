@@ -12,14 +12,14 @@ import { parseTemplate } from './parse-template.ts';
  *
  * @example
  * ```ts
- * renderTemplate('{last}, {first}', { last: 'Lovelace', first: 'Ada' })
- * // -> 'Lovelace, Ada'
+ * renderTemplate('{city}, {country}', { city: 'Vienna', country: 'Austria' })
+ * // -> 'Vienna, Austria'
  *
- * renderTemplate('{last}, {first}', { last: 'Lovelace' })
- * // -> 'Lovelace'
+ * renderTemplate('{city}, {country}', { city: 'Vienna' })
+ * // -> 'Vienna'
  *
- * renderTemplate('{last}, {first}', { first: 'Ada' })
- * // -> 'Ada'
+ * renderTemplate('{city}, {country}', { country: 'Austria' })
+ * // -> 'Austria'
  * ```
  */
 export function renderTemplate(

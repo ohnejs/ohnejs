@@ -102,8 +102,7 @@ export function undoKeymap(run: KeyCommand): Keymap {
 }
 
 /**
- * Bindings for redo: `mod+y` and `shift+mod+z` on every platform.
- * macOS gets `cmd+y` and `cmd+shift+z`; Windows and Linux get `ctrl+y` and `ctrl+shift+z`.
+ * Bindings for redo: `mod+y` and `shift+mod+z` (Command on macOS, Control elsewhere).
  *
  * @example
  * ```ts

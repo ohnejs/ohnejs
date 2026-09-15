@@ -2,7 +2,6 @@ import { hasKey } from './has-key.ts';
 
 /**
  * Checks whether `value` has every listed key as an own property.
- * Narrows the type so each is accessible after the check.
  *
  * @example
  * ```ts

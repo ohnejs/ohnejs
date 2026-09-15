@@ -3,7 +3,6 @@
  * Empty strings pass through.
  *
  * Inverse of `uncapitalize`.
- * The tail is untouched, so it composes cleanly with already-formatted text and arbitrary tokens.
  *
  * @example
  * ```ts

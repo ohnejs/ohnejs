@@ -1,7 +1,5 @@
 /**
  * A FIFO async lock: it runs one task at a time, in the order the tasks were handed to it.
- * A task starts only once the previous one has settled, so its critical section never overlaps.
- * One task rejecting does not stall the queue; the next task runs regardless.
  */
 export type Mutex = <T>(task: () => Promise<T>) => Promise<T>;
 

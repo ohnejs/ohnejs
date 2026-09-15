@@ -4,7 +4,6 @@ import { splitTokens } from './split-tokens.ts';
  * Splits a string into lowercase word tokens.
  * Same boundaries as `splitTokens`, then each token is lowercased.
  *
- * Used by `toKebabCase` and `toSnakeCase`.
  * Use `splitTokens` instead when casing matters (`toCamelCase`, `toPascalCase`).
  *
  * @example

@@ -25,14 +25,6 @@ export interface GateCloseOptions {
   /**
    * How long to wait for in-flight work before giving up, as a `parseDuration` value.
    * Omitted means wait indefinitely.
-   *
-   * @example
-   * ```ts
-   * 5000   // 5 seconds, as raw milliseconds
-   * '5s'   // 5 seconds
-   * '1.5s' // 1500 milliseconds
-   * '2m'   // 2 minutes
-   * ```
    */
   timeout?: number | string;
 }
@@ -40,9 +32,6 @@ export interface GateCloseOptions {
 /**
  * A drain primitive: admit work while open, refuse while closing, wait for in-flight work to finish.
  *
- * Each `enter` is one unit of work that must be released.
- * `close` flips the gate and refuses new units.
- * It resolves once the in-flight count reaches zero or the timeout wins.
  * It carries no domain knowledge - HTTP holds a ticket per request, a job queue holds one per job.
  */
 export interface Gate {
@@ -74,10 +63,6 @@ export interface Gate {
 
 /**
  * Creates a `Gate`: a standalone drain primitive with no domain knowledge.
- *
- * `enter` admits a unit of work and returns its release fn.
- * It returns `null` once closing, so callers refuse new work.
- * `close` waits for in-flight units to finish, bounded by an optional timeout.
  *
  * @example
  * ```ts

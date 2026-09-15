@@ -44,7 +44,6 @@ export const slugGerman: Record<string, string> = {
  * Bosnian Latin transliteration map for `slugify`.
  * Maps the five letters with diacritics to their bare ASCII equivalents.
  * `đ` is the only one that does not decompose under NFD.
- * The rest are listed explicitly so the intent of the map is visible at a glance.
  *
  * @example
  * ```ts
@@ -64,18 +63,12 @@ export const slugBosnian: Record<string, string> = {
 /**
  * Converts a string to a URL-friendly slug.
  *
- * Trim and lowercase the input.
- * Apply any `replace` maps in order.
- * NFD-normalize and drop combining marks.
- * Replace non-alphanumeric runs with `separator`.
- * Collapse consecutive separators.
- * Strip leading and trailing separators.
+ * Trims and lowercases, applies `replace` maps in order, then drops the combining marks NFD splits off.
+ * Each run of characters outside `a-z0-9` becomes one `separator`, none left leading or trailing.
  *
  * `replace` runs before NFD so digraph maps stay meaningful.
- * Without `slugGerman`, `'Übersetzung'` loses its umlaut to NFD and lands on `'ubersetzung'`.
- * With it, `ü -> ue` catches first and the result is `'uebersetzung'`.
  *
- * Non-Latin scripts (Cyrillic, CJK, Arabic, ...) decompose to nothing under NFD and yield an empty slug.
+ * Non-Latin scripts (Cyrillic, CJK, Arabic, ...) are not `a-z0-9`, so they drop out of the slug.
  * Supply a `replace` map to romanize them.
  *
  * @example

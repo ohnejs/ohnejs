@@ -2,8 +2,6 @@
  * Compiled glob matcher produced by `compileGlob`.
  * Call it with a string to test it against the pattern.
  *
- * The matcher carries the source glob and the compiled regex.
- *
  * @example
  * ```ts
  * const matcher = compileGlob('/admin/**')

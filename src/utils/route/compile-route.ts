@@ -10,8 +10,6 @@ export type RouteParams = Record<string, string>;
  * Compiled URL route matcher produced by `compileRoute`.
  * Call it with a path to extract params; returns `null` on no match.
  *
- * The matcher carries the normalized pattern, the param names in order, and the compiled regex.
- *
  * @example
  * ```ts
  * const matcher = compileRoute('/authors/[id]')

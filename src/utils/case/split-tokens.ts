@@ -2,7 +2,6 @@
  * Splits a string into word tokens, preserving original casing.
  * Recognizes camelCase, acronym, letter/digit, and non-alphanumeric boundaries.
  *
- * Foundation for `splitWords` and the case converters.
  * Reach for it when acronym casing matters (`toCamelCase`, `toPascalCase`).
  *
  * @example

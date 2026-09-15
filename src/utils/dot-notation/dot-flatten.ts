@@ -8,6 +8,7 @@ import { isPlainObject } from '../is/is-plain-object.ts';
  * Descends only plain objects and arrays.
  * Anything else (`Date`, `Map`, `Set`, class instances, primitives) is treated as a leaf.
  * Nested empty objects and arrays are preserved as leaves.
+ * A key that is empty or holds `.`, `[`, or `]` throws, since no path could address it.
  *
  * @example
  * ```ts

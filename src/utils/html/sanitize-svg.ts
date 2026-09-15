@@ -168,9 +168,9 @@ function scrubAttributes(attrs: string, removed: Set<string>): string {
  * @example
  * ```ts
  * isSVG('<?xml version="1.0"?>\n<svg></svg>') // -> true
- * isSVG('<svg/>')                              // -> true
- * isSVG('<html><body></body></html>')          // -> false
- * isSVG('<svgfake></svgfake>')                 // -> false
+ * isSVG('<svg/>')                             // -> true
+ * isSVG('<html><body></body></html>')         // -> false
+ * isSVG('<svgfake></svgfake>')                // -> false
  * ```
  */
 export function isSVG(text: string): boolean {

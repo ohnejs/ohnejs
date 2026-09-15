@@ -8,7 +8,6 @@ const ROUNDING_INCREMENTS: ReadonlySet<number> = new Set([
 /**
  * Parses an ICU number skeleton (without the leading `::`) into `Intl.NumberFormatOptions`.
  *
- * Covers the full skeleton grammar.
  * Fraction shortcuts: `.00`, `.0##`, `.00*`.
  * Significant shortcuts: `@@@`, `@@##`, `@*`.
  *

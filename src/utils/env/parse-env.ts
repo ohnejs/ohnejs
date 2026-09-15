@@ -7,7 +7,7 @@ const KEY = /[A-Za-z_][A-Za-z0-9_]*/y;
  * The first `=` on the line separates key from value.
  * Whitespace around the `=` is allowed and stripped.
  *
- * Values come in three flavors:
+ * Values come in these flavors:
  * - Bare values run until end-of-line or an inline ` # comment`.
  *   Trailing whitespace is trimmed.
  *   A `#` without preceding whitespace stays part of the value (e.g. `COLOR=#fff`).
@@ -21,7 +21,7 @@ const KEY = /[A-Za-z_][A-Za-z0-9_]*/y;
  * Inside any quoted value, `#` is literal.
  * Duplicate keys keep the last assignment.
  *
- * Throws on malformed input: missing `=`, unterminated quote, or non-whitespace after a closing quote.
+ * Throws on an invalid key, a missing `=`, an unterminated quote, or non-comment text after a closing quote.
  *
  * @example
  * ```ts

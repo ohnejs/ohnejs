@@ -71,6 +71,7 @@ export interface Prompt {
 
   /**
    * Prints a boxed aside off the rail, for information shown between prompts.
+   * Pass `last` when nothing follows, so the box closes the rail instead of continuing it.
    */
   note(message: string, title?: string, last?: boolean): void;
 }

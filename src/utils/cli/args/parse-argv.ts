@@ -13,9 +13,8 @@ export type FlagValue = string | boolean | Array<string | boolean>;
  */
 export interface ParseArgvOptions {
   /**
-   * Long flag names (without the `--`) that never take a value.
+   * Flag names (without dashes) that never take a value.
    * A boolean flag does not consume the token after it, so `--force build` keeps `build` positional.
-   * Without this hint, a bare flag followed by a non-flag token consumes that token as its value.
    * A long flag matches a listed name in kebab too, so a `--forceSync` spelling honors `force-sync`.
    * A short flag matches only verbatim, keeping `-P` and `-p` distinct.
    *

@@ -73,9 +73,6 @@ export interface Registry<V> {
 /**
  * Creates a typed registry: a key-value store with a configurable conflict policy.
  *
- * By default, registering a key that already exists replaces the previous value.
- * Pass `options.merge` to fold the incoming value into the existing one instead.
- *
  * @example
  * ```ts
  * const r = createRegistry<number>()

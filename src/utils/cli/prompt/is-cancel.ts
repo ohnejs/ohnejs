@@ -1,5 +1,11 @@
 /**
  * Sentinel a prompt resolves to when the user cancels with `ctrl+c`.
+ *
+ * @example
+ * ```ts
+ * const name = await prompt.text({ message: 'Name?' })
+ * name === CANCEL // -> true after ctrl+c
+ * ```
  */
 export const CANCEL: unique symbol = Symbol('ohne.prompt.cancel');
 

@@ -5,7 +5,6 @@ import { access } from 'node:fs/promises';
  *
  * Returns `false` only when the path is genuinely absent.
  * Permission errors (`EACCES`, `EPERM`) propagate.
- * "Cannot access" is not the same as "does not exist".
  *
  * @example
  * ```ts

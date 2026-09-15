@@ -122,7 +122,7 @@ export function runWithScope<T>(s: Scope, fn: () => T): T {
 
 /**
  * Captures the active scope onto `e` and, when one is active, enlists `e` for disposal.
- * At the top level `e.scope` stays null, so `runEffect` runs `e` unwrapped - the same as before.
+ * At the top level `e.scope` stays null, so `runEffect` runs `e` unwrapped.
  */
 export function register(e: Effect): void {
   const scope = activeScope();

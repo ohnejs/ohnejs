@@ -28,11 +28,6 @@ export interface EnvSpec<T> {
 
 /**
  * Typed env-var registry.
- *
- * Each var is registered with `define`, gets a parser and a default, and can be read with `get`.
- * Reads consult an in-memory override first, then `process.env`, then the default.
- * Overrides are set with `set` and cleared with `unset`; neither touches `process.env`.
- * `fill` is the one method that writes to `process.env`, and only the names it lacks.
  */
 export interface EnvRegistry<E extends object> {
   /**

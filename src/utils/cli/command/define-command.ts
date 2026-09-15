@@ -43,7 +43,6 @@ export interface CommandContext<S extends ArgsSchema> {
 export interface Command<S extends ArgsSchema = ArgsSchema> {
   /**
    * Identifying metadata.
-   * `name` is required.
    */
   meta: CommandMeta;
 

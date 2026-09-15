@@ -6,7 +6,6 @@ import { runUntracked } from './_runtime.ts';
  * Reads of `Ref.value` or `ComputedRef.value` inside `fn` do NOT subscribe the outer effect.
  * Writes still trigger subscribers as usual.
  * The outer effect is not re-triggered by its own self-write inside `fn`.
- * Returns whatever `fn` returns.
  *
  * @example
  * ```ts

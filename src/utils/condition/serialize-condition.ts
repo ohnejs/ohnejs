@@ -52,8 +52,8 @@ function entryOf(node: LeafNode): SearchParamValue {
 }
 
 /**
- * Serializes a condition AST into its canonical object form, the exact inverse of `parseCondition`:
- * parsing the output yields a deep-equal AST for every normalized node.
+ * Serializes a condition AST into its canonical object form, the exact inverse of `parseCondition`.
+ * Parsing the output yields a deep-equal AST for every normalized node.
  * An un-negated `equalsTo` emits the scalar shorthand; a negated leaf wraps its entry in `not`.
  * An `and` node merges children into one object when each child claims one distinct top-level key.
  * Otherwise it emits `{ and: [...] }`; an `or` node always emits `{ or: [...] }`.

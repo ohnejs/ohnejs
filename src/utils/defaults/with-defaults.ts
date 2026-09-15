@@ -74,13 +74,6 @@ export interface WithDefaultsOptions {
  *   { strategies: { items: 'defaults' } }
  * )
  * // -> { items: [{ name: 'A', kind: 'x' }, { kind: 'y' }] }
- *
- * withDefaults(
- *   { variants: { thumbnail: { width: 200 } } },
- *   { variants: { thumbnail: { width: 320, height: 320 }, hero: { width: 1200 } } },
- *   { strategies: { variants: 'assign' } }
- * )
- * // -> { variants: { thumbnail: { width: 200 }, hero: { width: 1200 } } }
  * ```
  */
 export function withDefaults<T>(input: T, defaults: undefined, options?: WithDefaultsOptions): T;

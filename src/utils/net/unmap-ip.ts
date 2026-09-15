@@ -5,7 +5,6 @@ const MAPPED = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i;
  *
  * A dual-stack socket reports an IPv4 client as `'::ffff:127.0.0.1'`.
  * This returns `'127.0.0.1'`, so the address reads and compares as IPv4.
- * Anything that is not IPv4-mapped is returned as-is.
  *
  * @example
  * ```ts
