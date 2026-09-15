@@ -1,11 +1,11 @@
 # Collections and fields
 
 A collection is a set of fields, declared in one file under `collections/`. Each field becomes a
-column, a relation, or a nested table. This guide covers the field types; see
-[schema sync](./sync.md) for how a collection file becomes a table, and
-[reading records](./queries.md) for querying them. Every field also takes per-value options:
-`default`, `sanitizers`, and `validators` act at write time, covered in
-[writing records](./writing.md); `when` activates a field per record, covered in
+column, a relation, or a nested table. This guide covers the built-in field types -
+[define your own](./field-types.md) when none fits; see [schema sync](./sync.md) for how a
+collection file becomes a table, and [reading records](./queries.md) for querying them. Every
+field also takes per-value options: `default`, `sanitizers`, and `validators` act at write time,
+covered in [writing records](./writing.md); `when` activates a field per record, covered in
 [conditional fields](./conditional-fields.md).
 
 ```ts

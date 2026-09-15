@@ -46,10 +46,10 @@ await query('Posts')
 Which operators appear depends on the field's type. A text column offers `contains`,
 `startsWith`, `endsWith`, and the raw `like`; text and number columns alike admit the ordering
 comparisons `greaterThan`, `atLeast`, `lessThan`, and `atMost`; both offer `equalsTo` and `in`.
-A field type that marks its JSON column a list (`jsonList` on `defineField`) adds `includes`,
-`includesAll`, and `includesAny` - membership over the stored list's elements. Asking for an
-operator the field does not admit - ordering on a boolean, `contains` on a number - does not
-compile.
+A `multiSelect` field, or a [custom field type](./field-types.md#storage) marked `jsonList`, adds
+`includes`, `includesAll`, and `includesAny` - membership over the stored list's elements. Asking
+for an operator the field does not admit - ordering on a boolean, `contains` on a number - does
+not compile.
 
 Chained `where` calls AND together. Each returns the builder, so you keep filtering.
 

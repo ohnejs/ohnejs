@@ -88,15 +88,11 @@ alone; see [write-only and locked fields](./collections.md#write-only-and-locked
 
 ## Defaults
 
-A field type may ship a default, and an instance may set its own. When create input omits the
-field, the instance default wins, then the type's, then `null` for a nullable field. A
-non-nullable field with no default requires input.
+A [field type](./field-types.md#defaults) may ship a default, and an instance may set its own.
+When create input omits the field, the instance default wins, then the type's, then `null` for a
+nullable field. A non-nullable field with no default requires input.
 
 ```ts
-// a field type with a default
-export default defineField({ columnType: 'integer', defaultValue: 0 });
-
-// an instance overriding it
 field('integer', { default: 10 });
 ```
 
@@ -106,19 +102,10 @@ created record. A `record` default is a plain `UUID`, so it stays a value.
 
 ## Sanitizers and validators
 
-A field type cleans and checks its value through two ordered lists. Sanitizers transform the value
-and never report; validators return a message when the value is wrong, or `undefined` when it is
-fine.
-
-```ts
-export default defineField({
-  columnType: 'text',
-  sanitizers: [(value) => (typeof value === 'string' ? value.trim() : value)],
-  validators: [(value) => (value === '' ? 'This value must not be empty' : undefined)],
-});
-```
-
-An instance adds its own, run after the type's:
+A field cleans and checks its value through ordered lists of sanitizers and validators. Sanitizers
+transform the value and never report; validators return a message when the value is wrong, or
+`undefined` when it is fine. An instance adds its own, run after the ones its
+[field type](./field-types.md#sanitizers-and-validators) ships:
 
 ```ts
 field('text', {
@@ -128,22 +115,8 @@ field('text', {
 
 The tiers run in order - type sanitizers, type validators, instance sanitizers, instance
 validators - and the first message stops the field. A returned message always lands at the field's
-own name. To report a failure deep inside a composite value, write into `ctx.errors` keyed by the
-subfield path; the pipeline prefixes it under the field:
-
-```ts
-export default defineField({
-  columnType: 'json',
-  validators: [
-    (value, ctx) => {
-      const address = value as { city?: string };
-      if (!address.city) ctx.errors.city = 'This value must not be empty';
-    },
-  ],
-});
-```
-
-On a field named `address`, that failure lands at `address.city`.
+own name. To report a failure inside a composite value, a validator writes into `ctx.errors`
+instead - see [custom field types](./field-types.md#sanitizers-and-validators).
 
 ## Uniqueness and references
 

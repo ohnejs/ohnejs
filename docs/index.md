@@ -35,7 +35,9 @@ project extend another.
 Declare your data as collections of fields. ohne keeps the schema in step with your code and gives
 you a typed query builder for reads and writes.
 
-- [Collections and fields](./database/collections.md) - the field types and their options.
+- [Collections and fields](./database/collections.md) - the built-in field types and their options.
+- [Custom field types](./database/field-types.md) - define a field type once, use it in any
+  collection.
 - [Conditional fields](./database/conditional-fields.md) - fields that activate on a condition.
 - [Blocks](./database/blocks.md) - ordered lists of mixed, reusable shapes.
 - [Translations](./database/translations.md) - one value per locale.
