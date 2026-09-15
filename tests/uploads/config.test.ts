@@ -1,6 +1,7 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
+import { useEnv } from '../../src/ohne/env/use-env.ts';
 import { useLayers } from '../../src/ohne/layers/use-layers.ts';
 import { UPLOADS_DEFAULTS, useUploadsConfig } from '../../src/uploads/config.ts';
 
@@ -30,5 +31,12 @@ describe('useUploadsConfig', () => {
   it('replaces cache rather than merging it', () => {
     useLayers().add({ path: PATH, input: { uploads: { cache: { maxAge: 60 } } } });
     deepStrictEqual(useUploadsConfig().cache, { maxAge: 60 });
+  });
+});
+
+describe('the uploads env vars', () => {
+  it('declare no CLI flag, since the CLI parses its flags before any layer loads', () => {
+    strictEqual(useEnv().flag('UPLOADS_URL'), undefined);
+    strictEqual(useEnv().flag('IMAGES_SECRET'), undefined);
   });
 });

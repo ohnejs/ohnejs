@@ -180,7 +180,7 @@ export const UPLOADS_STRATEGIES: LayerStrategies = {
   'images.variants': 'assign',
 };
 
-useEnv().define('UPLOADS_URL', { default: undefined, flag: 'value' });
+useEnv().define('UPLOADS_URL', { default: undefined });
 useEnv().define('IMAGES_SECRET', { default: undefined });
 
 /**
