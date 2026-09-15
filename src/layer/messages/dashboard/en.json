@@ -146,6 +146,7 @@
   "invalidNumber": "Enter a number",
   "login": {
     "email": "Email",
+    "failed": "The sign-in failed",
     "forgotPassword": "Forgot password?",
     "hidePassword": "Hide password",
     "password": "Password",

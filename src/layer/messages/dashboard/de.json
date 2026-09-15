@@ -146,6 +146,7 @@
   "invalidNumber": "Zahl eingeben",
   "login": {
     "email": "E-Mail",
+    "failed": "Die Anmeldung ist fehlgeschlagen",
     "forgotPassword": "Passwort vergessen?",
     "hidePassword": "Passwort verbergen",
     "password": "Passwort",
