@@ -171,7 +171,7 @@ function renderBlocks(target: HTMLElement, text: string): void {
  * Inline, it covers `**bold**`, backticked code, `[label](https://url)` links in a new tab, and breaks.
  * A pipe table needs a `|-|-|` separator as its second line.
  * A `|||` header row renders no `thead`.
- * `markdown: false` renders the text as-is.
+ * Passing `false` as `markdown` renders the text as-is.
  *
  * Content never reaches `innerHTML`, so server-provided strings stay inert.
  * Style the target with `ohne-prose` for the typographic flow.

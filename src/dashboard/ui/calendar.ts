@@ -403,7 +403,6 @@ css`
  * Arrow keys navigate while open: Left/Right step months, Down is the previous year, Up the next.
  * Shift-clicking the header chevrons steps years; Escape dismisses an open selector pane first.
  * Typing while open collects a keyword overlay that jumps to a day, month name, or year after 750ms.
- * `commit` fires with the settled value when the picker closes, and immediately on clear.
  *
  * @example
  * ```ts

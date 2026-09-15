@@ -40,8 +40,8 @@ export interface TimeRangeOptions {
   max?: number | string | (() => number | string);
 
   /**
-   * The minimum time span between start and end:
-   * ms, a duration string like `'30 minutes'`, or a parts object like `{ hours: 1 }`.
+   * The minimum time span between start and end.
+   * It takes ms, a duration string like `'30 minutes'`, or a parts object like `{ hours: 1 }`.
    * A getter reads reactively.
    *
    * @default
@@ -50,8 +50,8 @@ export interface TimeRangeOptions {
   minRange?: TimeSpanValue | (() => TimeSpanValue);
 
   /**
-   * The maximum time span between start and end:
-   * ms, a duration string like `'2 hours'`, or a parts object like `{ hours: 2 }`.
+   * The maximum time span between start and end.
+   * It takes ms, a duration string like `'2 hours'`, or a parts object like `{ hours: 2 }`.
    * A getter reads reactively.
    *
    * @default

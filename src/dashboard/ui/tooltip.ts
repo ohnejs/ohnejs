@@ -59,6 +59,9 @@ let touchTracked = false;
 let usingTouch = false;
 let lastMouseMove = 0;
 
+/**
+ * Flags touch input from a touch start until two mouse moves land within 20ms; installs its listener once.
+ */
 function trackTouch(): void {
   if (touchTracked) return;
   touchTracked = true;
@@ -80,6 +83,9 @@ function trackTouch(): void {
   );
 }
 
+/**
+ * Replaces `target`'s children with markdown-lite `text`: `**bold**`, backticked code, and `<br>` breaks.
+ */
 function renderContent(target: HTMLElement, text: string): void {
   target.textContent = '';
   text.split('<br>').forEach((line, index) => {
@@ -99,7 +105,6 @@ function renderContent(target: HTMLElement, text: string): void {
 /**
  * Attaches a tooltip to an element; returns the dispose.
  *
- * Defaults are an arrow, top placement flipping when space is short, a 10px offset, and 320px max width.
  * Show and hide are instant, any click hides, and touch shows only while holding.
  * Every tooltip is raised to the top layer as it appears, so it covers the surface that opened it.
  * The content string speaks markdown-lite: `**bold**`, backticked code, and `<br>` breaks.

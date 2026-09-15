@@ -35,7 +35,7 @@ let current: Ref<DashboardLanguage> | undefined;
  *
  * Reading `.value` inside a reactive render subscribes to it.
  * Writing a new tag re-renders every `useT` string in place.
- * It starts at the injected `messages.defaultLanguage`.
+ * It starts at the app's `messages.defaultLanguage`.
  *
  * @example
  * ```ts

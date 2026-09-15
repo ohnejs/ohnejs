@@ -13,8 +13,8 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseRealValue } from '../parse.ts';
 
 /**
- * The `number` field type: cell display, inline cell editor, and form control.
- * Everywhere the entry parses strictly to a finite double.
+ * The `number` field type: cell display, inline cell editor, form control, and filter.
+ * The editor and control parse entry strictly to a finite double.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
  * The control validates on blur and on read.
  */

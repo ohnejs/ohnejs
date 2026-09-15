@@ -52,7 +52,8 @@ export interface StructureDraggable {
   structureId: string | null;
 
   /**
-   * Function to remove the current draggable item from its current structure.
+   * Removes the item from its structure and returns the items left there.
+   * Passing `false` also fires that structure's `onCommit` with those items.
    */
   remove: (isSameStructure: boolean) => Record<string, unknown>[];
 }

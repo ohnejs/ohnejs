@@ -101,6 +101,9 @@ export function each<T, K>(
   return fragment;
 }
 
+/**
+ * Moves the nodes from `start` through `end` in front of `before`, or nothing when `before` is detached.
+ */
 function moveRange(start: ChildNode, end: ChildNode, before: ChildNode): void {
   const parent = before.parentNode;
   if (isNull(parent)) return;

@@ -154,9 +154,7 @@ css`
 /**
  * A vertical scroll container with a hidden scrollbar and sticky hover-to-scroll edge buttons.
  * The chevrons double as scroll-position indicators: each shows only while its edge is unreached.
- * Negative content margins absorb the button heights.
- * Visibility flips then never change the scroll height.
- * Edge reveals animate; container resizes snap without transition.
+ * A showing button overlays the content edge, so it never shifts the content or the scroll height.
  *
  * @example
  * ```ts

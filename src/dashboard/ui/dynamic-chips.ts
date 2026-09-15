@@ -85,7 +85,7 @@ export interface DynamicChipsPaginatedChoices {
 export interface DynamicChipsOptions {
   /**
    * Resolves the choices for the chips field.
-   * It receives the current `page` number and the search `keyword` as arguments.
+   * It receives the 1-based `page` and the search `keyword`.
    */
   choicesResolver: (page: number, keyword: string) => Promise<DynamicChipsPaginatedChoices>;
 
@@ -113,8 +113,8 @@ export interface DynamicChipsOptions {
   maxItems?: number | false;
 
   /**
-   * The minimum number of items allowed in the array; `false` disables the limit.
-   * This component never enforces it; enforcement lives in validators.
+   * The minimum number of items allowed in the array.
+   * The component never enforces it; check the count yourself.
    *
    * @default
    * false
@@ -448,6 +448,9 @@ css`
   }
 `;
 
+/**
+ * Returns the choice's `label`, else its `value`, as text; any falsy result, `0` included, shows `-`.
+ */
 function labelOrDash(choice: DynamicChipsChoice): string {
   return String((choice.label ?? choice.value) || '-');
 }

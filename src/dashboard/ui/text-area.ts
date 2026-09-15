@@ -162,7 +162,7 @@ css`
 `;
 
 /**
- * A multi-line variant of `textInput` with three resize modes.
+ * A multi-line variant of `textInput`.
  * By default it autosizes: the height follows the content, re-measured when the width changes.
  * Typing writes into the model; writing the model updates the textarea.
  * Escape blurs the textarea without bubbling, and double-clicks stop at the box.

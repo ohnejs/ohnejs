@@ -13,7 +13,7 @@ import { untracked } from '../../utils/reactive/untracked.ts';
  *
  * A primitive renders as text; a `Node` is inserted as-is; an array splices its items in order.
  * `null`, `undefined`, and booleans render nothing.
- * A function makes the child reactive: it is bound through `insert`, re-rendering on change.
+ * A function makes the child reactive, re-rendering on change.
  * Its return may be any `Child`, so a binding can swap whole nodes, not just patch text.
  */
 export type Child = Node | string | number | boolean | null | undefined | (() => Child) | Child[];
@@ -50,6 +50,9 @@ export function insert(parent: Node, getter: () => Child): void {
   });
 }
 
+/**
+ * Renders `value` between the anchors, reusing a lone text node for a string or number.
+ */
 function patch(start: ChildNode, end: ChildNode, value: Child): void {
   const node = start.nextSibling;
   if (node instanceof Text && node.nextSibling === end && (isString(value) || isNumber(value))) {

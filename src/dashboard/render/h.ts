@@ -18,7 +18,7 @@ export type Props = Record<string, unknown>;
  *
  * Props bind statically or reactively; children append in order.
  * A function child or attribute value is wrapped in a `batchedEffect`.
- * A reactive change patches only the text node or attribute it touches - no re-render, no virtual DOM.
+ * A reactive change updates only its own attribute or child region; a region holding elements rebuilds.
  *
  * @example
  * ```ts
@@ -35,6 +35,9 @@ export function h(tag: string, props?: Props | null, ...children: Child[]): HTML
   return el;
 }
 
+/**
+ * Binds `on*` functions as listeners, other functions as reactive attributes, the rest as static ones.
+ */
 function setProps(el: HTMLElement, props: Props): void {
   for (const key in props) {
     const value = props[key];
@@ -48,6 +51,9 @@ function setProps(el: HTMLElement, props: Props): void {
   }
 }
 
+/**
+ * Writes one attribute: nullish and `false` remove it, `true` sets it empty, anything else its string.
+ */
 function setAttribute(el: HTMLElement, key: string, value: unknown): void {
   if (isNullish(value) || value === false) el.removeAttribute(key);
   else if (value === true) el.setAttribute(key, '');

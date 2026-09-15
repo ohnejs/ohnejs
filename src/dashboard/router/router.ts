@@ -102,7 +102,7 @@ export function lastNavigation(): NavigationCause {
 /**
  * Installs the guard every navigation consults before touching history, or uninstalls it with `null`.
  * A guard returning `false` aborts the navigation and owns resuming it later.
- * The record page's unsaved-changes strip resumes the blocked target on Discard or Save.
+ * A resuming `navigate` call consults the guard again, so the guard must let it pass or be uninstalled.
  * The back and forward buttons are guarded too: a blocked popstate re-pushes the rendered path.
  */
 export function setNavigationGuard(next: ((target: string) => boolean) | null): void {

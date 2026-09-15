@@ -83,7 +83,7 @@ export interface PlaceInput {
   placement?: Placement;
 
   /**
-   * When set, the placement with the most main-axis space wins, earlier entries breaking ties.
+   * When set, the roomiest placement that fits wins, else the roomiest; earlier entries break ties.
    * The preferred `placement` is ignored entirely.
    */
   allowedPlacements?: Placement[];
@@ -166,18 +166,30 @@ interface Overflow {
   left: number;
 }
 
+/**
+ * Returns the side a placement attaches to, dropping any alignment.
+ */
 function sideOf(placement: Placement): Side {
   return placement.split('-')[0] as Side;
 }
 
+/**
+ * Returns the placement's alignment, or `null` for a bare side that centers.
+ */
 function alignmentOf(placement: Placement): Alignment | null {
   return (placement.split('-')[1] as Alignment | undefined) ?? null;
 }
 
+/**
+ * Whether the side puts the element above or below the reference, making x the cross axis.
+ */
 function isVertical(side: Side): boolean {
   return side === 'top' || side === 'bottom';
 }
 
+/**
+ * Returns the top-left corner flush against the reference, before offset and cross-axis shift.
+ */
 function coordsAt(
   placement: Placement,
   reference: Rect,
@@ -207,6 +219,9 @@ function coordsAt(
   };
 }
 
+/**
+ * Returns how far each edge pokes past the viewport inset by `padding`; negative values are spare room.
+ */
 function overflowAt(
   x: number,
   y: number,
@@ -222,11 +237,17 @@ function overflowAt(
   };
 }
 
+/**
+ * Returns the viewport edge an aligned element grows toward along the cross axis.
+ */
 function alignedSide(side: Side, alignment: Alignment): Side {
   if (isVertical(side)) return alignment === 'start' ? 'right' : 'left';
   return alignment === 'start' ? 'bottom' : 'top';
 }
 
+/**
+ * Returns the fitting placement with the most main-axis room, else the roomiest; earlier entries win ties.
+ */
 function pickPlacement(
   allowed: Placement[],
   reference: Rect,
@@ -249,6 +270,9 @@ function pickPlacement(
   return (scored.find((entry) => entry.fits) ?? scored[0]!).placement;
 }
 
+/**
+ * Returns the placement mirrored to the opposite side, keeping its alignment.
+ */
 function opposedPlacement(placement: Placement): Placement {
   const opposite: Record<Side, Side> = {
     top: 'bottom',
@@ -261,6 +285,9 @@ function opposedPlacement(placement: Placement): Placement {
   return alignment ? `${side}-${alignment}` : side;
 }
 
+/**
+ * Returns the opposite placement when the preferred one overflows its side and the opposite overflows less.
+ */
 function flipPlacement(
   preferred: Placement,
   reference: Rect,
@@ -278,6 +305,9 @@ function flipPlacement(
   return oppositeMain < main ? opposite : preferred;
 }
 
+/**
+ * Returns the width and height the element may take at `x`/`y` inside the viewport inset by `padding`.
+ */
 function availabilityAt(
   placement: Placement,
   x: number,

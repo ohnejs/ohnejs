@@ -283,6 +283,9 @@ css`
   }
 `;
 
+/**
+ * Pads the integer part to `width` digits, keeping sign and decimals; `width <= 0` changes nothing.
+ */
 function leadingZeros(value: number, width: number): string {
   if (width <= 0) return value.toString();
   const [integer = '', decimals] = Math.abs(value).toString().split('.');
@@ -298,9 +301,6 @@ function leadingZeros(value: number, width: number): string {
  * Blur, steps, and drag end settle the value, then report it to `onCommit`.
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display.
- *
- * With `autoWidth` the box hugs its content and suffix, measured through a hidden mirror span.
- * It re-measures whenever the span's border box changes.
  *
  * @example
  * ```ts

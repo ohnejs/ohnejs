@@ -659,6 +659,9 @@ css`
   }
 `;
 
+/**
+ * Returns the type's leading icon at 1.5em, or `null` for `'default'`.
+ */
 function typeIcon(type: ToastRecord['type']): SVGSVGElement | null {
   if (type === 'default') return null;
   const svg = icon(TYPE_ICONS[type]);
@@ -667,6 +670,9 @@ function typeIcon(type: ToastRecord['type']): SVGSVGElement | null {
   return svg;
 }
 
+/**
+ * Builds the close button's 12px stroked cross from `CLOSE_SHAPE`.
+ */
 function closeIcon(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', '12');
@@ -735,15 +741,11 @@ export function queueToast(message: string, options?: ToastOptions): void {
 }
 
 /**
- * The global toast outlet.
- * A top-center stack of at most 3 visible toasts, expanded.
- * The toasts sit 336px wide with an 8px gap, on 4000ms timers that pause while hovered or held.
- * Swipe-up dismisses (20px or 0.11 px/ms), exits get a 200ms window, and Alt+T focuses the stack.
+ * The global toast outlet: a top-center stack of at most 3 visible toasts.
+ * Timers pause while the stack is hovered or held, a swipe up dismisses, and Alt+T focuses the stack.
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.
  *
- * The outlet is a lazy singleton built in a detached scope: every call returns the same element.
- * A screen swap re-parents it instead of rebuilding it, which drops it out of the top layer.
- * The next toast raises it back; its `z-index` carries the stack in the meantime.
+ * Every call returns the same element, so a screen swap re-parents it instead of rebuilding it.
  * A showing toast keeps its DOM, its running timer, and its animation state across navigations.
  *
  * @example
@@ -756,6 +758,9 @@ export function toaster(): HTMLElement {
   return outlet;
 }
 
+/**
+ * Builds the outlet `toaster` caches, wiring hover pause, focus restore, Alt+T, and the queue drains.
+ */
 function createToaster(): HTMLElement {
   const expanded = ref(false);
   const interacting = ref(false);

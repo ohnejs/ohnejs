@@ -278,6 +278,9 @@ css`
   }
 `;
 
+/**
+ * Creates the named icon at 1.125em, classed to sit at the trailing end of its row.
+ */
 function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
   const svg = icon(name);
   svg.classList.add('ohne-select-icon');
@@ -286,6 +289,9 @@ function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
   return svg;
 }
 
+/**
+ * Renders a choice value as text, with `null` and `undefined` as the empty string.
+ */
 function toDisplay(value: Primitive): string {
   return isNullish(value) ? '' : String(value);
 }

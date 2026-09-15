@@ -184,7 +184,7 @@ css`
  *
  * @example
  * ```ts
- * const input = textInput(raw)
+ * const input = textInput(raw).querySelector('input') as HTMLInputElement
  * describeControl(input, field, path, () => error())
  * ```
  */
@@ -214,7 +214,6 @@ export function describeControl(
  * The label carries the required mark, and a unique field pairs it with the unique chip.
  * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
  * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
- * The pattern mirrors the macOS close button, which shows its cross over the document-edited dot.
  * The message under the control shows the description as prose, or the error destructive in its place.
  * An expandable description sits behind a chevron toggle that reads its show or hide label.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.

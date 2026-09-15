@@ -2,7 +2,6 @@ import { append, type Child } from './insert.ts';
 
 /**
  * Mounts a view into a container, replacing whatever it held.
- * A function view binds reactively through `append`.
  *
  * @example
  * ```ts

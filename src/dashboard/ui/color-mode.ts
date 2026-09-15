@@ -46,6 +46,9 @@ export function setColorMode(mode: ColorMode): void {
   setTimeout(() => document.body.classList.remove('ohne-no-transition'), 150);
 }
 
+/**
+ * The persisted preference, falling back to `system` when nothing valid is stored.
+ */
 function storedPreference(): ColorMode {
   const stored = localStorage.getItem(KEY);
   return stored === 'light' || stored === 'dark' ? stored : 'system';

@@ -104,8 +104,8 @@ export interface TimeOptions {
   labels?: TimeLabels;
 
   /**
-   * Called with the composed value in ms whenever a segment settles:
-   * after blur, arrow key steps, and stepper clicks.
+   * Called with the composed value in ms whenever a segment settles.
+   * A segment settles on blur, an arrow key step, or a stepper click.
    */
   onCommit?: (value: number) => void;
 }

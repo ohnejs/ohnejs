@@ -20,18 +20,12 @@ export interface TableColumn<T = unknown> {
 
   /**
    * Sets the width of a table column using CSS values like `100px`, `20rem`, `50%`, `auto`, etc.
-   * The specified `width` is applied to the `style` attribute of `<col>` elements.
-   * Those elements sit within the `<colgroup>`.
    */
   width?: string;
 
   /**
    * Sets the minimum width of a table column using CSS values like `100px`, `20rem`, etc.
-   * The specified `min-width` is applied to the `style` attribute of `<col>` elements.
-   * Those elements sit within the `<colgroup>`.
-   *
-   * The `minWidth` property is useful for specifying `width` in percentages.
-   * It ensures a minimum width for the column.
+   * It is useful when `width` is a percentage.
    */
   minWidth?: string;
 
@@ -136,7 +130,7 @@ export function tableColumn<T = unknown>(
  *
  * @example
  * ```ts
- * toggleSort(null, 'name')                                // -> { column: 'name', direction: 'asc' }
+ * toggleSort(null, 'name')                                 // -> { column: 'name', direction: 'asc' }
  * toggleSort({ column: 'name', direction: 'asc' }, 'name') // -> { column: 'name', direction: 'desc' }
  * toggleSort({ column: 'name', direction: 'asc' }, 'id')   // -> { column: 'id', direction: 'asc' }
  * ```

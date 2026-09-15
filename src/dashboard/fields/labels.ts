@@ -22,7 +22,7 @@ let awaitingMeta = false;
  * The resolved label for one record of the target collection, `undefined` while unresolved.
  * The read is reactive, and an unknown `uuid` schedules a batched fetch, so a binding resolves in place.
  * A record without label text, a deleted record, and an unresolvable target all settle on `fallbackLabel`.
- * A binding therefore always lands on text and never refetches.
+ * A failed request leaves the label `undefined` until a later read retries.
  * `target` is the collection name, as `DashboardField.target` carries it.
  */
 export function labelOf(target: string, uuid: string): string | undefined {
@@ -111,6 +111,9 @@ function evict(): void {
   }
 }
 
+/**
+ * Adds `uuid` to its target's pending batch and schedules a flush, unless a request already carries it.
+ */
 function enqueue(target: string, uuid: string): void {
   if (inFlight.has(`${target}:${uuid}`)) return;
   const bucket = pending.get(target);
@@ -119,6 +122,9 @@ function enqueue(target: string, uuid: string): void {
   schedule();
 }
 
+/**
+ * Queues one `flush` on a microtask, however many requests arrive before it runs.
+ */
 function schedule(): void {
   if (scheduled) return;
   scheduled = true;
@@ -201,7 +207,6 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
 
 /**
  * The collection named `name`, when the discovery read lists it as readable for the user.
- * `targetOf` in `_search.ts` resolves from a field; the cache holds only the name, so it looks up itself.
  */
 function readableCollection(name: string): DashboardCollection | undefined {
   const collection = dashboardMeta()?.collections.find((entry) => entry.name === name);
@@ -209,6 +214,9 @@ function readableCollection(name: string): DashboardCollection | undefined {
   return collection;
 }
 
+/**
+ * Stores `label` for the record, waking every binding that reads it.
+ */
 function write(target: string, uuid: string, label: string): void {
   entryOf(`${target}:${uuid}`).value = label;
 }

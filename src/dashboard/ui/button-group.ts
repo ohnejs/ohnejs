@@ -180,7 +180,6 @@ css`
  * Arrow keys step through the choices and clamp at the edges; Space cycles with wraparound.
  * A trailing hidden input carries `id` and `name`, so label linkage and form serialization work.
  * A `focus:<id>` trigger focuses the group and shows the ring.
- * `:focus-visible` cannot match a programmatic focus.
  *
  * @example
  * ```ts
@@ -277,6 +276,9 @@ export function buttonGroup(model: Ref<Primitive>, options: ButtonGroupOptions):
   return root;
 }
 
+/**
+ * The default text of a choice: its `label`, else its stringified `value`, or `''` for a nullish value.
+ */
 function displayChoice(choice: ButtonGroupChoice): string {
   const shown = choice.label || choice.value;
   return isNullish(shown) ? '' : String(shown);

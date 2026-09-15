@@ -14,8 +14,8 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseIntegerValue } from '../parse.ts';
 
 /**
- * The `integer` field type: cell display, inline cell editor, and form control.
- * Everywhere the entry parses strictly: decimal digits only, no floats, no exponents.
+ * The `integer` field type: cell display, inline cell editor, form control, and filter.
+ * The editor and control parse entry strictly: decimal digits only, no floats, no exponents.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
  * The control validates on blur and on read, and steps by 1 on the arrow keys, by 10 with Shift.
  */

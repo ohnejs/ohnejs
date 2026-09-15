@@ -28,7 +28,6 @@ let unauthorizedHandler: (() => void) | null = null;
  * A signed-in dashboard reaching a `401` means the session expired.
  * The layer's login popup registers here to reopen sign-in in place.
  * Every `/auth/` route is excluded: their `401`s are answers, not expiries.
- * The anonymous session probe and a wrong login both speak through their own surfaces.
  */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
@@ -70,7 +69,7 @@ export function handleUnauthorized(status: number, path: string): void {
  *
  * @example
  * ```ts
- * withAcceptLanguage(undefined, 'de').get('accept-language')                    // -> 'de'
+ * withAcceptLanguage(undefined, 'de').get('accept-language')                   // -> 'de'
  * withAcceptLanguage({ 'Accept-Language': 'en' }, 'de').get('accept-language') // -> 'en'
  * ```
  */

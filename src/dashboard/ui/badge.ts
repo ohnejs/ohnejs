@@ -94,6 +94,9 @@ export function badge(content: Child | (() => Child), options: BadgeOptions = {}
   return root;
 }
 
+/**
+ * The WCAG relative luminance of 0-255 sRGB channels, from `0` for black to `1` for white.
+ */
 function luminance(r: number, g: number, b: number): number {
   const rr = r / 255;
   const gg = g / 255;

@@ -64,6 +64,9 @@ export function summarySpan(parts: readonly string[], title: string): HTMLElemen
   return h('span', { class: 'ohne-truncate', title }, children);
 }
 
+/**
+ * The `summaryTitle` rows, each label chained under `prefix` with `›`.
+ */
 function titleRows(
   item: Readonly<Record<string, unknown>>,
   subfields: readonly DashboardField[],

@@ -223,7 +223,7 @@ css`
 /**
  * The picker overlay engine.
  *
- * A full-width handle button toggles a panel positioned by `placeFloating`.
+ * A full-width handle button toggles a floating panel.
  * Bottom-start is preferred, the roomiest corner wins, 7px gap, 8px viewport padding, clamped to fit.
  * The panel is raised to the top layer, so a `container-type` or transformed ancestor cannot crop it.
  * While open, the window and an optional container are scroll-locked.

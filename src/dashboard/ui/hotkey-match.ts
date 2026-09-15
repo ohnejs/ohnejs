@@ -49,7 +49,7 @@ export interface HotkeyContext {
 
   /**
    * Actions that keep firing while `editing`, on top of `save`.
-   * A `History`-backed form lists `undo` and `redo`, so its history wins over the browser's text undo.
+   * Listing `undo` and `redo` lets an app's own undo history win over the browser's text undo.
    *
    * @default
    * []
@@ -78,6 +78,9 @@ export function matchHotkey(stroke: KeyStroke, context: HotkeyContext): HotkeyAc
   return (context.allowWhileTyping ?? []).includes(action) ? action : null;
 }
 
+/**
+ * Maps a stroke to its action without the `editing` gate; while not `idle`, only `save` resolves.
+ */
 function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAction | null {
   const letter = stroke.key.toLowerCase();
   const bare = !stroke.meta && !stroke.alt && !stroke.ctrl && !stroke.shift;

@@ -20,7 +20,7 @@ import { fieldTypeFor, registeredFieldType } from './field-type.ts';
  */
 export interface FieldFormOptions {
   /**
-   * Create omits pristine fields so server defaults apply; edit patches only dirty ones.
+   * Create keeps immutable fields settable; edit locks them on an existing item.
    */
   mode: 'create' | 'edit';
 

@@ -79,6 +79,9 @@ const PART_POSITIONS: Record<string, number | undefined> = {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
+/**
+ * The 24-hour `Intl.DateTimeFormat` that reads numeric wall-clock parts in `zone`, built once per zone.
+ */
 function formatterFor(zone: string): Intl.DateTimeFormat {
   let formatter = formatters.get(zone);
   if (!formatter) {
@@ -118,6 +121,9 @@ function wallValue(
   return date.getTime();
 }
 
+/**
+ * The wall clock of `timestamp` in `zone` as `[year, month, day, hour, minute, second]`.
+ */
 function wallParts(timestamp: number, zone: string): number[] {
   const filled = [0, 0, 0, 0, 0, 0];
   for (const { type, value } of formatterFor(zone).formatToParts(new Date(timestamp))) {
@@ -164,6 +170,9 @@ function fixOffset(wall: number, seed: number, zone: string): [number, number] {
   return [wall - Math.min(first, second), Math.max(first, second)];
 }
 
+/**
+ * Builds the `ZonedDate` for `timestamp` from a known `offset` in milliseconds, without asking `Intl`.
+ */
 function fromWall(timestamp: number, offset: number, zone: string): ZonedDate {
   const wall = new Date(timestamp + offset);
   return {
@@ -183,7 +192,6 @@ function fromWall(timestamp: number, offset: number, zone: string): ZonedDate {
 
 /**
  * Reads the instant `timestamp` as a wall clock in `zone`.
- * The instant is kept, the fields change.
  *
  * The fields come straight from `Intl.DateTimeFormat`, so years before 1000 stay correct.
  *
@@ -254,6 +262,9 @@ export function startOfZonedDay(date: ZonedDate, reference = Date.now()): ZonedD
   return zonedFromWallClock(date.zone, date.year, date.month, date.day, 0, 0, 0, reference);
 }
 
+/**
+ * Moves `date` to `year` and `month` on the wall clock, clamping the day and keeping its offset.
+ */
 function shiftWall(date: ZonedDate, year: number, month: number): ZonedDate {
   const day = Math.min(date.day, daysInMonth(year, month));
   const previous = wallValue(
@@ -334,7 +345,7 @@ const REGEX_PARSE =
 /**
  * Parses a calendar `min`/`max`/`initial` input into a timestamp.
  * A number passes through.
- * A string matching the parse pattern (and not ending in `Z`) reads as local time.
+ * A date or date-time string with no zone suffix reads as local time.
  * So `'2024-12-15'` is local midnight - unlike `Date.parse`, which reads date-only strings as UTC.
  * Anything else, including `Z`-suffixed ISO strings, falls back to the `Date` parser.
  */

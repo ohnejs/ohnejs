@@ -3,7 +3,6 @@
  * Empty until codegen runs; the `browser/messages.ts` it emits augments this with one member per key.
  * Each member maps a key to the object of parameters its ICU template expects.
  *
- * It mirrors the Node-side `KnownMessages`, so `useT` in the browser types a key exactly as the server does.
  * `type` aliases cannot be augmented, so the overridable keys live on this interface instead.
  *
  * @example

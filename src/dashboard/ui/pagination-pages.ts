@@ -5,7 +5,7 @@ import { last } from '../../utils/array/last.ts';
  *
  * A window of up to seven pages centers on the current page.
  * When the window misses the first page, `1` is prepended.
- * An ellipsis joins it only when the gap is more than one page.
+ * An ellipsis joins it only when at least one page is hidden between them.
  * The last page is appended the same way.
  * A single page yields `[1]`, and the component renders nothing for it.
  *

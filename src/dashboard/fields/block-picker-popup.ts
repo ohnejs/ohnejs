@@ -112,18 +112,15 @@ css`
 `;
 
 /**
- * Opens the block picker popup.
- *
- * A search-first popup over the block types `allowed` names, or every described type when omitted.
+ * Opens a search-first popup over the block types `allowed` names, or every described type when omitted.
  * Typing anywhere before the search input takes focus funnels into the search.
  * Arrows walk the grid: up and down move within a column, left and right step through the list.
  * Enter picks the highlighted block, and Tab moves focus onto the grid itself.
  * Mouse highlighting pauses after keyboard moves until the pointer really travels again.
  *
  * Resolves with the picked block name the moment it is chosen, before the close animation.
- * The caller inserts while the popup fades; Escape and the overlay click resolve `null`.
- * A `null` close restores focus to the previously focused element.
- * A pick leaves focus to the caller, which moves it into the new block's form.
+ * Escape and the overlay click resolve `null` and restore focus to the previously focused element.
+ * A pick leaves focus to the caller.
  */
 export function openBlockPicker(allowed?: readonly string[]): Promise<string | null> {
   return new Promise((resolve) => {

@@ -112,7 +112,7 @@ export function formatTime(timestamp: number): string {
  *
  * @example
  * ```ts
- * formatRelative(Date.now() - 7_200_000)               // -> '2 hours ago'
+ * formatRelative(Date.now() - 7_200_000)                   // -> '2 hours ago'
  * h('span', null, () => formatRelative(record._updatedAt)) // ticks every 30 seconds
  * ```
  */

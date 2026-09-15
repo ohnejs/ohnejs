@@ -20,7 +20,7 @@ export interface MessageEntry {
 
 /**
  * One group's resolved messages for a language: a flat map of message key to its entry.
- * This is exactly the shape the `GET /messages/:group/:language` endpoint returns.
+ * This is exactly the shape the `GET /messages/[group]/[language]` endpoint returns.
  */
 export type MessageCatalog = Record<string, MessageEntry>;
 
@@ -29,13 +29,9 @@ const cells = new Map<string, Ref<MessageCatalog | undefined>>();
 /**
  * Reactively reads a group's catalog for a language, fetching it from the API the first time.
  *
- * Reading inside a reactive render subscribes to the catalog, so the render updates once it loads.
  * The result is `undefined` until the fetch resolves; callers fall back to the raw key meanwhile.
  * A `(language, group)` pair is fetched at most once: the cell is created before the request starts.
- * Concurrent reads share that cell, and later reads hit the cache.
- *
  * A failed or missing fetch resolves to an empty catalog, so a broken request degrades to raw keys.
- * The empty result is cached, so it does not retry on every render.
  *
  * @example
  * ```ts
@@ -54,6 +50,9 @@ export function messageCatalog(language: string, group: string): MessageCatalog 
   return cell.value;
 }
 
+/**
+ * Stores the group's fetched catalog in `cell`, an empty one when the fetch fails.
+ */
 async function fill(
   cell: Ref<MessageCatalog | undefined>,
   language: string,
@@ -62,6 +61,9 @@ async function fill(
   cell.value = await fetchCatalog(language, group);
 }
 
+/**
+ * Fetches a group's catalog for a language, answering `{}` on any failure.
+ */
 async function fetchCatalog(language: string, group: string): Promise<MessageCatalog> {
   try {
     const path = `/messages/${encodeURIComponent(group)}/${encodeURIComponent(language)}`;

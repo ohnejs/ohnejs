@@ -24,7 +24,7 @@ export interface Hotkeys {
   /**
    * Whether this instance stays live while an overlay is open.
    * Even then it only fires at the overlay depth it was created at.
-   * An instance made inside a popup dies when a deeper popup opens on top.
+   * An instance made inside a popup stands down while a deeper popup is open on top.
    */
   allowInOverlays: Ref<boolean>;
 
@@ -59,7 +59,7 @@ export interface HotkeysOptions {
 
   /**
    * Actions that keep firing while focus sits in a text-editing element; `save` always does.
-   * A `History`-backed form lists `undo` and `redo`, so its history wins over the browser's text undo.
+   * Listing `undo` and `redo` lets an app's own undo history win over the browser's text undo.
    *
    * @default
    * []
@@ -68,7 +68,7 @@ export interface HotkeysOptions {
 
   /**
    * Whether to start listening immediately.
-   * Overlay code passes `false` and resumes once its surface is mounted.
+   * Pass `false` with a getter `target`, then `resume` once the surface is mounted.
    *
    * @default
    * true

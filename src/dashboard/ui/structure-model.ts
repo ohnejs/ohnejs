@@ -46,8 +46,8 @@ export function structureAccepts(
 /**
  * Resolves the final insertion index for a drop on an item's zone.
  * `'after'` targets the slot below the item, so the index advances by one.
- * For a same-structure drop, pass the dragged item's `draggableIndex`:
- * a target below it shifts up by one, because the item is removed before it is re-inserted.
+ * For a same-structure drop, pass the dragged item's `draggableIndex`.
+ * A target below it then shifts up by one, because the item is removed before it is re-inserted.
  * Pass `null` for a cross-structure drop, where nothing leaves the receiving list first.
  */
 export function structureDropIndex(

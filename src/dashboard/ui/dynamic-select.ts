@@ -94,7 +94,7 @@ export interface DynamicSelectPaginatedChoices {
 export interface DynamicSelectOptions {
   /**
    * Resolves the choices for the select field.
-   * It receives the current `page` number and the search `keyword` as arguments.
+   * It receives the 1-based `page` and the search `keyword`.
    */
   choicesResolver: (page: number, keyword: string) => Promise<DynamicSelectPaginatedChoices>;
 
@@ -392,6 +392,9 @@ css`
   }
 `;
 
+/**
+ * Returns the named icon at `1.125em`, classed to sit at the trailing end of its row.
+ */
 function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
   const svg = icon(name);
   svg.classList.add('ohne-dynamic-select-icon');
@@ -400,6 +403,9 @@ function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
   return svg;
 }
 
+/**
+ * Returns the choice's `label`, else its `value`, as text; any falsy result, `0` included, shows `-`.
+ */
 function labelOrDash(choice: DynamicSelectChoice): string {
   return String((choice.label ?? choice.value) || '-');
 }
@@ -412,7 +418,7 @@ function labelOrDash(choice: DynamicSelectChoice): string {
  * The overlay caps at the search row plus 11 choice rows and grows or shrinks with the results.
  * The selected choice resolves asynchronously through `selectedChoiceResolver`.
  * The field renders its placeholder until the initial resolve lands.
- * Row height follows the first choice: a `detail` there switches the whole list to tall rows.
+ * Height and scroll math size every row like the first choice, so give every choice a `detail` or none.
  *
  * @example
  * ```ts

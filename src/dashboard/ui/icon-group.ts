@@ -220,7 +220,6 @@ css`
  * Arrow keys step through the choices and clamp at the edges; Space cycles with wraparound.
  * A trailing hidden input carries `id` and `name`, so label linkage and form serialization work.
  * A `focus:<id>` trigger focuses the group and shows the ring.
- * `:focus-visible` cannot match a programmatic focus.
  *
  * @example
  * ```ts
@@ -315,6 +314,9 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
   return root;
 }
 
+/**
+ * Resolves a choice's icon name or node, tagging it with the cell icon class; `null` when there is none.
+ */
 function choiceIcon(shape: IconName | Node | undefined): Node | null {
   if (shape === undefined) return null;
   const node = isString(shape) ? icon(shape) : shape;
@@ -322,6 +324,9 @@ function choiceIcon(shape: IconName | Node | undefined): Node | null {
   return node;
 }
 
+/**
+ * The corner bubble with its optional tooltip, or `null` when the choice has none.
+ */
 function choiceBubble(model: IconGroupBubble | undefined): Node | null {
   if (model === undefined) return null;
   const pill = bubble(model.content, { variant: model.variant });

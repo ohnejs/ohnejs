@@ -18,7 +18,7 @@ export interface DashboardOperation {
 }
 
 /**
- * The four collections-API operations of one collection; a closed operation is `null`.
+ * The collections-API operations of one collection; a closed operation is `null`.
  */
 export interface DashboardOperations {
   /**
@@ -116,7 +116,7 @@ export interface DashboardField {
   nullable: boolean;
 
   /**
-   * Whether a create must provide the field.
+   * Whether a create must provide the field: column-bearing, non-nullable, no default, and user-written.
    */
   required: boolean;
 
@@ -200,7 +200,7 @@ export interface DashboardCollection {
 
   /**
    * The Tabler icon the sidebar menu shows, as declared; absent when the collection declares none.
-   * The API validates it at boot, so the name always resolves to a shape.
+   * Validated at boot, so the name always resolves to a shape.
    */
   icon?: IconName;
 
@@ -240,12 +240,10 @@ export interface DashboardCollection {
 }
 
 /**
- * One block type a `blocks` field may hold.
+ * One block type a `blocks` field may hold, described for the dashboard's editors.
  *
- * Block types are named, never inlined.
- * A block may hold a `blocks` field allowing its own type, so the graph has cycles.
- * Only a flat registry keyed by name closes.
- * A field's `allow` names its members; every name it lists is described here.
+ * Block types are named, never inlined, since a block may admit its own type.
+ * A field's `allow` names its members; `DashboardMeta.blocks` describes them.
  */
 export interface DashboardBlock {
   /**
@@ -255,6 +253,7 @@ export interface DashboardBlock {
 
   /**
    * The display label, resolved in the request's language.
+   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
    */
   label: string;
 
@@ -305,7 +304,8 @@ export interface DashboardMenuGroup {
  */
 export interface DashboardMeta {
   /**
-   * The sidebar menu groups, their rows resolved for this user.
+   * The sidebar menu groups, resolved from `dashboard.menu` and filtered by the `dashboard:menu` hook.
+   * Collection rows are scoped to what the user may reach; a declared link is not.
    */
   menu: DashboardMenuGroup[];
 
@@ -315,7 +315,7 @@ export interface DashboardMeta {
   collections: DashboardCollection[];
 
   /**
-   * Every block type the listed collections can reach, sorted by name.
+   * Every block type the listed collections and the account fields can reach, sorted by name.
    * A `blocks` field's `allow` resolves against this registry, nested fields included.
    */
   blocks: DashboardBlock[];

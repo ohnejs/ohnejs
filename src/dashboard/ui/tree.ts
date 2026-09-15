@@ -170,21 +170,10 @@ export interface TreeOptions<T> {
   persistentExpandButton?: boolean;
 
   /**
-   * The source from which the tree is built.
-   *
-   * - The `source.root` must be an array of objects that have the `source.props.id` property.
-   * - If the objects are nestable, they must have the `source.props.children` property.
-   * - The `source.props.children` property must be an array of source objects of the same type.
-   *
-   * If specified, the component automatically mutates the source.
-   * It reflects the following callbacks in the tree:
-   *
-   * - `onDuplicateItems` - A random string of 23 alphabetic characters is generated per item.
-   * - `onMoveUpItems`
-   * - `onMoveDownItems`
-   * - `onDropItems`
-   * - `onDeleteItems`
-   * - `onCutItems` - Handles only the deletion.
+   * A source structure the tree mirrors its mutations into, in place.
+   * With it set, a user's duplicate, move, drop, delete, or cut updates both `model` and the source.
+   * Omitted, those actions only call their callbacks, like `onDropItems`, and leave `model` untouched.
+   * A duplicate gets a fresh 23-letter id, also written to its source item under `props.id`.
    */
   source?: TreeSource;
 

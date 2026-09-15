@@ -61,7 +61,6 @@ export interface CheckboxOptions {
 
   /**
    * Called after a toggle with the new value and the native `change` event.
-   * The event lets a caller read modifier keys for range selection.
    */
   onChange?: (value: boolean, event: Event) => void;
 }
@@ -168,6 +167,9 @@ css`
 
 let sequence = 0;
 
+/**
+ * The check mark, or a minus while indeterminate, drawn at full stroke width.
+ */
 function markIcon(indeterminate: boolean): SVGSVGElement {
   const mark = icon(indeterminate ? 'minus' : 'check');
   mark.classList.add('ohne-stroke-2');

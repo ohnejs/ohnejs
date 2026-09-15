@@ -150,7 +150,7 @@ export interface TableOptions<TColumns extends TableColumns> {
   /**
    * Renders one row's actions panel; its presence adds the trailing actions column.
    * Called while the row's menu is open, anchored to `reference`; call `close` to dismiss.
-   * The panel floats itself - pass a dropdown built on the floating engine.
+   * The table does not position the panel, so return a self-positioning one such as a `dropdown` root.
    */
   actions?: (payload: {
     row: TableRow<TColumns>;
@@ -309,7 +309,10 @@ css`
 const shiftHeld = ref(false);
 let shiftTracked = false;
 
-// Shift is tracked on the window, so the flag can stick when focus leaves mid-hold.
+/**
+ * Installs the Shift listeners once, however many tables mount.
+ * Shift is tracked on the window, so the flag can stick when focus leaves mid-hold.
+ */
 function trackShift(): void {
   if (shiftTracked) return;
   shiftTracked = true;
@@ -329,7 +332,6 @@ function trackShift(): void {
  * The table sets no height and never scrolls - put it inside a scroll container.
  * Sort and action buttons hide off-hover through CSS; the sorted column and the open menu stay visible.
  * Selection bookkeeping lives in the caller.
- * `onSelectAll` fills or clears `selected`, and selection writes are recomputed into `selectAllState` there.
  *
  * @example
  * ```ts

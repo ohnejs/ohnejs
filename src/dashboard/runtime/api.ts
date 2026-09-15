@@ -13,6 +13,7 @@ export { setUnauthorizedHandler } from './_request.ts';
  * A leading method overrides `init.method`; the rest is the path appended to the base URL.
  * Requests carry credentials, so the session cookie flows to the API; `init.credentials` overrides.
  * They also carry `Accept-Language` for the dashboard language, so answers speak it; a given one wins.
+ * A `401` from a route outside `/auth/` calls the handler installed with `setUnauthorizedHandler`.
  * Returns the raw `Response`; the caller decides how to read it.
  *
  * @example

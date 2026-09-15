@@ -100,6 +100,7 @@ export interface CalendarRangeOptions {
 
   /**
    * The minimum selectable date: a timestamp in milliseconds or an ISO 8601 string.
+   * A date-only string reads as UTC midnight.
    *
    * @default
    * -59011459200000
@@ -108,6 +109,7 @@ export interface CalendarRangeOptions {
 
   /**
    * The maximum selectable date: a timestamp in milliseconds or an ISO 8601 string.
+   * A date-only string reads as UTC midnight.
    *
    * @default
    * 8640000000000000
@@ -237,10 +239,9 @@ css`
 /**
  * The date range picker.
  *
- * Two stacked calendars share one `[from, to]` tuple model and constrain each other:
- * `minRange` keeps the ends apart even against the global bounds, `maxRange` caps the span.
+ * Two stacked calendars share one `[from, to]` tuple model and constrain each other.
+ * `minRange` keeps the ends apart even against the global bounds, and `maxRange` caps the span.
  * An absolute bracket decorator ties the two inputs together on the left or right edge.
- * `commit` fires with the settled tuple when either picker closes, and immediately on clear.
  *
  * @example
  * ```ts

@@ -3,11 +3,8 @@ import { css } from '../../render/css.ts';
 /**
  * The base reset and element defaults.
  *
- * The `:where()` blocks have zero specificity, so any component declaration wins.
- * `border: 0 solid hsl(var(--ohne-border))` sits on everything.
- * A component sets only a border width and inherits the themed color.
- * Plain anchors and buttons get link chrome through `:is()`; a component opts out with `ohne-raw`.
- * Opting out drops the browser's own anchor underline too, so a raw anchor carrying text reads plain.
+ * Every element carries a zero-width themed border, so a component sets only a border width.
+ * Plain anchors and buttons get link chrome; a component opts out with `ohne-raw`.
  * Icons ship `stroke-width` 2 and are globally thinned to 1.5; `ohne-stroke-2` reverts.
  */
 css`

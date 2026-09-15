@@ -66,8 +66,8 @@ css`
 
 /**
  * A bordered surface with optional header, body, and footer sections.
- * A section renders only when its content is given, and each takes a padding override hook:
- * `--ohne-padding-header`, `--ohne-padding-body`, `--ohne-padding-footer`.
+ * A section renders only when its content is given.
+ * Each section's padding reads `--ohne-padding-header`, `--ohne-padding-body`, or `--ohne-padding-footer`.
  * The body is an inline-size container, so descendants can key `@container` queries on card width.
  *
  * @example

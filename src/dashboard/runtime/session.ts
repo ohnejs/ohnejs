@@ -193,9 +193,7 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
 export async function logout(): Promise<void> {
   try {
     await api('POST /auth/logout');
-  } catch {
-    /* the cookie may outlive an unreachable API; the SPA session still ends */
-  }
+  } catch {}
   apply(null);
   invalidateDashboardMeta();
 }
@@ -210,9 +208,7 @@ async function resolve(): Promise<void> {
   try {
     const response = await api('GET /auth/me');
     if (response.ok) answer = (await response.json()) as SessionUser;
-  } catch {
-    /* unreachable reads as signed out */
-  }
+  } catch {}
   if (isUndefined(user.value) && apply(answer)) invalidateDashboardMeta();
 }
 

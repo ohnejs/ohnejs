@@ -237,7 +237,7 @@ css`
  * The modal layer.
  * A dimmed backdrop and a centered card appended to `document.body`, the base of every popup.
  *
- * Mounting claims an overlay depth a timeout later, so same-cycle hotkey instances pin above it.
+ * Mounting claims an overlay depth a timeout later, so same-cycle hotkey instances pin to that depth.
  * It then autofocuses the first `[autofocus]`/`[data-autofocus]` descendant, falling back to the root.
  * Tab is trapped inside.
  * Escape defers a timeout so inner widgets can `preventDefault` first, and never closes while typing.

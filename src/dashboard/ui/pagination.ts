@@ -61,6 +61,7 @@ export interface PaginationOptions {
 
   /**
    * Renders one page number button in place of the default; not the ellipsis or the chevrons.
+   * `index` is the page number the button stands for.
    * `onClick` guards the current page before reporting the change.
    */
   button?: (payload: {

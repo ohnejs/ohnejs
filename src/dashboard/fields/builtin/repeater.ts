@@ -58,8 +58,7 @@ css`
  * Cells digest the first item's values on one line, a dim `+N` counting the rest.
  * A first item with nothing to show keeps the dim item count.
  * There is no inline cell editor: the list edits on the record page as structure cards.
- * Cards drag-reorder across matching repeaters, collapse, and carry the header actions cluster:
- * move, expand, add, clipboard copy and paste, duplicate, and delete.
+ * Cards drag-reorder across matching repeaters and collapse.
  * Kept items ride their `UUID`.
  * A pasted, duplicated, or cross-dropped item sheds every `UUID` and inserts as a new row.
  * The record's one save writes the list whole.
@@ -127,7 +126,6 @@ export const repeaterType: FieldType = {
 
     const rebuild = (): void => {
       for (const entry of entries.value) entry.form.dispose();
-      // Collapsed stays collapsed on a model replace; an empty list expands.
       const expanded = entries.value.length === 0 || !allCollapsed();
       entries.value = baseEntries(expanded);
     };
@@ -243,7 +241,7 @@ export const repeaterType: FieldType = {
                 onRemove: () => remove(entry()),
               }),
         ],
-        // The form is stable per row, so the untracked read cannot go stale; it holds focus through expand-all.
+        // The form is stable per row, so an untracked read is safe; it holds focus through expand-all.
         item: (entry) =>
           h('div', { class: 'ohne-repeater-item' }, untracked(() => entry().form).render()),
         itemBefore: (entry) =>

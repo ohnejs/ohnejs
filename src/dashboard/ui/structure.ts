@@ -47,7 +47,6 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
 
   /**
    * A function to resolve the type of an item.
-   * Receives the item as parameter and returns the item type.
    */
   resolveItemType?: (item: TItem) => string | undefined;
 
@@ -61,6 +60,7 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
 
   /**
    * Controls whether the items in the structure can be dropped in other structure components.
+   * A cross drop lands only in a structure that sets it too.
    *
    * @default
    * false
@@ -96,8 +96,7 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
 
   /**
    * The scroll surface the freezer pins during a drop.
-   * Omitted, the freezer targets `window`, which has no reactive offset.
-   * So only an explicit surface actually re-triggers the revert.
+   * Omitted, the freezer pins the nearest `.ohne-container` ancestor, if any, and never the window.
    */
   scroll?: ScrollableHandle;
 
@@ -181,7 +180,6 @@ css`
  * A same-structure drop reorders in place.
  * A cross-structure drop inserts here first and removes from the donor a tick later.
  * So the item transiently exists in both lists.
- * `onCommit` fires two ticks after a drop, once the model has settled, and on a cross-structure departure.
  * While empty and accepting, the structure renders a dashed dropzone with `dropItemsHereLabel`.
  * A click outside cancels an in-flight drag without dropping.
  *

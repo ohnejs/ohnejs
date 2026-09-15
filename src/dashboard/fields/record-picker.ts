@@ -58,7 +58,7 @@ let active: RecordPicker | undefined;
 
 /**
  * Registers the record picker the relation controls open.
- * The dashboard layer registers its table popup at boot; core only holds the seam.
+ * The last registration wins; the dashboard registers its table popup at boot.
  */
 export function registerRecordPicker(picker: RecordPicker): void {
   active = picker;

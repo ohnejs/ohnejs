@@ -156,7 +156,6 @@ let activeContext: Ref<number | string | undefined> | null = null;
  * The layout therefore never jumps while the incoming panel mounts.
  * The content is a function, called once during construction.
  * `tab` calls inside it bind to this instance.
- * `onChange` fires only from user interaction, never from a prop-driven reset.
  *
  * @example
  * ```ts

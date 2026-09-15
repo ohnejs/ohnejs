@@ -5,7 +5,6 @@ import type { LiteralUnion } from '../../utils/types/literal-union.ts';
  * Empty until codegen runs; the `browser/routes.ts` it emits augments this with one member per route.
  * Each member is a route id, either `'{METHOD} {pattern}'` or a bare `pattern` for an any-method route.
  *
- * It mirrors the Node-side `KnownRoutes`, so `api` suggests a route id exactly as the server registers it.
  * `type` aliases cannot be augmented, so the overridable ids live on this interface instead.
  *
  * @example

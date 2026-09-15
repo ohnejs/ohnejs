@@ -164,11 +164,7 @@ export function filterKey(): string {
 }
 
 /**
- * Serializes the filter model into the `where` shape ohne's body-query endpoint reads.
- *
- * The emitted value is a `ConditionObject`.
- * That is exactly what `POST /collections/[segment]/query` accepts as its `where` key.
- * Precisely:
+ * Serializes the filter model into the `where` that `POST /collections/[segment]/query` accepts.
  *
  * - `eq` emits `{ [field]: { equalsTo: value } }`.
  * - `ne` emits `{ not: { [field]: { equalsTo: value } } }`.
@@ -218,6 +214,9 @@ export function filterFromWhere(where: ConditionObject | undefined): FilterModel
   return { relation: 'and', items: parseObject(where) };
 }
 
+/**
+ * The members joined under `relation`, a lone member unwrapped, `undefined` when none serializes.
+ */
 function serializeItems(
   relation: 'and' | 'or',
   items: readonly FilterNode[],
@@ -233,6 +232,9 @@ function serializeItems(
   return { [relation]: members };
 }
 
+/**
+ * One rule's condition object; negated operators wrap in `not`, and an empty pattern sends `' '`.
+ */
 function serializeCondition(condition: FilterCondition): ConditionObject {
   const { field, operator } = condition;
   let value = condition.value;
@@ -243,6 +245,9 @@ function serializeCondition(condition: FilterCondition): ConditionObject {
   return { [field]: { [OHNE_OPERATORS[operator]]: value } };
 }
 
+/**
+ * The nodes of an `and` or `or` list; a branch of several rules nests as an `and` group.
+ */
 function parseBranches(branches: readonly unknown[]): FilterNode[] {
   const items: FilterNode[] = [];
   for (const branch of branches) {
@@ -254,6 +259,9 @@ function parseBranches(branches: readonly unknown[]): FilterNode[] {
   return items;
 }
 
+/**
+ * The nodes one condition object holds, in key order; a key the builder cannot represent is dropped.
+ */
 function parseObject(where: ConditionObject): FilterNode[] {
   const items: FilterNode[] = [];
   for (const [key, value] of Object.entries(where)) {
@@ -272,6 +280,9 @@ function parseObject(where: ConditionObject): FilterNode[] {
   return items;
 }
 
+/**
+ * The negated rule a `not` holds, or `undefined` unless it wraps one comparison with a negated form.
+ */
 function parseNegated(value: ConditionValue): FilterCondition | undefined {
   if (!isPlainObject(value)) return undefined;
   const entries = Object.entries(value as ConditionObject);
@@ -283,6 +294,9 @@ function parseNegated(value: ConditionValue): FilterCondition | undefined {
   return isUndefined(negated) ? undefined : { ...parsed, operator: negated };
 }
 
+/**
+ * The rule one field's comparison encodes, a bare scalar as `eq`; `undefined` when unrepresentable.
+ */
 function parseCompare(field: string, value: ConditionValue): FilterCondition | undefined {
   if (isScalar(value)) return { key: filterKey(), field, operator: 'eq', value };
   if (!isPlainObject(value)) return undefined;
@@ -294,6 +308,9 @@ function parseCompare(field: string, value: ConditionValue): FilterCondition | u
   return { key: filterKey(), field, operator, value: operand };
 }
 
+/**
+ * Whether an operand fits `FilterValue`, so `null`, lists, and objects never become a rule.
+ */
 function isScalar(value: unknown): value is FilterValue {
   return isString(value) || isNumber(value) || isBoolean(value);
 }

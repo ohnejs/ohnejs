@@ -79,18 +79,19 @@ export interface FieldControlContext {
   field: DashboardField;
 
   /**
-   * The stored value the control edits; `undefined` in create mode.
+   * The value the control starts from; `undefined` when there is none, as on a fresh record or item.
+   * A pristine control over `undefined` returns `{}` from `read`, so server defaults apply.
    */
   initial: unknown;
 
   /**
-   * Create omits pristine fields so server defaults apply; edit patches only dirty ones.
+   * The hosting form's mode: create keeps immutable fields settable, edit locks them on an existing item.
    */
   mode: 'create' | 'edit';
 
   /**
    * The field's dot-and-bracket path from the record root, like `sections[2].heading`.
-   * Seeds element ids and scopes error routing; `''` only while a host builds nested paths.
+   * Seeds element ids and scopes error routing.
    */
   path: string;
 
@@ -308,8 +309,8 @@ export function registerFieldType(type: string, fieldType: FieldType): void {
  * Resolves the dashboard behaviour for a field, falling back for an unregistered type name.
  * A plain column falls back to its storage primitive's registered behaviour.
  * An app-defined scalar type therefore edits as text, number, or boolean without registering anything.
- * Everything else falls back to a generic display-only type.
- * That fallback renders primitives as text, lists as counts, and objects as a dim mark.
+ * Everything else falls back to a generic type whose form control is a missing-component alert.
+ * It renders primitives and string lists as text, other lists as counts, and objects as a dim mark.
  */
 export function fieldTypeFor(field: DashboardField): FieldType {
   return registeredFieldType(field) ?? FALLBACK;

@@ -218,10 +218,8 @@ function shapeOf(name: IconName): Promise<string | null> {
 /**
  * One dashboard icon: a Tabler SVG on a 24x24 grid, stroked in the current text colour.
  *
- * The element comes back synchronously and is never empty for long.
- * An inlined icon carries its shape at once.
- * Any other name is fetched from the dashboard server once and fills the element on arrival.
- * The chrome therefore paints without waiting on the network.
+ * The element comes back synchronously.
+ * A shape not shipped inline is fetched once from the dashboard server and fills in on arrival.
  * The markup is never anything a caller supplied.
  * It is a module constant, or a vendored shape the server found by name.
  * Width and height are `1em`, so an icon sizes with the local font size.

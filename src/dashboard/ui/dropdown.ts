@@ -61,7 +61,7 @@ export interface DropdownOptions {
 
   /**
    * Which side of the `reference` the panel prefers.
-   * The roomiest of the four corner placements wins, earlier candidates breaking ties.
+   * The roomiest corner placement that fits wins, else the roomiest; earlier candidates break ties.
    *
    * @default
    * 'start'
@@ -223,12 +223,9 @@ css`
  * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements wins.
  * The height clamps to the available space with an 8px inset.
  * The panel is raised to the top layer, so a `container-type` or transformed ancestor cannot crop it.
- * The resolved placement drives the pop-in direction class.
  * With `handleControls` on, the page loses pointer events.
  * Focus roves through `.ohne-dropdown-item` rows with wraparound.
  * Escape or an outside click asks the owner to close.
- * Returns a handle instead of a bare element.
- * The handle exposes `update`, `calcItemSizes`, and the scroll surface; `floater` set the precedent.
  *
  * @example
  * ```ts

@@ -61,7 +61,6 @@ css`
  * Cells summarize the list as the first block's type label plus a dim `+n` tail.
  * There is no inline cell editor: the list edits on the record page as structure cards.
  * Cards drag-reorder across blocks fields that admit the type, and collapse.
- * The header carries the actions cluster: move, expand, add, copy and paste, duplicate, delete.
  * Adding opens the block picker when several types are admitted, and adds directly when one is.
  * Nested `blocks` subfields recurse through this same control, so depth costs one card per level.
  * The record's one save writes the whole list: an item keeps its `UUID`, anything left out is deleted.
@@ -406,7 +405,7 @@ export const blocksType: FieldType = {
         base = value;
         const items = baseItems();
         const live = nodes.value;
-        // Rebasing in place keeps forms, focus, and open rows; a rebuild would drop all three.
+        // Rebasing in place keeps forms, focus, and open rows; a rebuild would drop them.
         const matches =
           items.length === live.length &&
           items.every(

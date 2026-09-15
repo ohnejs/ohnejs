@@ -103,8 +103,8 @@ export function overlayCount(): number {
  * Popups sit at `z-index` 100, with DOM order breaking ties.
  * Everything that floats above them - panels, menus, toasts, tooltips - is raised to the top layer.
  * `raiseToTopLayer` puts them there, and the one raised last paints on top.
- * Closing assumes LIFO order: `undim` acts only when the counter is exactly 1.
- * Overlays closed out of order keep the body dimmed until the last one releases.
+ * Closing assumes LIFO order: `isTopmost` and pinned hotkeys compare their depth with the live counter.
+ * Releasing a lower overlay first leaves the top one off by one: `isTopmost` is false and its hotkeys mute.
  *
  * @example
  * ```ts

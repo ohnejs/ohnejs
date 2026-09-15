@@ -158,6 +158,9 @@ css`
   }
 `;
 
+/**
+ * The displayed month as week rows of seven cells, padded with disabled adjacent-month days.
+ */
 function weeks(options: CalendarMonthOptions): DayCell[][] {
   const year = options.year();
   const month = options.month();
@@ -212,6 +215,9 @@ function weeks(options: CalendarMonthOptions): DayCell[][] {
   return Array.from({ length: weekCount }, (_, i) => calendarDays.slice(i * 7, i * 7 + 7));
 }
 
+/**
+ * One day cell as a `data-day` button; a disabled day leaves the tab order and drops its tooltip.
+ */
 function dayButton(cell: DayCell, options: CalendarMonthOptions): HTMLElement {
   return h(
     'button',

@@ -38,13 +38,7 @@ export type TreeItemModel<T> = {
 
   /**
    * Specifies whether the selected tree items can be dropped on a target.
-   * If a function is provided, it is called with the current `selection`, the `target` item, and the drop `zone`.
-   * The function should return a boolean indicating whether the `selection` can be dropped there.
-   *
-   * The following checks are performed by default:
-   *
-   * - Items cannot be dropped in themselves.
-   * - Parent items cannot be dropped inside their descendants.
+   * Dropping an item inside itself or onto one of its descendants is always refused.
    *
    * @default
    * false
@@ -107,7 +101,7 @@ export interface TreeExtendedItemModel<T> {
   item: TreeItemModel<T>;
 
   /**
-   * The index of the item in the `parent` or the root tree if `parents` is empty.
+   * The index of the item within its parent's children, or within the root tree if `parents` is empty.
    */
   index: number;
 
@@ -117,7 +111,7 @@ export interface TreeExtendedItemModel<T> {
   parents: TreeExtendedParentItemModel<T>[];
 
   /**
-   * All descendants of the item.
+   * The descendants of the item that are currently visible, in display order.
    */
   descendants: TreeExtendedItemModel<T>[];
 }
@@ -703,6 +697,9 @@ export function cloneTreeItem<T>(item: TreeItemModel<T>, sourceIdProp?: string):
   return clone;
 }
 
+/**
+ * Gives the item and its descendants fresh 23-letter ids, also written to `source` under `sourceIdProp`.
+ */
 function randomizeIds<T>(item: TreeItemModel<T>, sourceIdProp?: string): void {
   item.id = randomAlphabetic(23);
 
@@ -719,6 +716,9 @@ function randomizeIds<T>(item: TreeItemModel<T>, sourceIdProp?: string): void {
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
+/**
+ * Returns `length` random ASCII letters drawn from `crypto.getRandomValues`.
+ */
 function randomAlphabetic(length: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   let id = '';
@@ -726,6 +726,9 @@ function randomAlphabetic(length: number): string {
   return id;
 }
 
+/**
+ * Deep-copies arrays and objects as plain ones, symbol keys included; primitives and functions pass through.
+ */
 function deepCloneValue<T>(value: T): T {
   if (value === null || typeof value !== 'object') {
     return value;
@@ -748,6 +751,9 @@ function deepCloneValue<T>(value: T): T {
   return clone as T;
 }
 
+/**
+ * Keeps the first item per `id`, preserving order.
+ */
 function uniqueById<T>(items: TreeItemModel<T>[]): TreeItemModel<T>[] {
   return items.filter((item, index) => items.findIndex(({ id }) => id === item.id) === index);
 }

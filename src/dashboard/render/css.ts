@@ -2,7 +2,7 @@ const adopted = new Set<string>();
 
 /**
  * Adopts a stylesheet into the document, once per unique text.
- * Call it at module top level beside the component it styles; the same text adopts only once.
+ * Call it at module top level beside the component it styles.
  * Interpolations splice in, so tokens and shared fragments compose.
  * Sheets apply in first-adoption order, after the document's own stylesheets.
  *

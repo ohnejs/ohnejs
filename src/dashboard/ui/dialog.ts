@@ -144,8 +144,6 @@ export function openDialog<const TActions extends readonly DialogAction[]>(
  * The global confirm dialog outlet.
  * Mount it once in the shell.
  * It renders the `openDialog` state inside a popup sized by the `--ohne-dialog-size` knob.
- * The actions sit right-aligned in array order.
- * Every dismissal path settles the promise: an action click with its name, a dismissal with `undefined`.
  *
  * @example
  * ```ts
