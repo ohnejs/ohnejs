@@ -17,8 +17,11 @@ code in this process. Whoever acquires the lock runs the function; everyone else
 The lock releases when the function settles - on success and on throw alike - and `withLock`
 returns whatever the function returned.
 
-`withLock` needs the connected main database. Inside a running app that is a given; a script
-running outside the app lifecycle must open the [connection](./engine.md) first.
+`withLock` needs the connected main database. Inside a running app - a handler, a hook - that is a
+given. [Boot files](../project/boot.md) run before the [connection](./engine.md) opens, so a boot
+file calls `withLock` from a hook such as [`server:ready`](../api/hooks.md#serverready), never at
+its top level. A standalone script, such as a cron job,
+[opens the connection itself](./engine.md#outside-the-app).
 
 ## Timing
 

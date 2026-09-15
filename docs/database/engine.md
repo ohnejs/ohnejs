@@ -51,6 +51,9 @@ two name the same one, the closer layer wins.
 
 ## Raw SQL
 
+[Read](./queries.md) and [write](./writing.md) your collections through the query builder; raw SQL
+is the escape hatch beside it, for a helper database or a table of your own.
+
 `useDatabase()` returns the main connection as a small async adapter - the same surface a helper
 has. Statements are parametrized with positional `?` placeholders:
 
@@ -121,6 +124,62 @@ your own transaction writes:
 await useDatabase().transaction(async (tx) => {
   await tx.run('DELETE FROM hits WHERE count = ?', [0]);
 }, 'immediate');
+```
+
+## Outside the app
+
+A cron job or a one-off maintenance task runs outside the server, so nothing opens the connection
+for it. Open it yourself:
+
+```ts
+// scripts/prune-hits.ts
+import {
+  bootLayers,
+  closeDatabases,
+  connect,
+  loadLayers,
+  loadProjectEnv,
+  useDatabase,
+  withLock,
+} from 'ohnejs';
+
+await loadProjectEnv(process.cwd());
+await loadLayers();
+await bootLayers();
+await connect();
+
+try {
+  await withLock('hits:prune', () => useDatabase().run('DELETE FROM hits WHERE count = ?', [0]));
+} finally {
+  await closeDatabases();
+}
+```
+
+- `loadProjectEnv` reads the project `.env`, so `DATABASE` may live there.
+- `loadLayers` resolves your config and every layer it stacks.
+- `bootLayers` runs your [boot files](../project/boot.md), so a dialect a layer registers is in
+  place for `connect`.
+- `connect` opens the main database and every helper.
+- `closeDatabases` closes them, whether the work succeeds or throws.
+
+Your collections are not registered in such a script, so `query` throws `Unknown collection`. Use
+[raw SQL](#raw-sql) there. The [cluster lock](./with-lock.md) needs no sync first: it creates its
+table on its first bid.
+
+Run the script from the project root, with ohne's `register` hook so Node can load ohne's
+TypeScript from `node_modules`:
+
+```sh
+node --import ohnejs/register scripts/prune-hits.ts
+```
+
+The hook and `process.cwd()` both resolve from where you launch, so a cron entry changes into the
+project first. A cron job also starts with a bare environment. If your app takes `DATABASE` from
+its host, pass the same value; without it the script opens `database.url` or `.data/ohne.db`, and
+the lock guards a database your app never reads:
+
+```sh
+cd /srv/app && DATABASE=/srv/data/app.db node --import ohnejs/register scripts/prune-hits.ts
 ```
 
 ## Reserved tables
