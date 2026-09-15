@@ -40,9 +40,9 @@ POST   /collections/posts/[uuid]/translations/copy    copy one locale's translat
 DELETE /collections/posts/[uuid]/translations         delete one locale's translation
 ```
 
-The three translation routes apply only to collections with
+The translation routes apply only to collections with
 [translatable fields](../database/translations.md); on any other they answer the same `404` as an
-unknown collection. The `GET` answers exactly the record's own `_translations` field.
+unknown collection. The `GET` answers `{ locales }`, the same list as the record's `_translations`.
 
 These are ordinary [routes](./routes.md) shipped by the ohne layer, so everything routes do
 applies: `api.basePath` prefixes them, your app overrides one by shipping the same route id, and
@@ -95,8 +95,8 @@ Failures keep the shapes the rest of ohne uses:
 
 - A validation failure is a `422` with translated messages keyed by field path, exactly as
   [writing records](../database/writing.md) reports them.
-- A malformed query or body is a `400` with a stable `code` and `path`; see
-  [errors](./errors.md).
+- A malformed query is a `400` with a stable `code` and `path`; see
+  [querying over HTTP](./url-queries.md#errors). A malformed body is a plain `400`.
 - A delete blocked by a `restrict` reference is a `409`; a busy database a `503` with
   `Retry-After`.
 
@@ -108,9 +108,9 @@ field in a write body rejects the same way.
 ## Exposure
 
 An exposed operation is guarded by default: the request needs a signed-in user whose
-[capabilities](../auth/roles.md) cover `collection.<Name>.<operation>`. No user answers `401`; a
-user without the capability `403`. `api: true` opens every operation guarded. An object opens per
-operation, and anything unnamed stays closed:
+[capabilities](../auth/roles.md#the-collections-api-guard) cover `collection.<Name>.<operation>`.
+`api: true` opens every operation guarded. An object opens per operation, and anything unnamed
+stays closed:
 
 ```ts
 export default defineCollection({
@@ -123,7 +123,7 @@ export default defineCollection({
 });
 ```
 
-An operation is `true` (guarded), `'public'` (open to anyone), or an object with three options.
+An operation is `true` (guarded), `'public'` (open to anyone), or an object of options.
 `public: true` is the object spelling of `'public'`, and `middleware` names
 [middleware](./middleware.md) to run after the guard, in order, after the global ones. A
 middleware that returns a value answers the request, and the operation never runs. `access`
@@ -133,7 +133,7 @@ narrows the operation to the records and fields a request may reach; it has
 `public` and `middleware` compose: `{ public: true, middleware: ['require-auth'] }` skips the
 capability guard but still requires a signed-in user - any account, no role needed.
 
-`read` covers all three read endpoints. An unknown collection, an unexposed one, and a closed
+`read` covers every read endpoint. An unknown collection, an unexposed one, and a closed
 operation all answer the identical `404`, so the API never reveals what exists.
 
 ## Access
@@ -169,8 +169,8 @@ the update, so a `PATCH` on someone else's post answers the same `404` a missing
 is no `403` to tell an out-of-scope record from an absent one, so the API never reveals what the
 caller cannot reach.
 
-`access` returns one of three things. `true` runs the operation unscoped, exactly as if the option
-were omitted. `false` refuses it as that identical `404`. A scope object narrows it.
+A `true` from `access` runs the operation unscoped, exactly as if the option were omitted. `false`
+refuses it as that identical `404`. A scope object narrows it.
 
 ### The scope
 
@@ -184,19 +184,19 @@ further, never escape.
 address rows. On an update the same list bounds the body: only fields inside it write, and the
 answered record carries the scoped fields alone.
 
-`limit` caps the rows a list read returns; the request's own `limit` can only lower it. `locale` is
-the locale a read uses when the request names none - a default, not a wall.
+`limit` caps a list read's `limit`/`offset` window, and the request's own `limit` can only lower it;
+a paginated read sizes by `perPage` under the [`maxPerPage` guard](./url-queries.md#guards) instead.
+`locale` is the locale a read uses when the request names none - a default, not a wall.
 
-A `read` scope also reaches through relations. When another collection's endpoint populates or
-probes this one, this collection's own `read` exposure, guard, and scope decide what comes back:
-nothing from a collection the caller cannot read, only the admitted rows and fields otherwise. The
-target's own middleware run too; one that answers makes the target unreachable.
+When another collection's endpoint populates or probes this one, this collection's own `read`
+exposure, guard, scope, and middleware decide what comes back, and a middleware that answers makes
+it unreachable; see [querying over HTTP](./url-queries.md).
 
-A `read` scope shapes all three read endpoints. An `update` or `delete` scope decides which rows
+A `read` scope shapes every read endpoint. An `update` or `delete` scope decides which rows
 the write may touch: a row outside `where` answers `404` as if it did not exist. The filter reads
 the row as stored, so a body may carry a row out of the scope - an author handing a post to someone
-else. Keep a field inside the scope with `select`, or lock it with `writable: false` as the next
-example does. A create has no rows yet, so only the verdict applies - return `true` or `false`.
+else. Keep a field inside the scope with `select`, or lock it with `writable: false`. A create has
+no rows yet, so only the verdict applies - return `true` or `false`.
 
 A `where` over translatable fields matches per locale, so it can admit a record at `en` and hide it
 at `de`. The endpoints then narrow the record's `_translations` to the admitted locales; a `where`

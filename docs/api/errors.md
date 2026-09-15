@@ -49,7 +49,7 @@ import { HTTPError } from 'ohnejs';
 throw new HTTPError(418, "I'm a teapot");
 ```
 
-The framework throws these itself where the request is at fault: a body over `server.maxBodySize`
+The framework throws these itself where the request is at fault: a body over `api.maxBodySize`
 is a `413`, a JSON body reader given the wrong `Content-Type` a `415`, a malformed body a `400`.
 
 ## Attaching data
@@ -78,9 +78,7 @@ a generic response:
 
 Nothing of the real error reaches the client: no message, no stack. The server logs it instead as
 an error block naming the route; the stack shows only under `DEBUG`. A throwing handler never
-takes the server down - the request is answered and the process keeps serving. Failures inside a
-request are always HTTP concerns, mapped to a response; the process-level error printing you see
-when a boot fails is reserved for failures outside requests.
+takes the server down - the request is answered and the process keeps serving.
 
 ## Write failures
 

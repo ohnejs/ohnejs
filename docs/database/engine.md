@@ -184,7 +184,7 @@ cd /srv/app && DATABASE=/srv/data/app.db node --import ohnejs/register scripts/p
 
 ## Reserved tables
 
-ohne keeps its own state in three tables in the main database: `ohne_locks` backs the
+ohne keeps its own state in the main database: `ohne_locks` backs the
 [cluster lock](./with-lock.md), `ohne_migrations` records which [migrations](./migrations.md) ran,
 and `ohne_schema` holds the sync's schema snapshot. A table rebuild briefly parks the old table
 under an `ohne_rebuild_` prefix. The framework manages all of them itself; leave the `ohne_`

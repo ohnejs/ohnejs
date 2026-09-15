@@ -70,7 +70,7 @@ The pieces then merge by identity, and the closer layer wins:
   opt-in in another is an error.
 - **Roles** - identity is the name; the closer definition replaces the further one entirely.
 
-Two kinds of content never collide:
+Some content never collides:
 
 - **Migrations** are layer-qualified, so every layer's run - furthest layer first, file name order
   within a layer. See [migrations](../database/migrations.md).
@@ -127,7 +127,7 @@ layer's own and never reach a consumer. See
 A layer that introduces settings of its own declares them by augmenting `Config`, then ships an
 `ohne.layer.ts` default-exporting `defineLayer` with what it owns: the defaults that floor the
 stack and the merge strategies for its keys. The file is optional - present only when a layer adds
-keys.
+keys or generates files.
 
 ```ts
 // ohne.layer.ts

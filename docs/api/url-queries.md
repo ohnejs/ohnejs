@@ -108,7 +108,7 @@ ask for the id alone, so it is rejected. On a translatable collection the whole 
 
 ## The row window
 
-Two windowing modes, and a query uses one or the other. `limit` and `offset` take a raw window:
+`limit` and `offset` take a raw window:
 
 ```
 ?limit=20&offset=40
@@ -120,17 +120,17 @@ Two windowing modes, and a query uses one or the other. `limit` and `offset` tak
 ?page=2&perPage=20
 ```
 
-Mixing the two modes is a `400`.
+Mixing `limit` or `offset` with `page` or `perPage` is a `400`.
 
-`applyQuery` does not consume the pair - the endpoint pins the terminal, so it reads them off the
-parsed query and calls `paginate` itself:
+`applyQuery` leaves `page` and `perPage` to your endpoint, which decides whether to paginate - read
+them off the parsed query and call `paginate` yourself:
 
 ```ts
 export default defineHandler(async () => {
   const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards());
   const builder = applyQuery(queryUntyped('Posts'), parsed);
-  if (parsed.page === null) return builder.findMany();
-  return builder.paginate(parsed.page, parsed.perPage ?? 20);
+  if (parsed.page === null && parsed.perPage === null) return builder.findMany();
+  return builder.paginate(parsed.page ?? 1, parsed.perPage ?? 20);
 });
 ```
 
@@ -161,10 +161,10 @@ named in its level's `select` when one is set, or it silently drops.
 Through the shipped collection endpoints, a populated relation hydrates only what the caller's own
 read of the target would return: a `record` into a collection the caller cannot read comes back
 `null`, a `records` element from one drops, and a target's read scope narrows the rows and the
-fields at every level. Your own endpoint gets the same by parsing through `parseWireQuery` with a
-reach resolver; a plain `parseQueryParams` read crosses into its targets unscoped.
+fields at every level. Your endpoint scopes targets through `parseWireQuery`, whose last argument
+maps each crossed collection to a read scope or `false`; `parseQueryParams` alone crosses unscoped.
 
-Depth and size are bounded by two [guards](#guards): `maxPopulateDepth` (default `2`, so
+Depth and size are bounded by the [guards](#guards) `maxPopulateDepth` (default `2`, so
 `comments.author` works out of the box) and `maxPopulate` (default `20` nodes in total). Depth
 past the default is new transitive reach across collections, so raising it is an explicit
 endpoint decision.
@@ -204,8 +204,8 @@ own `locale` wins. Locales select content, they do not protect it. `applyQuery` 
 `_translations` as stored; the shipped collection endpoints narrow it further, to the locales a
 scoped `where` admits the record at.
 
-`applyScope` composes the same scope onto a builder with no wire query to replay - the shape for
-a query your route writes itself under an operation's `access`.
+`applyScope` composes the same scope onto a builder with no wire query to replay. To run your own
+query under a collection's guard and `access`, use [`queryScoped`](./collections.md#your-own-routes).
 
 The shipped collection endpoints take their scope from the operation's
 [`access`](./collections.md#access) option, so a collection declares the rule once and every
@@ -257,11 +257,24 @@ so a URL can never probe which fields your collection has. The complete catalog 
 
 ## Guards
 
-The untrusted path is bounded so a hostile URL cannot exhaust the server: a cap on conditions, `has`
-nesting, `in` length, total bound parameters, selected fields, order keys, populate nodes and depth,
-value and pattern size, and page size. The full set is the `QueryGuards` interface, one ceiling per
-field, each with its default. The defaults are generous, and a real query never approaches one. The
-fluent builder is trusted and never checked.
+The untrusted path is bounded so a hostile URL cannot exhaust the server. Each ceiling is a
+`QueryGuards` field, with a default generous enough that a real query never approaches it:
+
+| Guard              | Default | Caps                                                                |
+| ------------------ | ------- | ------------------------------------------------------------------- |
+| `maxConditions`    | `100`   | Comparisons in one `where`, `has` and `empty` included.             |
+| `maxHasDepth`      | `8`     | How deep `has` nests.                                               |
+| `maxInLength`      | `2000`  | Elements in an `in`, `includesAll`, or `includesAny` list.          |
+| `maxBoundParams`   | `10000` | Parameters one query binds, capped at the database's own limit.     |
+| `maxSelect`        | `200`   | Fields one `select` names.                                          |
+| `maxOrder`         | `10`    | Keys in one `order`.                                                |
+| `maxPopulate`      | `20`    | Nodes in one `populate` tree.                                       |
+| `maxPopulateDepth` | `2`     | How deep `populate` nests.                                          |
+| `maxValueBytes`    | `4096`  | Bytes in one string value.                                          |
+| `maxPatternBytes`  | `512`   | Bytes in a `contains`, `startsWith`, `endsWith`, or `like` pattern. |
+| `maxPerPage`       | `500`   | The largest `perPage`; a larger one clamps to it.                   |
+
+The fluent builder is trusted and never checked.
 
 Override a ceiling app-wide in `ohne.config.ts`:
 

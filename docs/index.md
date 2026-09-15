@@ -1,13 +1,9 @@
 # ohne
 
-ohne is a zero-dependency TypeScript framework for the web. It gives you a database, an HTTP API,
-internationalization, and a dashboard, with no build step and no runtime dependencies. The
+ohne is a **zero-dependency** TypeScript framework for the web. It gives you a database, an HTTP API,
+internationalization, and a dashboard, with **no build step** and no runtime dependencies. The
 framework ships `.ts` source, your app is `.ts` source, and Node 26 runs both directly. What you
 write is what runs.
-
-The name is German for "without". The constraint is the product: no bundler, no transpile, no
-transitive dependency tree to audit. You reach for Node's own building blocks and the framework
-fills the gaps.
 
 ## Start here
 

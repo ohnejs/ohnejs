@@ -23,7 +23,7 @@ A user with `roles: ['editor']` can now do anything on `Posts` and read `Tags`, 
 
 ## Capabilities
 
-A capability is a dot-separated string. Every collection contributes four, one per operation, plus
+A capability is a dot-separated string. Every collection contributes one per operation, plus
 a wildcard:
 
 ```
@@ -49,7 +49,7 @@ Each `.ts` file under `roles/` is one role, named by its kebab-cased path: `role
 result, and codegen types every name into `RoleName`, so assignments autocomplete and a typo is a
 compile error.
 
-The ohne layer ships one role: `admin`, holding `['*']`. There is no separate superuser flag - the
+The ohne layer ships the `admin` role, holding `['*']`. There is no separate superuser flag - the
 wildcard is the bypass. Your app can [override](../project/layers.md) it by shipping its own
 `roles/admin.ts`, or drop it with `disable: { roles: ['admin'] }`.
 
@@ -98,7 +98,7 @@ export default defineHandler(async () => {
 ```
 
 To branch instead of reject, `userCan` answers the same question as a boolean, and
-`userCapabilities` returns the resolved union. Both are pure registry work over the user's roles -
+`userCapabilities` returns the resolved union. Both work from the user's roles and the role files -
 no query runs:
 
 ```ts
@@ -144,9 +144,8 @@ declare module 'ohnejs' {
 
 Both names now complete in `defineRole`, `requireCapability`, and `userCan`, beside the generated
 ones. The union stays open, so a name you did not declare still typechecks; the declaration buys
-completion, not rejection. A [layer](../project/layers.md) declares its names the same way, and
-codegen carries every `declare module 'ohne'` file a stacked layer ships into the app's type
-program.
+completion, not rejection. A [layer](../project/layers.md#new-config-keys) declares its names the
+same way.
 
 Prefix a layer's capabilities with its name and they cannot collide with an app's own.
 

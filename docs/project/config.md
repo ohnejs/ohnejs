@@ -66,7 +66,7 @@ disable: {
   from the schema and the generated types; a field still referencing a dropped field type fails at
   codegen.
 
-All six lists accumulate across layers: every layer's entries combine, deduped, so a layer can
+The lists accumulate across layers: every layer's entries combine, deduped, so a layer can
 drop components too and you can always add more.
 
 ## Content locales
@@ -172,8 +172,8 @@ query: {
 },
 ```
 
-A ceiling you name replaces the framework default; the rest keep theirs. The full set and its
-defaults live in [querying over HTTP](../api/url-queries.md#guards).
+A ceiling you name replaces the framework default; the rest keep theirs. Every ceiling and its
+default is listed in [querying over HTTP](../api/url-queries.md#guards).
 
 ## The printer
 
@@ -181,9 +181,6 @@ defaults live in [querying over HTTP](../api/url-queries.md#guards).
 
 - `silent: false` - `true` drops every print call.
 - `debug: false` - `true` emits debug output.
-
-The `SILENT` and `DEBUG` env vars take precedence whenever they are set, regardless of value; the
-config fields apply only while the matching var is unset.
 
 ## Env vars win
 
@@ -198,10 +195,8 @@ A handful of env vars override their config counterpart whenever they are set:
 - `SILENT` - `printer.silent`.
 - `DEBUG` - `printer.debug`.
 
-Each is also a CLI flag - the kebab-case of its name, so `FORCE_SYNC` is `--force-sync` - and the
-flag wins over the env var for that run. A variable set in the project's `.env` counts as set too:
-it fills what the process environment lacks and beats config the same way. The full list of
-built-ins lives in [env](./env.md), the file in [the `.env` file](./env.md#the-env-file).
+A CLI flag or a `.env` entry counts as set too. The full order and every built-in live in
+[env](./env.md#environment-beats-config).
 
 ## Own vs inherited keys
 
@@ -209,9 +204,9 @@ Config resolves per key, closest first: your value wins, and a layer's value fil
 nothing. Nested groups merge key by key, so setting `api.handlerTimeout` does not discard a layer's
 `api.basePath`.
 
-Two kinds of keys resolve differently:
+Some keys resolve differently:
 
-- **Accumulating** - the five `disable` lists combine entries across every layer, deduped.
+- **Accumulating** - each `disable` list combines entries across every layer, deduped.
 - **Own** - never inherited: a layer's value applies to that layer alone, and only your own config
   reaches your app. These are `dirs`, `printer`, `api.port`, `api.host`, `dashboard.port`,
   `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`, `dashboard.menu`, `database.dialect`,

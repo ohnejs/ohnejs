@@ -25,7 +25,7 @@ The file's path names the collection: `collections/Posts.ts` becomes the `Posts`
 subdirectory joins the name - `collections/blog/Posts.ts` becomes `BlogPosts` - and a
 `blog/index.ts` collapses to `Blog`. Names normalize to PascalCase; field names are camelCase.
 
-Every collection gets two columns you never declare: `UUID`, the text primary key, and
+Every collection gets columns you never declare: `UUID`, the text primary key, and
 `_updatedAt`, an internal timestamp. Your fields become the other columns. A field is `NOT NULL`
 unless you pass `nullable: true`.
 
@@ -85,8 +85,8 @@ The refusal names exactly what would be lost. Empty tables and all-`NULL` column
 freely - there is nothing to lose.
 
 An intentional change is expressed as a [migration](./migrations.md): a file under `migrations/`
-built with `defineMigration`, moving, renaming, or discarding data. Migrations run inside the
-same sync transaction, before the diff, so a covered change passes the guard.
+built with `defineMigration`. Migrations run inside the same sync transaction, before the diff, so
+a covered change passes the guard.
 
 ## Force
 
@@ -104,7 +104,7 @@ data is truly disposable.
 
 Not everything can be forced. A unique over duplicate values, `NOT NULL` over rows holding
 `NULL`, and a retype into `NOT NULL` on a populated column refuse regardless - force cannot pick
-which rows win. Fix the data first, or rewrite it with a move migration.
+which rows win. Fix the data first, or rewrite it with a migration.
 
 ## Rolling back
 

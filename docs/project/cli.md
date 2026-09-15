@@ -23,11 +23,8 @@ is what makes a directory an ohne project. It also reads a `.env` at that root b
 anything else, filling in the variables the shell did not set - see
 [the `.env` file](./env.md#the-env-file).
 
-Registered [env vars](./env.md) surface as flags on every command: the kebab-case of the name, so
-`PORT` is `--port` and `FORCE_SYNC` is `--force-sync`. A boolean var becomes a switch, the rest
-take a value, and the flag wins over the env var for that run. The root help lists them all under
-global options, and a layer that registers its own flagged var gets its flag the same way -
-nothing to wire.
+Every built-in env var is also a [flag](./env.md#flags) on every command - the kebab-case of its
+name, so `PORT` is `--port` - and the root help lists them under global options.
 
 ```sh
 npx ohne serve api --port 8080 --host 0.0.0.0
@@ -50,10 +47,8 @@ One command runs everything while you work:
 npx ohne dev
 ```
 
-`dev` is a supervisor. It starts the dashboard child, runs a full generation pass into the codegen
-dir - it owns codegen - then spawns the API child, the very processes `serve` runs in production.
-The API child skips its own codegen, since the supervisor already ran it; the dashboard serves
-straight away, reading modules from disk per request.
+`dev` is a supervisor. It starts the dashboard child, generates the types, then spawns the API
+child - the very processes `serve` runs in production.
 
 On every change it re-runs just the codegen the changed files affect, then drains the API child
 and respawns it fresh - a new process every time, so no stale module survives a reload. A change

@@ -50,18 +50,9 @@ What the component returns and how it updates is the runtime's story:
 ## Navigation
 
 The dashboard is a single-page app. The server answers every path with the same shell, so a deep
-link loads directly; from there the client router owns navigation. A plain `<a href="/authors">`
-just works - a same-origin left-click is intercepted and swaps the page in place, as do the back
-and forward buttons. Programmatic navigation is one call:
-
-```ts
-import { navigate } from 'ohne/dashboard';
-
-navigate('/authors/42');
-```
-
-The most specific matching route wins, and a page's module loads on demand the first time its
-route matches. An unmatched path renders the dashboard's not-found page.
+link loads directly; from there the client router swaps pages in place. Links, `navigate`, and the
+back and forward buttons are covered in [rendering](./rendering.md#navigation). The most specific
+matching route wins.
 
 `lastNavigation()` tells a page how it was reached: the initial `load`, a `navigate` call or a
 clicked link, or `popstate` for the back and forward buttons. A page that restores a remembered
@@ -89,7 +80,7 @@ export default defineConfig({
 });
 ```
 
-A group's `items` hold two kinds of row, in the order you write them.
+A group's `items` hold its rows, in the order you write them.
 
 A **string** names a [collection](../database/collections.md) and renders its list link. The label
 and icon come from the collection itself, and the row disappears for a viewer who cannot reach it.
@@ -126,12 +117,8 @@ registerFieldType('rating', {
 });
 ```
 
-There is nothing to export and nothing to call - importing the file is the whole mechanism.
-
-Within one `boot/` directory, every top-level `.ts` file runs, sorted naturally by name - `2-`
-before `10-` - and each file finishes before the next starts. Nested files are ignored, and a
-`_`-prefixed file is a helper: skipped, free to be imported by the others. An `index.ts` takes
-over: when present it is the only file that runs, and it orders the rest by importing them itself.
+Files run in the order [server boot files](../project/boot.md#ordering) do: top-level only, sorted
+naturally by name, one at a time, `_`-prefixed helpers skipped, and an `index.ts` taking over.
 
 Across [layers](../project/layers.md), the furthest layer boots first, so a base layer's field types
 are registered when your boot files run. A boot file's identity is its path: your `boot/fields.ts`
@@ -139,7 +126,7 @@ replaces a layer's `boot/fields.ts` and runs in its place.
 
 ## What a page may import
 
-The shell injects an import map with exactly three entries:
+The shell injects an import map with these entries:
 
 - `ohnejs/dashboard` - the browser runtime: `defineDashboardPage`, `h`, `api`, `useT`, ...
 - `ohnejs/utils` - the isomorphic utility barrel, the same one your Node code imports.
@@ -170,7 +157,7 @@ Port, host, and the API base URL the browser talks to sit under `dashboard.*` in
 ## Type checking
 
 Dashboard code is browser code - DOM types, no `node:` imports - so it type-checks as its own
-program. The scaffold's root `tsconfig.json` excludes `dashboard/`; the directory carries its own:
+program. The scaffold's root `tsconfig.json` excludes `dashboard/`; the directory needs its own:
 
 ```json
 {
@@ -184,6 +171,6 @@ program. The scaffold's root `tsconfig.json` excludes `dashboard/`; the director
 
 `ohnejs/tsconfig.browser.json` brings the DOM lib. `paths` resolves `app/` imports the way the server
 does: your own directory first, then each stacked layer's dashboard directory - add one entry per
-layer you list. The two `../.ohne` globs bring the generated types - the typed `api` route ids and
+layer you list. The `../.ohne` globs bring the generated types - the typed `api` route ids and
 message keys. The dashboard server warns at boot when the file is missing, printing this content
 with the paths adjusted to your `dirs`.

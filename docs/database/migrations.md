@@ -198,13 +198,7 @@ mistyped, and the error says which.
 
 ## Rehearsing
 
-`ohne sync --dry-run` runs your migrations for real - transforms included - against the live
-database, together with the diff and the guard, then rolls everything back:
-
-```sh
-pnpm exec ohne sync --dry-run
-```
-
-A migration that would refuse fails the dry run exactly where it would fail the boot, which makes
-it the place to test a transform before it touches anything. See
-[syncing without serving](./sync.md#syncing-without-serving).
+`ohne sync --dry-run` runs your migrations for real against the live database - transforms
+included - then rolls everything back. A migration that would refuse fails the dry run exactly
+where it would fail the boot, which makes it the place to test a transform before it touches
+anything. See [syncing without serving](./sync.md#syncing-without-serving).

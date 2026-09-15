@@ -116,9 +116,8 @@ language.
 
 Catalogs merge across [layers](../project/layers.md), per key and language: a closer layer
 overrides exactly the keys it redefines and leaves the rest in place, and your app, the closest
-layer, overrides all. The framework's own layer is the base, shipping its `api.*`, `query.*`, and
-`validation.*` strings in English, German, and Bosnian - so replacing one shipped string is a
-tiny catalog:
+layer, overrides all. The framework's own layer is the base, shipping its strings in English,
+German, and Bosnian - so replacing one shipped string is a tiny catalog:
 
 ```json
 {
@@ -128,9 +127,8 @@ tiny catalog:
 }
 ```
 
-To drop keys instead, `disable.messages` in config takes globs over the dot-separated key
-(`'dashboard.**'` drops a whole group); a dropped key vanishes from the catalogs, the endpoint,
-and the generated types.
+To drop keys instead, list globs over the dot-separated key in
+[`disable.messages`](../project/config.md#disabling): `'dashboard.**'` drops a whole group.
 
 ## Validation messages
 

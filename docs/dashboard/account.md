@@ -25,7 +25,7 @@ opens the page gets the app's defaults and the device's zone.
 
 ## Date and time formats
 
-The two format settings are token patterns, and a preview beside each input shows the pattern
+The format settings are token patterns, and a preview beside each input shows the pattern
 applied to the current moment as you type. `YYYY-MM-DD` renders `2025-02-24`, `HH:mm` renders
 `21:30`. Any other character passes through, and `[...]` escapes text that would otherwise read as
 tokens: `[Week] W` renders `Week 9`.

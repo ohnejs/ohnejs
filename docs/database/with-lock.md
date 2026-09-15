@@ -25,7 +25,7 @@ its top level. A standalone script, such as a cron job,
 
 ## Timing
 
-Two options tune a bid:
+A third argument tunes a bid:
 
 ```ts
 await withLock('reports:rebuild', () => rebuildReports(), {

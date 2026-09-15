@@ -106,8 +106,6 @@ curl http://localhost:9001/posts
 []
 ```
 
-No posts yet.
-
 ## Creating posts
 
 The POST route reads a JSON body and writes:

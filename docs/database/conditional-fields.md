@@ -45,7 +45,7 @@ climbs one level.
 field('text', { nullable: true, when: { '../kind': 'promo' } });
 ```
 
-A dot descends into a composite (`address.city`). A relation cannot be walked - a `record` or
+A dot descends into an `object` (`address.city`). A relation cannot be walked - a `record` or
 `records` is a `UUID` at write time - so test one with bare existence:
 
 ```ts

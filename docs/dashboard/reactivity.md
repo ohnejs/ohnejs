@@ -152,10 +152,9 @@ scope cascades. Disposal is idempotent, and `onCleanup` outside any scope is a n
 
 ## Server and browser
 
-The core is plain TypeScript with no DOM and no Node APIs, so a ref behaves identically in a route
-handler, a test, and a dashboard page. In the browser, `ohnejs/utils` resolves through the served
-import map - the import line above works unchanged on both sides.
+In the browser, `ohnejs/utils` resolves through the served import map - the import line above works
+unchanged on both sides.
 
-The dashboard renderer is a consumer like any other: `h` wraps every function prop and child in a
+The dashboard renderer is a consumer like any other: `h` wraps every function attribute and child in a
 `batchedEffect`, so the text and attributes that read a ref patch when it changes. See
 [rendering](./rendering.md).

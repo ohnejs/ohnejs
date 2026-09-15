@@ -37,8 +37,6 @@ formatMessage(
 // -> 'Open the door.'
 ```
 
-That's the whole spec for simple substitution. Everything else builds on it.
-
 ## Plurals
 
 English has two number forms (one apple, two apples). Russian has three. Arabic has six. Hard-coding "1 item" / "N items" stops working the moment you translate.
@@ -178,7 +176,7 @@ formatMessage(
 
 The gap in `19,50 €` is a no-break space, exactly as `Intl` emits it.
 
-Skeletons are their own small language. `.00` fixes two fraction digits. `currency/USD` sets currency. `group-off` disables thousands separators. You don't need to learn the whole grammar to start; just enough for the formats you reach for.
+Skeletons are their own small language. `.00` fixes two fraction digits. `currency/USD` sets currency. `group-off` disables thousands separators.
 
 ## Dates and times
 
@@ -273,5 +271,3 @@ const msg = `{user} {n, plural, offset:1
 t(msg, { user: 'Alex', n: 4, seen: new Date('2026-06-09T00:00:00') });
 // -> 'Alex and 3 others are here, last seen Jun 9, 2026.'
 ```
-
-That's the whole language. From here, the rest is practice and the occasional skeleton lookup.

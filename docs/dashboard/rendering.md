@@ -50,9 +50,6 @@ const saving = ref(false);
 h('button', { disabled: () => saving.value, onClick: () => (saving.value = true) }, 'Save');
 ```
 
-`disabled` starts absent and appears the moment `saving` flips - the exact boolean-attribute
-behavior HTML expects.
-
 ## Children
 
 A child renders by what it is:
@@ -167,7 +164,7 @@ mount(h('h1', null, 'ohne'), document.querySelector('#widget')!);
 
 Pages live under `dashboard/pages/` - the file convention is covered in [pages](./pages.md). The
 router renders the page matching the current URL and swaps it in place on navigation, without a
-full reload. Three things navigate:
+full reload. These navigate:
 
 - a left-click on a same-origin link - `h('a', { href: '/posts' }, 'Posts')` just works. Clicks
   the browser should own pass through: a modified click, another origin, a `target`, a

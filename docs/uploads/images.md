@@ -41,7 +41,7 @@ export default defineConfig({
 });
 ```
 
-A name is a camelCase identifier. The layer ships one, `thumbnail`, as
+A name is a camelCase identifier. The layer ships `thumbnail` as
 `{ width: 320, height: 320, fit: 'inside', format: 'webp' }`: it fits an image inside a 320 pixel
 box for the dashboard grid without cropping, so only a square source renders square. Names union
 across layers and a redefinition replaces the whole preset, so `thumbnail: { width: 200 }` does not

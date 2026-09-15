@@ -1,14 +1,11 @@
 # Getting started
 
-ohne is a zero-dependency TypeScript framework for the web. There is no build step: the framework
-ships `.ts` source, your app is `.ts` source, and Node runs both directly. What you write is what
-runs.
-
 ## Requirements
 
 Node.js 26 or newer. Node 26 executes TypeScript natively by stripping the types, which is what
-makes the no-build setup work - nothing transpiles, nothing bundles. The scaffold pins `engines`
-to it, and TypeScript itself is only a dev dependency, there for type checking.
+makes the no-build setup work - nothing transpiles, nothing bundles. The scaffolded `package.json`
+sets `engines.node` to `>=26.0.0` and lists TypeScript under `devDependencies`, since it is only
+used for type checking.
 
 ## Creating a project
 
@@ -92,7 +89,7 @@ and the Node types are dev dependencies.
 ```
 
 The base config pins what the no-build setup needs, `erasableSyntaxOnly` among it, so you can only
-write syntax Node can strip. The two `.ohne/` entries pull the generated types into the program:
+write syntax Node can strip. The `.ohne/` entries pull the generated types into the program:
 `shared` holds plain types, `node` holds the augmentations that type your routes, collections, and
 messages. `dashboard/` is excluded because dashboard code is browser code, checked by its own
 TypeScript program when you add one.

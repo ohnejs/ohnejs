@@ -105,7 +105,7 @@ rest of the query surface are structured values in the URL.
 
 ## The body
 
-Four readers, one per shape. Each is valid only within a request:
+One reader per shape, each valid only within a request:
 
 ```ts
 // api/subscribers.post.ts
@@ -130,7 +130,7 @@ export default defineHandler(async () => {
 The stream is consumed once and memoized: every reader reuses the same bytes, so reading twice -
 or as text after raw - costs nothing and never fails on a spent stream.
 
-Bodies are bounded by `server.maxBodySize`, `'1mb'` by default; an over-cap body is refused with
+Bodies are bounded by `api.maxBodySize`, `'1mb'` by default; an over-cap body is refused with
 `413`. Raise it in [config](../project/config.md), or per route through `defineHandler` options.
 
 ## Cookies

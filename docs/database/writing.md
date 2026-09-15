@@ -31,8 +31,8 @@ On success, `record` is the full record read back after the insert: your fields,
 `errors` maps each failing field to a message:
 an untranslated key like `validation.required`, a `{ key, params }` object when the message carries
 values, or the string a custom validator returned. A nested failure is keyed by its path:
-`sections[2].title`, `author`. Outside a handler, resolve a key to display text yourself with
-`useT` - see [messages](../i18n/messages.md).
+`sections[2].title`, `author`. Resolve a key to display text yourself with `useT` - see
+[messages](../i18n/messages.md).
 
 When you would rather handle failures as exceptions, `createOrThrow` returns the record directly
 and throws a `ValidationError` whose `errors` carries the same map:

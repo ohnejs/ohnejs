@@ -41,7 +41,7 @@ signal: point your platform's probe at the port, as a TCP check or a request to 
 serve. A failed boot - a refused sync, a bad config - means the port never opens, the probe never
 passes, and the previous instance keeps serving.
 
-Two more signals for supervisors: once listening, the process prints ``API ready at `http://...` ``
+Supervisors get more signals: once listening, the process prints ``API ready at `http://...` ``
 and, when spawned with an IPC channel, sends a `'ready'` process message. To announce the address
 yourself - to a service registry, say - register the `server:ready` [hook](../api/hooks.md) from a
 boot file.
@@ -125,7 +125,7 @@ always wins. See [the `.env` file](../project/env.md#the-env-file).
 ## Graceful shutdown
 
 `SIGTERM` and `SIGINT` funnel into one ordered drain: stop accepting, wait for in-flight requests
-and their `waitUntil` work, then close the database. Three `api` settings shape it:
+and their `waitUntil` work, then close the database. These `api` settings shape it:
 
 - `preStopDelay` - keep serving this long after the signal before refusing connections, buying the
   load balancer time to deregister the instance. Default: refuse at once.

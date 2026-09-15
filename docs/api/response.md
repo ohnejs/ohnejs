@@ -86,7 +86,7 @@ useResponse().headers.set('cache-control', cacheControl({ public: true, maxAge: 
 
 ## Serving files
 
-`sendFile` serves a UTF-8 file from the first of its roots that contains it. The path is resolved
+`sendFile` serves a file from the first of its roots that contains it. The path is resolved
 against each root and confined to it - `..` and absolute paths cannot escape - and when no root
 has the file, it throws a `404`:
 

@@ -93,11 +93,11 @@ fields: {
 ```
 
 `min` and `max` on a `multiSelect` bound the entry count. In queries, the `includes` operators
-probe the list, so `where: { channels: { includes: 'web' } }` finds records carrying an entry.
+probe the list, so `.where('channels', (w) => w.includes('web'))` finds records carrying an entry.
 
 ## Date and time fields
 
-Three types cover moments and calendar values, each stored in the form that matches what it is:
+The date and time types store each value in the form that matches what it is:
 
 - `date` is a calendar day, stored as `YYYY-MM-DD` text. A day is not an instant, so no timezone
   is involved and no conversion can shift it.
@@ -115,11 +115,11 @@ fields: {
 }
 ```
 
-All three take `min` and `max` bounds in their own value form; `dateTime` also accepts ISO 8601
+Each takes `min` and `max` bounds in its own value form; `dateTime` also accepts ISO 8601
 strings there. Because `date` and `time` store fixed-width ISO text, comparisons and sorting work
 in calendar and clock order without any parsing.
 
-`dateTime` takes two display options on top. `relativeTime: true` shows the instant as elapsed
+`dateTime` takes display options on top. `relativeTime: true` shows the instant as elapsed
 time, like "2 hours ago", with the exact date on hover - the way the `Updated` column already
 reads. `timezone` pins an IANA zone for the field's cells and calendar, for an instant that belongs
 to one place whoever is looking:
@@ -133,8 +133,8 @@ fields: {
 
 ## Write-only and locked fields
 
-Three options control who may see or change a field. Every field kind takes them - columns,
-relations, composites, and blocks alike.
+`readable`, `writable`, and `immutable` control who may see or change a field. Every field kind
+takes them - columns, relations, composites, and blocks alike.
 
 `readable: false` makes a field write-only. No read returns it: it is gone from every record a
 query or the [collections API](../api/collections.md) hands back, including the record a create or
@@ -279,7 +279,7 @@ or a whole item list per locale for composites and `records`. The one exception 
 
 ## Dashboard appearance
 
-Every field takes three presentation options, shown wherever the dashboard renders it. `label`
+Every field takes presentation options, shown wherever the dashboard renders it. `label`
 replaces the sentence-cased field name, `description` renders beneath it, and `placeholder` hints
 an empty input. Each accepts a plain string or a message key that translates per the viewer's
 language:
@@ -297,31 +297,13 @@ fields: {
 A description renders as markdown: bold, code, links, and pipe tables. A long one can start
 collapsed behind a "Show description" toggle - pass an object with `text` instead of a string.
 `showLabel` and `hideLabel` replace the toggle's labels, and `expanded: true` opens it from the
-start:
+start.
 
-```ts
-fields: {
-  cron: field('text', {
-    description: {
-      text: 'Five fields, space-separated.\n\n|Field|Range|\n|-|-|\n|minute|0-59|\n|hour|0-23|',
-    },
-  }),
-}
-```
-
-Two field types take a display variant on top. A `boolean` edits as a checkbox unless you pass
-`display: 'switch'`, and a `text` field with `multiline: true` edits as a text area from the
-start. Neither changes what is stored:
-
-```ts
-fields: {
-  published: field('boolean', { display: 'switch' }),
-  body: field('text', { multiline: true }),
-}
-```
+A `boolean` edits as a checkbox unless you pass `display: 'switch'`, and a `text` field with
+`multiline: true` edits as a text area from the start. Neither changes what is stored.
 
 The optional collection-level `dashboard` key groups how the dashboard presents the collection
-itself. It holds three keys: `icon`, `recordLabel`, and `table`.
+itself: `icon`, `recordLabel`, and `table`.
 
 `icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
 in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.

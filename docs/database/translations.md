@@ -77,7 +77,7 @@ translation of a record is one query per configured locale.
 
 Which locales a record holds is a read-only system field, `_translations`: the held locales in
 configured order, `[]` when none. Every record of a translatable collection carries it, whichever
-locale you read at, and a `select` that leaves it out skips the probe. It lists, never filters:
+locale you read at, unless a `select` leaves it out. It lists, never filters:
 to find untranslated records, read at that locale and test for `null`, as below.
 
 ```ts

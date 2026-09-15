@@ -1,6 +1,6 @@
 # Media fields
 
-Four field types reference uploads from your own collections: `image` and `file` hold one, `images`
+Media field types reference uploads from your own collections: `image` and `file` hold one, `images`
 and `files` an ordered list. Each stores the upload's `UUID`, exactly as a
 [relation](../database/collections.md#relations) does, and checks the referenced file against
 the bounds you declare.
