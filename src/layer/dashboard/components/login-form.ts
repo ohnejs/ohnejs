@@ -33,7 +33,7 @@ export interface LoginFormOptions {
 /**
  * The email and password sign-in form.
  * An empty field earns its message under the input.
- * Wrong credentials and an unreachable server each raise a toast, once per attempt.
+ * Wrong credentials, an unreachable server, and any other refusal each raise a toast, once per attempt.
  * The password input reveals through its suffix button.
  * Enter submits from any control, including the remember-me checkbox.
  * A success updates `sessionUser`, so the page hosting the form owns the navigation.
@@ -51,6 +51,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   // Reading the failure strings here starts their catalog fetches, so the first toast is translated.
   t('auth.invalidCredentials');
   t('dashboard.login.unreachable');
+  t('dashboard.login.failed');
 
   const submit = async (): Promise<void> => {
     if (busy.value) return;
@@ -60,8 +61,9 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     busy.value = true;
     const outcome = await login(email.value, password.value, remember.value);
     busy.value = false;
-    if (outcome === 'invalid') toast(t('auth.invalidCredentials'), { type: 'error' });
-    else if (outcome === 'unreachable') toast(t('dashboard.login.unreachable'), { type: 'error' });
+    if (outcome.kind === 'invalid') toast(t('auth.invalidCredentials'), { type: 'error' });
+    if (outcome.kind === 'unreachable') toast(t('dashboard.login.unreachable'), { type: 'error' });
+    if (outcome.kind === 'failed') toast(t('dashboard.login.failed'), { type: 'error' });
   };
 
   // One persistent button whose icon swaps in place, so a click never unmounts the focused node.

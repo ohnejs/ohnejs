@@ -1,11 +1,15 @@
+import type { LoginOutcome } from './_session.ts';
 import type { DashboardLanguage } from './use-dashboard-language.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { loginRefusal } from './_session.ts';
 import { api } from './api.ts';
 import { dashboardConfig } from './config.ts';
 import { invalidateDashboardMeta } from './meta.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
+
+export type { LoginOutcome };
 
 /**
  * The signed-in user, as `GET /auth/me`, a successful login, and a saved `updateSessionUser` answer it.
@@ -59,12 +63,6 @@ export interface SessionUser {
    */
   smartClipboard: boolean;
 }
-
-/**
- * How a `login` attempt ended.
- * `signed-in` stored the session; `invalid` is a wrong email or password; `unreachable` a network failure.
- */
-export type LoginOutcome = 'signed-in' | 'invalid' | 'unreachable';
 
 /**
  * How an `updateSessionUser` write ended.
@@ -150,12 +148,12 @@ export async function login(
       body: JSON.stringify({ email, password, remember }),
     });
   } catch {
-    return 'unreachable';
+    return { kind: 'unreachable' };
   }
-  if (!response.ok) return 'invalid';
+  if (!response.ok) return loginRefusal(response.status);
   apply((await response.json()) as SessionUser);
   invalidateDashboardMeta();
-  return 'signed-in';
+  return { kind: 'signed-in' };
 }
 
 /**
