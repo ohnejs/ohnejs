@@ -9,6 +9,7 @@ import {
   serializeTableColumnEdits,
   serializeTableColumns,
   serializeTableState,
+  sortableFieldsOf,
   sortFromOrder,
   stripEditParam,
   type TableFieldMeta,
@@ -166,6 +167,24 @@ describe('orderedSelection', () => {
   it('ignores keys marked false and never re-appends a kept entry', () => {
     deepStrictEqual(orderedSelection(['a'], { a: true, b: false }), ['a']);
     deepStrictEqual(orderedSelection(['b', 'a'], { a: true, b: true }), ['b', 'a']);
+  });
+});
+
+describe('sortableFieldsOf', () => {
+  it('offers a record field, which the wire orders by its stored reference', () => {
+    const author = field('author', { kind: 'record' });
+    deepStrictEqual(sortableFieldsOf([author]), [author]);
+  });
+
+  it('leaves out json columns, composites, and unreadable fields', () => {
+    const title = field('title');
+    const fields = [
+      title,
+      field('data', { logicalType: 'json' }),
+      field('tags', { kind: 'childMany' }),
+      field('secret', { readable: false }),
+    ];
+    deepStrictEqual(sortableFieldsOf(fields), [title]);
   });
 });
 

@@ -16,6 +16,7 @@ import {
 } from 'ohnejs/dashboard';
 import { hasKey, isEmpty, isNumber, isString, onCleanup, untracked } from 'ohnejs/utils';
 
+import { sortableFieldsOf } from './collection-table-state.ts';
 import { translationsCell } from './translations-cell.ts';
 
 /**
@@ -70,13 +71,10 @@ export function readableFields(collection: DashboardCollection): DashboardField[
 }
 
 /**
- * The collection's sortable fields.
- * A json column holds a list, which has no order to sort by.
+ * The collection's readable fields a column header can sort by.
  */
 export function sortableFields(collection: DashboardCollection): DashboardField[] {
-  return collection.fields.filter(
-    (field) => field.readable && field.kind === 'column' && field.logicalType !== 'json',
-  );
+  return sortableFieldsOf(collection.fields);
 }
 
 /**

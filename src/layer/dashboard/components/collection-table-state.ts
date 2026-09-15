@@ -158,6 +158,13 @@ function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
 }
 
 /**
+ * The readable fields a column header can sort by, in declared order.
+ */
+export function sortableFieldsOf<F extends TableFieldMeta>(fields: readonly F[]): F[] {
+  return fields.filter((field) => field.readable && sortableOf(field) !== false);
+}
+
+/**
  * The parsed, admissible entries of a `columns` spec, in order.
  * An entry is dropped when it names nothing, an unknown field, an unreadable one, or a repeat.
  * A width slot that is not a plain CSS length or percentage is dropped alone.
