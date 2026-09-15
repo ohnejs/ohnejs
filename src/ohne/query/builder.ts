@@ -900,7 +900,7 @@ interface WriteEntry<C extends CollectionName, S, P> {
   create(input: InsertInputOf<C>): Promise<CreateResult<QueryRow<C, S, P>>>;
 
   /**
-   * Creates one record and returns it, throwing a `validationError` carrying the failures instead.
+   * Creates one record and returns it, throwing an `isValidationError` error carrying the failures instead.
    *
    * @example
    * ```ts
@@ -930,7 +930,7 @@ interface UpdateMutations<C extends CollectionName, S, P> {
   update(input: UpdateInputOf<C>): Promise<UpdateResult<QueryRow<C, S, P>[]>>;
 
   /**
-   * Updates every matching record and returns them re-read, throwing a `validationError` on failure instead.
+   * Updates every matching record and returns them re-read; a failure throws an `isValidationError` error.
    *
    * @example
    * ```ts
@@ -948,6 +948,7 @@ interface UpdateMutations<C extends CollectionName, S, P> {
 interface DeleteMutation {
   /**
    * Deletes every matching record and reports how many were removed.
+   * A `restrict` reference still pointing at a matched row throws; uncaught in a handler, it is a `409`.
    *
    * @example
    * ```ts

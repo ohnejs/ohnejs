@@ -399,7 +399,7 @@ export interface UntypedQueryBuilder {
   create(input: Record<string, unknown>): Promise<CreateOutcome>;
 
   /**
-   * Creates one record and returns it, throwing a `validationError` carrying the failures instead.
+   * Creates one record and returns it, throwing an `isValidationError` error carrying the failures instead.
    *
    * @example
    * ```ts
@@ -422,7 +422,7 @@ export interface UntypedQueryBuilder {
   update(input: Record<string, unknown>): Promise<UpdateOutcome>;
 
   /**
-   * Updates every matching record and returns them re-read, throwing a `validationError` on failure instead.
+   * Updates every matching record and returns them re-read; a failure throws an `isValidationError` error.
    *
    * @example
    * ```ts
@@ -435,7 +435,7 @@ export interface UntypedQueryBuilder {
 
   /**
    * Deletes every matching record and reports how many were removed.
-   * A `restrict` reference still pointing at a matched row throws a `referenceViolation`.
+   * A `restrict` reference still pointing at a matched row throws an `isReferenceViolation` error.
    * Refused on a locale-scoped chain, which must not cascade-delete every locale.
    *
    * @example

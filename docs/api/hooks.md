@@ -21,7 +21,8 @@ hook('server:ready', async ({ host, port }) => {
 `hook(name, fn)` appends the callback to the hook's chain, and checks its signature against the
 hook's declared type - an unknown name or a wrong parameter is a compile error. Register from a
 [boot file](../project/boot.md): boot runs before the port opens, so the callback is in place for
-the first occurrence.
+the first occurrence. The read and schema hooks name their payloads `QueryIR`, `QueryRecord`, and
+`GuardReport`: import those from `ohnejs` to type a callback you declare apart from its `hook` call.
 
 When a hook fires, its callbacks run in registration order, each awaited before the next, so a mix
 of sync and async callbacks stays deterministic. Across [layers](../project/layers.md), the

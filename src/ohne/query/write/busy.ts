@@ -26,12 +26,17 @@ export function busyError(cause?: unknown): BusyError {
 }
 
 /**
- * Whether `value` is a `busyError`.
+ * Whether `value` is the retryable error a write throws while another connection keeps the database busy.
+ * An HTTP handler answers it with a `503` on its own; a script or job retries the write itself.
  *
  * @example
  * ```ts
- * isBusyError(busyError()) // -> true
- * isBusyError(new Error()) // -> false
+ * try {
+ *   await query('Posts').create({ title: 'Hello' })
+ * } catch (error) {
+ *   if (!isBusyError(error)) throw error
+ *   await query('Posts').create({ title: 'Hello' })
+ * }
  * ```
  */
 export function isBusyError(value: unknown): value is BusyError {

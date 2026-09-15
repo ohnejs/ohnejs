@@ -35,15 +35,29 @@ values, or the string a custom validator returned. A nested failure is keyed by 
 `useT` - see [messages](../i18n/messages.md).
 
 When you would rather handle failures as exceptions, `createOrThrow` returns the record directly
-and throws a `validationError` carrying the same map:
+and throws a `ValidationError` whose `errors` carries the same map:
 
 ```ts
 const post = await query('Posts').createOrThrow({ title: 'Hello' });
 ```
 
-Inside an HTTP handler you rarely catch it yourself: a thrown `validationError` becomes a `422`
+To catch it, tell it apart from any other failure with `isValidationError`, imported from `ohnejs`:
+
+```ts
+import { isValidationError, query } from 'ohnejs';
+
+try {
+  await query('Posts').createOrThrow({ title: 'Hello' });
+} catch (error) {
+  if (!isValidationError(error)) throw error;
+  error.errors; // { body: 'validation.required' }
+}
+```
+
+Inside an HTTP handler you rarely catch it yourself: the thrown error becomes a `422`
 whose body carries the errors, each resolved to display text in the request's language, and a busy
-database becomes a `503` with a `Retry-After`.
+database becomes a `503` with a `Retry-After`. Outside a handler, recognize that busy failure with
+`isBusyError` from `ohnejs` and retry the write.
 
 ## Input
 
@@ -173,8 +187,7 @@ if (result.ok) {
 }
 ```
 
-`updateOrThrow` returns the array directly and throws a `validationError` on failure, exactly as
-`createOrThrow` does.
+`updateOrThrow` returns the array directly and throws on failure, exactly as `createOrThrow` does.
 
 A `where` is required. `update` and `delete` are offered only once a filter narrows the query, so an
 unfiltered write that would touch every record can never happen by accident.
@@ -237,7 +250,8 @@ const { deleted } = await query('Posts').where('status', 'spam').delete();
 A delete cascades: a record's child rows and its relation links go with it. A `record` reference
 from elsewhere follows its own `onDelete` rule - `cascade` deletes the referencing row, `setNull`
 clears the link. A `restrict` reference still pointing at the record blocks the delete, and inside
-an HTTP handler becomes a `409`.
+an HTTP handler becomes a `409`. Outside a handler, `isReferenceViolation` from `ohnejs` recognizes
+the error the blocked delete throws.
 
 Like `update`, `delete` requires a `where`.
 

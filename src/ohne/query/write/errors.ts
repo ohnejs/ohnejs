@@ -46,12 +46,17 @@ export function validationError(errors: FieldErrors): ValidationError {
 }
 
 /**
- * Whether `value` is a `validationError`.
+ * Whether `value` is the error a write throws when its input fails validation, as `createOrThrow` does.
+ * Its `errors` maps each failing field path to a message, the same map a failed `create` returns.
  *
  * @example
  * ```ts
- * isValidationError(validationError({ title: 'required' })) // -> true
- * isValidationError(new Error('x'))                         // -> false
+ * try {
+ *   await query('Posts').createOrThrow({ title: 'Hello' })
+ * } catch (error) {
+ *   if (!isValidationError(error)) throw error
+ *   error.errors // -> { body: 'validation.required' }
+ * }
  * ```
  */
 export function isValidationError(value: unknown): value is ValidationError {
@@ -76,12 +81,16 @@ export function referenceViolation(cause?: unknown): Error {
 }
 
 /**
- * Whether `value` is a `referenceViolation`.
+ * Whether `value` is the error a `delete` throws when a `restrict` reference still points at a record.
  *
  * @example
  * ```ts
- * isReferenceViolation(referenceViolation()) // -> true
- * isReferenceViolation(new Error('x'))       // -> false
+ * try {
+ *   await query('Authors').where('UUID', uuid).delete()
+ * } catch (error) {
+ *   if (!isReferenceViolation(error)) throw error
+ *   console.warn('A post still references this author')
+ * }
  * ```
  */
 export function isReferenceViolation(value: unknown): value is Error {
