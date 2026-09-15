@@ -361,7 +361,7 @@ export interface DashboardMeta {
   collections: DashboardCollection[];
 
   /**
-   * Every block type the listed collections can reach, sorted by name.
+   * Every block type the listed collections and the account fields can reach, sorted by name.
    * A `blocks` field's `allow` resolves against this registry, nested fields included.
    */
   blocks: DashboardBlock[];
@@ -468,16 +468,17 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
   const menu = await applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
+  const account = await describeAccountFields(user);
   return {
     menu,
     collections,
-    blocks: describeBlocks(collections),
+    blocks: describeBlocks([...collections.flatMap((collection) => collection.fields), ...account]),
     roles: useRoles().keys(),
     capabilities: userCapabilities(user),
     locales,
     defaultLocale,
     languages: catalogLanguages(),
-    accountFields: await describeAccountFields(user),
+    accountFields: account,
   };
 });
 
@@ -499,14 +500,14 @@ async function describeAccountFields(user: User): Promise<DashboardField[]> {
 }
 
 /**
- * Describes every block type the listed collections can reach, following `allow` to closure.
+ * Describes every block type the root fields can reach, following `allow` to closure.
  * A block's own fields may admit further blocks, and a block may admit itself.
  * The walk is therefore a worklist over names already described, not a recursion into field trees.
  */
-function describeBlocks(collections: readonly DashboardCollection[]): DashboardBlock[] {
+function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
   const described = new Map<string, DashboardBlock>();
   const pending: string[] = [];
-  for (const collection of collections) collectAllowed(collection.fields, pending);
+  collectAllowed(roots, pending);
   while (!isEmpty(pending)) {
     const name = pending.pop() as string;
     if (described.has(name)) continue;

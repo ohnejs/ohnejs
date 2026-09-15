@@ -73,7 +73,13 @@ useFields().register('language', { name: 'language', fieldType: languageField })
 useFields().register('locale', { name: 'locale', fieldType: localeField });
 useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
 useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
-useCollections().register('Users', { name: 'Users', collection: UsersCollection });
+useCollections().register('Users', {
+  name: 'Users',
+  collection: {
+    ...UsersCollection,
+    fields: { ...UsersCollection.fields, badges: field('blocks', { allow: ['DashBadge'] }) },
+  },
+});
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
 useRoles().register('admin', { name: 'admin', role: { capabilities: ['*'] } });
@@ -188,6 +194,14 @@ useBlocks().register('DashAside', {
 useBlocks().register('DashSecret', {
   name: 'DashSecret',
   block: { fields: { code: field('text') } },
+});
+useBlocks().register('DashBadge', {
+  name: 'DashBadge',
+  block: { fields: { ribbon: field('blocks', { allow: ['DashRibbon'] }) } },
+});
+useBlocks().register('DashRibbon', {
+  name: 'DashRibbon',
+  block: { fields: { color: field('text') } },
 });
 
 useCollections().register('DashPages', {
@@ -744,6 +758,23 @@ describe('blocks', () => {
     );
     strictEqual(fields[1]?.type, 'text');
     strictEqual(fields[1]?.required, true);
+  });
+
+  it('serves the types an account field reaches when `Users` is not listed', async () => {
+    hook('auth:account-fields', (fields) => {
+      fields.push('badges');
+    });
+    try {
+      const { body } = await call(user);
+      strictEqual(names(body).includes('Users'), false);
+      deepStrictEqual(body.accountFields.at(-1)?.allow, ['DashBadge']);
+      deepStrictEqual(
+        body.blocks.map((entry) => entry.name),
+        ['DashAside', 'DashBadge', 'DashHero', 'DashRibbon'],
+      );
+    } finally {
+      useHooks().delete('auth:account-fields');
+    }
   });
 
   it('resolves `allow` on a field and on a block subfield alike', async () => {
