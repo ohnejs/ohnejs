@@ -20,6 +20,7 @@ import {
   isObject,
   isString,
   isUndefined,
+  omit,
   uniqueArray,
 } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
@@ -106,7 +107,7 @@ async function fieldSnapshot(
 ): Promise<unknown> {
   if (!isUndefined(ctx.snapshot) && hasKey(ctx.snapshot, name)) return ctx.snapshot[name];
   const subfields = meta.subfields as Record<string, FieldQueryMeta>;
-  const { snapshot: _outer, ...base } = ctx;
+  const base = omit(ctx, ['snapshot']);
   const path = fieldPath(name, ctx);
   if (meta.kind === 'childOne') {
     return itemSnapshot(subfields, value as Record<string, unknown>, { ...base, path });
@@ -175,6 +176,7 @@ export async function finishComposite(
   processScope: ProcessScope,
   snapshot?: unknown,
 ): Promise<FieldOutput> {
+  const base = omit(ctx, ['snapshot']);
   const path = fieldPath(name, ctx);
 
   if (meta.kind === 'records') {
@@ -190,7 +192,7 @@ export async function finishComposite(
   }
 
   if (meta.kind === 'blocks') {
-    return finishBlocks(name, meta, value as Record<string, unknown>[], path, ctx, processScope);
+    return finishBlocks(name, meta, value as Record<string, unknown>[], path, base, processScope);
   }
 
   const subfields = meta.subfields as Record<string, FieldQueryMeta>;
@@ -198,7 +200,7 @@ export async function finishComposite(
     if (isNull(value))
       return ctx.operation === 'update' ? { child: { meta, path, items: [] } } : {};
     const result = await processScope(subfields, value as Record<string, unknown>, {
-      ...ctx,
+      ...base,
       path,
       ...(isObject(snapshot) ? { snapshot: snapshot as Record<string, unknown> } : {}),
     });
@@ -232,7 +234,7 @@ export async function finishComposite(
     }
     const itemView = isArray(snapshot) ? snapshot[index] : undefined;
     const result = await processScope(subfields, correlated.input, {
-      ...ctx,
+      ...base,
       path: `${path}[${index}]`,
       ...(isObject(itemView) ? { snapshot: itemView as Record<string, unknown> } : {}),
     });

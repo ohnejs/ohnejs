@@ -59,7 +59,6 @@ declare module 'ohnejs' {
 
 /**
  * The pipeline's per-scope threading: where in the record tree it runs, and against which transaction.
- * A nested composite scope carries its own `path` and `input`, everything else inherited.
  */
 export interface ScopeContext {
   /**
@@ -92,6 +91,7 @@ export interface ScopeContext {
    * The scope's precomputed coerced view, set on a composite item descent; absent at the record root.
    * An absent subfield's key holds its already-resolved default, so a callback default runs once.
    * A nested composite's key holds its own precomputed view, reused instead of rebuilt.
+   * A descent never inherits it: a child without its own view resolves its absent fields afresh.
    */
   snapshot?: Record<string, unknown>;
 }
