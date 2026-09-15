@@ -81,10 +81,10 @@ useStorages().register('s3', (url) => createS3Storage(url));
 uploads: { storage: 's3', url: 's3://bucket?region=eu-central-1' },
 ```
 
-The backend never sees the database. The layer's helpers keep rows and objects in agreement, and
-every storage effect is journaled inside the transaction that changes the rows, then run after the
-commit. An effect that fails is retried at the next drain and at every boot, so a crash between
-the two never leaves a row pointing nowhere.
+The backend never sees the database. The layer's helpers record each move and delete inside the
+transaction that changes the rows and run it after the commit. A failed one is retried later and at
+every boot, so a crash never leaves a row pointing nowhere. A retry may repeat an effect that
+already ran, so `move` and `delete` must treat a missing path as a no-op.
 
 ## The collection
 
@@ -106,8 +106,24 @@ upload.url; // -> '/uploads/photos/2024/sunset.jpg'
 upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/2024/sunset.jpg'
 ```
 
-Only `read` is exposed over the collections API. Every write goes through the routes below or the
-helpers, which are the only code that moves bytes.
+Only `read` is exposed over the [collections API](../api/collections.md), and it is guarded: the
+caller needs the `collection.Uploads.read` [capability](../auth/roles.md). Every write goes through
+the routes below or the helpers, which are the only code that moves bytes.
+
+To open that read to anyone, or scope it with [`access`](../api/collections.md#access), ship your
+own `collections/Uploads.ts`. It replaces the layer's `Uploads` entirely, so spread
+`uploadsDefinition` and change only what you name:
+
+```ts
+// collections/Uploads.ts
+import { defineCollection } from 'ohnejs';
+import { uploadsDefinition } from 'ohnejs/uploads';
+
+export default defineCollection({
+  ...uploadsDefinition,
+  api: { read: 'public' },
+});
+```
 
 ## Uploading over HTTP
 
@@ -131,12 +147,13 @@ The name and directory are slugified, so the answer's `path` is `photos/sunset.j
 already taken gets a `-2` suffix. Missing folders are created on the way. The file's type comes
 from its extension and is verified against its first bytes, so a PNG named `.jpg` is a `422`; an
 SVG is sanitized before it is stored. Writes need the `collection.Uploads.*` capabilities of
-[roles](../auth/roles.md); the bytes are public.
+[roles](../auth/roles.md), and reading the records needs `collection.Uploads.read`; only the bytes
+are public.
 
 `PATCH` with `name` or `directory` renames or moves the row and its object, keeping a file's
 extension; `?locale=` addresses the alt text's locale. The upload and replace routes accept
-bodies up to `uploads.maxFileSize` and run without a handler deadline; Node's own
-`api.requestTimeout` is the ceiling for a slow connection.
+bodies up to `uploads.maxFileSize` and run without a handler deadline; `api.requestTimeout`,
+Node's 5 minutes unless you set it, is the ceiling for a slow connection.
 
 ## Serving
 
@@ -161,14 +178,18 @@ await createFolder({ directory: 'archive', name: '2027' });
 await deleteUpload(upload.UUID);
 ```
 
-`body` is a web `ReadableStream`, as `useRequest().body` hands it to you. Each helper answers the
-decorated record and throws the same errors the routes answer with. Changing `name` or
-`directory` through `query('Uploads')` directly moves no object; use `moveUpload`.
+`body` is a web `ReadableStream`, as `useRequest().body` hands it to you. Every helper throws the
+same errors the routes answer with, and each but `deleteUpload` answers the decorated record, an
+`UploadRecord`. Changing `name` or `directory` through `query('Uploads')` directly moves no object;
+use `moveUpload`.
+
+`replaceUpload(uuid, body)` swaps a file's bytes and keeps its `UUID`, path, and type, so every
+field that references it stays linked. Bytes that contradict the type are a `422`.
 
 ## The dashboard
 
 The layer ships the Media page at `/media`, with folders, drag and drop uploads, a details popup
 for alt text and the focal point, and a picker the [media fields](./fields.md) open. The sidebar
 row replaces the `Uploads` collection's own row, so a viewer who may read `Uploads` sees Media
-where the table would have been. To place it yourself, list `{ to: '/media' }` in
-[`dashboard.menu`](../dashboard/pages.md#the-sidebar).
+where the table would have been. To place it yourself, list `'Uploads'` in
+[`dashboard.menu`](../dashboard/pages.md#the-sidebar) where you want the row.

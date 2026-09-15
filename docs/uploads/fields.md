@@ -62,6 +62,12 @@ post.cover.url; // -> '/uploads/photos/sunset.jpg'
 post.cover.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 ```
 
+Over the [collections API](../api/collections.md), a media field populates only for a caller who
+may read `Uploads`, by default one holding the `collection.Uploads.read` capability. Anyone else,
+including a visitor who is not signed in, gets `null` for `image` and `file` and an empty list for
+`images` and `files`. To serve media fields to everyone,
+[open the read](./uploads.md#the-collection).
+
 For a page of your own, build a variant with `imageURL` or a `srcset` with `imageSrcSet`, from a
 [named variant](./images.md#named-variants) or ad hoc transforms:
 
