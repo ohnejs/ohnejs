@@ -76,7 +76,7 @@ declare module 'ohnejs' {
         /**
          * Named transform presets, each a set of `ImageTransforms`.
          * A name is a camelCase identifier; `thumbnail` ships, and an app redefines it by name.
-         * A redefinition replaces the preset whole, so it inherits nothing from the layer beneath.
+         * A redefinition replaces the preset whole.
          *
          * @default
          * { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } }
@@ -157,8 +157,7 @@ export interface ResolvedUploadsConfig {
 }
 
 /**
- * The uploads defaults the layer contributes through its `ohne.layer.ts`.
- * The single source `useUploadsConfig` also falls back to, so the framework's own repo resolves them too.
+ * The `Config.uploads` defaults, which `useUploadsConfig` fills in wherever config leaves a field unset.
  */
 export const UPLOADS_DEFAULTS = {
   storage: 'fs',
@@ -185,8 +184,7 @@ useEnv().define('IMAGES_SECRET', { default: undefined });
 
 /**
  * Returns the resolved uploads settings, `Config.uploads` merged over the layer defaults.
- * The merge follows `UPLOADS_STRATEGIES`, so it reads the same whether or not the layer stack is loaded.
- * Valid wherever config is, so the routes, helpers, and storage read one consistent shape.
+ * Valid wherever config is.
  */
 export function useUploadsConfig(): ResolvedUploadsConfig {
   return withDefaults(useConfig().uploads ?? {}, UPLOADS_DEFAULTS, {

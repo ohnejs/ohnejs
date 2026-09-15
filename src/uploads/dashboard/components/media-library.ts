@@ -245,11 +245,9 @@ export function mediaActionsRegistry(): MediaActions {
  *
  * Sorting by kind, media type, or folder splits the page into runs under sticky labels.
  * Only a folder has no media type, so that run reads `Folders` under either field.
- * A folder path label keeps its own case; the rest read as uppercase headings.
- * Every other order renders one plain grid.
  * A directory or query change reloads with a short debounce; the `media:refresh` trigger reloads in place.
  * A folder that no longer exists sends the view to the root.
- * After every load the page's selection clears, so a moved or deleted row never lingers as selected.
+ * A load clears the media page's selection, so no moved or deleted row lingers; a picker keeps its picks.
  * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
  * Escape clears, and Delete deletes.
  * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
@@ -522,7 +520,7 @@ export function mediaLibraryPage(route: RouteContext, actions?: MediaActions): C
 }
 
 /**
- * The page frame around a folder: view state from the URL, the memory hand-off, and the three regions.
+ * The page frame around a folder: view state from the URL, the memory hand-off, header, grid, and footer.
  */
 function mediaPage(directory: string, actions: MediaActions): Child {
   const remembered = mediaMemory.get(directory) ?? '';

@@ -41,7 +41,7 @@ export function decorateUpload(record: Record<string, unknown>): void {
  *
  * @example
  * ```ts
- * const records = await queryUntyped('Uploads').findMany()
+ * const records = [{ directory: 'photos', name: 'sunset.jpg' }, { directory: '', name: 'notes.pdf' }]
  * decorateUploads(records)
  * ```
  */

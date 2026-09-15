@@ -10,8 +10,8 @@ import {
 
 /**
  * The `422` a helper raises at one field with an `uploads.errors.*` message.
- * The key lives in the layer's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Its object is therefore not a `Message` member here; the cast bridges it.
+ * Once `KnownMessages` has keys, the object must name one of them.
+ * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
  */
 export function uploadsError(
   field: string,

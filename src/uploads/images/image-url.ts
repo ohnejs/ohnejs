@@ -59,7 +59,7 @@ const TRAILING_SLASHES = /\/+$/;
  *
  * @example
  * ```ts
- * isOptimizableImage('image/png')      // -> true
+ * isOptimizableImage('image/png')       // -> true
  * isOptimizableImage('application/pdf') // -> false
  * ```
  */
@@ -83,9 +83,7 @@ export function hasImageService(): boolean {
  * The original is answered when no service is configured or when the transforms ask for nothing.
  * It is also answered for a type the service does not render.
  * A focal point stored on the upload fills the position when a `cover` fit names none.
- * Other fits never crop, so they carry no position.
- * The signature covers `{transforms}/{path}` under the first `IMAGES_SECRET`.
- * Without a secret the segment reads `unsigned`, which only an unsigned service renders.
+ * Without an `IMAGES_SECRET` the signature reads `unsigned`, which only an unsigned service renders.
  *
  * @example
  * ```ts

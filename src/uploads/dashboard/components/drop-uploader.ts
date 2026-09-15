@@ -79,7 +79,6 @@ css`
  * A drop uploads into the folder the media library shows, or the root elsewhere.
  * A stray drop never navigates the window.
  * Dropped folders are walked and rebuilt under that folder.
- * A file without an entry still uploads, straight into that folder.
  * A drag that starts inside the page never opens the panel, so a dragged thumbnail cannot re-upload itself.
  * Clicking the panel opens the file picker; leaving it, dropping, or losing window focus dismisses it.
  */

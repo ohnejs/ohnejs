@@ -15,8 +15,8 @@ export interface MediaBreadcrumbsOptions {
   view: MediaView;
 
   /**
-   * The query string the parent links carry, read reactively; `''` carries none.
-   * The page keeps its view across folders this way, minus the page number.
+   * The query string the parent links carry, `?` included, read reactively; `''` carries none.
+   * The media page passes its own query minus `page`, so a folder change keeps its view.
    */
   search?: () => string;
 

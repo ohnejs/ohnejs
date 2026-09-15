@@ -184,7 +184,6 @@ css`
  * The drag selects it, shows the moving ghost, and arms the drop targets.
  * The checkbox toggles the selection, ranging from the last pick while the range modifier is held.
  * Once something is selected, a Shift-click on the tile's link ranges too, instead of following it.
- * A right-click hands the record to `onContextMenu`.
  */
 export function mediaItem(record: () => UploadRecord, options: MediaItemOptions): HTMLElement {
   const t = useUploadsT();

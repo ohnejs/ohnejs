@@ -78,11 +78,6 @@ export function buildTargetTree(
 
 /**
  * Whether any folder of the tree, the root included, may take the selection.
- *
- * @example
- * ```ts
- * hasValidTarget({ path: '', name: 'Root', disabled: true, children: [] }) // -> false
- * ```
  */
 export function hasValidTarget(node: TargetDirectory): boolean {
   return !node.disabled || node.children.some(hasValidTarget);

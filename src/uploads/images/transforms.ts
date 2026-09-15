@@ -129,8 +129,8 @@ const FOCAL = /^(\d(?:\.\d{1,3})?)_(\d(?:\.\d{1,3})?)$/;
  * ```ts
  * stringifyImageTransforms({ width: 800, format: 'webp' })       // -> 'w_800,f_webp'
  * stringifyImageTransforms({ width: 800, fit: 'cover', dpr: 1 }) // -> 'w_800'
- * stringifyImageTransforms({ focalPoint: { x: 0.25, y: 1 } })     // -> 'fp_0.25_1'
- * stringifyImageTransforms({})                                  // -> ''
+ * stringifyImageTransforms({ focalPoint: { x: 0.25, y: 1 } })    // -> 'fp_0.25_1'
+ * stringifyImageTransforms({})                                   // -> ''
  * ```
  */
 export function stringifyImageTransforms(transforms: ImageTransforms): string {
@@ -159,10 +159,10 @@ export function stringifyImageTransforms(transforms: ImageTransforms): string {
  *
  * @example
  * ```ts
- * parseImageTransforms('w_800,f_webp')   // -> { width: 800, format: 'webp' }
- * parseImageTransforms('fp_0.25_1')      // -> { focalPoint: { x: 0.25, y: 1 } }
- * parseImageTransforms('w_800,w_600')    // -> undefined
- * parseImageTransforms('rotate_90')      // -> undefined
+ * parseImageTransforms('w_800,f_webp') // -> { width: 800, format: 'webp' }
+ * parseImageTransforms('fp_0.25_1')    // -> { focalPoint: { x: 0.25, y: 1 } }
+ * parseImageTransforms('w_800,w_600')  // -> undefined
+ * parseImageTransforms('rotate_90')    // -> undefined
  * ```
  */
 export function parseImageTransforms(tokens: string): ImageTransforms | undefined {

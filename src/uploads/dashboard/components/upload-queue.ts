@@ -26,7 +26,7 @@ export function uploadTasks(): readonly UploadTask[] {
 }
 
 /**
- * The measured upload speed in bytes per second, `null` before the first upload sends bytes.
+ * The measured upload speed in bytes per second, `null` before the first measurement.
  * Reactive.
  */
 export function uploadSpeed(): number | null {

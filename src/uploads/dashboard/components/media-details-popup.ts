@@ -403,12 +403,10 @@ export async function loadUpload(
 }
 
 /**
- * The file details popup, deep-linked by `?details=<uuid>`.
+ * The file details popup; the media page deep-links it by `?details=<uuid>`.
  *
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
- * It opens on Details unless `tab` names another.
  * Details lists the upload time and author, the type, size, and dimensions, and the URL with a copy button.
- * The upload time reads in the user's formats, its relative wording beside it.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
  * Variants lists every named image variant with its tokens, byte size, rendered size, and a copy button.
  * That tab exists only while the record carries `variants`.

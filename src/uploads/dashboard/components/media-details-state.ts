@@ -48,13 +48,6 @@ const SMALL_PREVIEW = 480;
 
 /**
  * What the popup previews for a record, `null` when the type neither displays nor plays.
- *
- * @example
- * ```ts
- * previewKindOf(png)  // -> 'image'
- * previewKindOf(mp4)  // -> 'video'
- * previewKindOf(pdf)  // -> null
- * ```
  */
 export function previewKindOf(record: UploadRecord): DetailsPreview | null {
   if (isDisplayableImage(record)) return 'image';
@@ -67,12 +60,6 @@ export function previewKindOf(record: UploadRecord): DetailsPreview | null {
 /**
  * Whether an image is small enough to center in the preview: at most 480 pixels on both sides.
  * An unsized image never is.
- *
- * @example
- * ```ts
- * isSmallPreview({ ...png, width: 320, height: 240 })  // -> true
- * isSmallPreview({ ...png, width: 1920, height: 240 }) // -> false
- * ```
  */
 export function isSmallPreview(record: UploadRecord): boolean {
   return (
@@ -85,11 +72,6 @@ export function isSmallPreview(record: UploadRecord): boolean {
 
 /**
  * The editable details of a record, as the history stores them.
- *
- * @example
- * ```ts
- * detailsStateOf(sunset) // -> { description: 'Sunset', focalX: 0.5, focalY: 0.25 }
- * ```
  */
 export function detailsStateOf(record: UploadRecord): DetailsState {
   return { description: record.description, focalX: record.focalX, focalY: record.focalY };
@@ -101,7 +83,7 @@ export function detailsStateOf(record: UploadRecord): DetailsState {
  *
  * @example
  * ```ts
- * focalPointAt(25, 50, 100, 200) // -> { focalX: 0.25, focalY: 0.25 }
+ * focalPointAt(25, 50, 100, 200)  // -> { focalX: 0.25, focalY: 0.25 }
  * focalPointAt(-5, 300, 100, 200) // -> { focalX: 0, focalY: 1 }
  * ```
  */
@@ -129,11 +111,6 @@ export function focalPercent(fraction: number): string {
 
 /**
  * The `PATCH` body a saved state sends: the description, and the focal point when the file is an image.
- *
- * @example
- * ```ts
- * detailsPatch({ description: 'Sunset', focalX: 0.5, focalY: 0.5 }, false) // -> { description: 'Sunset' }
- * ```
  */
 export function detailsPatch(state: DetailsState, image: boolean): Record<string, unknown> {
   return image ? { ...state } : { description: state.description };

@@ -20,10 +20,11 @@ import { updateUpload } from '../../uploads/update-upload.ts';
  * `PATCH /uploads/[uuid]`
  *
  * Changes a row from `{ name?, directory?, description?, focalX?, focalY? }` and answers its final record.
- * `name` and `directory` move the row and its object; the other three change its metadata.
+ * `name` and `directory` move the row and its object; the rest change its metadata.
  * `?locale=` writes `description` at that content locale.
  * Needs `collection.Uploads.update`: no user `401`, no capability `403`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`; an unknown `UUID` a `404`.
+ * A changed extension, a folder moved into itself, a taken target, or an out-of-range value is a `422`.
  */
 export default defineHandler(async ({ params }): Promise<UploadRecord> => {
   await requireCapability('collection.Uploads.update');

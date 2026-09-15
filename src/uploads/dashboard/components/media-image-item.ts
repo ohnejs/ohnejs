@@ -248,7 +248,7 @@ export function detailsHref(record: UploadRecord, bare: boolean): string {
 /**
  * The click a file tile's link takes.
  * A plain click picks, toggles, or opens the details through `onDetails` instead of following the link.
- * Following the link re-renders the page through the router, so a modified click alone still does that.
+ * A Cmd, Ctrl, or Shift click, or a click on a tile with nothing to pick, toggle, or open, follows the link.
  */
 export function fileTileClick(
   record: () => UploadRecord,

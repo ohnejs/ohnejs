@@ -68,11 +68,6 @@ css`
 /**
  * A ring that fills clockwise from the top as `progress` climbs from `0` to `100`, the percentage inside.
  * It covers its positioned parent and sizes the ring to the smaller side, so it fits any square or circle.
- *
- * @example
- * ```ts
- * h('span', { class: 'status' }, uploadProgressCircle(() => task().progress * 100))
- * ```
  */
 export function uploadProgressCircle(
   progress: () => number,

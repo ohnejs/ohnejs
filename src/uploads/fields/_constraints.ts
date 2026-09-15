@@ -157,8 +157,8 @@ export const listOptions = {
 
 /**
  * An `uploads.errors.*` failure as its `{ key, params }` message object.
- * The keys live in the layer's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Their objects are therefore not `Message` members here; the cast bridges them.
+ * Once `KnownMessages` has keys, the object must name one of them.
+ * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
  */
 function uploadsMessage(name: string, params: Record<string, unknown>): Message {
   return { key: `uploads.errors.${name}`, params } as unknown as Message;

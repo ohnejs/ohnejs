@@ -165,14 +165,14 @@ export function constraintsOf(
 
 /**
  * The `accept` a file input takes for the field's `types`, `undefined` when it must accept everything.
- * Exact types and `image/*` wildcards pass through; the four top-level categories become wildcards.
+ * Exact types and wildcards pass through; a category that is a whole top-level type becomes its wildcard.
  * Any other category has no `accept` form, so the whole attribute drops and validation decides after upload.
  *
  * @example
  * ```ts
- * acceptOf(['image', 'application/pdf'])  // -> 'image/*,application/pdf'
- * acceptOf(['document'])                  // -> undefined
- * acceptOf(undefined)                     // -> undefined
+ * acceptOf(['image', 'application/pdf']) // -> 'image/*,application/pdf'
+ * acceptOf(['document'])                 // -> undefined
+ * acceptOf(undefined)                    // -> undefined
  * ```
  */
 export function acceptOf(types: readonly string[] | undefined): string | undefined {

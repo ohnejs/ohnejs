@@ -171,7 +171,6 @@ export function previewURL(record: UploadRecord): string {
  * Without a filter the page lists the folder's children; with one, the filter runs over its subtree.
  * A translatable `Uploads` reads at the active content locale.
  * Descriptions and the filters over them then follow the language switcher.
- * Call it inside the load effect, so a language switch reloads the page.
  */
 export function loadUploads(
   directory: string,

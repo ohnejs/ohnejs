@@ -56,7 +56,7 @@ export function resolveImageVariant(name: string): ImageTransforms {
 
 /**
  * The canonical token string of every configured variant, keyed by name.
- * A service allowlist is built from it: the values are what `IMAGES_VARIANTS` lists.
+ * A service allowlist is built from it: the reference service reads the values from `IMAGES_VARIANTS`.
  *
  * @example
  * ```ts

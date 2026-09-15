@@ -6,7 +6,7 @@ import { defineCollection, field } from 'ohnejs';
  * Storage is not transactional.
  * A helper writes the effect here, inside the transaction that changes `Uploads`.
  * A drain runs each entry against storage after the commit and deletes it once it succeeded.
- * An entry that fails waits for the next drain, and every drain replays at `server:ready`.
+ * An entry that fails waits for the next drain, and a drain also runs at `schema:synced`.
  * `UUID`s are time-ordered, so a drain ordered by `UUID` runs entries in the order they were written.
  * Never exposed over the API.
  */
