@@ -57,6 +57,8 @@ and serve routes, media fields, and the dashboard's Media page.
 - [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
 - [Media fields](./uploads/fields.md) - reference uploads from your collections.
 - [Image variants](./uploads/images.md) - signed URLs an image service renders on demand.
+- [The image service](./uploads/image-service.md) - the protocol a service follows to render
+  variants.
 
 ## HTTP API
 
