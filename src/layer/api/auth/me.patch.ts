@@ -10,9 +10,9 @@ import { isPlainObject, pick } from 'ohnejs/utils';
 
 import type { User } from '../../auth/types.ts';
 
-import { toUser } from '../../auth/_user.ts';
 import { accountFields } from '../../auth/account-fields.ts';
 import { requireUser } from '../../auth/require-user.ts';
+import { toUser } from '../../auth/to-user.ts';
 
 /**
  * `PATCH /auth/me`

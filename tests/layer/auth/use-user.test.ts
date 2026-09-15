@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import { hashSessionToken } from '../../../src/layer/auth/_token.ts';
-import { toUser, userColumns } from '../../../src/layer/auth/_user.ts';
+import { userColumns } from '../../../src/layer/auth/_user.ts';
 import { useSession } from '../../../src/layer/auth/use-session.ts';
 import { useUser } from '../../../src/layer/auth/use-user.ts';
 import SessionsCollection from '../../../src/layer/collections/Sessions.ts';
@@ -128,24 +128,7 @@ describe('useUser and useSession', () => {
   });
 });
 
-describe('toUser', () => {
-  it('projects a record that lacks the settings columns onto the defaults', () => {
-    deepStrictEqual(
-      toUser({ UUID: 'u', email: 'u@example.com', roles: ['admin'], password: 'x' }),
-      {
-        UUID: 'u',
-        email: 'u@example.com',
-        roles: ['admin'],
-        dashboardLanguage: null,
-        contentLanguage: null,
-        timezone: null,
-        dateFormat: 'LL',
-        timeFormat: 'LTS',
-        smartClipboard: false,
-      },
-    );
-  });
-
+describe('userColumns', () => {
   it('names every declared user column for a read', () => {
     deepStrictEqual(userColumns(), [
       'UUID',

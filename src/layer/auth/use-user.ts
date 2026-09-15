@@ -3,7 +3,7 @@ import { isNull, isUndefined } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 
-import { toUser } from './_user.ts';
+import { toUser } from './to-user.ts';
 import { useSession } from './use-session.ts';
 
 const cache = new WeakMap<Event, Promise<User | null>>();

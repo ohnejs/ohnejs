@@ -3,8 +3,8 @@ import { defineHandler, forbidden, queryUntyped, readJSONBody } from 'ohnejs';
 import type { User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
-import { toUser } from '../../auth/_user.ts';
 import { createSession } from '../../auth/create-session.ts';
+import { toUser } from '../../auth/to-user.ts';
 
 /**
  * `POST /auth/install`

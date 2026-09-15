@@ -6,10 +6,11 @@ import type { User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
 import { normalizeEmail } from '../../auth/_email.ts';
-import { toUser, userColumns } from '../../auth/_user.ts';
+import { userColumns } from '../../auth/_user.ts';
 import { useAuthConfig } from '../../auth/config.ts';
 import { createSession } from '../../auth/create-session.ts';
 import { dummyVerify } from '../../auth/dummy-verify.ts';
+import { toUser } from '../../auth/to-user.ts';
 
 /**
  * `POST /auth/login`
