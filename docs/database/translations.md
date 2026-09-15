@@ -136,6 +136,31 @@ satisfy it. The answered record's `_translations` lists the locale just written.
 An update that touches no translatable field changes nothing about translations: records missing
 one keep missing it.
 
+## Copying a translation
+
+When the [collections API](../api/collections.md) exposes a collection's `update`,
+`POST /collections/posts/[uuid]/translations/copy` copies a record's translatable values from one
+locale onto another, and the dashboard copies a translation through it. To change what a copy
+writes, give the collection a `copyTranslation` function. It receives the `source` record, the
+default `input`, the `sourceLocale`, and the `targetLocale`, and returns the input to write:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text', { translatable: true }),
+    published: field('boolean', { translatable: true, default: false }),
+  },
+  copyTranslation: ({ input }) => ({ ...input, published: false }),
+});
+```
+
+A copied translation now starts unpublished. Whatever the function returns, only translatable
+fields that are writable and not `immutable` write, so a copy never touches a value shared across
+locales.
+
 ## Deleting translations
 
 A locale-scoped chain swaps `delete` for `deleteTranslation`:
