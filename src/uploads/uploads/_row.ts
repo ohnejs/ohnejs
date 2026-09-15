@@ -3,15 +3,15 @@ import type { Transaction } from 'ohnejs';
 import { queryUntyped } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
-import type { UploadRecord } from './types.ts';
+import type { UploadDecorations, UploadRecord } from './types.ts';
 
 import { notFound } from '../../ohne/http/http-error.ts';
 import { decorateUpload } from './decorate.ts';
 
 /**
- * An `Uploads` row as the query layer returns it, before `decorateUpload` adds `path` and `url`.
+ * An `Uploads` row as the query layer returns it, before `decorateUpload` adds the `UploadDecorations`.
  */
-export type UploadRow = Omit<UploadRecord, 'path' | 'url' | 'variants'>;
+export type UploadRow = Omit<UploadRecord, keyof UploadDecorations>;
 
 /**
  * Reads one row by `UUID`, on `tx` when the caller holds one, or throws the `404`.

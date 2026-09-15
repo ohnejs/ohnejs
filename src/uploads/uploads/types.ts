@@ -1,7 +1,30 @@
 /**
+ * The fields every `Uploads` read adds to the stored columns.
+ */
+export interface UploadDecorations<Variant extends string = string> {
+  /**
+   * The location, `directory` and `name` joined: `photos/2024/sunset.jpg`.
+   */
+  path: string;
+
+  /**
+   * Where the bytes are served from: the configured `publicURL` origin, else the backend's own URL.
+   * Without either, it is the API's `/uploads/<path>`.
+   * Absent on a folder, which has no bytes.
+   */
+  url?: string;
+
+  /**
+   * One signed image service URL per configured variant, keyed by name.
+   * Present only for an optimizable image when a service is configured.
+   */
+  variants?: Record<Variant, string>;
+}
+
+/**
  * An `Uploads` record as every read returns it, decorations included.
  */
-export interface UploadRecord {
+export interface UploadRecord extends UploadDecorations {
   /**
    * The record's `UUID`.
    */
@@ -76,21 +99,4 @@ export interface UploadRecord {
    * When the row last changed, in epoch milliseconds.
    */
   _updatedAt: number;
-
-  /**
-   * The location, `directory` and `name` joined: `photos/2024/sunset.jpg`.
-   */
-  path: string;
-
-  /**
-   * Where the bytes are served from: the configured `publicURL` origin, else the API's `/uploads/<path>`.
-   * Absent on a folder, which has no bytes.
-   */
-  url?: string;
-
-  /**
-   * One signed image service URL per configured variant, keyed by name.
-   * Present only for an optimizable image when a service is configured.
-   */
-  variants?: Record<string, string>;
 }
