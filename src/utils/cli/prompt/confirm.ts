@@ -90,6 +90,9 @@ export function confirmDefinition(options: ConfirmOptions): PromptDefinition<boo
   };
 }
 
+/**
+ * Draws one choice, a cyan dot when selected, dimmed otherwise.
+ */
 function radio(selected: boolean, label: string, colors: ANSIColors): string {
   return selected ? `${colors.cyan('●')} ${label}` : colors.dim(`○ ${label}`);
 }

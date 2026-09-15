@@ -64,22 +64,37 @@ class Failure {
   }
 }
 
+/**
+ * Aborts the parse with a `Failure` that `parseCondition` turns into its error result.
+ */
 function fail(code: ConditionError['code'], path: string, key?: string): never {
   throw new Failure(isUndefined(key) ? { code, path } : { code, path, key });
 }
 
+/**
+ * Appends `key` to a dot path, with no dot after the empty root.
+ */
 function join(path: string, key: string): string {
   return path === '' ? key : `${path}.${key}`;
 }
 
+/**
+ * Whether `value` is a string, a number other than `NaN`, or a boolean.
+ */
 function isScalar(value: unknown): value is string | number | boolean {
   return isString(value) || isNumber(value) || isBoolean(value);
 }
 
+/**
+ * Whether `key` is an own key of `compareOperators`, so inherited names like `toString` never count.
+ */
 function isCompareOperator(key: string): key is CompareOperator {
   return hasKey(compareOperators, key);
 }
 
+/**
+ * Splits a field key into an optional `/`, one `..` per leading `../`, then dot parts; an empty part fails.
+ */
 function fieldPath(key: string, path: string): string[] {
   const segments: string[] = [];
   let rest = key;
@@ -99,12 +114,18 @@ function fieldPath(key: string, path: string): string[] {
   return segments;
 }
 
+/**
+ * Negates a node by De Morgan: groups swap `and` and `or` over negated children, leaves flip `negated`.
+ */
 function negate(node: ConditionNode): ConditionNode {
   if (node.kind === 'and') return { kind: 'or', nodes: node.nodes.map(negate) };
   if (node.kind === 'or') return { kind: 'and', nodes: node.nodes.map(negate) };
   return { ...node, negated: !node.negated };
 }
 
+/**
+ * Builds a compare leaf once `value` fits the operator's value kind; `null` equality fails.
+ */
 function compareLeaf(
   op: CompareOperator,
   value: unknown,
@@ -135,6 +156,9 @@ function compareLeaf(
   return { kind: 'compare', path: field, op, value, negated: false };
 }
 
+/**
+ * Parses a field's comparison object, ANDing its operators and ORing that group with each `or` alternative.
+ */
 function parseComparison(
   input: unknown,
   field: readonly string[],
@@ -190,6 +214,9 @@ function parseComparison(
   return branches.length === 1 ? branches[0] : { kind: 'or', nodes: branches };
 }
 
+/**
+ * Parses a condition object, ANDing its field and group keys; a single part stands alone.
+ */
 function parseWhere(input: unknown, path: string, depth: number, maxDepth: number): ConditionNode {
   if (depth > maxDepth) fail('tooDeep', path);
   if (!isPlainObject(input)) fail('invalidShape', path);

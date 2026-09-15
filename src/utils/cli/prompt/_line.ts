@@ -8,21 +8,84 @@ import { isUndefined } from '../../is/is-undefined.ts';
  * Indices count code points, so astral characters move and delete as one unit.
  */
 export interface LineEditor {
+  /**
+   * The current text.
+   */
   value: string;
+
+  /**
+   * Caret position in code points, from `0` to the end of `value`.
+   */
   cursor: number;
+
+  /**
+   * Inserts `str` at the caret and moves the caret past it.
+   */
   insert(str: string): void;
+
+  /**
+   * Replaces the whole line and parks the caret at the end.
+   */
   set(value: string): void;
+
+  /**
+   * Moves the caret one character left, stopping at the start.
+   */
   charLeft(): void;
+
+  /**
+   * Moves the caret one character right, stopping at the end.
+   */
   charRight(): void;
+
+  /**
+   * Moves the caret to the start of the current or previous word.
+   */
   wordLeft(): void;
+
+  /**
+   * Moves the caret to the end of the current or next word.
+   */
   wordRight(): void;
+
+  /**
+   * Moves the caret before the first character.
+   */
   lineStart(): void;
+
+  /**
+   * Moves the caret after the last character.
+   */
   lineEnd(): void;
+
+  /**
+   * Deletes the character before the caret.
+   */
   deleteCharLeft(): void;
+
+  /**
+   * Deletes the character under the caret.
+   */
   deleteCharRight(): void;
+
+  /**
+   * Deletes back to the start of the current or previous word.
+   */
   deleteWordLeft(): void;
+
+  /**
+   * Deletes forward to the end of the current or next word, leaving the caret in place.
+   */
   deleteWordRight(): void;
+
+  /**
+   * Deletes from the start of the line to the caret.
+   */
   deleteToStart(): void;
+
+  /**
+   * Deletes from the caret to the end of the line.
+   */
   deleteToEnd(): void;
 }
 
@@ -195,6 +258,9 @@ export function isPrintable(str: string | undefined): boolean {
   return true;
 }
 
+/**
+ * Returns the `[start, end)` range of a line to show so the caret stays within `width` columns.
+ */
 function caretWindow(length: number, cursor: number, width: number | undefined): [number, number] {
   if (isUndefined(width) || length + 1 <= width) return [0, length];
   const visible = Math.max(0, width - 1);
@@ -203,6 +269,9 @@ function caretWindow(length: number, cursor: number, width: number | undefined):
   return [start, Math.min(length, start + visible)];
 }
 
+/**
+ * Returns where a backward word move lands: past any boundaries, then to the start of the word.
+ */
 function prevWord(chars: string[], cursor: number, isStop: (char: string) => boolean): number {
   let i = cursor;
   while (i > 0 && isStop(chars[i - 1])) i -= 1;
@@ -210,6 +279,9 @@ function prevWord(chars: string[], cursor: number, isStop: (char: string) => boo
   return i;
 }
 
+/**
+ * Returns where a forward word move lands: past any boundaries, then to the end of the word.
+ */
 function nextWord(chars: string[], cursor: number, isStop: (char: string) => boolean): number {
   let i = cursor;
   while (i < chars.length && isStop(chars[i])) i += 1;
@@ -217,6 +289,9 @@ function nextWord(chars: string[], cursor: number, isStop: (char: string) => boo
   return i;
 }
 
+/**
+ * Whether `char` is a space or a tab.
+ */
 function isSpace(char: string): boolean {
   return char === ' ' || char === '\t';
 }

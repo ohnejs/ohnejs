@@ -77,6 +77,9 @@ export function onCleanup(fn: () => void): void {
   if (!isNull(scope)) scope.cleanups.push(fn);
 }
 
+/**
+ * Disposes `scope` once: stops its effects, runs its cleanups, disposes its children, then detaches it.
+ */
 function disposeScope(scope: Scope): void {
   if (!scope.active) return;
   scope.active = false;
@@ -89,6 +92,9 @@ function disposeScope(scope: Scope): void {
   detach(scope);
 }
 
+/**
+ * Swaps the last sibling into the slot of `scope` to detach it in O(1), unless the parent is disposing.
+ */
 function detach(scope: Scope): void {
   const parent = scope.parent;
   if (isNull(parent) || !parent.active) return;

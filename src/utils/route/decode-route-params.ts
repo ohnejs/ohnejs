@@ -20,6 +20,9 @@ export function decodeRouteParams(params: RouteParams): RouteParams {
   return out;
 }
 
+/**
+ * URI-decodes a string, returning it unchanged when a percent-sequence is malformed.
+ */
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);

@@ -88,6 +88,9 @@ export function selectDefinition<T>(options: SelectOptions<T>): PromptDefinition
   };
 }
 
+/**
+ * Draws one option, a cyan dot and its hint when active, dimmed otherwise.
+ */
 function row<T>(option: SelectOption<T>, active: boolean, colors: ANSIColors): string {
   const label = optionLabel(option);
   if (!active) return colors.dim(`○ ${label}`);

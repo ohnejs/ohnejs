@@ -27,6 +27,9 @@ const VALUE_STOP = ',]}';
 
 const DEFAULT_MAX_DEPTH = 32;
 
+/**
+ * Sets `key` as an own enumerable property, so a `__proto__` key stays data, never the prototype.
+ */
 function assign(
   obj: { [key: string]: SearchParamValue },
   key: string,
@@ -35,6 +38,9 @@ function assign(
   Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
 }
 
+/**
+ * URI-decodes a string, returning it unchanged when a percent-sequence is malformed.
+ */
 function decode(raw: string): string {
   try {
     return decodeURIComponent(raw);
@@ -43,6 +49,9 @@ function decode(raw: string): string {
   }
 }
 
+/**
+ * Reads a token up to a `stop` character; a leading backtick keeps it a string, anything else is coerced.
+ */
 function parseScalar(cur: Cursor, stop: string): SearchParamValue {
   const start = cur.pos;
   while (cur.pos < cur.src.length && !stop.includes(cur.src[cur.pos])) cur.pos++;
@@ -51,6 +60,9 @@ function parseScalar(cur: Cursor, stop: string): SearchParamValue {
   return coerceToken(decode(token));
 }
 
+/**
+ * Reads an object key up to the next `:`, throwing when none follows.
+ */
 function parseKey(cur: Cursor): string {
   const start = cur.pos;
   while (cur.pos < cur.src.length && cur.src[cur.pos] !== ':') cur.pos++;
@@ -75,6 +87,9 @@ function parseFlat(cur: Cursor, stop: string): string {
   return decode(cur.src.slice(start, cur.pos));
 }
 
+/**
+ * Parses a `[...]` array from its opening bracket; a missing `,` or `]` throws.
+ */
 function parseArray(cur: Cursor, depth: number): SearchParamValue[] {
   cur.pos++;
   const arr: SearchParamValue[] = [];
@@ -90,6 +105,9 @@ function parseArray(cur: Cursor, depth: number): SearchParamValue[] {
   }
 }
 
+/**
+ * Parses a `{...}` object from its opening brace; a missing `,` or `}` throws.
+ */
 function parseObject(cur: Cursor, depth: number): SearchParamValue {
   cur.pos++;
   const obj: { [key: string]: SearchParamValue } = {};
@@ -107,6 +125,9 @@ function parseObject(cur: Cursor, depth: number): SearchParamValue {
   }
 }
 
+/**
+ * Parses the value at the cursor, handing a structure past `maxDepth` to `parseFlat` as raw text.
+ */
 function parseValue(cur: Cursor, stop: string, depth: number): SearchParamValue {
   const ch = cur.src[cur.pos];
   if (ch !== '[' && ch !== '{') return parseScalar(cur, stop);
@@ -114,6 +135,9 @@ function parseValue(cur: Cursor, stop: string, depth: number): SearchParamValue 
   return ch === '[' ? parseArray(cur, depth) : parseObject(cur, depth);
 }
 
+/**
+ * Parses one query value whole, falling back to its decoded text when malformed or followed by stray input.
+ */
 function parseTopValue(raw: string, maxDepth: number): SearchParamValue {
   if (raw === '') return '';
   const cur: Cursor = { src: raw, pos: 0, maxDepth };

@@ -1,11 +1,22 @@
 import { scrypt } from 'node:crypto';
 
 /**
- * scrypt cost parameters: CPU/memory cost, block size, and parallelization.
+ * scrypt cost parameters.
  */
 export interface ScryptParams {
+  /**
+   * The scrypt CPU/memory cost; must be a power of two.
+   */
   cost: number;
+
+  /**
+   * The scrypt block size.
+   */
   blockSize: number;
+
+  /**
+   * The scrypt parallelization factor.
+   */
   parallelization: number;
 }
 

@@ -138,6 +138,9 @@ export function resolveArgs<const S extends ArgsSchema>(
   return { ok: true, values: values as ResolvedArgs<S>, positionals: parsed.positionals };
 }
 
+/**
+ * Returns the raw value given for `name`, checking its key spellings before its aliases.
+ */
 function pickRaw(
   flags: Record<string, string | boolean | Array<string | boolean>>,
   name: string,
@@ -157,6 +160,9 @@ function pickRaw(
   return undefined;
 }
 
+/**
+ * Coerces a raw flag value to the arg's type, or returns a printable error message.
+ */
 function coerceValue(
   def: ArgSchema,
   raw: string | boolean,

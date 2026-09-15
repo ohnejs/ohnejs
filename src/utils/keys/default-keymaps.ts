@@ -117,6 +117,9 @@ export function redoKeymap(run: KeyCommand): Keymap {
   };
 }
 
+/**
+ * Binds `key` with `alt` on macOS and `ctrl` on Windows and Linux, the word-motion modifiers there.
+ */
 function wordChord(key: string, run: KeyCommand): Keymap {
   return {
     [`alt+${key}`]: { run, platforms: ['mac'] },

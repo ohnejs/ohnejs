@@ -166,6 +166,9 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   let matches = complete(editor.value);
   let current: PromptState<string>;
 
+  /**
+   * Lists `dir` as completion entries, cached per directory and empty when it cannot be read.
+   */
   function read(dir: string): PathEntry[] {
     const hit = cache.get(dir);
     if (!isUndefined(hit)) return hit;
@@ -181,6 +184,9 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
     return entries;
   }
 
+  /**
+   * Fuzzy-matches the typed value's last segment against its directory's entries, best first.
+   */
   function complete(value: string): Match[] {
     const fragment = endsWithSep(value) ? '' : basename(value);
     const prefix = value.slice(0, value.length - fragment.length);
@@ -198,6 +204,9 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
     return scored.sort((a, b) => rank(a, b, fragment));
   }
 
+  /**
+   * Whether an entry passes `only`, `ext`, and `filter`; directories always pass for navigation.
+   */
   function keep(entry: PathEntry): boolean {
     if (entry.type === 'directory') return true;
     if (options.only === 'directory') return false;
@@ -321,6 +330,9 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   };
 }
 
+/**
+ * Renders the completion rows, or a dim `no matches` row when there are none.
+ */
 function listBody(
   matches: Match[],
   cursor: number,
@@ -339,6 +351,9 @@ function listBody(
   );
 }
 
+/**
+ * Draws one completion with its matched characters marked and a trailing `/` on a directory.
+ */
 function row(match: Match, active: boolean, colors: ANSIColors): string {
   const { entry } = match;
   const name = entry.type === 'directory' ? `${entry.name}/` : entry.name;
@@ -348,6 +363,9 @@ function row(match: Match, active: boolean, colors: ANSIColors): string {
   return active ? `${colors.cyan('●')} ${label}` : `${colors.dim('○')} ${label}`;
 }
 
+/**
+ * Styles each character of `name` with `mark` at the matched `positions` and `base` elsewhere.
+ */
 function highlight(
   name: string,
   positions: number[],
@@ -365,23 +383,35 @@ function highlight(
   return out;
 }
 
+/**
+ * Orders matches by descending score, falling back to `byKind` on a tie or an empty fragment.
+ */
 function rank(a: Match, b: Match, fragment: string): number {
   if (fragment === '') return byKind(a.entry, b.entry);
   if (a.score !== b.score) return b.score - a.score;
   return byKind(a.entry, b.entry);
 }
 
+/**
+ * Sorts directories before files, then by case-insensitive name.
+ */
 function byKind(a: PathEntry, b: PathEntry): number {
   if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
   return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1;
 }
 
+/**
+ * Builds a completion entry for a dirent, or `undefined` when it is neither file nor directory.
+ */
 function entryOf(dirent: Dirent, dir: string): PathEntry | undefined {
   const path = joinPath(dir, dirent.name);
   const type = kindOf(dirent, path);
   return isUndefined(type) ? undefined : { name: dirent.name, path, type };
 }
 
+/**
+ * Classifies a dirent as file or directory, resolving a symlink through its target.
+ */
 function kindOf(dirent: Dirent, path: string): 'file' | 'directory' | undefined {
   if (dirent.isDirectory()) return 'directory';
   if (dirent.isFile()) return 'file';
@@ -389,6 +419,9 @@ function kindOf(dirent: Dirent, path: string): 'file' | 'directory' | undefined 
   return undefined;
 }
 
+/**
+ * Stats `path`, reporting a failed stat as `exists: false` and any non-directory as a file.
+ */
 function inspect(path: string): { exists: boolean; type?: 'file' | 'directory' } {
   try {
     const stats = statSync(path);
@@ -398,10 +431,16 @@ function inspect(path: string): { exists: boolean; type?: 'file' | 'directory' }
   }
 }
 
+/**
+ * Collects extensions into a set, each with its leading dot.
+ */
 function normalizeExts(ext: string | string[]): Set<string> {
   return new Set(toArray(ext).map((value) => (value.startsWith('.') ? value : `.${value}`)));
 }
 
+/**
+ * Whether `value` ends in a `/` or `\` separator.
+ */
 function endsWithSep(value: string): boolean {
   return value.endsWith('/') || value.endsWith('\\');
 }

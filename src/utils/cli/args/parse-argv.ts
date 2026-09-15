@@ -139,22 +139,37 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
   return { positionals, flags };
 }
 
+/**
+ * Whether a bare flag consumes `next`, true only when it is unlisted and `next` is a non-flag token.
+ */
 function consumesNext(listed: boolean, next: string | undefined): boolean {
   return !listed && !isUndefined(next) && !isFlag(next);
 }
 
+/**
+ * Sets each character in `chars` to `true` as its own flag.
+ */
 function expandShort(chars: string, assign: (name: string, value: boolean) => void): void {
   for (const char of chars) assign(char, true);
 }
 
+/**
+ * Whether `token` is a flag; a lone `-` and a negative number are not.
+ */
 function isFlag(token: string): boolean {
   return token.length > 1 && token[0] === '-' && !isNegativeNumber(token);
 }
 
+/**
+ * Whether `token` is a single-dash cluster, not a `--` flag, a lone `-`, or a negative number.
+ */
 function isShortFlag(token: string): boolean {
   return token[0] === '-' && token.length > 1 && token[1] !== '-' && !isNegativeNumber(token);
 }
 
+/**
+ * Whether `token` reads as a negative number: a dash followed by a digit.
+ */
 function isNegativeNumber(token: string): boolean {
   return /^-\d/.test(token);
 }

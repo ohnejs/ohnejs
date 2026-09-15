@@ -11,6 +11,9 @@ export type JSONReplacer =
   | ((this: unknown, key: string, value: unknown) => unknown)
   | (string | number)[];
 
+/**
+ * Copies `value` with plain-object keys sorted at every depth; arrays keep their element order.
+ */
 function sortKeys(value: unknown): unknown {
   if (isArray(value)) return value.map(sortKeys);
 

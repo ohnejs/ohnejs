@@ -5,6 +5,9 @@ import { isNull } from '../is/is-null.ts';
 
 type LeafNode = Extract<ConditionNode, { negated: boolean }>;
 
+/**
+ * Sets `key` as an own enumerable property, so a `__proto__` key stays data, never the prototype.
+ */
 function assign(
   obj: { [key: string]: SearchParamValue },
   key: string,
@@ -13,6 +16,9 @@ function assign(
   Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
 }
 
+/**
+ * Joins path segments back into a field key, the inverse of how `parseCondition` splits one.
+ */
 function joinField(path: readonly string[]): string {
   let out = '';
   let index = 0;
@@ -27,6 +33,9 @@ function joinField(path: readonly string[]): string {
   return out + path.slice(index).join('.');
 }
 
+/**
+ * Serializes a leaf's entry: the bare scalar for an un-negated `equalsTo`, else an operator object.
+ */
 function entryOf(node: LeafNode): SearchParamValue {
   if (node.kind === 'compare' && node.op === 'equalsTo' && !node.negated) {
     return node.value as SearchParamValue;

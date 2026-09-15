@@ -32,6 +32,9 @@ export function dotFlatten(
   return result;
 }
 
+/**
+ * Writes each leaf of `value` into `result` under its path from `prefix`, skipping prototype-polluting keys.
+ */
 function flattenInto(value: unknown, prefix: string, result: Record<string, unknown>): void {
   if (isArray(value)) {
     if (value.length === 0) {

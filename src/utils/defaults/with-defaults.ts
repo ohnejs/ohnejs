@@ -101,6 +101,9 @@ export function withDefaults(
 
 const POISONED = new Set(['__proto__', 'constructor', 'prototype']);
 
+/**
+ * Resolves `input` against `defaults` at `path`, under the strategy set for that path or the default merge.
+ */
 function apply(
   input: unknown,
   defaults: unknown,
@@ -153,6 +156,9 @@ function apply(
   return input;
 }
 
+/**
+ * The own keys of both objects, `input`'s first, minus `__proto__`, `constructor`, and `prototype`.
+ */
 function unionKeys(input: Record<string, unknown>, defaults: Record<string, unknown>): Set<string> {
   const keys = new Set<string>();
   for (const k of Object.keys(input)) if (!POISONED.has(k)) keys.add(k);
@@ -160,6 +166,9 @@ function unionKeys(input: Record<string, unknown>, defaults: Record<string, unkn
   return keys;
 }
 
+/**
+ * Keys the strategies by canonical path, so an invalid path throws before any merging starts.
+ */
 function normaliseStrategies(
   raw: Record<string, WithDefaultsStrategy> | undefined,
 ): Map<string, WithDefaultsStrategy> {
@@ -169,6 +178,9 @@ function normaliseStrategies(
   return map;
 }
 
+/**
+ * Parses `path` and reprints it in the `a.b[0].c` form `apply` builds as it descends.
+ */
 function canonicalise(path: string): string {
   const segments = parseDotNotation(path);
   let out = '';

@@ -71,6 +71,9 @@ export class MessageFormatError extends Error {
   }
 }
 
+/**
+ * Resolves an offset, clamped into the template, to its 1-indexed line and column and a caret snippet.
+ */
 function locate(
   template: string,
   position: number,

@@ -134,6 +134,9 @@ export function createEnvRegistry<E extends object>(): EnvRegistry<E> {
   const version = ref(0);
   let filled: readonly string[] = [];
 
+  /**
+   * Returns the reactive override slot for `name`, creating an empty one on first use.
+   */
   function slot(name: string): Ref<Slot> {
     let s = slots.get(name);
     if (isUndefined(s)) {

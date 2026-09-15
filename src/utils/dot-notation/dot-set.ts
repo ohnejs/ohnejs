@@ -50,6 +50,9 @@ export function dotSet(value: unknown, path: string, newValue: unknown): unknown
   return setRecursive(value, segments, 0, newValue);
 }
 
+/**
+ * Copies `current` with `newValue` at `segments[index]` onward, creating or replacing containers to fit.
+ */
 function setRecursive(
   current: unknown,
   segments: DotNotationSegment[],

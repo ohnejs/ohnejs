@@ -130,6 +130,9 @@ export function parseEnv(text: string): Record<string, string> {
   return result;
 }
 
+/**
+ * Skips a closing quote's trailing whitespace or comment to the line end, throwing on any other text.
+ */
 function expectLineEnd(text: string, i: number, key: string): number {
   const len = text.length;
   while (i < len && (text[i] === ' ' || text[i] === '\t' || text[i] === '\r')) i++;

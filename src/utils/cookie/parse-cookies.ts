@@ -1,7 +1,13 @@
+/**
+ * Defines `key` as an own enumerable property, so a `__proto__` key cannot reach the prototype.
+ */
 function assign(out: Record<string, string>, key: string, value: string): void {
   Object.defineProperty(out, key, { value, writable: true, enumerable: true, configurable: true });
 }
 
+/**
+ * Percent-decodes `raw`, or returns it unchanged when its escapes are malformed.
+ */
 function decode(raw: string): string {
   try {
     return decodeURIComponent(raw);

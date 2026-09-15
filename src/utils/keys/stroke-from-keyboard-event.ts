@@ -6,10 +6,29 @@ import { isString } from '../is/is-string.ts';
  * The subset of a browser `KeyboardEvent` a `KeyStroke` is built from.
  */
 export interface KeyboardEventLike {
+  /**
+   * The key value in `KeyboardEvent.key` form: `'a'`, `'Enter'`, `'ArrowLeft'`, `' '`.
+   */
   key: string;
+
+  /**
+   * Whether the Control key was held.
+   */
   ctrlKey: boolean;
+
+  /**
+   * Whether the Alt (Option on macOS) key was held.
+   */
   altKey: boolean;
+
+  /**
+   * Whether the Shift key was held.
+   */
   shiftKey: boolean;
+
+  /**
+   * Whether the Meta (Command on macOS, the Windows key elsewhere) key was held.
+   */
   metaKey: boolean;
 }
 

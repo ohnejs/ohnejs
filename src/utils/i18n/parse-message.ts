@@ -56,6 +56,9 @@ export function parseMessage(template: string): MessageAST {
   return ast;
 }
 
+/**
+ * Parses nodes until an unmatched `}` or the end, leaving the cursor on the `}`; a top-level `}` throws.
+ */
 function parseBody(c: Cursor, inPluralBody: boolean, topLevel: boolean): MessageAST {
   const nodes: MessageNode[] = [];
   let literal = '';
@@ -101,6 +104,9 @@ function parseBody(c: Cursor, inPluralBody: boolean, topLevel: boolean): Message
   return nodes;
 }
 
+/**
+ * Consumes a `'` and returns what it stands for: `'` for a doubled or lone quote, else the quoted span.
+ */
 function readQuoted(c: Cursor, inPluralBody: boolean): string {
   c.pos++;
 
@@ -136,6 +142,9 @@ function readQuoted(c: Cursor, inPluralBody: boolean): string {
   return out;
 }
 
+/**
+ * Parses an argument from its opening `{`; an unknown or unsupported type throws.
+ */
 function parseArgument(c: Cursor, inPluralBody: boolean): MessageNode {
   c.pos++;
   skipWhitespace(c);
@@ -195,6 +204,9 @@ function parseArgument(c: Cursor, inPluralBody: boolean): MessageNode {
   }
 }
 
+/**
+ * Parses the rest of a `number`, `date`, or `time` argument; an empty style reads as `null`.
+ */
 function parseSimpleArg(c: Cursor, name: string, type: 'number' | 'date' | 'time'): MessageNode {
   skipWhitespace(c);
 
@@ -217,6 +229,9 @@ function parseSimpleArg(c: Cursor, name: string, type: 'number' | 'date' | 'time
   return { kind: type, name, style };
 }
 
+/**
+ * Parses the rest of a `plural` or `selectordinal` argument, which must declare an `other` case.
+ */
 function parsePlural(c: Cursor, name: string, ordinal: boolean): MessagePluralNode {
   const argStart = c.pos;
   skipWhitespace(c);
@@ -262,6 +277,9 @@ function parsePlural(c: Cursor, name: string, ordinal: boolean): MessagePluralNo
   return { kind: 'plural', name, ordinal, offset, cases };
 }
 
+/**
+ * Parses the rest of a `select` argument, which must declare an `other` case.
+ */
 function parseSelect(c: Cursor, name: string, inPluralBody: boolean): MessageSelectNode {
   const argStart = c.pos;
   skipWhitespace(c);
@@ -292,6 +310,9 @@ function parseSelect(c: Cursor, name: string, inPluralBody: boolean): MessageSel
   return { kind: 'select', name, cases };
 }
 
+/**
+ * Reads an optional `offset:N` prefix, `0` when absent.
+ */
 function readOffset(c: Cursor): number {
   if (!c.src.startsWith('offset:', c.pos)) return 0;
 
@@ -307,6 +328,9 @@ function readOffset(c: Cursor): number {
   return Number(raw);
 }
 
+/**
+ * Reads an optionally negative decimal, returning its text, or `null` with the cursor left in place.
+ */
 function readNumber(c: Cursor): string | null {
   const start = c.pos;
   if (c.src[c.pos] === '-') c.pos++;
@@ -326,6 +350,9 @@ function readNumber(c: Cursor): string | null {
   return c.src.slice(start, c.pos);
 }
 
+/**
+ * Reads one plural case: an `=N` exact or a keyword, then its `{...}` body, where `#` is a `pound` node.
+ */
 function readPluralCase(c: Cursor): MessagePluralCase {
   let keyword: string;
   let exact: number | null = null;
@@ -363,6 +390,9 @@ function readPluralCase(c: Cursor): MessagePluralCase {
   return { keyword, exact, body };
 }
 
+/**
+ * Reads one select case: a keyword, then its `{...}` body.
+ */
 function readSelectCase(c: Cursor, inPluralBody: boolean): MessageSelectCase {
   const start = c.pos;
   const keyword = readName(c);
@@ -384,6 +414,9 @@ function readSelectCase(c: Cursor, inPluralBody: boolean): MessageSelectCase {
   return { keyword, body };
 }
 
+/**
+ * Advances to the `}` closing an argument style, stepping over quoted spans and balanced braces.
+ */
 function skipStyle(c: Cursor): void {
   while (c.pos < c.src.length) {
     const ch = c.src[c.pos]!;
@@ -434,24 +467,39 @@ function skipStyle(c: Cursor): void {
   }
 }
 
+/**
+ * Advances the cursor to the next non-whitespace character or the end.
+ */
 function skipWhitespace(c: Cursor): void {
   while (c.pos < c.src.length && isWhitespace(c.src.charCodeAt(c.pos))) c.pos++;
 }
 
+/**
+ * Reads a run of name characters at the cursor, `''` when none.
+ */
 function readName(c: Cursor): string {
   const start = c.pos;
   while (c.pos < c.src.length && isNameChar(c.src.charCodeAt(c.pos))) c.pos++;
   return c.src.slice(start, c.pos);
 }
 
+/**
+ * Whether `code` can sit in an argument name, type, or case keyword.
+ */
 function isNameChar(code: number): boolean {
   return !NAME_STOP.has(code);
 }
 
+/**
+ * Whether `code` is an ASCII digit.
+ */
 function isDigit(code: number): boolean {
   return code >= 0x30 && code <= 0x39;
 }
 
+/**
+ * Whether `code` is a space, tab, `\n`, or `\r`.
+ */
 function isWhitespace(code: number): boolean {
   return code === 0x20 || code === 0x09 || code === 0x0a || code === 0x0d;
 }

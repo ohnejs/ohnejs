@@ -62,10 +62,16 @@ export function messageParamTypesAST(ast: MessageAST): Record<string, MessagePar
   return params;
 }
 
+/**
+ * Records into `params` the type each node in `nodes` implies.
+ */
 function walk(nodes: MessageAST, params: Record<string, MessageParamType>): void {
   for (const node of nodes) walkNode(node, params);
 }
 
+/**
+ * Records the type one node implies for its parameter, then walks plural and select case bodies.
+ */
 function walkNode(node: MessageNode, params: Record<string, MessageParamType>): void {
   switch (node.kind) {
     case 'literal':
@@ -100,6 +106,9 @@ function walkNode(node: MessageNode, params: Record<string, MessageParamType>): 
   }
 }
 
+/**
+ * Stores a parameter's type, narrowing it against an earlier use; uses with no common type throw.
+ */
 function record(
   params: Record<string, MessageParamType>,
   name: string,
@@ -120,6 +129,9 @@ function record(
   params[name] = merged;
 }
 
+/**
+ * Returns the type satisfying both uses, or `null` when none does; two choices merge their options.
+ */
 function narrow(a: MessageParamType, b: MessageParamType): MessageParamType | null {
   if (a.kind === 'choice' && b.kind === 'choice') {
     return { kind: 'choice', options: uniqueArray([...a.options, ...b.options]) };

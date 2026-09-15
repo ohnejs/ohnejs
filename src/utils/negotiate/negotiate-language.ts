@@ -44,6 +44,9 @@ export function negotiateLanguage(
   return best;
 }
 
+/**
+ * The `q` of the most specific range matching `offer`, or `0` when no range matches.
+ */
 function qualityOf(offer: string, ranges: AcceptEntry[]): number {
   let best = -1;
   let q = 0;
@@ -57,6 +60,9 @@ function qualityOf(offer: string, ranges: AcceptEntry[]): number {
   return q;
 }
 
+/**
+ * How closely `range` matches `offer`: `2` exact, `1` a range extending `offer`, `0` for `*`, `-1` no match.
+ */
 function specificity(offer: string, range: string): number {
   if (range === '*') return 0;
   if (offer === range) return 2;

@@ -13,10 +13,29 @@ const SHOW_CURSOR = '\x1b[?25h';
  * A decoded keypress, as produced by `node:readline`.
  */
 export interface Key {
+  /**
+   * Key name, such as `return`, `up`, or `a`.
+   */
   name?: string;
+
+  /**
+   * Whether `ctrl` was held.
+   */
   ctrl?: boolean;
+
+  /**
+   * Whether `meta` (`alt` or `option`) was held.
+   */
   meta?: boolean;
+
+  /**
+   * Whether `shift` was held.
+   */
   shift?: boolean;
+
+  /**
+   * The raw input sequence the key was decoded from.
+   */
   sequence?: string;
 }
 
@@ -55,12 +74,21 @@ export interface PromptOptions {
 
 /**
  * Per-prompt render context for a flow.
- * `colors` styles the frame and `lead` draws a connecting rail above the prompt.
- * `columns` is the current terminal width, when known.
  */
 export interface PromptContext {
+  /**
+   * Styles the frame.
+   */
   colors: ANSIColors;
+
+  /**
+   * Whether to draw a connecting rail above the prompt.
+   */
   lead: boolean;
+
+  /**
+   * The current terminal width, when known.
+   */
   columns?: number;
 }
 
@@ -68,7 +96,14 @@ export interface PromptContext {
  * The mutable state a prompt definition reads and updates on each keypress.
  */
 export interface PromptState<T> {
+  /**
+   * The value the prompt resolves to on submit.
+   */
   value: T;
+
+  /**
+   * `active` while the prompt runs; `submit` or `cancel` ends it.
+   */
   status: 'active' | 'submit' | 'cancel';
 }
 
@@ -76,8 +111,19 @@ export interface PromptState<T> {
  * The behavior of a single prompt: its starting value, how it draws, and how it reacts to keys.
  */
 export interface PromptDefinition<T> {
+  /**
+   * The value the prompt starts with.
+   */
   initialValue: T;
+
+  /**
+   * Returns the frame for `state`, called again after every keypress and terminal resize.
+   */
   render(state: PromptState<T>, context: PromptContext): string;
+
+  /**
+   * Updates `state` for a keypress; `ctrl+c` never reaches it.
+   */
   onKey(key: Key, str: string | undefined, state: PromptState<T>): void;
 }
 
@@ -134,6 +180,9 @@ export function runPrompt<T>(
   });
 }
 
+/**
+ * Returns the escapes that move to the top of a `rowCount`-row frame and clear it, or `''` for none.
+ */
 function eraseFrame(rowCount: number): string {
   if (rowCount <= 0) return '';
   const up = rowCount > 1 ? `\x1b[${rowCount - 1}A` : '';
@@ -142,6 +191,9 @@ function eraseFrame(rowCount: number): string {
 
 const SGR = new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g');
 
+/**
+ * Counts the terminal rows a frame occupies, wrapping each line at `columns` once styling is stripped.
+ */
 function frameRows(frame: string, columns: number | undefined): number {
   let rows = 0;
   for (const line of frame.split('\n')) {

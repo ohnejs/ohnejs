@@ -213,12 +213,18 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
 
   let colors: ANSIColors = pickANSIColors(state.color ?? isColorStream(state.stream));
 
+  /**
+   * Writes a rendered line unless printing is silent or it is a debug line with `debug` off.
+   */
   function emitLine(level: PrintLevel, message: string): void {
     if (state.silent) return;
     if (level === 'debug' && !state.debug) return;
     state.stream.write(renderLine(level, message, colors));
   }
 
+  /**
+   * Writes a rendered block unless printing is silent or it is a debug block with `debug` off.
+   */
   function emitBlock(level: PrintLevel, options: BlockOptions): void {
     if (state.silent) return;
     if (level === 'debug' && !state.debug) return;
@@ -280,6 +286,9 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
   };
 }
 
+/**
+ * Renders the level glyph and message as one line, tinting an error message red.
+ */
 function renderLine(level: PrintLevel, message: string, colors: ANSIColors): string {
   const tint = levelTint(level, colors);
   const isError = level === 'error';
@@ -288,6 +297,9 @@ function renderLine(level: PrintLevel, message: string, colors: ANSIColors): str
   return `${tint(GLYPH_HEAD)}  ${final}\n`;
 }
 
+/**
+ * Renders the title line, the railed paragraphs, and the closing corner or `path`.
+ */
 function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColors): string {
   const tint = levelTint(level, colors);
   const isDebug = level === 'debug';
@@ -328,6 +340,9 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
   return lines.join('\n') + '\n';
 }
 
+/**
+ * Splits a body into paragraphs of non-blank lines, dropping empty paragraphs.
+ */
 function normalizeBody(body: string | string[]): string[][] {
   const raw = isString(body) ? body.split('\n\n') : body;
   const result: string[][] = [];
@@ -340,6 +355,9 @@ function normalizeBody(body: string | string[]): string[][] {
   return result;
 }
 
+/**
+ * Picks a level's color for its glyphs, its `path` line, and a warn or error title.
+ */
 function levelTint(level: PrintLevel, colors: ANSIColors): (text: string) => string {
   switch (level) {
     case 'success':

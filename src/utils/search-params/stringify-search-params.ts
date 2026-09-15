@@ -8,6 +8,9 @@ import { coerceToken, type SearchParamValue } from './coerce-token.ts';
 
 const ENCODE = new Set([' ', '"', '#', '<', '>', "'", '%', '&', '[', ']', '{', '}', ',', ':']);
 
+/**
+ * Percent-encodes control and non-ASCII characters, those in `ENCODE`, and `=` when `encodeEquals` is set.
+ */
 function encode(str: string, encodeEquals: boolean): string {
   let out = '';
   for (const ch of str) {
@@ -21,10 +24,16 @@ function encode(str: string, encodeEquals: boolean): string {
   return out;
 }
 
+/**
+ * Whether a string needs the leading backtick: it starts with one, or it would read back as another type.
+ */
 function needsMarker(value: string): boolean {
   return value.startsWith('`') || coerceToken(value) !== value;
 }
 
+/**
+ * Encodes one value, writing a non-finite number as `null` and an unsafe integer in exponent form.
+ */
 function encodeValue(value: SearchParamValue): string {
   if (isNull(value)) return 'null';
   if (isBoolean(value)) return value ? 'true' : 'false';

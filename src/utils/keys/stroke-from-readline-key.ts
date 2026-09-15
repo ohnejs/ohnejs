@@ -4,10 +4,29 @@ import type { KeyStroke } from './key-stroke.ts';
  * The decoded keypress `node:readline` produces alongside the raw string.
  */
 export interface ReadlineKey {
+  /**
+   * The decoded key name, like `'return'`, `'up'`, or `'a'`.
+   */
   name?: string;
+
+  /**
+   * Whether the Control key was held.
+   */
   ctrl?: boolean;
+
+  /**
+   * Whether the Alt (Option on macOS) key was held, which readline reports as `meta`.
+   */
   meta?: boolean;
+
+  /**
+   * Whether the Shift key was held.
+   */
   shift?: boolean;
+
+  /**
+   * The raw character sequence the terminal sent.
+   */
   sequence?: string;
 }
 
@@ -52,6 +71,9 @@ export function strokeFromReadlineKey(str: string | undefined, key: ReadlineKey)
   };
 }
 
+/**
+ * Returns a named key's `KeyboardEvent.key` spelling, else a printable `str`, else the name or `''`.
+ */
 function keyValue(str: string | undefined, name: string | undefined): string {
   const named = name ? NAMED[name] : undefined;
   if (named) return named;
@@ -59,6 +81,9 @@ function keyValue(str: string | undefined, name: string | undefined): string {
   return name ?? '';
 }
 
+/**
+ * Whether `str` has no C0 control character or DEL, so it stands as typed.
+ */
 function isGraphic(str: string): boolean {
   for (const char of str) {
     const code = char.codePointAt(0)!;

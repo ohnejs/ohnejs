@@ -11,6 +11,9 @@ import { hasKey } from '../object/has-key.ts';
 
 type OrderingOperator = 'greaterThan' | 'atLeast' | 'lessThan' | 'atMost';
 
+/**
+ * Applies an ordering operator to two numbers or two strings, strings comparing by code unit.
+ */
 function ordinal<T extends number | string>(op: OrderingOperator, left: T, right: T): boolean {
   if (op === 'greaterThan') return left > right;
   if (op === 'atLeast') return left >= right;
@@ -51,6 +54,9 @@ function likeMatch(text: string, pattern: string): boolean {
   return pi === parts.length;
 }
 
+/**
+ * Descends `value` through own keys of plain objects, `undefined` once a segment is missing.
+ */
 function readPath(value: unknown, path: readonly string[]): unknown {
   let cursor: unknown = value;
   for (const segment of path) {
@@ -60,6 +66,9 @@ function readPath(value: unknown, path: readonly string[]): unknown {
   return cursor;
 }
 
+/**
+ * Applies a compare operator to a resolved value; mismatched types or shapes are `false`.
+ */
 function compareValue(op: CompareOperator, resolved: unknown, value: unknown): boolean {
   switch (op) {
     case 'equalsTo':
@@ -95,6 +104,9 @@ function compareValue(op: CompareOperator, resolved: unknown, value: unknown): b
   }
 }
 
+/**
+ * Tests a `has` value: without a `condition`, non-nullish and not `[]`; else a matching array item or object.
+ */
 function hasMatch(condition: ConditionNode | null, value: unknown): boolean {
   if (isNull(condition)) {
     return !isNullish(value) && (!isArray(value) || value.length > 0);

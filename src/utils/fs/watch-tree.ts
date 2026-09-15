@@ -67,6 +67,9 @@ export function watchTree(
     watchers.clear();
   };
 
+  /**
+   * Watches `path` and walks its subtree, skipping a path already watched or unwatchable.
+   */
   async function watchDir(path: string, emitExisting: boolean): Promise<void> {
     if (closed || watchers.has(path)) return;
 
@@ -89,6 +92,9 @@ export function watchTree(
     await walk(path, emitExisting);
   }
 
+  /**
+   * Watches each unpruned subdirectory of `path`, reporting each unpruned file when `emitExisting` is set.
+   */
   async function walk(path: string, emitExisting: boolean): Promise<void> {
     let entries: Dirent[];
     try {
@@ -107,6 +113,9 @@ export function watchTree(
     );
   }
 
+  /**
+   * Reports and re-syncs the unpruned path that changed; a null `filename` reports `watchedDir` itself.
+   */
   function onEvent(watchedDir: string, filename: string | null): void {
     if (closed) return;
     if (isNull(filename)) {
@@ -133,6 +142,9 @@ export function watchTree(
     });
   }
 
+  /**
+   * Drops the watches at and under `path`, then watches it anew if it is a directory.
+   */
   async function syncWatch(path: string): Promise<void> {
     if (closed) return;
     let isDir = false;
@@ -146,6 +158,9 @@ export function watchTree(
     if (isDir) await watchDir(path, ready);
   }
 
+  /**
+   * Closes the watch on `path` and on every directory beneath it.
+   */
   function evictSubtree(path: string): void {
     const prefix = `${path}/`;
     for (const [key, watcher] of watchers) {

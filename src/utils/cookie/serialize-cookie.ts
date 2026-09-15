@@ -63,6 +63,9 @@ export interface SerializeCookieOptions {
 
 const TOKEN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
+/**
+ * Throws when `value` holds a line break or `;`, either of which would inject into the header.
+ */
 function assertSafe(label: string, value: string): void {
   if (value.includes('\n') || value.includes('\r') || value.includes(';')) {
     throw new Error(`Invalid cookie ${label}: ${JSON.stringify(value)}`);

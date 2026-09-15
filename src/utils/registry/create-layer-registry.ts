@@ -201,11 +201,17 @@ export function createLayerRegistry<C extends object, X extends object = object>
   let cached: (Layer<C> & X)[] | null = null;
   const version = ref(0);
 
+  /**
+   * Drops the cached fold and bumps `version`, re-running effects that read the registry.
+   */
   function invalidate(): void {
     cached = null;
     version.value++;
   }
 
+  /**
+   * Returns the cached layers, refolding every spec base-first after an invalidation.
+   */
   function ensureFresh(): (Layer<C> & X)[] {
     if (!isNull(cached)) return cached;
     const result: (Layer<C> & X)[] = [];

@@ -3,34 +3,72 @@ import { isNull } from '../is/is-null.ts';
 
 /**
  * A unit of reactive work.
- * `fn` is the user callback; `scheduler` (when set) replaces `fn` on trigger - used by `computed`.
- * `deps` is the set of subscriber sets this effect has been added to, used for stale-dep cleanup.
- * `subs`, on a computed's runner, is that computed's own subscriber set.
- * `trigger` reads it to propagate invalidation before running any reader.
- * `scope`, when set, owns this effect: it stops the effect on disposal and is restored around re-runs.
  */
 export interface Effect {
+  /**
+   * The work each run executes.
+   */
   fn: () => void;
+
+  /**
+   * Runs instead of `fn` on trigger; `computed` and `batchedEffect` set it.
+   */
   scheduler?: () => void;
+
+  /**
+   * On a computed's runner, that computed's own subscriber set.
+   * `trigger` walks it to invalidate before running any reader.
+   */
   subs?: Set<Effect>;
+
+  /**
+   * The subscriber sets this effect has joined, left on cleanup so stale deps stop triggering it.
+   */
   deps: Set<Set<Effect>>;
+
+  /**
+   * `false` once stopped, which makes `runEffect` and a second `stopEffect` no-ops.
+   */
   active: boolean;
+
+  /**
+   * The owning scope, which stops this effect on disposal and is restored around its re-runs.
+   */
   scope?: Scope | null;
 }
 
 /**
  * An ownership group for the effects and nested scopes created while it is active.
- * `effects` and `scopes` are the children captured during a `runWithScope` run.
- * `cleanups` are teardown callbacks registered through `onCleanup`.
- * `parent` and `index` locate this scope in its parent's `scopes`, for O(1) detach on disposal.
- * `active` is false once disposed, which makes a second disposal a no-op.
  */
 export interface Scope {
+  /**
+   * Effects created during a `runWithScope` run, stopped on disposal.
+   */
   effects: Effect[];
+
+  /**
+   * Nested scopes created during a `runWithScope` run, disposed with this one.
+   */
   scopes: Scope[];
+
+  /**
+   * Teardown callbacks registered through `onCleanup`.
+   */
   cleanups: (() => void)[];
+
+  /**
+   * The scope this one is nested in, or `null` for a root or detached scope.
+   */
   parent: Scope | null;
+
+  /**
+   * This scope's slot in its parent's `scopes`, for O(1) detach on disposal.
+   */
   index: number;
+
+  /**
+   * `false` once disposed, which makes a second disposal a no-op.
+   */
   active: boolean;
 }
 

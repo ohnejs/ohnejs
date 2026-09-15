@@ -55,11 +55,17 @@ export function dateOptionsFromSkeleton(skeleton: string): Intl.DateTimeFormatOp
   return options;
 }
 
+/**
+ * Whether `ch` is an ASCII letter, which alone can form a skeleton symbol.
+ */
 function isPatternLetter(ch: string): boolean {
   const code = ch.charCodeAt(0);
   return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
 }
 
+/**
+ * Sets the `Intl` options for a run of `count` identical symbols; a symbol with no `Intl` equivalent throws.
+ */
 function applySymbol(symbol: string, count: number, options: Intl.DateTimeFormatOptions): void {
   switch (symbol) {
     case 'G':

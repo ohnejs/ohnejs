@@ -27,6 +27,9 @@ export interface Authorization {
   password?: string;
 }
 
+/**
+ * Decodes a Basic token (base64, then UTF-8) and splits it at the first colon; `null` when either step fails.
+ */
 function decodeBasic(token: string): Pick<Authorization, 'username' | 'password'> | null {
   let decoded: string;
   try {

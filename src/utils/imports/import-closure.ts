@@ -21,6 +21,9 @@ export async function importClosure(entry: string): Promise<Set<string>> {
   await visit(resolvePath(entry));
   return seen;
 
+  /**
+   * Adds `file` to `seen` on first sight, then visits each file its relative imports resolve to.
+   */
   async function visit(file: string): Promise<void> {
     if (seen.has(file)) return;
     seen.add(file);

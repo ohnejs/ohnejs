@@ -1,7 +1,13 @@
+/**
+ * Defines `key` as an own enumerable property, so a `__proto__` key cannot reach the prototype.
+ */
 function assign(out: Record<string, string>, key: string, value: string): void {
   Object.defineProperty(out, key, { value, writable: true, enumerable: true, configurable: true });
 }
 
+/**
+ * Reads `;`-separated `name=value` pairs into `out`, lowercasing names and keeping the first of each.
+ */
 function readParameters(input: string, out: Record<string, string>): void {
   const seen = new Set<string>();
   let i = 0;

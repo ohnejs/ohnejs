@@ -77,6 +77,9 @@ export function compileGlob(glob: string): GlobMatcher {
 
   const regex = new RegExp(src);
 
+  /**
+   * Tests the whole of `input` against the anchored `regex`.
+   */
   function match(input: string): boolean {
     return regex.test(input);
   }

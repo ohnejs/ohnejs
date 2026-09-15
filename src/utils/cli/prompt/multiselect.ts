@@ -131,6 +131,9 @@ export function multiselectDefinition<T>(options: MultiselectOptions<T>): Prompt
   };
 }
 
+/**
+ * Draws one row: a cyan box and hint when focused, a green box when checked, dimmed otherwise.
+ */
 function checkbox<T>(
   option: SelectOption<T>,
   focused: boolean,

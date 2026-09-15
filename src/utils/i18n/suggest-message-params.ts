@@ -137,6 +137,9 @@ export function suggestMessageParamsAST(
   return suggestions;
 }
 
+/**
+ * Collects an entry for every argument in `nodes`, `path` holding the outer values that route into them.
+ */
 function walk(
   nodes: MessageAST,
   path: readonly PathStep[],
@@ -146,6 +149,9 @@ function walk(
   for (const node of nodes) walkNode(node, path, entries, locale);
 }
 
+/**
+ * Collects the entry one node implies; plural and select nodes also add variations and walk their bodies.
+ */
 function walkNode(
   node: MessageNode,
   path: readonly PathStep[],
@@ -180,6 +186,9 @@ function walkNode(
   }
 }
 
+/**
+ * Adds a variation per exact case, reachable keyword, locale-only category, and offset boundary.
+ */
 function visitPlural(
   node: MessagePluralNode,
   path: readonly PathStep[],
@@ -241,6 +250,9 @@ function visitPlural(
   }
 }
 
+/**
+ * Adds a variation per case, defaulting to the first, then walks each body routed by its keyword.
+ */
 function visitSelect(
   node: MessageSelectNode,
   path: readonly PathStep[],
@@ -258,6 +270,9 @@ function visitSelect(
   }
 }
 
+/**
+ * Returns the argument's entry, creating it with `initialDefault` so the first use sets the default.
+ */
 function ensureEntry(
   entries: Map<string, ArgEntry>,
   name: string,
@@ -270,6 +285,9 @@ function ensureEntry(
   return created;
 }
 
+/**
+ * Returns the first `offset`-shifted probe value that selects `keyword` without an exact case claiming it.
+ */
 function probeForKeyword(
   keyword: string,
   rules: Intl.PluralRules,
@@ -284,6 +302,9 @@ function probeForKeyword(
   return null;
 }
 
+/**
+ * Picks a sample number that reads naturally in `style`, like `0.42` for percent or `12345` for compact.
+ */
 function numberSample(style: string | null): number {
   if (isNull(style)) return SAMPLE_DEFAULT_NUMBER;
   if (style === 'integer') return 1234;
@@ -299,6 +320,9 @@ function numberSample(style: string | null): number {
   return SAMPLE_DEFAULT_NUMBER;
 }
 
+/**
+ * Serializes params into a key-order-independent string tagging each value's type, so `1` and `'1'` differ.
+ */
 function stableKey(params: Record<string, SampleValue>): string {
   const keys = Object.keys(params).sort();
   let out = '';

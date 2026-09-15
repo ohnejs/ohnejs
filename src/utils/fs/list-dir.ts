@@ -156,6 +156,9 @@ export async function listDir(
   await walk(rootDir, root, 0);
   return results;
 
+  /**
+   * Collects the wanted entries of `dir` into `results`, descending while `currentDepth` is below `depth`.
+   */
   async function walk(dir: Dir, currentDir: string, currentDepth: number): Promise<void> {
     for await (const dirent of dir) {
       const name = dirent.name;
@@ -190,11 +193,17 @@ export async function listDir(
   }
 }
 
+/**
+ * Collects extensions into a set, each with its leading dot.
+ */
 function normalizeExtensions(ext: string | string[]): Set<string> {
   const list = isArray(ext) ? ext : [ext];
   return new Set(list.map((value) => (value.startsWith('.') ? value : `.${value}`)));
 }
 
+/**
+ * Classifies a dirent as file or directory, or `null`; a symlink resolves only with `followSymlinks`.
+ */
 async function resolveType(
   dirent: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean },
   entryPath: string,

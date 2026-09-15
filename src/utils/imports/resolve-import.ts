@@ -40,6 +40,9 @@ export async function resolveImport(fromFile: string, specifier: string): Promis
   return null;
 }
 
+/**
+ * Whether `specifier` is `.` or `..`, or starts with `./` or `../`.
+ */
 function isRelativeSpecifier(specifier: string): boolean {
   return (
     specifier === '.' ||
@@ -49,6 +52,9 @@ function isRelativeSpecifier(specifier: string): boolean {
   );
 }
 
+/**
+ * Lists the file paths `target` may name, trying a `.js`-family name's TypeScript sibling first.
+ */
 function fileCandidates(target: string): string[] {
   const ext = extname(target);
   if (ext === '') return [target, ...SOURCE_EXTS.map((e) => `${target}${e}`)];
@@ -58,10 +64,16 @@ function fileCandidates(target: string): string[] {
   return [`${target.slice(0, -ext.length)}${tsSibling}`, target];
 }
 
+/**
+ * Lists the `index` files, one per source extension, that a directory `target` may resolve to.
+ */
 function indexCandidates(target: string): string[] {
   return SOURCE_EXTS.map((e) => joinPath(target, `index${e}`));
 }
 
+/**
+ * Whether `path` is a regular file, `false` when it cannot be stat'd.
+ */
 async function isFile(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile();

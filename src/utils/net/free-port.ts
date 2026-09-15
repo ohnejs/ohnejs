@@ -92,6 +92,9 @@ export async function freePort(preferred = 0, options: FreePortOptions = {}): Pr
  */
 const LOOPBACKS = ['127.0.0.1', '::1'];
 
+/**
+ * Probes the wildcard, then each loopback on the port it bound; `null` when any of them is taken.
+ */
 async function probeEverywhere(port: number): Promise<number | null> {
   const wildcard = await probe(port);
   if (isNull(wildcard)) return null;
@@ -105,11 +108,17 @@ async function probeEverywhere(port: number): Promise<number | null> {
   return wildcard;
 }
 
+/**
+ * Whether a bind error means the host lacks that address family, such as a machine without IPv6.
+ */
 function familyAbsent(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code;
   return code === 'EADDRNOTAVAIL' || code === 'EAFNOSUPPORT' || code === 'EINVAL';
 }
 
+/**
+ * Binds and closes a server on `port`, resolving the bound port, or `null` when it is in use.
+ */
 function probe(port: number, host?: string): Promise<number | null> {
   return new Promise((resolve, reject) => {
     const server = createServer();

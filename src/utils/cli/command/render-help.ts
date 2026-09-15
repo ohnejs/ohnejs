@@ -61,6 +61,9 @@ export function renderHelp(command: Command, colors: ANSIColors, globals?: ArgsS
   return lines.join('\n') + '\n';
 }
 
+/**
+ * Builds one help row per arg in `args`, skipping `hidden` ones.
+ */
 function schemaRows(args: ArgsSchema | undefined, colors: ANSIColors): Row[] {
   const rows: Row[] = [];
   for (const name of Object.keys(args ?? {})) {
@@ -71,6 +74,9 @@ function schemaRows(args: ArgsSchema | undefined, colors: ANSIColors): Row[] {
   return rows;
 }
 
+/**
+ * Builds the command's option rows, then `--version` when `meta.version` is set, and `--help` last.
+ */
 function optionRows(command: Command, args: Command['args'], colors: ANSIColors): Row[] {
   const rows = schemaRows(args, colors);
   if (command.meta.version)
@@ -83,6 +89,9 @@ function optionRows(command: Command, args: Command['args'], colors: ANSIColors)
   return rows;
 }
 
+/**
+ * Formats an arg's flags and aliases, with a value placeholder unless it is boolean.
+ */
 function optionRow(name: string, def: ArgSchema, colors: ANSIColors): Row {
   const flags = [`--${toKebabCase(name)}`];
   for (const alias of toArray(def.alias ?? []))
@@ -98,6 +107,9 @@ function optionRow(name: string, def: ArgSchema, colors: ANSIColors): Row {
   };
 }
 
+/**
+ * Appends `(required)` or `(default: ...)` to an arg's description.
+ */
 function optionDesc(def: ArgSchema): string {
   const parts: string[] = [];
   if (def.description) parts.push(def.description);
@@ -106,6 +118,9 @@ function optionDesc(def: ArgSchema): string {
   return parts.join(' ');
 }
 
+/**
+ * Pads labels to the widest one so descriptions line up in a column.
+ */
 function renderRows(rows: Row[]): string[] {
   const width = Math.max(0, ...rows.map(({ label }) => label.length));
   return rows.map(({ label, styled, desc }) =>

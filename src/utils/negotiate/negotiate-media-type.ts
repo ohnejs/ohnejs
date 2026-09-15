@@ -1,5 +1,8 @@
 import { type AcceptEntry, parseAccept } from './parse-accept.ts';
 
+/**
+ * How closely `range` matches `type/subtype`: `2` exact, `1` for `type/*`, `0` a catch-all, `-1` no match.
+ */
 function specificity(type: string, subtype: string, range: string): number {
   if (range === '*' || range === '*/*') return 0;
   const slash = range.indexOf('/');
@@ -11,6 +14,9 @@ function specificity(type: string, subtype: string, range: string): number {
   return rangeSub === subtype ? 2 : -1;
 }
 
+/**
+ * The `q` of the most specific range matching `offer`, or `0` when no range matches.
+ */
 function qualityOf(offer: string, ranges: AcceptEntry[]): number {
   const slash = offer.indexOf('/');
   const type = offer.slice(0, slash);

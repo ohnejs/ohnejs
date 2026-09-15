@@ -90,6 +90,9 @@ export interface ComposedCodecs {
 export function composeCodecs(...codecs: JSONCodec<any>[]): ComposedCodecs {
   const byName = keyBy(codecs, (c) => c.name);
 
+  /**
+   * Tags `value` with the first matching codec and walks the payload; unmatched values are walked untagged.
+   */
   function encode(value: unknown): unknown {
     for (const codec of codecs) {
       if (codec.test(value)) return { [`$${codec.name}`]: descend(codec.encode(value)) };
@@ -97,6 +100,9 @@ export function composeCodecs(...codecs: JSONCodec<any>[]): ComposedCodecs {
     return descend(value);
   }
 
+  /**
+   * Encodes each array element or plain-object value; any other value is returned as-is.
+   */
   function descend(value: unknown): unknown {
     if (isArray(value)) return value.map(encode);
 

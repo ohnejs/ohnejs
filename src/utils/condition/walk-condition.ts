@@ -18,6 +18,9 @@ export interface WalkConditionInfo {
   hasDepth: number;
 }
 
+/**
+ * Visits `node`, then its group children and `has` condition one level deeper.
+ */
 function step(
   node: ConditionNode,
   visit: (node: ConditionNode, info: WalkConditionInfo) => void,

@@ -28,12 +28,18 @@ export interface ETagOptions {
   weak?: boolean;
 }
 
+/**
+ * Formats the quoted tag for bytes: the hex byte length, then the SHA-1 in base64 without padding.
+ */
 function contentTag(entity: string | Uint8Array): string {
   const size = isString(entity) ? Buffer.byteLength(entity) : entity.length;
   const hash = createHash('sha1').update(entity).digest('base64').slice(0, 27);
   return `"${size.toString(16)}-${hash}"`;
 }
 
+/**
+ * Formats the quoted tag for stats: the hex size, then the hex mtime in milliseconds.
+ */
 function statTag(stats: ETagStats): string {
   return `"${stats.size.toString(16)}-${stats.mtime.getTime().toString(16)}"`;
 }

@@ -47,6 +47,9 @@ export type RangeResult =
 
 const POSITION = /^\d+$/;
 
+/**
+ * Resolves one `start-end`, `start-`, or `-suffix` spec against `size`, clamping the end to the last byte.
+ */
 function parseSpec(spec: string, size: number): ByteRange | 'unsatisfiable' | 'malformed' {
   const dash = spec.indexOf('-');
   if (dash === -1) return 'malformed';

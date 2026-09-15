@@ -90,6 +90,9 @@ export function createKeymap(keymap: Keymap, options: KeymapOptions = {}): KeyMa
   };
 }
 
+/**
+ * Resolves a spec to its lookup key for `platform`; a bare trailing `+` is the plus key itself.
+ */
 function compileSpec(spec: string, platform: Platform): string {
   const parts = spec.split('+').map((part) => part.trim());
   let key = parts.pop() ?? '';
@@ -116,6 +119,9 @@ function compileSpec(spec: string, platform: Platform): string {
   return canonical(ctrl, alt, shift, meta, key);
 }
 
+/**
+ * Builds the lookup key shared by specs and strokes: modifier flags in fixed order, then the normalized key.
+ */
 function canonical(
   ctrl: boolean,
   alt: boolean,
@@ -127,6 +133,9 @@ function canonical(
   return `${flags} ${normalizeKey(key)}`;
 }
 
+/**
+ * Lowercases a key and maps the aliases `space` and `esc` to the values a stroke carries.
+ */
 function normalizeKey(key: string): string {
   const lower = key.toLowerCase();
   if (lower === 'space') return ' ';

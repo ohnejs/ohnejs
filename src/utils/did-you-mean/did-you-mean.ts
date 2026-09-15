@@ -39,7 +39,10 @@ export function didYouMean(
   return best;
 }
 
-// OSA-variant Damerau-Levenshtein. Three rolling rows because the transposition rule reads two rows above.
+/**
+ * The optimal-string-alignment variant of Damerau-Levenshtein distance between `a` and `b`.
+ * Three rolling rows, because the transposition rule reads two rows above.
+ */
 function damerauLevenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;

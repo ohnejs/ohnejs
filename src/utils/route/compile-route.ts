@@ -92,6 +92,9 @@ export function compileRoute(pattern: string): RouteMatcher {
 
   const regex = new RegExp(regexSrc);
 
+  /**
+   * Matches `path` with one trailing `/` dropped, returning each param's raw capture, or `null`.
+   */
   function match(path: string): RouteParams | null {
     const trimmed =
       path.length > 1 && path.charCodeAt(path.length - 1) === 47 ? path.slice(0, -1) : path;

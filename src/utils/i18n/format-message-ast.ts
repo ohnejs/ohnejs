@@ -84,12 +84,18 @@ export function formatMessageAST(
   });
 }
 
+/**
+ * Renders a node sequence into one string under one shared context.
+ */
 function renderNodes(nodes: MessageAST, ctx: Context): string {
   let out = '';
   for (const node of nodes) out += renderNode(node, ctx);
   return out;
 }
 
+/**
+ * Dispatches a node to the renderer for its `kind`; a literal renders verbatim.
+ */
 function renderNode(node: MessageNode, ctx: Context): string {
   switch (node.kind) {
     case 'literal':
@@ -111,12 +117,18 @@ function renderNode(node: MessageNode, ctx: Context): string {
   }
 }
 
+/**
+ * Renders a simple argument as its string value, or its `{name}` placeholder when the param is missing.
+ */
 function renderArgument(node: MessageArgumentNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
   return String(value);
 }
 
+/**
+ * Formats a `number` argument by its style, or renders `{name}` when the param is missing or not numeric.
+ */
 function renderNumber(node: MessageNumberNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
@@ -126,6 +138,9 @@ function renderNumber(node: MessageNumberNode, ctx: Context): string {
   return numberFormat(node.style, ctx.language).format(num);
 }
 
+/**
+ * Formats a `date` argument by its style, or renders `{name}` when the param does not coerce to a date.
+ */
 function renderDate(node: MessageDateNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
@@ -134,6 +149,9 @@ function renderDate(node: MessageDateNode, ctx: Context): string {
   return dateFormat(node.style, ctx.language).format(date);
 }
 
+/**
+ * Formats a `time` argument by its style, or renders `{name}` when the param does not coerce to a date.
+ */
 function renderTime(node: MessageTimeNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
@@ -142,6 +160,9 @@ function renderTime(node: MessageTimeNode, ctx: Context): string {
   return timeFormat(node.style, ctx.language).format(date);
 }
 
+/**
+ * Renders the case the plural value selects, with `#` inside it bound to the value minus the offset.
+ */
 function renderPlural(node: MessagePluralNode, ctx: Context): string {
   const value = pluralValue(node, ctx);
   const adjusted = value - node.offset;
@@ -149,6 +170,9 @@ function renderPlural(node: MessagePluralNode, ctx: Context): string {
   return renderNodes(chosen.body, { ...ctx, pound: { value, offset: node.offset } });
 }
 
+/**
+ * Renders the case matching the param's string value, or `other`, reporting a missing param.
+ */
 function renderSelect(node: MessageSelectNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   const nullish = isNullish(value);
@@ -157,12 +181,18 @@ function renderSelect(node: MessageSelectNode, ctx: Context): string {
   return renderNodes(chosen.body, ctx);
 }
 
+/**
+ * Formats `#` as the enclosing plural's value minus its offset, or a literal `#` outside any plural.
+ */
 function renderPound(ctx: Context): string {
   if (!ctx.pound) return '#';
   const adjusted = ctx.pound.value - ctx.pound.offset;
   return new Intl.NumberFormat(ctx.language).format(adjusted);
 }
 
+/**
+ * Reads a plural param as a number, reporting it and falling back to `0` when missing or not numeric.
+ */
 function pluralValue(node: MessagePluralNode, ctx: Context): number {
   const raw = lookup(node.name, ctx);
   if (isNullish(raw)) {
@@ -179,6 +209,9 @@ function pluralValue(node: MessagePluralNode, ctx: Context): number {
   return fallback;
 }
 
+/**
+ * Picks the `=N` case equal to `raw`, else the case for the plural category of `adjusted`, else `other`.
+ */
 function matchPluralCase(
   node: MessagePluralNode,
   raw: number,
@@ -197,26 +230,41 @@ function matchPluralCase(
   return node.cases.find((c) => c.keyword === 'other')!;
 }
 
+/**
+ * Picks the case whose keyword equals `key`, else `other`.
+ */
 function matchSelectCase(cases: readonly MessageSelectCase[], key: string): MessageSelectCase {
   for (const c of cases) if (c.keyword === key) return c;
   return cases.find((c) => c.keyword === 'other')!;
 }
 
+/**
+ * Reads a param by own key, so inherited names like `toString` read as missing.
+ */
 function lookup(name: string, ctx: Context): unknown {
   if (!ctx.params) return undefined;
   if (!hasKey(ctx.params, name)) return undefined;
   return ctx.params[name];
 }
 
+/**
+ * Reports a missing param and returns its `{name}` placeholder.
+ */
 function missing(name: string, ctx: Context): string {
   notify(ctx, `missing parameter \`${name}\``);
   return `{${name}}`;
 }
 
+/**
+ * Reports a soft failure to `onError`, doing nothing when no handler is set.
+ */
 function notify(ctx: Context, message: string): void {
   if (ctx.onError) ctx.onError(new MessageFormatError(message));
 }
 
+/**
+ * Builds the number formatter for no style, `integer`, `percent`, or a `::` skeleton; other styles throw.
+ */
 function numberFormat(style: string | null, language: string): Intl.NumberFormat {
   if (isNull(style)) return new Intl.NumberFormat(language);
   if (style === 'integer') return new Intl.NumberFormat(language, { maximumFractionDigits: 0 });
@@ -232,6 +280,9 @@ function numberFormat(style: string | null, language: string): Intl.NumberFormat
   throw new MessageFormatError(`unknown number style \`${style}\``);
 }
 
+/**
+ * Builds the date formatter for a style keyword or `::` skeleton, `medium` when unstyled; others throw.
+ */
 function dateFormat(style: string | null, language: string): Intl.DateTimeFormat {
   const key = style ?? 'medium';
   if (DATETIME_STYLE_KEYWORDS.has(key)) {
@@ -245,6 +296,9 @@ function dateFormat(style: string | null, language: string): Intl.DateTimeFormat
   throw new MessageFormatError(`unknown date style \`${style}\``);
 }
 
+/**
+ * Builds the time formatter for a style keyword or `::` skeleton, `medium` when unstyled; others throw.
+ */
 function timeFormat(style: string | null, language: string): Intl.DateTimeFormat {
   const key = style ?? 'medium';
   if (DATETIME_STYLE_KEYWORDS.has(key)) {

@@ -65,6 +65,9 @@ export function noteBlock(
   return leadIn(`${top}\n${body}\n${base}`, lead, colors);
 }
 
+/**
+ * Counts the code points of `text` once styling codes are stripped.
+ */
 function visibleWidth(text: string): number {
   return [...text.replace(SGR, '')].length;
 }

@@ -31,6 +31,9 @@ export interface ForwardedElement {
   [param: string]: string | undefined;
 }
 
+/**
+ * Defines `name` as an own enumerable property, so a `__proto__` name cannot reach the prototype.
+ */
 function assign(element: ForwardedElement, name: string, value: string): void {
   Object.defineProperty(element, name, {
     value,

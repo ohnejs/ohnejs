@@ -31,6 +31,9 @@ export function numberOptionsFromSkeleton(skeleton: string): Intl.NumberFormatOp
   return options;
 }
 
+/**
+ * Applies one skeleton token, routing `.` and `@` shortcuts and splitting a `stem/arg` at its slash.
+ */
 function applyToken(token: string, options: Intl.NumberFormatOptions): void {
   if (token.startsWith('.')) {
     applyFractionShortcut(token, options);
@@ -53,6 +56,9 @@ function applyToken(token: string, options: Intl.NumberFormatOptions): void {
   applyBareStem(stem, options);
 }
 
+/**
+ * Applies a stem without an argument; an unknown stem or one with no `Intl.NumberFormat` equivalent throws.
+ */
 function applyBareStem(stem: string, options: Intl.NumberFormatOptions): void {
   switch (stem) {
     case 'compact-short':
@@ -195,6 +201,9 @@ function applyBareStem(stem: string, options: Intl.NumberFormatOptions): void {
   }
 }
 
+/**
+ * Applies a `stem/arg` token; `raw` is the whole token, named in an unsupported-stem error.
+ */
 function applyParametricStem(
   stem: string,
   arg: string,
@@ -255,6 +264,9 @@ function applyParametricStem(
   }
 }
 
+/**
+ * Applies a fraction shortcut: each `0` a required digit, each `#` an optional one, a trailing `*` up to 20.
+ */
 function applyFractionShortcut(token: string, options: Intl.NumberFormatOptions): void {
   let i = 1;
   let min = 0;
@@ -276,6 +288,9 @@ function applyFractionShortcut(token: string, options: Intl.NumberFormatOptions)
   options.maximumFractionDigits = star ? 20 : max;
 }
 
+/**
+ * Applies a significant-digits shortcut: each `@` a required digit, each `#` an optional one, `*` up to 21.
+ */
 function applySignificantShortcut(token: string, options: Intl.NumberFormatOptions): void {
   let i = 0;
   let min = 0;
@@ -297,6 +312,9 @@ function applySignificantShortcut(token: string, options: Intl.NumberFormatOptio
   options.maximumSignificantDigits = star ? 21 : max;
 }
 
+/**
+ * Returns the minimum integer digits of an `integer-width` argument: its `0`s after an optional `*` or `+`.
+ */
 function parseIntegerWidth(arg: string): number {
   const body = arg.startsWith('*') || arg.startsWith('+') ? arg.slice(1) : arg;
   if (!/^0+$/.test(body)) {
@@ -305,6 +323,9 @@ function parseIntegerWidth(arg: string): number {
   return body.length;
 }
 
+/**
+ * Scales a `precision-increment` value to an integer and its fraction digits, so `0.05` gives `5` and `2`.
+ */
 function parseIncrement(arg: string): { increment: number; minMax: number } {
   if (!/^\d+(?:\.\d+)?$/.test(arg)) {
     throw new MessageFormatError(`malformed precision-increment value \`${arg}\``);
@@ -315,12 +336,18 @@ function parseIncrement(arg: string): { increment: number; minMax: number } {
   return { increment: scaled, minMax };
 }
 
+/**
+ * Drops a unit's category prefix up to the first `-`, so `length-meter` becomes `meter`.
+ */
 function stripUnitPrefix(name: string): string {
   const dash = name.indexOf('-');
   if (dash === -1) return name;
   return name.slice(dash + 1);
 }
 
+/**
+ * Sets the unit display and its matching currency display, so one width stem styles both.
+ */
 function stashUnitWidth(
   value: 'narrow' | 'short' | 'long',
   options: Intl.NumberFormatOptions,
@@ -331,6 +358,9 @@ function stashUnitWidth(
   else options.currencyDisplay = 'symbol';
 }
 
+/**
+ * Returns the error for a token `Intl.NumberFormat` cannot express, for the caller to throw.
+ */
 function unsupported(token: string, reason: string): MessageFormatError {
   return new MessageFormatError(`number skeleton \`${token}\` is not supported (${reason})`);
 }

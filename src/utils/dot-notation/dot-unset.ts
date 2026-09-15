@@ -32,6 +32,9 @@ export function dotUnset<T>(value: T, path: string): T {
   return unsetRecursive(value, segments, 0) as T;
 }
 
+/**
+ * Drops the property at `segments[index]` onward; returns `current` itself when the path does not resolve.
+ */
 function unsetRecursive(current: unknown, segments: DotNotationSegment[], index: number): unknown {
   const segment = segments[index] as DotNotationSegment;
   if (!segmentAddresses(segment, current)) return current;

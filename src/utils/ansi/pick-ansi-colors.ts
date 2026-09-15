@@ -4,13 +4,44 @@
  * In the plain set each returns its input untouched, so no codes are ever produced.
  */
 export interface ANSIColors {
+  /**
+   * Tints `text` green.
+   */
   green(text: string): string;
+
+  /**
+   * Tints `text` bright cyan.
+   */
   cyan(text: string): string;
+
+  /**
+   * Tints `text` yellow.
+   */
   yellow(text: string): string;
+
+  /**
+   * Tints `text` red.
+   */
   red(text: string): string;
+
+  /**
+   * Tints `text` gray (bright black).
+   */
   gray(text: string): string;
+
+  /**
+   * Sets `text` in bold.
+   */
   bold(text: string): string;
+
+  /**
+   * Dims `text`.
+   */
   dim(text: string): string;
+
+  /**
+   * Swaps the foreground and background colors of `text`.
+   */
   inverse(text: string): string;
 }
 
