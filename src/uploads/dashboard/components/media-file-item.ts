@@ -112,6 +112,11 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .o-media-file-compact .o-media-file-size {
+    bottom: 0.375rem;
+    right: 0.375rem;
+  }
+
   .o-media-file-item-disabled-indicator {
     position: absolute;
     top: 0.5rem;
@@ -166,7 +171,10 @@ export function mediaFileItem(
   return h(
     'div',
     {
-      class: () => 'o-media-file-item' + (disabled().value ? ' o-media-file-item-disabled' : ''),
+      class: () =>
+        'o-media-file-item' +
+        (disabled().value ? ' o-media-file-item-disabled' : '') +
+        (options.compact ? ' o-media-file-compact' : ''),
     },
     h(
       'a',
