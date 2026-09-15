@@ -9,6 +9,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
 import { icon } from './icon.ts';
@@ -850,13 +851,4 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   });
 
   return root;
-}
-
-function lockScroll(element: HTMLElement): () => void {
-  const previous = element.style.overflow;
-  element.style.overflow = 'hidden';
-  return () => {
-    if (previous) element.style.overflow = previous;
-    else element.style.removeProperty('overflow');
-  };
 }

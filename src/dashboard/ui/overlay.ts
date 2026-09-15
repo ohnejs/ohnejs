@@ -138,25 +138,6 @@ export function acquireOverlay(): OverlayHandle {
 }
 
 /**
- * Hides an element's scrollbars while a floating surface is open; returns the restore.
- * The stored `overflow` inline style is put back exactly, so nested locks release in LIFO order.
- * Pass `document.documentElement` to lock the window.
- *
- * @example
- * ```ts
- * const unlock = lockScroll(document.documentElement)
- * unlock()
- * ```
- */
-export function lockScroll(el: HTMLElement): () => void {
-  const initial = el.style.overflow;
-  el.style.overflow = 'hidden';
-  return () => {
-    el.style.overflow = initial;
-  };
-}
-
-/**
  * Calls `onOutside` for every click that lands outside `el`; returns the stop.
  * A press that STARTS inside `el` never counts, so a drag from inside to outside does not close.
  * Both listeners sit on `window` in the capture phase, ahead of anything a page stops.

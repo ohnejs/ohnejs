@@ -12,15 +12,10 @@ import { sleep } from '../../utils/sleep/sleep.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { placeFloating } from './floater-place.ts';
-import {
-  FOCUSABLE,
-  lockScroll,
-  listenClickOutside,
-  placeFixed,
-  raiseToTopLayer,
-} from './overlay.ts';
+import { FOCUSABLE, listenClickOutside, placeFixed, raiseToTopLayer } from './overlay.ts';
 import './tokens.ts';
 
 /**
