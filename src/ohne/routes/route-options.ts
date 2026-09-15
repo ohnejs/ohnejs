@@ -9,21 +9,21 @@ import type { AnyHandler } from './route.ts';
  */
 export interface RouteOptions {
   /**
-   * Largest request body this route accepts, as a `parseBytes` value, or `false` for no cap.
-   * Overrides `server.maxBodySize` for this route.
+   * Largest request body this route accepts, as bytes or `'10mb'`, or `false` for no cap.
+   * Overrides `api.maxBodySize` for this route.
    */
   maxBodySize?: number | string | false;
 
   /**
-   * How long this route's middleware and handler may run, as a `parseDuration` value, or `false` for none.
-   * Overrides `server.handlerTimeout` for this route.
+   * How long this route's middleware and handler may run, as milliseconds or `'30s'`, or `false` for none.
+   * Overrides `api.handlerTimeout` for this route.
    */
   handlerTimeout?: number | string | false;
 
   /**
-   * How long this route's `waitUntil` work may run after the response, as a `parseDuration` value.
+   * How long this route's `waitUntil` work may run after the response, as milliseconds or `'60s'`.
    * Set `false` for no deadline.
-   * Overrides `server.waitUntilTimeout` for this route.
+   * Overrides `api.waitUntilTimeout` for this route.
    */
   waitUntilTimeout?: number | string | false;
 

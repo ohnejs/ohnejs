@@ -26,11 +26,11 @@ export interface GuardOptions {
 }
 
 /**
- * What the guard let through.
+ * What a schema sync destroyed, and the orphan rows it left in place.
  */
 export interface GuardReport {
   /**
-   * One line per destroyed or purged item, ready for a single warn block.
+   * One line per dropped table, dropped or retyped column, and purge of rows or values, ready to print.
    */
   deletions: string[];
 

@@ -107,7 +107,7 @@ async function writeNode(dir: string, routes: readonly RouteMeta[]): Promise<str
 }
 
 /**
- * Writes `browser/routes.ts`: augments `ohnejs/dashboard` so `api` narrows its route id to the known set.
+ * Writes `browser/routes.ts`: augments `ohnejs/dashboard` so `api` suggests the known route ids.
  * Its shape is constant; it only wires the shared type onto the browser's interface.
  */
 async function writeBrowser(dir: string): Promise<string> {

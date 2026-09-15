@@ -21,7 +21,7 @@ import { OHNE_LOCKS } from './naming/table-names.ts';
 export type LogicalType = 'text' | 'integer' | 'real' | 'boolean' | 'json';
 
 /**
- * A list-membership operator over a `json` list column: the `includes*` trio.
+ * A list-membership operator over a `json` list column.
  */
 export type ListMembershipOperator = 'includes' | 'includesAll' | 'includesAny';
 
@@ -103,9 +103,8 @@ export interface SchemaTransactionOptions {
  * A database dialect: the single place a driver and its SQL live.
  *
  * The engine speaks intent - logical types, quoted identifiers, a per-table diff.
- * The dialect turns that into the driver's SQL; nothing outside a dialect imports a driver or branches on one.
+ * The dialect turns that into SQL; nothing outside a dialect imports a driver or branches on one.
  * Abstract members are the completeness contract: a dialect that cannot satisfy one cannot compile.
- * Later phases add more members, so every dialect layer gets a compile error rather than a runtime surprise.
  *
  * Register an instance under a name with `useDialects`; `database.dialect` selects it.
  * The base `acquireLock`/`releaseLock` implement a portable cluster lock over an `ohne_locks` table.
@@ -271,8 +270,6 @@ export abstract class Dialect {
    * A dialect over a database with non-transactional DDL must journal its own undo to honor this.
    *
    * With `options.commit` false the success path rolls back as well, still returning `fn`'s result.
-   * Every statement runs against live data, then the whole unwinds - a rehearsal.
-   * The failure path is unchanged: it always rolls back and re-throws.
    *
    * @example
    * ```ts
@@ -402,7 +399,7 @@ export abstract class Dialect {
 
   /**
    * Releases a held lock by deleting its row, matched on both key and nonce.
-   * Takes a `Transaction` so a sync can free the cluster as its final statement, released atomically by COMMIT.
+   * Takes a `Transaction` so a sync can free the lock as its final statement, released atomically by COMMIT.
    * A nonce mismatch (another holder took over) deletes nothing, so a stale holder cannot free a live lock.
    *
    * @example

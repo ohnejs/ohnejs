@@ -4,23 +4,6 @@ import type { NodeEnv } from '../../utils/env/index.ts';
  * Typed ohne env vars.
  * Add fields by augmenting it from a layer with `declare module 'ohnejs'`.
  *
- * Built-ins:
- * - `NODE_ENV` - runtime environment; `production` or `test`, else `development`.
- * - `PORT` - overrides `Config.api.port` and `Config.dashboard.port` when set.
- * - `HOST` - overrides `Config.api.host` and `Config.dashboard.host` when set.
- * - `API_URL` - the dashboard's API base URL; overrides `Config.dashboard.apiURL` and the derived default.
- * - `DASHBOARD_URL` - the dashboard's origin; overrides `Config.dashboard.origin` and the derived default.
- * - `COOKIE_SECRET` - signs cookies set with `setSignedCookie`; required to use signed cookies.
- * - `SILENT` - truthy disables every printer call.
- * - `DEBUG` - debug filter, resolved against the `ohne` namespace via `isDebugEnabled`.
- * - `NO_COLOR` - non-empty value disables ANSI colors per the `no-color.org` standard.
- * - `FORCE_COLOR` - forces ANSI on (or off) regardless of TTY detection.
- * - `SKIP_CODEGEN` - truthy skips codegen on startup, for when a parent process already ran it.
- * - `DASHBOARD_RELOAD` - truthy makes the dashboard serve its dev reload stream and inject the client.
- * - `DATABASE` - overrides `Config.database.url`, the main database connection URL.
- * - `DB` - alias of `DATABASE`; setting both throws.
- * - `FORCE_SYNC` - truthy authorizes and performs a destructive schema sync for one boot.
- *
  * Each built-in is also a CLI flag - the kebab-case of its name, so `FORCE_SYNC` is `--force-sync`.
  * A booleanish var is a switch (`--force-sync` / `--no-force-sync`); the rest take a value (`--host x`).
  * The flag wins over the env var for that run.
@@ -98,7 +81,7 @@ export interface Env {
 
   /**
    * Whether the `ohne` namespace is enabled by the current `DEBUG` filter.
-   * Resolved through `isDebugEnabled('ohne', process.env.DEBUG)`.
+   * `DEBUG=1`, `DEBUG=*`, `DEBUG=ohne`, and `DEBUG=ohne:*` all enable it.
    *
    * @default
    * false
@@ -124,7 +107,7 @@ export interface Env {
   FORCE_COLOR: boolean | undefined;
 
   /**
-   * When `true`, startup skips codegen.
+   * When `true`, startup skips codegen, for when `ohne prepare` or a parent process already ran it.
    *
    * @default
    * false

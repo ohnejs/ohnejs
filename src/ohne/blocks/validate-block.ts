@@ -9,8 +9,7 @@ import { ohneError } from '../error/ohne-error.ts';
  * Validates a block definition.
  *
  * - Field names must be camelCase, non-reserved, and case-insensitively unique.
- * - `block` is additionally reserved: it is the discriminator key beside a block's own fields,
- *   in the read shape, the write input, and a blocks `has` scope alike.
+ * - `block` is also reserved: the discriminator beside a block's fields in reads, writes, and `has` scopes.
  * - A known block name sharpens the messages; omit it before the name is known.
  */
 export function validateBlockDefinition<TFields extends Record<string, FieldInstance>>(

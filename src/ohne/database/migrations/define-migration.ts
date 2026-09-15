@@ -236,7 +236,6 @@ export const DELETE_RECORD: unique symbol = Symbol('deleteRecord');
 /**
  * The context a transform runs in: read-only queries in the sync transaction, and the row in hand.
  * A transform can look values up mid-migration; everything it reads sees the migration so far.
- * `locale` is set on a locale-keyed row - a companion or a locale-scoped derived table - absent otherwise.
  * `deleteRecord()` returns the sentinel that deletes the whole row; return it, never just call it.
  * Only a switch honors the sentinel: a move carries values, so it refuses a deletion.
  */
@@ -248,7 +247,7 @@ export interface MigrationContext extends Pick<Transaction, 'query' | 'queryOne'
 
   /**
    * Returns the delete sentinel: `return ctx.deleteRecord()` drops the whole row.
-   * A fan-in uses it to resolve surplus locales; everything the row held goes with it.
+   * A switch uses it to drop surplus locales or duplicates; everything the row held goes with it.
    */
   deleteRecord(): DeleteRecord;
 }
@@ -285,8 +284,8 @@ export interface SwitchAttributes {
  * `value` arrives deserialized as the `from` type; a returned value serializes as the `to` type.
  * `row` is the full `from` row, deserialized by column.
  * On a move, each value carries over rewritten.
- * On a switch, `undefined` keeps the row untouched and `ctx.deleteRecord()` deletes it whole:
- * a fan-in promotes one locale's value per entity this way, and a fan-out reshapes per entity.
+ * On a switch, `undefined` keeps the row untouched and `ctx.deleteRecord()` deletes it whole.
+ * Turning `translatable` off promotes one locale's value per entity; turning it on reshapes each value.
  * May return a promise.
  */
 export type MigrationTransform = (
@@ -356,7 +355,7 @@ export interface DiscardMigration {
 
 /**
  * At least one switch attribute set, so a switch is never mistaken for a move at the type level.
- * Distributes over the four attributes: each member requires its own key and keeps the rest optional.
+ * Distributes over the attributes: each member requires its own key and keeps the rest optional.
  */
 type SwitchState = {
   [K in keyof SwitchAttributes]-?: Required<Pick<SwitchAttributes, K>> & SwitchAttributes;
@@ -368,10 +367,8 @@ type SwitchState = {
  * `from` addresses the field and asserts its live attribute state; a drifted state is a hard error.
  * Exactly one attribute switches per migration; chain files to flip several.
  * `to` is optional: a boolean has exactly one other state, and the desired schema already holds it.
- * The `translatable` switch is the flip machinery's handle.
- * On -> off runs the fan-in transform once per (entity, locale); off -> on reshapes each entity's value.
- * A `nullable` or `unique` switch runs the transform once per row.
- * Backfills and dedups then satisfy the constraint the guard would otherwise refuse.
+ * Turning `translatable` off runs the transform once per row in each locale; turning it on, once per entity.
+ * Every other switch runs the transform once per row, so backfills and dedups satisfy the new constraint.
  * `translatable` is logical-only: a raw table has no translatable concept.
  * A block field flips `nullable` and `unique` only: blocks store no locale dimension.
  */
@@ -388,8 +385,8 @@ export interface SwitchMigration {
   to?: SwitchAttributes;
 
   /**
-   * Per-row (or per-entity, on a fan-out) value transform.
-   * If omitted, a fan-in promotes the default locale and a value pass keeps every row as it is.
+   * Per-row value transform, per entity when turning `translatable` on.
+   * Omitted, turning `translatable` off promotes the default locale, and every other switch keeps each value.
    */
   transform?: MigrationTransform;
 }
@@ -448,17 +445,6 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * export default defineMigration({
  *   from: { collection: 'Posts', field: 'legacy' },
  *   to: null,
- * })
- * ```
- *
- * @example
- * ```ts
- * // migrations/2026-09-banner.ts - rename a block, wrapper rows rewritten mechanically
- * import { defineMigration } from 'ohne'
- *
- * export default defineMigration({
- *   from: { block: 'Hero' },
- *   to: { block: 'Banner' },
  * })
  * ```
  *

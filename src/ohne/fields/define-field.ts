@@ -16,7 +16,7 @@ import { validateFieldType } from './validate-field.ts';
  * A field type: the reusable storage contract every `field(...)` instance is built from.
  *
  * These members define how the field's value is stored.
- * The built-ins ship in core and register at module load; layers add their own under `dirs.fields`.
+ * The built-ins ship in core; layers add their own under `dirs.fields`.
  * `TOptions` captures the options this type declares, so `field('<name>', ...)` narrows to them.
  * `TColumn` keeps the `columnType` literal, so column-less types stay distinguishable at the type level.
  * `TForceNullable` and `TForceIndex` keep the forced flags, so `field(...)` hides the options they lock.
@@ -94,7 +94,6 @@ export interface FieldType<
    * Return only the value type (`'string'`, `'number[]'`, `"'a' | 'b'"`).
    * A multiline type may return an array of lines instead of one `\n`-joined string.
    * The framework wraps `| null` for a nullable field, and indents each line at the emission site.
-   * `ctx` carries the resolved `options` and `importType`.
    *
    * `emitType` narrows only the generated type.
    * The runtime gates the value at the column primitive and the field's tiers, nothing else.
@@ -107,8 +106,6 @@ export interface FieldType<
    * - `real` -> `number`
    * - `boolean` -> `boolean`
    * - `json` -> `unknown`.
-   *
-   * Declared as a method, so a concrete field type stays assignable to the registry's wide `FieldType`.
    *
    * @example
    * ```ts

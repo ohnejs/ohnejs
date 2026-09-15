@@ -169,8 +169,8 @@ export interface CreateServerOptions {
 
   /**
    * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
-   * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
-   * They override the socket's own scheme and host.
+   * A trusted peer's `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` are honored.
+   * `event.ip` and `event.url` then reflect the original client, not the proxy hop.
    * An empty list (the default) trusts no proxy.
    * Only `X-Forwarded-*` is read; the RFC 7239 `Forwarded` header is ignored.
    * A proxy often forwards a client-supplied `Forwarded` header unchanged, so trusting it is unsafe.

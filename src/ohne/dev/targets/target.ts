@@ -1,9 +1,6 @@
 /**
  * A codegen unit the dev supervisor can invalidate and regenerate on change.
  *
- * Every generated output implements this one interface.
- * The supervisor drives them all the same way.
- *
  * `affectedBy` is a dependency-closure containment test, not a file-set membership test.
  * It asks whether a changed path falls within everything the target reads.
  * So a brand-new file is caught even though no prior snapshot lists it.

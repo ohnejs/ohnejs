@@ -136,6 +136,7 @@ export interface DispatchOptions {
  * A middleware that returns a value short-circuits, and the handler never runs.
  * When `maxBodySize` is set, an over-cap `Content-Length` is refused with `413` before the handler runs.
  * A returned or thrown `HTTPError` maps to its status.
+ * A write that fails validation, hits a busy database, or is blocked by a reference maps to its own status.
  * Any other throw becomes a `500` with the real error logged, never sent.
  * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
  * A thrown error runs the `error:response` hook first.
@@ -168,7 +169,6 @@ export async function dispatch(
     context: {} as EventContext,
     appliedMiddleware: [],
     waitUntil(promise) {
-      // Handle now, not at drain time.
       // A rejection deferred to drain leaks an unhandledRejection before the response is sent.
       const bounded = isUndefined(waitUntilTimeout)
         ? promise

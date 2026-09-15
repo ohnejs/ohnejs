@@ -55,7 +55,7 @@ export interface ToRequestOptions {
  * Only `X-Forwarded-Proto` and `X-Forwarded-Host` are read; the `Forwarded` header is not consulted.
  * An untrusted peer's forwarding headers are ignored, closing the cache-poisoning and open-redirect gap.
  *
- * The transport assembles the URL before routing, then hands it to `toRequest`, so the body is built once.
+ * The transport assembles the URL before routing, so `toRequest` builds the body once, with the route's cap.
  */
 export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean): URL {
   const forwarded = trusts(trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
@@ -75,8 +75,6 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  * When `maxBodySize` is set, the streamed body is metered, so an overrun aborts mid-flight with `413`.
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
  * The `Content-Length` pre-check lives in `dispatch`, so a policy middleware's headers reach the `413`.
- *
- * This is the only inbound place Node internals are touched.
  */
 export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
   const url = options.url ?? toURL(req);
@@ -108,7 +106,6 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
  *
  * The RFC 7239 `Forwarded` header is not consulted.
  * A proxy that forwards a client-supplied one could otherwise be spoofed.
- * This reads the Node socket, so it lives in the adapter with the other inbound bridging.
  */
 export function clientIP(req: IncomingMessage, trustProxy?: (ip: string) => boolean): string {
   const peer = req.socket.remoteAddress ?? '';
@@ -185,8 +182,6 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  * The open CORS default is then applied, unless a policy already set or denied an origin.
  * The pipe carries backpressure and destroys both ends on error.
  * A bodyless response (e.g. `204`) just ends the socket.
- *
- * This is the only outbound place Node internals are touched.
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;

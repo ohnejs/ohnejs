@@ -152,8 +152,8 @@ export async function runDelete(
  * The delete attempt inside the transaction, compiling the same `WHERE` clause the read path does.
  * A `DELETE` cannot join.
  * A condition touching companion columns therefore narrows through `UUID IN (SELECT ...)`.
- * A collection holding blocks anywhere takes the instance-cleanup path instead.
- * The metadata walk decides, so a blocks-free collection keeps this single statement.
+ * A delete that can doom blocks, its own or through a cascade edge, takes the instance-cleanup path instead.
+ * A pre-delete or commit subscriber makes it list the matched `UUID`s first; else it is one statement.
  */
 async function attemptDelete(
   tx: Transaction,
@@ -415,7 +415,6 @@ async function matchedUUIDs(
  * Each record that lost a row bumps its `_updatedAt` - a translation write touches its record.
  * A record with nothing stored at the locale is matched but uncounted: nothing changed.
  * A busy database surfaces as a retryable `busyError`.
- * It deletes only companion, locale-scoped, and instance rows, never a main record.
  * No `restrict` reference into the collection can fire, so the terminal declares no foreign-key arm.
  */
 export async function runDeleteTranslation(

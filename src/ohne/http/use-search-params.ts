@@ -14,8 +14,6 @@ const cache = new WeakMap<Event, { [key: string]: SearchParamValue }>();
  * Values carry their own type: `?n=2&ok=true` becomes `{ n: 2, ok: true }`.
  * For the raw `URLSearchParams`, reach `useEvent().url.searchParams`.
  *
- * The name `query` stays reserved for the database layer, so this is `useSearchParams`.
- *
  * @example
  * ```ts
  * // GET /search?q=ohne&page=2&tags=[new,sale]

@@ -7,7 +7,7 @@ import { useConfig } from '../layers/use-config.ts';
 
 /**
  * Returns the app's content locales, resolved from config.
- * The query layer is the write-layer enforcer of the set the schema engine never reads.
+ * The query layer enforces the set; the schema engine never reads it.
  * Read live like `resolveGuards` reads its config tier, so tests vary the config freely.
  */
 export function queryLocales(): ResolvedLocales {

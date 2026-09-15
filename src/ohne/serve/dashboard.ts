@@ -110,7 +110,6 @@ const CANVAS = `
 
 /**
  * The framework `src` directory, the root the client modules are served from.
- * Resolved from this file's location: `src/ohne/serve` up two is `src`.
  */
 const SRC_ROOT = resolvePath('../..', dirname(fileURLToPath(import.meta.url)));
 

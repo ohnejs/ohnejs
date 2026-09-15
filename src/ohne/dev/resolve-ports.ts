@@ -53,7 +53,7 @@ export interface DevPortInputs {
  * Without `base`, each side resolves from its own preferred port.
  * Either way a port already taken is skipped and `onBusy` is called with it, so the caller can warn.
  *
- * The sibling's port is excluded from the API's scan, so the two never collide without a warning.
+ * The sibling's port is excluded from the API's scan, so the two never collide and the skip is not reported.
  * The two scans can overlap, so a busy port is reported to `onBusy` once, not per scan.
  */
 export async function resolveDevPorts(

@@ -3,7 +3,7 @@ import type { MiddlewareKey } from './known-middleware.ts';
 
 /**
  * A request middleware.
- * Runs before the route handler, inside the request's `AsyncLocalStorage`, with the `Event` passed in.
+ * Runs before the route handler, inside the request, with the `Event` passed in.
  * Read or mutate `event.context`, set `event.response` headers and status, or short-circuit.
  *
  * A middleware under the `global/` directory runs on every request.

@@ -178,7 +178,7 @@ export interface ReconcilePlan {
   doomedInstances: BlockInstance[];
 
   /**
-   * The per-parent kept-row sequences whose unique values constrain write order, sentinels included.
+   * The per-table kept-row sequences whose unique values constrain write order, sentinels included.
    */
   ordered: OrderedWrites[];
 
@@ -298,7 +298,7 @@ export function createPlan(
  * A correlated child over several rewriting parents fails `singleRecord` before any row is read.
  * Nested items gate per parent through the ancestry, and correlation validates the effective items.
  * An item a gate substitutes away is therefore never demanded to exist.
- * Kept rows' unique-column values ride the same read, so the write order resolves without another.
+ * Kept repeater and object rows' unique values ride the same read; blocks read theirs per parent and type.
  * Kept rewrites gather per table and order once across every parent and depth that writes it.
  */
 export async function planReconcile(
@@ -810,11 +810,11 @@ function descendKept(
 /**
  * Plans one fresh scope: its row, then its junction appends and child subtrees, depth-first.
  *
- * Three row modes, keyed on `parent`. `'top'` is the record root and carries `_updatedAt`.
+ * The row mode keys on `parent`: `'top'` is the record root and carries `_updatedAt`.
  * An object literal marks a child row: `_parentUUID`, a repeater position, `_localeCode` when scoped.
  * `'block'` marks a block instance row: a per-type table has no parent link and no timestamp.
  * Every descendant row gets a fresh `uuidv7`.
- * A claimed item `UUID` under a fresh parent is ignored, exactly as the plan's Q6 deferral sanctions.
+ * A claimed item `UUID` under a fresh parent is ignored.
  */
 function planFresh(
   plan: ReconcilePlan,

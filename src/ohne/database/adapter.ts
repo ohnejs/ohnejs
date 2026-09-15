@@ -25,8 +25,8 @@ export type TransactionMode = 'deferred' | 'immediate';
  * A live database connection ohne speaks to.
  *
  * Async even over a synchronous driver, so the driver stays swappable behind the same surface.
- * Nothing outside a dialect implements or imports this: the dialect's `connect` returns it.
- * Framework code speaks these six methods and nothing driver-specific.
+ * Nothing outside a dialect implements this: the dialect's `connect` returns it.
+ * Framework code speaks these methods and nothing driver-specific.
  */
 export interface DatabaseAdapter {
   /**
@@ -42,7 +42,6 @@ export interface DatabaseAdapter {
 
   /**
    * Runs a single write statement and reports how many rows it changed.
-   * The lock race reads `changes` to tell the winner from a contender; writes read it for affected counts.
    *
    * @example
    * ```ts
@@ -78,7 +77,7 @@ export interface DatabaseAdapter {
    * Runs `fn` inside a transaction, committing its result or rolling back on a throw.
    * The dialect owns `BEGIN`/`COMMIT`/`ROLLBACK`; `fn` sees a `Transaction`, which cannot nest another.
    * Transactions on one connection serialize: a second call waits for the first to settle, never nesting.
-   * `mode` picks how the transaction takes its lock; a write pass opens `immediate` (below).
+   * `mode` picks how the transaction takes its write lock, `deferred` when omitted.
    *
    * @example
    * ```ts

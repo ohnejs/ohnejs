@@ -7,8 +7,7 @@ import { useLayers } from '../../layers/use-layers.ts';
 /**
  * A set-based `Target` whose snapshot the config target can reset.
  *
- * `invalidate` drops the file-set snapshot so the next `regen` writes unconditionally.
- * That is how a config change forces a full regen even when no source file moved.
+ * Dropping the snapshot is how a config change forces a full regen even when no source file moved.
  */
 export interface SetTarget extends Target {
   /**

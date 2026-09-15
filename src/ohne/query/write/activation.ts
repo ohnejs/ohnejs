@@ -78,7 +78,7 @@ export function whenGates(
 /**
  * Partitions matched records into activation groups, keyed by which gates each record's `when` activates.
  *
- * Each record's overlay is its full stored shape - columns, relations, and composites - under the provided input.
+ * Each record's overlay is its full stored shape - columns, relations, composites - under the provided input.
  * A gate reading a relation or composite therefore resolves against the persisted membership, as on a create.
  * Groups keep first-seen order, so the writes stay deterministic across a run.
  */
@@ -144,14 +144,14 @@ export function activeScope(
 }
 
 /**
- * Whether a narrowed scope writes nothing: an empty-signature record, left untouched with no `_updatedAt` bump.
+ * Whether a narrowed scope writes nothing, leaving its record untouched with no `_updatedAt` bump.
  */
 export function isEmptyScope(scope: ProcessedScope): boolean {
   return isEmpty(scope.columns) && scope.relations.length === 0 && scope.children.length === 0;
 }
 
 /**
- * Whether any composite subfield, at any depth, declares a `when` - so an update must gate per matched record.
+ * Whether any composite subfield, at any depth, declares a `when`, so an update must gate per matched record.
  * A blocks item's subfields resolve through its block type, so only the named blocks count.
  */
 export function hasNestedGates(scope: ProcessedScope): boolean {
@@ -187,7 +187,7 @@ export function itemSubfields(
 /**
  * Narrows a nested item to one matched parent, replacing every inactive subfield with its default.
  *
- * Each gated subfield's `when` resolves against the item's coerced values over `ancestry`, root overlay first.
+ * Each gated subfield's `when` reads the item's coerced values over `ancestry`, root overlay first.
  * An inactive subfield takes its default, exactly as a create or an omitted subfield does.
  * A column takes its serialized `gatedDefaults` value; a relation its default `UUID`s.
  * A composite takes its default items; with no default, each kind takes its empty form.

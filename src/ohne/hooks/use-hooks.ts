@@ -13,7 +13,7 @@ const registry: Registry<AnyHookFn[]> = createRegistry<AnyHookFn[]>({
  * The boot files populate it at start via `hook`; call sites read it through `applyHook`.
  * Registering appends, so every layer and every boot file adds to the same chain.
  *
- * Extend the typed shape via `declare module 'ohne'`.
+ * Type a hook by augmenting `Hooks`; `hook` checks callbacks against it, this registry does not.
  *
  * @example
  * ```ts

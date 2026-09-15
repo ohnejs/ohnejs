@@ -10,7 +10,7 @@ import { useEvent } from './use-event.ts';
  * @example
  * ```ts
  * export default defineHandler(() => {
- *   if (!useCookies().sid) sendRedirect('/login')
+ *   if (!useCookies().sid) return sendRedirect('/login')
  *   return dashboard()
  * })
  *

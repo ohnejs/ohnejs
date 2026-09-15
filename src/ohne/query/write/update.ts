@@ -293,7 +293,7 @@ async function attemptPlainUpdate(
  * The gated path: partition activation first, then precheck the union of what the groups write.
  *
  * Top-level fields partition the matched records by signature, dropping each inactive gate's parts.
- * A record whose whole top-level signature is inactive is untouched, with no `_updatedAt` bump.
+ * A record left with nothing to write once its inactive gates drop is untouched, with no `_updatedAt` bump.
  * Each record's overlay is its stored shape under `scope.values`, the substrate a create's gates read.
  * A nested `when` reaching the root therefore reads that record's stored state.
  *

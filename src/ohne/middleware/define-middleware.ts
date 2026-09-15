@@ -20,7 +20,7 @@ import type { Middleware } from './middleware.ts';
  *
  * @example
  * ```ts
- * // middleware/global/auth.ts - runs on every request
+ * // middleware/global/session.ts - runs on every request
  * import { defineMiddleware, matchPath, unauthorized } from 'ohnejs'
  *
  * export default defineMiddleware((event) => {
@@ -44,16 +44,6 @@ import type { Middleware } from './middleware.ts';
  * import { defineHandler } from 'ohnejs'
  *
  * export default defineHandler(() => search(), { middleware: ['rate-limit'] })
- * ```
- *
- * @example
- * ```ts
- * // boot/middleware.ts - dynamic, per-request filtering (escape hatch)
- * import { hook } from 'ohne'
- *
- * hook('middleware:resolve', (names, event) =>
- *   isPublic(event) ? names.filter((name) => name !== 'global-auth') : names,
- * )
  * ```
  */
 export function defineMiddleware(middleware: Middleware): Middleware {

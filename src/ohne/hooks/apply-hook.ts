@@ -8,7 +8,6 @@ import { useHooks } from './use-hooks.ts';
  *
  * Pass the hook's arguments after the name.
  * Callbacks run one at a time, each awaited before the next.
- * The order is deterministic whether the callbacks are sync or async.
  *
  * The first argument is the threaded value.
  * A callback that returns a value replaces it for the next callback.
@@ -18,7 +17,6 @@ import { useHooks } from './use-hooks.ts';
  * It leaves the value untouched throughout, so its first argument comes back unchanged.
  *
  * Because `undefined` means "no change", a filter cannot thread `undefined` as a value.
- * Returning it is always read as leaving the value as it was.
  *
  * @example
  * ```ts

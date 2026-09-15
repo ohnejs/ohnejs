@@ -137,24 +137,20 @@ export interface FieldValidateContext<
  * A field sanitizer: cleans a value of `TValue` and returns one, never reporting.
  * Runs in order within its tier - the type's sanitizers first, then the instance's.
  * It is type-preserving: the value it receives is already the field's primitive, so it only cleans that.
- *
- * A bivariant method call keeps a concrete field type assignable to the registry's wide `FieldType`.
- * This mirrors `schema` and `emitType`, which are declared as methods for the same reason.
  */
 export type FieldSanitizer<
   TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
   TValue = unknown,
 > = {
+  // A method is bivariant, so a concrete field type stays assignable to the wide `FieldType`.
   clean(value: TValue, ctx: FieldWriteContext<TOptions>): TValue | Promise<TValue>;
 }['clean'];
 
 /**
  * A field validator: returns a message to reject its value, or `undefined` to accept it.
  * A message is a param-free key, a `{ key, params }` object, or a plain string (`Message`).
- * The first own-message stops its tier.
+ * The first message stops the field: no later validator runs.
  * A composite validator may instead write sub-path errors into `ctx.errors`.
- *
- * The call is a bivariant method, for the same assignability reason as `FieldSanitizer`.
  */
 export type FieldValidator<
   TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,

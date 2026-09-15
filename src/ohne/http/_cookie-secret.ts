@@ -2,8 +2,8 @@ import { isEmpty, isUndefined } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 
 /**
- * Resolves the cookie-signing secrets, newest first.
- * Signing uses the first; verification accepts any, which is the seam for key rotation.
+ * Resolves the cookie-signing secrets.
+ * Signing uses the first; verification accepts any.
  * Throws when none is set, so a misconfigured app fails loud instead of signing under a blank key.
  */
 export function cookieSecrets(): string[] {

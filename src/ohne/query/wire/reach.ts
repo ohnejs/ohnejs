@@ -33,8 +33,8 @@ export type ReachResolver = (collection: string) => Promise<QueryScope | false>;
  *
  * The raw `populate` and `where` are walked for the collections they cross into before anything parses.
  * The walk is tolerant: a malformed entry is left for the parse to refuse, so no target shapes an error.
- * `resolve` answers each crossed collection, and the query then parses against metadata hiding what
- * each reach withholds.
+ * `resolve` answers each crossed collection.
+ * The query then parses against metadata that hides what each reach withholds.
  * A target field outside a reach is therefore refused in a subselect or a `has` leaf as an unknown field.
  * The reach rides the parsed query for `applyQuery` to install, and every read compiles under it.
  * A reach scope's `where` and `select` carry; its `limit` and `locale` do not apply to a crossed read.

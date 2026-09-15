@@ -59,13 +59,13 @@ export interface DevOptions {
 }
 
 /**
- * Watches the project and reloads `ohne serve api` on every change.
+ * Watches the project and reloads `ohne serve api` when a change affects it.
  *
  * The `.env` at `from` is read first, so the ports resolve from it and both children inherit it.
  * A `.env` change reloads it here and restarts both children, so they inherit the new values.
  * Owns codegen, then spawns the server as a child with `SKIP_CODEGEN` so the child only serves.
  * The initial build writes the full set and prunes stale files from the codegen dir.
- * A change re-runs the affected codegen, then drains the child and respawns it.
+ * A change re-runs its codegen; an API source, message, or `.env` change also drains and respawns the child.
  * An `ohne.config.ts` change refreshes the registry first, as a barrier, so every table is rebuilt.
  *
  * Codegen failures and child crashes never tear the supervisor down.

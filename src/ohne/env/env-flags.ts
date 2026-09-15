@@ -23,7 +23,7 @@ interface EnvFlag {
 
 /**
  * Every registered env var that opts into a CLI flag, resolved to its kebab flag and camel arg key.
- * Derived from the registry, so a layer that `define`s a flagged env var is picked up automatically.
+ * The CLI reads the registry before any layer loads, so only the built-in env vars resolve here.
  */
 function envFlags(): EnvFlag[] {
   const env = useEnv();

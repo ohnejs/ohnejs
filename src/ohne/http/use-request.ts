@@ -8,7 +8,6 @@ import { useEvent } from './use-event.ts';
  * ```ts
  * useRequest().method            // -> 'POST'
  * useRequest().headers.get('ct') // -> the header value
- * await useRequest().json()      // -> the parsed body
  * ```
  */
 export function useRequest(): Request {

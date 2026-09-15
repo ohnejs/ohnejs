@@ -10,9 +10,9 @@ import { useLayers } from '../../layers/use-layers.ts';
  *
  * Its closure is every layer's `ohne.config.ts` and `ohne.layer.ts`.
  * On change it reloads the registry with a fresh `loadLayers`, reading past the module cache.
+ * It then forces a full regen of every dependent against the fresh registry.
  * A config that fails to import leaves the previous stack intact, so `affectedBy` keeps matching.
  * A later good save then recovers.
- * It then forces a full regen of every dependent against the fresh registry.
  * The supervisor runs it first, as a barrier, so a config-only edit still rewrites every table.
  */
 export function createConfigTarget(from: string, dependents: readonly SetTarget[]): Target {

@@ -26,8 +26,7 @@ function isDiscriminator(node: ConditionNode): node is Discriminator {
  *
  * The discriminator is exactly one top-level, bare, un-negated `block` equality naming the type.
  * It is the root node itself, or a direct child of a root `and`.
- * `rest` is what remains.
- * It is `null` when the discriminator stood alone, one sibling bare, or several re-wrapped as `and`.
+ * `rest` is `null` when the discriminator stood alone, else the lone sibling or several re-wrapped as `and`.
  * Returns `{ ok: false }` when nothing matches - a `has` scope that names no type.
  *
  * A `block` leaf surviving into `rest` (negated, listed, grouped, a second equality) is deliberate.

@@ -5,7 +5,8 @@ import { translate } from './translate.ts';
  *
  * Thrown or returned from a handler, it maps to a response with its `status`.
  * The body is JSON `{ statusCode, message, data? }`.
- * Any other thrown value becomes a generic `500`, so a leaked internal error never reaches the client.
+ * A write that fails validation, hits a busy database, or is blocked by a reference maps to its own status.
+ * Any other throw becomes a generic, detail-free `500`.
  *
  * Reach for the named constructors (`badRequest`, `notFound`, ...) rather than `new HTTPError`.
  */
@@ -97,7 +98,7 @@ export function conflict(message = translate('api.http.conflict'), data?: unknow
 
 /**
  * Builds a `413 Content Too Large` error.
- * The status the server returns when a request body exceeds `server.maxBodySize`.
+ * The status the server returns when a request body exceeds `api.maxBodySize`.
  *
  * @example
  * ```ts

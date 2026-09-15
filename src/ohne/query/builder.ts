@@ -65,7 +65,7 @@ type PlainScalar<M extends QueryFieldMeta> = M extends { record: string }
     : ScalarOf<M>;
 
 /**
- * `equalsTo`/`in`, admitted where a scalar exists and is a comparable primitive.
+ * `equalsTo`, admitted where a scalar exists and is a comparable primitive.
  * `record` and the `UUID` entries carry `scalar: string`, so both compare the raw stored `UUID`.
  */
 type EqualityOps<M extends QueryFieldMeta> = [ScalarOf<M>] extends [never]
@@ -549,8 +549,8 @@ type PopulateTarget<C extends CollectionName, F> =
       : CollectionName;
 
 /**
- * One callback populate in `P`: the field it hydrates and the sub-select/sub-populate it carries.
- * A phantom marker - `QueryRow` and `PluckValue` dispatch on it; no value ever has this type.
+ * One callback populate in a query's type: the relation it hydrates and what its callback wrote.
+ * It exists only in types; no value ever has this shape.
  */
 export type PopulateEntry<F extends string, SubS, SubP> = { field: F; S: SubS; P: SubP };
 
@@ -700,7 +700,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
   /**
    * Narrows the read to the named fields, accumulating across calls.
    * The returned rows carry only the selected fields.
-   * A call with no fields is a no-op, so the read stays whole-record - exactly what the type says.
+   * A call with no fields is a no-op, so the read stays whole-record.
    *
    * @example
    * ```ts
@@ -1112,9 +1112,7 @@ type Assert<A extends B, B> = A;
 
 /**
  * The compile-time parity contract: a typed state's method names are all names of the untyped surface.
- * A typed view can therefore never name a method the one runtime class does not implement.
- * Each `Assert` checks its constraint where it is written, so a drift is a compile error here.
- * The populate sub-state asserts against its own runtime twin, the callback's sub-builder.
+ * A typed view can therefore never name a method its runtime class does not implement.
  */
 export type QueryStateParity = [
   Assert<keyof PendingQuery<CollectionName>, keyof UntypedQueryBuilder>,

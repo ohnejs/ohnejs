@@ -207,8 +207,8 @@ export async function checkChildUnique(
 /**
  * The field-keyed error a caught unique violation falls back to when it escapes the precheck.
  *
- * The dialect's parsed target maps back through metadata, so the failure blames the exact field:
- * a main or companion column names its top-level field, a child or block column its dotted subfield path.
+ * The dialect's parsed target maps back through metadata, so the failure blames the exact field.
+ * A main or companion column names its top-level field; a child or block column its dotted subfield path.
  * The path is dotted - `items.slug` - since the constraint alone cannot name the item's index.
  * When nothing maps, every unique field the collection declares is named, or the root when none is.
  */

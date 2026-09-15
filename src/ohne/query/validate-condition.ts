@@ -67,8 +67,8 @@ export interface ConditionProblem {
  * A `has`'s nested condition re-scopes to the relation's target and is walked there in turn.
  * A blocks `has` scope must open with a bare `block` equality naming an allowed type.
  * The remainder walks that type's fields.
- * Its field name pushes onto the returned `path`, so the failure locates itself from the root.
- * A `where` path is a single segment in v1: an anchored or dotted path reads as an unknown field.
+ * Each `has` pushes its field name onto the returned `path`, so the failure locates itself from the root.
+ * A `where` path is a single segment: an anchored or dotted path reads as an unknown field.
  * `untrusted` walks for the wire: a `readable: false` field reads as unknown at every depth.
  * Its name stays out of the suggestion candidates; the trusted fluent walk stays flag-blind.
  * Returns `null` when every leaf is sound.
@@ -197,12 +197,9 @@ function checkBlocksHas(
 /**
  * Gates a parsed condition against a collection's metadata, the runtime twin of the type-level narrowing.
  *
- * Every leaf must address a real field and apply an operator that field admits.
  * An unknown field throws, with a `didYouMean` suggestion when one is close.
  * An inapplicable operator throws, naming the field and the operator.
- * A `has`'s nested condition re-scopes to the relation's target and is gated there in turn.
  * A blocks `has` scope must open with a bare `block` equality naming an allowed type.
- * A `where` path is a single segment in v1: an anchored or dotted path reads as an unknown field.
  * Untyped callers thus hit the same failures the typed surface prevents at compile time.
  */
 export function validateCondition(node: ConditionNode, meta: CollectionQueryMeta): void {

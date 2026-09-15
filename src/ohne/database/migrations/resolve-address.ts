@@ -62,8 +62,8 @@ export interface ConsumedAddress {
 
   /**
    * The logical subtree a table-grain logical `from` consumes, its derived family included.
-   * A compound enumerates its family only at run time, so satisfaction matches on this instead:
-   * a logical `to` under the subtree counts as consumed even where no physical name can line up.
+   * A compound enumerates its family only at run time, so satisfaction matches on this instead.
+   * A logical `to` under the subtree counts as consumed even where no physical name can line up.
    */
   subtree?: LogicalSubtree;
 }
@@ -274,7 +274,7 @@ function ownedBy(origin: DerivedOrigin, owner: DerivedOwner): boolean {
 
 /**
  * The physical readings of one address: the tables it may name, purely from the address itself.
- * An ambiguous logical address lists both readings; over-approximation is safe for both callers.
+ * An ambiguous logical address lists both readings; over-approximation is safe for its callers.
  * A collection and a top-level field list the companion reading too: a translatable column lives there.
  * A block owner never has one, so its readings stop at the column and the table.
  */
@@ -360,7 +360,7 @@ export function touchedByMigration(meta: MigrationMeta): string[] {
 }
 
 /**
- * The attribute keys of the four switches, in one place for detection and validation.
+ * The attribute keys of the switches, in one place for detection and validation.
  */
 const SWITCH_KEYS = ['nullable', 'unique', 'uniquePerLocale', 'translatable'] as const;
 
@@ -381,7 +381,7 @@ function switchKeysOf(address: object): SwitchAttribute[] {
  * A collection-level rename or discard lowers to its family of member tables, claims-enumerated.
  * A pre-ownership snapshot bootstraps a rename's family from the `to` tree.
  * Table-grain discards refuse there, since nothing records what they cover.
- * A switch key on `from` marks the fourth form and lowers first, before any address pairing.
+ * A switch key on `from` marks a switch, which lowers first, before any address pairing.
  */
 export async function lowerMigration(
   state: ResolveState,
@@ -898,8 +898,8 @@ async function lowerLogicalPair(
  * With no live evidence the `to` side decides the reading, desired first, then live.
  * The desired schema never holds both readings: one field materializes as one storage shape.
  *
- * `fromLive` reports whether the `from` column is live, so the caller knows the move will run:
- * an absent `from` only ever skips or refuses, both blind to the lowered types.
+ * `fromLive` reports whether the `from` column is live, so the caller knows the move will run.
+ * An absent `from` only ever skips or refuses, both blind to the lowered types.
  */
 async function resolveReading(
   state: ResolveState,
@@ -959,8 +959,8 @@ async function resolveReading(
 /**
  * Lowers one side of a move to its physical column address, resolving the table and type it asserts.
  *
- * The table is the column's home: the main-path table, or the companion when the column lives
- * (or is desired) there - a translatable field's column moves with its flag, and so must the address.
+ * The table is the column's home: the main-path table, or the companion where the column lives or is desired.
+ * A translatable field's column moves with its flag, and so must the address.
  * An explicit `type` wins and stays the live-drift assertion.
  * A `from` falls back to the claim record, then the live column, then a placeholder.
  * The executor never reads the placeholder: an absent `from` skips before any type is read.
@@ -1078,8 +1078,6 @@ function lowerRenameCompound(
     toPath.length === 0
       ? ownerTableName(toOwner)
       : derivedTableName(derivedRootName(toOwner), toPath[0] as string, ...toPath.slice(1));
-  // A field-path primary reads its origin from the claims; a pre-ownership snapshot has none
-  // there, so the desired `to` tree supplies it - the claim must never rename origin-less.
   const claimedOrigin = fromPath.length === 0 ? undefined : state.claimed[fromPrimary]?.derived;
   const primaryOrigin = isUndefined(claimedOrigin)
     ? state.desired.find((table) => table.name === toPrimary)?.derived

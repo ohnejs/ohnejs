@@ -146,7 +146,7 @@ export function invalidNumberError(param: string): HTTPError {
 }
 
 /**
- * `limit`/`offset` mixed with `page`/`perPage` in one query; the two windowing modes are exclusive.
+ * `limit`/`offset` mixed with `page`/`perPage` in one query; the windowing modes are exclusive.
  */
 export function paginationError(): HTTPError {
   return wireError('invalidPagination', '');

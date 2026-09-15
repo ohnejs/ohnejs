@@ -62,7 +62,7 @@ export async function runCompositeTiers(
  *
  * An absent field takes its empty default, except at the top level of an update, where it is skipped.
  * An explicit `undefined` counts as absent, exactly as `prepareScalar` reads it.
- * A nested composite item is always full, so its absent list or object subfield defaults even under an update.
+ * A nested composite item is always full, so an absent list or object subfield defaults even under an update.
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
  * A provided value is marked `provided`, so Phase B runs the field's own sanitizers and validators over it.
  * A default is trusted and unmarked: its tiers never run, so an absent or inactive list lands `[]` untiered.
@@ -358,8 +358,8 @@ function blockEnvelope(
 
 /**
  * The `unknownBlock` failure as its `{ key, params }` message object.
- * The key lives in the framework's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Its object is therefore not a `Message` member here; the cast bridges it.
+ * Once `KnownMessages` has keys, the object must name one of them.
+ * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
  */
 function unknownBlockMessage(block: unknown): Message {
   return { key: 'validation.unknownBlock', params: { block: String(block) } } as unknown as Message;
@@ -367,7 +367,7 @@ function unknownBlockMessage(block: unknown): Message {
 
 /**
  * Lifts a repeater item's `UUID` off for correlation on update, leaving the rest to process as a full item.
- * On create the `UUID` stays in, so `processScope` rejects it as an unknown field - a create item carries none.
+ * On create the `UUID` stays in, so `processScope` rejects it as an unknown field.
  * A present-but-non-string `UUID` is an invalid value.
  */
 function liftItemUUID(

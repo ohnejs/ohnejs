@@ -33,9 +33,8 @@ import type { LayerName } from './layer-name.ts';
 export interface Config {
   /**
    * Layers this project extends, by name.
-   * Each name must be an ohne layer in the dependency closure; that closure types `LayerName`.
    * Add a layer to your `package.json` dependencies to make it referenceable, then list it here to stack it.
-   * A name outside `LayerName` is accepted too, so a fresh layer can be listed before codegen sees it.
+   * Autocomplete suggests every installed layer; a name it does not know yet is accepted too.
    *
    * Listed furthest-first: a later entry overrides an earlier one, and this project overrides all.
    * Resolution cascades - each listed layer's own `layers` load before it.
@@ -219,7 +218,7 @@ export interface Config {
 
     /**
      * Collection names to drop, matched exactly.
-     * A dropped collection vanishes from registration, the desired schema, and the generated types.
+     * A dropped collection is treated everywhere as if no layer defined it, schema sync included.
      *
      * @default
      * []
@@ -237,7 +236,7 @@ export interface Config {
 
     /**
      * Block names to drop, matched exactly.
-     * A dropped block vanishes from registration, the desired schema, and the generated types.
+     * A dropped block is treated everywhere as if no layer defined it, schema sync included.
      * A `blocks` field still allowing a dropped block fails at codegen.
      *
      * @default
@@ -262,7 +261,7 @@ export interface Config {
     /**
      * The content locales records may hold, as BCP-47 tags.
      * Canonicalized before use; an invalid tag or a duplicate is an error.
-     * The write layer enforces the set; sync never reads it.
+     * Queries refuse a locale outside the set; changing the set never changes the database schema.
      * Content locales are not UI languages, so the set is independent of the message catalogs.
      *
      * @default
@@ -281,8 +280,7 @@ export interface Config {
     /**
      * The locale existing values land on when a field turns translatable.
      * Must be one of `locales`; it never falls back to the set's first entry.
-     * The one locale the schema engine consumes.
-     * Inherited across layers, so a base layer can set the content dimension once.
+     * A query that names no locale reads and writes this one.
      *
      * @default
      * 'en'
@@ -298,7 +296,6 @@ export interface Config {
      * Language to fall back to when a request's language, and its parents, have no entry.
      * A BCP-47 tag like `en` or `de-AT`, canonicalized before use.
      * Once codegen has run it must be one of the catalog languages, typed by `KnownLanguages`.
-     * Inherited across layers, so an upper layer can set it once for everything above.
      *
      * @default
      * 'en'
@@ -332,7 +329,6 @@ export interface Config {
      * So `'/api'` serves a `/authors` route at `/api/authors`, and the handler still sees `/authors`.
      * Slashes are forgiving: `'/api'`, `'api/'`, and `'/api/'` all mean the same mount.
      * Empty mounts at the root, with no prefix.
-     * Inherited across layers, so a base layer can mount a whole stack under one prefix.
      *
      * @default
      * ''
@@ -375,7 +371,8 @@ export interface Config {
     shutdownTimeout?: number | string | false;
 
     /**
-     * Global deadline for every shutdown hook combined, passed to `useShutdown().watch`.
+     * Global deadline for every `onShutdown` hook combined, the server's own drain included.
+     * When it passes, the process exits with code `1`.
      * `false` waits for the hooks indefinitely.
      *
      * @default
@@ -469,6 +466,7 @@ export interface Config {
      * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
      * A body that overruns mid-stream aborts with the same `413`.
      * `false` leaves the body size unbounded.
+     * A route overrides it for itself through `defineHandler`.
      *
      * @default
      * '1mb'
@@ -486,6 +484,7 @@ export interface Config {
      * How long middleware and the handler may run before the request is answered with `503`.
      * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
      * `false` lets the handler run without a deadline.
+     * A route overrides it for itself through `defineHandler`.
      *
      * @default
      * '30s'
@@ -501,9 +500,10 @@ export interface Config {
 
     /**
      * How long a `waitUntil` promise may run after the response before it is abandoned.
-     * A `parseDuration` value; on overrun the promise is logged and the request's drain ticket released.
+     * A `parseDuration` value; on overrun the promise is logged and shutdown stops waiting for it.
      * Distinct from `shutdownTimeout`, which bounds background work only while shutting down.
      * `false` lets background work run without a deadline.
+     * A route overrides it for itself through `defineHandler`.
      *
      * @default
      * false
@@ -519,8 +519,8 @@ export interface Config {
 
     /**
      * CIDR ranges of proxies allowed to set `X-Forwarded-*`.
-     * When the immediate peer is in one of these ranges, `X-Forwarded-Proto`/`X-Forwarded-Host` are honored.
-     * They override the socket's own scheme and host, so `event.url` reflects the original client request.
+     * A trusted peer's `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` are honored.
+     * `event.ip` and `event.url` then reflect the original client, not the proxy hop.
      * An empty list trusts no proxy, so forwarding headers are ignored and the socket is the only truth.
      *
      * @default
@@ -594,7 +594,7 @@ export interface Config {
      * A collection the viewer cannot reach drops from its group.
      * Accessible collections in no group land in a trailing unlabeled group.
      * Omitted, the menu leads with the overview row, then lists every accessible collection unlabeled.
-     * Declared, it holds only the rows you list: add a link to `/overview` to keep the overview row.
+     * Declared, the menu shows the overview row only if you list a link to `/overview`.
      *
      * @example
      * ```ts
@@ -657,7 +657,6 @@ export interface Config {
     /**
      * Additional databases keyed by name, each a URL the dialect understands.
      * Reach one with `useDatabase('name')`; a helper holds no schema, only what you read and write.
-     * Any layer can contribute a helper; if two layers name the same one, the closer layer wins.
      *
      * @default
      * {}
@@ -693,12 +692,11 @@ export interface Config {
     /**
      * DoS ceilings for wire-driven queries, overriding the framework defaults per key.
      * They gate the untrusted URL and POST-body paths; the fluent builder is trusted and never checked.
-     * A closer layer or the app overrides a ceiling by naming it; unnamed ceilings keep the default.
      *
      * @example
      * ```ts
      * query: {
-     *   limits: { maxInLength: 500, maxPerPage: 100 },
+     *   guards: { maxInLength: 500, maxPerPage: 100 },
      * }
      * ```
      */
@@ -755,24 +753,8 @@ export interface ConfigExtensions {}
  * Framework config defaults, applied beneath every layer.
  * Merged into the furthest layer's own defaults, so any layer or the app can override them.
  *
- * ---
- *
- * `dirs` is absent: a codegen or api directory is a per-layer preference, never inherited.
- * Its defaults live in `DIR_DEFAULTS`, read from each layer's own config.
- *
- * ---
- *
- * `printer` is absent too: `usePrinter` reads it before layers load and supplies its own fallback.
- *
- * ---
- *
- * `api.port` and `api.host` are absent for the same reason: both are `'own'` (layer-private).
- * `dashboard.port` and `dashboard.host` are absent for the same reason.
- * A merged default never applies to an `'own'` key.
- *
- * ---
- *
- * `port` falls back to `DEFAULT_API_PORT`, read at point of use; `dashboard.port` to `DEFAULT_DASHBOARD_PORT`.
+ * Every `'own'` key in `BASE_STRATEGIES` is absent, since a merged default never applies to one.
+ * Their defaults apply at point of use, such as `DIR_DEFAULTS` and `DEFAULT_API_PORT`.
  */
 export const DEFAULTS = {
   layers: [],
@@ -844,13 +826,9 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * Framework merge strategies, seeded into the layer registry.
  *
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
- * - `disable.routes` accumulates across layers and dedupes, so every layer can add routes to drop.
- * - `disable.messages` accumulates across layers and dedupes, so every layer can add keys to drop.
- * - `disable.collections`, `disable.fields`, `disable.blocks`, and `disable.roles` accumulate and dedupe too.
+ * - Every `disable` list accumulates across layers and dedupes, so every layer can add components to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
- * - `api.port` and `api.host` stay each layer's own: both are private to the layer that sets them.
- * - `dashboard.port`, `dashboard.host`, and `dashboard.apiURL` stay each layer's own, like `api`'s.
- * - `dashboard.origin` and `dashboard.menu` stay each layer's own too.
+ * - The listed `api` and `dashboard` keys stay each layer's own: an app owns its servers and sidebar.
  * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
  * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
  * - `database.helpers` is unlisted on purpose: the default per-key merge already lets any layer add one.

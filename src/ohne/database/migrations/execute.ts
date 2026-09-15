@@ -67,9 +67,6 @@ export interface ExecuteMigrationsOptions {
 
   /**
    * Authorizes the value losses a move would otherwise refuse, reporting them as deletions.
-   *
-   * @default
-   * false
    */
   force: boolean;
 
@@ -1345,8 +1342,8 @@ async function runValuePass(
  * The sync bracket runs with foreign keys off, so nothing cascades on its own.
  * A blocks wrapper first sweeps the instances only its doomed rows reference, reported like any purge.
  * Child tables, junctions, wrappers, and companions keyed to the deleted rows die next, recursively.
- * Rows of a per-type block table pull the wrapper rows referencing them along too:
- * the link is polymorphic, so no key would ever cascade it.
+ * Rows of a per-type block table pull the wrapper rows referencing them along too.
+ * The link is polymorphic, so no key would ever cascade it.
  * A junction row deletes by its link pair, plus `_localeCode` when the table carries it.
  * Every other table deletes by its primary key.
  */

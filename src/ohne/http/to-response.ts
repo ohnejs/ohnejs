@@ -7,8 +7,7 @@ import { HTTPError } from './http-error.ts';
  * Serializes a handler's return value into a Web `Response`.
  *
  * The value decides the shape.
- * `init` supplies status and headers, except for a verbatim `Response` and an `HTTPError`.
- * Those two carry their own status:
+ * `init` supplies status and headers, but a verbatim `Response` and an `HTTPError` carry their own status:
  *
  * - `Response` - its own status and body win; `init` headers are merged in, the Response winning per name.
  * - `HTTPError` - JSON `{ statusCode, message, data? }` at the error's status.

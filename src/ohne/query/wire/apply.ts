@@ -26,7 +26,7 @@ export interface QueryScope {
 
   /**
    * The fields a request may read; a request's own `select` intersects with these, never widening.
-   * Parsed against `scopedMetadata`, a field outside them is refused wherever a read could address it.
+   * A query parsed against `scopedMetadata` refuses a field outside them wherever a read could address it.
    */
   select?: string[];
 
@@ -48,9 +48,7 @@ export interface QueryScope {
  * The parsed query drives the same untyped methods the fluent builder narrows, so both paths compile alike.
  * The locale applies first, the request's choice over the scope's, then the filters replay.
  * A query `parseWireQuery` parsed carries its reach, installed so every crossed read composes under it.
- * The terminal stays with the caller, which pins `findMany`/`paginate`/... and runs it.
- * It reads `parsed.page`/`parsed.perPage` when it paginates.
- * Returns the builder for the terminal to run.
+ * The caller pins the terminal, passing `parsed.page` and `parsed.perPage` itself when it paginates.
  *
  * @example
  * ```ts

@@ -12,7 +12,7 @@ import { useLayers } from '../../layers/use-layers.ts';
  * The catalog depends on file contents, not just the set of files.
  * `regen` runs unconditionally and lets `generateMessages` write only when its output changes.
  * One scan emits the shared, node, and browser buckets together.
- * `invalidate` is a no-op for the same reason: there is no file-set snapshot to drop.
+ * `invalidate` is a no-op: there is no file-set snapshot to drop.
  */
 export function createMessagesTarget(from: string): SetTarget {
   return {

@@ -62,7 +62,7 @@ export interface SyncProjectOptions {
  * The default content locale resolves from `Config.collections`, feeding the translatable fan-out.
  * Deletions - forced, or authorized by an applied migration - land in a warn block.
  * Orphan warnings land in another; a refusal throws through the funnel.
- * Under `dryRun` the reconciliation rolls back and the two blocks read in the future tense.
+ * Under `dryRun` the reconciliation rolls back and the warn blocks read in the future tense.
  * `serveAPI` runs it before `listen()`; `ohne sync` runs it standalone.
  */
 export async function syncProjectDatabase(options: SyncProjectOptions = {}): Promise<GuardReport> {

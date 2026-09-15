@@ -121,7 +121,7 @@ export async function runCreate(
 }
 
 /**
- * The insert attempt inside the transaction, ordered exactly as the plan pins.
+ * The insert attempt inside the transaction, in the order `runCreate` lists.
  */
 async function attemptCreate(
   tx: Transaction,

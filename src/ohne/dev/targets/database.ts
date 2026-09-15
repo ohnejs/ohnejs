@@ -14,7 +14,7 @@ const DIRS = ['collections', 'fields', 'blocks', 'migrations'] as const;
  * The generated types depend on file contents, not just the set of files.
  * `regen` runs unconditionally and lets `generateDatabase` write only when its output changes.
  * Definitions re-import fresh, so an edited collection or field type is read again.
- * `invalidate` is a no-op for the same reason: there is no file-set snapshot to drop.
+ * `invalidate` is a no-op: there is no file-set snapshot to drop.
  */
 export function createDatabaseTarget(from: string): SetTarget {
   return {

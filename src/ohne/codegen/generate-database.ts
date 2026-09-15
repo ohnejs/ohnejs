@@ -160,7 +160,7 @@ const ITEM_UUID_DOC =
   "This item's unique identifier.\nAssigned when the item is created and never changes.";
 
 /**
- * The docs the three structural members of a blocks-union arm carry, by member name.
+ * The docs the structural members of a blocks-union arm carry, by member name.
  */
 const BLOCK_ARM_DOCS = {
   block: 'The block type.',
@@ -174,7 +174,7 @@ const BLOCK_ARM_DOCS = {
  * `shared/database.ts` carries the pure types: `GeneratedCollections`, `GeneratedBlocks`, and friends.
  * `node/database.ts` imports every collection, block, field-type, and migration definition.
  * Importing it registers them all.
- * It also augments `KnownCollections`, `KnownBlocks`, `KnownFields`, `KnownDatabases`, and `KnownCapabilities`.
+ * It also augments each `Known*` that `shared/database.ts` backs, and `KnownFields` per custom field type.
  * Migration registration order is the execution order: furthest layer first, name order within a layer.
  * Both files are written even when empty, so a stale one never imports deleted files.
  *
@@ -249,8 +249,7 @@ function messageResolver(messages: readonly MessageMeta[]): MessageResolver {
 }
 
 /**
- * Writes `shared/database.ts`, the pure type bucket.
- * It carries `GeneratedCollections`, `GeneratedRelations`, `GeneratedBlocks`, and `GeneratedDatabases`.
+ * Writes `shared/database.ts`, the pure type bucket holding every `Generated*` type this generator emits.
  * `GeneratedCapabilities` derives the capability names from the collection set.
  * `GeneratedLocales` closes the file with the configured locale set.
  * The traversals run before emission, so `importType` records its `import type` lines first.
@@ -1003,7 +1002,7 @@ function fieldBullets(
 }
 
 /**
- * Whether the field itself permits `null`: a lone child row, or a nullable-or-forced column; a list never does.
+ * Whether the field itself permits `null`: a lone child row or a nullable-or-forced column, never a list.
  * A translatable column also reads `null` per missing locale, which the translatability line already conveys.
  */
 function fieldNullable(
@@ -1017,7 +1016,7 @@ function fieldNullable(
 }
 
 /**
- * The index bullet for a column-bearing field: its unique scope, a plain index, or none; column-less has no index.
+ * The index bullet of a column-bearing field: its unique scope, a plain index, or `No index`; else `null`.
  */
 function indexBullet(
   kind: FieldStorageKind,
@@ -1033,7 +1032,7 @@ function indexBullet(
 }
 
 /**
- * A count bullet naming how many of one thing a field carries: `No sanitizers`, `1 validator`, `2 validators`.
+ * A count bullet for how many of one thing a field carries: `No sanitizers`, `1 validator`, `2 validators`.
  */
 function countBullet(count: number, noun: string): string {
   return count === 0 ? `No ${noun}s` : `${count} ${pluralize(count, noun)}`;
@@ -1072,7 +1071,7 @@ function describeOptionValue(value: unknown): string {
 }
 
 /**
- * Wraps a value in backticks, the printer's highlight for an identifier or literal.
+ * Wraps a value in backticks, so the generated doc comment renders it as inline code.
  */
 function inlineCode(value: string): string {
   return `\`${value}\``;

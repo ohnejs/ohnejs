@@ -3,7 +3,7 @@ import type { CollectionName } from '../collections/known-collections.ts';
 /**
  * Codegen extension point mapping every collection to its update-input shape.
  * Empty until codegen runs; the generated `database.ts` augments it with one member per collection.
- * A member describes what `update` accepts: every field optional, a repeater item carrying an optional `UUID`.
+ * A member describes what `update` accepts: every field optional, a repeater item with an optional `UUID`.
  *
  * `type` aliases cannot be augmented, so the table lives on this interface instead.
  *

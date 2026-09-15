@@ -3,7 +3,7 @@ import type { LiteralUnion } from '../../utils/index.ts';
 /**
  * Codegen extension point for the schema-derived capability names.
  * Empty until codegen runs; the `database.ts` it emits augments this with one member per capability.
- * Every collection contributes `collection.<Name>.<operation>` for the four API operations.
+ * Every collection contributes `collection.<Name>.<operation>` for each API operation.
  * The per-collection wildcard `collection.<Name>.*`, `collection.*`, and `*` round out the set.
  * An app or layer adds its own names the same way, with `declare module 'ohnejs'`, so they complete too.
  *

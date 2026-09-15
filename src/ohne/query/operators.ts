@@ -21,12 +21,12 @@ const operatorCache = new WeakMap<FieldQueryMeta, ReadonlySet<QueryOperator>>();
  *
  * The `UUID` entries (`id` marker) take the identity tests alone.
  * A `record` takes identity tests, `isNull` when nullable, and the relation pair `has`/`empty`.
- * A UUID-typed foreign key never gains the text trio or ordering.
- * `records` and the child kinds take `has`/`empty` only.
+ * A UUID-typed foreign key never gains the substring operators or ordering.
+ * `records`, the child kinds, and `blocks` take `has`/`empty` only.
  * `childOne` gets nothing null-related, since `empty` covers it.
  * Scalar groups gate on the column's logical type.
  * `equalsTo` admits `text`/`integer`/`real`/`boolean`; `in` and ordering admit `text`/`integer`/`real`.
- * The text trio and `like` admit `text` alone.
+ * The substring operators and `like` admit `text` alone.
  * `isNull` requires nullability or a companion column.
  * A missing translation reads `null` whatever the option says.
  * `includes*` requires a column flagged `jsonList`.

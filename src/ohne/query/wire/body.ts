@@ -25,9 +25,7 @@ export interface ReadQueryBodyOptions {
  *
  * The parsed object feeds the same `parseQueryParams` a URL does, so both transports converge.
  * Rejects `415` unless the `Content-Type` is `application/json` or a `+json` suffix.
- * An empty, non-object, or malformed body rejects `400`.
- * The text is depth-scanned against `maxDepth` (default `32`, matching the URL grammar) before `JSON.parse`.
- * A deeply nested payload is refused before it can overflow the parser's stack.
+ * An empty, non-object, malformed, or too-nested body rejects `400`.
  * The result is unverified; `parseQueryParams` validates it.
  *
  * @example

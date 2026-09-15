@@ -34,7 +34,7 @@ export interface LayerWatch {
  * Layers whose directory lies under `node_modules` are skipped - installed deps never change in dev.
  * A workspace or linked layer resolves to its source directory outside `node_modules`, so it stays watched.
  *
- * Inside each watched directory, `watchTree` prunes `node_modules`, dot-dirs, and the codegen output dir.
+ * Inside each watched directory, `watchTree` prunes `node_modules`, dot-prefixed names, and the codegen dir.
  * A generated file write therefore never reports a change.
  *
  * The registry must already be populated, since the supervisor runs `loadLayers` first.

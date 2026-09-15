@@ -61,14 +61,11 @@ declare module 'ohnejs' {
  * Boots the API backend for the project rooted at `from` and starts serving it.
  *
  * Resolves and registers the layer stack, runs every layer's boot files, then regenerates types.
- * Boot registers each layer's hooks and startup side effects before the server is built.
- * Files an earlier run left in the codegen dir are pruned, so it holds exactly the current output.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
- * A skipped codegen still reads the banner stamp and warns when another ohne version generated the files.
+ * A skipped codegen still warns when another ohne version generated the files.
  *
- * The generated `routes.ts` is then imported to populate `useRoutes` with live handlers.
  * The database connects and its schema syncs before the server is built, so a failed sync never serves.
- * The server is built from that table, started, and wired to graceful shutdown through `onShutdown`.
+ * The server is then started and wired to graceful shutdown through `onShutdown`.
  * Once it is listening, the `server:ready` hook runs before readiness is announced.
  * A hook that throws drains the server and rethrows, so a half-booted process exits instead of serving.
  * The listening socket and the shutdown signal funnel keep the process alive after this resolves.

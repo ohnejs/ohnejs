@@ -119,8 +119,7 @@ export interface ValidateFieldArgs {
  * - `uniquePerParent` narrows a unique too, so it requires the flag; its placement is the schema's rule.
  * - `writable: false` on a required column with no default, instance or type, would fail every create.
  * - `immutable` on top of `writable: false` is redundant - the wider flag already locks updates.
- * - `immutable` is top-level only: an update rewrites composite items and block instances whole,
- *   so a nested value cannot lock.
+ * - `immutable` is top-level only: an update rewrites composite items and block instances whole.
  */
 export function validateField(args: ValidateFieldArgs): void {
   const { owner, name, nested, instance, fieldType, hint } = args;

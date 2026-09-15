@@ -9,7 +9,6 @@ import { usePrinter } from '../printer/use-printer.ts';
  *
  * Reads `.env` at `root`, the directory holding `ohne.config.ts`, and fills every name the process lacks.
  * A name the shell, the host, or a supervising `ohne dev` already set keeps its value.
- * The file never overrides.
  * A missing file applies nothing, so production runs the same path with no file present.
  * A repeat call replaces what the previous one applied, which is how `ohne dev` picks up an edited file.
  * Readers cached in an `effect` or `computed` re-run, since the fill goes through `useEnv().fill`.

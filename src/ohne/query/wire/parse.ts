@@ -52,18 +52,12 @@ import {
 /**
  * A validated query lifted off the wire, ready to replay through the untyped builder.
  *
- * `where` is the condition object the builder re-parses; `select` is `null` when unnarrowed.
- * `limit`/`offset` and `page`/`perPage` are the two windowing modes, never both set at once.
+ * `limit`/`offset` and `page`/`perPage` are the windowing modes, never both set at once.
  * The endpoint pins the terminal, so it reads whichever pair its terminal consumes.
  */
 export interface ParsedQuery {
   /**
    * The `where` condition, or `null` when the query names none.
-   *
-   * @example
-   * ```ts
-   * { status: 'published' }
-   * ```
    */
   where: ConditionInput | null;
 
@@ -85,11 +79,6 @@ export interface ParsedQuery {
   /**
    * The relations to hydrate - bare names or recursive spec objects; empty when the query names none.
    * Spec values arrive normalized: a lone-string `select` or `populate` is already a proper list.
-   *
-   * @example
-   * ```ts
-   * ['author', { comments: { select: ['text'], populate: ['author'] } }]
-   * ```
    */
   populate: (string | PopulateSpec)[];
 
@@ -142,9 +131,10 @@ const KNOWN_PARAMS = new Set([
  *
  * Every failure throws an `HTTPError(400)` carrying a stable `code` and the offending dot `path`.
  * The condition parses through the shared grammar, then gates applicability, DoS ceilings, and value types.
- * `select`, `order`, and `populate` gate against the same fields; the two windowing modes are exclusive.
+ * `select`, `order`, and `populate` gate against the same fields; the windowing modes are exclusive.
  * `locale` canonicalizes and must name a configured content locale on a translatable collection.
  * The untrusted path is the only one guard-checked; the fluent builder is not.
+ * A `populate` or conditioned `has` reads its target collection unscoped; `parseWireQuery` scopes each.
  *
  * @example
  * ```ts
@@ -549,7 +539,7 @@ function countPopulateNode(budget: { nodes: number }, guards: QueryGuards): void
 }
 
 /**
- * Parses the windowing params, rejecting a mix of the two modes and clamping `perPage` to its ceiling.
+ * Parses the windowing params, rejecting mixed modes and clamping `perPage` to its ceiling.
  */
 function parseWindow(
   params: Record<string, SearchParamValue>,

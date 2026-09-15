@@ -34,7 +34,8 @@ export interface ResolvedLocales {
  * resolveLocales({ locales: ['en', 'de-at'], defaultLocale: 'en' })
  * // -> { locales: ['en', 'de-AT'], defaultLocale: 'en' }
  *
- * resolveLocales(undefined) // -> { locales: ['en'], defaultLocale: 'en' }
+ * resolveLocales(undefined)
+ * // -> { locales: ['en'], defaultLocale: 'en' }
  * ```
  */
 export function resolveLocales(collections: Config['collections']): ResolvedLocales {

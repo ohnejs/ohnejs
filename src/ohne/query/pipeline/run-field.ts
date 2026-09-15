@@ -70,7 +70,7 @@ export function isProvided(input: Readonly<Record<string, unknown>>, name: strin
 }
 
 /**
- * The default path (step 0), keyed on the field's storage kind.
+ * The default path, keyed on the field's storage kind.
  *
  * An instance `default` wins; then a column's type `defaultValue`; then the kind's empty value.
  * A non-nullable column with no default is `required`.

@@ -6,7 +6,7 @@ import { isOhneProject } from '../../project/is-ohne-project.ts';
 
 /**
  * The `ohne dev` command.
- * Watches the project at `--cwd`, reloads the API server on every change, and serves the dashboard.
+ * Watches the project at `--cwd`, reloads the API server when a change affects it, and serves the dashboard.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
  */

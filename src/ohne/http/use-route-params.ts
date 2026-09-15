@@ -7,7 +7,7 @@ import { useEvent } from './use-event.ts';
  * Shorthand for `useEvent().params`; valid only within a request.
  *
  * A `[id]` segment becomes `params.id`; a catch-all `[...path]` becomes `params.path`.
- * Values are the raw matched substrings, not URI-decoded.
+ * Values are URI-decoded; a value with a malformed percent-sequence stays as matched.
  *
  * @example
  * ```ts

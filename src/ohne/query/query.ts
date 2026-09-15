@@ -10,7 +10,6 @@ import { queryMetadata } from './metadata.ts';
  *
  * The collection name narrows to the generated union.
  * Every field, operator, and result row types through the generated metadata.
- * One runtime class backs it, shared with `queryUntyped`.
  *
  * @example
  * ```ts
@@ -26,9 +25,9 @@ export function query<C extends CollectionName>(collection: C): QueryBuilder<C> 
 }
 
 /**
- * Opens an untyped query builder over a collection, the entry the wire path and internals use.
+ * Opens an untyped query builder over a collection, the builder `applyQuery` and other dynamic callers take.
  *
- * The collection must exist; its metadata resolves and memoizes on first use.
+ * An unknown collection throws.
  *
  * @example
  * ```ts

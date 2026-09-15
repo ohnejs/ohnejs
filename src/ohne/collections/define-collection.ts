@@ -83,7 +83,7 @@ export interface CollectionEndpoint<
    * Resolves the operation's per-request scope, once the guard and the middleware have passed.
    * The context names the operation; a create or update carries `input`, the write the caller intends.
    * The collections API hands it the JSON body, or an empty write when the body fails to read.
-   * A translation copy hands it the values it copies.
+   * A translation copy hands it an empty write to reach the source, then the values it copies.
    * A returned scope composes into every query the operation runs.
    * Its `where` ANDs in, so an out-of-scope record answers the same `404` a missing one does.
    * The filter reads the stored row, so a writable scope key lets a body hand the row out of the scope.
@@ -133,7 +133,7 @@ export interface CollectionAPI<TField extends string = string> {
   read?: boolean | 'public' | CollectionEndpoint<TField, 'read'>;
 
   /**
-   * Opens `POST /collections/<name>` - creating a record.
+   * Opens `POST /collections/<kebab-name>` - creating a record.
    *
    * @default
    * false
@@ -141,7 +141,7 @@ export interface CollectionAPI<TField extends string = string> {
   create?: boolean | 'public' | CollectionEndpoint<TField, 'create'>;
 
   /**
-   * Opens `PATCH /collections/<name>/<uuid>` - updating one record.
+   * Opens `PATCH /collections/<kebab-name>/<uuid>` - updating one record.
    *
    * @default
    * false
@@ -149,7 +149,7 @@ export interface CollectionAPI<TField extends string = string> {
   update?: boolean | 'public' | CollectionEndpoint<TField, 'update'>;
 
   /**
-   * Opens `DELETE /collections/<name>/<uuid>` - deleting one record.
+   * Opens `DELETE /collections/<kebab-name>/<uuid>` - deleting one record.
    *
    * @default
    * false
@@ -281,12 +281,12 @@ export interface CopyTranslationContext {
   input: Record<string, unknown>;
 
   /**
-   * The resolved locale the copy reads from, narrowed to the configured set once codegen has run.
+   * The resolved locale the copy reads from, one of `collections.locales`.
    */
   sourceLocale: LocaleCode;
 
   /**
-   * The resolved locale the copy writes to, narrowed the same way.
+   * The resolved locale the copy writes to, one of `collections.locales`.
    */
   targetLocale: LocaleCode;
 }

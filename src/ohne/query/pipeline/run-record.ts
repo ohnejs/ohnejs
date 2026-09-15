@@ -323,7 +323,7 @@ function isScalarField(meta: FieldQueryMeta): boolean {
  * Processes one scope's fields through the two-phase pipeline, dispatching each field on its kind.
  *
  * Phase A runs every field's default path, null gate, and coerce.
- * A create gates each field on its `when` (step 3) between the phases, reading coerced siblings and ancestry.
+ * A create gates each field on its `when` between the phases, reading coerced siblings and ancestry.
  * An inactive field drops its value, `null` included, and takes the default path.
  * An update never gates here; its activation is per matched record, resolved by the executor.
  * Provided fields there validate once, whether active or not.

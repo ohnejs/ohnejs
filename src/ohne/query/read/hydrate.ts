@@ -83,8 +83,7 @@ export async function deserializeColumn(
 }
 
 /**
- * Whether a field's value lives outside its scope's table:
- * a `records` relation, a child composite, a `blocks` list, or the `translations` probe.
+ * Whether a field's value lives outside its scope's table.
  */
 function isColumnless(field: FieldQueryMeta): boolean {
   return (

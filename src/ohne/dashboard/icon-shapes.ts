@@ -13,11 +13,8 @@ const FILE = resolvePath('icon-shapes.json', dirname(import.meta.filename));
 let shapes: Record<string, string> | undefined;
 
 /**
- * Parses the shape table on first use and keeps it.
- * The dashboard server reads it per icon request, the collection validator once per declared icon.
- * A project whose collections name no icon never reads the file.
- * One that does pays a single parse of roughly 7ms and holds about 2.5MB for the process lifetime.
- * The API server pays that as readily as the dashboard one, since both validate the collections.
+ * Parses the shape table on first use and keeps it, about 2.5MB for the process lifetime.
+ * Any process that imports a collection declaring an icon loads it, the API server included.
  */
 function table(): Record<string, string> {
   shapes ??= JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, string>;

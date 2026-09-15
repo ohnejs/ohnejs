@@ -42,8 +42,8 @@ export interface ResponseInit {
 }
 
 /**
- * One object per request, held in `AsyncLocalStorage` for the request's lifetime.
- * `useEvent` reaches it at any depth, which is what makes the composables ambient.
+ * One object per request, alive for the request's lifetime.
+ * `useEvent` reaches it at any call depth, so the request composables never need it passed in.
  *
  * The request and parsed URL are the inbound contract.
  * `response` and `context` are the outbound and cross-cutting state a handler or middleware writes to.
@@ -89,23 +89,9 @@ export interface Event {
   appliedMiddleware: MiddlewareKey[];
 
   /**
-   * Keep background work alive past the response.
-   * The promise runs after the response is sent and holds the request's drain ticket until it settles.
-   * Shutdown therefore waits for it.
+   * Keeps background work alive past the response, like the `waitUntil` composable.
+   * The response is sent without waiting for it, and a graceful shutdown waits for the work to settle.
    * A rejection is isolated and logged, never touching the sent response.
-   * Best for short side effects like logging or analytics; durable work belongs in a queue, not here.
-   *
-   * @example
-   * ```ts
-   * export default defineHandler(async () => {
-   *   const user = await createUser()
-   *
-   *   // Send a welcome email after the response is sent
-   *   useEvent().waitUntil(sendWelcomeEmail(user))
-   *
-   *   return user
-   * })
-   * ```
    */
   waitUntil(promise: Promise<unknown>): void;
 }

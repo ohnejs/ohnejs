@@ -10,11 +10,11 @@ import { validationError } from '../write/errors.ts';
  *
  * The wire's half of the flag contract: the generated input types already drop flagged fields.
  * A typed caller cannot name them; this guards the HTTP ingress, where no types exist.
- * Three kinds of key deny: unknown, `writable: false`, and - on update - `immutable: true`.
- * Every one collects `validation.unknownField` at its dot path, one indistinguishable shape.
+ * A key is denied when it is unknown, `writable: false`, or - on update - `immutable: true`.
+ * Each denied key collects `validation.unknownField` at its dot path, one indistinguishable shape.
  * A response therefore never reveals that a hidden field exists.
- * The walk descends composite items and block envelopes, mirroring the pipeline's own key rule:
- * a field is settable when it carries a `fieldType`, and an item `UUID` is legal on update alone.
+ * The walk descends composite items and block envelopes, mirroring the pipeline's own key rule.
+ * A field is settable when it carries a `fieldType`, and an item `UUID` is legal on update alone.
  * Value shapes stay the pipeline's job: a value that does not match its field's shape is not descended.
  * Every denied path collects before the throw; a failure throws a `ValidationError` rendered as `422`.
  */

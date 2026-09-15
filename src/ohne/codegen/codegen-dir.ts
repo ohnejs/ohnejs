@@ -8,7 +8,7 @@ import { version } from '../meta/version.ts';
  * A codegen output bucket, partitioning generated files by which TypeScript program consumes them.
  * `shared` holds pure types both programs include.
  * `node` holds `ohnejs` augmentations and registrations; `browser` holds `ohnejs/dashboard` augmentations.
- * The two `tsconfig`s route each bucket by directory.
+ * Each program's `tsconfig` includes its buckets by directory.
  */
 export type CodegenBucket = 'shared' | 'node' | 'browser';
 

@@ -44,7 +44,7 @@ const SQLITE_LOCKED = 6;
 /**
  * The SQLite dialect, over Node's built-in `node:sqlite`.
  *
- * The only file in ohne that imports a database driver.
+ * Its directory is the only place in ohne that imports a database driver.
  * Everything else speaks `DatabaseAdapter` and `Dialect`.
  * The base `acquireLock`/`releaseLock` carry over unchanged.
  * They run their portable SQL through this dialect's `quote` and `columnType`.
@@ -123,7 +123,7 @@ export class SQLiteDialect extends Dialect {
   /**
    * SQLite's default `LIKE` is ASCII-case-insensitive, exactly the operator contract.
    * The plain operator suffices, with backslash declared as the escape character.
-   * `PRAGMA case_sensitive_like` must never be set: it would make the trio case-sensitive.
+   * `PRAGMA case_sensitive_like` must never be set: it would make the text-match operators case-sensitive.
    */
   textMatch(quotedColumn: string): string {
     return `${quotedColumn} LIKE ? ESCAPE '\\'`;

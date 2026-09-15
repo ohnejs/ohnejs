@@ -13,7 +13,7 @@ export interface QueryFieldMeta {
   /**
    * The field's emitted value type without `| null`; column and `record` kinds only.
    * Its TypeScript kind gates the scalar operators.
-   * `string` unlocks the text trio; ordering wants `string | number`.
+   * `string` unlocks the substring operators; ordering wants `string | number`.
    */
   scalar?: unknown;
 

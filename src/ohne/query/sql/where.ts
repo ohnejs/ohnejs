@@ -240,7 +240,7 @@ function compileHas(
 }
 
 /**
- * Compiles `empty` per relation kind: a record's null foreign key, or the negation of the relation's `EXISTS`.
+ * Compiles `empty` per relation kind: a record's null foreign key, or the relation's negated `EXISTS`.
  */
 function compileEmpty(
   node: Extract<ConditionNode, { kind: 'empty' }>,

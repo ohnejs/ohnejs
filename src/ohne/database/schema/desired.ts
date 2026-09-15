@@ -119,7 +119,7 @@ const UPDATED_AT_COLUMN: ColumnSchema = { name: '_updatedAt', type: 'integer', n
  * Builds the desired schema from the collection, field-type, and block registries.
  *
  * One main table per collection, carrying `UUID`, `_updatedAt`, and one column per column-bearing field.
- * Nullability is `!(nullable || forceNullable)`.
+ * `notNull` is `!(nullable || forceNullable)`.
  * A `record` field adds a foreign key on its column, aimed at the target collection's `UUID`.
  * An owning `records` field adds a junction table beside the main one; an `inverse` field adds nothing.
  * An `object` or `repeater` field adds a child table keyed by `UUID`, one or many rows per parent.
@@ -139,13 +139,10 @@ const UPDATED_AT_COLUMN: ColumnSchema = { name: '_updatedAt', type: 'integer', n
  * Every block table is shared - wrappers reference it, so it is emitted once.
  * Block tables follow the collections, sorted by name.
  * A registered block no wrapper allows stays a type without a table.
- * The `blocks` registry defaults to empty.
- * A blocks-bearing project that omits `useBlocks()` silently plans no block tables.
  *
  * A field referencing an unregistered type, target collection, or allowed block throws.
  * The error names the reference and the collection or block it appears in.
  * Instance-level rules are validated here, the one place every reference is resolved.
- * They cover common options on column-less fields, `nullable` on force-nullable types, and inverse pairing.
  * Subfield names are validated within each composite's scope.
  *
  * @example

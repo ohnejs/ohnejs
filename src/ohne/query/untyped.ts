@@ -174,9 +174,6 @@ export interface UntypedPopulateBuilder {
 /**
  * The runtime query surface every typed builder state is a view of.
  *
- * One class implements it; the typed states narrow its methods, so impl and views can never drift.
- * The wire path drives this surface directly, so replaying a URL query composes through the same methods.
- * The surface carries the read chain - filtering, ordering, the row window - and the read terminals.
  * The typed `query` narrows this; `queryUntyped` returns it raw, for the wire and other dynamic callers.
  *
  * @example
@@ -192,7 +189,7 @@ export interface UntypedPopulateBuilder {
 export interface UntypedQueryBuilder {
   /**
    * Adds a condition, ANDed onto whatever was already there.
-   * The object form parses to the shared AST, and each leaf is gated against the collection's metadata.
+   * A malformed condition, an unknown field, or an operator its field does not support throws.
    *
    * @example
    * ```ts
@@ -222,6 +219,7 @@ export interface UntypedQueryBuilder {
    * A populate hydrates only what the target's reach admits, narrowed to the fields it names.
    * A collection the reach never names reaches nothing, so a read fails closed.
    * A write terminal ANDs the condition in unscoped; the reach narrows reads alone.
+   *
    * @example
    * ```ts
    * queryUntyped('Posts').wire({ author: { has: { name: 'Ada' } } }, new Map([['Users', false]]))

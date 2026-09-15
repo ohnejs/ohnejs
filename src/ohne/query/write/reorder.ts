@@ -117,7 +117,6 @@ export function orderKeptWrites(
       }
       continue;
     }
-    // Every pending write waits on another's stored value: a swap cycle. Break the lowest holder.
     const holder = Math.min(
       ...[...pending].filter((index) => edges.some((edge) => edge.holder === index)),
     );

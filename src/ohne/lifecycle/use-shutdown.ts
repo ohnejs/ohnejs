@@ -13,7 +13,7 @@ export type ShutdownHook = () => void | Promise<void>;
  */
 export interface ShutdownRunOptions {
   /**
-   * Global deadline for every hook combined, as a `parseDuration` value.
+   * Global deadline for every hook combined, as milliseconds or `'30s'`.
    * Omitted means wait for the hooks indefinitely.
    */
   deadline?: number | string;
@@ -131,7 +131,7 @@ const shutdown: Shutdown = {
  *
  * Register teardown with `add` (or the `onShutdown` sugar), drive it with `watch`, run it with `run`.
  * Every arrival path funnels into one ordered run: signals, a process message, a parent disconnect.
- * The job queue and the HTTP server then drain through the same coordinator, with no handler of their own.
+ * The HTTP server and the database connections then close through it, with no signal handler of their own.
  *
  * @example
  * ```ts

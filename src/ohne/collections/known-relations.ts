@@ -10,8 +10,8 @@
  * ```ts
  * declare module 'ohnejs' {
  *   interface KnownRelations {
- *     Posts: { authors: 'Users' };
- *     Users: {};
+ *     Posts: { authors: 'Users' }
+ *     Users: {}
  *   }
  * }
  * ```

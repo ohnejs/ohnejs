@@ -11,7 +11,7 @@ import { useRequest } from './use-request.ts';
  * An absent body yields empty `FormData`.
  * Valid only within a request.
  *
- * File parts are buffered in memory, bounded by `server.maxBodySize`.
+ * File parts are buffered in memory, bounded by `api.maxBodySize`.
  *
  * @example
  * ```ts

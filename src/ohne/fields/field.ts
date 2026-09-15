@@ -118,7 +118,7 @@ export interface ValueOptions<
   /**
    * A value to store when this field is left out of a create.
    * Pass the value, or a function to compute it - the function can read the record's other input.
-   * A relation or composite (`records`/`object`/`repeater`) default must be a function, never a literal.
+   * A `records`, `object`, `repeater`, or `blocks` default must be a function, never a literal.
    *
    * @example
    * ```ts
@@ -245,7 +245,7 @@ export interface PresentationOptions {
 }
 
 /**
- * The common options after resolution: keys in `FIELD_OPTION_DEFAULTS` are required, the rest stay `?:`.
+ * The common options after resolution: options with a default are required, the rest stay `?:`.
  * The framework fills those defaults, so a resolved field reads them directly, without a fallback.
  * The value options join here so a resolved field carries its `default`, `sanitizers`, and `validators`.
  * The presentation options join too, so a resolved field carries its `label` and `description`.
@@ -263,11 +263,9 @@ type DeclaredOptions<K extends FieldTypeName> =
 
 /**
  * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
- * A column-less type stores through its hint alone.
- * `translatable` and the visibility flags (`readable`, `writable`, `immutable`) survive there.
- * Every kind can hide or lock itself.
- * Its derived table can still be locale-scoped.
- * The unique flags and `index` have no column to cover; `nullable` no cell to hold `NULL`.
+ * A column-less type keeps `translatable` and the visibility flags (`readable`, `writable`, `immutable`).
+ * Its derived table can still be locale-scoped, and every kind can hide or lock itself.
+ * It drops the unique flags and `index`, having no column, and `nullable`, having no cell to hold `NULL`.
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
  */
@@ -281,7 +279,7 @@ type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] exten
 
 /**
  * The full options object `field('K', ...)` accepts.
- * A `KnownFieldOptions` member is the complete shape.
+ * A `KnownFieldOptions` member replaces the declared and common options.
  * Otherwise the type's declared options resolve homomorphically.
  * The common options then join per the column gate.
  * The value and presentation options join outside that gate, so every kind carries them.

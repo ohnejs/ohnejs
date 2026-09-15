@@ -17,8 +17,8 @@ interface Manifest {
  */
 export interface OhneLayer {
   /**
-   * Package name of the layer.
-   * Falls back to the directory name when the manifest has none.
+   * Package name of the layer, or its full specifier (`@acme/kit/auth`) for a subpath layer.
+   * The app falls back to its directory name when its manifest has none.
    */
   name: string;
 
@@ -94,15 +94,14 @@ export async function resolveOhnePackages(from: string = process.cwd()): Promise
 }
 
 /**
- * Resolves the ordered layer stack for the current ohne app.
+ * Resolves every ohne layer in the current app's dependency closure, whether or not `Config.layers` lists it.
+ * The stack ohne merges comes from `resolveLayerStack`, which keeps only the layers `Config.layers` reaches.
  *
- * The stack runs furthest-first: a layer is positioned before the layers that depend on it.
+ * The list runs furthest-first: a layer is positioned before the layers that depend on it.
  * The app itself comes last.
- * That order is the merge order everywhere in ohne: later overrides earlier.
- * So a layer overrides every layer it pulls in, and the app overrides them all.
  *
  * The graph is walked depth-first in post-order, so a dependency is emitted before its dependent.
- * Unrelated sibling layers keep the order they are declared in, with the later one winning.
+ * Unrelated sibling layers keep the order they are declared in.
  * Only ohne projects become layers.
  * Non-ohne packages are still traversed to reach the ohne layers behind them.
  * The root's dev dependencies count; a transitive layer's do not.
