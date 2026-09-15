@@ -37,6 +37,23 @@ describe('fuzzyMatch', () => {
     deepStrictEqual(fuzzyMatch('gf', 'getFile')?.positions, [0, 3]);
   });
 
+  it('treats a digit after a letter as a word boundary', () => {
+    strictEqual(fuzzyMatch('2', 'ab2')?.score, fuzzyMatch('2', 'a-2')?.score);
+    strictEqual(fuzzyMatch('2', 'AB2')?.score, fuzzyMatch('2', 'A-2')?.score);
+  });
+
+  it('does not treat a digit after a digit as a word boundary', () => {
+    strictEqual(fuzzyMatch('2', 'a12')?.score, fuzzyMatch('c', 'abc')?.score);
+  });
+
+  it('does not treat a caseless letter after a letter as a word boundary', () => {
+    strictEqual(fuzzyMatch('う', 'あいう')?.score, fuzzyMatch('c', 'abc')?.score);
+  });
+
+  it('does not treat a separator as the start of a word', () => {
+    strictEqual(fuzzyMatch('.', 'readme.md')?.score, fuzzyMatch('.', 'README.md')?.score);
+  });
+
   it('scores an exact-case hit above a case-folded one', () => {
     const exact = fuzzyMatch('F', 'File');
     const folded = fuzzyMatch('f', 'File');

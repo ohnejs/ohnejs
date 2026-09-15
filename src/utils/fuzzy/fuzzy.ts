@@ -20,6 +20,8 @@ const BOUNDARY = 8;
 const CONSECUTIVE = 8;
 const CASE = 1;
 const GAP = 1;
+const UPPER = /\p{Lu}/u;
+const NUMBER = /\p{N}/u;
 
 /**
  * Scores `needle` against `haystack` as a subsequence, the way an editor's "go to file" search does.
@@ -27,7 +29,7 @@ const GAP = 1;
  * Matching is case-insensitive; an exact-case hit scores a touch higher.
  *
  * The score rewards word-boundary matches and consecutive runs, and penalizes the gaps between them.
- * A word boundary is the string start, a spot after a separator, or a camelCase hump.
+ * A word boundary is the string start, a spot after a separator, a camelCase hump, or a digit after a letter.
  * An empty needle matches everything with score `0` and no positions.
  * `positions` index into `haystack` and can drive highlighting of the matched characters.
  *
@@ -111,6 +113,9 @@ export function fuzzyMatch(needle: string, haystack: string): FuzzyMatch | null 
   return { score: bestScore, positions };
 }
 
+/**
+ * The score for matching `char` at `haystack[j]`: the base, plus any word-boundary and exact-case bonus.
+ */
 function charScore(char: string, haystack: string, j: number): number {
   let score = MATCH;
   if (isBoundary(haystack, j)) score += BOUNDARY;
@@ -118,13 +123,21 @@ function charScore(char: string, haystack: string, j: number): number {
   return score;
 }
 
+/**
+ * Whether `haystack[j]` starts a word: the string start or a spot after a separator.
+ * An uppercase letter after any other word character also counts, as does a digit after a letter.
+ */
 function isBoundary(haystack: string, j: number): boolean {
   if (j === 0) return true;
   const prev = haystack[j - 1];
   if (!isWordChar(prev)) return true;
-  return prev === prev.toLowerCase() && haystack[j] === haystack[j].toUpperCase();
+  const char = haystack[j];
+  return (UPPER.test(char) && !UPPER.test(prev)) || (NUMBER.test(char) && !NUMBER.test(prev));
 }
 
+/**
+ * Whether `char` is a Unicode letter or number; anything else, `_` included, is a separator.
+ */
 function isWordChar(char: string): boolean {
   return /[\p{L}\p{N}]/u.test(char);
 }
