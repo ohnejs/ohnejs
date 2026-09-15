@@ -24,8 +24,8 @@ export interface Measured<T> {
  *
  * @example
  * ```ts
- * const { result, ms } = await measure(() => generate(cwd))
- * print.info(`done in ${formatDuration(ms)}`) // -> 'done in 1s 200ms'
+ * const { result, ms } = await measure(() => fetch(url))
+ * formatDuration(ms) // -> '1s 200ms'
  * ```
  */
 export async function measure<T>(fn: () => Promise<T> | T): Promise<Measured<T>> {

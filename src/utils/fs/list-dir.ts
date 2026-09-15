@@ -116,15 +116,15 @@ export interface ListDirOptions {
  * Returns `null` if the root directory does not exist.
  * Returns `[]` for an existing but empty directory.
  *
- * All paths in the result are normalized through the project's path utilities.
+ * All paths in the result are normalized to `/` separators.
  *
  * @example
  * ```ts
- * await listDir('./src', { ext: 'ts' })
+ * await listDir('./src', { ext: ['ts', 'tsx'], depth: 1 })
+ * // -> [{ relativePath: 'ui/button.tsx', name: 'button.tsx', type: 'file', ... }]
  *
- * await listDir('./pages', { depth: 1, ext: ['.ts', '.tsx'] })
- *
- * await listDir('./layers', { dirs: true, files: false, depth: 0 })
+ * await listDir('./missing')
+ * // -> null
  * ```
  */
 export async function listDir(

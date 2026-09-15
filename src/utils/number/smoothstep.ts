@@ -2,7 +2,7 @@ import { clamp } from './clamp.ts';
 
 /**
  * Eases `t` across `[0, 1]` with the Hermite smoothstep curve `3t² - 2t³`.
- * It starts and ends with zero velocity, so windows chained through it join without a kink.
+ * It starts and ends with zero velocity, so segments eased one after another join without a kink.
  *
  * `t` is clamped to `[0, 1]` first.
  *

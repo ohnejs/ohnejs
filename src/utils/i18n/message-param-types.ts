@@ -6,7 +6,7 @@ import { parseMessage } from './parse-message.ts';
 
 /**
  * The TypeScript type of one message parameter, inferred from how an ICU template uses it.
- * Codegen renders each kind to a concrete annotation:
+ * Each kind stands for a concrete annotation:
  *
  * - `value`  -> `string | number` (a plain `{name}` placeholder)
  * - `number` -> `number` (`{n, number}`, `{n, plural}`, `{n, selectordinal}`)

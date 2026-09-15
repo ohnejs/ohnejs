@@ -6,9 +6,9 @@ import { capabilityCovers } from './capability-covers.ts';
  *
  * @example
  * ```ts
- * hasCapability(['collection.Posts.*'], 'collection.Posts.read') // -> true
- * hasCapability(['*'], 'billing.export')                         // -> true
- * hasCapability([], 'collection.Posts.read')                     // -> false
+ * hasCapability(['blog.posts.*'], 'blog.posts.read') // -> true
+ * hasCapability(['*'], 'billing.export')             // -> true
+ * hasCapability([], 'blog.posts.read')               // -> false
  * ```
  */
 export function hasCapability(held: readonly string[], required: string): boolean {

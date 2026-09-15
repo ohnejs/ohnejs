@@ -6,11 +6,11 @@
  *
  * @example
  * ```ts
- * capabilityCovers('collection.Posts.read', 'collection.Posts.read') // -> true
- * capabilityCovers('collection.Posts.*', 'collection.Posts.read')    // -> true
- * capabilityCovers('collection.*', 'collection.Posts.read')          // -> true
- * capabilityCovers('*', 'billing.export')                            // -> true
- * capabilityCovers('collection.Posts.read', 'collection.Posts.*')    // -> false
+ * capabilityCovers('blog.posts.read', 'blog.posts.read') // -> true
+ * capabilityCovers('blog.posts.*', 'blog.posts.read')    // -> true
+ * capabilityCovers('blog.*', 'blog.posts.read')          // -> true
+ * capabilityCovers('*', 'billing.export')                // -> true
+ * capabilityCovers('blog.posts.read', 'blog.posts.*')    // -> false
  * ```
  */
 export function capabilityCovers(held: string, required: string): boolean {

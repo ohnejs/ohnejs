@@ -19,7 +19,7 @@ export type ConditionValue =
   | ConditionObject;
 
 /**
- * A condition in object form: the shape `parseCondition` reads and a field's `when` accepts.
+ * A condition in object form: the shape `parseCondition` reads.
  * A field key maps to a scalar (the `equalsTo` shorthand) or a comparison object of operators.
  * The logical keys `and`, `or`, and `not` group nested conditions.
  * This is the authoring surface; the parsed `ConditionNode` is what every consumer evaluates.

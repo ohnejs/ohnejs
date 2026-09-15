@@ -13,8 +13,8 @@ import { writeFile } from './write-file.ts';
  *
  * @example
  * ```ts
- * await writeFileIfChanged('./.ohne/imports.ts', source) // -> true  (first run)
- * await writeFileIfChanged('./.ohne/imports.ts', source) // -> false (unchanged)
+ * await writeFileIfChanged('./.gen/imports.ts', source) // -> true  (first run)
+ * await writeFileIfChanged('./.gen/imports.ts', source) // -> false (unchanged)
  * ```
  */
 export async function writeFileIfChanged(path: string, content: string): Promise<boolean> {

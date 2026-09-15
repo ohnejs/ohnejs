@@ -18,7 +18,7 @@ const JS_TO_TS: Record<string, string> = {
  * Resolves a relative import specifier to the absolute project file it names, or `null`.
  *
  * Only relative specifiers (`./`, `../`) resolve.
- * Bare and external specifiers (`ohne`, `node:fs`, `@scope/pkg`) return `null`, never under `node_modules`.
+ * Bare and external specifiers (`pkg`, `node:fs`, `@scope/pkg`) return `null`, never under `node_modules`.
  * Resolution probes the filesystem like the TypeScript and Node resolvers.
  * It tries an explicit extension first, then source extensions, then an `index` file for a directory.
  * A `.js`-family specifier prefers its TypeScript sibling, so `./x.js` resolves to `./x.ts` when it exists.

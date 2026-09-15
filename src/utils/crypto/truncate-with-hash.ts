@@ -11,10 +11,11 @@ import { createHash } from 'node:crypto';
  *
  * @example
  * ```ts
- * truncateWithHash('IX__Posts__author') // -> 'IX__Posts__author'
+ * truncateWithHash('idx_orders_customer')
+ * // -> 'idx_orders_customer'
  *
- * truncateWithHash('UX__' + 'Collection'.repeat(8))
- * // -> 'UX__CollectionCollectionCollectionCollectionCollection$a1c2cb18'
+ * truncateWithHash('idx_' + 'categories'.repeat(8))
+ * // -> 'idx_categoriescategoriescategoriescategoriescategories$b560e838'
  * ```
  */
 export function truncateWithHash(name: string, max = 63): string {

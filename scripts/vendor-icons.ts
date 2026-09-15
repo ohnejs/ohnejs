@@ -53,11 +53,10 @@ const union = names.map((name) => `  | '${name}'`).join('\n');
 await writeFile(
   NAMES,
   `/**
- * Every icon the dashboard can render: the full Tabler set, named after its originals.
+ * Every icon name in the Tabler set, as Tabler names them.
  *
  * Generated from Tabler \`${TABLER}\` by \`pnpm vendor:icons\`; edit that script, never this file.
- * The shapes live in \`src/ohne/dashboard/icon-shapes.json\`, which the dashboard server serves.
- * It serves one shape at a time, so naming an icon here costs the browser nothing on its own.
+ * Type-only, so naming an icon ships no shape data.
  *
  * @example
  * \`\`\`ts

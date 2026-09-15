@@ -183,7 +183,7 @@ export type ResolvedArgs<S extends ArgsSchema> = DeepPrettify<
 
 /**
  * Identity helper that captures an `ArgsSchema` with its literal types intact.
- * Use it to define a schema once and reuse the inferred shape with `resolveArgs` and the command layer.
+ * Use it to define a schema once and reuse the inferred shape with `resolveArgs` and `defineCommand`.
  *
  * @example
  * ```ts

@@ -65,7 +65,7 @@ export type ResolveArgsResult<S extends ArgsSchema> =
  * A scalar flag repeated under one name takes its last value.
  * When a flag is given under both its canonical name and an alias, the canonical name wins.
  * A `recognize` schema is folded into flag recognition and boolean hinting but not resolved into `values`.
- * Use it to accept flags owned by another layer without reporting them as unknown.
+ * Use it to accept flags another parser handles without reporting them as unknown.
  *
  * @example
  * ```ts

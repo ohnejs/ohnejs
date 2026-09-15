@@ -224,9 +224,9 @@ function parseWhere(input: unknown, path: string, depth: number, maxDepth: numbe
 /**
  * Parses the condition object form into the normalized `ConditionNode` AST.
  * Validates shape only - operator names, arity, value JSON-kinds.
- * Field applicability is the framework's job.
- * Sibling field keys AND; `and`/`or` take arrays of groups, `not` one group; a comparison's `or`
- * ORs the AND of its sibling operators against each alternative.
+ * Per-field applicability is the consumer's job.
+ * Sibling field keys AND; `and`/`or` take arrays of groups, `not` one group.
+ * A comparison's `or` ORs the AND of its sibling operators against each alternative.
  * Negation folds to the leaves: De Morgan over groups, double negation cancels, no `not` node.
  * Groups with one child collapse to that child; empty groups survive as `and([])` / `or([])`.
  * An array operator value is copied, so mutating the caller's array never changes the parsed node.

@@ -22,11 +22,11 @@ export interface ImportDefaultOptions {
  *
  * @example
  * ```ts
- * await importDefault<Config>('/app/ohne.config.ts')
- * // -> { layers: [...] }
+ * await importDefault<Settings>('/app/settings.ts')
+ * // -> { port: 3000 }
  *
- * await importDefault<Config>('/app/ohne.config.ts', { fresh: true })
- * // -> the edited module
+ * await importDefault<Settings>('/app/settings.ts', { fresh: true })
+ * // -> { port: 4000 }, read again after an edit
  * ```
  */
 export async function importDefault<T>(

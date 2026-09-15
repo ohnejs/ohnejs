@@ -44,7 +44,7 @@ function statTag(stats: ETagStats): string {
  * Stats yield a weak tag (`W/"size-mtime"`), since equal size and mtime do not prove identical bytes.
  *
  * Pass `weak` to override either default.
- * Set the result as the response `ETag` header, then short-circuit with `isFresh`.
+ * Set the result as the response `ETag` header, then answer a matching `If-None-Match` with `304`.
  *
  * @example
  * ```ts

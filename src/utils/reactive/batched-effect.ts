@@ -5,7 +5,6 @@ import { dequeue, enqueue } from './_scheduler.ts';
  * Runs `fn` immediately, then re-runs it on a microtask whenever a tracked dependency changes.
  *
  * Unlike `effect`, re-runs are batched: many synchronous writes coalesce into one re-run.
- * The first run is synchronous, so the DOM an `h` call builds is populated before it returns.
  * Created inside an `effectScope`, the effect is stopped when that scope is disposed.
  * The returned function stops the effect and cancels any pending re-run.
  *

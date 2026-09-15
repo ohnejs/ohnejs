@@ -177,9 +177,9 @@ export interface LayerRegistry<C extends object, X extends object = object> {
  *
  * @example
  * ```ts
- * interface Config { tags: string[]; routes: string[] }
+ * interface Settings { tags: string[]; routes: string[] }
  *
- * const registry = createLayerRegistry<Config>({
+ * const registry = createLayerRegistry<Settings>({
  *   strategies: { tags: 'concat-unique', routes: 'concat' },
  * })
  *

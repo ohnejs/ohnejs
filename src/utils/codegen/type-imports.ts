@@ -55,7 +55,7 @@ export interface TypeImports {
  *
  * @example
  * ```ts
- * const imports = createTypeImports('/app/.ohne')
+ * const imports = createTypeImports('/app/.gen')
  *
  * imports.reference({ fromDir: '/app/fields', path: './geo.ts', exportName: 'LatLng' })
  * // -> 'LatLng'

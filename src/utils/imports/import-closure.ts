@@ -10,9 +10,6 @@ import { resolveImport } from './resolve-import.ts';
  * Bare and external specifiers are not followed; unreadable files are dropped.
  * Cycles terminate via a visited set.
  *
- * This is the dependency closure a content-based codegen target invalidates on.
- * Any change to a file in the set can change the entry's output.
- *
  * @example
  * ```ts
  * await importClosure('/app/schema.ts')

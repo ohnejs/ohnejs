@@ -10,7 +10,7 @@ const COLON_PARAM_RE = /:([A-Za-z_][A-Za-z0-9_]*)/g;
  * Segments without any ASCII alphanumeric character are removed.
  *
  * Bracket (`[name]`, `[...name]`) param syntax is preserved; colon params (`:name`) normalize to it.
- * Equivalent spellings so share one pattern, colliding within a layer and overriding across layers.
+ * Equivalent spellings therefore share one pattern.
  *
  * The result always starts with `/`.
  * A path that reduces to nothing becomes `/`.

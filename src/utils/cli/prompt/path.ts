@@ -152,7 +152,7 @@ interface Match {
  * - Printable keys insert and the usual line edits apply, with word jumps stopping at each `/`.
  * - `enter` submits the typed value once `only`, `mustExist`, and `validate` accept it.
  *
- * Paths use `/` and resolve through the project's path utilities, so a value works on every platform.
+ * The result is normalized to `/` separators, so a value works on every platform.
  */
 export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   const root = options.root ?? process.cwd();

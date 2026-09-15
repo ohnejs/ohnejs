@@ -6,8 +6,8 @@
  *
  * @example
  * ```ts
- * type M = DefaultsMarker<{ dirs: { codegen: string }; tags: string[] }>
- * // -> { dirs: { codegen: true }; tags: true }
+ * type M = DefaultsMarker<{ theme: { color: string }; tags: string[] }>
+ * // -> { theme: { color: true }; tags: true }
  * ```
  */
 export type DefaultsMarker<T> = {

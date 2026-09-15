@@ -1,6 +1,5 @@
 /**
  * The closed set of comparison operators the condition grammar speaks.
- * Wire spelling, builder method name, and object key are one spelling.
  * `has` and `empty` are `ConditionNode` kinds, not compare operators.
  * Every operator except `isNull` treats a `NULL` operand as no match, negated or not, as SQL does.
  */

@@ -36,7 +36,6 @@ function step(
  * Walks a condition AST pre-order, visiting every node once.
  * The root arrives at `depth` 0; group children and nested `has` conditions descend one level.
  * Entering a `has` node's condition also increments `hasDepth`.
- * The substrate for wire limiters counting nodes, depth, and `has` nesting.
  *
  * @example
  * ```ts

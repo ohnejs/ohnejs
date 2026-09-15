@@ -8,9 +8,9 @@ import { nextTick as flushed } from './_scheduler.ts';
  * @example
  * ```ts
  * const count = ref(0)
- * const label = h('span', null, () => count.value)
+ * batchedEffect(() => console.log(count.value)) // logs 0
  * count.value = 1
- * await nextTick() // label now renders '1'
+ * await nextTick()                              // has logged 1
  * ```
  */
 export function nextTick(): Promise<void> {

@@ -7,9 +7,9 @@ import { isString } from './is-string.ts';
  *
  * @example
  * ```ts
- * isEmail('user@ohne.dev') // -> true
- * isEmail('not-an-email')  // -> false
- * isEmail('a@b')           // -> false
+ * isEmail('user@example.com') // -> true
+ * isEmail('not-an-email')     // -> false
+ * isEmail('a@b')              // -> false
  * ```
  */
 export function isEmail<T extends string = string>(value: unknown): value is T {
