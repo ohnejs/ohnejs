@@ -33,7 +33,6 @@ import {
  * Distinct from the interface language: it addresses translatable field values.
  * `undefined` means the app's default locale; the switcher writes chosen codes here.
  * The user record holds the preference: the session seeds the ref, and the switcher persists each change.
- * The record editor and the single-field edit popup resolve field values through it.
  */
 export const contentLocale: Ref<string | undefined> = ref<string | undefined>(undefined);
 
@@ -74,7 +73,6 @@ export function registerTranslatableContext(matches: () => boolean): void {
 /**
  * The header's content-language dropdown.
  * It renders only while the discovery data lists more than one locale and the page is translatable.
- * Pages where translation means nothing carry no switcher.
  * The button shows the active locale's formatted code; picking another persists it and toasts.
  * The choice lands on the user record; an unreachable server toasts, and the choice holds for the session.
  */
@@ -87,8 +85,6 @@ export function contentLanguageSwitcher(): Child {
 
 /**
  * Whether the current page edits translatable content, reactively.
- * The collection pages qualify while their collection declares translatable fields.
- * Any other page qualifies through a `registerTranslatableContext` matcher.
  */
 function translatableContext(): boolean {
   return collectionContext() || contexts.some((matches) => matches());
@@ -193,7 +189,7 @@ export function effectiveContentLocale(): string {
 
 /**
  * The locale's display name in the dashboard's interface language, falling back to the code.
- * The name is capitalized, since some languages spell their own name lowercase.
+ * The name is capitalized, since some languages spell language names lowercase.
  * The discovery data carries only codes.
  */
 export function localeName(code: string): string {

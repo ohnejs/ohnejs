@@ -26,8 +26,8 @@ import { requireCapability } from './capabilities.ts';
  * The operation's `access` resolver then runs; `false` is the identical `404`.
  * A create or update hands the resolver `input`, the write the caller intends.
  * Omitted, the resolver judges an empty write.
- * A read composes the whole scope onto the returned builder.
- * An update or delete ANDs the scope's `where` in, as the shipped handlers do; a create stays bare.
+ * A read carries the whole scope; an update or delete only its `where`, and a create none.
+ * No write narrows its input or its returned records to the scope's `select`.
  * The operation's named middleware do not run - a route of your own carries its own.
  * Valid only within a request.
  *

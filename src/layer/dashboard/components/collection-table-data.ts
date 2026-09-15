@@ -28,10 +28,29 @@ export type TableRecord = Record<string, unknown>;
  * One page of records, as the body-query endpoint answers it.
  */
 export interface QueryPage {
+  /**
+   * The records on this page, in the query's order.
+   */
   records: TableRecord[];
+
+  /**
+   * The page read, one-based; it exceeds `lastPage` when the request asked past the end.
+   */
   page: number;
+
+  /**
+   * The number of the last page, at least `1` even when nothing matches.
+   */
   lastPage: number;
+
+  /**
+   * The page size the read used.
+   */
   perPage: number;
+
+  /**
+   * The total number of matching records across every page.
+   */
   total: number;
 }
 

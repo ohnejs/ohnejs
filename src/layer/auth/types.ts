@@ -78,7 +78,7 @@ export interface Session {
   UUID: string;
 
   /**
-   * The `UUID` of the user the session belongs to, or `null` if the user was removed.
+   * The `UUID` of the user the session belongs to.
    */
   user: string | null;
 

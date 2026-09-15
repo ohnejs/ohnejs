@@ -480,6 +480,9 @@ export function filterPopup(options: FilterPopupOptions): Popup {
       ),
     );
 
+  /**
+   * A group's member cards, one per condition or nested group, followed by its add buttons.
+   */
   function groupBody(group: () => FilterGroup): Child {
     return h(
       'div',
@@ -506,6 +509,9 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     );
   }
 
+  /**
+   * A nested group's card: its and/or relation toggle in the header, over the group's body.
+   */
   function groupCard(group: () => FilterGroup): Child {
     return card(groupBody(group), {
       header: h(

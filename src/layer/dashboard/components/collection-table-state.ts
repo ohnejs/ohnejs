@@ -76,12 +76,12 @@ export interface TableColumnSpec {
   sortable: false | 'text' | 'numeric';
 
   /**
-   * The CSS width from the `columns` URL spec.
+   * The CSS width from the `columns` spec.
    */
   width?: string;
 
   /**
-   * The CSS minimum width; `'256px'` unless the URL spec sets a `width`.
+   * The CSS minimum width, from the `columns` spec or the resolver's `'256px'` default.
    */
   minWidth?: string;
 }
@@ -401,10 +401,16 @@ export function parseTableState(search: string, defaultOrder: readonly string[])
  *
  * @example
  * ```ts
- * serializeTableState({ page: 1, order: ['-_updatedAt'], where: undefined, columns: undefined }, ['-_updatedAt'])
+ * serializeTableState(
+ *   { page: 1, order: ['-_updatedAt'], where: undefined, columns: undefined },
+ *   ['-_updatedAt'],
+ * )
  * // -> ''
  *
- * serializeTableState({ page: 2, order: ['title'], where: { age: 2 }, columns: undefined }, ['-_updatedAt'])
+ * serializeTableState(
+ *   { page: 2, order: ['title'], where: { age: 2 }, columns: undefined },
+ *   ['-_updatedAt'],
+ * )
  * // -> 'page=2&order=[title]&where={age:2}'
  * ```
  */

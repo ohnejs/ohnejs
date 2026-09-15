@@ -100,7 +100,6 @@ export async function admitCollection<O extends CollectionOperation>(
 /**
  * Runs an endpoint's named middleware in order, exactly as route middleware do.
  * The first value one returns is the answer; `undefined` means every middleware passed.
- * Each records on the event; an unknown name throws - a misconfigured exposure is a `500`, never an open door.
  */
 async function runMiddleware(
   endpoint: Pick<CollectionEndpoint, 'middleware'>,
@@ -185,7 +184,7 @@ export async function accessScope<O extends CollectionOperation>(
 }
 
 /**
- * Pins a list read's terminal: `paginate` when the request names a page, `findMany` otherwise.
+ * Pins a list read's terminal: `paginate` when the request names `page` or `perPage`, `findMany` otherwise.
  * Shared by the `GET` list and the `POST` body-query endpoint, so both transports read identically.
  * The gate's access scope composes in, narrowing the rows and fields the request may reach.
  * Each answered record's `_translations` then narrows to the locales the scope admits it at.

@@ -18,8 +18,8 @@ export default defineField({
 
 /**
  * The `unknownLocale` failure as its `{ key, params }` message object.
- * The key lives in the layer's own catalog, resolved at the boundary, never in `KnownMessages`.
- * Its object is therefore not a `Message` member here; the cast bridges it.
+ * Once `KnownMessages` has keys, the object must name one of them.
+ * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
  */
 function unknownLocaleMessage(locale: string): Message {
   return { key: 'auth.unknownLocale', params: { locale } } as unknown as Message;

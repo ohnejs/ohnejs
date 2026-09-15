@@ -9,7 +9,6 @@ import { logo } from './logo.ts';
 export interface WidgetOptions {
   /**
    * Resolves the edit link for the content behind the widget; `null` hides the link.
-   * The caller supplies the destination.
    */
   editHref?: () => string | null;
 }

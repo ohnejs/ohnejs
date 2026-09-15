@@ -11,7 +11,7 @@ import { hashSessionToken } from './_token.ts';
  * Expired rows sweep out first, so abandoned sessions never accrete in the store.
  * A remembered session lasts `auth.sessionMaxAge`, one without lasts `auth.transientSessionMaxAge`.
  * The cookie of a session without remember me additionally ends with the browser session.
- * Call it after a successful `register` or `login`.
+ * Call it after your own sign-in or signup check succeeds.
  *
  * @example
  * ```ts

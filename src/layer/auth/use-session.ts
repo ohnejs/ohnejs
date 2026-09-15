@@ -32,6 +32,9 @@ export function useSession(): Promise<Session | null> {
   return resolved;
 }
 
+/**
+ * Looks the hashed request token up in `Sessions`, uncached; an expired row is deleted and reads as `null`.
+ */
 async function resolveSession(): Promise<Session | null> {
   const token = readSessionToken();
   if (isNull(token)) return null;

@@ -62,7 +62,7 @@ export interface DashboardOperation {
 }
 
 /**
- * The four collections-API operations of one collection; a closed operation is `null`.
+ * The collections-API operations of one collection; a closed operation is `null`.
  */
 export interface DashboardOperations {
   /**
@@ -113,7 +113,6 @@ export interface DashboardField {
 
   /**
    * The display label, resolved in the request's language.
-   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
    */
   label: string;
 
@@ -161,7 +160,7 @@ export interface DashboardField {
   nullable: boolean;
 
   /**
-   * Whether a create must provide the field: non-nullable, no default, and user-written.
+   * Whether a create must provide the field: column-bearing, non-nullable, no default, and user-written.
    */
   required: boolean;
 
@@ -286,10 +285,8 @@ export interface DashboardCollection {
 /**
  * One block type a `blocks` field may hold, described for the dashboard's editors.
  *
- * Block types are named, never inlined.
- * A block may hold a `blocks` field allowing its own type, so the graph has cycles.
- * Only a flat registry keyed by name closes.
- * A field's `allow` names its members; every name it lists is described here.
+ * Block types are named, never inlined, since a block may admit its own type.
+ * A field's `allow` names its members; `DashboardMeta.blocks` describes them.
  */
 export interface DashboardBlock {
   /**
@@ -538,8 +535,7 @@ function blockLabelOf(name: string, label: Message | undefined): string {
 }
 
 /**
- * Resolves a collection's four operations for `user`, or `null` when none is usable.
- * A collection with no usable operation stays invisible, matching the API's identical `404`.
+ * Resolves a collection's operations for `user`, or `null` when none is usable.
  */
 function describeOperations(
   api: boolean | CollectionAPI | undefined,

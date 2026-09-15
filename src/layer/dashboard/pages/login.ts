@@ -15,8 +15,8 @@ import { installRequired } from './install.ts';
 
 /**
  * The login page: the watermark logo over a card holding the sign-in form, on the auth layout.
- * The safe `next` destination is captured once; the session effect owns every navigation.
- * A signing-in success and a signed-in visitor both land there through the same effect.
+ * The safe `next` destination is captured once.
+ * A signing-in success and a signed-in visitor both land there through the session effect.
  * While the first-user setup is pending, the page yields to the install page.
  */
 export default defineDashboardPage(() => {

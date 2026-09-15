@@ -22,7 +22,6 @@ export const USER_FIELDS = [
  * Projects a `Users` record onto the public `User` shape.
  * A settings member the record lacks or holds as `null` takes its default: `null`, `LL`, `LTS`, or `false`.
  * An override of `Users` that dropped a settings field therefore degrades to defaults instead of throwing.
- * The three nullable members are always present as `null`, never omitted, so the shape stays stable.
  * Nothing else is copied, so a record read with `password` selected still answers without the hash.
  */
 export function toUser(record: Record<string, unknown>): User {

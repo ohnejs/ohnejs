@@ -133,7 +133,7 @@ css`
  * The editable cell wrapper.
  *
  * It renders the field's display content with a hover-revealed edit button.
- * Clicking sets the `edit=<field>:<id>` query parameter.
+ * Clicking sets the `edit=[<field>,<id>]` query parameter.
  * While the parameter names this cell, the single-field edit popup mounts.
  * A read-only field opens in view mode.
  * An `action` swaps the edit for the host's own button, and the popup never mounts.

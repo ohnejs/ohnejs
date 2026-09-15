@@ -33,6 +33,9 @@ export function useUser(): Promise<User | null> {
   return resolved;
 }
 
+/**
+ * Loads the session's user as a public `User`, uncached; `null` without a session or its user row.
+ */
 async function resolveUser(): Promise<User | null> {
   const session = await useSession();
   if (isNull(session) || isNull(session.user)) return null;

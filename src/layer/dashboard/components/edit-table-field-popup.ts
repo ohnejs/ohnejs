@@ -340,7 +340,7 @@ type WriteOutcome =
   | { kind: 'writeFailed' };
 
 /**
- * Sends the one-field `PATCH`, retrying once on a busy `503`, exactly as the sheet's cell write.
+ * Sends the one-field `PATCH`, retrying once on a busy `503`.
  * A given `locale` rides the URL, so a translatable collection writes that locale's value.
  */
 async function writeField(

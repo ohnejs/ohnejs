@@ -185,7 +185,6 @@ css`
  * The collections merge newest first, one page at a time.
  * `Load more` extends the feed and hides once every collection has run out.
  * The shared `search` filters the rows; while searching, an empty card hides.
- * The page passes the search state in.
  */
 export function overviewRecentEdits(search: OverviewSearch): Child {
   const t = useT();
@@ -363,7 +362,6 @@ function takeNewest(buckets: Bucket[]): RecentEdit | undefined {
  * Appends `bucket`'s next page to its buffer through the body-query endpoint.
  * It asks for one row past the page, so only a full answer proves the collection holds more.
  * A short answer ends the bucket; a failure ends it too, so a broken collection drops out of the feed.
- * A record without a label value shows `#` plus its `UUID`'s first eight characters.
  */
 async function fillBucket(bucket: Bucket): Promise<void> {
   const select = ['UUID', '_updatedAt', ...bucket.collection.labelFields];

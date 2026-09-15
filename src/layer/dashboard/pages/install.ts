@@ -68,7 +68,6 @@ type InstallOutcome =
  * The first-user form: the welcome note, email, and password over a full-width submit.
  * A `422` routes its per-field messages under the inputs; a `403` yields to the login page.
  * An unreachable server raises a toast.
- * Success replaces the document with home, so the session resolves fresh from the new cookie.
  */
 function installForm(): HTMLElement {
   const t = useT();

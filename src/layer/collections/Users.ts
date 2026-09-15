@@ -10,8 +10,8 @@ import { normalizeEmail } from '../auth/_email.ts';
  * `password` takes a plaintext password on write; the field type stores its scrypt hash, never the text.
  * The hash is write-only: no read returns it unless a trusted `select` names it explicitly.
  * `roles` holds the user's role names; the capabilities of every held role union.
- * The six fields after `roles` are the user's own dashboard settings, edited on the account page.
- * All six are nullable, so an existing table gains them without a migration.
+ * The fields after `roles` are the user's own dashboard settings, edited on the account page.
+ * Each is nullable, so an existing table gains them without a migration.
  * `toUser` reads a `null` setting as its default.
  * The API exposure is guarded, so user management needs the `collection.Users.*` capabilities.
  */
@@ -85,9 +85,9 @@ const users = defineCollection({
 /**
  * The `Users` definition, for an app's own `collections/Users.ts` to spread and extend.
  * An override replaces the file whole, so spread this to keep the fields auth depends on.
- * The auth routes and helpers read `email`, `password`, and `roles`; keep all three.
- * The account page edits the six settings fields, `dashboardLanguage` through `smartClipboard`.
- * Spread all nine: a dropped settings field falls back to its default, so the dashboard degrades quietly.
+ * The auth routes and helpers read `email`, `password`, and `roles`.
+ * The account page edits the settings fields, `dashboardLanguage` through `smartClipboard`.
+ * A dropped settings field falls back to its default, so the dashboard degrades quietly.
  *
  * @example
  * ```ts
@@ -97,7 +97,7 @@ const users = defineCollection({
  *
  * export default defineCollection({
  *   ...usersDefinition,
- *   fields: { ...usersDefinition.fields, name: field('text') },
+ *   fields: { ...usersDefinition.fields, name: field('text', { nullable: true }) },
  * })
  * ```
  */

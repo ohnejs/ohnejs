@@ -72,16 +72,13 @@ css`
 /**
  * The signed-in user's own settings surface, at `/account`.
  *
- * The scrollable column holds the header row, the email beside the title, and the account field rows.
  * The discovery data lists the fields; an empty list redirects to the overview with a toast.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * `historyScrollState` pins the scroll across the re-render.
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
  * A saved language change resets the discovery data, so the form rebuilds on labels in the new language.
  * The history and the guard live outside that rebuild, so the rebuilt form starts clean.
- * The footer's plug button signs every other session out after a confirmation.
  */
 export function accountEditor(): Child {
   const t = useT();

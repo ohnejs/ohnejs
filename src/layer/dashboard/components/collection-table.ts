@@ -140,10 +140,7 @@ css`
  * Every cell renders its field's display inside an editable cell whose popup patches only that field.
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
  * Rows select with shift ranges into the batch delete.
- * The footer's clear button empties the selection.
  * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
- * Reads page through the body-query endpoint.
- * Deletes run record by record with the sheet's toasts.
  */
 export function collectionTable(collection: DashboardCollection): HTMLElement {
   const t = useT();
@@ -288,6 +285,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
   };
 
+  /**
+   * Rederives selection mode and the select-all state from `selected`.
+   */
   function refreshSelectable(): void {
     if (Object.values(selected.value).some((value) => value)) {
       selectable.value = true;

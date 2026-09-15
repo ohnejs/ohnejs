@@ -40,7 +40,7 @@ css`
 `;
 
 /**
- * The narrow centered layout for the auth screens: login, install, logout.
+ * The narrow centered layout for the auth screens.
  * The header holds the watermark logo.
  * The main section draws two full-width divider lines above and below the card.
  * They span the wrapper between the rails.
@@ -50,6 +50,9 @@ export function authLayout(header: Child, ...children: Child[]): HTMLElement {
   return base(layout(header, children));
 }
 
+/**
+ * The auth column between the wrapper's rails, without the `base` screen root.
+ */
 function layout(header: Child, children: Child[]): HTMLElement {
   return wrapper(
     h(

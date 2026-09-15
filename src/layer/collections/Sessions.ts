@@ -23,7 +23,6 @@ const ownSessions = async (): Promise<AccessScope<'expiresAt' | 'tokenHash' | 'u
  * `expiresAt` is epoch milliseconds; a session past it is treated as gone.
  * Deleting a user cascades to their sessions, so a removed account cannot leave a session behind.
  * The API exposes `read` and `delete` to the session's own user alone, scoped by `access`.
- * A signed-in user therefore lists and revokes only their own sessions.
  */
 export default defineCollection({
   api: {

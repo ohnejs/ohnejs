@@ -47,7 +47,7 @@ export default defineDashboardPage(() =>
 
 /**
  * The page body: the dim code over the message, and one link back to the dashboard home.
- * There is no per-page chrome between the main area and the body: `.o-main-content` carries that height.
+ * Its `min-height: 100%` resolves against the shell's `.o-main-content`, which wraps it with nothing between.
  */
 function notFound(): Child {
   const t = useT();

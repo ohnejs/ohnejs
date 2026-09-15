@@ -8,13 +8,9 @@ import type { History } from './history.ts';
 /**
  * The undo and redo button pair for a `History` instance.
  *
- * Two outline buttons, disabled while `canUndo`/`canRedo` say so.
- * Each carries a live tooltip showing the action label and the remaining step count.
- * The pair also binds the `undo` and `redo` hotkeys on `hotkeys`.
- * By default that is a fresh `useHotkeys({ allowInOverlays: true, allowWhileTyping: ['undo', 'redo'] })`.
- * It listens on `document`.
+ * It binds the `undo` and `redo` hotkeys on `hotkeys`, which by default listens on `document`.
+ * The default fires while typing too, so the history owns undo and redo over the browser's text undo.
  * A popup passes its own root-targeted instance, since keydowns stop at a popup root.
- * The strokes fire while typing too, so the history owns undo and redo over the browser's text undo.
  * `restore` receives the state returned by `history.undo()`/`history.redo()`, only when one came back.
  * Focus on an element with an `id` returns to that `id` afterwards, with the caret at the end of its text.
  * A `restore` that rebuilds its controls thus keeps the user in the field they were editing.

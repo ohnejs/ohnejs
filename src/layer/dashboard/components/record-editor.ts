@@ -125,10 +125,7 @@ css`
  * The record surface.
  *
  * Create and edit share this one page; `uuid` absent means create.
- * The scrollable page column holds the header row and the field rows.
- * The sticky footer holds the undo and redo pair, Save with the dirty primary toggle, and the actions menu.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * `historyScrollState` pins the scroll across the re-render.
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.

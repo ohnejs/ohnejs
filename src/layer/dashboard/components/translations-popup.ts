@@ -108,7 +108,7 @@ css`
  * The record translations popup.
  *
  * One row per configured locale: the formatted code, its display name, and the locale's actions.
- * The current content locale carries a marker instead of an edit button, unless `showEditCurrent`.
+ * The current content locale carries a marker, and its actions only with `showEditCurrent`.
  * New and Edit close the popup, route to the record when elsewhere, and switch the content locale.
  * Copy projects the current locale's translatable values onto the target locale, staying open.
  * Delete confirms first, then removes the locale's translation whole, staying open too.

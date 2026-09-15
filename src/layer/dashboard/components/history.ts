@@ -128,7 +128,6 @@ export class History<T extends object = Record<string, unknown>> {
 
   /**
    * Adds a new state to the history stack with a debounce `delay` in milliseconds.
-   * The default `delay` is 100 milliseconds.
    */
   pushDebounced(state: T, delay = 100): Promise<this> {
     return new Promise((resolve) => {
@@ -182,7 +181,7 @@ export class History<T extends object = Record<string, unknown>> {
   }
 
   /**
-   * Returns the current active state.
+   * Returns a copy of the current state, or `undefined` while the history is empty.
    */
   getCurrentState(): T | undefined {
     const state = this.states[this.currentIndex];
@@ -204,14 +203,14 @@ export class History<T extends object = Record<string, unknown>> {
   }
 
   /**
-   * Returns the original state before any changes were made.
+   * Returns the baseline `isDirty` compares against: the first push, or the last `setOriginalState`.
    */
   getOriginalState(): T | undefined {
     return isUndefined(this.original) ? undefined : jsonClone(this.original);
   }
 
   /**
-   * Sets the original state before any changes were made.
+   * Makes `state` the baseline `isDirty` compares against, like the state a save just wrote.
    */
   setOriginalState(state: T): this {
     this.original = jsonClone(state);
@@ -219,7 +218,7 @@ export class History<T extends object = Record<string, unknown>> {
   }
 
   /**
-   * Removes all states and resets the history.
+   * Removes every state and the original, and cancels a pending debounced push.
    */
   clear(): this {
     this.states = [];
@@ -232,6 +231,9 @@ export class History<T extends object = Record<string, unknown>> {
     return this.refresh();
   }
 
+  /**
+   * Re-derives every reactive ref from the stack and the original.
+   */
   protected refresh(): this {
     this.canUndo.value = this.currentIndex > 0;
     this.canRedo.value = this.currentIndex < this.states.length - 1;
@@ -242,6 +244,9 @@ export class History<T extends object = Record<string, unknown>> {
     return this;
   }
 
+  /**
+   * Whether the current state differs from the original, both with the `omit` keys stripped.
+   */
   protected compareOriginalVsCurrentState(): boolean {
     const originalState = omit(this.original ?? ({} as T), this.omit as (keyof T)[]);
     const currentState = omit(this.getCurrentState() ?? ({} as T), this.omit as (keyof T)[]);
