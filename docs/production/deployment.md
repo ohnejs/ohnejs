@@ -10,21 +10,21 @@ dashboard - each a plain long-running process.
 Install, then serve:
 
 ```sh
-pnpm install
-pnpm exec ohne serve api
+npm install
+npx ohne serve api
 ```
 
 The scaffolded `package.json` wires `"prepare": "ohne prepare"`, so the install itself runs
-codegen through npm's own lifecycle hook - the generated types are in place for a `pnpm typecheck`
-in CI with no extra step. The server regenerates them at boot anyway, so a stale artifact cannot
+codegen through npm's own lifecycle hook - the generated types are in place for an
+`npm run typecheck` in CI with no extra step. The server regenerates them at boot anyway, so a stale artifact cannot
 serve; `SKIP_CODEGEN=1` skips that pass when the install already prepared.
 
 The API and the dashboard are separate processes on separate ports. Run each under your process
 manager, each with its own `PORT`:
 
 ```sh
-PORT=8080 pnpm exec ohne serve api
-PORT=8081 pnpm exec ohne serve dashboard
+PORT=8080 npx ohne serve api
+PORT=8081 npx ohne serve dashboard
 ```
 
 The dashboard tells the browser where the API lives. By default it derives the address from the
@@ -52,7 +52,7 @@ The [schema sync](../database/sync.md) runs inside every boot, guarded against d
 deploy, gate the pipeline before cutover:
 
 ```sh
-pnpm exec ohne sync --dry-run
+npx ohne sync --dry-run
 ```
 
 It rehearses migrations, diff, and guard against the live database, then rolls everything back,

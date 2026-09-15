@@ -25,7 +25,7 @@ How a project is put together - the config file, the CLI, and the layer system t
 project extend another.
 
 - [Configuration](./project/config.md) - `ohne.config.ts` and every setting it holds.
-- [The CLI](./project/cli.md) - `dev`, `init`, `prepare`, `serve`, and `sync`.
+- [The CLI](./project/cli.md) - `npm create ohne`, `dev`, `prepare`, `serve`, and `sync`.
 - [Environment variables](./project/env.md) - the built-ins and how to define your own.
 - [Boot files](./project/boot.md) - code that runs before the server opens.
 - [Layers](./project/layers.md) - stack projects as packages and override what they ship.

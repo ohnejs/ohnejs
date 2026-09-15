@@ -45,7 +45,7 @@ Several built-ins shadow a [config](./config.md) field. Config is what the proje
 the environment is where it runs, so a set variable wins:
 
 ```sh
-PORT=4000 pnpm exec ohne serve api
+PORT=4000 npx ohne serve api
 ```
 
 For any one read, the order is: CLI flag, then the process environment, then the project `.env`,
@@ -63,7 +63,7 @@ COOKIE_SECRET=a-long-random-value
 ```
 
 The file fills gaps and never overrides. A variable the shell, your host, or CI already set keeps
-its value, so `PORT=5000 pnpm dev` beats a `PORT` in the file, and a host that injects secrets
+its value, so `PORT=5000 npm run dev` beats a `PORT` in the file, and a host that injects secrets
 needs no file at all. Against config it counts as set, exactly as a shell variable would.
 
 There is one file and no layering - no `.env.local`, no `.env.production`. In production, set the
@@ -75,7 +75,7 @@ With `DEBUG=1`, startup lists the names the file applied - a name missing from t
 already set by the environment.
 
 `ohne dev` reloads the file on every change and restarts both servers, so an edit takes effect
-without a restart. `PORT` is the exception: it seeds the ports when `dev` starts. `ohne init`
+without restarting `dev`. `PORT` is the exception: it seeds the ports when `dev` starts. The scaffold
 already gitignores the file.
 
 ## Flags
@@ -84,9 +84,9 @@ Every built-in is also a flag on the `ohne` CLI - the kebab-case of its name. A 
 becomes a switch, the rest take a value:
 
 ```sh
-pnpm exec ohne dev --port 4000
-pnpm exec ohne sync --force-sync
-pnpm exec ohne dev --no-color
+npx ohne dev --port 4000
+npx ohne sync --force-sync
+npx ohne dev --no-color
 ```
 
 A switch negates with `no-`: `--no-force-sync` turns `FORCE_SYNC` off for the run. (`--no-color`

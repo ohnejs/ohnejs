@@ -13,7 +13,7 @@ import { defineDashboardPage, h } from 'ohnejs/dashboard';
 export default defineDashboardPage(() => h('h1', null, 'Hello'));
 ```
 
-`pnpm exec ohne dev` serves it at `http://localhost:9000`, alongside the API.
+`npx ohne dev` serves it at `http://localhost:9000`, alongside the API.
 
 ## From file to route
 

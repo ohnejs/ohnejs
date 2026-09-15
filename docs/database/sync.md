@@ -94,8 +94,8 @@ same sync transaction, before the diff, so a covered change passes the guard.
 `database.sync.force` in config does the same for every boot until you remove it:
 
 ```sh
-FORCE_SYNC=1 pnpm serve:api
-pnpm serve:api --force-sync
+FORCE_SYNC=1 npm run serve:api
+npm run serve:api -- --force-sync
 ```
 
 Force does not skip the checks - it performs the deletions they warned about, and reports
@@ -121,7 +121,7 @@ If you need the old data too, restore the database backup together with the old 
 `ohne sync` runs the same sync as the server boot and exits - no port opens:
 
 ```sh
-pnpm exec ohne sync
+npx ohne sync
 ```
 
 Use it as a deploy step: stop the app, sync, start the new build. A guard refusal then fails the
@@ -129,7 +129,7 @@ deploy instead of the first boot, and you see it before anything serves. `--forc
 destructive changes, exactly like `FORCE_SYNC`:
 
 ```sh
-pnpm exec ohne sync --force
+npx ohne sync --force
 ```
 
 `--dry-run` rehearses the whole sync - migrations, diff, guard - against the live database, then
@@ -138,7 +138,7 @@ sync would refuse, which makes it the deploy gate: run it before cutover, and a 
 fails the pipeline while the old build still serves:
 
 ```sh
-pnpm exec ohne sync --dry-run
+npx ohne sync --dry-run
 ```
 
 A database already in shape makes the command a no-op, so it is always safe to run.

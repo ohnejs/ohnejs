@@ -13,14 +13,19 @@ to it, and TypeScript itself is only a dev dependency, there for type checking.
 ## Creating a project
 
 ```sh
-pnpm dlx ohne init my-app
+npm create ohne my-app
 ```
 
-In a terminal, `init` walks you through the setup: where the project goes (when you did not pass
-it), the project name (defaulting to the directory name), the package manager (npm or pnpm), and
+In a terminal, `npm create ohne` walks you through the setup: where the project goes (when you
+did not pass it), the project name (defaulting to the directory name), the package manager, and
 whether to initialize a git repository. It then writes the files and installs the dependencies.
 
-Flags cover every prompt:
+Flags cover every prompt but the package manager. Put them after `--`, so npm hands them to the
+scaffold instead of reading them itself:
+
+```sh
+npm create ohne my-app -- --yes --git
+```
 
 - `--yes` (`-y`) skips the prompts and the install, taking the defaults.
 - `--name` sets the package name instead of the directory name.
@@ -28,12 +33,12 @@ Flags cover every prompt:
 - `--force` (`-f`) overwrites a non-empty directory. Without it, a non-empty target asks twice
   in a terminal and refuses outside one.
 
-Outside a terminal - CI, a script - `init` behaves like `--yes`: no prompts, no install, and the
-target defaults to the current directory.
+Outside a terminal - CI, a script - `npm create ohne` behaves like `--yes`: no prompts, no
+install, and the target defaults to the current directory.
 
 ## The scaffold
 
-`init` writes four files:
+`npm create ohne` writes these files:
 
 ```
 my-app/
@@ -100,10 +105,10 @@ which every command reads at start - see [the `.env` file](../project/env.md#the
 
 ```sh
 cd my-app
-pnpm dev
+npm run dev
 ```
 
-If you skipped the install with `--yes`, run `pnpm install` first.
+If you skipped the install with `--yes`, run `npm install` first.
 
 `ohne dev` starts the dashboard at `http://localhost:9000`, generates the project types, and boots
 the API at `http://localhost:9001`. Then it watches. Change a source file and the API reloads;
@@ -123,7 +128,7 @@ it - `ohne prepare` runs every codegen once, and `ohne dev` regenerates whatever
 while it runs.
 
 `prepare` is wired as the npm `prepare` script, so every install runs it - a fresh clone
-type-checks right after `pnpm install`.
+type-checks right after `npm install`.
 
 The directory is disposable. Every run writes the full set and prunes what an earlier run left
 behind, so you can delete `.ohne/` at any time and the next `prepare` or `dev` rebuilds it. That

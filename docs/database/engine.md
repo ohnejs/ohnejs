@@ -28,7 +28,7 @@ without touching it; `DB` is an alias. Setting both throws - ohne cannot tell wh
 full precedence is env, then `database.url`, then the default `.data/ohne.db`:
 
 ```sh
-DATABASE=:memory: pnpm exec ohne dev
+DATABASE=:memory: npx ohne dev
 ```
 
 ## Helper databases

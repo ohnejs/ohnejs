@@ -68,7 +68,7 @@ bare-path id uploads with `POST`. Pass a `signal` to cancel: the promise rejects
 
 ## Typed route ids
 
-`pnpm exec ohne prepare` generates `.ohne/browser/routes.ts`, which fills `KnownAPIRoutes` with
+`npx ohne prepare` generates `.ohne/browser/routes.ts`, which fills `KnownAPIRoutes` with
 one member per route across every layer - the same table the server registers. Your editor then
 autocompletes the ids in `api`, and `ohne dev` keeps them fresh as you add route files.
 

@@ -8,13 +8,13 @@ You need Node 26 or newer; [installation](./installation.md) covers the setup in
 
 ## Scaffold
 
-`ohne init` scaffolds a project:
+`npm create ohne` scaffolds a project:
 
 ```sh
-pnpm dlx ohne init blog
+npm create ohne blog
 ```
 
-Answer the prompts - name, package manager, git - and init writes four files, installs the
+Answer the prompts - name, package manager, git - and it writes these files, installs the
 dependencies, and prints the next steps:
 
 - `ohne.config.ts` - the project's config, and what marks the directory as an ohne project
@@ -41,7 +41,7 @@ Start the dev server:
 
 ```sh
 cd blog
-pnpm dev
+npm run dev
 ```
 
 `ohne dev` watches the project, regenerates types on every save, and starts two servers: the

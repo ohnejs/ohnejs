@@ -1,22 +1,23 @@
 # The CLI
 
-Installing ohne installs one binary, `ohne`. It carries five commands: `init` scaffolds a project,
-`dev` runs it while you work, `prepare` generates its types, `serve` runs one backend in
-production, and `sync` reconciles the database schema. Run it through your package manager:
+Installing ohne installs one binary, `ohne`. Its commands: `dev` runs a project while you work,
+`prepare` generates its types, `serve` runs one backend in production, and `sync` reconciles the
+database schema. A new project starts from `npm create ohne`, covered below. Run the binary with
+`npx`, which picks up the project's own copy:
 
 ```sh
-pnpm exec ohne --help
+npx ohne --help
 ```
 
-The scaffold wires the everyday ones as scripts, so `pnpm dev` and `pnpm serve:api` work out of
-the box.
+The scaffold wires the everyday ones as scripts, so `npm run dev` and `npm run serve:api` work out
+of the box.
 
 ## Every command
 
 `--help` prints usage for any command; `ohne --version` prints the installed version. Bare `ohne`
 prints the root help.
 
-Every command except `init` takes `--cwd`, the project root to operate on, defaulting to the
+Every command takes `--cwd`, the project root to operate on, defaulting to the
 current directory. A command refuses to run without an `ohne.config.ts` at that root - the file
 is what makes a directory an ohne project. It also reads a `.env` at that root before doing
 anything else, filling in the variables the shell did not set - see
@@ -29,23 +30,24 @@ global options, and a layer that registers its own flagged var gets its flag the
 nothing to wire.
 
 ```sh
-pnpm exec ohne serve api --port 8080 --host 0.0.0.0
+npx ohne serve api --port 8080 --host 0.0.0.0
 ```
 
-## ohne init
+## npm create ohne
 
-`ohne init [dir]` scaffolds a new project: `ohne.config.ts`, `package.json`, `tsconfig.json`, and
-a `.gitignore`. On a TTY it prompts for the location, name, package manager, and git, then
+`npm create ohne [dir]` scaffolds a new project: `ohne.config.ts`, `package.json`, `tsconfig.json`,
+and a `.gitignore`. On a TTY it prompts for the location, name, package manager, and git, then
 installs the dependencies; `--yes` skips the prompts and the install, taking the defaults. A
 non-empty target directory needs a double confirm to purge - or `--force` to purge without
-asking. The [installation guide](../start/installation.md) walks through the result.
+asking. Flags go after `--`, as in `npm create ohne my-app -- --yes`, so npm passes them on. The
+[installation guide](../start/installation.md) walks through the result.
 
 ## ohne dev
 
 One command runs everything while you work:
 
 ```sh
-pnpm exec ohne dev
+npx ohne dev
 ```
 
 `dev` is a supervisor. It starts the dashboard child, runs a full generation pass into the codegen
@@ -79,7 +81,7 @@ is read once, when `dev` starts, so moving the ports takes a fresh `dev`.
 `prepare` runs every codegen and exits:
 
 ```sh
-pnpm exec ohne prepare
+npx ohne prepare
 ```
 
 The output lands in the codegen dir, `.ohne/` by default: the typed routes, middleware, message
@@ -100,8 +102,8 @@ in between - after a pull, or in CI before `tsc`.
 Production runs one process per backend:
 
 ```sh
-pnpm exec ohne serve api
-pnpm exec ohne serve dashboard
+npx ohne serve api
+npx ohne serve dashboard
 ```
 
 `serve api` boots the API: it runs the boot files, regenerates the types (skipped when
@@ -123,7 +125,7 @@ processes fit a deployment is covered in [deployment](../production/deployment.m
 boot runs, without opening a port:
 
 ```sh
-pnpm exec ohne sync
+npx ohne sync
 ```
 
 `--force` authorizes the destructive changes the sync would otherwise refuse; `--dry-run`
