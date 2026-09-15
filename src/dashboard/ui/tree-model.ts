@@ -1,4 +1,5 @@
 import { last } from '../../utils/array/last.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 
@@ -29,8 +30,6 @@ export type TreeItemModel<T> = {
 
   /**
    * Specifies whether the tree item can be dragged.
-   * If a function is provided, it is called with the `item` as the only argument.
-   * The function should return a boolean indicating whether the `item` can be dragged.
    *
    * @default
    * false
@@ -60,8 +59,6 @@ export type TreeItemModel<T> = {
 
   /**
    * Specifies whether the tree item can be moved within the same level using keyboard shortcuts.
-   * Only truthiness is checked: a function form is never invoked.
-   * So passing a function means the item is always movable.
    *
    * @default
    * false
@@ -511,10 +508,7 @@ export function addTreeItemsAfter<T>(
 /**
  * Moves the specified `items` in the `tree` model in the specified `direction`.
  * Returns the moved tree items with their parent item, old index, and new index.
- *
- * The `min`/`max` ratchets compress a stacked selection at the edges without crossing.
- * They are shared across parent slots.
- * So a selection spanning levels can be over-constrained.
+ * Items given in tree order compress at the edge of their level without crossing.
  */
 export function moveTreeItems<T>(
   items: TreeItemModel<T>[],
@@ -528,36 +522,46 @@ export function moveTreeItems<T>(
     newIndex: number;
   }[] = [];
 
-  let min: number | undefined;
-  let max: number | undefined;
+  const bounds = new Map<TreeItemModel<T>[], number>();
 
   for (const item of direction === 'up' ? items : [...items].reverse()) {
-    if (item.movable) {
+    if (treeItemAllows(item, 'movable')) {
       const parent = last(getParentTreeItems(item, tree));
       const slot = parent?.nestable ? parent.children! : tree;
       const oldIndex = slot.findIndex(({ id }) => id === item.id);
-      const newIndex = clamp(
-        oldIndex + (direction === 'up' ? -1 : 1),
-        min ?? 0,
-        max ?? slot.length - 1,
-      );
+      const newIndex =
+        direction === 'up'
+          ? clamp(oldIndex - 1, bounds.get(slot) ?? 0, slot.length - 1)
+          : clamp(oldIndex + 1, 0, bounds.get(slot) ?? slot.length - 1);
 
       if (newIndex !== oldIndex) {
         slot.splice(oldIndex, 1);
         slot.splice(newIndex, 0, item);
       }
 
-      if (direction === 'up' && (min === undefined || newIndex + 1 < min)) {
-        min = newIndex + 1;
-      } else if (direction === 'down' && (max === undefined || newIndex - 1 > max)) {
-        max = newIndex - 1;
-      }
-
+      bounds.set(slot, direction === 'up' ? newIndex + 1 : newIndex - 1);
       moved.push({ item, parent, oldIndex, newIndex });
     }
   }
 
   return moved;
+}
+
+/**
+ * Resolves whether the tree `item` allows `flag`.
+ * A function form is called with the item.
+ */
+export function treeItemAllows<T>(item: TreeItemModel<T>, flag: 'draggable' | 'movable'): boolean {
+  const value = item[flag];
+  return isFunction(value) ? value(item) : value === true;
+}
+
+/**
+ * Whether a drag may carry the selected `items`: every item the drop moves allows `draggable`.
+ * A selected descendant of a selected item moves with it, so only the ancestor is asked.
+ */
+export function canDragTreeItems<T>(items: TreeItemModel<T>[], tree: TreeModel<T>): boolean {
+  return normalizeTreeSelection(items, tree).every((item) => treeItemAllows(item, 'draggable'));
 }
 
 /**

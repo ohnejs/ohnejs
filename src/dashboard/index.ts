@@ -228,6 +228,7 @@ export {
   activeTreeItems,
   addTreeItemsAfter,
   addTreeItemsBefore,
+  canDragTreeItems,
   cloneTreeItem,
   deleteTreeItems,
   dropTreeItems,
@@ -238,6 +239,7 @@ export {
   moveTreeItems,
   normalizeTreeSelection,
   sortTreeItems,
+  treeItemAllows,
   useTree,
 } from './ui/tree-model.ts';
 export type {

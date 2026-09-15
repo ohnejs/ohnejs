@@ -5,6 +5,7 @@ import {
   activeTreeItems,
   addTreeItemsAfter,
   addTreeItemsBefore,
+  canDragTreeItems,
   cloneTreeItem,
   deleteTreeItems,
   dropTreeItems,
@@ -15,6 +16,7 @@ import {
   moveTreeItems,
   normalizeTreeSelection,
   sortTreeItems,
+  treeItemAllows,
   type TreeItemModel,
   type TreeModel,
   useTree,
@@ -182,9 +184,10 @@ describe('moveTreeItems', () => {
       { ...leaf('a'), movable: true },
       { ...leaf('b'), movable: true },
       { ...leaf('c'), movable: true },
+      { ...leaf('d'), movable: true },
     ];
-    moveTreeItems([tree[0]!, tree[1]!], tree, 'up');
-    deepStrictEqual(ids(tree), ['a', 'b', 'c']);
+    moveTreeItems([tree[0]!, tree[1]!, tree[2]!], tree, 'up');
+    deepStrictEqual(ids(tree), ['a', 'b', 'c', 'd']);
   });
 
   it('compresses a stacked selection at the bottom without crossing', () => {
@@ -192,32 +195,84 @@ describe('moveTreeItems', () => {
       { ...leaf('a'), movable: true },
       { ...leaf('b'), movable: true },
       { ...leaf('c'), movable: true },
+      { ...leaf('d'), movable: true },
     ];
-    moveTreeItems([tree[1]!, tree[2]!], tree, 'down');
-    deepStrictEqual(ids(tree), ['a', 'b', 'c']);
+    moveTreeItems([tree[1]!, tree[2]!, tree[3]!], tree, 'down');
+    deepStrictEqual(ids(tree), ['a', 'b', 'c', 'd']);
   });
 
-  it('shares the ratchet across parent slots', () => {
-    const child = { ...leaf('a1'), movable: true };
-    const tree = [
-      branch('a', [child, { ...leaf('a2'), movable: true }], true),
-      { ...leaf('b'), movable: true },
-    ];
-    const moved = moveTreeItems([child, tree[1]!], tree, 'up');
+  it('ratchets each parent slot on its own going up', () => {
+    const child = { ...leaf('p1'), movable: true };
+    const parent = branch('p', [child, leaf('p2')], true);
+    const tree = [leaf('x'), { ...leaf('y'), movable: true }, parent];
+    const moved = moveTreeItems([tree[1]!, child], tree, 'up');
+    deepStrictEqual(ids(tree), ['y', 'x', 'p']);
+    deepStrictEqual(ids((parent as { children: TreeItemModel<VNode>[] }).children), ['p1', 'p2']);
     deepStrictEqual(
       moved.map(({ item, oldIndex, newIndex }) => [item.id, oldIndex, newIndex]),
       [
-        ['a1', 0, 0],
-        ['b', 1, 1],
+        ['y', 1, 0],
+        ['p1', 0, 0],
       ],
     );
-    deepStrictEqual(ids(tree), ['a', 'b']);
   });
 
-  it('never invokes a function `movable`, treating it as truthy', () => {
-    const tree = [leaf('a'), { ...leaf('b'), movable: () => false }];
-    moveTreeItems([tree[1]!], tree, 'up');
-    deepStrictEqual(ids(tree), ['b', 'a']);
+  it('ratchets each parent slot on its own going down', () => {
+    const child = { ...leaf('p3'), movable: true };
+    const parent = branch('p', [leaf('p1'), leaf('p2'), child, leaf('p4')], true);
+    const tree = [parent, { ...leaf('y'), movable: true }, leaf('x')];
+    const moved = moveTreeItems([child, tree[1]!], tree, 'down');
+    deepStrictEqual(ids(tree), ['p', 'x', 'y']);
+    deepStrictEqual(ids((parent as { children: TreeItemModel<VNode>[] }).children), [
+      'p1',
+      'p2',
+      'p4',
+      'p3',
+    ]);
+    deepStrictEqual(
+      moved.map(({ item, oldIndex, newIndex }) => [item.id, oldIndex, newIndex]),
+      [
+        ['y', 1, 2],
+        ['p3', 2, 3],
+      ],
+    );
+  });
+
+  it('calls a function `movable` with the item', () => {
+    const tree: TreeModel<VNode> = [leaf('a'), { ...leaf('b'), movable: ({ id }) => id !== 'b' }];
+    deepStrictEqual(moveTreeItems([tree[1]!], tree, 'up'), []);
+    deepStrictEqual(ids(tree), ['a', 'b']);
+  });
+});
+
+describe('treeItemAllows', () => {
+  it('reads a boolean flag and refuses an absent one', () => {
+    strictEqual(treeItemAllows({ ...leaf('a'), draggable: true }, 'draggable'), true);
+    strictEqual(treeItemAllows({ ...leaf('a'), movable: false }, 'movable'), false);
+    strictEqual(treeItemAllows(leaf('a'), 'draggable'), false);
+  });
+
+  it('calls a function flag with the item', () => {
+    const item: TreeItemModel<VNode> = {
+      ...leaf('a'),
+      draggable: ({ id }) => id !== 'a',
+      movable: ({ id }) => id === 'a',
+    };
+    strictEqual(treeItemAllows(item, 'draggable'), false);
+    strictEqual(treeItemAllows(item, 'movable'), true);
+  });
+});
+
+describe('canDragTreeItems', () => {
+  it('carries a non-draggable child with its selected draggable parent', () => {
+    const child = leaf('a1');
+    const tree: TreeModel<VNode> = [{ ...branch('a', [child], true), draggable: true }];
+    strictEqual(canDragTreeItems([tree[0]!, child], tree), true);
+  });
+
+  it('refuses when a carried item is not draggable', () => {
+    const tree: TreeModel<VNode> = [{ ...leaf('a'), draggable: true }, leaf('b')];
+    strictEqual(canDragTreeItems(tree, tree), false);
   });
 });
 

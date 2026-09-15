@@ -17,8 +17,10 @@ import {
   getChildTreeItems,
   type TreeDropTarget,
   type TreeExtendedItemModel,
+  canDragTreeItems,
   type TreeItemModel,
   type TreeModel,
+  treeItemAllows,
 } from './tree-model.ts';
 import './tokens.ts';
 
@@ -310,10 +312,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
 
   const item = (): TreeItemModel<T> => options.model().item;
 
-  const isDraggable = (): boolean => {
-    const current = item();
-    return isFunction(current.draggable) ? current.draggable(current) : Boolean(current.draggable);
-  };
+  const isDraggable = (): boolean => treeItemAllows(item(), 'draggable');
 
   const hasToggle = (): boolean => {
     const current = item();
@@ -430,11 +429,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
       return;
     }
 
-    if (
-      event.button > 0 ||
-      !isDraggable() ||
-      !options.selectedItems().every(({ draggable }) => draggable)
-    ) {
+    if (event.button > 0 || !isDraggable()) {
       return;
     }
 
@@ -442,14 +437,16 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
 
     const stopMouseMove = listen(document, 'mousemove', ((move: MouseEvent) => {
       if (Math.abs(move.clientX - x) > 5 || Math.abs(move.clientY - y) > 5) {
-        options.isDragging.value = true;
-        options.isTouchDragging.value = false;
+        stopMouseMove();
 
         if (!options.selectedItems().some(({ id }) => id === item().id)) {
           select(move);
         }
 
-        stopMouseMove();
+        if (canDragTreeItems(options.selectedItems(), options.tree())) {
+          options.isDragging.value = true;
+          options.isTouchDragging.value = false;
+        }
       }
     }) as EventListener);
 
@@ -464,10 +461,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
   };
 
   const onTouchStart = (): void => {
-    if (
-      item().selectable !== false &&
-      (isDraggable() || options.selectedItems().every(({ draggable }) => draggable))
-    ) {
+    if (item().selectable !== false && isDraggable()) {
       touchTimeout = setTimeout(() => {
         options.onSelect([item()]);
         options.isDragging.value = true;
