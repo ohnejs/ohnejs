@@ -68,6 +68,7 @@ declare module 'ohnejs' {
      * Runs just before a delete removes its rows, inside the transaction, carrying the doomed `UUID`s.
      * Fires only when it or `record:committed` has a subscriber; else the fast delete never lists them.
      * Use it to clean up rows outside the cascade - an external mirror, a derived table - on the same `tx`.
+     * A `deleteTranslation` never fires it, since every record it matches survives.
      * An action: its return is ignored, and the delete proceeds once every callback settles.
      * The `ctx` carries the `collection`, the scoped `condition`, the `matched` UUIDs, and the open `tx`.
      */
@@ -76,7 +77,7 @@ declare module 'ohnejs' {
 }
 
 /**
- * The count a delete removed, plus the `UUID`s it touched when a pre-delete or commit effect needs them.
+ * The count a delete or translation delete reports, plus the `UUID`s it touched when an effect needs them.
  */
 interface DeleteResult {
   deleted: number;
@@ -427,13 +428,21 @@ export async function runDeleteTranslation(
   const meta = queryMetadata(collection);
   const dialect = useDialect();
   const scoped = await scopeCondition(collection, condition, 'delete');
-  return runWrite(
+  const outcome = await runWrite<DeleteResult>(
     dialect,
     joinedTx,
     () => false,
     (tx) => attemptDeleteTranslation(tx, meta, dialect, scoped, locale),
     () => undefined,
   );
+  if (isUndefined(joinedTx)) {
+    await commitEffects({
+      collection: collection as CollectionName,
+      operation: 'update',
+      uuids: outcome.uuids,
+    });
+  }
+  return { deleted: outcome.deleted };
 }
 
 /**
@@ -449,9 +458,9 @@ async function attemptDeleteTranslation(
   dialect: Dialect,
   condition: ConditionNode,
   locale: string,
-): Promise<DeleteOutcome> {
+): Promise<DeleteResult> {
   const matched = await matchedUUIDs(tx, meta, dialect, condition, locale);
-  if (matched.length === 0) return { deleted: 0 };
+  if (matched.length === 0) return { deleted: 0, uuids: [] };
 
   const scoped = Object.values(meta.fields).filter(
     (field) => field.localeScoped === true && field.inverse !== true,
@@ -493,7 +502,7 @@ async function attemptDeleteTranslation(
       [bump, ...batch],
     );
   }
-  return { deleted: affected.size };
+  return { deleted: affected.size, uuids: [...affected] };
 }
 
 /**

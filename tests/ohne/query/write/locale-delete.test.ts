@@ -1,5 +1,7 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
+
+import type { RecordCommitted } from '../../../../src/ohne/query/write/committed.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -8,6 +10,8 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 
@@ -189,6 +193,59 @@ describe('deleteTranslation', () => {
     deepStrictEqual(row?.sections, []);
     strictEqual(row?.views, 31);
     strictEqual(await mainRows(post), 1);
+  });
+});
+
+describe('deleteTranslation hooks', () => {
+  afterEach(() => useHooks().clear());
+
+  it('fires `record:committed` as an update of the records that lost the locale', async () => {
+    const held = await seed({ title: 'Committed', views: 51 });
+    await seed({ title: 'Untouched', views: 52 });
+    await updateDE(held, { title: 'Festgeschrieben' });
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+
+    await queryUntyped('LDPosts')
+      .locale('de')
+      .where({ views: { in: [51, 52] } })
+      .deleteTranslation();
+
+    deepStrictEqual(events, [{ collection: 'LDPosts', operation: 'update', uuids: [held] }]);
+  });
+
+  it('skips `record:committed` for a joined translation delete', async () => {
+    const post = await seed({ title: 'Joined', views: 53 });
+    await updateDE(post, { title: 'Verbunden' });
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+
+    await db.transaction(async (tx) => {
+      await queryUntyped('LDPosts').use(tx).locale('de').where({ UUID: post }).deleteTranslation();
+    });
+
+    strictEqual(events.length, 0);
+  });
+
+  it('leaves `record:before-delete` silent, since every record survives', async () => {
+    const post = await seed({ title: 'Survivor', views: 54 });
+    await updateDE(post, { title: 'Überlebender' });
+    let fired = 0;
+    hook('record:before-delete', () => {
+      fired++;
+    });
+
+    const result = await queryUntyped('LDPosts')
+      .locale('de')
+      .where({ UUID: post })
+      .deleteTranslation();
+
+    deepStrictEqual(result, { deleted: 1 });
+    strictEqual(fired, 0);
   });
 });
 

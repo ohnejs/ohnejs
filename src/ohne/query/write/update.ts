@@ -82,7 +82,7 @@ declare module 'ohnejs' {
 
     /**
      * Filters the `WHERE` condition of an update or delete before it resolves which rows are touched.
-     * Fires once at the terminal's top, outside the transaction, before the matched set compiles.
+     * Fires once per update or delete call, `deleteTranslation` included, outside the transaction.
      * Force-scope the write - a tenant filter, a soft-delete guard - by returning a narrowed condition.
      * Return a replacement `ConditionNode`, or return nothing to leave the caller's condition as is.
      * The `ctx` carries the `collection` and whether this is an `update` or a `delete`.

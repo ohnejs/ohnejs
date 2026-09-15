@@ -34,7 +34,8 @@ declare module 'ohnejs' {
     /**
      * Runs after a self-owned write commits, for external effects that must never fire on a rollback.
      * Fires post-commit, outside the transaction, so a cache bust, a webhook, or an external index is safe.
-     * A joined `.use(tx)` write skips it: the effect defers to whoever owns the outer commit.
+     * A joined `.use(tx)` write never fires it, since the code that opened `tx` owns that commit.
+     * A `deleteTranslation` reports an `update` of the records that lost the locale.
      * An action: its return is ignored.
      * The payload carries the `collection`, the `operation`, and the affected `uuids`.
      */

@@ -335,7 +335,8 @@ Runs just before a delete removes its rows, inside the transaction, carrying the
 Use it to clean up rows outside the cascade - an external mirror, a derived table - on the same
 `tx`. The `ctx` carries the `collection`, the scoped `condition`, the `matched` UUIDs, and the open
 `tx`. It fires only when it or `record:committed` has a subscriber; without one, the fast delete
-never lists the doomed rows.
+never lists the doomed rows. A `deleteTranslation` never fires it, since every record it matches
+survives.
 
 ```ts
 // boot/cleanup-attachments.ts
@@ -355,7 +356,8 @@ hook('record:before-delete', async (ctx) => {
 Runs after a self-owned write commits, for external effects that must never fire on a rollback. It
 fires post-commit, outside the transaction, so a cache bust, a webhook, or an external index is
 safe. A joined `.use(tx)` write skips it: the effect defers to whoever owns the outer commit. The
-payload carries the `collection`, the `operation`, and the affected `uuids`.
+payload carries the `collection`, the `operation`, and the affected `uuids`. A `deleteTranslation`
+reports an `update` of the records that lost the locale.
 
 ```ts
 // boot/webhook.ts
