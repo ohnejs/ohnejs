@@ -6,6 +6,8 @@ import { createPrompt, defineCommand, isCancel } from '../../../utils/cli/index.
 import { listDir, removeDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
 import {
   basename,
+  first,
+  isEmpty,
   isNull,
   isUndefined,
   joinPath,
@@ -69,6 +71,11 @@ export const initCommand = defineCommand({
   },
   args: {
     name: { type: 'string', description: 'Package name. Defaults to the directory name.' },
+    pm: {
+      type: 'enum',
+      options: ['npm', 'pnpm'],
+      description: 'Package manager. Defaults to npm when npm runs the command, else pnpm.',
+    },
     git: { type: 'boolean', description: 'Initialize a git repository.' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip prompts and take the defaults.' },
     force: { type: 'boolean', alias: 'f', description: 'Overwrite a non-empty directory.' },
@@ -87,7 +94,7 @@ export const initCommand = defineCommand({
       prompt.intro('Creating a new **ohne** project');
     }
 
-    let where = positionals[0];
+    let where = first(positionals);
     if (isUndefined(where) && interactive) {
       const answer = await prompt.path({
         message: 'Where should the project go?',
@@ -101,7 +108,7 @@ export const initCommand = defineCommand({
     const dirName = basename(target);
 
     const entries = await listDir(target, { depth: 0, dirs: true, hidden: true });
-    if (!isNull(entries) && entries.length > 0) {
+    if (!isNull(entries) && !isEmpty(entries)) {
       if (!values.force) {
         if (!interactive) {
           print.errorBlock({
@@ -135,8 +142,8 @@ export const initCommand = defineCommand({
       name = answer;
     }
 
-    let pm = packageManager();
-    if (interactive) {
+    let pm = values.pm ?? packageManager();
+    if (interactive && isUndefined(values.pm)) {
       const answer = await prompt.select<'npm' | 'pnpm'>({
         message: 'Package manager?',
         options: [

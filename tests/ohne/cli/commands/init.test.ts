@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, strictEqual } from 'node:assert';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +64,21 @@ describe('ohne init', () => {
     await runCommand(ohne, ['init', dir, '--yes', '--name', '@acme/ui']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     strictEqual(manifest.name, '@acme/ui');
+  });
+
+  it('lets `--pm` pick the package manager in the next steps', async () => {
+    const dir = join(freshDir('app'), 'managed');
+    const output: string[] = [];
+
+    usePrinter().configure({
+      silent: false,
+      color: false,
+      stream: { write: (s) => output.push(s) },
+    });
+    await runCommand(ohne, ['init', dir, '--yes', '--pm', 'npm']);
+    usePrinter().configure({ silent: true, stream: process.stderr });
+    match(output.join(''), /\bnpm install/);
+    match(output.join(''), /\bnpm run dev/);
   });
 
   it('points the ohne dependency at a local path with --ohne-path', async () => {
