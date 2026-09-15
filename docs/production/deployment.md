@@ -29,8 +29,9 @@ PORT=8081 pnpm exec ohne serve dashboard
 
 The dashboard tells the browser where the API lives. By default it derives the address from the
 `api` config, which only works when the browser can reach that host directly. Behind a proxy or
-across domains, set `dashboard.apiURL` (or the `API_URL` env var) to the public API origin. See
-[config](../project/config.md).
+across domains, set `dashboard.apiURL` (or the `API_URL` env var) to the public API base URL,
+`api.basePath` included. Set `dashboard.origin` (or `DASHBOARD_URL`) to the dashboard's own public
+origin as well, so [CORS](#cors) lets it call the API. See [config](../project/config.md).
 
 ## Readiness
 
@@ -104,9 +105,11 @@ refused with `400` before routing. Empty, the server answers to any host.
 
 ## CORS
 
-With no cors middleware mounted, the API allows any origin - an open default, applied last and
-only when nothing else decided. An app that authenticates with cookies wants an explicit allowlist
-in production: mount the `cors` middleware as a global and the default steps aside. See
+The ohne layer mounts a global `cors` middleware: only the dashboard's origin may read API
+responses, cookies included. That origin is `DASHBOARD_URL`, else `dashboard.origin`, else
+`localhost` on `dashboard.port`. A dashboard reached at any other origin - a public domain, or a
+port moved with `PORT` - needs one of the first two set to that origin, or the browser blocks its
+requests. Set `DASHBOARD_URL` on the API process, not the dashboard's. See
 [middleware](../api/middleware.md#cors).
 
 ## Secrets

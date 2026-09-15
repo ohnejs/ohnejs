@@ -25,14 +25,15 @@ on every request; anywhere else it is opt-in, run only by the routes that select
 ## Global middleware
 
 A file under `middleware/global/` runs on every request, before any opt-in middleware. Globals
-run in name order, so a numeric prefix orders them: `global/10-cors.ts` runs before
-`global/20-auth.ts`.
+from every layer run together in name order, so a numeric prefix orders them:
+`global/10-request-id.ts` runs before `global/20-locale.ts`. A digit sorts before any letter, so
+prefixed globals run before unprefixed ones.
 
 A global that should only act on part of the app scopes itself with `matchPath`, which tests the
 current request's path against one or more patterns:
 
 ```ts
-// middleware/global/auth.ts
+// middleware/global/session.ts
 import { defineMiddleware, matchPath, unauthorized } from 'ohnejs';
 
 export default defineMiddleware(async (event) => {
@@ -110,7 +111,7 @@ import { hook, matchesPath } from 'ohnejs';
 
 hook('middleware:resolve', (names, event) =>
   matchesPath(event.url.pathname, '/public/**')
-    ? names.filter((name) => name !== 'global-auth')
+    ? names.filter((name) => name !== 'global-session')
     : names,
 );
 ```
@@ -119,19 +120,27 @@ See [hooks](./hooks.md).
 
 ## CORS
 
-Out of the box the API is open to browsers: every response carries
-`Access-Control-Allow-Origin: *`, and a preflight allows any method and header. The wildcard is
-credential-free - a browser never exposes a credentialed response under it - so cookies stay
-safe even with the open default.
+The `ohnejs` layer ships `middleware/global/cors.ts`: the dashboard's origin - the `DASHBOARD_URL`
+env var, else `dashboard.origin`, else `http://localhost` on `dashboard.port` - may make
+credentialed requests, and every other origin gets no CORS headers. Without the `ohnejs` layer, every
+response carries a credential-free `Access-Control-Allow-Origin: *`, so cookies stay safe.
 
-To restrict which origins may read responses, mount the `cors` middleware as a global:
+To pick the origins yourself, shadow that file and keep the dashboard's origin in the list, here
+`https://admin.example.com`:
 
 ```ts
 // middleware/global/cors.ts
 import { cors } from 'ohnejs';
 
-export default cors({ origin: ['https://app.example.com'], credentials: true });
+export default cors({
+  origin: ['https://app.example.com', 'https://admin.example.com'],
+  credentials: true,
+});
 ```
+
+Only a file that resolves to the same name, `global-cors`, shadows the shipped policy. Any other
+name, such as `global/10-cors.ts` (`global-10-cors`), adds a second global middleware, and both
+policies run.
 
 Mounting one replaces the open default. `origin` is a single origin, a list, or `'*'`; origins
 match exactly - scheme, host, and port. There is no reflection mode: an origin you did not list
@@ -148,9 +157,10 @@ is needed. The remaining options:
 - `exposeHeaders` - response headers scripts may read beyond the safelisted ones.
 - `maxAge` - seconds the browser may cache the preflight; omitted, the browser uses its own default.
 
-Globals run in name order, so an auth middleware that rejects anonymous requests must sort after
-cors - a preflight carries no credentials, and rejecting it blocks the real request behind it.
-Name the files to order them.
+An auth middleware that rejects anonymous requests must run after cors - a preflight carries no
+credentials, and rejecting it blocks the real request behind it. Globals from every layer share
+one name order, so give the auth file a name that sorts after `cors`: `global/session.ts` above
+runs after it, while `global/auth.ts` and `global/20-auth.ts` run first.
 
 CORS governs what a browser will read, never who may call the API - authorization is its own
 layer. For the full production posture, see [deployment](../production/deployment.md).

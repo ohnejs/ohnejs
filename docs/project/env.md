@@ -30,6 +30,7 @@ A malformed value fails loudly, naming the variable: `PORT=abc` refuses to boot 
 | `SKIP_CODEGEN`     | `false`       | Skips codegen at startup, for when a parent process already ran it.                             |
 | `DASHBOARD_RELOAD` | `false`       | Serves the dashboard's live-reload stream. `ohne dev` turns it on for you.                      |
 | `API_URL`          | -             | Base URL the dashboard's browser client calls, over `dashboard.apiURL`.                         |
+| `DASHBOARD_URL`    | -             | Dashboard origin the API's [CORS](../api/middleware.md#cors) allows, over `dashboard.origin`.   |
 
 Boolean variables accept `1`, `true`, `0`, and `false`, case-insensitive. Three go their own way:
 `NO_COLOR` follows the no-color.org standard, where any non-empty value disables color; `DEBUG` is

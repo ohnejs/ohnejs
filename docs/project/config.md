@@ -134,6 +134,10 @@ When and how to set these for production is covered in [deployment](../productio
 - `apiURL` - the absolute API base URL the browser calls, including any `api.basePath`. Omitted, it
   is derived from `api`; set it when the API sits at a different origin, such as behind a reverse
   proxy.
+- `origin` - the absolute origin the browser reaches the dashboard at, such as
+  `https://admin.example.com`. The API's [CORS](../api/middleware.md#cors) accepts credentialed
+  requests from it. Omitted, it is `http://localhost` on `port`; set it whenever the browser reaches
+  the dashboard anywhere else.
 - `menu` - the [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Omitted, the sidebar
   leads with the overview row, then lists every accessible collection in one unlabeled group.
 
@@ -188,6 +192,7 @@ A handful of env vars override their config counterpart whenever they are set:
 - `PORT` - `api.port` and `dashboard.port`.
 - `HOST` - `api.host` and `dashboard.host`.
 - `API_URL` - `dashboard.apiURL`, and the URL derived from `api`.
+- `DASHBOARD_URL` - `dashboard.origin`.
 - `DATABASE` - `database.url`. `DB` is an alias; setting both throws.
 - `FORCE_SYNC` - `database.sync.force`, for a single boot.
 - `SILENT` - `printer.silent`.
