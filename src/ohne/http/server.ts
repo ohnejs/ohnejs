@@ -36,7 +36,7 @@ declare module 'ohnejs' {
      * Fires once a dispatched request finishes: the response written and all `waitUntil` work drained.
      * Receives the request `Event`, so a trace can read its params, context, and resolved IP after the fact.
      * Reach for it when a span must cover background work, not close when the response is sent.
-     * It runs outside the request `AsyncLocalStorage`, so read the passed `event`, not the composables.
+     * It runs outside the request context, so read the passed `event`, not the composables.
      * A router miss, a refused host, and an off-prefix path never dispatch, so none of them fire it.
      * It is an action: any return value is ignored.
      */

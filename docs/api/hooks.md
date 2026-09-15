@@ -33,8 +33,7 @@ furthest layer boots first - a base layer's callbacks run ahead of yours.
 Every hook is one of two shapes, and the shape tells you what a callback may do.
 
 An **action** returns nothing and runs for effect - `server:ready` warms a cache, `record:committed`
-fires a webhook. Its return is ignored; a throw aborts the caller through the
-[error funnel](./errors.md).
+fires a webhook. Its return is ignored; a throw aborts whatever fired it.
 
 A **filter** threads a value. Its first argument is that value, and each callback's return replaces
 it for the next; the last return is what the framework uses. Returning `undefined` means "no
@@ -55,7 +54,8 @@ hook('response:headers', (headers) => {
 
 ## The hooks at a glance
 
-Every built-in hook, by the lifecycle it belongs to. Each is covered below.
+Every built-in hook, by the lifecycle it belongs to. `auth:account-fields` is covered with
+[the account page](../dashboard/account.md#extending-the-page), every other hook below.
 
 | Hook                   | Kind   | Fires                                                     |
 | ---------------------- | ------ | --------------------------------------------------------- |
@@ -79,6 +79,7 @@ Every built-in hook, by the lifecycle it belongs to. Each is covered below.
 | `populate:targets`     | filter | a populate node's target records, before they key back    |
 | `schema:synced`        | action | the schema reconcile committed                            |
 | `dashboard:menu`       | filter | the dashboard sidebar resolved, before discovery answers  |
+| `auth:account-fields`  | filter | the fields the account page and `PATCH /auth/me` accept   |
 
 ## Server lifecycle
 
@@ -88,16 +89,6 @@ Runs once the API server is listening, after the socket accepts and before readi
 The callback receives the bound `host` and `port` - read `port` to learn the real port when
 `api.port` is `0`. Warm a cache, open a pool, announce the address to discovery. For teardown,
 register `onShutdown` instead.
-
-```ts
-// boot/ready.ts
-import { hook } from 'ohne';
-
-hook('server:ready', async ({ host, port }) => {
-  await warmCache();
-  console.log(`listening on http://${host}:${port}`);
-});
-```
 
 ### `request:complete`
 
@@ -121,45 +112,35 @@ hook('request:complete', (event) => {
 
 ## The request pipeline
 
-These filters wrap a request as it flows through dispatch. The first three run inside the request
-context; the last two run at the transport edge, after it.
+`middleware:resolve`, `handler:result`, and `error:response` run inside the request context, where
+the composables work; `response:send` and `response:headers` run at the transport edge, after it.
 
 ### `middleware:resolve`
 
 Filters or reorders the middleware for a request, after the globals and the route's selection
-resolve - globals first, then the route's list. Return the names to run, filtered or reordered. It
-is the escape hatch for dynamic, per-request control; routine selection belongs
-[on the route](./middleware.md). The list is a per-request copy, so leaving it untouched is safe.
-
-```ts
-// boot/middleware.ts
-import { hook, matchesPath } from 'ohne';
-
-hook('middleware:resolve', (names, event) =>
-  matchesPath(event.url.pathname, '/public/**')
-    ? names.filter((name) => name !== 'global-auth')
-    : names,
-);
-```
+resolve - globals first, then the route's list. Return the names to run. It is the escape hatch for
+dynamic, per-request control, shown in [middleware](./middleware.md#per-request-control); routine
+selection belongs on the route.
 
 ### `handler:result`
 
 Filters a handler's raw return value before it serializes into a `Response`. It fires for a handler
 result and for a middleware short-circuit, each before serialization runs, so the replacement
-serializes by the same rules: a `Response`, an [`HTTPError`](./errors.md), a string, or JSON. An
-error outcome never lands here - filter those through `error:response`.
+serializes by the same rules: a `Response`, an [`HTTPError`](./errors.md), a string, or JSON. A
+returned `HTTPError` lands here too; a thrown error goes to `error:response` instead.
 
 ```ts
 // boot/envelope.ts
 import { hook } from 'ohnejs';
+import { isArray, isPlainObject } from 'ohnejs/utils';
 
 hook('handler:result', (result) =>
-  result instanceof Response ? undefined : { data: result },
+  isPlainObject(result) || isArray(result) ? { data: result } : undefined,
 );
 ```
 
-Returning `undefined` leaves a value unchanged, so the guard above wraps a plain result while
-letting a hand-built `Response` pass straight through.
+Returning `undefined` leaves a value unchanged, so the guard above wraps only a plain object or
+array; a `Response`, a returned `HTTPError`, a string, an empty body, or a stream passes through.
 
 ### `error:response`
 
@@ -306,9 +287,9 @@ hook('record:after-update', async (record, ctx) => {
 ### `record:condition`
 
 Filters the `WHERE` condition of an update or delete before it resolves which rows are touched. It
-fires once at the terminal's top, outside the transaction, before the matched set compiles.
+fires once per update or delete call, not per row, outside the transaction.
 Force-scope the write - a tenant filter, a soft-delete guard - by returning a narrowed condition.
-The condition is a [`ConditionNode`](../database/queries.md): AND-fold your clause into it and
+The condition is a `ConditionNode` from `ohnejs/utils`: AND-fold your clause into it and
 return the new node, or return nothing to leave the caller's condition as is.
 
 ```ts
@@ -426,10 +407,10 @@ hook('query:records', (records, { collection }) => {
 ### `query:complete`
 
 Runs once when a row read finishes, carrying its timing and shape - an action for logging or
-metrics. It fires only for the record reads, where `rowCount` is honest; `count` and `exists`
-return a scalar and do not fire, so time those at the database adapter. `durationMs` spans compile,
-query, hydrate, populate, and `query:records`, on the monotonic clock; `rowCount` is the returned
-count after every transform.
+metrics. It fires for every read that returns records, `pluck`'s record fallback included; `count`,
+`exists`, and `pluck`'s column path do not fire, so time those at the database adapter. `durationMs`
+spans compile, query, hydrate, populate, and `query:records`, on the monotonic clock; `rowCount` is
+the returned count after every transform.
 
 ```ts
 // boot/slow-reads.ts

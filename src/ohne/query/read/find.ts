@@ -28,8 +28,8 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the whole assembled rowset once, after hydrate and populate, just before a row read returns.
-     * Fires for `findMany`, `findFirst`, and `pluck`'s fallback, the reads that return records.
-     * `count`, `exists`, and `pluck`'s column path return a scalar or a column list, so they do not fire.
+     * Fires for `findMany`, `findFirst`, `paginate`, `pluck`, and a write's read-back.
+     * `count`, `exists`, and a `pluck` of a plain column or an unpopulated `record` skip it.
      * Runs once over the array, never per row: add computed fields, redact output, or decrypt at rest.
      * The `context` carries the read's `collection` and its resolved `ir`, the snapshot after `query:filter`.
      * Return a replacement `QueryRecord[]`, or mutate the array in place and return nothing to keep it.
@@ -41,10 +41,10 @@ declare module 'ohnejs' {
 
     /**
      * Runs once when a row read finishes, carrying its timing and shape, an action for logging or metrics.
-     * Fires only for the record reads (`findMany`, `findFirst`, `pluck`'s fallback), where `rowCount` is honest.
+     * Fires for the same reads as `query:records`, where `rowCount` is honest.
      * `count` and `exists` return a scalar and do not fire; time those at the database adapter.
      * `durationMs` spans compile, query, hydrate, populate, and `query:records`, on the monotonic clock.
-     * `rowCount` is the returned record count, after `query:filter` scoping and any `query:records` transform.
+     * `rowCount` is the returned record count, after `query:filter` and any `query:records` transform.
      * The `ir` is the resolved snapshot the read executed, the state after `query:filter`.
      */
     'query:complete': (info: {

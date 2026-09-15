@@ -44,10 +44,9 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the raw input of a create or update before the pipeline coerces it, inside the transaction.
-     * Fires once per record at the tree root, for both operations, before the input is frozen.
+     * Fires once per create or update call, however many records the update matches.
      * One site covers every caller, so a timestamps, tenant, or audit layer stamps input everywhere.
      * Return a replacement record, or mutate the passed object in place and return nothing.
-     * Returning `undefined` leaves the input unchanged.
      * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
      */
     'record:before-change': (

@@ -30,11 +30,10 @@ declare module 'ohnejs' {
      * Fires once per node's batched read, after the target rows assemble and before they are keyed by `UUID`.
      * Drop a soft-deleted or unauthorized target here.
      * A dropped target leaves a `record` link `null`, and removes a `records` element.
-     * The surviving set is what the node's children recurse over, so a filtered target hides its whole subtree.
+     * The node's children recurse over the surviving set, so a filtered target hides its whole subtree.
      * The `context` carries the populate `node` and its target `collection`.
      * Return the filtered `QueryRecord[]`, or nothing to keep every target.
-     * It covers only `record` and `records` populates, not junction `UUID` lists, child composites, or blocks.
-     * Those load outside the populate path, so this hook never sees them.
+     * It never sees junction `UUID` lists, child composites, or blocks; those load outside the populate path.
      */
     'populate:targets': (
       targets: QueryRecord[],

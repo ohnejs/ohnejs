@@ -52,7 +52,7 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the field errors of a create or update after coercion, before any precheck or write.
-     * Fires inside the transaction, for both operations, once the pipeline has a coerced `scope`.
+     * Fires inside the transaction, with the coerced values in `scope.values`.
      * Add cross-field or cross-collection failures the per-field validator cannot express.
      * The threaded value is the errors so far: spread it to add keys, or return your own to replace.
      * A non-empty result aborts the write as `{ ok: false, errors }`, and nothing is written.

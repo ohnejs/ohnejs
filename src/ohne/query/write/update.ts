@@ -72,8 +72,7 @@ export interface RecordConditionContext {
 declare module 'ohnejs' {
   interface Hooks {
     /**
-     * Runs for each record an update touched, re-read in its final state, inside the transaction.
-     * Fires once per matched record, on both the plain and the gated path, so it is genuinely per-row.
+     * Runs once for each record an update matched, re-read in its final state, inside the transaction.
      * Use it for a per-record atomic effect - a search-index row, a revision - written on the same `tx`.
      * An action: its return is ignored, and the record is passed through unchanged.
      * The `ctx` carries the `collection`, the open `tx`, and the effective `locale`.

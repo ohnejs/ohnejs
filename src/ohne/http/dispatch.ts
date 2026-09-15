@@ -32,7 +32,7 @@ declare module 'ohnejs' {
      * The replacement serializes by the handler-return rules: a `Response`, `HTTPError`, string, or JSON.
      * Returning `undefined` leaves the value unchanged, so a callback cannot force a `204` from nothing.
      * It runs inside the request context, so the passed `event` and the composables both reach the request.
-     * An error outcome never lands here; filter those through `error:response`.
+     * A returned `HTTPError` lands here like any value; a thrown error goes to `error:response` instead.
      */
     'handler:result': (result: unknown, event: Event) => unknown;
 
@@ -42,7 +42,7 @@ declare module 'ohnejs' {
      * The generic `500` and the timed-out `503` run through it too.
      * Return a replacement `Response`, or mutate `response.headers` in place and return nothing.
      * Returning `undefined` leaves the response unchanged.
-     * It runs outside the request `AsyncLocalStorage`, so read the passed `event`, not the composables.
+     * It runs outside the request context, so read the passed `event`, not the composables.
      * Router misses (`404`/`405`) skip dispatch; reach for `response:headers` to cover those too.
      */
     'response:send': (
@@ -138,7 +138,7 @@ export interface DispatchOptions {
  * A returned or thrown `HTTPError` maps to its status.
  * Any other throw becomes a `500` with the real error logged, never sent.
  * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
- * An error outcome runs the `error:response` hook first.
+ * A thrown error runs the `error:response` hook first.
  * `response:send` then filters the final response of every outcome, the timeout `503` included.
  * The returned `drain` defers background work past the response.
  *

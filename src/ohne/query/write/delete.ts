@@ -66,7 +66,6 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Runs just before a delete removes its rows, inside the transaction, carrying the doomed `UUID`s.
-     * Fires only when it or `record:committed` has a subscriber; else the fast delete never lists them.
      * Use it to clean up rows outside the cascade - an external mirror, a derived table - on the same `tx`.
      * A `deleteTranslation` never fires it, since every record it matches survives.
      * An action: its return is ignored, and the delete proceeds once every callback settles.
