@@ -89,7 +89,7 @@ The framework ships no signup endpoint - account creation is where apps differ, 
 ```ts
 // api/signup.post.ts
 import { defineHandler, query, readJSONBody } from 'ohnejs';
-import { createSession } from 'ohnejs/auth';
+import { createSession, toUser } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const { email, password } = await readJSONBody<{ email: string; password: string }>();
@@ -98,7 +98,7 @@ export default defineHandler(async () => {
   const record = await query('Users').createOrThrow({ email, password });
 
   await createSession(record.UUID);
-  return { UUID: record.UUID, email: record.email };
+  return toUser(record);
 });
 ```
 
@@ -108,7 +108,7 @@ write-only (`readable: false`), so no read returns the hash - not even `record` 
 
 `createOrThrow` runs the collection's own email validation and its unique constraint, so a bad or
 duplicate email answers `422` with per-field messages. `createSession` writes the session cookie,
-exactly as `login` does.
+exactly as `login` does, and `toUser` answers the same `User` shape `login` returns.
 
 A new account holds no [roles](./roles.md) unless you pass some, like `roles: ['editor']`. The first
 administrator comes from the install page; see [assigning roles](./roles.md#assigning-roles).
