@@ -3,6 +3,8 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
+import { countDecimals } from '../../utils/number/count-decimals.ts';
+import { roundTo } from '../../utils/number/round-to.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
@@ -32,6 +34,7 @@ export interface NumberInputOptions {
 
   /**
    * The number of decimal places a settled value keeps.
+   * `Infinity` keeps the value as typed.
    *
    * @default
    * 0
@@ -335,8 +338,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
     const value = numericValue();
     if (stringified.value.trim() && isRealNumber(value)) {
       const bounded = clamp(value, options.min ?? -Infinity, options.max ?? Infinity);
-      const rounded = Math.round(bounded * 10 ** decimalPlaces) / 10 ** decimalPlaces;
-      stringified.value = leadingZeros(rounded, padZeros);
+      stringified.value = leadingZeros(roundTo(bounded, decimalPlaces), padZeros);
       return true;
     }
     return false;
@@ -344,7 +346,10 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
 
   const add = (amount: number): void => {
     const value = numericValue();
-    if (isRealNumber(value)) stringified.value = leadingZeros(value + amount, padZeros);
+    if (!isRealNumber(value)) return;
+    // Steps are whole multiples of `increment`, so the exact sum has no more decimals than it or `value`.
+    const places = Math.max(countDecimals(value), countDecimals(increment));
+    stringified.value = leadingZeros(roundTo(value + amount, places), padZeros);
   };
 
   const step = (amount: number): void => {

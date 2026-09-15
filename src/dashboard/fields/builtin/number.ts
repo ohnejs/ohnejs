@@ -120,6 +120,7 @@ export const numberType: FieldType = {
       return numberInput(bridged, {
         id: inputID,
         name: inputID,
+        decimalPlaces: Infinity,
         showSteppers: true,
         onCommit: (next) => commit(next),
       });
