@@ -63,16 +63,9 @@ Adding a `roles` field to your own collection that already holds rows is the sta
 new-required-field story: add it `nullable: true`, backfill, then drop the flag with a
 [switch migration](../database/migrations.md#switching-an-attribute).
 
-The first admin is one write from your own code, in a [boot file](../project/boot.md) or a signup
-flow:
-
-```ts
-await query('Users').create({
-  email: 'ada@example.com',
-  password: 'correct horse',
-  roles: ['admin'],
-});
-```
+The first admin needs no code. While `Users` is empty, the dashboard opens its install page, which
+creates the account with the `admin` role and signs it in. `POST /auth/install` with
+`{ email, password }` does the same over HTTP and answers `403` once any user exists.
 
 Because `Users` is itself exposed over the collections API, that first admin can then manage every
 account over HTTP - creating users, assigning roles - guarded by the `collection.Users.*`

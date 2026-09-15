@@ -4,9 +4,9 @@ The ohne layer ships email and password authentication: a `Users` collection, se
 sign-in endpoints, and helpers to read the signed-in user. Stack the ohne layer and it is there.
 Leave it out and none of it exists, so you are free to build your own.
 
-You never store a password. You hash it with scrypt when you create an account, and `login` verifies
-against the hash. A session is an opaque token in a `Secure`, `HttpOnly` cookie, and only its hash is
-stored, so a leaked database cannot hand back a usable session.
+You never store a password. The `password` field hashes it with scrypt when an account is written,
+and `login` verifies against the hash. A session is an opaque token in a `Secure`, `HttpOnly`
+cookie, and only its hash is stored, so a leaked database cannot hand back a usable session.
 
 Creating accounts is left to you - it varies too much between apps to ship one way, from invite-only
 signups to email verification to accepting terms. The framework gives you the `Users` collection and
@@ -14,7 +14,7 @@ the pieces to build it, covered in [creating accounts](#creating-accounts).
 
 ## The endpoints
 
-Five routes cover the sign-in flow and the account. Each speaks JSON.
+These routes cover the sign-in flow, the account, and first-user setup. Each speaks JSON.
 
 ```bash
 # Sign in. Returns the user and sets the session cookie.
@@ -36,7 +36,17 @@ GET   /auth/me
 # Update the signed-in user's own settings. A partial body; unknown keys are a 422.
 PATCH /auth/me      { "timezone": "Europe/Berlin", "dateFormat": "DD.MM.YYYY" }
 # -> 200 the user, 422 with per-field messages, or 401 when signed out
+
+# Whether first-user setup is still pending.
+GET   /auth/install
+# -> 200 { "required": true }, or { "required": false } once a user exists
+
+# Create the first user with the admin role and sign it in.
+POST  /auth/install { "email": "ada@example.com", "password": "correct horse" }
+# -> 200 the user, 422 with per-field messages, or 403 once a user exists
 ```
+
+The dashboard's [install page](./roles.md#assigning-roles) drives the install routes.
 
 The user is one shape everywhere: `UUID`, `email`, the [role names](./roles.md), and the
 [account settings](../dashboard/account.md) - `dashboardLanguage`, `contentLanguage`, `timezone`,
@@ -59,7 +69,7 @@ The user is one shape everywhere: `UUID`, `email`, the [role names](./roles.md),
 The email is stored trimmed and lowercased, so `Ada@Example.com` and `ada@example.com` are the same
 account, and `login` matches either.
 
-`PATCH /auth/me` accepts the fields the `auth:account-fields` hook allows, by default the six
+`PATCH /auth/me` accepts the fields the `auth:account-fields` hook allows, by default the account
 settings and `password`. The write runs through the field pipeline, so a bad time zone or a blank
 format answers `422` exactly as a collection write would, and a new password is hashed before it is
 stored. Changing the password asks for no confirmation of the current one. `email` and `roles` are
@@ -78,37 +88,58 @@ The framework ships no signup endpoint - account creation is where apps differ, 
 
 ```ts
 // api/signup.post.ts
-import { conflict, defineHandler, query, readJSONBody } from 'ohnejs';
+import { defineHandler, query, readJSONBody } from 'ohnejs';
 import { createSession } from 'ohnejs/auth';
 
 export default defineHandler(async () => {
   const { email, password } = await readJSONBody<{ email: string; password: string }>();
   // enforce whatever your app wants here: a length rule, an invite, a captcha...
 
-  const result = await query('Users').create({ email, password });
-  if (!result.ok) throw conflict(); // the email is taken
+  const record = await query('Users').createOrThrow({ email, password });
 
-  await createSession(result.record.UUID);
-  return { UUID: result.record.UUID, email: result.record.email };
+  await createSession(record.UUID);
+  return { UUID: record.UUID, email: record.email };
 });
 ```
 
 You pass the password as plain text. The `password` field hashes it with scrypt just before it is
 stored, so the plaintext never lands anywhere - there is no hashing step to remember. The field is
-write-only (`readable: false`), so no read returns the hash - not even `result.record` here.
+write-only (`readable: false`), so no read returns the hash - not even `record` here.
 
-`create` runs the collection's own email validation and its unique constraint, so a bad or duplicate
-email comes back as `result.ok === false`. `createSession` writes the session cookie, exactly as
-`login` does.
+`createOrThrow` runs the collection's own email validation and its unique constraint, so a bad or
+duplicate email answers `422` with per-field messages. `createSession` writes the session cookie,
+exactly as `login` does.
 
-A new account holds no [roles](./roles.md) unless you assign some: pass `roles: ['admin']` on the
-create to bootstrap your first administrator.
+A new account holds no [roles](./roles.md) unless you pass some, like `roles: ['editor']`. The first
+administrator comes from the install page; see [assigning roles](./roles.md#assigning-roles).
+
+## Adding fields to `Users`
+
+Your own `collections/Users.ts` replaces the ohne layer's `Users` collection whole. Spread
+`usersDefinition` from `ohnejs/auth` to keep the fields sign-in and the account page read, then add
+yours:
+
+```ts
+// collections/Users.ts
+import { defineCollection, field } from 'ohnejs';
+import { usersDefinition } from 'ohnejs/auth';
+
+export default defineCollection({
+  ...usersDefinition,
+  fields: { ...usersDefinition.fields, name: field('text', { nullable: true }) },
+});
+```
+
+Make an added field `nullable: true` or give it a `default`: the install page creates the first
+admin from an email and a password alone. [`useUser`](#reading-the-current-user) returns the
+`User` shape without your fields, so read them with `query('Users')`.
 
 ## Reading the current user
 
 Inside your own [route handler](../api/routes.md), reach for the current user with `useUser`. It
-returns the user, or `null` when the request has no live session. Outside a request, in a boot
-file or a script, there is no session to read, so it resolves to `null` there too.
+returns the user, typed as `User` from `ohnejs/auth`, or `null` when the request has no live session.
+Outside a request, in a boot file or a script, there is no session to read, so it resolves to
+`null` there too.
 
 ```ts
 // api/profile.get.ts
@@ -186,10 +217,6 @@ await useSession();                    // the current session row, or null
 await destroySession();                // ends the session and clears the cookie
 ```
 
-The second argument picks the lifetime, for the row and the cookie together. It defaults to `true`,
-so your own signup opens a remembered session unless you pass `false`, while `POST /auth/login`
-reads a missing `remember` as `false`.
-
 ## Configuration
 
 The auth settings live under `auth` in [`ohne.config.ts`](../project/config.md):
@@ -236,6 +263,5 @@ from the ohne layer. An app that does not [stack](../project/layers.md) it has n
 nothing reserves the `Users` name or the `/auth` paths. Build the collection you want, hash with
 `hashPassword` from `ohnejs/utils/crypto`, and write your own endpoints.
 
-Two helpers from `ohnejs/auth` are worth reusing even then. `createSession` and `destroySession` manage
-the session cookie for you, and `dummyVerify` spends a real password check's worth of time on your
-login's "no such user" path, so timing cannot reveal which emails have an account.
+`dummyVerify` from `ohnejs/auth` is worth reusing even then. It spends a real password check's worth
+of time on your login's "no such user" path, so timing cannot reveal which emails have an account.

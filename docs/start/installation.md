@@ -109,6 +109,10 @@ If you skipped the install with `--yes`, run `pnpm install` first.
 the API at `http://localhost:9001`. Then it watches. Change a source file and the API reloads;
 change a dashboard file and the open browser reloads instead - the API keeps running.
 
+While no user exists, the dashboard opens its first-user setup instead of the login page. The
+account you create there gets the `admin` role and is signed in - see
+[assigning roles](../auth/roles.md#assigning-roles).
+
 The [CLI page](../project/cli.md) covers every command in depth.
 
 ## Generated types

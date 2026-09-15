@@ -165,14 +165,18 @@ Run the first `curl` again and your post is in the list.
 
 The dashboard is a browser app ohne serves for you - no build step, no bundler. Your `.ts` files
 are type-stripped and served as modules, straight from disk. Open `http://localhost:9000` now and
-it answers "Not found": there are no pages yet.
+the ohne layer's own pages answer: with no user yet, it opens the first-user setup. Enter an email
+and a password, choose **Create account**, and you land on the overview, signed in as `admin`.
 
-Pages follow the same file convention as routes, under `dashboard/pages/`:
+Pages follow the same file convention as routes, under `dashboard/pages/`. Add one for your posts
+beside the layer's own pages:
 
 ```ts
-// dashboard/pages/index.ts
+// dashboard/pages/posts.ts
 import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
 import { ref } from 'ohnejs/utils';
+
+import { shell } from 'app/components/shell.ts';
 
 interface Post {
   UUID: string;
@@ -180,34 +184,69 @@ interface Post {
   body: string;
 }
 
-export default defineDashboardPage(() => {
-  const posts = ref<Post[]>([]);
+export default defineDashboardPage(() =>
+  shell(() => {
+    const posts = ref<Post[]>([]);
 
-  void api('GET /posts')
-    .then((response) => response.json())
-    .then((list: Post[]) => (posts.value = list));
+    void api('GET /posts')
+      .then((response) => response.json())
+      .then((list: Post[]) => (posts.value = list));
 
-  return h(
-    'main',
-    null,
-    h('h1', null, 'Posts'),
-    each(
-      () => posts.value,
-      (post) => post.UUID,
-      (post) =>
-        h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
-    ),
-  );
-});
+    return h(
+      'div',
+      null,
+      h('h1', null, 'Posts'),
+      each(
+        () => posts.value,
+        (post) => post.UUID,
+        (post) =>
+          h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
+      ),
+    );
+  }),
+);
 ```
 
-`index.ts` is the dashboard's `/`. The page fetches through `api`, a typed `fetch` against the
-API server: dev wires the two together, and codegen suggests `'GET /posts'` because that route
-exists. It returns the raw `Response` - you decide how to read it.
+`posts.ts` is the dashboard's `/posts`. `shell` is the frame the layer's own pages render in: the
+header, the sidebar, and a redirect to the login page when nobody is signed in. It lives in the
+ohne layer's dashboard directory, and `app/` reaches it there - see
+[what a page may import](../dashboard/pages.md#what-a-page-may-import).
+
+The page fetches through `api`, a typed `fetch` against the API server: dev wires the two together,
+and codegen suggests `'GET /posts'` because that route exists. It returns the raw `Response` - you
+decide how to read it.
 
 `ref` holds reactive state, `h` builds real DOM, and `each` renders a keyed list. The function
 children - `() => post().title` - are reactive: when the fetch lands and `posts.value` changes,
 the list fills in by patching exactly the nodes that changed. No virtual DOM, no re-render.
+
+The page is reachable by URL as soon as the file exists, but the sidebar lists only what the config
+names. Give it a row below the overview in `ohne.config.ts`:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs'],
+  dashboard: {
+    menu: [
+      {
+        items: [
+          { to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' },
+          { to: '/posts', label: 'Posts', icon: 'article' },
+        ],
+      },
+    ],
+  },
+});
+```
+
+A declared `menu` replaces the default one, so the first row brings the overview back, labeled
+with the layer's own message key. The second row is yours: `to` is the page's path, a plain-string
+`label` shows as written, and `icon` names a [Tabler icon](https://tabler.io/icons). Collections the
+menu does not list, `Sessions` and `Users` here, still follow in a group of their own.
+[The sidebar](../dashboard/pages.md#the-sidebar) covers groups, headings, and translated labels.
 
 One last file. The root `tsconfig.json` excludes `dashboard/`, because browser code type-checks
 against DOM types, not Node's. Give the dashboard its own `dashboard/tsconfig.json`:
@@ -215,11 +254,15 @@ against DOM types, not Node's. Give the dashboard its own `dashboard/tsconfig.js
 ```json
 {
   "extends": "ohnejs/tsconfig.browser.json",
+  "compilerOptions": {
+    "paths": { "app/*": ["./*", "../node_modules/ohnejs/src/layer/dashboard/*"] }
+  },
   "include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]
 }
 ```
 
-Refresh `http://localhost:9000` and your posts are on screen. From here, edits are instant: the
+Pick **Posts** in the sidebar, or open `http://localhost:9000/posts`, and your posts are on screen
+inside the dashboard. From here, edits are instant: the
 browser reloads on every dashboard save, and nothing restarts - pages are read fresh per request.
 [Pages](../dashboard/pages.md) covers the convention and serving,
 [rendering](../dashboard/rendering.md) the `h`, `each`, and router surface,

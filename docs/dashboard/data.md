@@ -36,6 +36,9 @@ const author = await response.json();
 
 The id's method wins over `init.method`, so the route id alone decides how the request is sent.
 
+`api` resolves a `401` like any other status. From a route outside `/auth/` it counts as an expired
+session, and a page wrapped in `shell` from `app/components/shell.ts` opens a sign-in popup in place.
+
 ## Uploading with progress
 
 `fetch` cannot tell you how much of a body has gone out, so `apiUpload` sends one over
