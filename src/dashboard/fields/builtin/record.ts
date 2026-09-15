@@ -392,6 +392,7 @@ function fallbackInput(
   const raw = ref(untracked(current) ?? '');
   const control = textInput(raw, { error: () => error() !== '', disabled: () => disabled });
   const input = control.querySelector('input') as HTMLInputElement;
+  input.classList.add('cell-mono');
   input.addEventListener('input', () => {
     model.value = input.value === '' ? null : input.value;
     change();
