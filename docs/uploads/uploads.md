@@ -46,7 +46,8 @@ uploads: {
 - `cache` - the `Cache-Control` directives every served file carries. The default revalidates on
   every use, so a renamed or replaced file is never stale.
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
-  the storage. Omitted, the API serves every file itself.
+  the storage. Omitted, a backend that serves its files itself names the URL; otherwise the API
+  serves every file itself.
 - `images` - the image service that renders resized variants, and the named variants every image
   read carries. `url` has no default; without it every image URL points at the original. See
   [image variants](./images.md).
@@ -61,9 +62,10 @@ temp file beside its target and renames into place, a delete removes empty paren
 behind it, and moving a folder is one rename.
 
 A backend is a `StorageAdapter`: `write`, `read` with an optional byte range, `stat`, `move`,
-`delete`, and an optional `url` for a backend that serves its objects itself. `move` and `delete`
-take a prefix as well as a file, so a folder is one operation. Register one from a
-[boot file](../project/boot.md) and select it by name:
+`delete`, and an optional `url` for a backend that serves its objects itself. A record's `url` then
+comes from the backend, unless `publicURL` is set. `move` and `delete` take a prefix as well as a
+file, so a folder is one operation. Register one from a [boot file](../project/boot.md) and select
+it by name:
 
 ```ts
 // boot/storage.ts
@@ -142,7 +144,8 @@ bodies up to `uploads.maxFileSize` and run without a handler deadline; Node's ow
 `If-None-Match` answers `304`, `Cache-Control` from `uploads.cache`, and `Range` support for video
 and audio. Every answer is `nosniff`; a type a browser would run as a document downloads as an
 attachment, and an SVG renders under a sandboxing content security policy. With `publicURL` set,
-records point at that origin and this route stays the origin behind it.
+records point at that origin and this route stays the origin behind it. Otherwise, when the
+backend has its own `url`, records point there.
 
 ## In server code
 

@@ -58,7 +58,8 @@ declare module 'ohnejs' {
 
       /**
        * An origin that serves the stored files by their path, such as a CDN in front of the storage.
-       * Omitted, the API serves every file itself at `/uploads/<path>`.
+       * Omitted, a backend that serves its files itself names the URL.
+       * Failing that, the API serves every file itself at `/uploads/<path>`.
        */
       publicURL?: string;
 

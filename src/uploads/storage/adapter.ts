@@ -84,6 +84,7 @@ export interface StorageAdapter {
   /**
    * The public URL of the object at `path`, when the backend serves its objects itself.
    * A backend that leaves serving to the API omits it.
+   * A configured `uploads.publicURL` takes precedence over it.
    */
   url?(path: string): string;
 }
