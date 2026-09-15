@@ -29,6 +29,9 @@ export function readRawBody(): Promise<Uint8Array | undefined> {
   return bytes;
 }
 
+/**
+ * Reads the whole body, or `undefined` when the request has none or it is empty.
+ */
 async function consume(request: Request): Promise<Uint8Array | undefined> {
   if (isNull(request.body)) return undefined;
 

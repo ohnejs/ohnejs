@@ -124,6 +124,9 @@ export async function readRows(ir: QueryIR, keepHidden = false): Promise<QueryRe
   return records;
 }
 
+/**
+ * Runs the `query:records` hook over the records, or returns them untouched when none is registered.
+ */
 async function resolveRecords(records: QueryRecord[], ir: QueryIR): Promise<QueryRecord[]> {
   const callbacks = useHooks().get('query:records');
   if (isUndefined(callbacks) || callbacks.length === 0) return records;

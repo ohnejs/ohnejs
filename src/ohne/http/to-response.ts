@@ -71,6 +71,9 @@ function mergeHeaders(response: Response, extra: Headers): Response {
   });
 }
 
+/**
+ * Whether `value` passes to `Response` as raw bytes rather than serializing to JSON.
+ */
 function isBinary(value: unknown): value is ReadableStream | Uint8Array | ArrayBuffer | Blob {
   return (
     value instanceof ReadableStream ||

@@ -273,6 +273,9 @@ interface RequestLimits {
   waitUntilTimeout: number | undefined;
 }
 
+/**
+ * Answers one request, holding its gate ticket until the response is sent and its `waitUntil` work drains.
+ */
 async function handle(
   router: Router,
   gate: Gate,
@@ -356,12 +359,18 @@ async function handle(
   }
 }
 
+/**
+ * Runs the `request:complete` hook, returning at once when nothing listens.
+ */
 async function completeRequest(event: Event): Promise<void> {
   const callbacks = useHooks().get('request:complete');
   if (isUndefined(callbacks) || isEmpty(callbacks)) return;
   await applyHook('request:complete', event);
 }
 
+/**
+ * Builds the `404` for an unmatched path, or the `405` with `Allow` when only the method misses.
+ */
 function errorResponse(match: Exclude<RouteMatch, { type: 'matched' | 'options' }>): Response {
   const headers = new Headers();
   if (match.type === 'method-not-allowed') {
@@ -392,6 +401,9 @@ function autoOptionsRoute(allow: HTTPMethod[]): Route {
   };
 }
 
+/**
+ * Picks a route's limit override over the server-wide fallback; an override of `false` lifts the limit.
+ */
 function limit(
   override: number | false | undefined,
   fallback: number | undefined,

@@ -194,6 +194,9 @@ async function warnStaleCodegen(file: string, dir: string): Promise<void> {
   });
 }
 
+/**
+ * Starts listening and resolves with the bound address, rejecting when the port cannot be taken.
+ */
 function listen(server: Server, port: number, host?: string): Promise<AddressInfo> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error): void => reject(error);

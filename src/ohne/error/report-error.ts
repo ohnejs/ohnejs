@@ -37,10 +37,16 @@ export function reportError(error: unknown, printer: Printer = usePrinter()): vo
   if (error instanceof Error && !isUndefined(error.stack)) printer.debug(error.stack);
 }
 
+/**
+ * Makes `path` relative to `process.cwd()`, passing `undefined` through.
+ */
 function relativize(path: string | undefined): string | undefined {
   return isUndefined(path) ? undefined : relativePath(process.cwd(), path);
 }
 
+/**
+ * Pulls the first `file://` location from the stack as `file:line`, plus `:col` when present.
+ */
 function errorLocation(error: unknown): string | undefined {
   if (!(error instanceof Error) || isUndefined(error.stack)) return undefined;
   const match = error.stack.match(/(file:\/\/\/\S*?):(\d+)(?::(\d+))?/);

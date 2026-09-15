@@ -8,6 +8,9 @@ import { isEmpty, isNull, isPlainObject, merge } from '../../utils/index.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
 
+/**
+ * Emits each defaulted key as `true`, nesting into plain objects, so the type mirrors the defaults' shape.
+ */
 function writeDefaults(code: CodeBuilder, defaults: Record<string, unknown>): void {
   for (const [name, value] of Object.entries(defaults)) {
     if (isPlainObject(value)) {

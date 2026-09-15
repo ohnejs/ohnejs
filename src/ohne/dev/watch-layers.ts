@@ -53,6 +53,9 @@ export function watchLayers(onChange: (path: string) => void): LayerWatch {
   resync();
   return { resync, close };
 
+  /**
+   * Reconciles `watchers` with the registry's layer set, rebuilding them all when the codegen name changed.
+   */
   function resync(): void {
     const ignore = codegenName();
     if (ignore !== ignoreName) {
@@ -71,12 +74,18 @@ export function watchLayers(onChange: (path: string) => void): LayerWatch {
     }
   }
 
+  /**
+   * Stops every live watch and forgets it, so a later `resync` starts from scratch.
+   */
   function close(): void {
     for (const stop of watchers.values()) stop();
     watchers.clear();
   }
 }
 
+/**
+ * The registered layer directories, minus any that lie under `node_modules`.
+ */
 function watchedDirs(): string[] {
   return useLayers()
     .layers()
@@ -84,6 +93,9 @@ function watchedDirs(): string[] {
     .filter((dir) => !normalizePath(dir).split('/').includes('node_modules'));
 }
 
+/**
+ * The basename of the app's `dirs.codegen`, the directory name every layer watch prunes.
+ */
 function codegenName(): string {
   const app = last(useLayers().layers());
   return basename(app?.input.dirs?.codegen ?? DIR_DEFAULTS.codegen);

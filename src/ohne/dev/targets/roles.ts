@@ -14,6 +14,9 @@ export function createRolesTarget(from: string): SetTarget {
   );
 }
 
+/**
+ * The source files of every stacked layer's roles, re-imported fresh so a fixed file recovers.
+ */
 async function roleFiles(): Promise<Set<string>> {
   const roles = await collectRoles(stackedLayers(), { fresh: true });
   return new Set(roles.map((role) => role.file));

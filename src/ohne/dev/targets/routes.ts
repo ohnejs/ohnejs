@@ -12,6 +12,9 @@ export function createRoutesTarget(from: string): SetTarget {
   return createSetTarget('routes', from, 'api', routeFiles, generateRoutes);
 }
 
+/**
+ * The source files of every stacked layer's routes left after `disable.routes`.
+ */
 async function routeFiles(): Promise<Set<string>> {
   const routes = await collectRoutes(stackedLayers(), {
     disable: useConfig().disable.routes,

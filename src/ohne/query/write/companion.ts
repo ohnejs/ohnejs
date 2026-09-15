@@ -27,13 +27,22 @@ export function splitColumns(
 
 /**
  * How a write's companion columns land per matched record: update the existing row, or materialize one.
- * `defaults` carries the values a materialized row fills its unwritten columns with.
- * `errors` carries each failing default's errors by its column.
- * They fail the call only when a row must actually materialize and the write leaves that column unfilled.
  */
 export interface CompanionPlan {
+  /**
+   * The matched record `UUID`s that already hold a companion row at the write's locale.
+   */
   hasRow: ReadonlySet<string>;
+
+  /**
+   * The values a materialized row fills its unwritten columns with.
+   */
   defaults: Record<string, unknown>;
+
+  /**
+   * Each failing default's errors, by its column.
+   * They fail the call only when a row must actually materialize and the write leaves that column unfilled.
+   */
   errors: Record<string, FieldErrors>;
 }
 

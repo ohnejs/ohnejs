@@ -80,6 +80,9 @@ export async function resolveLayerStack(
   await walk(last(closure)!);
   return stack;
 
+  /**
+   * Pushes `layer` after every layer its `layers` lists, visiting each directory once.
+   */
   async function walk(layer: OhneLayer): Promise<void> {
     if (visited.has(layer.dir)) return;
     visited.add(layer.dir);

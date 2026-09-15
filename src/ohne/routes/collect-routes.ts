@@ -65,6 +65,9 @@ export async function collectRoutes(
     .sort((a, b) => naturalCompare(routeID(a.method, a.pattern), routeID(b.method, b.pattern)));
 }
 
+/**
+ * Builds the drop predicate for `disable`; a `METHOD ` prefix limits a glob to that method.
+ */
 function disabled(globs: string[]): (route: RouteMeta) => boolean {
   const matchers = globs.map((glob) => {
     const prefixed = glob.match(METHOD_PREFIX_RE);

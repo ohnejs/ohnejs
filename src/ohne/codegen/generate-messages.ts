@@ -144,6 +144,9 @@ async function writeBrowser(dir: string): Promise<string> {
   return write(dir, code);
 }
 
+/**
+ * Writes `messages.ts` into `dir` when its contents changed, returning its absolute path either way.
+ */
 async function write(dir: string, code: CodeBuilder): Promise<string> {
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('messages.ts', code.toString());
@@ -193,6 +196,9 @@ function unifyKeyTypes(messages: readonly MessageMeta[]): Map<string, string> {
   return new Map([...seen.keys()].sort().map((key) => [key, seen.get(key)!.type]));
 }
 
+/**
+ * Reads the parameter types of a message's template, rethrowing an invalid template as an `ohneError`.
+ */
 function paramsOf(message: MessageMeta): Record<string, MessageParamType> {
   try {
     return messageParamTypes(message.template);
@@ -205,6 +211,9 @@ function paramsOf(message: MessageMeta): Record<string, MessageParamType> {
   }
 }
 
+/**
+ * Renders parameter types as an object type literal sorted by name, `{}` when there are none.
+ */
 function renderParamObject(params: Record<string, MessageParamType>): string {
   const names = Object.keys(params).sort();
   if (names.length === 0) return '{}';
@@ -212,6 +221,9 @@ function renderParamObject(params: Record<string, MessageParamType>): string {
   return `{ ${fields.join('; ')} }`;
 }
 
+/**
+ * The TypeScript type one parameter accepts; a `choice` with options narrows to their sorted literal union.
+ */
 function renderParamType(type: MessageParamType): string {
   switch (type.kind) {
     case 'value':

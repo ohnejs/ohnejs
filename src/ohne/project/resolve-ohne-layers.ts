@@ -75,6 +75,9 @@ export async function resolveOhnePackages(from: string = process.cwd()): Promise
   packages.push({ name: rootManifest.name ?? basename(appDir), dir: appDir, layer: true });
   return packages;
 
+  /**
+   * Pushes each resolvable package in `names` after its own dependencies, visiting each directory once.
+   */
   async function walk(base: string, names: string[]): Promise<void> {
     for (const name of names) {
       const dir = await resolveModuleDir(name, base);

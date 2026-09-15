@@ -123,6 +123,9 @@ async function writeBrowser(dir: string): Promise<string> {
   return write(dir, code);
 }
 
+/**
+ * Writes `routes.ts` into `dir` when its contents changed, returning its absolute path either way.
+ */
 async function write(dir: string, code: CodeBuilder): Promise<string> {
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('routes.ts', code.toString());

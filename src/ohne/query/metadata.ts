@@ -149,14 +149,13 @@ export interface FieldQueryMeta {
 /**
  * A collection-level `unique` composite the write pipeline prechecks before a write.
  * Resolved from each `compositeIndexes` entry whose `unique` is set.
- * `fields` are the covered field names in order - each names its column and the path a collision keys.
- * `companion` marks a composite over translatable fields, whose constraint lives on the companion table.
  */
 export interface CompositeUnique {
   /**
    * The covered field names in declaration order; each is column-bearing, so its name is its column.
    */
   fields: readonly string[];
+
   /**
    * Whether the constraint lives on the companion table - `true` iff every covered field is translatable.
    */

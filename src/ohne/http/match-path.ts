@@ -3,6 +3,9 @@ import { useEvent } from './use-event.ts';
 
 const cache = new Map<string, (path: string) => boolean>();
 
+/**
+ * Returns the cached predicate for `pattern`: a route matcher when it holds `[`, a glob otherwise.
+ */
 function matcher(pattern: string): (path: string) => boolean {
   let compiled = cache.get(pattern);
   if (isUndefined(compiled)) {

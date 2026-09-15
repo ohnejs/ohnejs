@@ -11,6 +11,9 @@ export function createMiddlewareTarget(from: string): SetTarget {
   return createSetTarget('middleware', from, 'middleware', middlewareFiles, generateMiddleware);
 }
 
+/**
+ * The source files of every stacked layer's middleware, the set whose change regenerates the table.
+ */
 async function middlewareFiles(): Promise<Set<string>> {
   const middleware = await collectMiddleware(stackedLayers());
   return new Set(middleware.map((entry) => entry.file));

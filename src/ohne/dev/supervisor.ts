@@ -159,6 +159,9 @@ export async function dev(
   useShutdown().watch();
   return { close };
 
+  /**
+   * Drains `pending` batch by batch until it stays empty; a call during a running cycle only flags a rerun.
+   */
   async function tick(): Promise<void> {
     if (closed) return;
     if (cycling) {
@@ -179,6 +182,10 @@ export async function dev(
     }
   }
 
+  /**
+   * Reloads a changed `.env`, regenerates, then restarts, reloads, or respawns only what the batch affects.
+   * A `.env` or codegen failure is reported and parks the supervisor, leaving the children as they are.
+   */
   async function runCycle(batch: Set<string>): Promise<void> {
     const configChanged = [...batch].some((path) => config.affectedBy(path));
     const envChanged = batch.has(envFile);
@@ -206,6 +213,10 @@ export async function dev(
     park();
   }
 
+  /**
+   * Runs every target and prunes stale files for `null`, else only the targets a path in `batch` affects.
+   * A config change runs the config target alone, which rebuilds the rest, then resyncs the layer watch.
+   */
   async function regen(batch: Set<string> | null): Promise<void> {
     if (isNull(batch)) {
       const written = (await Promise.all(targets.map((target) => target.regen()))).flat();
@@ -223,6 +234,9 @@ export async function dev(
     }
   }
 
+  /**
+   * Stops the running API child, then spawns a fresh one, rejecting when its boot fails.
+   */
   function respawn(): Promise<void> {
     respawning = (async () => {
       if (api) {
@@ -242,6 +256,9 @@ export async function dev(
     return respawning;
   }
 
+  /**
+   * Hands the API child the dashboard's origin as `DASHBOARD_URL`, or nothing when the dashboard is off.
+   */
   function apiChildEnv(): Record<string, string> {
     if (!wantDashboard) return {};
     const origin =
@@ -251,6 +268,9 @@ export async function dev(
     return { DASHBOARD_URL: origin };
   }
 
+  /**
+   * Spawns the dashboard child pointed at the API; a failed boot only warns and leaves no dashboard.
+   */
   async function startDashboard(): Promise<void> {
     const config = useConfig();
     const api = config.api;
@@ -284,24 +304,39 @@ export async function dev(
     if (!closed) await startDashboard();
   }
 
+  /**
+   * Drops a crashed API child and parks until a change respawns it.
+   */
   function onCrash(): void {
     api = null;
     park();
   }
 
+  /**
+   * Drops an exited dashboard child with a warning; only a config or `.env` change starts it again.
+   */
   function onDashboardExit(): void {
     dashboard = null;
     printer.warn('Dashboard server exited.');
   }
 
+  /**
+   * Prints the dim line that marks the supervisor idle until the next change.
+   */
   function park(): void {
     printer.info('__Waiting for changes...__');
   }
 
+  /**
+   * Starts the teardown once; every later call returns the same promise.
+   */
   function close(): Promise<void> {
     return (closing ??= teardown());
   }
 
+  /**
+   * Closes the layer and `.env` watches, waits out any cycle or respawn in flight, then stops the children.
+   */
   async function teardown(): Promise<void> {
     closed = true;
     schedule.cancel();

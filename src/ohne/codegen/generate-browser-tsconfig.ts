@@ -41,6 +41,9 @@ export async function generateBrowserTSConfig(
   return write(dir, code);
 }
 
+/**
+ * Writes `tsconfig.json` into `dir` when its contents changed, returning its absolute path either way.
+ */
 async function write(dir: string, code: CodeBuilder): Promise<string> {
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('tsconfig.json', code.toString());

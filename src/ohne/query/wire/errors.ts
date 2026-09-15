@@ -56,6 +56,9 @@ export interface WireErrorData {
   path: string;
 }
 
+/**
+ * Builds the `400` a wire failure answers: its translated `query.<code>` message and its `WireErrorData`.
+ */
 function wireError(
   code: WireErrorCode,
   path: string,

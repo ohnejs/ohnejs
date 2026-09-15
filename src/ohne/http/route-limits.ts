@@ -11,10 +11,16 @@ interface RouteLimits {
 
 const cache = new WeakMap<AnyHandler, RouteLimits>();
 
+/**
+ * Parses a byte size, passing `undefined` and `false` through.
+ */
 function resolveBytes(value: number | string | false | undefined): number | false | undefined {
   return isUndefined(value) || value === false ? value : parseBytes(value);
 }
 
+/**
+ * Parses a duration to milliseconds, passing `undefined` and `false` through.
+ */
 function resolveMs(value: number | string | false | undefined): number | false | undefined {
   return isUndefined(value) || value === false ? value : parseDuration(value);
 }

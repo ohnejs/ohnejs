@@ -193,10 +193,16 @@ export function spawnServeChild(
     reload: () => send('reload'),
   };
 
+  /**
+   * Starts the drain once; every later call returns the same promise.
+   */
   function stop(): Promise<void> {
     return (stopping ??= drain());
   }
 
+  /**
+   * Sends a ready child `'shutdown'` or kills an unready one, escalating to `SIGKILL` after `killTimeout`.
+   */
   async function drain(): Promise<void> {
     commanded = true;
     if (gone) return;
@@ -210,6 +216,9 @@ export function spawnServeChild(
     }
   }
 
+  /**
+   * Sends `message` over IPC, a no-op once the channel has closed.
+   */
   function send(message: string): void {
     if (!child.connected) return;
     try {
@@ -220,6 +229,9 @@ export function spawnServeChild(
   }
 }
 
+/**
+ * The parent's `process.execArgv` minus any `--inspect*` flag, to avoid a debugger port clash.
+ */
 function nodeFlags(): string[] {
   return process.execArgv.filter((flag) => !flag.startsWith('--inspect'));
 }

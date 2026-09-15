@@ -79,6 +79,9 @@ export async function sendFile(
   throw notFound(options.notFound);
 }
 
+/**
+ * Sets the file's headers, then marks a fresh request `304` or returns the body, stripped when TypeScript.
+ */
 async function serve(
   file: string,
   stats: Stats,

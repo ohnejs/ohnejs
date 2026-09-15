@@ -246,24 +246,36 @@ export async function dispatch(
   };
 }
 
+/**
+ * Runs the `middleware:resolve` hook over `names`, or returns them as-is when nothing listens.
+ */
 async function resolveMiddleware(names: string[], event: Event): Promise<string[]> {
   const callbacks = useHooks().get('middleware:resolve');
   if (isUndefined(callbacks) || callbacks.length === 0) return names;
   return applyHook('middleware:resolve', names as MiddlewareKey[], event);
 }
 
+/**
+ * Runs the `response:send` hook over `response`, or returns it as-is when nothing listens.
+ */
 async function resolveResponse(response: Response, event: Event): Promise<Response> {
   const callbacks = useHooks().get('response:send');
   if (isUndefined(callbacks) || callbacks.length === 0) return response;
   return applyHook('response:send', response, event);
 }
 
+/**
+ * Runs the `handler:result` hook over `result`, or returns it as-is when nothing listens.
+ */
 async function resolveResult(result: unknown, event: Event): Promise<unknown> {
   const callbacks = useHooks().get('handler:result');
   if (isUndefined(callbacks) || callbacks.length === 0) return result;
   return applyHook('handler:result', result, event);
 }
 
+/**
+ * Runs the `error:response` hook over `response`, or returns it as-is when nothing listens.
+ */
 async function resolveErrorResponse(
   response: Response,
   error: unknown,
@@ -274,16 +286,25 @@ async function resolveErrorResponse(
   return applyHook('error:response', response, error, event);
 }
 
+/**
+ * Whether the declared `Content-Length` exceeds `max`; `false` without a body, a cap, or a numeric length.
+ */
 function exceedsBodySize(request: Request, max: number | undefined): boolean {
   if (isNull(request.body) || isUndefined(max)) return false;
   const length = coerceToNumber(request.headers.get('content-length'));
   return isNumber(length) && length > max;
 }
 
+/**
+ * Awaits the background work until none is left, so work registered while draining settles too.
+ */
 async function drain(background: Promise<unknown>[]): Promise<void> {
   while (background.length > 0) await Promise.all(background.splice(0));
 }
 
+/**
+ * Prints an unhandled route error as a block titled by the route, with the stack under `DEBUG`.
+ */
 function logUnhandled(route: Route, error: unknown): void {
   const printer = usePrinter();
   printer.errorBlock({

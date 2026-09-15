@@ -143,6 +143,9 @@ export function useShutdown(): Shutdown {
   return shutdown;
 }
 
+/**
+ * Runs every hook in order, logging failures; `completed` is `false` when the deadline passes first.
+ */
 async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
   const all = (async () => {
     for (const hook of hooks) {
@@ -167,6 +170,9 @@ async function drain(options?: ShutdownRunOptions): Promise<ShutdownOutcome> {
   );
 }
 
+/**
+ * Runs the shutdown, then exits `0` on a clean drain or `1` when the deadline won.
+ */
 async function exit(options?: ShutdownRunOptions): Promise<void> {
   const { completed } = await shutdown.run(options);
   process.exit(completed ? 0 : 1);

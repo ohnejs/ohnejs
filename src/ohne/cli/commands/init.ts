@@ -189,14 +189,23 @@ export const initCommand = defineCommand({
   },
 });
 
+/**
+ * The package manager to default to: `npm` when npm launched this process, else `pnpm`.
+ */
 function packageManager(): 'npm' | 'pnpm' {
   return (process.env.npm_config_user_agent ?? '').startsWith('npm/') ? 'npm' : 'pnpm';
 }
 
+/**
+ * The command that runs `script` under `pm`: `npm run <script>` for npm, `<pm> <script>` otherwise.
+ */
 function runScript(pm: string, script: string): string {
   return pm === 'npm' ? `npm run ${script}` : `${pm} ${script}`;
 }
 
+/**
+ * Writes the starter project files into `target`, with `ohnejs` as the dependency's version or local path.
+ */
 async function scaffold(target: string, name: string, ohne: string): Promise<void> {
   await writeFile(joinPath(target, 'ohne.config.ts'), CONFIG_FILE);
   await writeJSON(joinPath(target, 'package.json'), {
@@ -218,6 +227,9 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
   await writeFile(joinPath(target, '.gitignore'), GITIGNORE_FILE);
 }
 
+/**
+ * Runs `<pm> install` in `target`, resolving `false` instead of throwing when it fails.
+ */
 async function install(pm: string, target: string): Promise<boolean> {
   try {
     await run(pm, ['install'], { cwd: target });
@@ -227,6 +239,9 @@ async function install(pm: string, target: string): Promise<boolean> {
   }
 }
 
+/**
+ * Runs `git init` in `target`, resolving `false` instead of throwing when it fails.
+ */
 async function gitInit(target: string): Promise<boolean> {
   try {
     await run('git', ['init'], { cwd: target });

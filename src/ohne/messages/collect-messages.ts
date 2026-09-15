@@ -71,6 +71,9 @@ export async function collectMessages(
     .sort((a, b) => naturalCompare(a.language, b.language) || naturalCompare(a.key, b.key));
 }
 
+/**
+ * Compiles the `disable` globs into one predicate over message keys, each dot read as a path separator.
+ */
 function disabled(globs: string[]): (message: MessageMeta) => boolean {
   const matchers = globs.map((glob) => compileGlob(glob.replaceAll('.', '/')));
   return (message) => {

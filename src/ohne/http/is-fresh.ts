@@ -3,6 +3,9 @@ import { useEvent } from './use-event.ts';
 
 const noCache = /(?:^|,)\s*no-cache\s*(?:,|$)/;
 
+/**
+ * Whether any tag in an `If-None-Match` list equals `etag`, ignoring a `W/` prefix on either side.
+ */
 function matchesETag(noneMatch: string, etag: string): boolean {
   for (const candidate of noneMatch.split(',')) {
     const tag = candidate.trim();

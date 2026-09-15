@@ -129,6 +129,9 @@ export function createRouter(routes: Iterable<Route>): Router {
     compareSpecificity(a.matcher.pattern, b.matcher.pattern),
   );
 
+  /**
+   * Returns the most specific route for `method`, else the matching patterns' `allow`, else `not-found`.
+   */
   function match(method: HTTPMethod, path: string): RouteMatch {
     const allow = new Set<HTTPMethod>();
 

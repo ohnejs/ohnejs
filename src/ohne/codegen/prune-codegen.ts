@@ -30,6 +30,9 @@ export async function pruneCodegen(from: string, keep: readonly string[]): Promi
   return removed;
 }
 
+/**
+ * Whether the file at `path` starts with `BANNER_PREFIX`; a missing file counts as not generated.
+ */
 async function generated(path: string): Promise<boolean> {
   const content = await readFile(path);
   return !isNull(content) && content.startsWith(BANNER_PREFIX);

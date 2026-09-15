@@ -211,6 +211,9 @@ async function loadTargets(
   return keyed;
 }
 
+/**
+ * Runs the `populate:targets` hook over a node's targets, or returns them untouched when none is registered.
+ */
 async function resolveTargets(
   targets: QueryRecord[],
   node: PopulateNode,

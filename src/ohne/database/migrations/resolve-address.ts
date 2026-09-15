@@ -107,22 +107,63 @@ export type SwitchAttribute = keyof SwitchAttributes;
 
 /**
  * A switch migration lowered against the live state: the flipped attribute and where it lives.
- * `table` is the column's live home - main table or companion - or the main reading when absent.
- * `column` is absent when the field is live as a locale-scoped derived table.
- * The owner - `collection` or `block` - and `segments` carry the logical spelling.
- * The executor resolves placements through them.
  */
 export interface LoweredSwitch {
+  /**
+   * Tags this lowered migration as a switch.
+   */
   kind: 'switch';
+
+  /**
+   * The attribute the switch flips.
+   */
   attribute: SwitchAttribute;
+
+  /**
+   * The live state `from` asserts.
+   */
   from: boolean;
+
+  /**
+   * The target state `to` asserts; absent when `to` is omitted, so the desired schema supplies it.
+   */
   to?: boolean;
+
+  /**
+   * The column's live home - main-path table or companion - or the derived table when `column` is absent.
+   * A field live nowhere lowers onto the main-path table.
+   */
   table: string;
+
+  /**
+   * The flipped column; absent when the field is live as a derived table, which only `translatable` flips.
+   */
   column?: string;
+
+  /**
+   * The owning collection of a logical address; absent on a block or physical address.
+   */
   collection?: string;
+
+  /**
+   * The owning block of a logical address; absent on a collection or physical address.
+   */
   block?: string;
+
+  /**
+   * The field path, one segment per level; absent on a physical address.
+   * The executor resolves desired placements through it and the owner.
+   */
   segments?: readonly string[];
+
+  /**
+   * The logical type the address pins; every switch but `translatable` asserts it against the live column.
+   */
   type?: LogicalType;
+
+  /**
+   * The migration's value transform.
+   */
   transform?: MigrationTransform;
 }
 

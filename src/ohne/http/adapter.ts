@@ -121,10 +121,16 @@ export function clientIP(req: IncomingMessage, trustProxy?: (ip: string) => bool
   return unmapIP(peer);
 }
 
+/**
+ * Whether the socket's peer is a trusted proxy; always `false` without a `trustProxy`.
+ */
 function trusts(trustProxy: ((ip: string) => boolean) | undefined, req: IncomingMessage): boolean {
   return !isUndefined(trustProxy) && trustProxy(req.socket.remoteAddress ?? '');
 }
 
+/**
+ * Splits `X-Forwarded-For` into its non-empty, trimmed entries in header order; `[]` when absent.
+ */
 function forwardedFor(headers: IncomingHttpHeaders): string[] {
   const value = headers['x-forwarded-for'];
   if (isUndefined(value)) return [];
@@ -135,6 +141,9 @@ function forwardedFor(headers: IncomingHttpHeaders): string[] {
     .filter((part) => part.length > 0);
 }
 
+/**
+ * Reads the first `X-Forwarded-Proto` and `X-Forwarded-Host` tokens, each `undefined` when absent.
+ */
 function forwardedOrigin(headers: IncomingHttpHeaders): { proto?: string; host?: string } {
   return {
     proto: firstToken(headers['x-forwarded-proto']),
@@ -142,6 +151,9 @@ function forwardedOrigin(headers: IncomingHttpHeaders): { proto?: string; host?:
   };
 }
 
+/**
+ * The first comma-separated token of a header value, trimmed; `undefined` when absent or blank.
+ */
 function firstToken(value: string | string[] | undefined): string | undefined {
   if (isUndefined(value)) return undefined;
   const raw = isArray(value) ? first(value) : value;
@@ -149,6 +161,9 @@ function firstToken(value: string | string[] | undefined): string | undefined {
   return token ? token : undefined;
 }
 
+/**
+ * Passes the body through, throwing `payloadTooLarge` once more than `max` bytes have streamed.
+ */
 function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStream<Uint8Array> {
   let seen = 0;
   return body.pipeThrough(
@@ -191,6 +206,9 @@ export async function sendResponse(res: ServerResponse, response: Response): Pro
   }
 }
 
+/**
+ * Runs the `response:headers` hook when anything listens, then applies the open CORS default.
+ */
 async function resolveHeaders(response: Response, method?: string): Promise<Headers> {
   const callbacks = useHooks().get('response:headers');
   const headers =
@@ -216,6 +234,9 @@ function applyDefaultCORS(headers: Headers, method?: string): void {
   }
 }
 
+/**
+ * Whether the `Vary` header lists `Origin`, case-insensitively.
+ */
 function variesOnOrigin(headers: Headers): boolean {
   const vary = headers.get('vary');
   return (

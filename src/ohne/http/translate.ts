@@ -116,6 +116,9 @@ export function defaultLanguage(): string {
   return canonicalizeLanguage(configured) ?? configured;
 }
 
+/**
+ * Finds `key` along `language`'s fallback chain, then the default language; `undefined` when none has it.
+ */
 function lookup(key: string, language: string): { template: string; language: string } | undefined {
   const catalogs = useMessages().all();
   for (const lang of uniqueArray([...languageFallbacks(language), defaultLanguage()])) {
@@ -125,6 +128,9 @@ function lookup(key: string, language: string): { template: string; language: st
   return undefined;
 }
 
+/**
+ * Parses a message template once per process, returning the cached AST after that.
+ */
 function astOf(template: string): MessageAST {
   let ast = cache.get(template);
   if (isUndefined(ast)) {

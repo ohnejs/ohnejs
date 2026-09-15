@@ -742,6 +742,9 @@ async function writeNode(
   return write(dir, code);
 }
 
+/**
+ * Writes `database.ts` into `dir` when its contents changed, returning its absolute path either way.
+ */
 async function write(dir: string, code: CodeBuilder): Promise<string> {
   const gen = createCodeGenerator({ dir, banner: BANNER });
   await gen.write('database.ts', code.toString());
