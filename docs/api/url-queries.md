@@ -274,3 +274,17 @@ export default {
 ```
 
 Pass `resolveGuards({ maxPerPage: 100 })` to raise or lower a ceiling for one endpoint.
+
+The builder you replay onto can carry the same overrides with `.guards()`. They take effect only
+when you pass that builder to `resolveGuards` as well:
+
+```ts
+export default defineHandler(async () => {
+  const posts = queryUntyped('Posts').guards({ maxPopulateDepth: 3 });
+  const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards(posts));
+  return applyQuery(posts, parsed).findMany();
+});
+```
+
+Only the ceiling moves: past it, `perPage` still clamps and everything else is still a `400` with
+the same code.

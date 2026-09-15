@@ -1,11 +1,14 @@
+import type { UntypedQueryBuilder } from '../untyped.ts';
+
 import { isUndefined } from '../../../utils/index.ts';
 import { tryUseDialect } from '../../database/use-database.ts';
 import { useConfig } from '../../layers/use-config.ts';
+import { builderGuards } from '../impl.ts';
 
 /**
- * The DoS guards that bound a wire-driven query, resolved per key from three tiers.
+ * The DoS guards that bound a wire-driven query, resolved per key across tiers.
  *
- * Framework defaults, then `config.query.guards` app-wide, then `.guards()` per builder.
+ * Framework defaults, then `config.query.guards` app-wide, then what an endpoint passes to `resolveGuards`.
  * They gate the untrusted wire path; the fluent path is trusted and never guard-checked.
  * Every field is a generous ceiling, not policy: a real query never approaches one.
  */
@@ -103,7 +106,7 @@ export interface QueryGuards {
 }
 
 /**
- * The framework's generous default guards, the base tier the config and the builder override onto.
+ * The framework's generous default guards, the base tier every override folds onto.
  */
 export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
   maxConditions: 100,
@@ -120,16 +123,18 @@ export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
 };
 
 /**
- * Folds the three guard tiers into one effective table: defaults, then config, then the builder.
+ * Folds the guard tiers per key: the defaults, then `config.query.guards`, then `overrides`.
+ * A builder passed as `overrides` contributes its accumulated `.guards()` as that last tier.
  *
- * The framework defaults are the base; `config.query.guards` overrides them app-wide.
- * A builder's own `.guards()` overrides win last, per key.
- * `maxBoundParams` is then clamped to the dialect's own limit, so a config can lower it but not raise it.
+ * `maxBoundParams` is then clamped to the dialect's own limit, so no tier can raise it past the driver.
  * The wire always refuses before the read reaches the driver's wall.
  * Only the untrusted wire path resolves through this; the fluent path is trusted and never guard-checked.
  */
-export function resolveGuards(overrides: Partial<QueryGuards> = {}): QueryGuards {
-  const resolved = { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...overrides };
+export function resolveGuards(
+  overrides: Partial<QueryGuards> | UntypedQueryBuilder = {},
+): QueryGuards {
+  const layer = 'guards' in overrides ? builderGuards(overrides) : overrides;
+  const resolved = { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...layer };
   const wall = tryUseDialect()?.maxParameters;
   if (!isUndefined(wall)) resolved.maxBoundParams = Math.min(resolved.maxBoundParams, wall);
   return resolved;

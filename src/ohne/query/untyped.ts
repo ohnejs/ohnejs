@@ -301,11 +301,14 @@ export interface UntypedQueryBuilder {
 
   /**
    * Overrides the wire guards for this builder, merging per key so the last value for a key wins.
-   * The overrides gate the untrusted wire path; the fluent path is trusted and never guard-checked.
+   * They bind a wire query only when it is parsed under `resolveGuards(builder)`.
+   * The fluent path is trusted and never guard-checked.
    *
    * @example
    * ```ts
-   * queryUntyped('Posts').guards({ maxPerPage: 100 })
+   * const posts = queryUntyped('Posts').guards({ maxPopulateDepth: 3 })
+   * const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards(posts))
+   * await applyQuery(posts, parsed).findMany()
    * ```
    */
   guards(overrides: Partial<QueryGuards>): this;

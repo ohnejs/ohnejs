@@ -271,7 +271,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 }
 
 /**
- * Reads the wire-guard overrides a builder accumulated, the internal seam the wire parser resolves through.
+ * Reads the wire-guard overrides a builder accumulated, the tier `resolveGuards` folds in last.
  */
 export function builderGuards(builder: UntypedQueryBuilder): Partial<QueryGuards> {
   return (builder as QueryBuilderImpl).guardOverrides;

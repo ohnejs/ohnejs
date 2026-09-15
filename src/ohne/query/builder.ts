@@ -847,7 +847,7 @@ interface Terminals<C extends CollectionName, S, P> {
 interface Guardable<Self> {
   /**
    * Overrides the wire guards for this builder, merging per key so the last value for a key wins.
-   * These gate the untrusted wire path; the fluent path is trusted and never guard-checked.
+   * Only an untyped builder hands them to a wire parse, via `resolveGuards(builder)`; a typed query cannot.
    *
    * @example
    * ```ts
