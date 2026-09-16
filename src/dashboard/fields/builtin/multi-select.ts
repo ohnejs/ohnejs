@@ -2,6 +2,7 @@ import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { Primitive } from '../../ui/button-group.ts';
 
+import { first } from '../../../utils/array/first.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
@@ -13,7 +14,7 @@ import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
-import { type MessageParams, type Translate, useT } from '../../runtime/use-t.ts';
+import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { type ChipsChoice, chips } from '../../ui/chips.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
 import { textInput } from '../../ui/text-input.ts';
@@ -32,12 +33,11 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  */
 export const multiSelectType: FieldType = {
   display({ field, value }) {
-    const t = useT();
     return () => {
       const current = value();
       const values = isArray(current) ? current.filter(isString) : [];
       if (values.length === 0) return dimMark('-');
-      const pairs = choicesOf(field, t);
+      const pairs = choicesOf(field);
       const labels = values.map(
         (entry) => pairs.find((pair) => pair.value === entry)?.label ?? entry,
       );
@@ -83,7 +83,7 @@ export const multiSelectType: FieldType = {
     const element = chips(model, {
       disabled: () => context.disabled === true,
       choices: isArray(context.field.options?.choices)
-        ? (): ChipsChoice[] => choicesOf(context.field, t)
+        ? (): ChipsChoice[] => choicesOf(context.field)
         : undefined,
       maxItems: isNumber(max) ? max : undefined,
       placeholder: context.field.placeholder,
@@ -133,7 +133,7 @@ export const multiSelectType: FieldType = {
   },
   filter: {
     operators: () => ['includes', 'notIncludes'],
-    seed: (field) => choicesOf(field, useT())[0]?.value ?? '',
+    seed: (field) => first(choicesOf(field))?.value ?? '',
     input({ field, value, set, commit, inputID }) {
       const t = useT();
       if (isArray(field.options?.choices)) {
@@ -145,7 +145,7 @@ export const multiSelectType: FieldType = {
             commit(String(next));
           },
         };
-        return select(bridged, (): SelectChoice[] => choicesOf(field, t), {
+        return select(bridged, (): SelectChoice[] => choicesOf(field), {
           id: inputID,
           name: inputID,
         });
@@ -170,25 +170,18 @@ export const multiSelectType: FieldType = {
 
 /**
  * The declared `choices` option as resolved `value`/`label` pairs.
- * A plain string choice is its own display text; a declared label resolves through `t`.
+ * A plain string choice is its own display text; a declared label translates as a message.
  * A malformed or absent option resolves to no choices.
  */
-function choicesOf(field: DashboardField, t: Translate): { value: string; label: string }[] {
+function choicesOf(field: DashboardField): { value: string; label: string }[] {
   const declared = field.options?.choices;
   if (!isArray(declared)) return [];
-  const translate = t as (key: string, params?: MessageParams) => string;
   const pairs: { value: string; label: string }[] = [];
   for (const entry of declared) {
     if (isString(entry)) {
       pairs.push({ value: entry, label: entry });
     } else if (isPlainObject(entry) && isString(entry.value)) {
-      const label = entry.label;
-      const resolved = isString(label)
-        ? translate(label)
-        : isPlainObject(label) && isString(label.key)
-          ? translate(label.key, label.params as MessageParams | undefined)
-          : entry.value;
-      pairs.push({ value: entry.value, label: resolved });
+      pairs.push({ value: entry.value, label: translateMessage(entry.label) ?? entry.value });
     }
   }
   return pairs;

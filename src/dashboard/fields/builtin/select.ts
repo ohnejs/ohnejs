@@ -2,6 +2,7 @@ import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { Primitive } from '../../ui/button-group.ts';
 
+import { first } from '../../../utils/array/first.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -10,7 +11,7 @@ import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
-import { type MessageParams, type Translate, useT } from '../../runtime/use-t.ts';
+import { translateMessage } from '../../runtime/use-t.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -27,17 +28,15 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  */
 export const selectType: FieldType = {
   display({ field, value }) {
-    const t = useT();
     return () => {
       const current = value();
       if (isNullish(current)) return dimMark('-');
       const raw = String(current as string);
-      const match = choicesOf(field, t).find((choice) => choice.value === raw);
+      const match = choicesOf(field).find((choice) => choice.value === raw);
       return h('span', { class: 'ohne-truncate', title: raw }, match?.label ?? raw);
     };
   },
   control({ field, initial, path, disabled, onInput }) {
-    const t = useT();
     let base = initial;
     const model = ref<Primitive>(isString(base) ? base : null);
     const touched = ref(false);
@@ -46,7 +45,7 @@ export const selectType: FieldType = {
     const error = (): string => routed.value;
     const current = (): string | null => (isString(model.value) ? model.value : null);
     const entries = (): SelectChoice[] => {
-      const pairs: SelectChoice[] = choicesOf(field, t);
+      const pairs: SelectChoice[] = choicesOf(field);
       return field.nullable ? [{ value: null, label: '-', muted: true }, ...pairs] : pairs;
     };
 
@@ -106,9 +105,8 @@ export const selectType: FieldType = {
   },
   filter: {
     operators: () => ['eq', 'ne'],
-    seed: (field) => choicesOf(field, useT())[0]?.value ?? '',
+    seed: (field) => first(choicesOf(field))?.value ?? '',
     input({ field, value, commit, inputID }) {
-      const t = useT();
       const bridged: Ref<Primitive> = {
         get value() {
           return value();
@@ -117,7 +115,7 @@ export const selectType: FieldType = {
           commit(String(next));
         },
       };
-      return select(bridged, (): SelectChoice[] => choicesOf(field, t), {
+      return select(bridged, (): SelectChoice[] => choicesOf(field), {
         id: inputID,
         name: inputID,
       });
@@ -127,25 +125,18 @@ export const selectType: FieldType = {
 
 /**
  * The declared `choices` option as resolved `value`/`label` pairs.
- * A plain string choice is its own display text; a declared label resolves through `t`.
+ * A plain string choice is its own display text; a declared label translates as a message.
  * A malformed or absent option resolves to no choices.
  */
-function choicesOf(field: DashboardField, t: Translate): { value: string; label: string }[] {
+function choicesOf(field: DashboardField): { value: string; label: string }[] {
   const declared = field.options?.choices;
   if (!isArray(declared)) return [];
-  const translate = t as (key: string, params?: MessageParams) => string;
   const pairs: { value: string; label: string }[] = [];
   for (const entry of declared) {
     if (isString(entry)) {
       pairs.push({ value: entry, label: entry });
     } else if (isPlainObject(entry) && isString(entry.value)) {
-      const label = entry.label;
-      const resolved = isString(label)
-        ? translate(label)
-        : isPlainObject(label) && isString(label.key)
-          ? translate(label.key, label.params as MessageParams | undefined)
-          : entry.value;
-      pairs.push({ value: entry.value, label: resolved });
+      pairs.push({ value: entry.value, label: translateMessage(entry.label) ?? entry.value });
     }
   }
   return pairs;

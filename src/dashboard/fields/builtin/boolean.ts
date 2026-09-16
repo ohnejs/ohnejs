@@ -4,7 +4,7 @@ import type { Primitive } from '../../ui/button-group.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { useT } from '../../runtime/use-t.ts';
+import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { badge } from '../../ui/badge.ts';
 import { buttonGroup } from '../../ui/button-group.ts';
 import { checkbox } from '../../ui/checkbox.ts';
@@ -17,7 +17,8 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * The cell shows a secondary badge reading yes or no, and a dim hyphen for `null`.
  * The `false` badge inherits the cell's muted color, so only a `true` reads as foreground.
  * The cell editor toggles the value at once; a failed toggle closes back to the stored value.
- * The control is a checkbox, or a switch when the field declares `display: 'switch'`.
+ * The control is a checkbox, a switch under `display: 'switch'`, or a two-choice group under `'buttons'`.
+ * The group's choices read `falseLabel` and `trueLabel`, falling back to the catalog's no and yes.
  * It stays pristine until touched; once touched it reads binary.
  * A stored `null` therefore returns to `null` only through the row's revert.
  */
@@ -41,22 +42,48 @@ export const booleanType: FieldType = {
     return null;
   },
   control({ field, initial, path, disabled, onInput }) {
+    const t = useT();
     let base = initial;
     const checked = ref(base === true);
     const touched = ref(false);
     const routed = ref('');
 
     const error = (): string => routed.value;
-    const control = field.options?.display === 'switch' ? switchInput : checkbox;
-    const element = control(checked, undefined, { disabled: () => disabled === true });
-    const input = element.querySelector('input') as HTMLInputElement;
-    // The native input is `display: none`, so focus and the aria wiring go on the visible button.
-    const proxy = element.querySelector('button') as HTMLElement;
-    input.addEventListener('change', () => {
+    const touch = (): void => {
       touched.value = true;
       routed.value = '';
       onInput();
-    });
+    };
+    const display = field.options?.display;
+    let element: HTMLElement;
+    let proxy: HTMLElement;
+    if (display === 'buttons') {
+      const model: Ref<Primitive> = {
+        get value() {
+          return checked.value;
+        },
+        set value(next) {
+          checked.value = next === true;
+          touch();
+        },
+      };
+      element = buttonGroup(model, {
+        choices: () => [
+          { value: false, label: translateMessage(field.options?.falseLabel) ?? t('dashboard.no') },
+          { value: true, label: translateMessage(field.options?.trueLabel) ?? t('dashboard.yes') },
+        ],
+        variant: 'accent',
+        disabled: () => disabled === true,
+      });
+      proxy = element;
+    } else {
+      const control = display === 'switch' ? switchInput : checkbox;
+      element = control(checked, undefined, { disabled: () => disabled === true });
+      const input = element.querySelector('input') as HTMLInputElement;
+      // The native input is `display: none`, so focus and the aria wiring go on the visible button.
+      proxy = element.querySelector('button') as HTMLElement;
+      input.addEventListener('change', touch);
+    }
     describeControl(proxy, field, path, error);
 
     const wire = (): unknown => {

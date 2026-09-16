@@ -4,6 +4,8 @@ import type { KnownMessages } from './known-messages.ts';
 import { formatMessageAST } from '../../utils/i18n/format-message-ast.ts';
 import { messageGroup } from '../../utils/i18n/message-group.ts';
 import { parseMessage } from '../../utils/i18n/parse-message.ts';
+import { isPlainObject } from '../../utils/is/is-plain-object.ts';
+import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { messageCatalog } from './messages.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
@@ -49,6 +51,33 @@ const cache = new Map<string, MessageAST>();
  */
 export function useT(): Translate {
   return ((key: string, params?: MessageParams) => translate(key, params)) as Translate;
+}
+
+/**
+ * Translates a `Message` that reached the client as plain data.
+ * A string resolves as a key, or stays itself when no catalog defines it.
+ * A `{ key, params }` object formats.
+ * Anything else answers `undefined`, so a caller can fall back.
+ * The read is reactive, exactly as `useT` is.
+ *
+ * @example
+ * ```ts
+ * translateMessage('dashboard.yes')
+ * // -> 'Yes'
+ *
+ * translateMessage({ key: 'dashboard.foundErrors', params: { count: 2 } })
+ * // -> 'Found 2 errors'
+ *
+ * translateMessage(42)
+ * // -> undefined
+ * ```
+ */
+export function translateMessage(message: unknown): string | undefined {
+  if (isString(message)) return translate(message, undefined);
+  if (isPlainObject(message) && isString(message.key)) {
+    return translate(message.key, message.params as MessageParams | undefined);
+  }
+  return undefined;
 }
 
 /**
