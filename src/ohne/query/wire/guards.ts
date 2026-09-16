@@ -1,9 +1,6 @@
-import type { UntypedQueryBuilder } from '../untyped.ts';
-
 import { isUndefined } from '../../../utils/index.ts';
 import { tryUseDialect } from '../../database/use-database.ts';
 import { useConfig } from '../../layers/use-config.ts';
-import { builderGuards } from '../impl.ts';
 
 /**
  * The DoS guards that bound a wire-driven query, resolved per key across tiers.
@@ -124,17 +121,13 @@ export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
 
 /**
  * Folds the guard tiers per key: the defaults, then `config.query.guards`, then `overrides`.
- * A builder passed as `overrides` contributes its accumulated `.guards()` as that last tier.
  *
  * `maxBoundParams` is then clamped to the dialect's own limit, so no tier can raise it past the driver.
  * The wire always refuses before the read reaches the driver's wall.
  * Only the untrusted wire path resolves through this; the fluent path is trusted and never guard-checked.
  */
-export function resolveGuards(
-  overrides: Partial<QueryGuards> | UntypedQueryBuilder = {},
-): QueryGuards {
-  const layer = 'guards' in overrides ? builderGuards(overrides) : overrides;
-  const resolved = { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...layer };
+export function resolveGuards(overrides: Partial<QueryGuards> = {}): QueryGuards {
+  const resolved = { ...DEFAULT_QUERY_GUARDS, ...useConfig().query?.guards, ...overrides };
   const wall = tryUseDialect()?.maxParameters;
   if (!isUndefined(wall)) resolved.maxBoundParams = Math.min(resolved.maxBoundParams, wall);
   return resolved;

@@ -10,7 +10,6 @@ import { isOhneError, ohneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
-import { builderGuards } from '../../../src/ohne/query/impl.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 
 useLayers().add({
@@ -192,15 +191,6 @@ describe('QueryBuilderImpl pluck', () => {
   });
 });
 
-describe('QueryBuilderImpl limits', () => {
-  it('accumulates overrides per key, the last value winning', () => {
-    const builder = queryUntyped('IPosts')
-      .guards({ maxSelect: 5 })
-      .guards({ maxSelect: 10, maxOrder: 3 });
-    deepStrictEqual(builderGuards(builder), { maxSelect: 10, maxOrder: 3 });
-  });
-});
-
 describe('QueryBuilderImpl locale', () => {
   it('returns the same builder for further chaining', () => {
     const builder = queryUntyped('INotes');
@@ -248,14 +238,6 @@ describe('QueryBuilderImpl locale', () => {
         return true;
       },
     );
-  });
-
-  it('keeps guard overrides across locale', () => {
-    const builder = queryUntyped('INotes')
-      .guards({ maxSelect: 5 })
-      .locale('de')
-      .guards({ maxOrder: 3 });
-    deepStrictEqual(builderGuards(builder), { maxSelect: 5, maxOrder: 3 });
   });
 
   it('keeps a joined transaction across locale, rolling its write back with it', async () => {

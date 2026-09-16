@@ -9,7 +9,6 @@ import type { InsertInputOf } from './known-inserts.ts';
 import type { KnownQueryFields, QueryFieldMeta } from './known-query-fields.ts';
 import type { UpdateInputOf } from './known-updates.ts';
 import type { UntypedPopulateBuilder, UntypedQueryBuilder } from './untyped.ts';
-import type { QueryGuards } from './wire/guards.ts';
 import type { FieldErrors } from './write/errors.ts';
 
 /**
@@ -842,22 +841,6 @@ interface Terminals<C extends CollectionName, S, P> {
 }
 
 /**
- * The `guards` override, present on every state and returning that same state.
- */
-interface Guardable<Self> {
-  /**
-   * Overrides the wire guards for this builder, merging per key so the last value for a key wins.
-   * Only an untyped builder hands them to a wire parse, via `resolveGuards(builder)`; a typed query cannot.
-   *
-   * @example
-   * ```ts
-   * query('Posts').guards({ maxSelect: 50 })
-   * ```
-   */
-  guards(overrides: Partial<QueryGuards>): Self;
-}
-
-/**
  * A create's result: the new record, or the field failures keyed by dot-path.
  */
 export type CreateResult<T> = { ok: true; record: T } | { ok: false; errors: FieldErrors };
@@ -1022,7 +1005,6 @@ interface PendingBase<C extends CollectionName, S, P, L extends boolean>
     Refinements<C, S, P, L>,
     Terminals<C, S, P>,
     WriteEntry<C, S, P>,
-    Guardable<PendingQuery<C, S, P, L>>,
     Joinable<PendingQuery<C, S, P, L>> {}
 
 /**
@@ -1050,7 +1032,6 @@ interface ReadyBase<C extends CollectionName, S, P, L extends boolean>
     Refinements<C, S, P, L>,
     Terminals<C, S, P>,
     UpdateMutations<C, S, P>,
-    Guardable<ReadyQuery<C, S, P, L>>,
     Joinable<ReadyQuery<C, S, P, L>> {}
 
 /**
@@ -1076,7 +1057,6 @@ interface ReadOnlyBase<C extends CollectionName, S, P, L extends boolean>
     WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P, L>>,
     Refinements<C, S, P, L>,
     Terminals<C, S, P>,
-    Guardable<ReadOnlyQuery<C, S, P, L>>,
     Joinable<ReadOnlyQuery<C, S, P, L>> {}
 
 /**

@@ -2,7 +2,6 @@ import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection, TargetReach } from './ir.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
-import type { QueryGuards } from './wire/guards.ts';
 import type { CreateOutcome } from './write/create.ts';
 import type { DeleteOutcome } from './write/delete.ts';
 import type { UpdateOutcome } from './write/update.ts';
@@ -296,20 +295,6 @@ export interface UntypedQueryBuilder {
    * ```
    */
   offset(count: number): this;
-
-  /**
-   * Overrides the wire guards for this builder, merging per key so the last value for a key wins.
-   * They bind a wire query only when it is parsed under `resolveGuards(builder)`.
-   * The fluent path is trusted and never guard-checked.
-   *
-   * @example
-   * ```ts
-   * const posts = queryUntyped('Posts').guards({ maxPopulateDepth: 3 })
-   * const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards(posts))
-   * await applyQuery(posts, parsed).findMany()
-   * ```
-   */
-  guards(overrides: Partial<QueryGuards>): this;
 
   /**
    * Scopes the query to one content locale; translatable collections only, once per chain.

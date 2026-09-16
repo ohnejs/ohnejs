@@ -13,7 +13,6 @@ import type {
   UntypedWhereGroup,
   WhereGroupBuild,
 } from './untyped.ts';
-import type { QueryGuards } from './wire/guards.ts';
 import type { CreateOutcome } from './write/create.ts';
 
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
@@ -49,7 +48,6 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private localeValue: string | null = null;
   private wireState: WireReach | null = null;
   private joinedTx?: Transaction;
-  readonly guardOverrides: Partial<QueryGuards> = {};
   private readonly meta: CollectionQueryMeta;
 
   constructor(meta: CollectionQueryMeta) {
@@ -112,11 +110,6 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   offset(count: number): this {
     this.offsetValue = count;
-    return this;
-  }
-
-  guards(overrides: Partial<QueryGuards>): this {
-    Object.assign(this.guardOverrides, overrides);
     return this;
   }
 
@@ -268,13 +261,6 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       wire: this.wireState,
     });
   }
-}
-
-/**
- * Reads the wire-guard overrides a builder accumulated, the tier `resolveGuards` folds in last.
- */
-export function builderGuards(builder: UntypedQueryBuilder): Partial<QueryGuards> {
-  return (builder as QueryBuilderImpl).guardOverrides;
 }
 
 /**

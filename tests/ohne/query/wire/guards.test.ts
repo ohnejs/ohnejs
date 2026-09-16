@@ -7,7 +7,6 @@ import { clearDatabases, registerDialect } from '../../../../src/ohne/database/u
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
-import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { DEFAULT_QUERY_GUARDS, resolveGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
 
@@ -39,18 +38,9 @@ describe('resolveGuards', () => {
   });
 });
 
-describe('resolveGuards folds a builder tier', () => {
-  it('takes the builder `.guards()` overrides as the last tier, per key', () => {
-    const builder = queryUntyped('GPosts').guards({ maxPerPage: 5 }).guards({ maxSelect: 1 });
-    deepStrictEqual(resolveGuards(builder), {
-      ...DEFAULT_QUERY_GUARDS,
-      maxPerPage: 5,
-      maxSelect: 1,
-    });
-  });
-
-  it('binds a wire query parsed for that builder: a clamp clamps, a refusal refuses', () => {
-    const guards = resolveGuards(queryUntyped('GPosts').guards({ maxPerPage: 5, maxSelect: 1 }));
+describe('resolveGuards binds a wire parse', () => {
+  it('a clamp clamps, a refusal refuses', () => {
+    const guards = resolveGuards({ maxPerPage: 5, maxSelect: 1 });
     const meta = queryMetadata('GPosts');
     strictEqual(parseQueryParams({ page: 1, perPage: 50 }, meta, guards).perPage, 5);
     throws(
