@@ -7,7 +7,7 @@
   "author": "Muris Ceman <muris@ohne.dev>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/murisceman/ohne.git"
+    "url": "git+https://github.com/ohnejs/ohnejs.git"
   },
   "bin": {
     "ohne": "./src/ohne/cli/bin.js"
