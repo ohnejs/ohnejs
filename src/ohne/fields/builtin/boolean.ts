@@ -1,3 +1,5 @@
+import type { Message } from '../../messages/known-messages.ts';
+
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 
@@ -9,11 +11,38 @@ export const boolean = defineField({
   options: {
     /**
      * The control the dashboard edits the value with.
+     * `'buttons'` renders a two-choice button group labeled by `falseLabel` and `trueLabel`.
      * Presentation only: the stored value is a plain boolean either way.
      *
      * @default
      * 'checkbox'
      */
-    display: option<'checkbox' | 'switch'>({ default: 'checkbox' }),
+    display: option<'checkbox' | 'switch' | 'buttons'>({ default: 'checkbox' }),
+
+    /**
+     * The `true` choice's label under `display: 'buttons'`.
+     * Pass a message key to translate it per the viewer's language.
+     * Omitted, the choice reads "Yes" in the viewer's language.
+     *
+     * @example
+     * ```ts
+     * trueLabel: 'Enabled'
+     * trueLabel: 'app.flags.enabled'
+     * ```
+     */
+    trueLabel: option<Message>(),
+
+    /**
+     * The `false` choice's label under `display: 'buttons'`.
+     * Pass a message key to translate it per the viewer's language.
+     * Omitted, the choice reads "No" in the viewer's language.
+     *
+     * @example
+     * ```ts
+     * falseLabel: 'Disabled'
+     * falseLabel: 'app.flags.disabled'
+     * ```
+     */
+    falseLabel: option<Message>(),
   },
 });
