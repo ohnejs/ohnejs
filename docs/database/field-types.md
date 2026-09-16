@@ -132,7 +132,8 @@ export default defineField({ columnType: 'integer', defaultValue: 0 });
 Pass a value, or a callback that computes one from `ctx`: the field's `options`, the record's raw
 `input`, and the `operation`. A field's own `default` replaces the type's; see
 [writing records](./writing.md#defaults) for the full order. A default runs through the type's
-sanitizers and validators like any value, so it must be one they accept.
+sanitizers and validators like any value, so it must be one they accept. A literal default they
+reject fails at boot. A callback default fails the create that computes it.
 
 ## Sanitizers and validators
 

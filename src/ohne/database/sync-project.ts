@@ -11,6 +11,7 @@ import { useHooks } from '../hooks/use-hooks.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { warmQueryMetadata } from '../query/metadata.ts';
+import { validateLiteralDefaults } from '../query/validate-literal-defaults.ts';
 import { connect } from './connect.ts';
 import { useMigrations } from './migrations/use-migrations.ts';
 import { buildDesiredSchema } from './schema/desired.ts';
@@ -58,6 +59,7 @@ export interface SyncProjectOptions {
  * Connects the project's database and reconciles it with the schema the registries declare.
  * Every collection's query metadata builds first, so a malformed `when` fails before the reconcile.
  * The desired schema builds from the collection, field, and block registries; migrations run inside.
+ * Each literal default then runs its field's tiers, so a rejected default fails before the reconcile too.
  * Force resolves from `options.force`, then the `FORCE_SYNC` env, then `Config.database.sync.force`.
  * The default content locale resolves from `Config.collections`, feeding the translatable fan-out.
  * Deletions - forced, or authorized by an applied migration - land in a warn block.
@@ -68,13 +70,15 @@ export interface SyncProjectOptions {
 export async function syncProjectDatabase(options: SyncProjectOptions = {}): Promise<GuardReport> {
   warmQueryMetadata();
   const dialect = await connect();
+  const desired = buildDesiredSchema(useCollections(), useFields(), useBlocks());
+  await useDatabase().transaction((tx) => validateLiteralDefaults(tx));
   const database = useConfig().database;
   const force =
     options.force ??
     (useEnv().has('FORCE_SYNC') ? useEnv().get('FORCE_SYNC') : (database?.sync?.force ?? false));
   const dryRun = options.dryRun ?? false;
   const report = await syncDatabase(useDatabase(), dialect, {
-    desired: buildDesiredSchema(useCollections(), useFields(), useBlocks()),
+    desired,
     migrations: Object.values(useMigrations().all()),
     force,
     dryRun,

@@ -100,6 +100,10 @@ A default may be a value or a callback. A `records`, `object`, `repeater`, or `b
 be a callback, since a shared object or array literal would be shared mutable state across every
 created record. A `record` default is a plain `UUID`, so it stays a value.
 
+A default runs through the field's [sanitizers and validators](#sanitizers-and-validators) like any
+value. A literal default they reject fails at boot, so `default: ''` on a `text` field needs
+`allowEmpty: true`. A callback default fails the create that computes it.
+
 ## Sanitizers and validators
 
 A field cleans and checks its value through ordered lists of sanitizers and validators. Sanitizers

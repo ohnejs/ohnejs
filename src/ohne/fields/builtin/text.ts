@@ -15,7 +15,7 @@ export const text = defineField({
     /**
      * Whether an empty string is a legal value.
      * A text field rejects `''` unless this is set, so it is non-empty by default.
-     * A literal `default: ''` without it fails every write that omits the field.
+     * A literal `default: ''` without it is rejected at boot.
      *
      * @default
      * false
