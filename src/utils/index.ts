@@ -88,6 +88,7 @@ export * from './image/image-size.ts';
 export * from './is/is-array.ts';
 export * from './is/is-bigint.ts';
 export * from './is/is-boolean.ts';
+export * from './is/is-css-length.ts';
 export * from './is/is-date.ts';
 export * from './is/is-decimal-string.ts';
 export * from './is/is-email.ts';
