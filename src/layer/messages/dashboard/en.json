@@ -138,18 +138,20 @@
     "undo": "Undo"
   },
   "install": {
+    "firstName": "First name",
+    "lastName": "Last name",
     "submit": "Create account",
     "title": "Installation",
     "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
   },
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
-  "login": {
-    "email": "Email",
   "layout": {
     "collapse": "Collapse",
     "expand": "Expand"
   },
+  "login": {
+    "email": "Email",
     "failed": "The sign-in failed",
     "forgotPassword": "Forgot password?",
     "hidePassword": "Hide password",

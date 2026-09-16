@@ -138,18 +138,20 @@
     "undo": "Poništi"
   },
   "install": {
+    "firstName": "Ime",
+    "lastName": "Prezime",
     "submit": "Kreiraj račun",
     "title": "Instalacija",
     "welcomeMessage": "Dobrodošli u ohne! Unesite svoje podatke da kreirate primarni administratorski račun."
   },
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
-  "login": {
-    "email": "E-mail",
   "layout": {
     "collapse": "Skupi",
     "expand": "Proširi"
   },
+  "login": {
+    "email": "E-mail",
     "failed": "Prijava nije uspjela",
     "forgotPassword": "Zaboravili ste lozinku?",
     "hidePassword": "Sakrij lozinku",

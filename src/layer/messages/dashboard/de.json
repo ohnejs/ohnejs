@@ -138,18 +138,20 @@
     "undo": "Rückgängig"
   },
   "install": {
+    "firstName": "Vorname",
+    "lastName": "Nachname",
     "submit": "Konto erstellen",
     "title": "Installation",
     "welcomeMessage": "Willkommen bei ohne! Gib deine Daten ein, um das primäre Administratorkonto zu erstellen."
   },
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
-  "login": {
-    "email": "E-Mail",
   "layout": {
     "collapse": "Einklappen",
     "expand": "Ausklappen"
   },
+  "login": {
+    "email": "E-Mail",
     "failed": "Die Anmeldung ist fehlgeschlagen",
     "forgotPassword": "Passwort vergessen?",
     "hidePassword": "Passwort verbergen",
