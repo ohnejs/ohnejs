@@ -1,7 +1,30 @@
 import type { FieldInstance } from '../fields/field.ts';
+import type { FieldLayout } from '../fields/layout.ts';
 import type { Message } from '../messages/known-messages.ts';
 
 import { validateBlockDefinition } from './validate-block.ts';
+
+/**
+ * How the dashboard presents a block's fields in the blocks editor.
+ */
+export interface BlockDashboard<TField extends string = string> {
+  /**
+   * How the block's form arranges its fields: rows, cards, tabs, and rules.
+   * A field the layout does not name renders after it, in declaration order.
+   * Omitted, the fields stack in declaration order.
+   *
+   * @example
+   * ```ts
+   * layout: [
+   *   { row: ['title', 'alignment | 9rem'] },
+   *   'tagline',
+   *   '---',
+   *   { card: { label: 'Content', collapsible: true, fields: ['content'] } },
+   * ]
+   * ```
+   */
+  layout?: FieldLayout<TField>;
+}
 
 /**
  * A block definition: the fields one instance of the block carries.
@@ -37,6 +60,23 @@ export interface BlockDefinition<
    * ```
    */
   fields: TFields;
+
+  /**
+   * How the dashboard presents the block's fields; omitted, they stack in declaration order.
+   *
+   * @example
+   * ```ts
+   * dashboard: {
+   *   layout: [
+   *     { row: ['title', 'subtitle | 40%'] },
+   *     'body',
+   *     '---',
+   *     { card: ['footnote'] },
+   *   ],
+   * }
+   * ```
+   */
+  dashboard?: BlockDashboard<keyof TFields & string>;
 }
 
 /**
@@ -53,6 +93,11 @@ export interface AnyBlockDefinition {
    * The fields, keyed by their camelCase name.
    */
   fields: Record<string, FieldInstance>;
+
+  /**
+   * How the dashboard presents the block's fields; omitted, they stack in declaration order.
+   */
+  dashboard?: BlockDashboard;
 }
 
 /**

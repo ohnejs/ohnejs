@@ -1,4 +1,5 @@
 import type { FieldInstance } from '../field.ts';
+import type { FieldLayout } from '../layout.ts';
 
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
@@ -17,6 +18,22 @@ export const object = defineField({
      * The object's fields, each a regular `field(...)` instance.
      */
     fields: option<Record<string, FieldInstance>>({ required: true }),
+
+    /**
+     * How the dashboard arranges the object's fields: rows, cards, tabs, and rules.
+     * A field the layout does not name renders after it, in declaration order.
+     * Omitted, the fields stack in declaration order.
+     *
+     * @example
+     * ```ts
+     * layout: [
+     *   { row: ['street', 'number | 6rem'] },
+     *   { row: ['zip | 8rem', 'city'] },
+     *   { card: { label: 'Delivery notes', collapsible: true, fields: ['notes'] } },
+     * ]
+     * ```
+     */
+    layout: option<FieldLayout>(),
   },
   schema: (ctx) => ({
     kind: 'child',

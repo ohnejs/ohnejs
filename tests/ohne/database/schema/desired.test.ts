@@ -1042,6 +1042,29 @@ describe('buildDesiredSchema', () => {
     );
   });
 
+  it('rejects a composite layout naming an unknown subfield', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                meta: field('object', { fields: { city: field('text') }, layout: ['town'] }),
+              },
+            },
+          }),
+          useFields(),
+        ),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /`layout` references unknown field `town`/);
+        match([error.body].flat().join('\n'), /on field `meta` in collection `Posts`/);
+        return true;
+      },
+    );
+  });
+
   it('rejects a composite declaring no fields', () => {
     throws(
       () =>

@@ -1,5 +1,6 @@
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { FieldInstance } from '../fields/field.ts';
+import type { FieldLayout } from '../fields/layout.ts';
 import type { NamedMiddlewareKey } from '../middleware/known-middleware.ts';
 import type { QueryScope } from '../query/wire/apply.ts';
 import type { LocaleCode } from './known-locales.ts';
@@ -222,7 +223,7 @@ export interface CollectionTable<TField extends string = string> {
 }
 
 /**
- * How the dashboard presents a collection: its menu icon, record labels, and list view.
+ * How the dashboard presents a collection: its menu icon, record labels, list view, and editor layout.
  */
 export interface CollectionDashboard<TField extends string = string> {
   /**
@@ -264,6 +265,36 @@ export interface CollectionDashboard<TField extends string = string> {
    * ```
    */
   table?: CollectionTable<TField>;
+
+  /**
+   * How the record editor arranges the fields: rows, cards, tabs, and rules.
+   * A field the layout does not name renders after it, in declaration order.
+   * One layout serves create and edit; a field the form cannot show in a mode is skipped.
+   * Omitted, the fields stack in declaration order.
+   *
+   * @example
+   * ```ts
+   * layout: [
+   *   { row: ['title', 'slug | 40%'] },
+   *   'body',
+   *   {
+   *     tabs: [
+   *       { label: 'app.posts.seo', fields: ['metaTitle', 'metaDescription'] },
+   *       { label: 'Publishing', fields: [{ row: ['publishedAt', 'author'] }] },
+   *     ],
+   *   },
+   *   '---',
+   *   {
+   *     card: {
+   *       label: 'Internal',
+   *       collapsible: true,
+   *       fields: ['assignee', 'comments'],
+   *     },
+   *   },
+   * ]
+   * ```
+   */
+  layout?: FieldLayout<TField>;
 }
 
 /**
@@ -370,7 +401,7 @@ export interface CollectionDefinition<
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /**
-   * How the dashboard presents this collection: its menu icon, record labels, and list view.
+   * How the dashboard presents this collection: its menu icon, record labels, list view, and editor layout.
    *
    * @example
    * ```ts
@@ -378,6 +409,7 @@ export interface CollectionDefinition<
    *   icon: 'note',
    *   recordLabel: 'title',
    *   table: { columns: ['title | 320px', '_updatedAt'] },
+   *   layout: [{ row: ['title', 'slug'] }, 'body'],
    * }
    * ```
    */

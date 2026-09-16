@@ -13,6 +13,7 @@ import {
   isUndefined,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { validateLayout } from './layout.ts';
 
 const RESERVED_OPTIONS = new Set([
   'nullable',
@@ -106,6 +107,7 @@ export interface ValidateFieldArgs {
  * - A `foreignKey` hint requires `columnType: 'text'`: it stores the target's text `UUID`.
  * - A `junction` hint requires `columnType: false`: its links live in the junction table alone.
  * - A `child` hint requires `columnType: false` too, and must declare at least one subfield.
+ * - A child field's `layout` names its own subfields, each once, in the node grammar `validateLayout` sets.
  * - A `blocks` hint requires `columnType: false` too; its `allow` must not be empty or repeat a name.
  * - The unique flags and `index` need a column, so a column-less field takes none.
  * - A junction field with no links is empty, never `NULL`, so it takes no `nullable` either.
@@ -200,6 +202,10 @@ export function validateField(args: ValidateFieldArgs): void {
     }
   }
   const options: Record<string, unknown> = { ...instance.options };
+  if (hint?.kind === 'child') {
+    const scope = ` on field \`${name}\` in ${ownerLabel(owner)}`;
+    validateLayout(options.layout, Object.keys(hint.subfields), 'layout', scope);
+  }
   if (fieldType.columnType === false) {
     for (const key of ['unique', 'uniquePerLocale', 'uniquePerParent', 'index'] as const) {
       if (isUndefined(options[key])) continue;

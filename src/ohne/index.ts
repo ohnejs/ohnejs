@@ -57,6 +57,7 @@ export * from './fields/define-field.ts';
 export * from './fields/field.ts';
 export * from './fields/known-field-options.ts';
 export * from './fields/known-fields.ts';
+export * from './fields/layout.ts';
 export * from './fields/option.ts';
 export * from './fields/relation-options.ts';
 export * from './fields/scan-layer-fields.ts';

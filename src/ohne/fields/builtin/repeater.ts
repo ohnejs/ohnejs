@@ -1,4 +1,5 @@
 import type { FieldInstance } from '../field.ts';
+import type { FieldLayout } from '../layout.ts';
 
 import { isArray, isUndefined } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
@@ -19,6 +20,22 @@ export const repeater = defineField({
      * The fields of one item, each a regular `field(...)` instance.
      */
     fields: option<Record<string, FieldInstance>>({ required: true }),
+
+    /**
+     * How the dashboard arranges one item's fields: rows, cards, tabs, and rules.
+     * A field the layout does not name renders after it, in declaration order.
+     * Omitted, the fields stack in declaration order.
+     *
+     * @example
+     * ```ts
+     * layout: [
+     *   { row: ['label', 'url', 'newTab | auto'] },
+     *   '---',
+     *   { card: ['description'] },
+     * ]
+     * ```
+     */
+    layout: option<FieldLayout>(),
 
     /**
      * Whether an empty list is a legal value.

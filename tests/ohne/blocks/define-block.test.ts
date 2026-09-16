@@ -28,6 +28,38 @@ describe('defineBlock', () => {
     throws(() => defineBlock({ fields: { bLock: field('text') } }), /reserved/);
   });
 
+  it('accepts a dashboard layout unchanged', () => {
+    const definition = {
+      fields: { title: field('text'), subtitle: field('text') },
+      dashboard: { layout: [{ row: ['title', 'subtitle'] }] as const },
+    };
+    deepStrictEqual(defineBlock(definition), definition);
+  });
+
+  it('rejects an unknown dashboard key', () => {
+    throws(
+      () =>
+        defineBlock({
+          fields: { title: field('text') },
+          // @ts-expect-error `icon` is not a block dashboard key
+          dashboard: { icon: 'note' },
+        }),
+      /Unknown `dashboard` key `icon`/,
+    );
+  });
+
+  it('rejects a dashboard layout naming an unknown field', () => {
+    throws(
+      () =>
+        defineBlock({
+          fields: { title: field('text') },
+          // @ts-expect-error `body` is not a field of this block
+          dashboard: { layout: ['body'] },
+        }),
+      /`dashboard\.layout` references unknown field `body`/,
+    );
+  });
+
   it('rejects case-insensitively colliding field names', () => {
     throws(
       () => defineBlock({ fields: { subTitle: field('text'), subtitle: field('text') } }),

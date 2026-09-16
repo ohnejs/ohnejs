@@ -525,6 +525,174 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts a layout unchanged', () => {
+    const layout = [
+      { card: [{ row: ['title', 'views | 8rem'] }] },
+      { tabs: [{ label: 'More', fields: ['slug'] }] },
+      '---',
+    ] as const;
+    const definition = defineCollection({
+      fields: { title: field('text'), views: field('integer'), slug: field('text') },
+      dashboard: { layout },
+    });
+    deepStrictEqual(definition.dashboard?.layout, layout);
+  });
+
+  it('rejects a layout naming an unknown field, suggesting the nearest', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `titel` is not a field of this collection
+          dashboard: { layout: ['titel'] },
+        }),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        match(error.title ?? '', /`dashboard\.layout` references unknown field `titel`/);
+        match([error.body].flat().join('\n'), /Did you mean `title`\?/);
+        return true;
+      },
+    );
+  });
+
+  it('rejects a layout naming a system field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `_updatedAt` is not a declared field
+          dashboard: { layout: ['title', '_updatedAt'] },
+        }),
+      /unknown field `_updatedAt`/,
+    );
+  });
+
+  it('types the layout grammar: each structural rule fails to compile and fails at boot', () => {
+    const fields = { title: field('text'), views: field('integer') };
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error a rule cannot sit in a row
+          dashboard: { layout: [{ row: ['title', '---'] }] },
+        }),
+      /row holds a rule/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error rows do not nest
+          dashboard: { layout: [{ row: [{ row: ['title'] }] }] },
+        }),
+      /row nests a row/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `slug` is not a field of this collection
+          dashboard: { layout: [{ card: ['slug'] }] },
+        }),
+      /unknown field `slug`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `slug` is not a field of this collection
+          dashboard: { layout: [{ card: { fields: ['slug'] } }] },
+        }),
+      /unknown field `slug`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `slug` is not a field of this collection
+          dashboard: { layout: [{ tabs: [{ label: 'A', fields: ['slug'] }] }] },
+        }),
+      /unknown field `slug`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error a width does not admit an unknown name
+          dashboard: { layout: ['titel | 8rem'] },
+        }),
+      /unknown field `titel`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `header` is not a card key
+          dashboard: { layout: [{ card: { header: 'A', fields: ['title'] } }] },
+        }),
+      /card key `header`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `collapsible` is a boolean
+          dashboard: { layout: [{ card: { collapsible: 'yes', fields: ['title'] } }] },
+        }),
+      /card `collapsible` flag/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error a tab needs a label
+          dashboard: { layout: [{ tabs: [{ fields: ['title'] }] }] },
+        }),
+      /tab has no label/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields,
+          // @ts-expect-error `column` is not a layout node
+          dashboard: { layout: [{ column: ['title'] }] },
+        }),
+      /Invalid `dashboard\.layout` node/,
+    );
+  });
+
+  it('types the layout grammar: every node kind with widths compiles and passes boot', () => {
+    const definition = defineCollection({
+      fields: {
+        title: field('text'),
+        slug: field('text'),
+        views: field('integer'),
+        notes: field('text'),
+        pinned: field('boolean'),
+      },
+      dashboard: {
+        layout: [
+          {
+            card: {
+              label: 'General',
+              collapsible: true,
+              fields: [{ row: ['title', 'slug | 40%'] }],
+            },
+          },
+          {
+            row: [
+              'views | 8rem',
+              { card: ['notes'] },
+              { tabs: [{ label: 'T', fields: ['pinned'] }] },
+            ],
+          },
+          '---',
+        ],
+      },
+    });
+    ok(definition.dashboard?.layout);
+  });
+
   it('accepts a copyTranslation function unchanged', () => {
     const copyTranslation = ({ input }: { input: Record<string, unknown> }) => input;
     const definition = defineCollection({

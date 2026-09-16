@@ -5,6 +5,7 @@ import {
   didYouMean,
   isArray,
   isBoolean,
+  isCSSLength,
   isEmpty,
   isFunction,
   isNull,
@@ -16,6 +17,7 @@ import {
 import { iconNames, isIconName } from '../dashboard/icon-shapes.ts';
 import { validateFieldName, validateUniqueNames } from '../database/naming/validate-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { validateLayout } from '../fields/layout.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { isRecordLabelTemplate } from './record-label.ts';
 
@@ -29,11 +31,12 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
- * - `dashboard` must be an object holding only `icon`, `recordLabel`, and `table`.
+ * - `dashboard` must be an object holding only `icon`, `recordLabel`, `table`, and `layout`.
  * - `dashboard.icon` must name an icon the vendored set carries.
  * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
  * - `dashboard.table.columns` must be a non-empty list naming distinct, readable fields.
  * - A column is a declared field, `UUID`, `_updatedAt`, or `_translations` beside a translatable field.
+ * - `dashboard.layout` must name declared fields, each once, in the node grammar `validateLayout` sets.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -49,7 +52,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateDashboard(definition.dashboard, definition.fields, collection);
 }
 
-const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'table']);
+const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'table', 'layout']);
 
 /**
  * Rejects a malformed `dashboard` declaration.
@@ -77,7 +80,7 @@ function validateDashboard(
         title: `Unknown \`dashboard\` key \`${key}\``,
         body: [
           `The \`dashboard\` option${scope} names \`${key}\`.`,
-          'The keys are `icon`, `recordLabel`, and `table`.',
+          'The keys are `icon`, `recordLabel`, `table`, and `layout`.',
         ],
       });
     }
@@ -85,6 +88,7 @@ function validateDashboard(
   validateIcon(dashboard.icon, collection);
   validateRecordLabel(dashboard.recordLabel, fields, collection);
   validateTable(dashboard.table, fields, collection);
+  validateLayout(dashboard.layout, Object.keys(fields), 'dashboard.layout', scope);
 }
 
 /**
@@ -303,8 +307,6 @@ function validateRecordLabel(
 }
 
 // Must stay in sync with the width grammar the dashboard's column parser accepts.
-const CSS_WIDTH = /^\d+(\.\d+)?(px|rem|em|ch|vw|vh|vmin|vmax|%)$/;
-
 /**
  * Rejects a malformed `dashboard.table` declaration.
  * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
@@ -389,7 +391,7 @@ function validateTable(
     }
     seen.add(name);
     for (const width of widths) {
-      if (width !== '' && !CSS_WIDTH.test(width)) {
+      if (width !== '' && !isCSSLength(width)) {
         throw ohneError({
           title: `Invalid \`dashboard.table.columns\` width \`${width}\``,
           body: [
