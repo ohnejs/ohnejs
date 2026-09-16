@@ -10,6 +10,12 @@
   "timezone": {
     "auto": "Automatski (postavke uređaja)"
   },
+  "roles": {
+    "admin": {
+      "label": "Administrator",
+      "description": "Puni pristup svemu."
+    }
+  },
   "users": {
     "email": {
       "label": "Email",

@@ -53,6 +53,25 @@ The ohne layer ships the `admin` role, holding `['*']`. There is no separate sup
 wildcard is the bypass. Your app can [override](../project/layers.md) it by shipping its own
 `roles/admin.ts`, or drop it with `disable: { roles: ['admin'] }`.
 
+## Labels
+
+The dashboard names a role by its `label` wherever it picks or lists roles, and shows the
+`description` as a hint in the picker:
+
+```ts
+// roles/editor.ts
+import { defineRole } from 'ohnejs';
+
+export default defineRole({
+  label: 'app.roles.editor.label',
+  description: 'app.roles.editor.description',
+  capabilities: ['collection.Posts.*', 'collection.Tags.read'],
+});
+```
+
+Both are [messages](../i18n/messages.md): a catalog key translates per viewer, a plain string shows
+as is. Omit the label and the name is sentence-cased, so `content-editor` reads `Content editor`.
+
 ## Assigning roles
 
 The `Users` collection carries a `roles` field: the list of role names the user holds. It defaults

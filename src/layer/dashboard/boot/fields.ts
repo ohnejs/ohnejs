@@ -169,12 +169,12 @@ registerFieldType('roles', {
   display({ value }) {
     return () => {
       const current = value();
-      const names = isArray(current) ? current.filter(isString) : [];
-      if (names.length === 0) return dimMark('-');
-      const joined = names.length <= 3 ? names.join(', ') : (names[0] as string);
+      const labels = isArray(current) ? current.filter(isString).map(roleLabelOf) : [];
+      if (labels.length === 0) return dimMark('-');
+      const joined = labels.length <= 3 ? labels.join(', ') : (labels[0] as string);
       return [
         h('span', { class: 'ohne-truncate', title: joined }, joined),
-        names.length > 3 ? dimMark(` +${names.length - 1}`) : null,
+        labels.length > 3 ? dimMark(` +${labels.length - 1}`) : null,
       ];
     };
   },
@@ -211,7 +211,14 @@ registerFieldType('roles', {
 
     const element = chips(model, {
       disabled: () => context.disabled === true,
-      choices: () => (dashboardMeta()?.roles ?? []).map((name): ChipsChoice => ({ value: name })),
+      choices: () =>
+        (dashboardMeta()?.roles ?? []).map(
+          ({ name, label, description }): ChipsChoice => ({
+            value: name,
+            label,
+            tooltip: description,
+          }),
+        ),
       error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
@@ -258,7 +265,7 @@ registerFieldType('roles', {
   },
   filter: {
     operators: () => ['includes', 'notIncludes'],
-    seed: () => dashboardMeta()?.roles[0] ?? '',
+    seed: () => dashboardMeta()?.roles[0]?.name ?? '',
     input({ value, commit, inputID }) {
       const bridged: Ref<Primitive> = {
         get value() {
@@ -270,7 +277,8 @@ registerFieldType('roles', {
       };
       return select(
         bridged,
-        (): SelectChoice[] => (dashboardMeta()?.roles ?? []).map((name) => ({ value: name })),
+        (): SelectChoice[] =>
+          (dashboardMeta()?.roles ?? []).map(({ name, label }) => ({ value: name, label })),
         { id: inputID, name: inputID },
       );
     },
@@ -413,6 +421,13 @@ registerFieldType('datePattern', {
  */
 function listOf(value: unknown): readonly string[] {
   return isArray(value) ? value.filter(isString) : [];
+}
+
+/**
+ * A role's served label; a name no role declares any more shows as is.
+ */
+function roleLabelOf(name: string): string {
+  return dashboardMeta()?.roles.find((role) => role.name === name)?.label ?? name;
 }
 
 /**

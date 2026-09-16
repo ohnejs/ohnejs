@@ -85,7 +85,11 @@ useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCo
 useRoles().register('admin', { name: 'admin', role: { capabilities: ['*'] } });
 useRoles().register('dash-user', {
   name: 'dash-user',
-  role: { capabilities: ['collection.DashNotes.*', 'collection.DashOwners.read'] },
+  role: {
+    label: 'dash.roles.user.label',
+    description: 'dash.roles.user.description',
+    capabilities: ['collection.DashNotes.*', 'collection.DashOwners.read'],
+  },
 });
 
 useMessages().register('en', {
@@ -100,6 +104,8 @@ useMessages().register('en', {
   'dash.kinds.title.placeholder': 'Short name',
   'dash.kinds.help.text': 'Long help',
   'dash.blocks.hero.label': 'Hero section',
+  'dash.roles.user.label': 'Dashboard user',
+  'dash.roles.user.description': 'Reads owners and edits notes.',
   'dash.menu.reports': 'Reports',
   'dash.notes.main': 'Main',
   'dash.notes.more': 'More',
@@ -846,6 +852,19 @@ describe('account', () => {
     } finally {
       useHooks().delete('auth:account-layout');
     }
+  });
+});
+
+describe('roles', () => {
+  it('serves every role in registry order, labels resolved and descriptions where declared', async () => {
+    deepStrictEqual((await call(user)).body.roles, [
+      { name: 'admin', label: 'Admin' },
+      {
+        name: 'dash-user',
+        label: 'Dashboard user',
+        description: 'Reads owners and edits notes.',
+      },
+    ]);
   });
 });
 

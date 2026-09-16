@@ -436,6 +436,27 @@ export interface DashboardBlock {
 }
 
 /**
+ * One role the app declares, described for the dashboard's role pickers.
+ */
+export interface DashboardRole {
+  /**
+   * The role name, as a user's `roles` field stores it.
+   */
+  name: string;
+
+  /**
+   * The display label, resolved in the request's language.
+   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   */
+  label: string;
+
+  /**
+   * The declared `description`, resolved in the request's language; absent when the role declares none.
+   */
+  description?: string;
+}
+
+/**
  * One sidebar menu row: a link the dashboard draws, already resolved for the signed-in user.
  * A collection row and a declared page link arrive in the same shape, so the sidebar renders one kind.
  */
@@ -493,9 +514,9 @@ export interface DashboardMeta {
   blocks: DashboardBlock[];
 
   /**
-   * The role names the app declares, in registry order.
+   * The roles the app declares, in registry order.
    */
-  roles: string[];
+  roles: DashboardRole[];
 
   /**
    * The capabilities the signed-in user holds, the union of their roles' grants.
@@ -610,7 +631,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
       ...collections.flatMap((collection) => collection.fields),
       ...account.accountFields,
     ]),
-    roles: useRoles().keys(),
+    roles: describeRoles(),
     capabilities: userCapabilities(user),
     locales,
     defaultLocale,
@@ -659,7 +680,7 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     const meta = useBlocks().get(name);
     if (isUndefined(meta)) continue;
     const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
-    const block: DashboardBlock = { name, label: blockLabelOf(name, meta.block.label), fields };
+    const block: DashboardBlock = { name, label: declaredLabelOf(name, meta.block.label), fields };
     const layout = resolveLayout(meta.block.dashboard?.layout, namesOf(fields));
     if (!isUndefined(layout)) block.layout = layout;
     described.set(name, block);
@@ -679,9 +700,20 @@ function collectAllowed(fields: readonly DashboardField[], into: string[]): void
 }
 
 /**
- * The block's display label: its declared `label`, or the name sentence-cased.
+ * Every registered role with its label and description resolved in the request's language.
  */
-function blockLabelOf(name: string, label: Message | undefined): string {
+function describeRoles(): DashboardRole[] {
+  return Object.values(useRoles().all()).map(({ name, role }) => {
+    const described: DashboardRole = { name, label: declaredLabelOf(name, role.label) };
+    if (!isUndefined(role.description)) described.description = resolveMessage(role.description);
+    return described;
+  });
+}
+
+/**
+ * A file-named declaration's display label: its declared `label`, or the name sentence-cased.
+ */
+function declaredLabelOf(name: string, label: Message | undefined): string {
   return isUndefined(label) ? toSentenceCase(name) : resolveMessage(label);
 }
 

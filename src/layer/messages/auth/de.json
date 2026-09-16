@@ -10,6 +10,12 @@
   "timezone": {
     "auto": "Auto (Geräteeinstellungen)"
   },
+  "roles": {
+    "admin": {
+      "label": "Administrator",
+      "description": "Voller Zugriff auf alles."
+    }
+  },
   "users": {
     "email": {
       "label": "E-Mail",
