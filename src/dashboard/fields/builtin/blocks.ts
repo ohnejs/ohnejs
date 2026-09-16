@@ -105,11 +105,13 @@ export const blocksType: FieldType = {
       const name = isString(item.block) ? item.block : '';
       // Seeding a fresh item's form `undefined` keeps its immutable subfields settable.
       const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : undefined;
+      const type = blockNamed(blocks, name);
       const form = owner.run(() =>
-        createFieldForm(blockNamed(blocks, name)?.fields ?? [], fields, {
+        createFieldForm(type?.fields ?? [], fields, {
           mode: context.mode,
           path: `${context.path}[${key}].fields`,
           disabled: context.disabled === true,
+          layout: type?.layout,
           language: context.language,
           onInput: context.onInput,
         }),

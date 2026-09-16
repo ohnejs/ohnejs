@@ -97,6 +97,7 @@ export const objectType: FieldType = {
           mode: context.mode,
           path: context.path,
           disabled: off,
+          layout: context.field.layout,
           language: context.language,
           onInput: context.onInput,
         }),

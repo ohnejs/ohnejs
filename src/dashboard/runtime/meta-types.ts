@@ -163,6 +163,11 @@ export interface DashboardField {
   subfields?: DashboardField[];
 
   /**
+   * How the form arranges the subfields, resolved; child kinds that declare a `layout` only.
+   */
+  layout?: DashboardLayoutNode[];
+
+  /**
    * The block type names the field admits; `blocks` kind only.
    */
   allow?: readonly string[];
@@ -178,6 +183,119 @@ export interface DashboardTable {
    */
   columns?: readonly string[];
 }
+
+/**
+ * A field the layout places, by name.
+ * Mirrors the `GET /dashboard` response.
+ */
+export interface DashboardLayoutField {
+  /**
+   * The node kind.
+   */
+  kind: 'field';
+
+  /**
+   * The field name, one of the host's described fields.
+   */
+  name: string;
+
+  /**
+   * The declared width: a plain CSS length, a percentage, or `auto`; absent when the item declares none.
+   */
+  width?: string;
+}
+
+/**
+ * Nodes side by side, sharing the container's width.
+ */
+export interface DashboardLayoutRow {
+  /**
+   * The node kind.
+   */
+  kind: 'row';
+
+  /**
+   * The entries, left to right; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A bordered group of nodes.
+ */
+export interface DashboardLayoutCard {
+  /**
+   * The node kind.
+   */
+  kind: 'card';
+
+  /**
+   * The header label, resolved in the request's language; absent when the card declares none.
+   */
+  label?: string;
+
+  /**
+   * Whether the viewer can collapse the card.
+   */
+  collapsible: boolean;
+
+  /**
+   * The nodes, top to bottom; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A set of tabs, one panel of nodes per tab.
+ */
+export interface DashboardLayoutTabs {
+  /**
+   * The node kind.
+   */
+  kind: 'tabs';
+
+  /**
+   * The tabs, left to right; never empty.
+   */
+  tabs: DashboardLayoutTab[];
+}
+
+/**
+ * One tab of a `DashboardLayoutTabs` node.
+ */
+export interface DashboardLayoutTab {
+  /**
+   * The tab label, resolved in the request's language.
+   */
+  label: string;
+
+  /**
+   * The panel's nodes, top to bottom; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A horizontal rule between stacked nodes.
+ */
+export interface DashboardLayoutRule {
+  /**
+   * The node kind.
+   */
+  kind: 'rule';
+}
+
+/**
+ * One node of a resolved field layout, as the dashboard renders it.
+ * Labels arrive translated and widths split from their names, so the client parses nothing.
+ * A name the host does not describe is already dropped, and so is any container that left empty.
+ */
+export type DashboardLayoutNode =
+  | DashboardLayoutField
+  | DashboardLayoutRow
+  | DashboardLayoutCard
+  | DashboardLayoutTabs
+  | DashboardLayoutRule;
 
 /**
  * One collection the signed-in user may work with over the collections API.
@@ -208,6 +326,11 @@ export interface DashboardCollection {
    * The declared dashboard list-view defaults; absent when the collection declares none.
    */
   table?: DashboardTable;
+
+  /**
+   * How the record editor arranges the fields, resolved; absent when the collection declares no layout.
+   */
+  layout?: DashboardLayoutNode[];
 
   /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.
@@ -261,6 +384,11 @@ export interface DashboardBlock {
    * The block's own fields, its instance `UUID` included; a block carries no `_updatedAt`.
    */
   fields: DashboardField[];
+
+  /**
+   * How the block's form arranges the fields, resolved; absent when the block declares no layout.
+   */
+  layout?: DashboardLayoutNode[];
 }
 
 /**
@@ -348,8 +476,13 @@ export interface DashboardMeta {
   languages: string[];
 
   /**
-   * The `Users` fields the signed-in user edits on the account page, described in form order.
-   * The `auth:account-fields` hook decides the list; an empty list hides the page.
+   * The `Users` fields the signed-in user edits on the account page, described in layout order.
+   * The `auth:account-layout` hook decides them; an empty list hides the page.
    */
   accountFields: DashboardField[];
+
+  /**
+   * How the account page arranges `accountFields`, resolved; empty when the page is hidden.
+   */
+  accountLayout: DashboardLayoutNode[];
 }

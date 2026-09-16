@@ -1,5 +1,5 @@
 import type { Child } from '../render/insert.ts';
-import type { DashboardField } from '../runtime/meta-types.ts';
+import type { DashboardField, DashboardLayoutNode } from '../runtime/meta-types.ts';
 import type { ControlReading, FieldControl } from './field-type.ts';
 
 import { isEmpty } from '../../utils/is/is-empty.ts';
@@ -12,8 +12,10 @@ import { h } from '../render/h.ts';
 import { useT } from '../runtime/use-t.ts';
 import { blocksOf } from './_blocks.ts';
 import { carriedField, carryValue } from './_items.ts';
+import { renderFieldLayout } from './field-layout.ts';
 import { fieldRow } from './field-row.ts';
 import { fieldTypeFor, registeredFieldType } from './field-type.ts';
+import { placeLayout } from './place-layout.ts';
 
 /**
  * Options for `createFieldForm`.
@@ -81,6 +83,13 @@ export interface FieldFormOptions {
   language: () => string;
 
   /**
+   * How the rows are arranged: rows, cards, tabs, and rules, as `GET /dashboard` resolved them.
+   * A field the layout does not place renders after it, in field order.
+   * Omitted, every row stacks in field order.
+   */
+  layout?: readonly DashboardLayoutNode[];
+
+  /**
    * Fires on any user change in any of the form's controls.
    */
   onInput?(): void;
@@ -135,8 +144,16 @@ export interface FieldForm {
 
   /**
    * Focuses the first errored control, answering whether there was one.
+   * The tab or collapsed card holding it opens first.
    */
   focusError(): boolean;
+
+  /**
+   * Opens the tab and the collapsed card holding a field, so it can be scrolled to or focused.
+   * `path` is the field name, or a deeper path whose first segment names it.
+   * Answers whether a layout places the field; a flat form answers `false`.
+   */
+  reveal(path: string): boolean;
 
   /**
    * Restores every control to its baseline, clearing dirt and messages.
@@ -263,34 +280,54 @@ export function createFieldForm(
     return { value: item };
   };
 
+  const rowOf = (field: DashboardField): Child => {
+    const lockedRow = lockedByName.get(field.name);
+    if (!isUndefined(lockedRow)) {
+      return fieldRow({ field, path: lockedRow.path, locked: true }, lockedRow.control.element);
+    }
+    const row = rowByName.get(field.name);
+    if (isUndefined(row)) {
+      return staticRow(field, options, () => seed?.[field.name], editorless.has(field));
+    }
+    const { control } = row;
+    return fieldRow(
+      {
+        field,
+        path: row.path,
+        dirty: () => control.dirty(),
+        // A revert is a user change: without the ping, history still guards navigation as unsaved.
+        onRevert: () => {
+          control.revert();
+          options.onInput?.();
+        },
+        error: () => control.error(),
+        onLabelClick: () => control.focus(),
+      },
+      control.element,
+    );
+  };
+  const fieldByName = new Map(ordered.map((field) => [field.name, field]));
+  let reveal = (_name: string): boolean => false;
+
   return {
     render() {
-      return ordered.map((field) => {
-        const lockedRow = lockedByName.get(field.name);
-        if (!isUndefined(lockedRow)) {
-          return fieldRow({ field, path: lockedRow.path, locked: true }, lockedRow.control.element);
-        }
-        const row = rowByName.get(field.name);
-        if (isUndefined(row)) {
-          return staticRow(field, options, () => seed?.[field.name], editorless.has(field));
-        }
-        const { control } = row;
-        return fieldRow(
-          {
-            field,
-            path: row.path,
-            dirty: () => control.dirty(),
-            // A revert is a user change: without the ping, history still guards navigation as unsaved.
-            onRevert: () => {
-              control.revert();
-              options.onInput?.();
-            },
-            error: () => control.error(),
-            onLabelClick: () => control.focus(),
-          },
-          control.element,
-        );
+      if (isUndefined(options.layout)) return ordered.map(rowOf);
+      const { nodes, rest } = placeLayout(options.layout, [...fieldByName.keys()]);
+      const rendered = renderFieldLayout(nodes, {
+        row: (name) => {
+          const field = fieldByName.get(name);
+          return isUndefined(field) ? null : rowOf(field);
+        },
+        errored: (name) => {
+          const row = rowByName.get(name);
+          return !isUndefined(row) && rowErrored(row);
+        },
       });
+      reveal = rendered.reveal;
+      const trailing = rest
+        .map((name) => fieldByName.get(name))
+        .filter((field) => !isUndefined(field));
+      return h('div', { class: 'ohne-fields' }, rendered.children, trailing.map(rowOf));
     },
     read() {
       return collect(rows, true);
@@ -333,8 +370,12 @@ export function createFieldForm(
     focusError() {
       const errored = rows.find((row) => rowErrored(row));
       if (isUndefined(errored)) return false;
+      reveal(errored.field.name);
       errored.control.focus();
       return true;
+    },
+    reveal(path) {
+      return reveal(firstSegment(path));
     },
     revert() {
       for (const row of rows) row.control.revert();

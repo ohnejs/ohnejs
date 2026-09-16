@@ -378,6 +378,7 @@ function itemForm(
     path: `${context.path}[${key}]`,
     attachUUID: true,
     disabled: context.disabled === true,
+    layout: context.field.layout,
     language: context.language,
     onInput: context.onInput,
   });
