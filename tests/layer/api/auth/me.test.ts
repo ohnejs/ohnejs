@@ -7,7 +7,7 @@ import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 import loginHandler from '../../../../src/layer/api/auth/login.post.ts';
 import meGetHandler from '../../../../src/layer/api/auth/me.get.ts';
 import mePatchHandler from '../../../../src/layer/api/auth/me.patch.ts';
-import { DEFAULT_ACCOUNT_FIELDS } from '../../../../src/layer/auth/account-fields.ts';
+import { DEFAULT_ACCOUNT_LAYOUT } from '../../../../src/layer/auth/account-layout.ts';
 import SessionsCollection from '../../../../src/layer/collections/Sessions.ts';
 import UsersCollection from '../../../../src/layer/collections/Users.ts';
 import datePatternField from '../../../../src/layer/fields/date-pattern.ts';
@@ -29,6 +29,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { jsonClone } from '../../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -114,6 +115,8 @@ function defaults(user: User): User {
   return {
     UUID: user.UUID,
     email: user.email,
+    firstName: null,
+    lastName: null,
     roles: [],
     dashboardLanguage: null,
     contentLanguage: null,
@@ -143,6 +146,8 @@ describe('PATCH /auth/me', () => {
   it('round-trips every account setting and reads it back', async () => {
     const cookie = await signIn('settings@example.com');
     const settings = {
+      firstName: 'Ada',
+      lastName: 'Lovelace',
       dashboardLanguage: 'de',
       contentLanguage: 'de',
       timezone: 'Europe/Berlin',
@@ -198,33 +203,33 @@ describe('PATCH /auth/me', () => {
     strictEqual((await patch(cookie, null)).status, 400);
   });
 
-  it('lets the auth:account-fields hook narrow the list', async () => {
+  it('lets the auth:account-layout hook narrow the layout', async () => {
     const cookie = await signIn('narrow@example.com');
-    let seen: { fields: string[]; email: string } | null = null;
-    hook('auth:account-fields', (fields, context) => {
-      seen = { fields: [...fields], email: context.user.email };
-      return ['timezone'];
+    let seen: { layout: unknown; email: string } | null = null;
+    hook('auth:account-layout', (layout, context) => {
+      seen = { layout: jsonClone(layout), email: context.user.email };
+      return [{ card: ['timezone'] }];
     });
     try {
       deepStrictEqual(await errorsOf(await patch(cookie, { dateFormat: 'D' })), {
         dateFormat: 'validation.unknownField',
       });
       strictEqual((await patch(cookie, { timezone: 'UTC' })).status, 200);
-      deepStrictEqual(seen, { fields: [...DEFAULT_ACCOUNT_FIELDS], email: 'narrow@example.com' });
+      deepStrictEqual(seen, { layout: DEFAULT_ACCOUNT_LAYOUT, email: 'narrow@example.com' });
     } finally {
-      useHooks().delete('auth:account-fields');
+      useHooks().delete('auth:account-layout');
     }
   });
 
-  it('refuses every change once the hook empties the list', async () => {
+  it('refuses every change once the hook empties the layout', async () => {
     const cookie = await signIn('locked@example.com');
-    hook('auth:account-fields', () => []);
+    hook('auth:account-layout', () => []);
     try {
       deepStrictEqual(await errorsOf(await patch(cookie, { timezone: 'UTC' })), {
         timezone: 'validation.unknownField',
       });
     } finally {
-      useHooks().delete('auth:account-fields');
+      useHooks().delete('auth:account-layout');
     }
   });
 

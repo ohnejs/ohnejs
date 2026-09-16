@@ -7,6 +7,8 @@ import { hasKey } from 'ohnejs/utils';
 export const USER_FIELDS = [
   'UUID',
   'email',
+  'firstName',
+  'lastName',
   'roles',
   'dashboardLanguage',
   'contentLanguage',

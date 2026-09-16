@@ -19,6 +19,12 @@
       "label": "Passwort",
       "description": "Nimmt ein Klartext-Passwort entgegen und speichert nur dessen scrypt-Hash. Das Passwort selbst wird nie gespeichert."
     },
+    "firstName": {
+      "label": "Vorname"
+    },
+    "lastName": {
+      "label": "Nachname"
+    },
     "roles": {
       "label": "Rollen",
       "description": "Die Rollennamen dieses Benutzers. Die Berechtigungen aller Rollen werden vereinigt."
@@ -45,7 +51,9 @@
     },
     "smartClipboard": {
       "label": "Intelligente Zwischenablage",
-      "description": "Hintergrund-Zwischenablageüberwachung für sofortige Einfügebereitschaft. Diese Funktion fordert die Berechtigung des Browsers an, auf deine Zwischenablage zuzugreifen."
+      "description": "Hintergrund-Zwischenablageüberwachung für sofortige Einfügebereitschaft. Diese Funktion fordert die Berechtigung des Browsers an, auf deine Zwischenablage zuzugreifen.",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert"
     }
   },
   "sessions": {

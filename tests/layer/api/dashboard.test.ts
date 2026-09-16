@@ -101,9 +101,15 @@ useMessages().register('en', {
   'dash.kinds.help.text': 'Long help',
   'dash.blocks.hero.label': 'Hero section',
   'dash.menu.reports': 'Reports',
+  'dash.notes.main': 'Main',
+  'dash.notes.more': 'More',
   'dashMenu.tools': '{n, plural, one {# tool} other {# tools}}',
 });
-useMessages().register('de', { 'auth.users.timezone.label': 'Zeitzone' });
+useMessages().register('de', {
+  'auth.users.timezone.label': 'Zeitzone',
+  'dash.notes.main': 'Allgemein',
+  'dash.notes.more': 'Mehr',
+});
 useMessages().register('bs', { 'auth.users.timezone.label': 'Vremenska zona' });
 
 useCollections().register('DashNotes', {
@@ -113,6 +119,22 @@ useCollections().register('DashNotes', {
     dashboard: {
       recordLabel: ['title', 'note'],
       table: { columns: ['title | 20rem', 'note'] },
+      layout: [
+        {
+          card: {
+            label: 'dash.notes.main',
+            collapsible: true,
+            fields: [{ row: ['title | 20rem', 'note'] }],
+          },
+        },
+        {
+          tabs: [
+            { label: 'dash.notes.more', fields: ['owner'] },
+            { label: 'Secret', fields: ['secret'] },
+          ],
+        },
+        '---',
+      ],
     },
     fields: {
       title: field('text'),
@@ -128,7 +150,10 @@ useCollections().register('DashOwners', {
     api: { read: true },
     fields: {
       name: field('text', { unique: true, label: 'dash.owners.name.label' }),
-      profile: field('object', { fields: { bio: field('text', { nullable: true }) } }),
+      profile: field('object', {
+        fields: { bio: field('text', { nullable: true }) },
+        layout: ['bio | 50%'],
+      }),
     },
   },
 });
@@ -189,7 +214,7 @@ useBlocks().register('DashHero', {
 });
 useBlocks().register('DashAside', {
   name: 'DashAside',
-  block: { fields: { words: field('text') } },
+  block: { fields: { words: field('text') }, dashboard: { layout: ['words | auto'] } },
 });
 useBlocks().register('DashSecret', {
   name: 'DashSecret',
@@ -520,6 +545,55 @@ describe('fields', () => {
   });
 });
 
+describe('layout', () => {
+  it('ships a collection layout resolved: labels translated, widths split, and omits the key elsewhere', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(collection(body, 'DashNotes').layout, [
+      {
+        kind: 'card',
+        label: 'Main',
+        collapsible: true,
+        nodes: [
+          {
+            kind: 'row',
+            nodes: [
+              { kind: 'field', name: 'title', width: '20rem' },
+              { kind: 'field', name: 'note' },
+            ],
+          },
+        ],
+      },
+      {
+        kind: 'tabs',
+        tabs: [
+          { label: 'More', nodes: [{ kind: 'field', name: 'owner' }] },
+          { label: 'Secret', nodes: [{ kind: 'field', name: 'secret' }] },
+        ],
+      },
+      { kind: 'rule' },
+    ]);
+    strictEqual('layout' in collection(body, 'DashPublic'), false);
+  });
+
+  it('resolves card and tab labels in the request language', async () => {
+    const layout = collection((await call(user, 'de')).body, 'DashNotes').layout ?? [];
+    strictEqual(layout[0]?.kind === 'card' ? layout[0].label : '', 'Allgemein');
+    strictEqual(layout[1]?.kind === 'tabs' ? layout[1].tabs[0]?.label : '', 'Mehr');
+  });
+
+  it("describes a composite's layout on the field, stripped from its options", async () => {
+    const { body } = await call(user);
+    const owners = keyBy(collection(body, 'DashOwners').fields, (entry) => entry.name);
+    deepStrictEqual(owners.profile?.layout, [{ kind: 'field', name: 'bio', width: '50%' }]);
+    strictEqual(owners.profile?.options, undefined);
+  });
+
+  it("describes a block's layout", async () => {
+    const aside = (await call(user)).body.blocks.find((entry) => entry.name === 'DashAside');
+    deepStrictEqual(aside?.layout, [{ kind: 'field', name: 'words', width: 'auto' }]);
+  });
+});
+
 describe('menu', () => {
   it('folds the configured groups over the accessible collections, the rest trailing', async () => {
     deepStrictEqual(menuPaths((await call(user)).body), [
@@ -691,12 +765,14 @@ describe('languages', () => {
   });
 });
 
-describe('accountFields', () => {
-  it('describes the default allowlist in form order, the password write-only', async () => {
+describe('account', () => {
+  it('describes the default layout fields in layout order, the password write-only', async () => {
     const { body } = await call(user);
     deepStrictEqual(
       body.accountFields.map((entry) => entry.name),
       [
+        'firstName',
+        'lastName',
         'contentLanguage',
         'dashboardLanguage',
         'timezone',
@@ -720,12 +796,55 @@ describe('accountFields', () => {
     strictEqual(german.timezone?.label, 'Zeitzone');
   });
 
-  it('follows the auth:account-fields hook, an empty list describing nothing', async () => {
-    hook('auth:account-fields', () => []);
+  it('ships the default layout resolved, the name card first', async () => {
+    const { body } = await call(user);
+    deepStrictEqual(body.accountLayout[0], {
+      kind: 'card',
+      collapsible: false,
+      nodes: [
+        {
+          kind: 'row',
+          nodes: [
+            { kind: 'field', name: 'firstName' },
+            { kind: 'field', name: 'lastName' },
+          ],
+        },
+      ],
+    });
+    strictEqual(body.accountLayout.length, 5);
+  });
+
+  it('follows the auth:account-layout hook, dropping unknown names and the containers they empty', async () => {
+    hook('auth:account-layout', () => [
+      { card: ['nope'] },
+      { card: [{ row: ['timezone', 'UUID'] }] },
+    ]);
     try {
-      deepStrictEqual((await call(user)).body.accountFields, []);
+      const { body } = await call(user);
+      deepStrictEqual(
+        body.accountFields.map((entry) => entry.name),
+        ['timezone'],
+      );
+      deepStrictEqual(body.accountLayout, [
+        {
+          kind: 'card',
+          collapsible: false,
+          nodes: [{ kind: 'row', nodes: [{ kind: 'field', name: 'timezone' }] }],
+        },
+      ]);
     } finally {
-      useHooks().delete('auth:account-fields');
+      useHooks().delete('auth:account-layout');
+    }
+  });
+
+  it('describes nothing once the hook empties the layout', async () => {
+    hook('auth:account-layout', () => []);
+    try {
+      const { body } = await call(user);
+      deepStrictEqual(body.accountFields, []);
+      deepStrictEqual(body.accountLayout, []);
+    } finally {
+      useHooks().delete('auth:account-layout');
     }
   });
 });
@@ -761,8 +880,8 @@ describe('blocks', () => {
   });
 
   it('serves the types an account field reaches when `Users` is not listed', async () => {
-    hook('auth:account-fields', (fields) => {
-      fields.push('badges');
+    hook('auth:account-layout', (layout) => {
+      layout.push({ card: ['badges'] });
     });
     try {
       const { body } = await call(user);
@@ -773,7 +892,7 @@ describe('blocks', () => {
         ['DashAside', 'DashBadge', 'DashHero', 'DashRibbon'],
       );
     } finally {
-      useHooks().delete('auth:account-fields');
+      useHooks().delete('auth:account-layout');
     }
   });
 

@@ -10,6 +10,8 @@ describe('toUser', () => {
       {
         UUID: 'u',
         email: 'u@example.com',
+        firstName: null,
+        lastName: null,
         roles: ['admin'],
         dashboardLanguage: null,
         contentLanguage: null,

@@ -113,6 +113,8 @@ function defaults(UUID: string, email: string): User {
   return {
     UUID,
     email,
+    firstName: null,
+    lastName: null,
     roles: [],
     dashboardLanguage: null,
     contentLanguage: null,

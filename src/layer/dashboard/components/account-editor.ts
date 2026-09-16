@@ -208,6 +208,7 @@ export function accountEditor(): Child {
         mode: 'edit',
         path: '',
         readOnlyRows: true,
+        layout: meta.accountLayout,
         language: () => useDashboardLanguage().value,
         onInput: () => {
           const state = currentState();

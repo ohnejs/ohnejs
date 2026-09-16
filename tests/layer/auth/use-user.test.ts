@@ -109,6 +109,8 @@ describe('useUser and useSession', () => {
     deepStrictEqual(who.user, {
       UUID: uuid,
       email: 'owner@example.com',
+      firstName: null,
+      lastName: null,
       roles: [],
       dashboardLanguage: null,
       contentLanguage: null,
@@ -133,6 +135,8 @@ describe('userColumns', () => {
     deepStrictEqual(userColumns(), [
       'UUID',
       'email',
+      'firstName',
+      'lastName',
       'roles',
       'dashboardLanguage',
       'contentLanguage',

@@ -27,6 +27,16 @@ export interface User {
   email: string;
 
   /**
+   * The user's first name; `null` when not given.
+   */
+  firstName: string | null;
+
+  /**
+   * The user's last name; `null` when not given.
+   */
+  lastName: string | null;
+
+  /**
    * The role names the user holds.
    * The capabilities of every held role union; resolve them with `userCapabilities`.
    */

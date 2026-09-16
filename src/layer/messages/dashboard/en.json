@@ -146,6 +146,10 @@
   "invalidNumber": "Enter a number",
   "login": {
     "email": "Email",
+  "layout": {
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
     "failed": "The sign-in failed",
     "forgotPassword": "Forgot password?",
     "hidePassword": "Hide password",

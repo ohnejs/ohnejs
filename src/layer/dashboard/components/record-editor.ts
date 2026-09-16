@@ -160,6 +160,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       path: '',
       readOnlyRows: true,
       readOnly,
+      layout: collection.layout,
       language: () => useDashboardLanguage().value,
       onInput: () => {
         const state = currentState();
@@ -213,7 +214,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     form.value = buildForm(row);
     history.push(currentState() ?? {});
     state.value = 'ready';
-    settleHash();
+    settleHash(form.value);
   };
   const applyLinkedLocale = (): void => {
     const params = parseSearchParams(location.search);
@@ -232,7 +233,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   if (create) {
     // Untracked: a tracked seed read would subscribe the whole page region to the first keystroke.
     history.push(untracked(currentState) ?? {});
-    settleHash();
+    settleHash(form.value);
   } else {
     if (collection.translatable) applyLinkedLocale();
     void load();
@@ -666,12 +667,14 @@ function seedRecordLabel(collection: DashboardCollection, row: RecordRow): void 
 
 /**
  * Scrolls a `#field-<name>` hash target into view and focuses its control once the form stands.
+ * The tab or collapsed card holding the field opens first, so a hidden row can still be reached.
  */
-function settleHash(): void {
+function settleHash(form: FieldForm | undefined): void {
   const hash = location.hash.slice(1);
   if (!hash.startsWith('field-')) return;
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
+      form?.reveal(hash.slice('field-'.length));
       document.getElementById(hash)?.scrollIntoView({ block: 'center' });
       const input = document.getElementById(`${hash}-input`);
       if (input instanceof HTMLElement) input.focus();

@@ -1,5 +1,5 @@
 export { usersDefinition } from '../collections/Users.ts';
-export * from './account-fields.ts';
+export * from './account-layout.ts';
 export * from './capabilities.ts';
 export * from './create-session.ts';
 export * from './destroy-session.ts';

@@ -146,6 +146,10 @@
   "invalidNumber": "Zahl eingeben",
   "login": {
     "email": "E-Mail",
+  "layout": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen"
+  },
     "failed": "Die Anmeldung ist fehlgeschlagen",
     "forgotPassword": "Passwort vergessen?",
     "hidePassword": "Passwort verbergen",

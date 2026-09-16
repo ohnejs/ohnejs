@@ -8,11 +8,13 @@ import {
   defineHandler,
   endpointOf,
   type FieldInstance,
+  type FieldLayout,
   type FieldQueryMeta,
   isExpandableDescription,
   isRecordLabelTemplate,
   type LogicalType,
   type Message,
+  parseLayoutItem,
   queryMetadata,
   type RecordLabel,
   useBlocks,
@@ -41,7 +43,7 @@ import type { User } from '../auth/types.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
 import { defaultLanguage, resolveMessage, translate } from '../../ohne/http/translate.ts';
-import { accountFields } from '../auth/account-fields.ts';
+import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCan, userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
 
@@ -207,6 +209,11 @@ export interface DashboardField {
   subfields?: DashboardField[];
 
   /**
+   * How the form arranges the subfields, resolved; child kinds that declare a `layout` only.
+   */
+  layout?: DashboardLayoutNode[];
+
+  /**
    * The block type names the field admits; `blocks` kind only.
    */
   allow?: readonly string[];
@@ -221,6 +228,118 @@ export interface DashboardTable {
    */
   columns?: readonly string[];
 }
+
+/**
+ * A field the layout places, by name.
+ */
+export interface DashboardLayoutField {
+  /**
+   * The node kind.
+   */
+  kind: 'field';
+
+  /**
+   * The field name, one of the host's described fields.
+   */
+  name: string;
+
+  /**
+   * The declared width: a plain CSS length, a percentage, or `auto`; absent when the item declares none.
+   */
+  width?: string;
+}
+
+/**
+ * Nodes side by side, sharing the container's width.
+ */
+export interface DashboardLayoutRow {
+  /**
+   * The node kind.
+   */
+  kind: 'row';
+
+  /**
+   * The entries, left to right; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A bordered group of nodes.
+ */
+export interface DashboardLayoutCard {
+  /**
+   * The node kind.
+   */
+  kind: 'card';
+
+  /**
+   * The header label, resolved in the request's language; absent when the card declares none.
+   */
+  label?: string;
+
+  /**
+   * Whether the viewer can collapse the card.
+   */
+  collapsible: boolean;
+
+  /**
+   * The nodes, top to bottom; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A set of tabs, one panel of nodes per tab.
+ */
+export interface DashboardLayoutTabs {
+  /**
+   * The node kind.
+   */
+  kind: 'tabs';
+
+  /**
+   * The tabs, left to right; never empty.
+   */
+  tabs: DashboardLayoutTab[];
+}
+
+/**
+ * One tab of a `DashboardLayoutTabs` node.
+ */
+export interface DashboardLayoutTab {
+  /**
+   * The tab label, resolved in the request's language.
+   */
+  label: string;
+
+  /**
+   * The panel's nodes, top to bottom; never empty.
+   */
+  nodes: DashboardLayoutNode[];
+}
+
+/**
+ * A horizontal rule between stacked nodes.
+ */
+export interface DashboardLayoutRule {
+  /**
+   * The node kind.
+   */
+  kind: 'rule';
+}
+
+/**
+ * One node of a resolved field layout, as the dashboard renders it.
+ * Labels arrive translated and widths split from their names, so the client parses nothing.
+ * A name the host does not describe is already dropped, and so is any container that left empty.
+ */
+export type DashboardLayoutNode =
+  | DashboardLayoutField
+  | DashboardLayoutRow
+  | DashboardLayoutCard
+  | DashboardLayoutTabs
+  | DashboardLayoutRule;
 
 /**
  * One collection the signed-in user may work with over the collections API.
@@ -251,6 +370,11 @@ export interface DashboardCollection {
    * The declared dashboard list-view defaults; absent when the collection declares none.
    */
   table?: DashboardTable;
+
+  /**
+   * How the record editor arranges the fields, resolved; absent when the collection declares no layout.
+   */
+  layout?: DashboardLayoutNode[];
 
   /**
    * Whether the collection has translatable fields, so reads and writes accept a `locale`.
@@ -304,6 +428,11 @@ export interface DashboardBlock {
    * The block's own fields, its instance `UUID` included; a block carries no `_updatedAt`.
    */
   fields: DashboardField[];
+
+  /**
+   * How the block's form arranges the fields, resolved; absent when the block declares no layout.
+   */
+  layout?: DashboardLayoutNode[];
 }
 
 /**
@@ -391,10 +520,15 @@ export interface DashboardMeta {
   languages: string[];
 
   /**
-   * The `Users` fields the signed-in user edits on the account page, described in form order.
-   * The `auth:account-fields` hook decides the list; an empty list hides the page.
+   * The `Users` fields the signed-in user edits on the account page, described in layout order.
+   * The `auth:account-layout` hook decides them; an empty list hides the page.
    */
   accountFields: DashboardField[];
+
+  /**
+   * How the account page arranges `accountFields`, resolved; empty when the page is hidden.
+   */
+  accountLayout: DashboardLayoutNode[];
 }
 
 declare module 'ohnejs' {
@@ -421,8 +555,8 @@ const DEFAULT_MENU: { label?: Message; items: DashboardMenuEntry[] }[] = [
 const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
   record: new Set(['collection', 'onDelete']),
   records: new Set(['collection', 'inverse', 'onDelete']),
-  childOne: new Set(['fields']),
-  childMany: new Set(['fields']),
+  childOne: new Set(['fields', 'layout']),
+  childMany: new Set(['fields', 'layout']),
   blocks: new Set(['allow']),
 };
 
@@ -434,7 +568,8 @@ const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
  * Operations carry their verdicts, so the dashboard disables what the capability guard would refuse.
  * Fields carry the metadata a sheet needs: type, kind, flags, labels resolved in the request's language.
  * `languages` lists the catalog languages the dashboard language setting offers, the default first.
- * `accountFields` describes the `Users` fields the account page edits, as `auth:account-fields` allows.
+ * `accountFields` describes the `Users` fields the account page edits, as `auth:account-layout` places them.
+ * A declared layout arrives resolved on its collection, block, or composite field, and on `accountLayout`.
  * No signed-in user is a `401`.
  */
 export default defineHandler(async (): Promise<DashboardMeta> => {
@@ -461,21 +596,26 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     }
     if (!isUndefined(dashboard?.icon)) collection.icon = dashboard.icon;
     if (!isUndefined(dashboard?.table)) collection.table = dashboard.table;
+    const layout = resolveLayout(dashboard?.layout, namesOf(fields));
+    if (!isUndefined(layout)) collection.layout = layout;
     collections.push(collection);
   }
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
   const menu = await applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
-  const account = await describeAccountFields(user);
+  const account = await describeAccount(user);
   return {
     menu,
     collections,
-    blocks: describeBlocks([...collections.flatMap((collection) => collection.fields), ...account]),
+    blocks: describeBlocks([
+      ...collections.flatMap((collection) => collection.fields),
+      ...account.accountFields,
+    ]),
     roles: useRoles().keys(),
     capabilities: userCapabilities(user),
     locales,
     defaultLocale,
     languages: catalogLanguages(),
-    accountFields: account,
+    ...account,
   };
 });
 
@@ -487,13 +627,21 @@ function catalogLanguages(): string[] {
 }
 
 /**
- * Describes the `Users` fields the account page edits, in allowlist order; none without a `Users` collection.
+ * Describes the account page: the `Users` fields its layout lets the user edit, and the layout resolved.
+ * Both are empty without a `Users` collection, or once the `auth:account-layout` hook empties the layout.
  */
-async function describeAccountFields(user: User): Promise<DashboardField[]> {
+async function describeAccount(
+  user: User,
+): Promise<Pick<DashboardMeta, 'accountFields' | 'accountLayout'>> {
   const users = useCollections().get('Users');
-  if (isUndefined(users)) return [];
-  const allowed = pick(queryMetadata('Users').fields, await accountFields(user));
-  return describeFields(allowed, users.collection.fields);
+  if (isUndefined(users)) return { accountFields: [], accountLayout: [] };
+  const layout = await accountLayout(user);
+  const names = accountFields(layout);
+  const fields = describeFields(
+    pick(queryMetadata('Users').fields, names),
+    users.collection.fields,
+  );
+  return { accountFields: fields, accountLayout: resolveLayout(layout, new Set(names)) ?? [] };
 }
 
 /**
@@ -511,7 +659,10 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     const meta = useBlocks().get(name);
     if (isUndefined(meta)) continue;
     const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
-    described.set(name, { name, label: blockLabelOf(name, meta.block.label), fields });
+    const block: DashboardBlock = { name, label: blockLabelOf(name, meta.block.label), fields };
+    const layout = resolveLayout(meta.block.dashboard?.layout, namesOf(fields));
+    if (!isUndefined(layout)) block.layout = layout;
+    described.set(name, block);
     collectAllowed(fields, pending);
   }
   return [...described.values()].sort((left, right) => naturalCompare(left.name, right.name));
@@ -622,9 +773,75 @@ function describeField(
   if (!isUndefined(meta.target)) field.target = meta.target;
   if (!isUndefined(meta.subfields)) {
     field.subfields = describeFields(meta.subfields, subInstancesOf(instance));
+    const layout = resolveLayout(
+      options.layout as FieldLayout | undefined,
+      namesOf(field.subfields),
+    );
+    if (!isUndefined(layout)) field.layout = layout;
   }
   if (!isUndefined(meta.allow)) field.allow = meta.allow;
   return field;
+}
+
+/**
+ * The names of described fields, as the set a layout resolves against.
+ */
+function namesOf(fields: readonly DashboardField[]): ReadonlySet<string> {
+  return new Set(fields.map((field) => field.name));
+}
+
+/**
+ * Resolves a declared layout for the wire: labels translated, widths split, names outside `names` dropped.
+ * A row, card, or tab left empty drops with them; a layout left empty resolves to `undefined`.
+ */
+function resolveLayout(
+  layout: FieldLayout | undefined,
+  names: ReadonlySet<string>,
+): DashboardLayoutNode[] | undefined {
+  if (isUndefined(layout)) return undefined;
+  const nodes = resolveNodes(layout, names);
+  return isEmpty(nodes) ? undefined : nodes;
+}
+
+/**
+ * Resolves one node list, recursing into rows, cards, and tabs.
+ */
+function resolveNodes(nodes: FieldLayout, names: ReadonlySet<string>): DashboardLayoutNode[] {
+  const resolved: DashboardLayoutNode[] = [];
+  for (const node of nodes) {
+    if (node === '---') {
+      resolved.push({ kind: 'rule' });
+    } else if (isString(node)) {
+      const { name, width } = parseLayoutItem(node);
+      if (!names.has(name)) continue;
+      const field: DashboardLayoutField = { kind: 'field', name };
+      if (!isUndefined(width)) field.width = width;
+      resolved.push(field);
+    } else if ('row' in node) {
+      const inner = resolveNodes(node.row, names);
+      if (!isEmpty(inner)) resolved.push({ kind: 'row', nodes: inner });
+    } else if ('card' in node) {
+      const options = 'fields' in node.card ? node.card : { fields: node.card };
+      const inner = resolveNodes(options.fields, names);
+      if (isEmpty(inner)) continue;
+      const card: DashboardLayoutCard = {
+        kind: 'card',
+        collapsible: options.collapsible ?? false,
+        nodes: inner,
+      };
+      if (!isUndefined(options.label)) card.label = resolveMessage(options.label);
+      resolved.push(card);
+    } else {
+      const tabs = node.tabs
+        .map((tab) => ({
+          label: resolveMessage(tab.label),
+          nodes: resolveNodes(tab.fields, names),
+        }))
+        .filter((tab) => !isEmpty(tab.nodes));
+      if (!isEmpty(tabs)) resolved.push({ kind: 'tabs', tabs });
+    }
+  }
+  return resolved;
 }
 
 /**

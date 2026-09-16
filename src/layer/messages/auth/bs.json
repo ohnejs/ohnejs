@@ -19,6 +19,12 @@
       "label": "Lozinka",
       "description": "Prima lozinku u čistom tekstu i pohranjuje samo njen scrypt hash. Sama lozinka se nikada ne pohranjuje."
     },
+    "firstName": {
+      "label": "Ime"
+    },
+    "lastName": {
+      "label": "Prezime"
+    },
     "roles": {
       "label": "Uloge",
       "description": "Nazivi uloga koje ovaj korisnik ima. Sposobnosti svih uloga se objedinjuju."
@@ -45,7 +51,9 @@
     },
     "smartClipboard": {
       "label": "Pametni međuspremnik",
-      "description": "Praćenje međuspremnika u pozadini za trenutnu spremnost lijepljenja. Ova funkcija će zatražiti dozvolu preglednika za pristup vašem međuspremniku."
+      "description": "Praćenje međuspremnika u pozadini za trenutnu spremnost lijepljenja. Ova funkcija će zatražiti dozvolu preglednika za pristup vašem međuspremniku.",
+      "enabled": "Uključeno",
+      "disabled": "Isključeno"
     }
   },
   "sessions": {
