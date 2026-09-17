@@ -272,10 +272,9 @@ function resolveAPIURL(): string {
 }
 
 /**
- * Warns when the app's dashboard directory exists without a `tsconfig.json`, printing one to create.
- * Every path in it is relative to the dashboard directory, so a nested `dirs.dashboard` still resolves.
- * The `app/*` entry names `node_modules/ohnejs` by path, not the resolved framework layer directory.
- * The resolved directory is a realpath, which under pnpm is a version-pinned store path.
+ * Warns when the app's dashboard directory exists without a `tsconfig.json`, printing the one to create.
+ * It only extends the generated browser bucket config, which carries the `app/*` paths and the includes.
+ * The `extends` path is relative to the dashboard directory, so a nested `dirs.dashboard` still resolves.
  */
 async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promise<void> {
   if (!(await exists(dashboardDir))) return;
@@ -284,17 +283,13 @@ async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promis
   const codegen = await codegenDir(appDir);
   if (isNull(codegen)) return;
 
-  const buckets = relativePath(dashboardDir, codegen);
-  const framework = relativePath(
-    dashboardDir,
-    joinPath(appDir, 'node_modules/ohnejs/src/layer/dashboard'),
-  );
+  const base = relativePath(dashboardDir, joinPath(codegen, 'browser/tsconfig.json'));
   usePrinter().warnBlock({
     title: 'Dashboard has no `tsconfig.json`',
     body: [
       'Without it the editor lacks DOM types and the generated types for dashboard code.',
       'Create a `tsconfig.json` inside it with:',
-      `{\n  "extends": "ohnejs/tsconfig.browser.json",\n  "compilerOptions": {\n    "paths": { "app/*": ["./*", "${framework}/*"] }\n  },\n  "include": ["**/*.ts", "${buckets}/shared/**/*.ts", "${buckets}/browser/**/*.ts"]\n}`,
+      `{\n  "extends": ${JSON.stringify(base)}\n}`,
     ],
     path: relativePath(process.cwd(), dashboardDir),
   });

@@ -258,15 +258,7 @@ describe('serveDashboard', () => {
 
     const out = buf.join('');
     strictEqual(out.includes('Dashboard has no tsconfig.json'), true);
-    strictEqual(out.includes('"extends": "ohnejs/tsconfig.browser.json"'), true);
-    strictEqual(
-      out.includes('"paths": { "app/*": ["./*", "../node_modules/ohnejs/src/layer/dashboard/*"] }'),
-      true,
-    );
-    strictEqual(
-      out.includes('"include": ["**/*.ts", "../.ohne/shared/**/*.ts", "../.ohne/browser/**/*.ts"]'),
-      true,
-    );
+    strictEqual(out.includes('"extends": "../.ohne/browser/tsconfig.json"'), true);
   });
 
   it('derives the suggested tsconfig from the configured dirs', async () => {
@@ -279,9 +271,7 @@ describe('serveDashboard', () => {
     const buf = captureWarnings();
     http = await serveDashboard(dir);
 
-    const out = buf.join('');
-    strictEqual(out.includes('"../../generated/shared/**/*.ts"'), true);
-    strictEqual(out.includes('"../../node_modules/ohnejs/src/layer/dashboard/*"'), true);
+    strictEqual(buf.join('').includes('"extends": "../../generated/browser/tsconfig.json"'), true);
   });
 
   it('does not warn when the dashboard tsconfig exists or the folder is absent', async () => {

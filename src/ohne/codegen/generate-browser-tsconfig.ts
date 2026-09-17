@@ -1,25 +1,23 @@
-import { fileURLToPath } from 'node:url';
-
 import {
   type CodeBuilder,
   createCodeBuilder,
   createCodeGenerator,
 } from '../../utils/codegen/index.ts';
-import { isNull } from '../../utils/index.ts';
+import { first, isNull, isUndefined, relativePath } from '../../utils/index.ts';
+import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
+import { stackedLayers } from '../layers/stacked-layers.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
 
 /**
- * The framework's browser tsconfig, the `extends` target of every generated browser bucket config.
- */
-const BROWSER_TSCONFIG = fileURLToPath(new URL('../../../tsconfig.browser.json', import.meta.url));
-
-/**
- * Generates `browser/tsconfig.json`, giving the browser bucket a program an editor can discover.
+ * Generates `browser/tsconfig.json`, the base of the app's browser type program.
  *
+ * The app's `dashboard/tsconfig.json` extends it and needs nothing else.
+ * It extends `ohnejs/tsconfig.browser.json` by package name, as the scaffold's root tsconfig does.
+ * `paths` maps `app/*` onto every stacked layer's dashboard directory, closest first, as the server serves it.
+ * `include` covers the app's dashboard directory and the two buckets the browser program loads.
  * An editor assigns an open file to the nearest ancestor `tsconfig.json` that includes it.
- * The app's dashboard config covers the bucket but sits beside it, so that walk never finds one.
- * An unclaimed bucket file lands in an inferred project, whose resolution misses `ohnejs/dashboard`.
- * The config `extends` the framework's browser tsconfig by absolute path, so it resolves anywhere.
+ * The bucket's own files sit beside this one, so that walk finds it instead of an inferred project.
+ * Layers come from the registered stack, so `loadLayers` must have run first.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * The file is rewritten only when its contents change.
@@ -31,14 +29,45 @@ export async function generateBrowserTSConfig(
   const dir = await codegenBucket(from, 'browser');
   if (isNull(dir)) return null;
 
+  const roots = dashboardRoots(stackedLayers()).map((root) => relativePath(dir, root));
+  const own = first(roots);
+  const include = isUndefined(own) ? [] : [`${own}/**/*.ts`];
+  include.push('../shared/**/*.ts', './**/*.ts');
+
   const code = createCodeBuilder();
   code.line('{');
   code.indent(() => {
-    code.line(`"extends": ${JSON.stringify(BROWSER_TSCONFIG)},`);
-    code.line('"include": ["./**/*.ts"]');
+    code.line('"extends": "ohnejs/tsconfig.browser.json",');
+    code.line('"compilerOptions": {');
+    code.indent(() => {
+      code.line('"paths": {');
+      code.indent(() => {
+        emitList(
+          code,
+          '"app/*": ',
+          roots.map((root) => `${root}/*`),
+        );
+      });
+      code.line('}');
+    });
+    code.line('},');
+    emitList(code, '"include": ', include);
   });
   code.line('}');
   return write(dir, code);
+}
+
+/**
+ * Emits `head[`, one quoted item per line, then `]`.
+ */
+function emitList(code: CodeBuilder, head: string, items: readonly string[]): void {
+  code.line(`${head}[`);
+  code.indent(() => {
+    items.forEach((item, i) => {
+      code.line(`${JSON.stringify(item)}${i < items.length - 1 ? ',' : ''}`);
+    });
+  });
+  code.line(']');
 }
 
 /**
