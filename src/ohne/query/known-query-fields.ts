@@ -82,7 +82,7 @@ export interface QueryFieldMeta {
 
   /**
    * The field's `when` condition, in object form, present only when the instance declares one.
-   * A type-only passenger: the dashboard's field-visibility logic reads it; the query builder ignores it.
+   * A type-only passenger: the query builder ignores it.
    */
   when?: ConditionObject;
 }

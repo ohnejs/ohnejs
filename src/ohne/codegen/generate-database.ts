@@ -1185,7 +1185,7 @@ function metaLiteral(parts: string[], when: string | null): string {
 }
 
 /**
- * Renders a `when` condition object as a TypeScript type literal, the passenger the dashboard reads.
+ * Renders a `when` condition object as a TypeScript type literal.
  * String values quote through `literalString`; keys quote through `propertyKey`, so an anchored path holds.
  */
 function conditionLiteral(value: unknown): string {
