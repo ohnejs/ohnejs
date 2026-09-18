@@ -1,5 +1,5 @@
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs'],
+  layers: ['ohnejs/base'],
 });

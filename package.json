@@ -14,8 +14,6 @@
   },
   "files": [
     "src",
-    "ohne.config.ts",
-    "ohne.layer.ts",
     "tsconfig.browser.json",
     "tsconfig.node.json"
   ],
@@ -27,9 +25,10 @@
       "default": "./src/ohne/index.ts"
     },
     "./auth": {
-      "types": "./src/layer/auth/index.ts",
-      "default": "./src/layer/auth/index.ts"
+      "types": "./src/base/auth/index.ts",
+      "default": "./src/base/auth/index.ts"
     },
+    "./base": "./src/base/ohne.config.ts",
     "./dashboard": {
       "types": "./src/dashboard/index.ts",
       "default": "./src/dashboard/index.ts"
@@ -93,7 +92,7 @@
     "serve:api": "node src/ohne/cli/bin.js serve api",
     "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
     "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test \"tests/**/*.test.ts\"",
-    "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json && tsc -p src/layer/dashboard/tsconfig.json && tsc -p src/uploads/dashboard/tsconfig.json",
+    "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json && tsc -p src/base/dashboard/tsconfig.json && tsc -p src/uploads/dashboard/tsconfig.json",
     "vendor:icons": "node scripts/vendor-icons.ts"
   },
   "devDependencies": {

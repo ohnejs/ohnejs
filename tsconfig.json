@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.node.json",
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "ohne.config.ts", "ohne.layer.ts"],
-  "exclude": ["src/dashboard", "src/layer/dashboard", "src/uploads/dashboard"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "ohne.config.ts"],
+  "exclude": ["src/dashboard", "src/base/dashboard", "src/uploads/dashboard"]
 }

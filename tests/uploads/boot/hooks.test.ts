@@ -1,12 +1,12 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DashboardMenuGroup } from '../../../src/layer/api/dashboard.get.ts';
-import type { User } from '../../../src/layer/auth/types.ts';
+import type { DashboardMenuGroup } from '../../../src/base/api/dashboard.get.ts';
+import type { User } from '../../../src/base/auth/types.ts';
 
 import '../_fixture.ts';
 import '../../../src/uploads/boot/hooks.ts';
-import { toUser } from '../../../src/layer/auth/to-user.ts';
+import { toUser } from '../../../src/base/auth/to-user.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';

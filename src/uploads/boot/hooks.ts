@@ -4,7 +4,7 @@ import { hook } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
 import { isEmpty } from 'ohnejs/utils';
 
-import type { DashboardMenuGroup, DashboardMenuItem } from '../../layer/api/dashboard.get.ts';
+import type { DashboardMenuGroup, DashboardMenuItem } from '../../base/api/dashboard.get.ts';
 
 import { translate } from '../../ohne/http/translate.ts';
 import { decorateUploads } from '../uploads/decorate.ts';

@@ -2,15 +2,15 @@ import type { AnyHandler, Route } from '../../src/ohne/routes/route.ts';
 import type { HTTPMethod } from '../../src/utils/index.ts';
 import type { MemoryStorage } from './_storage.ts';
 
-import { hashSessionToken } from '../../src/layer/auth/_token.ts';
-import SessionsCollection from '../../src/layer/collections/Sessions.ts';
-import UsersCollection from '../../src/layer/collections/Users.ts';
-import datePatternField from '../../src/layer/fields/date-pattern.ts';
-import languageField from '../../src/layer/fields/language.ts';
-import localeField from '../../src/layer/fields/locale.ts';
-import passwordField from '../../src/layer/fields/password.ts';
-import rolesField from '../../src/layer/fields/roles.ts';
-import timezoneField from '../../src/layer/fields/timezone.ts';
+import { hashSessionToken } from '../../src/base/auth/_token.ts';
+import SessionsCollection from '../../src/base/collections/Sessions.ts';
+import UsersCollection from '../../src/base/collections/Users.ts';
+import datePatternField from '../../src/base/fields/date-pattern.ts';
+import languageField from '../../src/base/fields/language.ts';
+import localeField from '../../src/base/fields/locale.ts';
+import passwordField from '../../src/base/fields/password.ts';
+import rolesField from '../../src/base/fields/roles.ts';
+import timezoneField from '../../src/base/fields/timezone.ts';
 import { useCollections } from '../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../src/ohne/database/schema/desired.ts';
@@ -151,7 +151,7 @@ export function route(method: HTTPMethod, pattern: string, handler: unknown): Ro
     method,
     pattern,
     file: `${pattern}.ts`,
-    layer: 'ohnejs',
+    layer: 'ohnejs/uploads',
     handler: handler as AnyHandler,
   };
 }

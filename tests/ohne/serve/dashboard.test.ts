@@ -128,7 +128,7 @@ describe('serveDashboard', () => {
   it('does not serve the Node framework source outside the browser subtrees', async () => {
     const port = await serve('confined');
     strictEqual((await req(port, '/m/ohne/serve/dashboard.ts')).status, 404);
-    strictEqual((await req(port, '/m/layer/api/messages/[group]/[language].get.ts')).status, 404);
+    strictEqual((await req(port, '/m/base/api/messages/[group]/[language].get.ts')).status, 404);
   });
 
   it('answers a missing module with 404', async () => {

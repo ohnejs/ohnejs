@@ -1,13 +1,13 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import UsersCollection from '../../../src/layer/collections/Users.ts';
-import datePatternField from '../../../src/layer/fields/date-pattern.ts';
-import languageField from '../../../src/layer/fields/language.ts';
-import localeField from '../../../src/layer/fields/locale.ts';
-import passwordField from '../../../src/layer/fields/password.ts';
-import rolesField from '../../../src/layer/fields/roles.ts';
-import timezoneField from '../../../src/layer/fields/timezone.ts';
+import UsersCollection from '../../../src/base/collections/Users.ts';
+import datePatternField from '../../../src/base/fields/date-pattern.ts';
+import languageField from '../../../src/base/fields/language.ts';
+import localeField from '../../../src/base/fields/locale.ts';
+import passwordField from '../../../src/base/fields/password.ts';
+import rolesField from '../../../src/base/fields/roles.ts';
+import timezoneField from '../../../src/base/fields/timezone.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
