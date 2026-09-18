@@ -23,7 +23,7 @@ const run = promisify(execFile);
 const CONFIG_FILE = `import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs'],
+  layers: ['ohnejs/base'],
 });
 `;
 
