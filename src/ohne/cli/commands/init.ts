@@ -78,7 +78,7 @@ export const initCommand = defineCommand({
     },
     git: { type: 'boolean', description: 'Initialize a git repository.' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip prompts and take the defaults.' },
-    force: { type: 'boolean', alias: 'f', description: 'Overwrite a non-empty directory.' },
+    force: { type: 'boolean', alias: 'f', description: 'Delete a non-empty directory.' },
     ohnePath: { type: 'string', hidden: true },
   },
   async run({ values, positionals }) {
@@ -113,7 +113,7 @@ export const initCommand = defineCommand({
         if (!interactive) {
           print.errorBlock({
             title: 'Directory not empty',
-            body: 'Re-run with `--force` to overwrite its contents.',
+            body: 'Re-run with `--force` to delete its contents and scaffold into it.',
             path: relativePath(process.cwd(), target),
           });
           process.exitCode = 1;
