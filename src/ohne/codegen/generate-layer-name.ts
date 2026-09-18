@@ -20,7 +20,6 @@ import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
  * This is the type-side counterpart to `bootLayers`, which imports the same stacked layers at runtime.
  * The union spans the whole dependency closure, every layer you may list.
  * The imports track only the layers actually stacked through `Config.layers`, matching what boots.
- * ohne itself is skipped: its augmentations already reach the app through its barrel export.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Output lands in the `node` bucket of the app's `dirs.codegen` (default `.ohne`).
@@ -34,7 +33,7 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
 
   const names = await resolveDependencyLayerNames(from);
   const stack = await resolveLayerStack(from);
-  const layers = stack.slice(0, -1).filter((layer) => layer.name !== 'ohnejs');
+  const layers = stack.slice(0, -1);
   const files = (
     await Promise.all(layers.map((layer) => scanLayerAugmentations(layer.dir)))
   ).flat();
