@@ -59,7 +59,7 @@ export interface LayerLoadOptions {
  * @example
  * ```ts
  * await readLayerConfig('/srv/app')
- * // -> { input: { layers: ['@acme/base'] }, defaults: {}, strategies: {}, codegen: [] }
+ * // -> { input: { layers: ['@acme/blog'] }, defaults: {}, strategies: {}, codegen: [] }
  *
  * await readLayerConfig('/srv/not-a-layer') // -> null
  * ```

@@ -58,7 +58,7 @@ export interface CORSOptions {
  * It then runs on every request, including the auto-`OPTIONS` preflight: `export default cors({ origin })`.
  * Mounting one replaces the API's open default: with no cors anywhere, the API allows any origin.
  * That default is applied last, only when nothing else set or denied an origin, so this always wins.
- * The `ohnejs` layer ships a global cors that allows the dashboard's origin, with credentials.
+ * The `ohnejs/base` layer ships a global cors that allows the dashboard's origin, with credentials.
  * Your own `middleware/global/cors.ts` replaces it, so keep the dashboard's origin and `credentials: true`.
  * On an allowed cross-origin request it sets `Access-Control-Allow-Origin`.
  * A non-`*` policy always appends `Vary: Origin`, even on a denied origin, so shared caches key per origin.

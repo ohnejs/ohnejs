@@ -30,7 +30,7 @@ const CONDITIONS = new Set(['node', 'import', 'default']);
 /**
  * Resolves a layer specifier to the directory that holds its `ohne.config.ts`.
  *
- * A bare package name (`@acme/base`) resolves to the package root.
+ * A bare package name (`@acme/blog`) resolves to the package root.
  * A name carrying a subpath (`@acme/kit/auth`) resolves through the package's `exports`.
  * The subpath maps to a file - by convention the layer's `ohne.config.ts`.
  * Its directory is the layer, so one package can ship several layers as exported subfolders.
@@ -43,8 +43,8 @@ const CONDITIONS = new Set(['node', 'import', 'default']);
  *
  * @example
  * ```ts
- * await resolveLayerDir('@acme/base', '/srv/app')
- * // -> '/srv/app/node_modules/@acme/base' | null
+ * await resolveLayerDir('@acme/blog', '/srv/app')
+ * // -> '/srv/app/node_modules/@acme/blog' | null
  *
  * await resolveLayerDir('@acme/kit/auth', '/srv/app')
  * // -> '/srv/.../@acme/kit/auth' | null
@@ -66,7 +66,7 @@ export async function resolveLayerDir(specifier: string, from: string): Promise<
  * ```ts
  * parseLayerSpecifier('@acme/kit/auth') // -> { name: '@acme/kit', subpath: './auth' }
  * parseLayerSpecifier('ohnejs/uploads') // -> { name: 'ohnejs', subpath: './uploads' }
- * parseLayerSpecifier('@acme/base')     // -> { name: '@acme/base', subpath: '.' }
+ * parseLayerSpecifier('@acme/blog')     // -> { name: '@acme/blog', subpath: '.' }
  * ```
  */
 export function parseLayerSpecifier(specifier: string): LayerSpecifier {

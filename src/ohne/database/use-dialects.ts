@@ -9,7 +9,7 @@ registry.register('sqlite', new SQLiteDialect());
 /**
  * Returns the process-wide dialect registry, keyed by dialect name.
  *
- * ohne's built-in `sqlite` is registered here, so the database works even with the ohne layer opted out.
+ * ohne's built-in `sqlite` is registered here, so the database works without the `ohnejs/base` layer.
  * A dialect layer registers its own from a boot file that also augments `KnownDialects`.
  * `Config.database.dialect` selects one by name.
  * Registering an existing name overrides it, so a dialect from a closer layer wins.

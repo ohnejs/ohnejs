@@ -56,7 +56,7 @@ for (const [name, fieldType] of [
 /**
  * Returns the process-wide field-type registry, keyed by field-type name.
  *
- * ohne's built-in types are registered here, so a field resolves even with the ohne layer opted out.
+ * ohne's built-in types are registered here, so a field resolves without the `ohnejs/base` layer.
  * Codegen registers each layer's own types on top.
  * A name that already exists is overridden, so a field type from a closer layer wins.
  *

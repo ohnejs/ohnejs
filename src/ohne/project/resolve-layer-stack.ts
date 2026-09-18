@@ -62,7 +62,7 @@ export interface ResolvedLayer extends OhneLayer {
  * const stack = await resolveLayerStack()
  *
  * stack.map((layer) => layer.name)
- * // -> ['ohnejs', '@acme/base', '@acme/auth', 'app']
+ * // -> ['ohnejs/base', '@acme/blog', '@acme/auth', 'app']
  * ```
  */
 export async function resolveLayerStack(

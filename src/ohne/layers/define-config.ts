@@ -7,7 +7,7 @@ import type { Config } from './config.ts';
  * @example
  * ```ts
  * export default defineConfig({
- *   layers: ['ohnejs', '@acme/base'],
+ *   layers: ['ohnejs/base', '@acme/blog'],
  *   database: { url: '.data/app.db' },
  *   api: { port: 3000 },
  * })
