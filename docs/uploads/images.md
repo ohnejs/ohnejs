@@ -19,9 +19,14 @@ and `IMAGES_SECRET` in the environment to the secret you share with it:
 
 ```ts
 // ohne.config.ts
-uploads: {
-  images: { url: 'https://img.example.com' },
-},
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  uploads: {
+    images: { url: 'https://img.example.com' },
+  },
+});
 ```
 
 ```sh
