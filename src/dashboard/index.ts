@@ -81,6 +81,8 @@ export type {
 } from './runtime/meta.ts';
 export { login, logout, sessionUser, updateSessionUser } from './runtime/session.ts';
 export type { LoginOutcome, SessionUser, UpdateOutcome } from './runtime/session.ts';
+export { countVerdicts, loadVerdicts } from './runtime/verdicts.ts';
+export type { RowVerdicts, VerdictCounts } from './runtime/verdicts.ts';
 export { alert } from './ui/alert.ts';
 export type { AlertOptions } from './ui/alert.ts';
 export { badge } from './ui/badge.ts';

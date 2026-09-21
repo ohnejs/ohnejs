@@ -15,6 +15,11 @@ export interface DashboardOperation {
    * Whether the operation is open to anonymous requests, skipping the capability guard.
    */
   public: boolean;
+
+  /**
+   * Whether the operation declares an `access` resolver, so its verdict can differ per row.
+   */
+  scoped: boolean;
 }
 
 /**
