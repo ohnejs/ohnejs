@@ -43,6 +43,7 @@ import type { User } from '../auth/types.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
 import { defaultLanguage, resolveMessage, translate } from '../../ohne/http/translate.ts';
+import { landsWithoutInput } from '../../ohne/query/validate-when.ts';
 import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCan, userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
@@ -784,7 +785,7 @@ function describeField(
     kind: meta.kind,
     label: labelOf(name, options.label),
     nullable: meta.nullable,
-    required: requiredOf(meta, options),
+    required: requiredOf(meta),
     unique: options.unique === true,
     translatable: meta.companion === true || meta.localeScoped === true,
     readable: meta.readable !== false,
@@ -917,13 +918,11 @@ function labelOf(name: string, label: unknown): string {
 
 /**
  * Whether a create must provide the field.
- * System and framework-written fields never count; a default or a nullable column fills itself.
+ * System, framework-written, and gated fields never count; a field that lands without input fills itself.
  */
-function requiredOf(meta: FieldQueryMeta, options: Readonly<Record<string, unknown>>): boolean {
-  if (meta.kind !== 'column' && meta.kind !== 'record') return false;
+function requiredOf(meta: FieldQueryMeta): boolean {
   if (isUndefined(meta.fieldType) || meta.writable === false) return false;
-  if (meta.nullable) return false;
-  return isUndefined(options.default) && isUndefined(meta.fieldType.defaultValue);
+  return isUndefined(meta.when) && !landsWithoutInput(meta);
 }
 
 /**

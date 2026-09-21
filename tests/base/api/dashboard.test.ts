@@ -265,6 +265,8 @@ useCollections().register('DashKinds', {
       title: field('text', { placeholder: 'dash.kinds.title.placeholder', max: 40 }),
       status: field('select', { choices: ['draft', { value: 'live', label: 'Published' }] }),
       tags: field('multiSelect', { choices: ['a', 'b'], max: 2 }),
+      picks: field('multiSelect', { choices: ['a', 'b'], min: 1 }),
+      gatedPicks: field('multiSelect', { choices: ['a', 'b'], min: 1, when: { status: 'live' } }),
       day: field('date', { min: '2024-01-01', nullable: true }),
       when: field('dateTime', { nullable: true }),
       flag: field('boolean', { display: 'switch' }),
@@ -499,6 +501,14 @@ describe('fields', () => {
     strictEqual(fields.title?.required, true);
     strictEqual(fields.note?.required, false);
     strictEqual(fields.owner?.required, false);
+  });
+
+  it('requires a list that forbids the empty list', async () => {
+    const { body } = await call(user);
+    const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
+    strictEqual(kinds.tags?.required, false);
+    strictEqual(kinds.picks?.required, true);
+    strictEqual(kinds.gatedPicks?.required, false);
   });
 
   it('resolves labels: declared keys through the catalog, omitted to the sentence-cased name', async () => {
