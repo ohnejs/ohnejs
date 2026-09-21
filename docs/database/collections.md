@@ -474,10 +474,10 @@ relation cells, record pickers, and the activity feed. Each field it names must 
 text field.
 
 - A list joins its fields with single spaces, skipping empty values: `['firstName', 'lastName']`
-  renders as `Ada Lovelace`.
+  renders as `Anduin Wrynn`.
 - A template keeps literal text between its fields: `'{lastName}, {firstName}'` renders as
-  `Lovelace, Ada`. A literal renders only between filled fields, so an empty `firstName` gives
-  `Lovelace`, not `Lovelace,`.
+  `Wrynn, Anduin`. A literal renders only between filled fields, so an empty `firstName` gives
+  `Wrynn`, not `Wrynn,`.
 
 Search and sorting use the label's fields. A picker search matches each of its first ten words
 against every field.

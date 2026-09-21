@@ -221,7 +221,7 @@ export interface UntypedQueryBuilder {
    *
    * @example
    * ```ts
-   * queryUntyped('Posts').wire({ author: { has: { name: 'Ada' } } }, new Map([['Users', false]]))
+   * queryUntyped('Posts').wire({ author: { has: { name: 'Anduin' } } }, new Map([['Users', false]]))
    * ```
    */
   wire(condition: ConditionInput | null, reach: ReadonlyMap<string, TargetReach>): this;

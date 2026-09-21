@@ -16,7 +16,7 @@ These routes cover the sign-in flow, the account, and first-user setup. Each use
 
 ```bash
 # Sign in. Returns the user and sets the session cookie.
-POST  /auth/login   { "email": "ada@example.com", "password": "correct horse", "remember": true }
+POST  /auth/login   { "email": "anduin@example.com", "password": "correct horse", "remember": true }
 # -> 200 the user
 
 # Sign out. Deletes the session and clears the cookie.
@@ -40,7 +40,7 @@ GET   /auth/install
 # -> 200 { "required": true }, or { "required": false } once a user exists
 
 # Create the first user with the admin role and sign it in.
-POST  /auth/install { "email": "ada@example.com", "password": "correct horse" }
+POST  /auth/install { "email": "anduin@example.com", "password": "correct horse" }
 # -> 200 the user, 422 with per-field messages, or 403 once a user exists
 ```
 
@@ -53,7 +53,7 @@ carries the password hash.
 ```json
 {
   "UUID": "…",
-  "email": "ada@example.com",
+  "email": "anduin@example.com",
   "roles": [],
   "dashboardLanguage": null,
   "contentLanguage": null,
@@ -64,8 +64,8 @@ carries the password hash.
 }
 ```
 
-The email is stored trimmed and lowercased, so `Ada@Example.com` and `ada@example.com` are the same
-account.
+The email is stored trimmed and lowercased, so `Anduin@Example.com` and `anduin@example.com` are
+the same account.
 
 - **`POST /auth/login`** - matches the email in either form. A wrong password and an unknown email
   both answer `401` with the same message, so a caller cannot find out which emails exist.

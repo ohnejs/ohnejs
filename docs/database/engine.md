@@ -112,8 +112,8 @@ it instead of opening its own, so builder writes and raw statements commit or ro
 import { query, useDatabase } from 'ohnejs';
 
 await useDatabase().transaction(async (tx) => {
-  const author = await query('Authors').use(tx).createOrThrow({ name: 'Rams' });
-  await query('Posts').use(tx).createOrThrow({ title: 'Less, but better', author: author.UUID });
+  const author = await query('Authors').use(tx).createOrThrow({ name: 'Thrall' });
+  await query('Posts').use(tx).createOrThrow({ title: 'For the Horde', author: author.UUID });
 });
 ```
 

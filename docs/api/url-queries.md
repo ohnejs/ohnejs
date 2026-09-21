@@ -69,7 +69,7 @@ Filter on a relation with [`has`](../database/reading.md#filtering-relations). I
 to the target's fields. Use `empty` for the opposite:
 
 ```
-?where={author:{has:{name:Ada}}}
+?where={author:{has:{name:Anduin}}}
 ?where={tags:{empty:true}}
 ```
 

@@ -114,7 +114,7 @@ const page = await query('Pages').findFirst();
 page.content;
 // [
 //   { block: 'Hero', UUID: '019...', fields: { title: 'Welcome', subtitle: null } },
-//   { block: 'Quote', UUID: '019...', fields: { text: 'Less, but better.', attribution: 'Rams' } },
+//   { block: 'Quote', UUID: '019...', fields: { text: 'For the Horde!', attribution: 'Thrall' } },
 // ]
 ```
 
@@ -165,7 +165,7 @@ level, one `has` per branch:
 await query('Pages')
   .whereAny((q) => [
     q.where('content', (w) => w.has('Hero', (h) => h.where('title', 'Launch'))),
-    q.where('content', (w) => w.has('Quote', (h) => h.where('attribution', 'Rams'))),
+    q.where('content', (w) => w.has('Quote', (h) => h.where('attribution', 'Thrall'))),
   ])
   .findMany();
 ```
@@ -183,7 +183,7 @@ await query('Pages').create({
   title: 'Home',
   content: [
     { block: 'Hero', fields: { title: 'Welcome' } },
-    { block: 'Quote', fields: { text: 'Less, but better.', attribution: 'Rams' } },
+    { block: 'Quote', fields: { text: 'For the Horde!', attribution: 'Thrall' } },
   ],
 });
 ```
@@ -199,7 +199,7 @@ Positions follow your array, so reordering is just reordering the array.
 ```ts
 await query('Pages').where('UUID', id).update({
   content: [
-    { block: 'Quote', UUID: quote.UUID, fields: { text: 'Kept, edited.', attribution: 'Rams' } },
+    { block: 'Quote', UUID: quote.UUID, fields: { text: 'Kept, edited.', attribution: 'Thrall' } },
     { block: 'Hero', fields: { title: 'Brand new' } },
   ],
 }); // any block you did not list is deleted

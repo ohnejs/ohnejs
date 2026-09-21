@@ -110,7 +110,7 @@ collection's fields:
 
 ```ts
 await query('Posts')
-  .where('author', (w) => w.has((a) => a.where('name', 'Ada')))
+  .where('author', (w) => w.has((a) => a.where('name', 'Anduin')))
   .findMany();
 ```
 

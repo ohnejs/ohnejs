@@ -27,7 +27,7 @@ body there:
 ```ts
 const response = await api('POST /authors', {
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ name: 'Dieter Rams' }),
+  body: JSON.stringify({ name: 'Thrall' }),
 });
 const author = await response.json();
 ```

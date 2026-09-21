@@ -24,8 +24,8 @@ formatMessage('Welcome back.', undefined, 'en');
 Wrap a name in `{ }` and the value comes from the params object.
 
 ```ts
-formatMessage('Hello, {name}.', { name: 'Sam' }, 'en');
-// -> 'Hello, Sam.'
+formatMessage('Hello, {name}.', { name: 'Sylvanas' }, 'en');
+// -> 'Hello, Sylvanas.'
 ```
 
 A message can carry many placeholders, in any order.
@@ -294,6 +294,6 @@ const msg = `{user} {n, plural, offset:1
   other {and # others are here}
 }, last seen {seen, date, ::yMMMd}.`;
 
-t(msg, { user: 'Alex', n: 4, seen: new Date('2026-06-09T00:00:00') });
-// -> 'Alex and 3 others are here, last seen Jun 9, 2026.'
+t(msg, { user: 'Varian', n: 4, seen: new Date('2026-06-09T00:00:00') });
+// -> 'Varian and 3 others are here, last seen Jun 9, 2026.'
 ```

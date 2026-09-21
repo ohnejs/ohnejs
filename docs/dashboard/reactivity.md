@@ -26,8 +26,8 @@ subscribes it to the ref, and writing a different value notifies every subscribe
 ```ts
 const user = ref<{ name: string } | null>(null);
 
-user.value;                   // -> null
-user.value = { name: 'Ada' }; // subscribers re-run
+user.value;                      // -> null
+user.value = { name: 'Anduin' }; // subscribers re-run
 ```
 
 Only `.value` itself is reactive. Changing something inside a stored object notifies nobody, so
@@ -65,14 +65,14 @@ Each run collects its dependencies again, so a branch that was not taken is not 
 
 ```ts
 const loggedIn = ref(false);
-const name = ref('Ada');
+const name = ref('Anduin');
 
 effect(() => {
   console.log(loggedIn.value ? name.value : 'anonymous');
 }); // logs 'anonymous'
 
-name.value = 'Grace';  // nothing - `name` was not read on the last run
-loggedIn.value = true; // logs 'Grace'
+name.value = 'Garrosh'; // nothing - `name` was not read on the last run
+loggedIn.value = true;  // logs 'Garrosh'
 ```
 
 `effect` returns a stop function. Once called, the effect detaches from everything it tracked and

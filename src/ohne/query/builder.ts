@@ -316,7 +316,7 @@ type HasOps<F extends Record<string, QueryFieldMeta>, M extends QueryFieldMeta> 
    * ```ts
    * query('Posts').where('author', (w) => w.has())
    *
-   * query('Posts').where('author', (w) => w.has((a) => a.where('name', 'Ada')))
+   * query('Posts').where('author', (w) => w.has((a) => a.where('name', 'Anduin')))
    * ```
    */
   has(build?: (q: WhereBranch<F>) => WhereBranch<F>): WhereFieldAfterOp<M>;
@@ -504,7 +504,7 @@ interface WhereMethods<F extends Record<string, QueryFieldMeta>, Target> {
    * ```ts
    * query('Posts').where('views', (w) => w.atLeast(100))
    *
-   * query('Posts').where('author', (w) => w.has((a) => a.where('name', 'Ada')))
+   * query('Posts').where('author', (w) => w.has((a) => a.where('name', 'Anduin')))
    * ```
    */
   where<K extends keyof F & string>(field: K, build: WhereBuild<F[K]>): Target;
