@@ -101,6 +101,13 @@ export interface TableOptions<TColumns extends TableColumns> {
   selectable?: () => boolean;
 
   /**
+   * Whether one row can be selected, read reactively.
+   * A refused row shows a disabled checkbox, and a shift-click range skips it.
+   * Omitted keeps every row selectable.
+   */
+  rowSelectable?: (row: TableRow<TColumns>) => boolean;
+
+  /**
    * The selection map from row id to selection state, two-way.
    * Row checkbox toggles write a fresh object back; shift-clicks range from the anchor row.
    */
@@ -347,6 +354,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
   const labels = (): TableLabels =>
     (isFunction<() => TableLabels>(options.labels) ? options.labels() : options.labels) ?? {};
   const selectable = (): boolean => options.selectable?.() ?? false;
+  const rowSelectable = (row: TableRow<TColumns>): boolean => options.rowSelectable?.(row) ?? true;
   const selectAllState = (): boolean | 'indeterminate' => options.selectAllState?.() ?? false;
   const sortValue = (): TableSort<TColumns> => options.sort?.value ?? null;
   const selectedValue = (): Record<number | string, boolean> => options.selected?.value ?? {};
@@ -382,7 +390,9 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
     if (isNull(origin)) {
       select(id, value);
     } else if (origin !== id) {
-      writeSelected(rangeSelect(untracked(rows), untracked(selectedValue), origin, id, value));
+      writeSelected(
+        untracked(() => rangeSelect(rows(), selectedValue(), origin, id, value, rowSelectable)),
+      );
     }
   };
 
@@ -482,7 +492,8 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
       null,
       checkbox(model, undefined, {
         variant: 'accent',
-        disabled: () => shiftHeld.value && selectOrigin.value === row().id,
+        disabled: () =>
+          !rowSelectable(row()) || (shiftHeld.value && selectOrigin.value === row().id),
       }),
     );
   };

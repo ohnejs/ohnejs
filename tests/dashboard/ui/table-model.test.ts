@@ -75,6 +75,23 @@ describe('rangeSelect', () => {
     });
   });
 
+  it('skips the rows the predicate refuses', () => {
+    const selectable = (row: TableRow<Columns>): boolean => row.id !== 2;
+    deepStrictEqual(rangeSelect(rows(1, 2, 3), {}, 1, 3, true, selectable), { 1: true, 3: true });
+    deepStrictEqual(rangeSelect(rows(1, 2, 3), { 2: true, 3: true }, 1, 3, false, selectable), {
+      1: true,
+      2: true,
+      3: false,
+    });
+  });
+
+  it('never selects an anchor the predicate refuses', () => {
+    deepStrictEqual(
+      rangeSelect(rows(1, 2, 3), {}, 1, 3, true, (row) => row.id !== 1),
+      { 2: true, 3: true },
+    );
+  });
+
   it('returns a fresh object', () => {
     const selected = { 1: true };
     notStrictEqual(rangeSelect(rows(1, 2), selected, 1, 2, true), selected);

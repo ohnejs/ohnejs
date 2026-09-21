@@ -147,7 +147,8 @@ export function toggleSort<T extends TableColumns>(
 /**
  * The selection map after a shift-click that ranges from the anchor row to the target row.
  * Every row in the inclusive index range takes `value` on a copy of `selected`.
- * The anchor row is then forced back to `true`, so a deselecting range never drops its own anchor.
+ * The anchor row takes `true` instead, so a deselecting range never drops its own anchor.
+ * A row `selectable` refuses keeps its state.
  * Both ids must be present in `rows`; the anchor row does not move.
  *
  * @example
@@ -157,6 +158,9 @@ export function toggleSort<T extends TableColumns>(
  *
  * rangeSelect([{ id: 1 }, { id: 2 }, { id: 3 }], { 1: true, 2: true, 3: true }, 1, 2, false)
  * // -> { 1: true, 2: false, 3: true }
+ *
+ * rangeSelect([{ id: 1 }, { id: 2 }, { id: 3 }], {}, 1, 3, true, (row) => row.id !== 2)
+ * // -> { 1: true, 3: true }
  * ```
  */
 export function rangeSelect<T extends TableColumns>(
@@ -165,6 +169,7 @@ export function rangeSelect<T extends TableColumns>(
   origin: number | string,
   target: number | string,
   value: boolean,
+  selectable: (row: TableRow<T>) => boolean = () => true,
 ): Record<number | string, boolean> {
   const originIndex = rows.findIndex((row) => row.id === origin);
   const targetIndex = rows.findIndex((row) => row.id === target);
@@ -173,9 +178,9 @@ export function rangeSelect<T extends TableColumns>(
   const next = { ...selected };
 
   for (let i = start; i <= end; i++) {
-    next[rows[i]!.id] = value;
+    const row = rows[i]!;
+    if (selectable(row)) next[row.id] = row.id === origin || value;
   }
 
-  next[rows[originIndex]!.id] = true;
   return next;
 }
