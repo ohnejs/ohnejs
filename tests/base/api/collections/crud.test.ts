@@ -21,6 +21,7 @@ import { unauthorized } from '../../../../src/ohne/http/http-error.ts';
 import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -78,6 +79,15 @@ useCollections().register('CrudBroken', {
   },
 });
 
+useCollections().register('CrudSettings', {
+  name: 'CrudSettings',
+  collection: {
+    singleton: true,
+    api: { read: 'public', update: 'public' },
+    fields: { title: field('text', { default: 'My site' }) },
+  },
+});
+
 useMiddleware().register('crud-deny', () => unauthorized());
 useMiddleware().register('crud-note', () => undefined);
 
@@ -97,6 +107,7 @@ async function seed(collection: string, input: Record<string, unknown>): Promise
 const ada = await seed('CrudAuthors', { name: 'Ada' });
 const sel = await seed('CrudPosts', { title: 'Sel', secret: 'hush', slug: 'sel', author: ada });
 for (let n = 1; n <= 25; n++) await seed('CrudMany', { n });
+await runCreate('CrudSettings', {}, null);
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
   return {
@@ -381,5 +392,34 @@ describe('gate', () => {
     const { status, body } = await call(ROUTES.list, { collection: 'crud-broken' });
     strictEqual(status, 500);
     strictEqual((body as { statusCode: number }).statusCode, 500);
+  });
+});
+
+describe('singleton', () => {
+  const settings = { collection: 'crud-settings' };
+
+  it('lists its one record and patches it by UUID', async () => {
+    const listed = await call(ROUTES.list, settings);
+    strictEqual(listed.status, 200);
+    const records = listed.body as { UUID: string; title: string }[];
+    strictEqual(records.length, 1);
+    strictEqual(records[0].title, 'My site');
+
+    const patched = await call(
+      ROUTES.patch,
+      { ...settings, uuid: records[0].UUID },
+      { body: { title: 'ohne' } },
+    );
+    strictEqual(patched.status, 200);
+    strictEqual((patched.body as { title: string }).title, 'ohne');
+  });
+
+  it('answers the closed-operation 404 for create and delete', async () => {
+    const [record] = await queryUntyped('CrudSettings').findMany();
+    const created = await call(ROUTES.create, settings, { body: { title: 'Second' } });
+    strictEqual(created.status, 404);
+    const deleted = await call(ROUTES.del, { ...settings, uuid: record.UUID as string });
+    strictEqual(deleted.status, 404);
+    strictEqual(await queryUntyped('CrudSettings').count(), 1);
   });
 });

@@ -382,6 +382,11 @@ export interface DashboardCollection {
   translatable: boolean;
 
   /**
+   * Whether the collection holds exactly one record, so its menu row opens the editor directly.
+   */
+  singleton: boolean;
+
+  /**
    * The collection's operations, each `null` when closed.
    */
   operations: DashboardOperations;
@@ -607,6 +612,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
       segment: toKebabCase(meta.name),
       label: toSentenceCase(meta.name),
       translatable: query.translatable === true,
+      singleton: query.singleton === true,
       operations,
       fields,
       labelFields: labelFieldsOf(dashboard?.recordLabel, fields),

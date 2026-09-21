@@ -125,18 +125,19 @@ css`
  * The record surface.
  *
  * Create and edit share this one page; `uuid` absent means create.
+ * A singleton never creates: `uuid` absent there edits its one record, under the collection label alone.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
- * A vanished record redirects to the collection with a toast.
+ * A vanished record redirects to the collection with a toast, a singleton's to the overview.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
  * A `?locale=` on the URL switches the content locale once and strips itself, so a link opens one locale.
  */
 export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
   const t = useT();
-  const create = isUndefined(uuid);
-  const id = uuid ?? '';
+  const create = isUndefined(uuid) && !collection.singleton;
+  let id = uuid ?? '';
   const listPath = `/collections/${collection.segment}`;
   const canCreate = collection.operations.create?.allowed === true;
   const canUpdate = collection.operations.update?.allowed === true;
@@ -191,14 +192,14 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       description: t('dashboard.pageNotFound'),
       showAfterRouteChange: true,
     });
-    navigate(listPath);
+    navigate(collection.singleton ? '/' : listPath);
   };
 
   const load = async (): Promise<void> => {
     state.value = 'loading';
     const row = await readRecord(
       collection.segment,
-      id,
+      isEmpty(id) ? undefined : id,
       collection.translatable ? untracked(activeContentLocale) : undefined,
     );
     if (isUndefined(row)) {
@@ -209,6 +210,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       redirectGone();
       return;
     }
+    if (isString(row.UUID)) id = row.UUID;
     seedRecordLabel(collection, row);
     form.value?.dispose();
     form.value = buildForm(row);
@@ -291,7 +293,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     busy.value = true;
     const outcome = await write(
       collection.segment,
-      uuid,
+      create ? undefined : id,
       body,
       collection.translatable ? activeContentLocale() : undefined,
     );
@@ -359,21 +361,16 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     setTimeout(() => void save());
   });
 
-  const backButton = button(icon('folder'), { variant: 'outline', href: listPath });
-  onCleanup(
-    attachTooltip(backButton, () =>
-      t('dashboard.record.collectionOverview', { collection: collection.label }),
-    ),
-  );
-
-  const headerEl = h(
-    'div',
-    { class: 'o-record-editor-header' },
-    h(
-      'div',
-      { class: 'ohne-row' },
-      backButton,
-      h('span', { class: 'ohne-truncate' }, collection.label),
+  const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
+  if (!collection.singleton) {
+    const backButton = button(icon('folder'), { variant: 'outline', href: listPath });
+    onCleanup(
+      attachTooltip(backButton, () =>
+        t('dashboard.record.collectionOverview', { collection: collection.label }),
+      ),
+    );
+    heading.unshift(backButton);
+    heading.push(
       create
         ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
         : h(
@@ -381,7 +378,13 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             { class: 'ohne-truncate ohne-muted' },
             () => `(${knownLabel(collection.name, id) ?? fallbackLabel(id)})`,
           ),
-    ),
+    );
+  }
+
+  const headerEl = h(
+    'div',
+    { class: 'o-record-editor-header' },
+    h('div', { class: 'ohne-row' }, ...heading),
   );
 
   const mainEl = h('div', { class: 'o-record-editor-main' }, () => {
@@ -550,18 +553,19 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
 /**
  * Reads the record by `UUID` through the body-query endpoint, at `locale` when one is given.
+ * Without a `uuid` it reads the first record, which is a singleton's only one.
  * Resolves the row, `null` when the collection has no such record, `undefined` on failure.
  */
 async function readRecord(
   segment: string,
-  uuid: string,
+  uuid: string | undefined,
   locale?: string,
 ): Promise<RecordRow | null | undefined> {
   try {
     const response = await api(`POST /collections/${segment}/query`, {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        where: { UUID: uuid },
+        ...(isUndefined(uuid) ? {} : { where: { UUID: uuid } }),
         perPage: 1,
         ...(isUndefined(locale) ? {} : { locale }),
       }),

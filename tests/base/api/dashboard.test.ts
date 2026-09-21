@@ -272,6 +272,14 @@ useCollections().register('DashKinds', {
     },
   },
 });
+useCollections().register('DashSettings', {
+  name: 'DashSettings',
+  collection: {
+    singleton: true,
+    api: { read: 'public', update: true },
+    fields: { title: field('text', { default: 'My site' }) },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -352,6 +360,7 @@ describe('access', () => {
       'DashPages',
       'DashMetrics',
       'DashKinds',
+      'DashSettings',
     ]);
   });
 
@@ -369,6 +378,7 @@ describe('access', () => {
       'DashPages',
       'DashMetrics',
       'DashKinds',
+      'DashSettings',
     ]);
   });
 });
@@ -402,6 +412,18 @@ describe('operations', () => {
       read: { allowed: true, public: true },
       create: null,
       update: null,
+      delete: null,
+    });
+  });
+
+  it('marks a singleton, whose create and delete are always closed', async () => {
+    const { body } = await call(admin);
+    strictEqual(collection(body, 'DashSettings').singleton, true);
+    strictEqual(collection(body, 'DashNotes').singleton, false);
+    deepStrictEqual(collection(body, 'DashSettings').operations, {
+      read: { allowed: true, public: true },
+      create: null,
+      update: { allowed: true, public: false },
       delete: null,
     });
   });
@@ -617,6 +639,7 @@ describe('menu', () => {
           '/collections/dash-pages',
           '/collections/dash-metrics',
           '/collections/dash-kinds',
+          '/collections/dash-settings',
         ],
       },
     ]);
@@ -640,6 +663,7 @@ describe('menu', () => {
           '/collections/dash-pages',
           '/collections/dash-metrics',
           '/collections/dash-kinds',
+          '/collections/dash-settings',
         ],
       },
     ]);
@@ -684,6 +708,7 @@ describe('menu', () => {
             '/collections/dash-pages',
             '/collections/dash-metrics',
             '/collections/dash-kinds',
+            '/collections/dash-settings',
           ],
         },
       ]);

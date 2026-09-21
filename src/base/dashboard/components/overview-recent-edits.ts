@@ -382,14 +382,15 @@ async function fillBucket(bucket: Bucket): Promise<void> {
       const uuid = row.UUID;
       const updatedAt = row._updatedAt;
       if (!isString(uuid) || !isNumber(updatedAt)) continue;
-      const label = joinLabel(row, bucket.collection);
+      const { singleton, segment } = bucket.collection;
+      const label = singleton ? bucket.collection.label : joinLabel(row, bucket.collection);
       bucket.rows.push({
         collectionName: bucket.collection.name,
         collectionLabel: bucket.collection.label,
         uuid,
         label: label !== '' ? label : fallbackLabel(uuid),
         updatedAt,
-        editURL: `/collections/${bucket.collection.segment}/${uuid}`,
+        editURL: singleton ? `/collections/${segment}` : `/collections/${segment}/${uuid}`,
       });
     }
   } catch {

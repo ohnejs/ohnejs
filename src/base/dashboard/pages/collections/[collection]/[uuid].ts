@@ -7,6 +7,7 @@ import {
   fallbackLabel,
   h,
   knownLabel,
+  navigate,
   setDocumentTitle,
   useT,
   when,
@@ -29,6 +30,7 @@ css`
 /**
  * One record's page: the record editor, at `/collections/[collection]/[uuid]`.
  * The reserved uuid `new` opens the same editor in create mode, so create and edit are one surface.
+ * A singleton has no create mode, so its `new` redirects to the collection's own page.
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
 export default defineDashboardPage((route) =>
@@ -69,6 +71,10 @@ function pane(segment: () => string, uuid: () => string): Child {
           const collection = entry();
           if (isUndefined(collection)) return null;
           const id = uuid();
+          if (collection.singleton && id === 'new') {
+            navigate(`/collections/${collection.segment}`, { replace: true });
+            return null;
+          }
           return recordEditor(collection, id === 'new' ? undefined : id);
         },
         () => h('div', { class: 'o-record-page-missing' }, () => t('dashboard.notFound')),
