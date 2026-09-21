@@ -1,11 +1,10 @@
 # Boot files
 
-A boot file is a `.ts` file at the top level of `boot/` - the `dirs.boot` directory from
-[config](./config.md). It runs once at startup, by being imported: whatever its module body does
-happens before the app serves. Use it for startup registrations - anything that must exist before
-the first request.
+A boot file is a `.ts` file at the top level of `boot/`. It runs once at startup, before the app
+serves. Use it for anything that must exist before the first request. `dirs.boot` in
+[config](./config.md#directories) moves the directory elsewhere.
 
-The most common registration is a [hook](../api/hooks.md):
+The most common registration is a [hook](../api/hooks.md#registering):
 
 ```ts
 // boot/ready.ts
@@ -16,36 +15,41 @@ hook('server:ready', ({ host, port }) => {
 });
 ```
 
-There is nothing to export and nothing to call - importing the file is the whole mechanism.
+There is nothing to export and nothing to call, and nothing imports the file either. ohne finds it
+at startup and imports it for you. That import runs the code at its top level, which is all a boot
+file needs.
 
 ## When they run
 
-Boot files run right after the layer stack loads: before types regenerate, before the
-[schema sync](../database/sync.md), and before the port opens. Whatever a boot file registers is
-in place for everything that follows, and a throw aborts startup before anything serves.
+Boot files run right after the layer stack loads: before types [regenerate](./cli.md#ohne-prepare),
+before the [schema sync](../database/sync.md#what-happens-at-boot), and before the port opens.
+Whatever a boot file registers is in place for everything that follows. If a boot file throws,
+startup stops before anything serves.
 
-They run wherever the schema and the API do: under `ohne serve api`, under `ohne dev` - every
-reload is a fresh process, so boot runs again - and under `ohne sync`, which needs the dialect a
-boot file may register. The dashboard server does not run them.
+They run under [`ohne serve api`](./cli.md#ohne-serve), [`ohne dev`](./cli.md#ohne-dev) (again on
+every reload), and [`ohne sync`](./cli.md#ohne-sync), which needs any dialect a boot file registers.
+The dashboard server does not run them.
 
 ## Ordering
 
-Within one `boot/` directory, every top-level `.ts` file runs, sorted naturally by name - `2-`
-before `10-` - and each file finishes before the next starts. Nested files are ignored, and a
-`_`-prefixed file is a helper: skipped by the scan, free to be imported by the others.
+Within one `boot/` directory:
 
-An `index.ts` takes over: when present it is the only file that runs, and it orders the rest by
-importing them itself.
+- Every top-level `.ts` file runs, sorted naturally by name, so `2-` runs before `10-`. Each file
+  finishes before the next starts.
+- Nested files are ignored.
+- A `_`-prefixed file is a helper. The scan skips it, and the other files can import it.
+- An `index.ts` takes over. When present, it is the only file that runs, and it imports the rest in
+  its own order.
 
-Across [layers](./layers.md), the furthest layer boots first - a base layer's registrations are
-already in place when your boot files run, and its hooks fire ahead of yours. Each layer reads
-its own `dirs.boot`.
+Across [layers](./layers.md#the-stack), the furthest layer boots first. A base layer's registrations
+are in place when your boot files run, and its hooks fire before yours. Each layer reads its own
+`dirs.boot`.
 
 ## Registering a dialect
 
-A boot file is where a layer teaches the database a new dialect: register the implementation and
-augment `KnownDialects` so config accepts the name. See [the engine](../database/engine.md) for
-what a dialect drives.
+A boot file is where a layer adds a new dialect to the database: register the implementation and
+augment `KnownDialects` so [config](./config.md#the-database) accepts the name.
+[Other dialects](../database/engine.md#other-dialects) covers what a dialect does.
 
 ```ts
 // boot/dialect.ts
@@ -62,5 +66,5 @@ declare module 'ohnejs' {
 useDialects().register('postgres', new PostgresDialect());
 ```
 
-Registering an existing name overrides it, so a dialect from a closer layer wins - the same
-furthest-first order that lets your app overrule a base layer.
+Registering an existing name overrides it, so a dialect from a closer layer wins. This is the same
+furthest-first order that lets your app override a base layer.

@@ -20,12 +20,12 @@ The client receives the error's status and a JSON body:
 { "statusCode": 404, "message": "No such author" }
 ```
 
-The shape is fixed: `statusCode` mirrors the status, `message` carries the message, and `data`
+The shape is fixed: `statusCode` repeats the status, `message` carries the message, and `data`
 appears only when you attach one (below).
 
 ## Named constructors
 
-One constructor per common status, each importable from `ohnejs`:
+There is one constructor for each common status, and you import each from `ohnejs`:
 
 ```
 badRequest()           400 Bad Request
@@ -39,7 +39,7 @@ unprocessable()        422 Unprocessable Content
 tooManyRequests()      429 Too Many Requests
 ```
 
-Each takes an optional message and optional data. Omit the message and the status's standard
+Each takes an optional message and optional data. If you omit the message, the status's standard
 reason phrase is used - `notFound()` answers with `Not Found`. For any other status, build the
 error directly:
 
@@ -49,12 +49,15 @@ import { HTTPError } from 'ohnejs';
 throw new HTTPError(418, "I'm a teapot");
 ```
 
-The framework throws these itself where the request is at fault: a body over `api.maxBodySize`
-is a `413`, a JSON body reader given the wrong `Content-Type` a `415`, a malformed body a `400`.
+The framework throws these itself when the request is wrong:
+
+- A body over [`api.maxBodySize`](../project/config.md#the-api-server) is a `413`.
+- A [JSON body reader](./request.md#the-body) given the wrong `Content-Type` is a `415`.
+- A malformed body is a `400`.
 
 ## Attaching data
 
-The second argument rides along under `data` - machine-readable detail the client can act on:
+The second argument is sent under `data`. It is machine-readable detail the client can act on:
 
 ```ts
 throw unprocessable('Password too short', { field: 'password' });
@@ -64,31 +67,39 @@ throw unprocessable('Password too short', { field: 'password' });
 { "statusCode": 422, "message": "Password too short", "data": { "field": "password" } }
 ```
 
-`data` is serialized into the body verbatim, so never put anything there you would not show the
-client.
+`data` is serialized into the body unchanged, so never put anything there that you would not show
+the client.
 
 ## Unhandled errors
 
-Any other throw inside a request - a bug, a rejected promise, an error you did not map - becomes
-a generic response:
+Any other throw inside a request, such as a bug, a rejected promise, or an error you did not map,
+becomes a generic response:
 
 ```json
 { "statusCode": 500, "message": "Internal Server Error" }
 ```
 
 Nothing of the real error reaches the client: no message, no stack. The server logs it instead as
-an error block naming the route; the stack shows only under `DEBUG`. A throwing handler never
-takes the server down - the request is answered and the process keeps serving.
+an error block naming the route, and the stack shows only under
+[`DEBUG`](../project/env.md#the-built-ins). A handler that throws never stops the server: the
+request is answered and the process keeps serving.
+
+To replace the generic response, such as with a branded error page, filter it with the
+[`error:response`](./hooks.md#errorresponse) hook.
 
 ## Write failures
 
-Database writes map their own failures: a validation failure becomes a `422` whose `data.errors`
-keys each failing field to a message, a busy database a `503` with `Retry-After`, and a delete
-blocked by a referencing record a `409`. See [writing records](../database/writing.md#the-result).
+Database writes turn their own failures into responses:
+
+- A [validation failure](../database/writing.md#the-result) becomes a `422` whose `data.errors`
+  gives each failing field a message.
+- A [busy database](../database/engine.md#transactions) becomes a `503` with `Retry-After`.
+- A [delete blocked](../database/writing.md#deleting-records) by a referencing record becomes a
+  `409`.
 
 ## Translated messages
 
-The default messages are message keys - `notFound()` reads `api.http.notFound` from the catalogs -
-so they resolve in the request's language, and the field messages inside a write's `422` resolve
-the same way. A message you pass yourself is sent verbatim. See
-[messages](../i18n/messages.md).
+The default messages are message keys: `notFound()` reads `api.http.notFound` from the
+[catalogs](../i18n/messages.md#catalogs), so they resolve in the request's language. The
+[field messages](../i18n/messages.md#validation-messages) inside a write's `422` resolve the same
+way. A message you pass yourself is sent unchanged.

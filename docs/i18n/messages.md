@@ -1,9 +1,15 @@
 # Messages
 
 Messages are your app's translatable UI strings. You write them in JSON catalogs, one file per
-language; codegen types every key, and `useT` translates one in the language of the current
-request. The framework's own strings - validation failures, HTTP statuses - live in the same
-catalogs, so everything a client sees can speak the user's language.
+language. Codegen types every key, and `useT` translates one in the language of the current request.
+The framework's own strings, like
+[validation failures and HTTP statuses](../api/errors.md#translated-messages), live in the same
+catalogs, so everything a client sees can be in the user's language.
+
+Catalogs translate what the app says, not what records store. Records translate through
+[`translatable` fields](../database/translations.md#marking-fields). Adding `fr.json` gives you
+French error messages but no French record values, and a new
+[content locale](../project/config.md#content-locales) adds no UI language.
 
 A catalog is a file under `messages/`, named after its language. `messages/en.json`:
 
@@ -39,52 +45,67 @@ export default defineHandler(() => {
 });
 ```
 
-A request with `Accept-Language: de` answers "Du hast 3 ungelesene Nachrichten"; one without gets
-the English.
+A request with `Accept-Language: de` gets "Du hast 3 ungelesene Nachrichten", and one without gets
+the English text.
 
 ## Catalogs
 
-One file per language, under each layer's `dirs.messages` directory (default `messages/`), named
-by its BCP-47 tag: `en.json`, `de.json`, `de-AT.json`. The stem is the language - `de-at.json` and
-`de-AT.json` both mean `de-AT`.
+One file per language, under each layer's [`dirs.messages`](../project/config.md#directories)
+directory (default `messages/`), named by its BCP-47 tag: `en.json`, `de.json`, `de-AT.json`. The
+file name without its extension is the language, so `de-at.json` and `de-AT.json` both mean `de-AT`.
 
-Keys flatten to dot notation. Nesting inside the file supplies the segments, and a subdirectory
-prefixes its keys, so `messages/en.json` holding `{ "inbox": { "empty": ... } }` and
-`messages/inbox/en.json` holding `{ "empty": ... }` both contribute `inbox.empty`. The first
-segment is the key's group - the unit the catalog endpoint serves (below). Key segments are
-camelCase, acronyms fully uppercase: `invalidJSON`, never `invalidJson`.
+Keys flatten to dot notation. Nesting inside a file supplies the segments, and a subdirectory
+prefixes its keys. `messages/en.json` holding this:
 
-A `_`-prefixed file or directory is skipped, so a draft catalog can sit beside the live ones. Two
-files in one layer defining the same key for the same language is an error - within a layer,
-every key has one home.
+```json
+{ "inbox": { "empty": "No new notifications" } }
+```
+
+and `messages/inbox/en.json` holding this both contribute `inbox.empty`:
+
+```json
+{ "empty": "No new notifications" }
+```
+
+The first segment is the key's group, the unit the [catalog endpoint](#the-catalog-endpoint)
+serves.
+
+- Key segments are camelCase, acronyms fully uppercase: `invalidJSON`, never `invalidJson`.
+- A `_`-prefixed file or directory is skipped, so a draft catalog can sit beside the live ones.
+- Two files in one layer defining the same key for the same language is an error. Within a layer,
+  every key is defined in one place.
 
 ## Templates
 
 Every value is an ICU MessageFormat template: plain text, `{name}` placeholders, plurals, dates.
 [ICU MessageFormat](./icu.md) teaches the whole syntax.
 
-Backtick an interpolated value:
+Put backticks around an interpolated value:
 
 ```json
 "Invalid language `{language}`"
 ```
 
-The backticks travel with the string, so a client can render the dynamic part as a highlight,
-distinct from the static prose. The framework's shipped catalogs all follow this convention.
+The backticks stay in the string, so a client can highlight the dynamic part, separate from the
+static text. The framework's shipped catalogs all follow this convention.
 
-A key's parameters must agree across every language that defines it. If `en` writes `{count}`
-and `de` spells it `{total}`, codegen fails, naming the key, both languages, and both files - a
-translation can never drift from the shape the code passes.
+A key's parameters must be the same in every language that defines it. If `en` writes `{count}` and
+`de` spells it `{total}`, codegen fails, naming the key, both languages, and both files. A
+translation always takes the same parameters the code passes.
 
 ## Typed keys
 
-Codegen reads the merged catalogs and emits `KnownMessages` - one entry per key, mapping it to
-the exact parameter object its template expects - and `KnownLanguages`, one entry per catalog
-language. It runs at every `ohne dev` and `ohne serve api` boot, and on demand with
-[`ohne prepare`](../project/cli.md#ohne-prepare).
+`useT` autocompletes keys, a typo is a compile error, and a parameterized key requires exactly its
+parameters.
 
-From then on messages are part of the type surface: `useT` autocompletes keys, a typo is a
-compile error, and a parameterized key demands its parameters, exactly typed.
+Codegen makes that work. It reads the merged catalogs and generates these types:
+
+- `KnownMessages` maps each key to the parameter object its template expects.
+- `KnownLanguages` has one entry per catalog language.
+
+It runs at every [`ohne dev`](../project/cli.md#ohne-dev) and
+[`ohne serve api`](../project/cli.md#ohne-serve) boot, and on demand with
+[`ohne prepare`](../project/cli.md#ohne-prepare).
 
 ## Translating with useT
 
@@ -97,27 +118,33 @@ t('inbox.empty');                // -> 'No new notifications'
 t('inbox.unread', { count: 3 }); // -> 'You have 3 unread messages'
 ```
 
-The language is `context.locale` when a [middleware](../api/middleware.md) set it - from a
-cookie, a route segment, a user setting. Otherwise it is the best `Accept-Language` match among
-your catalog languages, with `Accept-Language` appended to the response `Vary`; a forced
-`locale` skips negotiation, so no `Vary` is added. A request offering neither resolves to
-`messages.defaultLanguage` - `'en'` unless [config](../project/config.md#messages) says
-otherwise, and typed to `KnownLanguages` so it must be a language you actually have.
+The language is the first of these that applies:
 
-A key the chosen language misses is filled from a less specific one: `de-AT` falls back to `de`,
-then to the default language. A fallback-filled message formats with the rules of the language it
-was found in, so its plurals and numbers match its text. A key no language defines renders as the
-key itself - never a throw, never a blank.
+1. [`context.locale`](../api/request.md#the-event), when a
+   [middleware](../api/middleware.md#global-middleware) set it from a cookie, a route segment, or a
+   user setting. Nothing is negotiated, so no `Vary` is added.
+2. The best [`Accept-Language`](../api/request.md#content-negotiation) match among your catalog
+   languages. `Accept-Language` is appended to the response `Vary`.
+3. `messages.defaultLanguage`, `'en'` unless [config](../project/config.md#messages) says otherwise.
+   It is typed to `KnownLanguages`, so it must be a language you actually have.
 
-Outside a request - a [boot file](../project/boot.md), a script - `useT` resolves the default
+When the chosen language does not have a key, a less specific language fills it:
+
+- `de-AT` falls back to `de`, then to the default language.
+- A message filled by fallback is formatted with the rules of the language it was found in, so its
+  plurals and numbers match its text.
+- A key that no language defines renders as the key itself. It never throws, and it is never blank.
+
+Outside a request, such as in a [boot file](../project/boot.md) or a script, `useT` uses the default
 language.
 
 ## Layers
 
-Catalogs merge across [layers](../project/layers.md), per key and language: a closer layer
-overrides exactly the keys it redefines and leaves the rest in place, and your app, the closest
-layer, overrides all. The framework's own layer is the base, shipping its strings in English,
-German, and Bosnian - so replacing one shipped string is a tiny catalog:
+Catalogs merge across [layers](../project/layers.md#what-overrides-what), per key and language. A
+closer layer overrides exactly the keys it redefines and leaves the rest in place. Your app is the
+closest layer, so it overrides all others. `ohnejs/base` is at the bottom and ships the framework's
+strings in English, German, and Bosnian. To replace one shipped string, you only need a tiny
+catalog:
 
 ```json
 {
@@ -127,14 +154,19 @@ German, and Bosnian - so replacing one shipped string is a tiny catalog:
 }
 ```
 
-To drop keys instead, list globs over the dot-separated key in
+To drop keys instead, list globs that match the dot-separated key in
 [`disable.messages`](../project/config.md#disabling): `'dashboard.**'` drops a whole group.
 
 ## Validation messages
 
-A field validator rejects a value by returning a `Message`: a message key, a `{ key, params }`
-object when the message carries values, or a plain string. With a catalog entry
-`"handleTooLong": "Keep it under {max} characters"` in a `profile` group:
+A [field validator](../database/writing.md#sanitizers-and-validators) rejects a value by returning
+a `Message`:
+
+- a message key,
+- a `{ key, params }` object, when the message carries values,
+- or a plain string.
+
+With a catalog entry `"handleTooLong": "Keep it under {max} characters"` in a `profile` group:
 
 ```ts
 field('text', {
@@ -146,15 +178,18 @@ field('text', {
 ```
 
 The object is typed against `KnownMessages`, so the key must exist and the parameters must match
-its template. Inside a handler you rarely resolve these yourself: a thrown validation failure
-becomes a `422` whose body carries each message already resolved in the request's language - see
-[writing records](../database/writing.md). When you shape the failure yourself, the result's
-`errors` map holds the raw messages, and `useT` turns a key into display text.
+its template.
+
+Inside a handler you rarely translate these yourself: a thrown validation failure becomes a
+[`422`](../api/errors.md#write-failures) whose body carries each message already translated into the
+request's language. When you handle the failure yourself, the result's
+[`errors` map](../database/writing.md#the-result) holds the raw messages, and `useT` turns a key
+into display text.
 
 ## The catalog endpoint
 
-The API serves the merged catalogs back out. `GET /messages/:group/:language` returns one
-group's keys for a language:
+The API also serves the merged catalogs. `GET /messages/:group/:language` returns one group's keys
+for a language:
 
 ```sh
 curl http://localhost:9001/messages/inbox/de
@@ -170,19 +205,12 @@ curl http://localhost:9001/messages/inbox/de
 }
 ```
 
-Each entry is the raw template plus the language it came from - the fallback chain runs
-server-side, key by key, so a `de-AT` request gets `de` entries where `de-AT` has no own value,
-and the client formats each with its origin language's plural rules. A malformed language tag is
-a `400`, a group with no keys a `404`.
+- Each entry is the raw template plus the language it came from.
+- The fallback chain runs server-side, key by key, so a `de-AT` request gets `de` entries where
+  `de-AT` has no value of its own.
+- The client formats each entry with the plural rules of the language it came from.
+- A malformed language tag is a `400`, and a group with no keys a `404`.
 
-This endpoint is what feeds the dashboard: its browser-side `useT` fetches each group on demand,
-once per language, and renders the same keys your handlers use. See
-[dashboard data](../dashboard/data.md).
-
-## Not content locales
-
-Message languages and content locales are independent systems. Catalogs translate the UI - what
-the app says. Content locales translate what records store, through `translatable` fields - what
-the app manages. Adding `fr.json` gives you French error messages; it does not make records hold
-French values, and a new content locale adds no UI language. See
-[translations](../database/translations.md).
+The dashboard uses this endpoint: its
+[browser-side `useT`](../dashboard/data.md#translations-in-the-browser) fetches each group on
+demand, once per language, and renders the same keys your handlers use.

@@ -1,9 +1,8 @@
 # ohne
 
-ohne is a **zero-dependency** TypeScript framework for the web. It gives you a database, an HTTP API,
-internationalization, and a dashboard, with **no build step** and no runtime dependencies. The
-framework ships `.ts` source, your app is `.ts` source, and Node 26 runs both directly. What you
-write is what runs.
+ohne is a **zero-dependency** TypeScript framework for the web. It gives you a database, an HTTP
+API, internationalization, and a dashboard, with **no build step**. The framework ships `.ts`
+source, your app is `.ts` source, and Node 26 runs both directly. What you write is what runs.
 
 ## Start here
 
@@ -13,7 +12,7 @@ New to ohne? Read these two in order:
 - [Your first app](./start/tutorial.md) - build a small blog end to end: a collection, two
   endpoints, and a dashboard page.
 
-Everything below is reference-shaped: read the page for the part you are working on.
+Everything below is reference material: read the page for the part you are working on.
 
 ## The project
 
@@ -28,13 +27,15 @@ project extend another.
 
 ## Database
 
-Declare your data as collections of fields. ohne keeps the schema in step with your code and gives
+Declare your data as collections of fields. ohne keeps the schema in sync with your code and gives
 you a typed query builder for reads and writes.
 
-- [Collections and fields](./database/collections.md) - the built-in field types and their options.
+- [Collections and fields](./database/collections.md) - your data model, and the built-in field
+  types it is made of.
 - [Custom field types](./database/field-types.md) - define a field type once, use it in any
   collection.
-- [Conditional fields](./database/conditional-fields.md) - fields that activate on a condition.
+- [Conditional fields](./database/conditional-fields.md) - fields that are active only when a
+  condition is true.
 - [Blocks](./database/blocks.md) - ordered lists of mixed, reusable shapes.
 - [Translations](./database/translations.md) - one value per locale.
 - [Reading records](./database/queries.md) - the fluent query builder: filter, sort, paginate,
@@ -47,7 +48,7 @@ you a typed query builder for reads and writes.
 
 ## Uploads
 
-An optional layer for files: storage behind a pluggable backend, an `Uploads` collection, upload
+An optional layer for files: storage with a backend you can replace, an `Uploads` collection, upload
 and serve routes, media fields, and the dashboard's Media page.
 
 - [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
@@ -63,7 +64,7 @@ Define endpoints as files. Handlers read the request and return a value ohne ser
 - [Routes](./api/routes.md) - the file convention and `defineHandler`.
 - [Reading the request](./api/request.md) - params, search params, body, cookies, negotiation.
 - [Shaping the response](./api/response.md) - status, headers, redirects, caching, files, events.
-- [HTTP errors](./api/errors.md) - `HTTPError` and the wire shape a client receives.
+- [HTTP errors](./api/errors.md) - `HTTPError` and the JSON body a client receives.
 - [Middleware](./api/middleware.md) - code that wraps every matching request.
 - [Hooks](./api/hooks.md) - react to framework lifecycle events.
 - [Querying over HTTP](./api/url-queries.md) - turn a URL query into a safe, filtered read.
@@ -71,8 +72,8 @@ Define endpoints as files. Handlers read the request and return a value ohne ser
 
 ## Authentication
 
-Email and password accounts, sessions, and the helpers to gate a route. Shipped by the ohne layer,
-so an app opts out by not stacking it.
+Email and password accounts, sessions, and the helpers to protect a route. Shipped by the
+`ohnejs/base` layer, so an app opts out by not stacking it.
 
 - [Authentication](./auth/authentication.md) - the `Users` collection, the `/auth` endpoints, and
   `useUser`.
@@ -92,8 +93,9 @@ Two independent systems: message catalogs for your UI strings, and content local
 A browser UI for your app, served by ohne with no build step. Pages are `.ts` modules that ship to
 the browser as type-stripped JavaScript.
 
-- [Dashboard pages](./dashboard/pages.md) - the pages convention and how they are served.
-- [Rendering](./dashboard/rendering.md) - `h`, `mount`, `each`, `when`, and the router.
+- [Dashboard pages](./dashboard/pages.md) - the pages convention, navigation, the sidebar, and how
+  pages are served.
+- [Rendering](./dashboard/rendering.md) - `h`, `mount`, `each`, and `when`.
 - [Reactivity](./dashboard/reactivity.md) - `ref`, `computed`, and `effect`.
 - [Data in the dashboard](./dashboard/data.md) - the typed `api()` fetch helper and translations.
 - [Field layouts](./dashboard/layouts.md) - rows, cards, tabs, and rules for every form the

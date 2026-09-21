@@ -10,22 +10,22 @@ import { withLock } from 'ohnejs';
 await withLock('emails:digest', () => sendDailyDigest());
 ```
 
-The lock is a row in the main database, so it excludes every instance of the app, not just other
-code in this process. Whoever acquires the lock runs the function; everyone else calling
-`withLock` with the same key waits until it is released, then takes their turn.
+The lock is a row in the main database, so it applies to every instance of the app, not just other
+code in this process. Whoever acquires the lock runs the function. Everyone else calling `withLock`
+with the same key waits until it is released, then takes their turn.
 
-The lock releases when the function settles - on success and on throw alike - and `withLock`
-returns whatever the function returned.
+The lock is released when the function finishes, whether it succeeds or throws. `withLock` returns
+whatever the function returned.
 
-`withLock` needs the connected main database. Inside a running app - a handler, a hook - that is a
-given. [Boot files](../project/boot.md) run before the [connection](./engine.md) opens, so a boot
-file calls `withLock` from a hook such as [`server:ready`](../api/hooks.md#serverready), never at
-its top level. A standalone script, such as a cron job,
-[opens the connection itself](./engine.md#outside-the-app).
+`withLock` needs the connected main database. Inside a running app, such as in a handler or a hook,
+the database is always connected. [Boot files](../project/boot.md) run before the
+[connection](./engine.md) opens, so a boot file calls `withLock` from a hook such as
+[`server:ready`](../api/hooks.md#serverready), never at its top level. A standalone script, such as
+a cron job, [opens the connection itself](./engine.md#outside-the-app).
 
 ## Timing
 
-A third argument tunes a bid:
+A third argument adjusts the timing of a call:
 
 ```ts
 await withLock('reports:rebuild', () => rebuildReports(), {
@@ -36,17 +36,18 @@ await withLock('reports:rebuild', () => rebuildReports(), {
 
 - `pollInterval` is how often a waiting instance re-checks a held lock, in milliseconds.
   Defaults to `250`.
-- `staleAfter` is when a held lock counts as abandoned - a holder that crashed without releasing -
-  and is taken over. Defaults to one minute.
+- `staleAfter` is the time after which a held lock counts as abandoned and is taken over. A lock is
+  abandoned when its holder crashed without releasing it. Defaults to one minute.
 
-`staleAfter` must exceed the worst-case duration of the guarded work. If the work can take five
-minutes, a one-minute `staleAfter` lets another instance steal the lock mid-run.
+`staleAfter` must be longer than the longest time the guarded work can take. If the work can take
+five minutes, a one-minute `staleAfter` lets another instance take over the lock while the work is
+still running.
 
-Waiting is unbounded. There is no timeout and no try-once option - a contender blocks until the
-lock is released or goes stale.
+Waiting has no limit. There is no timeout and no try-once option: a caller waits until the lock is
+released or goes stale.
 
 ## Rules
 
-- `withLock` is not reentrant. Nesting it on the same key stalls until the inner call steals the
-  outer lock after `staleAfter`.
+- `withLock` is not reentrant. A nested call on the same key waits until it takes over the outer
+  lock after `staleAfter`.
 - The key `sync` is reserved for the [schema sync](./sync.md). Passing it throws immediately.

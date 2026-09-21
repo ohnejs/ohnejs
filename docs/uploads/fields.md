@@ -1,9 +1,9 @@
 # Media fields
 
-Media field types reference uploads from your own collections: `image` and `file` hold one, `images`
-and `files` an ordered list. Each stores the upload's `UUID`, exactly as a
+Media field types let your own collections reference uploads: `image` and `file` hold one upload,
+and `images` and `files` hold an ordered list. Each stores the upload's `UUID`, exactly as a
 [relation](../database/collections.md#relations) does, and checks the referenced file against
-the bounds you declare.
+the limits you declare.
 
 ```ts
 // collections/Posts.ts
@@ -18,42 +18,46 @@ export default defineCollection({
 });
 ```
 
-In the dashboard each renders a picker over the media library and a direct upload button, and an
-ineligible file is greyed out with the reason.
+In the dashboard, each one shows a picker for the media library and a direct upload button. A file
+that the field cannot accept is greyed out, with the reason.
 
 ## Options
 
-`image` and `images` accept only images and add pixel bounds; `file` and `files` accept anything
+`image` and `images` accept only images and add pixel limits. `file` and `files` accept anything
 unless `types` narrows them.
 
-- `types` - the media types the field accepts. Defaults to `['image']` on the image fields, to
+- `types` - the media types the field accepts. Defaults to `['image']` on the image fields, and to
   any file on the others.
-- `minSize`, `maxSize` - byte bounds, as `parseBytes` values like `'5mb'`.
-- `minWidth`, `maxWidth`, `minHeight`, `maxHeight` - pixel bounds, image fields only.
-- `onDelete` - what happens when the upload is deleted. On `image` and `file`: `setNull` (the
-  default) clears the reference, `cascade` deletes the referencing row, `restrict` blocks the
-  delete. On `images` and `files`: `cascade` (the default) removes the link, `restrict` blocks.
-- `allowEmpty`, `min`, `max` - list fields only, bounding how many links a written list holds.
+- `minSize`, `maxSize` - file size limits, as `parseBytes` values like `'5mb'`.
+- `minWidth`, `maxWidth`, `minHeight`, `maxHeight` - pixel limits, image fields only.
+- `onDelete` - what happens when the upload is deleted, as for
+  [relations](../database/collections.md#relations): `setNull` by default on `image` and `file`,
+  and `cascade` on `images` and `files`.
+- `allowEmpty`, `min`, `max` - list fields only. They limit how many links a
+  [written list](../database/writing.md#input) holds.
 
 ### Types
 
 A `types` entry is an exact media type (`image/png`), a top-level wildcard (`image/*`), or a
 category name: `image`, `video`, `audio`, `document`, `archive`, `font`, `text`, `code`. A
 category groups the media types a person would expect under it, so `['document']` takes PDFs and
-office formats without listing them. The same grammar bounds `uploads.types` in
-[config](./uploads.md#configuration).
+office formats without listing them. `uploads.types` in [config](./uploads.md#configuration) uses
+the same grammar.
 
 ## Validation
 
-A write checks every referenced row in one read: it must be a file, an image for the image fields,
-within `types`, within the size bounds, and within the pixel bounds. A failure reports at the
-field, or at `field[2]` for the third item of a list, with a message such as
-`The file must be at most 5 MB`. A `UUID` that names no upload fails as any broken reference does.
+A write checks each referenced upload against the field's options, in one read. The upload must be
+a file, an image for the image fields, and within `types`, the size limits, and the pixel limits.
+
+A failure is reported at the field, or at `attachments[2]` for the third item of a list, with a
+[message](../i18n/messages.md#validation-messages) such as `The file must be at most 5 MB`. A `UUID`
+that belongs to no upload fails like any other
+[broken reference](../database/writing.md#uniqueness-and-references).
 
 ## Reading
 
-Populate the field to get the upload's record, decorated with `url` and, when an
-[image service](./images.md) is configured, `variants`:
+[Populate](../database/queries.md#populating-relations) the field to get the upload's record,
+decorated with `url`, and with `variants` when an [image service](./images.md) is configured:
 
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();
@@ -62,24 +66,12 @@ post.cover.url; // -> '/uploads/photos/sunset.jpg'
 post.cover.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 ```
 
-Over the [collections API](../api/collections.md), a media field populates only for a caller who
-may read `Uploads`, by default one holding the `collection.Uploads.read` capability. Anyone else,
-including a visitor who is not signed in, gets `null` for `image` and `file` and an empty list for
-`images` and `files`. To serve media fields to everyone,
-[open the read](./uploads.md#the-collection).
+Over the [collections API](../api/collections.md), a media field
+[populates](../api/url-queries.md#populating-relations) only for a caller who
+[may read `Uploads`](./uploads.md#the-collection). Anyone else, including a visitor who is not
+signed in, gets `null` for `image` and `file` and an empty list for `images` and `files`. To serve
+media fields to everyone, make that read public.
 
-For a page of your own, build a variant with `imageURL` or a `srcset` with `imageSrcSet`, from a
-[named variant](./images.md#named-variants) or ad hoc transforms:
-
-```ts
-import { imageSrcSet, imageURL } from 'ohnejs/uploads';
-
-const src = imageURL(post.cover, 'thumbnail');
-const srcset = imageSrcSet(post.cover, [
-  { width: 600, format: 'webp' },
-  { width: 1200, format: 'webp' },
-  { width: 2400, format: 'webp' },
-]);
-```
-
-Both fall back to the original's URL without a service, so a template needs no branch.
+For a page of your own, [`imageURL`](./images.md#named-variants) builds a variant URL and
+[`imageSrcSet`](./images.md#responsive-images) builds a `srcset`. Without a service, both fall back
+to the original's URL, so a template needs no special case.

@@ -1,10 +1,12 @@
 # ICU MessageFormat
 
-ICU MessageFormat is a small grammar for writing translatable strings. One string carries every shape the sentence can take: singular and plural, masculine and feminine, short and long dates. The renderer picks the right shape at runtime from the inputs you pass.
+ICU MessageFormat is a small grammar for writing translatable strings. One string holds every form
+the sentence can take: singular and plural, masculine and feminine, short and long dates. The
+renderer picks the right form at runtime from the inputs you pass.
 
-This page teaches the syntax from the ground up. Examples are run through `formatMessage`, imported from `ohnejs/utils`, but the syntax is identical anywhere ICU is supported.
-
-It is also the syntax of ohne's [message catalogs](./messages.md) - every value in a catalog is one of these templates.
+It is the syntax of every value in ohne's [message catalogs](./messages.md#templates). This page
+teaches it from the beginning. Examples call `formatMessage(template, params, language)` from
+`ohnejs/utils`, but the syntax is identical anywhere ICU is supported.
 
 ## Plain text
 
@@ -39,7 +41,8 @@ formatMessage(
 
 ## Plurals
 
-English has two number forms (one apple, two apples). Russian has three. Arabic has six. Hard-coding "1 item" / "N items" stops working the moment you translate.
+English has two number forms (one apple, two apples). Russian has three. Arabic has six. Hard-coding
+"1 item" / "N items" stops working as soon as you translate.
 
 ICU plurals let you write every form once and pick by category at runtime.
 
@@ -50,9 +53,11 @@ formatMessage(msg, { n: 1 }, 'en'); // -> '1 item'
 formatMessage(msg, { n: 5 }, 'en'); // -> '5 items'
 ```
 
-The shape is `{name, plural, case1 {body1} case2 {body2} ...}`. Inside a case body, `#` is the number itself, formatted for the language.
+The shape is `{name, plural, case1 {body1} case2 {body2} ...}`. Inside a case body, `#` is the
+number itself, formatted for the language.
 
-The case keywords are: `zero`, `one`, `two`, `few`, `many`, `other`. Each language uses a subset. `other` is required - it's the fallback when no other case matches.
+The case keywords are `zero`, `one`, `two`, `few`, `many`, and `other`. Each language uses a subset.
+`other` is required: it is the fallback when no other case matches.
 
 The same message in Russian uses three forms:
 
@@ -67,7 +72,8 @@ formatMessage(msg, { n: 5 }, 'ru'); // -> '5 файлов'
 
 ### Exact matches
 
-Sometimes you want a specific number to render differently. `=N` matches before the plural rules run.
+Sometimes you want a specific number to render differently. `=N` matches before the plural rules
+run.
 
 ```ts
 const msg = `{n, plural,
@@ -81,27 +87,10 @@ formatMessage(msg, { n: 1 }, 'en'); // -> '1 new message.'
 formatMessage(msg, { n: 7 }, 'en'); // -> '7 new messages.'
 ```
 
-### Offsets
-
-`offset:N` subtracts before category selection and before `#`. Useful for "you and N others" phrasing.
-
-```ts
-const msg = `You {n, plural, offset:1
-  =1 {are the only one here}
-  =2 {and one other are here}
-  other {and # others are here}
-}`;
-
-formatMessage(msg, { n: 1 }, 'en'); // -> 'You are the only one here'
-formatMessage(msg, { n: 2 }, 'en'); // -> 'You and one other are here'
-formatMessage(msg, { n: 5 }, 'en'); // -> 'You and 4 others are here'
-```
-
-`=N` matches the raw input. Keyword cases and `#` see the offset-adjusted value.
-
 ## Ordinals
 
-For "1st", "2nd", "3rd", use `selectordinal`. Same shape as `plural`; selects against ordinal rules.
+For "1st", "2nd", "3rd", use `selectordinal`. It has the same shape as `plural`, but picks the case
+by ordinal rules.
 
 ```ts
 const msg = '{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}';
@@ -115,7 +104,8 @@ formatMessage(msg, { n: 22 }, 'en'); // -> '22nd'
 
 ## Select
 
-When the branch is not numeric - a role, a gender, a status - use `select`. It matches the parameter as a string against case keywords.
+When the message depends on a value that is not a number, like a role, a gender, or a status, use
+`select`. It matches the parameter as a string against case keywords.
 
 ```ts
 const msg = `{role, select,
@@ -133,6 +123,25 @@ formatMessage(msg, { role: 'member' }, 'en');
 
 `other` is required, same as `plural`.
 
+## Offsets
+
+In a `plural`, `offset:N` subtracts N from the value before the category is picked and before `#`
+is rendered. It is useful for messages like "you and N others".
+
+```ts
+const msg = `You {n, plural, offset:1
+  =1 {are the only one here}
+  =2 {and one other are here}
+  other {and # others are here}
+}`;
+
+formatMessage(msg, { n: 1 }, 'en'); // -> 'You are the only one here'
+formatMessage(msg, { n: 2 }, 'en'); // -> 'You and one other are here'
+formatMessage(msg, { n: 5 }, 'en'); // -> 'You and 4 others are here'
+```
+
+`=N` matches the raw input. Keyword cases and `#` see the value after the subtraction.
+
 ## Numbers
 
 `{n, number}` formats with the locale's default decimal style.
@@ -142,7 +151,7 @@ formatMessage('{n, number}', { n: 1234.5 }, 'en'); // -> '1,234.5'
 formatMessage('{n, number}', { n: 1234.5 }, 'de'); // -> '1.234,5'
 ```
 
-A predefined style trims it.
+A predefined style changes the format.
 
 ```ts
 formatMessage('{n, number, integer}', { n: 12.7 }, 'en'); // -> '13'
@@ -157,7 +166,7 @@ formatMessage(
   { amount: 19.5 },
   'de',
 );
-// -> '19,50 €'
+// -> '19,50 €'
 
 formatMessage(
   '{n, number, ::compact-short}',
@@ -174,13 +183,18 @@ formatMessage(
 // -> 'Pi is about 3.142'
 ```
 
-The gap in `19,50 €` is a no-break space, exactly as `Intl` emits it.
+The gap in `19,50 €` is a no-break space, exactly as `Intl` produces it.
 
-Skeletons are their own small language. `.00` fixes two fraction digits. `currency/USD` sets currency. `group-off` disables thousands separators.
+Skeletons are their own small language:
+
+- `.00` always shows two fraction digits.
+- `currency/USD` sets the currency.
+- `group-off` disables thousands separators.
 
 ## Dates and times
 
-`{d, date}` and `{d, time}` accept a predefined style: `short`, `medium`, `long`, `full`. The default is `medium`. Dates format in the machine's local timezone.
+`{d, date}` and `{d, time}` accept a predefined style: `short`, `medium`, `long`, or `full`. The
+default is `medium`. Dates format in the machine's local timezone.
 
 ```ts
 const d = new Date('2026-06-09T14:30:00');
@@ -190,7 +204,8 @@ formatMessage('{d, date, long}', { d }, 'en');  // -> 'June 9, 2026'
 formatMessage('{d, time, short}', { d }, 'en'); // -> '2:30 PM'
 ```
 
-For finer control, use a CLDR skeleton with `::`. Letter counts pick the variant: `MMM` is short month, `MMMM` is long.
+For more control, use a CLDR skeleton with `::`. The number of letters picks the variant: `MMM` is
+the short month, `MMMM` is the long one.
 
 ```ts
 const d = new Date('2026-06-09T14:30:00');
@@ -199,7 +214,8 @@ formatMessage('{d, date, ::yMMMd}', { d }, 'en'); // -> 'Jun 9, 2026'
 formatMessage('{d, time, ::HH:mm}', { d }, 'en'); // -> '14:30'
 ```
 
-The locale chooses the order. `::yMMMd` is "Jun 9, 2026" in English and "9 juin 2026" in French; you don't write that ordering yourself.
+The locale chooses the order. `::yMMMd` is "Jun 9, 2026" in English and "9 juin 2026" in French, and
+you don't write that ordering yourself.
 
 ## Nesting
 
@@ -222,11 +238,10 @@ formatMessage(msg, { count: 7, kind: 'video' }, 'en');
 // -> 'You have 7 videos'
 ```
 
-The principle: a translator should only ever see the message they need to translate, and the renderer fits it together.
-
 ## Escaping
 
-`{`, `}`, and (inside a plural) `#` are special. To write them literally, wrap in single quotes. Two apostrophes (`''`) render one.
+`{`, `}`, and (inside a plural) `#` are special. To write them literally, wrap them in single
+quotes. Two apostrophes (`''`) render one.
 
 ```ts
 formatMessage("Use '{name}' to interpolate.", undefined, 'en');
@@ -239,11 +254,22 @@ formatMessage("It's {n, number} o'clock.", { n: 5 }, 'en');
 // -> "It's 5 o'clock."
 ```
 
-An apostrophe only opens an escape when the next character would otherwise be special. Everyday apostrophes pass through.
+An apostrophe only opens an escape when the next character would otherwise be special. Normal
+apostrophes stay as they are.
 
 ## Missing parameters
 
-Formatting never throws over a missing value. A plain placeholder (and `number`, `date`, `time`) renders as itself - `Hello, {name}.` stays `Hello, {name}.` - while `plural` formats the value as zero and `select` falls to `other`. To catch these instead, both `formatMessage` and `createMessageFormatter` take an options argument with an `onError` hook; it is called on every soft failure, and throwing from it makes formatting strict.
+Formatting never throws because of a missing value:
+
+- A plain placeholder, and `number`, `date`, and `time`, render as their `{name}` placeholder:
+  `Hello, {name}.` stays `Hello, {name}.`.
+- `plural` formats the value as zero.
+- `select` uses `other`.
+
+To catch these instead, pass an `onError` hook in the options argument. `formatMessage` takes it as
+its last argument, and `createMessageFormatter(language, options)` binds a language and options
+once. `onError` is called for every failure that does not throw, and throwing from it makes
+formatting strict:
 
 ```ts
 const strict = createMessageFormatter('en', {

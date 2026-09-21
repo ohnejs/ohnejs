@@ -1,8 +1,8 @@
 # The collections API
 
-A collection can serve itself over HTTP. One option on the definition, and ohne ships REST
-endpoints for it - reads through the full [wire query grammar](./url-queries.md), writes through
-the same validation the query builder runs.
+A collection can serve itself over HTTP. Add one option to the definition, and ohne ships REST
+endpoints for it. Reads take the [URL query](./url-queries.md) grammar, and writes run the same
+[validation](../database/writing.md) as the query builder.
 
 ```ts
 // collections/Posts.ts
@@ -17,11 +17,11 @@ export default defineCollection({
 });
 ```
 
-`GET /collections/posts?where={views:{atLeast:100}}&order=[-views]` now returns the matching
-records as JSON, to anyone - `read` is `'public'`. Creating needs a signed-in user holding the
-`collection.Posts.create` [capability](../auth/roles.md), because an exposed operation is guarded
-unless marked public. Nothing is exposed without `api` - a collection that does not opt in has no
-endpoints at all.
+`GET /collections/posts?where={views:{atLeast:100}}&order=[-views]` now returns the matching records
+as JSON, to anyone, because `read` is `'public'`. Creating needs a signed-in user who has the
+`collection.Posts.create` [capability](../auth/roles.md#the-collections-api-guard), because an
+exposed operation is guarded unless you mark it public. A collection without `api` has no endpoints
+at all.
 
 ## The routes
 
@@ -40,77 +40,94 @@ POST   /collections/posts/[uuid]/translations/copy    copy one locale's translat
 DELETE /collections/posts/[uuid]/translations         delete one locale's translation
 ```
 
-The translation routes apply only to collections with
-[translatable fields](../database/translations.md); on any other they answer the same `404` as an
-unknown collection. The `GET` answers `{ locales }`, the same list as the record's `_translations`.
+The [translation routes](#translations) exist only on collections with translatable fields. On any
+other collection they answer the same `404` as an unknown collection.
 
-These are ordinary [routes](./routes.md) shipped by the ohne layer, so everything routes do
-applies: `api.basePath` prefixes them, your app overrides one by shipping the same route id, and
-`disable: { routes: ['/collections/**'] }` drops them wholesale.
+These are ordinary [routes](./routes.md) shipped by the `ohnejs/base` layer, so they work like every
+other route:
+
+- [`api.basePath`](../project/config.md#the-api-server) prefixes them.
+- Your app [overrides](./routes.md#routes-across-layers) one by shipping the same route id.
+- [`disable: { routes: ['/collections/**'] }`](../project/config.md#disabling) drops all of them.
 
 ## Reading
 
-The list endpoint speaks the whole [URL query grammar](./url-queries.md): `where`, `select`,
-`order`, `populate`, `limit`/`offset` or `page`/`perPage`, and `locale`. With `page` or `perPage`
-it answers the paginated envelope (`records`, `total`, `page`, `perPage`, `lastPage`); otherwise a
-plain array. `perPage` defaults to `20` when only `page` is named.
+The list endpoint accepts the whole [URL query grammar](./url-queries.md): `where`, `select`,
+`order`, `populate`, `limit`/`offset` or `page`/`perPage`, and `locale`.
 
-A query too long for a URL travels as a JSON body instead. `POST /collections/posts/query` takes
-the same top-level keys and parses to the identical read:
+- With `page` or `perPage`, it answers a paginated object: `records`, `total`, `page`, `perPage`,
+  and `lastPage`. Otherwise it answers a plain array.
+- `perPage` defaults to `20` when only `page` is named.
+
+A query that is too long for a URL goes in a JSON body instead. `POST /collections/posts/query`
+takes the same top-level keys and runs the same read:
 
 ```
 POST /collections/posts/query
 { "where": { "views": { "atLeast": 100 } }, "order": ["-views"], "limit": 20 }
 ```
 
-The by-`UUID` read returns one record, shaped by `select`, `populate`, and `locale` alone - a
-filter or window param is a `400`, since the `UUID` already pins the row. No matching record is a
-`404`.
+The by-`UUID` read returns one record. Only `select`, `populate`, and `locale` shape it. A filter or
+window param is a `400`, because the `UUID` already selects the row. No matching record is a `404`.
 
-A record of a translatable collection carries `_translations`, the locales it holds a translation
-at, in every read and write answer. Under an `access` scope it lists only the locales the scope
-admits the record at, so a translation the scope hides never shows.
+A record of a translatable collection carries `_translations` in every read and write answer: the
+locales where it has a translation. Under an [`access`](#access) scope it lists only the locales
+where the scope allows the record, so a translation the scope hides never shows.
 
 ## Writing
 
-`POST` creates from a JSON body and answers `201` with the stored record - defaults filled,
-sanitizers run, exactly what a re-read returns. `PATCH` updates one record and answers with its
-final state; `DELETE` answers `204`. A translatable collection writes one locale at a time:
-`?locale=de` on the create or update addresses that locale's values.
-
-The translation routes manage those locales as units. The `GET` lists the locales at which the
-record holds a translation, in the configured order. The copy takes an optional JSON body naming
-the `source` locale and projects its translatable values onto `?locale=`'s target, answering the
-target's new state. The `DELETE` removes one locale's values whole - `?locale=de` drops the
-German translation while the record and every other locale survive, `204` on success and `404`
-when the record held nothing there. Reads gate on the `read` operation, the copy on `update`, and
-the translation delete on `delete`.
+`POST` creates a record from a JSON body and answers `201` with the stored record. Defaults are
+filled and sanitizers have run, so it is exactly what a later read returns.
 
 ```
 POST /collections/posts
 { "title": "Hello", "views": 0 }
 ```
 
-Failures keep the shapes the rest of ohne uses:
+- `PATCH` updates one record and answers with its final state.
+- `DELETE` answers `204`.
+- A translatable collection writes one locale at a time: `?locale=de` on the create or update writes
+  that locale's values.
+
+[Failures](./errors.md#write-failures) have the same shapes as in the rest of ohne:
 
 - A validation failure is a `422` with translated messages keyed by field path, exactly as
-  [writing records](../database/writing.md) reports them.
-- A malformed query is a `400` with a stable `code` and `path`; see
-  [querying over HTTP](./url-queries.md#errors). A malformed body is a plain `400`.
-- A delete blocked by a `restrict` reference is a `409`; a busy database a `503` with
-  `Retry-After`.
+  [writing records](../database/writing.md#the-result) reports them.
+- A malformed query is a `400` with a stable `code` and `path`, as
+  [querying over HTTP](./url-queries.md#errors) describes. A malformed body is a plain `400`.
+- A delete blocked by a `restrict` reference is a `409`.
+- A busy database is a `503` with `Retry-After`.
 
-A [write-only field](../database/collections.md#write-only-and-locked-fields) never comes back in
-a response unless the operation's [`access`](#access) scope names it, and naming one in a query is
-indistinguishable from naming a field that does not exist. An `immutable` or `writable: false`
-field in a write body rejects the same way.
+A [write-only field](../database/collections.md#write-only-and-locked-fields) never comes back in a
+response unless the operation's [`access`](#access) scope names it. If a query names one, or a write
+body names an `immutable` or `writable: false` field, the request is rejected as if the field did
+not exist.
+
+## Translations
+
+The translation routes manage a record's locales as units, on a collection with
+[translatable fields](../database/translations.md):
+
+- `GET /collections/posts/[uuid]/translations` answers `{ locales }`: the locales where the record
+  has a translation, in the configured order. It is the same list as its `_translations`.
+- `POST /collections/posts/[uuid]/translations/copy`
+  [copies a translation](../database/translations.md#copying-a-translation). An optional JSON body
+  names the `source` locale, `?locale=` names the target, and it answers the target's new state.
+- `DELETE /collections/posts/[uuid]/translations`
+  [removes all of one locale's values](../database/translations.md#deleting-translations).
+  `?locale=de` drops the German translation, and the record and every other locale stay. It answers
+  `204`, or `404` when the record had no translation there.
+
+Each one runs under an operation's rules: the `GET` under `read`, the copy under `update`, and the
+`DELETE` under `delete`. The copy runs `update`'s [`access`](#the-write-input) twice: first with an
+empty input to reach the source record, then with the values it is about to write.
 
 ## Exposure
 
 An exposed operation is guarded by default: the request needs a signed-in user whose
 [capabilities](../auth/roles.md#the-collections-api-guard) cover `collection.<Name>.<operation>`.
-`api: true` opens every operation guarded. An object opens per operation, and anything unnamed
-stays closed:
+`api: true` opens every operation, all of them guarded. An object opens operations one by one, and
+any operation it does not name stays closed:
 
 ```ts
 export default defineCollection({
@@ -123,24 +140,30 @@ export default defineCollection({
 });
 ```
 
-An operation is `true` (guarded), `'public'` (open to anyone), or an object of options.
-`public: true` is the object spelling of `'public'`, and `middleware` names
-[middleware](./middleware.md) to run after the guard, in order, after the global ones. A
-middleware that returns a value answers the request, and the operation never runs. `access`
-narrows the operation to the records and fields a request may reach; it has
-[its own section](#access).
+An operation is one of:
 
-`public` and `middleware` compose: `{ public: true, middleware: ['require-auth'] }` skips the
-capability guard but still requires a signed-in user - any account, no role needed.
+- `true` - guarded.
+- `'public'` - open to anyone.
+- An object of options:
+  - `public: true` - the same as `'public'`, in the object form.
+  - `middleware` - [middleware](./middleware.md#route-middleware) to run after the guard, in order,
+    after the global ones. A middleware that returns a value answers the request, and the operation
+    never runs.
+  - [`access`](#access) - narrows the operation to the records and fields a request may reach.
 
-`read` covers every read endpoint. An unknown collection, an unexposed one, and a closed
-operation all answer the identical `404`, so the API never reveals what exists.
+`public` and `middleware` work together: `{ public: true, middleware: ['require-auth'] }` skips the
+capability guard but still
+[requires a signed-in user](../auth/authentication.md#protecting-routes-with-middleware): any
+account, no role needed.
+
+`read` covers every read endpoint. An unknown collection, an unexposed one, and a closed operation
+all answer the identical `404`, so the API never reveals what exists.
 
 ## Access
 
 The guard decides whether a caller may run an operation at all. `access` decides which records and
-fields the operation reaches. It is a function on the operation, run once per request after the
-guard and the middleware, and what it returns composes into every query the operation runs:
+fields the operation reaches. It is a function on the operation. It runs once per request, after the
+guard and the middleware, and what it returns is applied to every query the operation runs:
 
 ```ts
 // collections/Posts.ts
@@ -164,52 +187,66 @@ export default defineCollection({
 });
 ```
 
-Anyone reads posts. A signed-in user updates only the posts they authored: the `where` ANDs onto
-the update, so a `PATCH` on someone else's post answers the same `404` a missing record does. There
-is no `403` to tell an out-of-scope record from an absent one, so the API never reveals what the
-caller cannot reach.
+Anyone can read posts. A signed-in user can update only the posts they wrote. The `where` is added
+to the update with AND, so a `PATCH` on someone else's post answers the same `404` as a missing
+record. A record outside the scope never answers `403`. It looks exactly like a missing one, so the
+API never reveals what the caller cannot reach.
 
-A `true` from `access` runs the operation unscoped, exactly as if the option were omitted. `false`
-refuses it as that identical `404`. A scope object narrows it.
+What `access` returns decides:
+
+- `true` runs the operation without a scope, exactly as if the option were omitted.
+- `false` refuses it with that same `404`.
+- A [scope](#the-scope) object narrows it.
 
 ### The scope
 
-`where` is a filter in the object form the URL grammar's [`where`](./url-queries.md#filtering)
-takes, keyed to the collection's fields. Every request is ANDed under it: a request can filter
-further, never escape.
+A scope object carries these keys:
 
-`select` names the fields the request may reach. A read returns those fields, and a request's own
-`select` narrows within them. A field outside them is refused in `where`, `order`, `select`, and
-`populate` exactly as a field that does not exist - `UUID` included, so name it when clients
-address rows. On an update the same list bounds the body: only fields inside it write, and the
-answered record carries the scoped fields alone.
+- `where` - a filter in the object form that the URL [`where`](./url-queries.md#filtering) takes,
+  with the collection's fields as keys. It is added to every request with AND, so a request can
+  filter further but can never escape it.
+- `select` - the fields the request may reach. A read returns those fields, and a request's own
+  `select` can only choose among them. On an update the same list limits the body: only fields in
+  the list are written, and the answered record carries only the scoped fields.
+- `limit` - the maximum for a list read's `limit`/`offset` window. The request's own `limit` can
+  only lower it. A paginated read takes its size from `perPage` instead, which the
+  [`maxPerPage` guard](./url-queries.md#guards) limits.
+- `locale` - the locale a read uses when the request names none. It is only a default, so a request
+  can still name another locale.
 
-`limit` caps a list read's `limit`/`offset` window, and the request's own `limit` can only lower it;
-a paginated read sizes by `perPage` under the [`maxPerPage` guard](./url-queries.md#guards) instead.
-`locale` is the locale a read uses when the request names none - a default, not a wall.
+A field outside `select` is refused in `where`, `order`, `select`, and `populate` exactly as a field
+that does not exist. That includes `UUID`, so name it when clients address rows.
 
-When another collection's endpoint populates or probes this one, this collection's own `read`
-exposure, guard, scope, and middleware decide what comes back, and a middleware that answers makes
-it unreachable; see [querying over HTTP](./url-queries.md).
+A `read` scope applies to every read endpoint. An `update` or `delete` scope decides which rows the
+write may touch: a row outside `where` answers `404` as if it did not exist. A create has no rows
+yet, so only `true` or `false` applies.
 
-A `read` scope shapes every read endpoint. An `update` or `delete` scope decides which rows
-the write may touch: a row outside `where` answers `404` as if it did not exist. The filter reads
-the row as stored, so a body may carry a row out of the scope - an author handing a post to someone
-else. Keep a field inside the scope with `select`, or lock it with `writable: false`. A create has
-no rows yet, so only the verdict applies - return `true` or `false`.
+The filter checks the row as it is stored, so an update body can move a row out of the scope, for
+example when an author gives a post to someone else. Protect such a field through the scope's
+`select`, or lock it with
+[`writable: false`](../database/collections.md#write-only-and-locked-fields).
 
-A `where` over translatable fields matches per locale, so it can admit a record at `en` and hide it
-at `de`. The endpoints then narrow the record's `_translations` to the admitted locales; a `where`
-over plain fields answers alike everywhere and costs no extra read.
+When another collection's endpoint [populates or probes](./url-queries.md#across-relations) this
+one, this collection's own `read` exposure, guard, scope, and middleware decide what comes back. If
+one of its middleware answers, this collection cannot be reached that way.
+
+A `where` on translatable fields matches per locale, so it can allow a record in `en` and hide it in
+`de`. The endpoints then reduce the record's `_translations` to the allowed locales. They also refuse
+a request's filter on `_translations` with `invalidField`, because it would reveal the hidden ones.
+A `where` on plain fields gives the same answer in every locale, costs no extra read, and keeps the
+filter.
 
 ### Who is asking
 
-`access` receives a context naming the `operation`. The caller is not in it: the caller is
-ambient, and `useUser`, `requireUser`, and `userCan` from `ohnejs/auth` read the request exactly as
-they do in a [handler](../auth/authentication.md#reading-the-current-user). That keeps a rule
-ordinary code. Here the author, any listed editor, or the author's manager may edit, only the
-author may delete, only the author hands a post to someone else, and a `posts.manage` capability
-bypasses the editing rule:
+`access` receives a context naming the `operation`. The caller is not passed in: read it with
+`useUser`, `requireUser`, and [`userCan`](../auth/roles.md#guarding-your-own-routes) from
+`ohnejs/auth`, exactly as in a [handler](../auth/authentication.md#reading-the-current-user). This
+way a rule is ordinary code. In this example:
+
+- the author, any listed editor, or the author's manager may edit,
+- only the author may delete,
+- only the author may give a post to someone else,
+- a `posts.manage` [capability](../auth/roles.md#custom-capabilities) bypasses the editing rule.
 
 ```ts
 // collections/Posts.ts
@@ -255,38 +292,39 @@ export default defineCollection({
 });
 ```
 
-`manager` is a `record` field to `Users` that your own `Users` collection declares. The `has`
-clauses read through the relations: `editors` is a `records` field, so `has` matches a listed
-editor, and `author` reaches the author's own `manager`.
+`manager` is a `record` field to `Users` that your own `Users` collection declares. `editors` is a
+`records` field, so `has` matches a listed editor, and `author` reaches the author's own `manager`.
 
-Name a bypass outside the `collection.` prefix. `collection.Posts.*` covers every name under it,
-`collection.Posts.manage` included, so a role meant for plain editing would hold the bypass too.
+`author` defaults to the signed-in user, and the create rule lets a body name only the caller, so a
+create gets its owner. An update that names `author` is limited to the author's own rows, so when an
+editor tries to reassign a post, the answer is `404`. Lock the field with `writable: false` instead
+when nobody may change it.
 
-`author` defaults to the ambient user, so a create that leaves it out carries its creator, and
-the create rule lets a body name only the caller - that is how a create gets its owner, since the
-scope has no row to filter yet. An update naming `author` narrows to the author's own rows, so an
-editor's attempt to reassign answers `404`. Lock the field with `writable: false` instead when
-nobody may change it.
+Give a bypass a name outside the `collection.` prefix.
+[`collection.Posts.*`](../auth/roles.md#capabilities) covers every name under it, including
+`collection.Posts.manage`, so a role meant for plain editing would have the bypass too.
 
 ### The write input
 
 A create or update carries `input` in the context: the JSON body as the request sent it, before
-validation. A rule can judge the write itself, not only the row it lands on - the example above
-lets only the author reassign `author`, and `input.status === 'published'` is how a rule asks for
-a manager before a post goes live. A read or delete carries no input; its context names the
-operation alone, so one function serves every slot by branching on `operation`.
-
-The translation copy resolves `update` twice: with an empty input to reach the source record,
-then with the values it is about to write.
+validation. A rule can judge the write itself, not only the row it changes. The example above lets
+only the author reassign `author`, and with `input.status === 'published'` a rule can require a
+manager before a post is published. A read or delete carries no input. Its context names only the
+operation, so one function can serve every operation by branching on `operation`.
 
 ### Your own routes
 
-`access` belongs to the shipped endpoints; a query in your own route is trusted and unscoped. To
-hold a route to the same policy, open the query through `queryScoped` from `ohnejs/auth`. It runs
-the guard and the resolver exactly as the collections API does - a closed operation or a `false`
-verdict is a `404`, a missing user `401`, a missing capability `403` - and returns a builder to
-query through. A read carries the whole scope; an update or delete ANDs the scope's `where` in,
-exactly as the shipped endpoints do. The builder speaks the object grammar the URL `where` takes:
+`access` applies only to the shipped endpoints. A query in your own route is trusted and has no
+scope. To apply the same policy to a route, open the query through `queryScoped` from `ohnejs/auth`.
+It runs the guard and `access` exactly as the collections API does, and returns a builder to query
+through:
+
+- A closed operation or a `false` from `access` is a `404`.
+- A missing user is a `401`, and a missing capability a `403`.
+- A read carries the whole scope. An update or delete adds the scope's `where` with AND, exactly as
+  the shipped endpoints do.
+
+The builder takes the same object grammar as the URL `where`:
 
 ```ts
 // api/drafts.get.ts
@@ -299,6 +337,7 @@ export default defineHandler(async () => {
 });
 ```
 
-A create or update takes the intended input as its third argument, so the rule judges it. The
-operation's own middleware do not run here; your route carries its own. A rule that must reach
-every read in the process, shipped or not, is a [`query:filter` hook](./hooks.md).
+A create or update takes the input you plan to write as its third argument, so the rule can judge
+it. The operation's own middleware do not run here, so your route needs its own. For a rule that
+must apply to every read in the process, shipped or not, use a
+[`query:filter` hook](./hooks.md#queryfilter).

@@ -1,8 +1,9 @@
 # Middleware
 
 A middleware is a function that runs before the route handler, once per request. It receives the
-request event - the same object `useEvent` returns - to authenticate, set headers, share data
-with the handler, or answer the request outright.
+request event, the same object [`useEvent`](./request.md#the-event) returns. With it, a middleware
+can [authenticate](../auth/authentication.md#protecting-routes-with-middleware), set headers, share
+data with the handler, or answer the request instead of the handler.
 
 ```ts
 // middleware/global/request-id.ts
@@ -13,23 +14,27 @@ export default defineMiddleware((event) => {
 });
 ```
 
-The contract is small. Return nothing and the request continues to the next middleware, then the
-handler. Return any value and it short-circuits: the value becomes the response, serialized
-exactly like a handler's return, and the handler never runs. A thrown or returned `HTTPError`
-maps to its status; see [errors](./errors.md).
+The rules are simple:
 
-Middleware lives in each layer's `dirs.middleware` directory - default `middleware/`, set in
-[config](../project/config.md). Where a file sits decides when it runs: under `global/` it runs
-on every request; anywhere else it is opt-in, run only by the routes that select it.
+- Return nothing, and the request continues to the next middleware, then the handler.
+- Return any value, and it becomes the response, serialized exactly like a handler's return. The
+  handler never runs.
+
+Throw or return an [`HTTPError`](./errors.md), and the response uses its status.
 
 ## Global middleware
 
-A file under `middleware/global/` runs on every request, before any opt-in middleware. Globals
-from every layer run together in name order, so a numeric prefix orders them:
+Middleware lives in each layer's [`dirs.middleware`](../project/config.md#directories) directory,
+`middleware/` by default. Where a file sits decides when it runs:
+
+- Under `global/`, it runs on every request, before any opt-in middleware.
+- Anywhere else, it is opt-in, so it runs only on the [routes that select it](#route-middleware).
+
+Globals from every layer run together in name order, so a numeric prefix orders them:
 `global/10-request-id.ts` runs before `global/20-locale.ts`. A digit sorts before any letter, so
 prefixed globals run before unprefixed ones.
 
-A global that should only act on part of the app scopes itself with `matchPath`, which tests the
+A global that should only act on part of the app limits itself with `matchPath`, which tests the
 current request's path against one or more patterns:
 
 ```ts
@@ -44,18 +49,18 @@ export default defineMiddleware(async (event) => {
 });
 ```
 
-A pattern with a `[param]` matches like a route (`/authors/[id]`); anything else is a glob, `*`
-matching one segment and `**` any depth. When you hold a path rather than a request,
-`matchesPath(path, ...patterns)` is the same test.
+- A pattern with a `[param]` matches like a [route](./routes.md#route-params): `/authors/[id]`.
+- Anything else is a glob: `*` matches one segment, and `**` any depth.
+- `matchesPath(path, ...patterns)` is the same test, for when you have a path instead of a request.
 
-`event.context` is the per-request bag a middleware fills and a handler reads - here, the
-authenticated session. Augment the `EventContext` interface from a layer to type what you put
-there.
+The example stores the session on `event.context`, the per-request object that a middleware fills
+and a handler reads. [The event](./request.md#the-event) shows how to type it by augmenting
+`EventContext`.
 
 ## Route middleware
 
-Every middleware outside `global/` is named and sits idle until a route opts in through
-`defineHandler`'s `middleware` option:
+Every middleware outside `global/` has a name and does nothing until a route selects it through
+`defineHandler`'s [`middleware` option](./routes.md#per-route-options):
 
 ```ts
 // middleware/rate-limit.ts
@@ -73,12 +78,14 @@ import { defineHandler } from 'ohnejs';
 export default defineHandler(() => search(), { middleware: ['rate-limit'] });
 ```
 
-The route runs every global middleware, then `rate-limit`, then the handler. An array lists the
-named middleware to run, in that order; duplicates and unknown names are dropped. The globals
-always run - the option adds on top of them, it cannot disable them.
+The route runs every global middleware, then `rate-limit`, then the handler.
 
-The option also takes a function, handed every named middleware in the app, returning the subset
-to run:
+- An array lists the named middleware to run, in that order. Duplicates and unknown names are
+  dropped.
+- The globals always run. The option adds on top of them and cannot disable them.
+
+The option also takes a function. It receives every named middleware in the app and returns the
+ones to run:
 
 ```ts
 export default defineHandler(() => report(), {
@@ -86,24 +93,29 @@ export default defineHandler(() => report(), {
 });
 ```
 
-The selection resolves once per route, not per request.
+The selection is computed once per route, not on every request.
 
 ## Names and layers
 
-The file's path under `middleware/` names it, kebab-case: `rate-limit.ts` is `rate-limit`,
-`shop/audit.ts` is `shop-audit`, and the `global/` prefix is part of the name - `global/auth.ts`
-is `global-auth`. A `_`-prefixed file or directory is a helper and is ignored. Two files in one
-layer resolving to the same name is an error.
+The file's path under `middleware/` names it, in kebab-case:
 
-Layers merge by name: when two layers define the same name, the closer layer's file wins, so an
-app replaces a layer's middleware by shadowing its path. The tier must match - a name cannot be
-global in one layer and opt-in in another. See [layers](../project/layers.md).
+- `rate-limit.ts` is `rate-limit`.
+- `shop/audit.ts` is `shop-audit`.
+- `global/auth.ts` is `global-auth`, since the `global/` prefix is part of the name.
+
+A `_`-prefixed file or directory is a helper and is ignored. It is an error when two files in one
+layer resolve to the same name.
+
+[Layers merge by name](../project/layers.md#what-overrides-what): when two layers define the same
+name, the closer layer's file wins. So an app replaces a layer's middleware by shadowing it with a
+file at the same path. The tier must match, so a name cannot be global in one layer and opt-in in
+another.
 
 ## Per-request control
 
-The `middleware:resolve` hook filters or reorders the resolved list - globals first, then the
-route's selection - just before it runs. It is the escape hatch for dynamic, per-request
-decisions; routine selection belongs on the route.
+The [`middleware:resolve`](./hooks.md#middlewareresolve) hook filters or reorders the resolved list
+just before it runs. The list has the globals first, then the route's selection. Use the hook only
+for dynamic, per-request decisions. Normal selection belongs on the route.
 
 ```ts
 // boot/middleware.ts
@@ -116,14 +128,18 @@ hook('middleware:resolve', (names, event) =>
 );
 ```
 
-See [hooks](./hooks.md).
-
 ## CORS
 
-The `ohnejs` layer ships `middleware/global/cors.ts`: the dashboard's origin - the `DASHBOARD_URL`
-env var, else `dashboard.origin`, else `http://localhost` on `dashboard.port` - may make
-credentialed requests, and every other origin gets no CORS headers. Without the `ohnejs` layer, every
-response carries a credential-free `Access-Control-Allow-Origin: *`, so cookies stay safe.
+The `ohnejs/base` layer ships `middleware/global/cors.ts`. The dashboard's origin may make requests
+with credentials, and every other origin gets no CORS headers. The dashboard's origin is the first
+of these that is set:
+
+1. The [`DASHBOARD_URL`](../project/env.md#the-built-ins) env var.
+2. [`dashboard.origin`](../project/config.md#the-dashboard) in config.
+3. `http://localhost` on `dashboard.port`.
+
+Without the `ohnejs/base` layer, every response carries `Access-Control-Allow-Origin: *` without
+credentials, so cookies stay safe.
 
 To pick the origins yourself, shadow that file and keep the dashboard's origin in the list, here
 `https://admin.example.com`:
@@ -139,28 +155,31 @@ export default cors({
 ```
 
 Only a file that resolves to the same name, `global-cors`, shadows the shipped policy. Any other
-name, such as `global/10-cors.ts` (`global-10-cors`), adds a second global middleware, and both
-policies run.
+name, such as `global/10-cors.ts`, adds a second global middleware, and both policies run.
 
-Mounting one replaces the open default. `origin` is a single origin, a list, or `'*'`; origins
-match exactly - scheme, host, and port. There is no reflection mode: an origin you did not list
-gets no CORS headers, and the browser blocks the read. Combining `origin: '*'` with
-`credentials` throws - the browser forbids a credentialed wildcard.
+Adding `cors()` replaces the open default. Its options:
 
-The middleware answers a preflight `OPTIONS` itself with `204` and the allow headers; the server
-answers `OPTIONS` on every route automatically and runs middleware first, so no `.options` route
-is needed. The remaining options:
+- `origin` - a single origin, a list, or `'*'`. Origins match exactly: scheme, host, and port.
+  There is no reflection mode, so an origin you did not list gets no CORS headers, and the browser
+  blocks the read.
+- `credentials` - send `Access-Control-Allow-Credentials`, so cookies and HTTP auth work across
+  origins. Combining it with `origin: '*'` throws, since the browser does not allow credentials with
+  a wildcard.
+- `methods` - preflight allow-list. Defaults to `GET`, `HEAD`, `PUT`, `PATCH`, `POST`, `DELETE`.
+- `allowHeaders` - request headers to allow. When omitted, the preflight allows the headers the
+  browser asked for.
+- `exposeHeaders` - response headers that scripts may read, in addition to the safelisted ones.
+- `maxAge` - seconds the browser may cache the preflight. When omitted, the browser uses its own
+  default.
 
-- `credentials` - send `Access-Control-Allow-Credentials`, so cookies and HTTP auth cross origins.
-- `methods` - preflight allow-list; defaults to `GET`, `HEAD`, `PUT`, `PATCH`, `POST`, `DELETE`.
-- `allowHeaders` - request headers to allow; omitted, the preflight reflects what was asked for.
-- `exposeHeaders` - response headers scripts may read beyond the safelisted ones.
-- `maxAge` - seconds the browser may cache the preflight; omitted, the browser uses its own default.
+It answers a preflight [`OPTIONS`](./routes.md#matching) itself, with `204` and the allow headers,
+so you need no `.options` route.
 
-An auth middleware that rejects anonymous requests must run after cors - a preflight carries no
-credentials, and rejecting it blocks the real request behind it. Globals from every layer share
-one name order, so give the auth file a name that sorts after `cors`: `global/session.ts` above
-runs after it, while `global/auth.ts` and `global/20-auth.ts` run first.
+An auth middleware that rejects anonymous requests must sort after `cors`. A preflight carries no
+credentials, and rejecting it blocks the real request that follows it. Globals from every layer
+share one name order: `global/session.ts` above runs after `cors`, while `global/auth.ts` and
+`global/20-auth.ts` run before it.
 
-CORS governs what a browser will read, never who may call the API - authorization is its own
-layer. For the full production posture, see [deployment](../production/deployment.md).
+CORS controls what a browser will read, never who may call the API.
+[Authorization](../auth/roles.md#guarding-your-own-routes) is handled separately, and
+[deployment](../production/deployment.md#cors) covers the production setup.

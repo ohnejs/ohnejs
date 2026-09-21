@@ -11,30 +11,29 @@ const posts = await query('Posts').findMany();
 ```
 
 `findMany` returns every record as a full object: your fields, plus the `UUID` primary key, the
-`_updatedAt` timestamp, and on a [translatable](./translations.md) collection the `_translations`
-locale list. `findFirst` returns the first match or `undefined`.
+`_updatedAt` timestamp, and on a [translatable](./translations.md#reading) collection the
+`_translations` locale list. `findFirst` returns the first match or `undefined`.
 
 ```ts
 const post = await query('Posts').findFirst();
 ```
 
-The collection is defined in a file under `collections/`; see [collections](./collections.md) for
-the field types and [schema sync](./sync.md) for how a collection becomes a table. The same query
-grammar is available over HTTP too - see [querying over HTTP](../api/url-queries.md).
+The fields come from your [collections](./collections.md). The same grammar is available
+[over HTTP](../api/url-queries.md).
 
 ## Filtering
 
-`where` narrows the read. The short form takes a field and a value, and matches on equality:
+`where` narrows the read. The short form takes a field and a value, and matches records where the
+field equals that value:
 
 ```ts
 await query('Posts').where('status', 'published').findMany();
 ```
 
-The value is typed to the field. Passing a number to a text field, or `null` to any field, is a
-compile error - `null` is never a value, and `isNull` is the only null test (below).
+The value is typed to the field, so passing a number to a text field is a compile error.
 
-For anything past equality, pass a callback. It receives a builder carrying exactly the operators
-that field admits:
+For anything other than equality, pass a callback. It receives a builder with exactly the operators
+that field allows:
 
 ```ts
 await query('Posts')
@@ -43,19 +42,24 @@ await query('Posts')
   .findMany();
 ```
 
-Which operators appear depends on the field's type. A text column offers `contains`,
-`startsWith`, `endsWith`, and the raw `like`; text and number columns alike admit the ordering
-comparisons `greaterThan`, `atLeast`, `lessThan`, and `atMost`; both offer `equalsTo` and `in`.
-A `multiSelect` field, or a [custom field type](./field-types.md#storage) marked `jsonList`, adds
-`includes`, `includesAll`, and `includesAny` - membership over the stored list's elements. Asking
-for an operator the field does not admit - ordering on a boolean, `contains` on a number - does
-not compile.
+| Operators                                      | Fields                                                                                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `equalsTo`, `in`                               | Text and number columns                                                                                                            |
+| `greaterThan`, `atLeast`, `lessThan`, `atMost` | Text and number columns                                                                                                            |
+| `contains`, `startsWith`, `endsWith`, `like`   | Text columns                                                                                                                       |
+| `includes`, `includesAll`, `includesAny`       | `multiSelect`, a [custom field type](./field-types.md#storage) marked `jsonList`, and [`_translations`](./translations.md#reading) |
+| `isNull`                                       | [Nullable fields](#null)                                                                                                           |
+| `has`, `empty`                                 | [Relations](#filtering-relations), `object`, `repeater`, and [blocks](#blocks)                                                     |
 
-Chained `where` calls AND together. Each returns the builder, so you keep filtering.
+An operator the field does not allow, like ordering on a boolean or `contains` on a number, does not
+compile.
+
+Chained `where` calls are combined with AND. Each returns the builder, so you keep filtering.
 
 ### Negation
 
-`not` negates the next operator. It reads as a namespace, never a suffixed operator name:
+`not` negates the next operator. You write it as its own step before the operator, never as part of
+the operator's name:
 
 ```ts
 await query('Posts').where('status', (w) => w.not.equalsTo('draft')).findMany();
@@ -63,8 +67,8 @@ await query('Posts').where('status', (w) => w.not.equalsTo('draft')).findMany();
 
 ### Null
 
-A nullable field admits `isNull`. It is the only way to test null - `equalsTo(null)` does not
-compile:
+`null` is never a value to compare against. A nullable field allows `isNull`, the only null test,
+and `equalsTo(null)` does not compile:
 
 ```ts
 await query('Posts').where('summary', (w) => w.isNull()).findMany();
@@ -72,8 +76,8 @@ await query('Posts').where('summary', (w) => w.isNull()).findMany();
 
 ### Or on one field
 
-After an operator, `or` starts an alternative on the same field - the record matches when either
-comparison does:
+After an operator, `or` starts an alternative on the same field. The record matches when either
+comparison matches:
 
 ```ts
 await query('Posts').where('views', (w) => w.atLeast(100).or.equalsTo(0)).findMany();
@@ -81,8 +85,9 @@ await query('Posts').where('views', (w) => w.atLeast(100).or.equalsTo(0)).findMa
 
 ### Either-or
 
-`where` clauses AND. For an OR, `whereAny` opens a group of branches; a record matches when any
-branch matches. Chaining `where` on one branch ANDs within it.
+`where` clauses combine with AND. For an OR, `whereAny` opens a group of branches, and a record
+matches when any branch matches. Chaining `where` on one branch combines with AND inside that
+branch.
 
 ```ts
 await query('Posts')
@@ -93,13 +98,13 @@ await query('Posts')
   .findMany();
 ```
 
-A `whereAny` ANDs onto the rest of the query, so you can read "published, and either featured or
-popular" by placing it after a `where`.
+A `whereAny` combines with the rest of the query using AND, so you can read "published, and either
+featured or popular" by placing it after a `where`.
 
-## Relations
+## Filtering relations
 
-A `record` or `records` field relates to another collection. `has` filters by the related rows,
-re-scoped to the target's fields:
+A [`record` or `records`](./collections.md#relations) field relates to another collection. `has`
+filters by the related rows. Its callback filters on the target collection's fields:
 
 ```ts
 await query('Posts')
@@ -107,29 +112,31 @@ await query('Posts')
   .findMany();
 ```
 
-Bare `has()` tests that the relation is set at all; `empty()` is its opposite:
+`has()` with no argument tests that the relation is set at all, and `empty()` is its opposite:
 
 ```ts
 await query('Posts').where('author', (w) => w.has()).findMany();
 await query('Posts').where('tags', (w) => w.empty()).findMany();
 ```
 
-An `object` or `repeater` field admits the same pair: bare `has()` tests it holds anything,
-`empty()` the opposite, and a callback probes the composite's subfields.
+An [`object` or `repeater`](./collections.md#composite-fields) field takes the same pair. `has()`
+with no argument tests that it holds anything, `empty()` tests the opposite, and a callback filters
+on the composite's subfields.
 
-By default a relation field reads back as `UUID`s - the id of the related row, or an array of them.
-`populate` swaps those ids for the full related records:
+## Populating relations
+
+By default a relation field is returned as `UUID`s: the id of the related row, or an array of them.
+`populate` replaces those ids with the full related records:
 
 ```ts
 const posts = await query('Posts').populate('author', 'tags').findMany();
 
 posts[0].author; // the full author record, or null
-posts[0].tags; // an array of full tag records
+posts[0].tags;   // an array of full tag records
 ```
 
-A callback narrows what the related records carry and populates their own relations. `select`
-names the fields to keep - the records then carry exactly those, `UUID` and `_updatedAt` only
-when named. `populate` descends one level further, with the same grammar at every depth:
+Pass a callback to shape the related records. `select` keeps the fields you name, and `populate`
+goes one level deeper, with the same grammar at every depth:
 
 ```ts
 const posts = await query('Posts')
@@ -142,20 +149,21 @@ const posts = await query('Posts')
 posts[0].comments[0].author; // { name: '...' }, or null
 ```
 
-The rows type exactly what the callback wrote, at every depth.
+The row types match exactly what you wrote in the callback, at every depth. A populated level has
+exactly the fields its `select` names. It includes `UUID` and `_updatedAt` only when you name them.
 
-A populated relation must be named in its level's `select` when one is set, or it silently
-drops - populate narrows a read, it never widens one. A field populates once per level:
-repeating a bare name is fine, repeating it with a callback or spec is an error.
+- When a level has a `select`, a populated relation must be named in it, or it is silently left out.
+  Populate narrows a read and never widens one.
+- A field can be populated once per level. Repeating the name alone is fine, but repeating it with a
+  callback or a spec object like `{ author: { select: ['name'] } }` is an error.
 
-Each level loads in one batched read, so a deep populate costs one query per relation, not one
-per row. The same rows are shared across the parents that link them, so do not mutate a
-populated record.
+Each level loads in one batched read, so a deep populate costs one query per relation, not one per
+row. Parents that link to the same row share one object, so do not mutate a populated record.
 
 ## Blocks
 
-A `blocks` field filters with the same `has`/`empty` pair, with one extra step: `has` names the
-block type before a callback probes its fields.
+A `blocks` field filters with the same `has` and `empty`, with one extra step: `has` names the block
+type first, and then a callback filters on its fields.
 
 ```ts
 await query('Pages')
@@ -163,18 +171,20 @@ await query('Pages')
   .findMany();
 ```
 
-The [blocks guide](./blocks.md#querying) covers the two-step and composing across types.
+The [blocks guide](./blocks.md#querying) covers these two steps and how to combine conditions across
+block types.
 
 ## Ordering
 
 `orderBy` sorts by a field. An optional second argument gives the direction, defaulting to
-ascending; call it again to add a tiebreaker:
+ascending. Call it again to add a second field, used when rows have the same value in the first:
 
 ```ts
 await query('Posts').orderBy('publishedAt', 'desc').orderBy('title').findMany();
 ```
 
-Ties always resolve by `UUID` last, so a paginated read never reorders rows between pages.
+Rows that are still equal are always sorted by `UUID` last, so a paginated read never reorders rows
+between pages.
 
 ## Selecting fields
 
@@ -184,17 +194,15 @@ type carries only those:
 ```ts
 const rows = await query('Posts').select('title', 'views').findMany();
 
-rows[0].title; // string
-rows[0].views; // number
-rows[0].author; // compile error: not selected
+rows[0].title;  // string
+rows[0].views;  // number
+rows[0].author; // error: not selected
 ```
 
-A [write-only field](./collections.md#write-only-and-locked-fields) inverts the default: no read
-returns it unless your `select` names it explicitly.
-
-`select` accumulates across calls. `_translations` selects like any field, and it is the one field
-you can neither filter nor order by: a locale list has no order, and a missing translation is a
-`null` you test at its locale.
+- Each `select` call adds to the ones before it.
+- A [write-only field](./collections.md#write-only-and-locked-fields) is never returned unless your
+  `select` names it explicitly.
+- `_translations` can be selected and [filtered](./translations.md#reading), but not ordered by.
 
 ## Pagination
 
@@ -203,36 +211,36 @@ you can neither filter nor order by: a locale list has no order, and a missing t
 ```ts
 const page = await query('Posts').orderBy('publishedAt', 'desc').paginate(1, 20);
 
-page.records; // the rows on this page
-page.total; // matching rows across every page
+page.records;  // the rows on this page
+page.total;    // matching rows across every page
 page.lastPage; // the number of the last page
 ```
 
-`limit` and `offset` are the lower-level pair when you want a window without the totals.
+`limit` and `offset` are the lower-level pair when you want a window of rows without the totals.
 
 ## Counting and checking
 
-`count` returns how many records match; `exists` returns whether any do. Both ignore ordering and
-the row window:
+`count` returns how many records match, and `exists` returns whether any do. Both ignore ordering
+and the row window:
 
 ```ts
 const total = await query('Posts').where('status', 'published').count();
 const any = await query('Posts').where('featured', true).exists();
 ```
 
-`pluck` reads one field's value from each record a `findMany` would return - the query's order
-and window apply:
+`pluck` reads one field's value from each record a `findMany` would return, with the query's order
+and window applied:
 
 ```ts
 const titles = await query('Posts').pluck('title'); // string[]
 ```
 
-Plucking a populated relation field returns the hydrated records, exactly as a full read would.
+Plucking a populated relation field returns the full related records, exactly as a full read would.
 
 ## Locales
 
-A collection with [translatable fields](./translations.md) reads one locale per query - `.locale()`
-picks it, the configured default applies without it:
+A collection with [translatable fields](./translations.md#reading) reads one locale per query.
+`.locale()` picks it, and the configured default applies without it:
 
 ```ts
 const german = await query('Posts').locale('de').findMany();

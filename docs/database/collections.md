@@ -1,12 +1,8 @@
 # Collections and fields
 
-A collection is a set of fields, declared in one file under `collections/`. Each field becomes a
-column, a relation, or a nested table. This guide covers the built-in field types -
-[define your own](./field-types.md) when none fits; see [schema sync](./sync.md) for how a
-collection file becomes a table, and [reading records](./queries.md) for querying them. Every
-field also takes per-value options: `default`, `sanitizers`, and `validators` act at write time,
-covered in [writing records](./writing.md); `when` activates a field per record, covered in
-[conditional fields](./conditional-fields.md).
+A collection is a table in your database, and each record is a row in it. You declare one as a set
+of fields, in one file under `collections/`. Each field becomes a column, a relation, or a nested
+table:
 
 ```ts
 // collections/Posts.ts
@@ -21,19 +17,39 @@ export default defineCollection({
 });
 ```
 
+This page covers the built-in field types. Every field also takes common options covered elsewhere:
+
+- [`default`](./writing.md#defaults),
+  [`sanitizers` and `validators`](./writing.md#sanitizers-and-validators) act when a record is
+  written.
+- [`when`](./conditional-fields.md) activates a field per record.
+
+When no built-in type fits, [define your own](./field-types.md). To read records back, use the
+[query builder](./queries.md).
+
+## Files and names
+
+The file's path names the collection, and [schema sync](./sync.md) creates its table at boot:
+
+- `collections/Posts.ts` becomes `Posts`.
+- A subdirectory joins the name: `collections/blog/Posts.ts` becomes `BlogPosts`.
+- An `index.ts` takes the name of its directory: `collections/blog/index.ts` becomes `Blog`.
+- A file or directory whose name starts with `_` is a helper and is ignored, so shared snippets can
+  live beside your collections.
+
+Collection names are converted to PascalCase, and field names are camelCase.
+
+Every collection also gets columns you never declare:
+
+- `UUID` - the text primary key.
+- `_updatedAt` - an internal timestamp.
+
 ## Column fields
 
 `text`, `integer`, `number`, and `boolean` are the plain column types. Each stores one value per
-row. The choice and date-time types below store through the same columns, adding shape on top.
+row.
 
-`integer` holds whole numbers within JavaScript's safe range. `number` holds finite decimals - an
-IEEE 754 double, exactly what a JavaScript number is, so every stored value reads back unchanged.
-`NaN` and the infinities are rejected.
-
-For money, use `integer` minor units (cents), not `number`. A double cannot represent a decimal
-tenth exactly, so float arithmetic drifts where currency must not.
-
-A field is required unless you pass `nullable: true`, which lets the column hold `null`:
+A field is required unless you pass `nullable: true`, which lets it hold `null`:
 
 ```ts
 fields: {
@@ -42,11 +58,16 @@ fields: {
 }
 ```
 
-A `text` field additionally rejects the empty string - `''` is not a value by default. Pass
-`allowEmpty: true` to permit it.
+- `text` rejects the empty string by default. Pass `allowEmpty: true` to allow it.
+- `integer` holds whole numbers within JavaScript's safe range.
+- `number` holds finite decimals, exactly like a JavaScript number. `NaN` and the infinities are
+  rejected.
 
-`text`, `integer`, and `number` take `min` and `max` bounds. On `integer` and `number` they bound
-the value; on `text` they bound the length in characters:
+For money, use `integer` minor units (cents), not `number`. A double cannot represent a tenth
+exactly, so float arithmetic builds up small errors that money must not have.
+
+`text`, `integer`, and `number` take `min` and `max`. On `integer` and `number` they limit the
+value, and on `text` they limit the length in characters:
 
 ```ts
 fields: {
@@ -55,13 +76,42 @@ fields: {
 }
 ```
 
-`unique` and `index` cover single-column constraints; multi-column ones live on the collection.
-Both are in [schema sync](./sync.md).
+## Uniques and indexes
+
+Field options cover the single-column cases:
+
+```ts
+fields: {
+  email: field('text', { unique: true }),
+  author: field('text', { index: true }),
+}
+```
+
+A unique index also works for plain lookups, so if you set both `unique` and `index`, only the
+unique index is created.
+
+Constraints over several columns live on the collection, one entry per constraint:
+
+```ts
+export default defineCollection({
+  fields: {
+    email: field('text'),
+    tenant: field('text'),
+  },
+  compositeIndexes: [{ fields: ['email', 'tenant'], unique: true }],
+});
+```
+
+`fields` lists your field names in order. With `unique: true` the entry is a unique constraint, and
+without it a plain index.
+
+The [destructive guard](./sync.md#the-destructive-guard) refuses a new unique constraint when the
+existing values contain duplicates.
 
 ## Choice fields
 
 `select` holds one value out of a list you declare. The generated record type narrows to exactly
-that union, and a write outside the list rejects:
+that union, and a write with a value outside the list is rejected:
 
 ```ts
 fields: {
@@ -69,8 +119,8 @@ fields: {
 }
 ```
 
-A choice may pair its stored value with a label the dashboard shows. Pass a message key to
-translate it per the viewer's language:
+A choice may pair its stored value with a label the dashboard shows. Pass a
+[message key](../i18n/messages.md) to translate it into the viewer's language:
 
 ```ts
 status: field('select', {
@@ -81,9 +131,7 @@ status: field('select', {
 }),
 ```
 
-`multiSelect` holds an ordered list of distinct strings, stored as a JSON list. With `choices`
-every entry must come from the list; without, any strings are legal - free-form tags. Duplicates
-collapse on write, and a create that omits the field stores `[]`:
+`multiSelect` holds an ordered list of distinct strings, stored as a JSON list:
 
 ```ts
 fields: {
@@ -92,8 +140,14 @@ fields: {
 }
 ```
 
-`min` and `max` on a `multiSelect` bound the entry count. In queries, the `includes` operators
-probe the list, so `.where('channels', (w) => w.includes('web'))` finds records carrying an entry.
+- With `choices`, every entry must come from the list. Without it, any strings are allowed, like
+  free-form tags.
+- Duplicates are removed on write.
+- A create that omits the field stores `[]`.
+- `min` and `max` limit the number of entries.
+
+In queries, the [`includes` operators](./queries.md#filtering) check the list, so
+`.where('channels', (w) => w.includes('web'))` finds records that have that entry.
 
 ## Date and time fields
 
@@ -103,9 +157,9 @@ The date and time types store each value in the form that matches what it is:
   is involved and no conversion can shift it.
 - `time` is a time of day, stored as `HH:MM:SS` text. `HH:MM` input is accepted and stored with
   `:00` seconds.
-- `dateTime` is an instant, stored as epoch milliseconds - the same representation `_updatedAt`
-  uses. The dashboard renders it in the viewer's own
-  [time zone setting](../dashboard/account.md), unless the field pins one.
+- `dateTime` is an instant, stored as epoch milliseconds, like `_updatedAt`. The dashboard renders
+  it in the viewer's own [time zone setting](../dashboard/account.md#the-settings), unless the
+  field sets a fixed zone.
 
 ```ts
 fields: {
@@ -115,14 +169,16 @@ fields: {
 }
 ```
 
-Each takes `min` and `max` bounds in its own value form; `dateTime` also accepts ISO 8601
-strings there. Because `date` and `time` store fixed-width ISO text, comparisons and sorting work
-in calendar and clock order without any parsing.
+Each takes `min` and `max` in its own value form, and `dateTime` also accepts ISO 8601 strings
+there. `date` and `time` store fixed-width text, so they compare and sort in calendar and clock
+order.
 
-`dateTime` takes display options on top. `relativeTime: true` shows the instant as elapsed
-time, like "2 hours ago", with the exact date on hover - the way the `Updated` column already
-reads. `timezone` pins an IANA zone for the field's cells and calendar, for an instant that belongs
-to one place whoever is looking:
+`dateTime` also takes display options:
+
+- `relativeTime: true` shows the instant as elapsed time, like "2 hours ago", with the exact date
+  on hover.
+- `timezone` sets a fixed IANA zone for the field's cells and calendar. Use it for an instant that
+  belongs to one place, no matter who is looking.
 
 ```ts
 fields: {
@@ -136,11 +192,16 @@ fields: {
 `readable`, `writable`, and `immutable` control who may see or change a field. Every field kind
 takes them - columns, relations, composites, and blocks alike.
 
-`readable: false` makes a field write-only. No read returns it: it is gone from every record a
-query or the [collections API](../api/collections.md) hands back, including the record a create or
-update returns. Over HTTP, naming it in a filter, select, or sort is indistinguishable from naming
-a field that does not exist - a client cannot even learn it is there. Trusted server code reads it
-by asking explicitly:
+- `readable: false` makes a field write-only. No read returns it, including the record a create or
+  update returns.
+- `writable: false` drops the field from the create and update inputs, so its value comes from its
+  `default`. Use it for values that the app computes and the caller never sets.
+- `immutable: true` locks a field after create: creates accept it, and updates do not. It is allowed
+  only on top-level fields, because an update rewrites composite items and block instances
+  completely.
+
+Server code reads a write-only field by selecting it explicitly. That is the only way to read it,
+and it is how the framework's own `Users.password` works:
 
 ```ts
 fields: {
@@ -152,18 +213,12 @@ fields: {
 const user = await query('Users').select('UUID', 'password').where('email', email).findFirst();
 ```
 
-That explicit `select` is the one way back in. The framework's own `Users.password` works exactly
-like this.
+In server code, the generated input types enforce `writable` and `immutable`. Over HTTP, through the
+[collections API](../api/collections.md) or a [URL query](../api/url-queries.md):
 
-`writable: false` is the mirror: the field drops from the create and update inputs, so its stored
-value comes from its `default`. Use it for values the app computes, never the caller.
-
-`immutable: true` locks a field after create. Creates accept it; updates do not. It is a
-top-level option: an update rewrites composite items and block instances whole, so a nested value
-cannot lock.
-
-`writable` and `immutable` act through the generated input types on the server and through request
-validation on the HTTP wire - a locked field in a write body rejects exactly as an unknown one.
+- A write-only field in a filter, select, or sort is treated like a field that does not exist, so
+  a client cannot learn it is there.
+- A `writable: false` or locked field in a write body is rejected like an unknown one.
 
 ## Relations
 
@@ -179,15 +234,18 @@ fields: {
 }
 ```
 
-The column stores the target's `UUID`, and it is always nullable - the target can be deleted out
-from under it. `onDelete` decides what happens then: `setNull` (the default) clears the reference,
-`cascade` deletes the referencing row too, `restrict` blocks the delete while the reference exists.
+The column stores the target's `UUID`. It is always nullable, because the target can be deleted
+while the reference still points to it. `onDelete` decides what happens then:
+
+- `setNull` (the default) clears the reference.
+- `cascade` deletes the referencing row too.
+- `restrict` blocks the delete while the reference exists.
 
 ```ts
 author: field('record', { collection: 'Users', onDelete: 'cascade' }),
 ```
 
-The column is indexed by default. `unique: true` upgrades that index to a one-to-one constraint -
+The column is indexed by default. `unique: true` upgrades that index to a one-to-one constraint:
 at most one row may reference each target.
 
 ### Many references
@@ -200,9 +258,9 @@ fields: {
 }
 ```
 
-Here `onDelete` is `cascade` or `restrict` and defaults to `cascade`, which removes the link when
-its target is deleted - the referencing row stays. `min` and `max` bound how many links a written
-list may hold.
+- `onDelete` is `cascade` (the default) or `restrict`. `cascade` removes the link when its target
+  is deleted, and the referencing row stays.
+- `min` and `max` limit how many links a written list may hold.
 
 ### Both sides of a relation
 
@@ -215,15 +273,19 @@ keeping its own order:
 fields: {
   tags: field('records', { collection: 'Tags' }),
 }
+```
 
+```ts
 // collections/Tags.ts
 fields: {
   posts: field('records', { collection: 'Posts', inverse: 'tags' }),
 }
 ```
 
-Reading `posts` on a tag walks the same links `tags` on a post does, backwards. The inverse side
-carries no `onDelete` of its own - it follows the owner.
+Reading `posts` on a tag uses the same links as `tags` on a post, in the opposite direction. The
+inverse side has no `onDelete` of its own. It follows the owner.
+
+To read related records, [populate](./queries.md#populating-relations) them.
 
 ## Composite fields
 
@@ -256,33 +318,35 @@ fields: {
 ```
 
 The subfields are ordinary `field(...)` instances, so a composite may nest further composites and
-relations to any depth. Every item carries its own `UUID`, stable across writes, so a read always
-tells you which item is which.
+relations to any depth. Every item has its own `UUID`, which stays the same across writes. This is
+how an [update keeps an item](./writing.md#lists-on-update).
 
-Inside a repeater, a `unique` subfield spans every item of every record at once.
-`uniquePerParent: true` scopes it to each record's own list, so a value may repeat across records.
-
-A repeater takes `min` and `max` to bound how many items a written list may hold.
+- `min` and `max` limit how many items a written repeater list may hold.
+- A `unique` subfield is unique across every item of every record. `uniquePerParent: true` limits it
+  to each record's own list, so a value may repeat across records.
+- `layout` arranges the subfields in the editor, in the same
+  [grammar](../dashboard/layouts.md) a collection uses.
 
 ## Blocks
 
-Where a repeater repeats one shape, a `blocks` field holds an ordered list of mixed, reusable
-shapes, each defined once under `blocks/`. See [blocks](./blocks.md).
+A repeater repeats one shape. A `blocks` field holds an ordered list of mixed, reusable shapes, each
+defined once under `blocks/`. [Blocks](./blocks.md) covers defining, reading, and writing them.
 
 ## Translations
 
-Any top-level field takes `translatable: true` to hold one value per locale - a scalar per locale,
-or a whole item list per locale for composites and `records`. The one exception is an inverse
-`records` field: it follows the owning side's junction. A translatable collection also reads
-`_translations`, the locales each record holds, beside `UUID` and `_updatedAt`. See
-[translations](./translations.md) for the locale set, reading, and writing per locale.
+Any top-level collection field takes [`translatable: true`](./translations.md#marking-fields) to
+hold one value per locale.
+[Translations](./translations.md) covers which fields can be translated, the locale set, and
+reading and writing per locale.
 
 ## Dashboard appearance
 
-Every field takes presentation options, shown wherever the dashboard renders it. `label`
-replaces the sentence-cased field name, `description` renders beneath it, and `placeholder` hints
-an empty input. Each accepts a plain string or a message key that translates per the viewer's
-language:
+Every field takes presentation options, shown wherever the dashboard renders it. Each accepts a
+plain string or a [message key](../i18n/messages.md) that is translated into the viewer's language:
+
+- `label` replaces the sentence-cased field name.
+- `description` renders below it, as markdown: bold, code, links, and pipe tables.
+- `placeholder` shows a hint in an empty input, on fields that have one.
 
 ```ts
 fields: {
@@ -294,39 +358,31 @@ fields: {
 }
 ```
 
-A description renders as markdown: bold, code, links, and pipe tables. A long one can start
-collapsed behind a "Show description" toggle - pass an object with `text` instead of a string.
-`showLabel` and `hideLabel` replace the toggle's labels, and `expanded: true` opens it from the
-start.
+A long description can start collapsed behind a "Show description" toggle. Pass an object with
+`text` instead of a string. `showLabel` and `hideLabel` replace the toggle's labels, and
+`expanded: true` opens it from the start.
 
-A `boolean` edits as a checkbox unless you pass `display: 'switch'`, and a `text` field with
-`multiline: true` edits as a text area from the start. Neither changes what is stored.
+```ts
+fields: {
+  slug: field('text', {
+    description: {
+      text: 'app.slug.help',
+      showLabel: 'Show examples',
+      hideLabel: 'Hide examples',
+    },
+  }),
+}
+```
 
-The optional collection-level `dashboard` key groups how the dashboard presents the collection
-itself: `icon`, `recordLabel`, and `table`.
+Two options change only the editor, never what is stored:
 
-`icon` names the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. The name completes
-in your editor, and an unknown one fails at boot. Omitted, the menu row renders no icon.
+- A `boolean` is edited as a checkbox, as a switch with `display: 'switch'`, or as two buttons with
+  `display: 'buttons'`, labeled by `trueLabel` and `falseLabel`.
+- A `text` field with `multiline: true` is edited as a text area.
 
-`recordLabel` names the field - or fields - whose values title a record wherever the dashboard
-shows one: relation cells, record pickers, the activity feed. A list joins its parts with single
-spaces, skipping empty values, so `['firstName', 'lastName']` renders as `Ada Lovelace`, and a
-picker search matches each of its first ten words against every part. Each part must be a readable
-plain text field.
+## The collection in the dashboard
 
-For anything beyond spaces, write a template: `'{lastName}, {firstName}'` renders as
-`Lovelace, Ada`, keeping the literal text between its fields. A literal only renders between
-filled fields, so an empty `firstName` gives `Lovelace`, not `Lovelace,`. Search and sorting keep
-working: the template's fields are the label fields.
-Omitted, the first readable text field titles the record. A record with no label text shows `#`
-plus the first eight characters of its `UUID`.
-
-`table` sets the list view's defaults. Its `columns` lists the columns to show, in order, one entry
-per field. An entry is a field name, optionally followed by its widths as `name|width|minWidth`,
-each a plain CSS length or percentage like `320px` or `50%`. `UUID`, `_updatedAt`, and on a
-translatable collection `_translations` are valid names beside your declared readable fields.
-Omitted, the list view shows the first four readable fields with `_updatedAt` closing the set; a
-translatable collection shows three, then `_translations`.
+The collection-level `dashboard` key sets how the dashboard presents the collection itself:
 
 ```ts
 export default defineCollection({
@@ -334,6 +390,7 @@ export default defineCollection({
     icon: 'note',
     recordLabel: 'title',
     table: { columns: ['title | 320px', 'views', '_updatedAt'] },
+    layout: [{ row: ['title', 'views | 8rem'] }],
   },
   fields: {
     title: field('text'),
@@ -342,5 +399,41 @@ export default defineCollection({
 });
 ```
 
-A viewer can rearrange the columns in the dashboard; their choice rides in the URL and overrides
+- `icon` - the [Tabler icon](https://tabler.io/icons) the sidebar menu shows. Your editor
+  autocompletes the name, and an unknown one fails at boot. If you omit it, the menu row shows no
+  icon.
+- `recordLabel` - the field that gives a record its title, as [record labels](#record-labels)
+  describes.
+- `table` - the list view's [default columns](#table-columns).
+- `layout` - how the record editor [arranges the fields](../dashboard/layouts.md).
+
+### Record labels
+
+`recordLabel` names the field whose value is a record's title wherever the dashboard shows one:
+relation cells, record pickers, and the activity feed. Each field it names must be a readable plain
+text field.
+
+- A list joins its fields with single spaces, skipping empty values: `['firstName', 'lastName']`
+  renders as `Ada Lovelace`.
+- A template keeps literal text between its fields: `'{lastName}, {firstName}'` renders as
+  `Lovelace, Ada`. A literal renders only between filled fields, so an empty `firstName` gives
+  `Lovelace`, not `Lovelace,`.
+
+Search and sorting use the label's fields. A picker search matches each of its first ten words
+against every field.
+
+If you omit the option, the first readable text field gives the record its title. A record with no
+label text shows `#` plus the first eight characters of its `UUID`.
+
+### Table columns
+
+`table.columns` lists the list view's columns in order, one entry per field. An entry may add its
+widths as `name|width|minWidth`, each a CSS length or percentage like `320px` or `50%`.
+
+- Your readable fields are valid names, plus `UUID`, `_updatedAt`, and on a translatable collection
+  `_translations`.
+- If you omit it, the list view shows the first four readable fields, with `_updatedAt` as the last
+  column. A translatable collection shows three, then `_translations`.
+
+A viewer can rearrange the columns in the dashboard. Their choice is stored in the URL and overrides
 the declared defaults until they restore them.

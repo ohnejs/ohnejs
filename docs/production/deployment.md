@@ -1,9 +1,9 @@
 # Deployment
 
 An ohne app deploys as the source you wrote. There is no build step: Node 26 runs the `.ts` files
-directly, so the artifact is your repository plus its installed dependencies. Production runs the
-same commands as your machine - `ohne serve api`, and `ohne serve dashboard` if you use the
-dashboard - each a plain long-running process.
+directly, so what you deploy is your repository plus its installed dependencies. Production runs
+the same commands as your machine: [`ohne serve api`](../project/cli.md#ohne-serve), and
+`ohne serve dashboard` if you use the dashboard. Each is a plain long-running process.
 
 ## What a deploy needs
 
@@ -14,10 +14,10 @@ npm install
 npx ohne serve api
 ```
 
-The scaffolded `package.json` wires `"prepare": "ohne prepare"`, so the install itself runs
-codegen through npm's own lifecycle hook - the generated types are in place for an
-`npm run typecheck` in CI with no extra step. The server regenerates them at boot anyway, so a stale artifact cannot
-serve; `SKIP_CODEGEN=1` skips that pass when the install already prepared.
+The install runs [`ohne prepare`](../project/cli.md#ohne-prepare) through the scaffolded `prepare`
+script, so the types are ready for `npm run typecheck` in CI. The server regenerates them at boot
+anyway, so it never runs with outdated types. [`SKIP_CODEGEN=1`](../project/env.md#the-built-ins)
+skips that step when the install has already prepared them.
 
 The API and the dashboard are separate processes on separate ports. Run each under your process
 manager, each with its own `PORT`:
@@ -27,64 +27,71 @@ PORT=8080 npx ohne serve api
 PORT=8081 npx ohne serve dashboard
 ```
 
-The dashboard tells the browser where the API lives. By default it derives the address from the
-`api` config, which only works when the browser can reach that host directly. Behind a proxy or
-across domains, set `dashboard.apiURL` (or the `API_URL` env var) to the public API base URL,
-`api.basePath` included. Set `dashboard.origin` (or `DASHBOARD_URL`) to the dashboard's own public
-origin as well, so [CORS](#cors) lets it call the API. See [config](../project/config.md).
+The dashboard tells the browser where the API is. It builds the address from the `api` config. That
+only works when the browser can reach that host directly. Behind a proxy or across domains:
+
+- Set [`dashboard.apiURL`](../project/config.md#the-dashboard), or the `API_URL` env var, to the
+  public API base URL, `api.basePath` included.
+- Set `dashboard.origin`, or `DASHBOARD_URL`, to the dashboard's own public origin, so [CORS](#cors)
+  lets it call the API.
 
 ## Readiness
 
-The port opens last. Layers load, boot files run, codegen writes, the database connects and its
-schema syncs - only then does the server listen. An accepted connection is therefore the readiness
-signal: point your platform's probe at the port, as a TCP check or a request to any route you
-serve. A failed boot - a refused sync, a bad config - means the port never opens, the probe never
-passes, and the previous instance keeps serving.
+The port opens last. Layers load, [boot files run](../project/boot.md#when-they-run), codegen
+writes, the database connects and its schema syncs, and only then does the server listen. So an
+accepted connection means the server is ready: point your platform's probe at the port, as a TCP
+check or a request to any route you serve.
 
-Supervisors get more signals: once listening, the process prints ``API ready at `http://...` ``
-and, when spawned with an IPC channel, sends a `'ready'` process message. To announce the address
-yourself - to a service registry, say - register the `server:ready` [hook](../api/hooks.md) from a
-boot file.
+A failed boot, like a refused sync or a bad config, never opens the port. The probe never passes,
+and the previous instance keeps serving.
+
+Supervisors get more signals once the server listens:
+
+- The process prints ``API ready at `http://...` ``.
+- A process spawned with an IPC channel sends a `'ready'` process message.
+
+To announce the address yourself, to a service registry for example, register the
+[`server:ready`](../api/hooks.md#serverready) hook from a boot file.
 
 ## Schema changes
 
-The [schema sync](../database/sync.md) runs inside every boot, guarded against data loss. For a
-deploy, gate the pipeline before cutover:
+The [schema sync](../database/sync.md) runs inside every boot, guarded against data loss. Run this
+check in your pipeline before the new build takes over:
 
 ```sh
 npx ohne sync --dry-run
 ```
 
-It rehearses migrations, diff, and guard against the live database, then rolls everything back,
-exiting non-zero exactly where a real boot would refuse - a bad schema change fails CI while the
-old build still serves. For the change itself, either let the new build's boot apply it, or stop
-the app, run `ohne sync`, and start; the sync page covers both.
+It [rehearses](../database/migrations.md#rehearsing) the whole sync against the live database and
+rolls it back, so a bad schema change fails CI while the old build still serves.
+[Syncing without serving](../database/sync.md#syncing-without-serving) explains how to apply the
+change after that.
 
 ## Data on disk
 
-SQLite is a file: `.data/ohne.db` by default, resolved against the project root, overridden by
-`database.url` or the `DATABASE` env var - see [the database](../database/engine.md). It runs in
-WAL mode, so two sidecars sit beside it, `ohne.db-wal` and `ohne.db-shm`, and the three are one
-database.
+SQLite is a file: `.data/ohne.db` by default, relative to the project root, and
+[overridden](../database/engine.md#where-the-database-lives) by `database.url` or the `DATABASE` env
+var. It runs in WAL mode, so two sidecar files sit beside it, `ohne.db-wal` and `ohne.db-shm`. The
+three files are one database.
 
 In production that means:
 
-- The data directory lives on a persistent volume. A container's writable layer vanishes with the
-  container, and the database with it.
-- The trio never separates. Move, copy, and restore all three together.
+- Keep the data directory on a persistent volume. A container's writable layer disappears with the
+  container, and so does the database.
+- Never separate the three files. Move, copy, and restore all three together.
 - Back up with the app stopped, where copying the directory is enough, or use SQLite-aware tooling
-  against the live file. A plain file copy while the app writes can catch the file and its journal
+  against the live file. A plain file copy while the app writes can copy the file and its journal
   at different moments and produce a corrupt copy.
 
 [Helper databases](../database/engine.md#helper-databases) are files too, each with its own
-sidecars. The same rules apply.
+sidecar files. The same rules apply.
 
 ## Behind a proxy
 
 By default ohne trusts no proxy: `api.trustProxy` is empty, forwarding headers are ignored, and
-the socket is the only truth. Behind a load balancer that means `event.ip` is the balancer's
-address and `event.url` reads as plain `http`. List the CIDR ranges your proxies connect from, and
-their `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` are honored:
+ohne trusts only the socket connection itself. Behind a load balancer,
+[`event.ip`](../api/request.md#the-event) is then the balancer's address and `event.url` reads as
+plain `http`.
 
 ```ts
 import { defineConfig } from 'ohnejs';
@@ -97,46 +104,48 @@ export default defineConfig({
 });
 ```
 
-Only `X-Forwarded-*` is read; the RFC 7239 `Forwarded` header is ignored, since proxies often pass
-it through unchanged from the client.
-
-`allowedHosts` closes the other direction: a request whose `Host` matches none of the patterns is
-refused with `400` before routing. Empty, the server answers to any host.
+- `trustProxy` lists the CIDR ranges your proxies connect from. ohne then trusts their
+  `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. The RFC 7239 `Forwarded`
+  header is ignored, since proxies often pass it through unchanged from the client.
+- `allowedHosts` limits which hosts the server answers to: a request whose `Host` matches none of
+  the patterns is refused with `400` before routing. When empty, the server answers to any host.
 
 ## CORS
 
-The ohne layer mounts a global `cors` middleware: only the dashboard's origin may read API
-responses, cookies included. That origin is `DASHBOARD_URL`, else `dashboard.origin`, else
-`localhost` on `dashboard.port`. A dashboard reached at any other origin - a public domain, or a
-port moved with `PORT` - needs one of the first two set to that origin, or the browser blocks its
-requests. Set `DASHBOARD_URL` on the API process, not the dashboard's. See
-[middleware](../api/middleware.md#cors).
+The `ohnejs/base` layer mounts a global [`cors` middleware](../api/middleware.md#cors): only the
+dashboard's origin may read API responses, cookies included.
+
+- When the dashboard is reached at any address other than `localhost` on `dashboard.port`, like a
+  public domain or a port changed with `PORT`, set `DASHBOARD_URL` or `dashboard.origin` to that
+  origin. Otherwise the browser blocks its requests.
+- Set `DASHBOARD_URL` on the API process, not the dashboard's.
 
 ## Secrets
 
-Signed cookies sign with the `COOKIE_SECRET` env var - a long random value. Without it, signing
-throws rather than sign under a blank key, so set it before the app needs it. See
-[reading the request](../api/request.md).
+[Signed cookies](../api/request.md#signed-cookies) are signed with the `COOKIE_SECRET` env var, a
+long random value. Without it, signing throws instead of signing with an empty key, so set it before
+the app needs it.
 
-Set it in the process environment, or in a `.env` at the project root on a single-host deploy. The
-file fills what the environment lacks and never overrides it, so a value the platform injects
-always wins. See [the `.env` file](../project/env.md#the-env-file).
+Set it in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project
+root on a single-host deploy. The file only sets variables the environment does not have and never
+overrides it, so a value set by the platform always wins.
 
 ## Graceful shutdown
 
-`SIGTERM` and `SIGINT` funnel into one ordered drain: stop accepting, wait for in-flight requests
-and their `waitUntil` work, then close the database. These `api` settings shape it:
+`SIGTERM` and `SIGINT` both start the same ordered drain: stop accepting connections, wait for
+in-flight requests and their [`waitUntil`](../api/response.md#after-the-response) work, then close
+the database. These `api` settings control it:
 
-- `preStopDelay` - keep serving this long after the signal before refusing connections, buying the
-  load balancer time to deregister the instance. Default: refuse at once.
+- `preStopDelay` - keep serving this long after the signal before refusing connections. This gives
+  the load balancer time to deregister the instance. Default: refuse at once.
 - `shutdownTimeout` - how long to wait for in-flight work to drain. When it expires, the remaining
-  connections are destroyed so the process can still exit. Default: wait indefinitely.
-- `deadline` - a global cap over every shutdown step combined, the pre-stop delay, the drain, and
-  the database close included. Default: wait indefinitely.
+  connections are destroyed so the process can still exit. Default: wait with no time limit.
+- `deadline` - a global limit for all shutdown steps together, including the pre-stop delay, the
+  drain, and the database close. Default: wait with no time limit.
 
-The process exits `0` on a clean drain, `1` when the deadline won. Fit the sum inside your
-platform's kill window - Kubernetes grants 30 seconds by default, PM2's `kill_timeout` only 1.6 -
-or the platform `SIGKILL`s the process mid-drain:
+The process exits `0` on a clean drain, and `1` when the deadline passes first. Keep the total below
+your platform's kill timeout, or the platform `SIGKILL`s the process during the drain. Kubernetes
+gives 30 seconds by default, and PM2's `kill_timeout` gives only 1.6:
 
 ```ts
 export default defineConfig({
@@ -150,23 +159,22 @@ export default defineConfig({
 
 ## Capacity
 
-The `api` group also carries the load-shaping knobs. Durations and sizes take a number or a string
-like `'30s'` and `'1mb'`; `false` turns a knob off. The full surface, with every default, lives in
-[config](../project/config.md).
+The `api` group also holds the settings that control load.
+[The API server](../project/config.md#the-api-server) lists each one with its default. For
+production:
 
-| Setting            | Default       | Caps                                                           |
-| ------------------ | ------------- | -------------------------------------------------------------- |
-| `maxConnections`   | unbounded     | Concurrent sockets the server accepts.                         |
-| `maxBodySize`      | `'1mb'`       | Request body size; anything over is refused with `413`.        |
-| `maxHeaderSize`    | 16 KiB (Node) | Total request header block.                                    |
-| `handlerTimeout`   | `'30s'`       | Middleware and handler runtime; on overrun the reply is `503`. |
-| `headersTimeout`   | 60s (Node)    | Wait for the complete request headers.                         |
-| `requestTimeout`   | 5m (Node)     | The entire request, headers and body.                          |
-| `keepAliveTimeout` | 5s (Node)     | Idle keep-alive socket between requests.                       |
-| `waitUntilTimeout` | off           | Background `waitUntil` work after the response.                |
+| Setting                                             | When to set it                                                                                            |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `maxConnections`                                    | To limit how many sockets one instance accepts at the same time. No limit by default.                     |
+| `maxBodySize`, `handlerTimeout`                     | When some routes need larger bodies or more time. Prefer [per route](../api/routes.md#per-route-options). |
+| `maxHeaderSize`, `headersTimeout`, `requestTimeout` | To drop oversized or slow clients sooner than Node's defaults, or to give slow uploads more time.         |
+| `keepAliveTimeout`                                  | Behind a load balancer that reuses connections, set it above the balancer's idle timeout.                 |
+| `waitUntilTimeout`                                  | To limit background `waitUntil` work, which a graceful shutdown otherwise waits for.                      |
 
 ## Logs
 
-Everything the app prints goes through one printer. `SILENT=1`, or `printer.silent` in config,
-drops every line; `DEBUG=1` adds debug output; env wins over config when set. See
-[env](../project/env.md).
+Everything the app prints goes through one printer:
+
+- `SILENT=1`, or `printer.silent` in config, drops every line.
+- `DEBUG=1` adds debug output.
+- The env var [wins over config](../project/env.md#environment-beats-config) when set.

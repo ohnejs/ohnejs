@@ -1,13 +1,7 @@
 # Roles and capabilities
 
 Authorization in ohne is capability-based. A capability is a permission string like
-`collection.Posts.create`. A role is a named bundle of capabilities, defined in code. A user holds
-any number of roles, and the capabilities of every held role union - what any role grants, the
-user can do.
-
-Roles live in your project, not in the database. They are policy, and policy is code: reviewed,
-versioned, and typed like everything else. The database stores only the assignment - which role
-names a user holds.
+`collection.Posts.create`. A role is a named bundle of capabilities, defined in code:
 
 ```ts
 // roles/editor.ts
@@ -18,13 +12,17 @@ export default defineRole({
 });
 ```
 
-A user with `roles: ['editor']` can now do anything on `Posts` and read `Tags`, both in the
-[collections API](../api/collections.md) and behind any [guard you write](#guarding-your-own-routes).
+A user holds any number of roles and gets the union of their capabilities. A user with
+`roles: ['editor']` can now do anything on `Posts` and read `Tags`, both in the
+[collections API](../api/collections.md#exposure) and behind any
+[guard you write](#guarding-your-own-routes).
+
+Roles are policy, so they live in your project as code: reviewed, versioned, and typed like
+everything else. The database stores only the assignment - which role names a user holds.
 
 ## Capabilities
 
-A capability is a dot-separated string. Every collection contributes one per operation, plus
-a wildcard:
+A capability is a dot-separated string. Every collection adds one per operation, plus a wildcard:
 
 ```
 collection.Posts.read
@@ -34,24 +32,26 @@ collection.Posts.delete
 collection.Posts.*
 ```
 
-`collection.*` covers every collection capability, and `*` alone covers everything - that is what
-makes an admin. Wildcards live on the granting side only: a role holds `collection.Posts.*`, but a
-check always asks for one concrete capability.
+- `collection.*` covers every collection capability.
+- `*` alone covers everything. A user who holds it is an admin.
+- Only roles use wildcards: a role holds `collection.Posts.*`, but a check always asks for one
+  concrete capability.
 
-Codegen derives these names from your collections, so they autocomplete wherever a capability is
-expected. Any other dot-separated string is legal too - see
-[custom capabilities](#custom-capabilities).
+[Codegen](../project/cli.md#ohne-prepare) generates these names from your collections, so they
+autocomplete wherever a capability is expected.
+[Any other dot-separated string](#custom-capabilities) is allowed too.
 
 ## Defining roles
 
 Each `.ts` file under `roles/` is one role, named by its kebab-cased path: `roles/editor.ts` is
 `editor`, `roles/shop/manager.ts` is `shop-manager`. The file default-exports a `defineRole`
-result, and codegen types every name into `RoleName`, so assignments autocomplete and a typo is a
+result. Codegen types every name into `RoleName`, so assignments autocomplete and a typo is a
 compile error.
 
-The ohne layer ships the `admin` role, holding `['*']`. There is no separate superuser flag - the
-wildcard is the bypass. Your app can [override](../project/layers.md) it by shipping its own
-`roles/admin.ts`, or drop it with `disable: { roles: ['admin'] }`.
+The `ohnejs/base` layer ships the `admin` role, holding `['*']`. There is no separate superuser
+flag. The wildcard is what lets an admin pass every check. Your app can
+[override](../project/layers.md#what-overrides-what) it by shipping its own `roles/admin.ts`, or
+drop it with [`disable: { roles: ['admin'] }`](../project/config.md#disabling).
 
 ## Labels
 
@@ -69,41 +69,48 @@ export default defineRole({
 });
 ```
 
-Both are [messages](../i18n/messages.md): a catalog key translates per viewer, a plain string shows
-as is. Omit the label and the name is sentence-cased, so `content-editor` reads `Content editor`.
+Both are [messages](../i18n/messages.md): a catalog key is translated for each viewer, and a plain
+string is shown unchanged. If you leave out the label, the name is sentence-cased, so
+`content-editor` reads `Content editor`.
 
 ## Assigning roles
 
-The `Users` collection carries a `roles` field: the list of role names the user holds. It defaults
-to `[]`, deduplicates on write, and rejects a name no role file defines. A role you later delete
-from code simply grants nothing - a stale assignment degrades, it never breaks.
+The `Users` collection has a `roles` field, the list of role names the user holds:
 
-Adding a `roles` field to your own collection that already holds rows is the standard
-new-required-field story: add it `nullable: true`, backfill, then drop the flag with a
+- It defaults to `[]` and removes duplicate names on write.
+- It rejects a name that no role file defines.
+- A role you later delete from code simply grants nothing. The old assignment loses its effect, but
+  it never causes an error.
+
+The first admin needs no code: the dashboard's [install page](./authentication.md#the-endpoints)
+creates it.
+
+`Users` is itself [exposed over the collections API](../api/collections.md#exposure), so the first
+admin can then manage every account over HTTP: creating users, assigning roles. The
+`collection.Users.*` capabilities guard these operations.
+
+Adding a `roles` field to your own collection that already holds rows works like adding any new
+required field: add it with [`nullable: true`](../database/collections.md#column-fields), fill the
+existing rows, then remove the flag with a
 [switch migration](../database/migrations.md#switching-an-attribute).
-
-The first admin needs no code. While `Users` is empty, the dashboard opens its install page, which
-creates the account with the `admin` role and signs it in. `POST /auth/install` with
-`{ email, password }` does the same over HTTP and answers `403` once any user exists.
-
-Because `Users` is itself exposed over the collections API, that first admin can then manage every
-account over HTTP - creating users, assigning roles - guarded by the `collection.Users.*`
-capabilities.
 
 ## The collections API guard
 
-An operation a collection [exposes](../api/collections.md#exposure) is guarded by default: the
-request needs a signed-in user whose capabilities cover `collection.<Name>.<operation>`. No user
-is a `401`, a user without the capability a `403`. An operation marked `'public'` skips the guard.
+An operation that a collection [exposes](../api/collections.md#exposure) is guarded by default: the
+request needs a signed-in user whose capabilities cover `collection.<Name>.<operation>`.
 
-The guard answers who may run an operation. Which records they reach - only their own posts, only
-published ones - is the operation's [`access`](../api/collections.md#access) option.
+- A request with no user gets a `401`.
+- A user without the capability gets a `403`.
+- An operation marked `'public'` skips the guard.
+
+The guard decides who may run an operation. The operation's [`access`](../api/collections.md#access)
+option decides which records they reach, for example only their own posts or only published ones.
 
 ## Guarding your own routes
 
-For your own endpoints, `requireCapability` is the one-line guard. It resolves the signed-in user,
-checks the capability against their union, and throws `401` or `403` exactly as the collections
-API does:
+For your own endpoints, `requireCapability` is the one-line guard. It gets the
+[signed-in user](./authentication.md#reading-the-current-user), checks the capability against the
+user's capabilities, and throws `401` or `403` exactly as the collections API does:
 
 ```ts
 // api/publish.post.ts
@@ -116,9 +123,9 @@ export default defineHandler(async () => {
 });
 ```
 
-To branch instead of reject, `userCan` answers the same question as a boolean, and
-`userCapabilities` returns the resolved union. Both work from the user's roles and the role files -
-no query runs:
+To branch instead of rejecting, `userCan` answers the same question with a boolean, and
+`userCapabilities` returns every capability the user's roles grant. Both work from the user's roles
+and the role files, so no query runs:
 
 ```ts
 import { requireUser, userCan, userCapabilities } from 'ohnejs/auth';
@@ -131,7 +138,7 @@ userCapabilities(user);                   // -> ['collection.Posts.*', 'collecti
 ## Custom capabilities
 
 A capability does not have to name a collection. Any dot-separated string works, so a feature can
-carve its own namespace:
+use its own namespace:
 
 ```ts
 // roles/accountant.ts
@@ -146,10 +153,9 @@ export default defineRole({
 await requireCapability('billing.export');
 ```
 
-A custom name needs no declaration to work, but nothing types it: codegen derives the known names
-from your collections alone, so `billing.export` does not autocomplete. Declare it yourself with
-the same `declare module` the other extension points take, in any file your `tsconfig.json`
-includes:
+A custom name works without any setup, but it does not autocomplete, because codegen generates the
+known names only from your collections. To get completion, declare it in any file your
+`tsconfig.json` includes, with the same `declare module` the other extension points use:
 
 ```ts
 // capabilities.ts
@@ -162,14 +168,17 @@ declare module 'ohnejs' {
 ```
 
 Both names now complete in `defineRole`, `requireCapability`, and `userCan`, beside the generated
-ones. The union stays open, so a name you did not declare still typechecks; the declaration buys
-completion, not rejection. A [layer](../project/layers.md#new-config-keys) declares its names the
-same way.
-
-Prefix a layer's capabilities with its name and they cannot collide with an app's own.
+ones. The union stays open, so a name you did not declare still typechecks. The declaration adds
+completion. It does not make other names an error.
 
 ## Roles across layers
 
-Roles stack like everything a layer ships: each layer's `roles/` directory is scanned, a closer
-layer's role replaces a further one's under the same name, and `disable: { roles: [...] }` drops
-names entirely. The directory is configurable per layer as `dirs.roles`.
+Roles [stack](../project/layers.md#what-overrides-what) like everything a layer ships:
+
+- Each layer's `roles/` directory is scanned. The directory is configurable per layer as
+  [`dirs.roles`](../project/config.md#directories).
+- A closer layer's role replaces a further layer's role with the same name.
+- `disable: { roles: [...] }` drops names entirely.
+
+A [layer](../project/layers.md#new-config-keys) declares its custom capability names the same way an
+app does. Prefix them with the layer's name, and they cannot collide with an app's own.

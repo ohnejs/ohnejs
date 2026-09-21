@@ -1,8 +1,8 @@
 # Translations
 
 A translatable field holds one value per locale. You mark the field, configure the locales your
-content speaks, and scope a query with `.locale()` - everything else stays the query surface you
-already know.
+content uses, and scope a query with `.locale()` to pick the locale you [read](./queries.md) or
+[write](./writing.md).
 
 ```ts
 fields: {
@@ -16,12 +16,12 @@ const german = await query('Posts').locale('de').findMany();
 ```
 
 Content locales are independent from the UI languages your [message catalogs](../i18n/messages.md)
-translate. A site can render its interface in English while serving German records, or the other
+translate. Your app can render its interface in English while serving German records, or the other
 way around.
 
 ## Marking fields
 
-Any top-level field takes `translatable: true`:
+Any top-level collection field takes `translatable: true`:
 
 ```ts
 fields: {
@@ -39,20 +39,23 @@ fields: {
 }
 ```
 
-A column-bearing field - a scalar or a `record` reference - keeps one value per locale. A
-composite or `records` field keeps one item list per locale: the German query reads and writes the
-German sections, the English ones untouched beside them. So does a [blocks](./blocks.md) field:
-one block list per locale.
+- A scalar or a `record` reference keeps one value per locale.
+- A composite, a `records`, or a [blocks](./blocks.md) field keeps one item list per locale. The
+  German query reads and writes the German sections, and the English ones stay untouched beside
+  them.
+- A composite translates as a whole. Marking one of its subfields is rejected when the collection
+  loads, so there is no half-translated repeater item.
+- A block's fields are never individually translatable. Mark the blocks field holding them instead.
+- An [inverse `records` field](./collections.md#both-sides-of-a-relation) cannot be translatable. It
+  follows the owning side's junction.
 
-A composite translates as a whole. Marking one of its subfields is rejected when the collection
-loads - there is no half-translated repeater item.
-
-Flipping an existing field to translatable is safe: the next [sync](./sync.md) moves its stored
-values to the default locale, so nothing is lost.
+Changing an existing field to translatable is safe: the next [sync](./sync.md#what-happens-at-boot)
+moves its stored values to the default locale, so nothing is lost.
 
 ## Configuring locales
 
-The locale set and its default live in `ohne.config.ts`:
+The locale set and its default live in `ohne.config.ts`, as
+[content locales](../project/config.md#content-locales):
 
 ```ts
 export default {
@@ -63,61 +66,68 @@ export default {
 };
 ```
 
-Both default to `en`. Every tag is a BCP-47 code, canonicalized for you (`de-at` becomes `de-AT`).
-`defaultLocale` must be a member of `locales` - the config errors loudly rather than guessing.
-
-After codegen, `.locale()` narrows to exactly this set: `.locale('fr')` on the config above is a
+After codegen, `.locale()` accepts exactly this set, so `.locale('fr')` on the config above is a
 compile error.
 
 ## Reading
 
-`.locale(code)` scopes the whole chain. It exists only on collections with a translatable field,
-and once per chain - a query reads one locale. There is no multi-locale read: fetching every
-translation of a record is one query per configured locale.
-
-Which locales a record holds is a read-only system field, `_translations`: the held locales in
-configured order, `[]` when none. Every record of a translatable collection carries it, whichever
-locale you read at, unless a `select` leaves it out. It lists, never filters:
-to find untranslated records, read at that locale and test for `null`, as below.
-
-```ts
-const post = await query('Posts').locale('de').findFirst();
-```
-
-Without `.locale()`, the query reads the default locale. The two lines below are the same read:
+`.locale(code)` scopes the whole chain. Without it, the query reads the default locale, so the two
+reads below are the same:
 
 ```ts
 await query('Posts').findMany();
 await query('Posts').locale('en').findMany(); // defaultLocale: 'en'
 ```
 
-A record does not need a translation to exist. Where the queried locale holds none, its
-translatable fields read `null`, its translatable lists read `[]` - the record still comes back,
-its plain fields intact. Nothing falls back to another locale silently; if you want the English
-title when the German one is missing, read it and say so:
+A record can exist without a translation. When the queried locale has none, the record still comes
+back:
+
+- Its translatable fields read `null`.
+- Its translatable lists read `[]`.
+- Its plain fields read as usual.
+
+Nothing falls back to another locale silently. If you want the English title when the German one is
+missing, read it and write the fallback yourself:
 
 ```ts
 post.title ?? fallback.title;
 ```
 
-Because a missing translation reads `null`, a translatable scalar or `record` field admits `isNull`,
-whatever its own nullability. Translatable composites and lists read `[]` instead, so you probe them
-with `empty()`. That is also how you find untranslated records:
+Every record of a translatable collection also carries `_translations`: the locales it holds, in
+configured order, or `[]` when it holds none. It is read-only, and a `select` can leave it out.
+
+Filter on it to find what is translated, and what is not:
 
 ```ts
 const untranslated = await query('Posts')
-  .locale('de')
-  .where('title', (w) => w.isNull())
+  .where('_translations', (w) => w.not.includes('de'))
   .findMany();
 ```
 
-Filters, ordering, and `pluck` on translatable fields all act on the queried locale's values.
-`populate` follows the query's locale into the target: a populated author reads its own
-translatable fields at the same locale.
+- It takes `includes`, `includesAll`, and `includesAny`. You cannot order by it.
+- The answer is the same whatever locale the query reads.
+
+To test one field instead, filter at that locale. Any translatable scalar or `record` takes
+[`isNull`](./queries.md#null), even a non-nullable one. Translatable lists read `[]`, so use
+`empty()`:
+
+```ts
+const withoutSummary = await query('Posts')
+  .locale('de')
+  .where('summary', (w) => w.isNull())
+  .findMany();
+```
+
+Filters, ordering, and `pluck` on translatable fields act on the queried locale's values.
+[`populate`](./queries.md#populating-relations) uses the query's locale for the target too, so a
+populated author reads its own translatable fields at the same locale.
+
+A query reads one locale. `.locale()` exists only on collections with a translatable field, and only
+once per chain. To fetch every translation of a record, run one query per configured locale.
 
 ## Writing
 
-A write lands on the chain's locale - explicit, or the default:
+A write goes to the chain's locale, either the one you set or the default:
 
 ```ts
 await query('Posts').create({ title: 'Hello' }); // stores title under 'en'
@@ -128,21 +138,25 @@ await query('Posts')
   .update({ title: 'Hallo' }); // stores title under 'de'
 ```
 
-That update is also how a translation comes to exist: a matched record without a German entry gets
-one. Fields your input omits fill from their defaults - and a translatable field that is neither
-provided, defaulted, nor nullable fails the call with `required`, since the new entry could not
-satisfy it. The answered record's `_translations` lists the locale just written.
+When a record has no translation at the update's locale, the update creates it:
 
-An update that touches no translatable field changes nothing about translations: records missing
-one keep missing it.
+- Omitted translatable fields take their [defaults](./writing.md#defaults), so a required one
+  without a default fails with `required`.
+- The returned record's `_translations` lists the locale just written.
+
+An update that touches no translatable field changes nothing about translations: a record without a
+translation stays without one.
 
 ## Copying a translation
 
-When the [collections API](../api/collections.md) exposes a collection's `update`,
-`POST /collections/posts/[uuid]/translations/copy` copies a record's translatable values from one
-locale onto another, and the dashboard copies a translation through it. To change what a copy
-writes, give the collection a `copyTranslation` function. It receives the `source` record, the
-default `input`, the `sourceLocale`, and the `targetLocale`, and returns the input to write:
+Copying fills a record's translatable values in one locale from another. The dashboard copies
+through `POST /collections/posts/[uuid]/translations/copy`, which the
+[collections API](../api/collections.md#translations) serves when it exposes the collection's
+`update`.
+
+To change what a copy writes, give the collection a `copyTranslation` function. It receives the
+`source` record, the default `input`, the `sourceLocale`, and the `targetLocale`, and returns the
+input to write:
 
 ```ts
 // collections/Posts.ts
@@ -157,13 +171,14 @@ export default defineCollection({
 });
 ```
 
-A copied translation now starts unpublished. Whatever the function returns, only translatable
-fields that are writable and not `immutable` write, so a copy never touches a value shared across
-locales.
+A copied translation now starts unpublished. Whatever the function returns, the copy writes only
+translatable fields that are
+[writable and not `immutable`](./collections.md#write-only-and-locked-fields), so it never touches a
+value shared across locales.
 
 ## Deleting translations
 
-A locale-scoped chain swaps `delete` for `deleteTranslation`:
+A locale-scoped chain has `deleteTranslation` instead of `delete`:
 
 ```ts
 const { deleted } = await query('Posts')
@@ -172,11 +187,11 @@ const { deleted } = await query('Posts')
   .deleteTranslation();
 ```
 
-It removes the matched records' German values and German list items - the records themselves and
+It removes the matched records' German values and German list items. The records themselves and
 every other locale survive. `deleted` counts the records that actually held something in German.
 
-`delete` stays on the unscoped chain, where its meaning is unambiguous: it removes whole records,
-every locale included.
+[`delete`](./writing.md#deleting-records) stays on the unscoped chain, where its meaning is clear:
+it removes whole records, every locale included.
 
 ```ts
 await query('Posts').where('status', 'spam').delete();
@@ -184,8 +199,9 @@ await query('Posts').where('status', 'spam').delete();
 
 ## Uniqueness per locale
 
-`unique` on a translatable field spans every locale: a value taken in German is taken in English
-too. When each locale should have its own namespace, add `uniquePerLocale`:
+[`unique`](./collections.md#uniques-and-indexes) on a translatable field applies across every
+locale: a value taken in German is taken in English too. When a value only has to be unique within
+its own locale, add `uniquePerLocale`:
 
 ```ts
 fields: {
@@ -198,7 +214,9 @@ German slugs at once.
 
 ## Over HTTP
 
-The wire mirror carries the locale as a query parameter; see
-[querying over HTTP](../api/url-queries.md#locales). The [collections API](../api/collections.md)
-answers `_translations` on every record, narrowed to the locales the operation's `access` scope
-admits, and `GET /collections/posts/[uuid]/translations` lists the same set for one record.
+- A [URL query](../api/url-queries.md#locales) carries the locale as a query parameter.
+- The [collections API](../api/collections.md) returns `_translations` on every record, limited to
+  the locales the operation's [`access` scope](../api/collections.md#the-scope) allows.
+- `?where={_translations:{not:{includes:de}}}` filters on it, unless that scope
+  [hides locales](../api/collections.md#the-scope).
+- `GET /collections/posts/[uuid]/translations` lists the same set for one record.

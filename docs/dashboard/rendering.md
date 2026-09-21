@@ -1,8 +1,8 @@
 # Rendering
 
-The dashboard renders with plain DOM. `h` creates real elements, and reactivity is opt-in per
-value: wrap a value in a function and the runtime keeps that one spot in sync. There is no virtual
-DOM and no re-render - a change patches exactly the text node or attribute it touches.
+The dashboard renders with plain DOM. `h` creates real elements, and you turn on reactivity per
+value: wrap a value in a function and the runtime keeps that one place up to date. There is no
+virtual DOM and no re-render. A change patches exactly the text node or attribute it touches.
 
 ```ts
 // dashboard/pages/index.ts
@@ -16,13 +16,15 @@ export default defineDashboardPage(() => {
 ```
 
 The component body runs once. The function child is a live binding: it reads `count`, so each
-click rewrites the button's text and nothing else runs again. The primitives the bindings consume -
-`ref`, `computed`, `effect` - live in [reactivity](./reactivity.md).
+click rewrites the button's text and nothing else runs again. The primitives the bindings use,
+[`ref`](./reactivity.md#ref), [`computed`](./reactivity.md#computed), and
+[`effect`](./reactivity.md#effect), are described in reactivity.
 
 ## Elements
 
-`h(tag, props, ...children)` returns a real `HTMLElement`. Children append in order, and since an
-element is a child too, `h` calls nest directly. Pass `null` for props when there are none:
+`h(tag, props, ...children)` returns a real `HTMLElement`. Children are appended in order. An
+element is a child too, so you can nest `h` calls directly. Pass `null` for props when there are
+none:
 
 ```ts
 h('article', { class: 'post' },
@@ -33,16 +35,19 @@ h('article', { class: 'post' },
 
 ## Props
 
-A prop's value decides what it becomes:
+Props set attributes, not DOM properties, so it is `class`, not `className`. A prop's value decides
+what it becomes:
 
-- an `on*` key with a function value binds an event listener - the event is the key after `on`,
-  lowercased, so `onClick` listens to `click` and `onInput` to `input`,
-- any other function value is a live attribute, re-applied when a ref it reads changes,
-- anything else sets a static attribute once.
+- An `on*` key with a function value binds an event listener. The event is the key after `on`,
+  lowercased, so `onClick` listens to `click` and `onInput` to `input`.
+- Any other function value is a live attribute, re-applied when a ref it reads changes.
+- Anything else sets a static attribute once.
 
-When an attribute is applied, `false`, `null`, and `undefined` remove it, `true` sets it empty,
-and any other value is stringified. Props set attributes, not DOM properties - so it is `class`,
-not `className`:
+When an attribute is applied:
+
+- `false`, `null`, and `undefined` remove it.
+- `true` sets it empty.
+- Any other value is converted to a string.
 
 ```ts
 const saving = ref(false);
@@ -52,17 +57,17 @@ h('button', { disabled: () => saving.value, onClick: () => (saving.value = true)
 
 ## Children
 
-A child renders by what it is:
+How a child renders depends on what it is:
 
 - a `Node` is inserted as-is,
 - a string or number becomes a text node,
-- an array splices its items in order,
-- `null`, `undefined`, and booleans render nothing - a static `loggedIn && h('a', null, 'Out')`
+- an array inserts its items in order,
+- `null`, `undefined`, and booleans render nothing, so a static `loggedIn && h('a', null, 'Out')`
   simply disappears,
 - a function is a live binding.
 
 A function child re-runs when a ref it read changes, and it may return any child - not just text.
-A binding over a single text node patches the text in place; one that returns different nodes
+A binding over a single text node patches the text in place. One that returns different nodes
 clears its region and rebuilds it, so a binding can swap whole subtrees:
 
 ```ts
@@ -73,24 +78,15 @@ h('header', null, () => (user.value ? h('strong', null, user.value.name) : 'Gues
 
 ## Updates
 
-Every live binding runs once synchronously while the element is built, then again whenever a ref
-it read changes. Re-runs are batched on a microtask, so many synchronous writes coalesce into one
-DOM update:
+Every live binding is a [`batchedEffect`](./reactivity.md#batchedeffect): it runs once while the
+element is built, and writes in one tick make one DOM update.
 
-```ts
-const n = ref(0);
-const span = h('span', null, () => n.value);
-
-n.value = 1;
-n.value = 2; // one microtask later the span updates once, to 2
-```
-
-When a binding replaces its content, effects created inside the old content are stopped with it -
-nothing left behind keeps reacting.
+When a binding replaces its content, effects created inside the old content are
+[stopped with it](./reactivity.md#effectscope), so no old effect keeps reacting.
 
 ## Lists
 
-`each` renders a keyed list that reconciles in place as the array changes:
+`each` renders a keyed list and updates it in place as the array changes:
 
 ```ts
 import { each, h } from 'ohnejs/dashboard';
@@ -108,16 +104,17 @@ h('ul', null, each(
 ));
 ```
 
-The first argument is a function, so the list is live: assign a new array and the DOM reconciles.
-The second returns a stable, unique key per item - keyed rows keep their DOM and state across
-moves, so reordering the array moves nodes instead of rebuilding them.
+The first argument is a function, so the list is live: assign a new array and the DOM updates to
+match.
 
-The render callback runs once per row and receives accessors, not values: read `todo()` and
-`index()` inside a binding to keep the row live. A row whose item or position changed updates
-through those reads without a rebuild, and a removed row's effects are disposed with its nodes.
+- The second argument returns a stable, unique key per item. A keyed row keeps its DOM and state
+  across moves, so reordering the array moves nodes instead of rebuilding them.
+- The render callback runs once per row and receives accessors, not values. Read `todo()` and
+  `index()` inside a binding, so the row updates in place when its item or position changes.
+- A removed row's effects are disposed with its nodes.
 
-Rows compare items by identity (`Object.is`), so produce a changed item as a new object - an
-in-place mutation of the old one goes unnoticed:
+Rows compare items by identity (`Object.is`), so create a new object for a changed item. If you
+change the old object in place, the row does not notice:
 
 ```ts
 todos.value = todos.value.map((t) => (t.id === 1 ? { ...t, text: 'buy oat milk' } : t));
@@ -142,17 +139,17 @@ h('section', null,
 );
 ```
 
-The second argument renders while the condition is truthy; an optional third renders while it is
-falsy. Without it, falsy renders nothing.
+- The second argument renders while the condition is truthy.
+- An optional third renders while it is falsy. Without it, falsy renders nothing.
 
-The branch swaps only when the truthiness flips - a change from one truthy value to another
-leaves the branch's DOM standing, and bindings inside it keep updating on their own. `when`
-returns a function child, so it drops in wherever a child goes.
+The branch rebuilds only when the condition changes between truthy and falsy. A change from one
+truthy value to another keeps the branch's DOM, and bindings inside it keep updating on their own.
+`when` returns a function child, so you can use it wherever a child goes.
 
 ## Mounting
 
 `mount(view, container)` clears the container and renders a view into it. The router mounts your
-pages for you, so you reach for `mount` only when rendering into a DOM node you own:
+pages for you, so you need `mount` only when rendering into a DOM node you own:
 
 ```ts
 import { h, mount } from 'ohnejs/dashboard';
@@ -162,31 +159,6 @@ mount(h('h1', null, 'ohne'), document.querySelector('#widget')!);
 
 ## Navigation
 
-Pages live under `dashboard/pages/` - the file convention is covered in [pages](./pages.md). The
-router renders the page matching the current URL and swaps it in place on navigation, without a
-full reload. These navigate:
-
-- a left-click on a same-origin link - `h('a', { href: '/posts' }, 'Posts')` just works. Clicks
-  the browser should own pass through: a modified click, another origin, a `target`, a
-  `download`, and an in-page `#` anchor on the same path,
-- `navigate(path)`, the programmatic form - a no-op when you are already there,
-- the back and forward buttons.
-
-```ts
-import { h, navigate } from 'ohnejs/dashboard';
-
-h('button', { onClick: () => navigate('/posts') }, 'Open posts');
-```
-
-A page component receives the route context:
-
-```ts
-// dashboard/pages/posts/[id].ts
-import { defineDashboardPage, h } from 'ohnejs/dashboard';
-
-export default defineDashboardPage((route) => h('h1', null, `Post ${route.params.id}`));
-```
-
-`route.params` holds the captured segments, URI-decoded; `route.path` is the matched location
-path. Page modules load on demand - a page's code is fetched the first time its route renders -
-and a URL no page matches renders the dashboard's not-found page.
+The router renders the page matching the current URL. [Navigation](./pages.md#navigation) covers
+links, `navigate`, and the back and forward buttons, and
+[the page component](./pages.md#the-page-component) covers the route context a page receives.

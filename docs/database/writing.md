@@ -26,13 +26,15 @@ if (result.ok) {
 }
 ```
 
-On success, `record` is the full record read back after the insert: your fields, the generated
-`UUID`, the `_updatedAt` timestamp, and `_translations` on a translatable collection. On failure,
-`errors` maps each failing field to a message:
-an untranslated key like `validation.required`, a `{ key, params }` object when the message carries
-values, or the string a custom validator returned. A nested failure is keyed by its path:
-`sections[2].title`, `author`. Resolve a key to display text yourself with `useT` - see
-[messages](../i18n/messages.md).
+On success, `record` is the full record read back after the insert. On failure, `errors` maps each
+failing field to a [message](../i18n/messages.md#validation-messages):
+
+- an untranslated key, like `validation.required`,
+- a `{ key, params }` object, when the message carries values,
+- or the string a custom validator returned.
+
+A nested failure is listed under its path, like `sections[2].title`. To show a key as text,
+translate it with [`useT`](../i18n/messages.md#translating-with-uset).
 
 When you would rather handle failures as exceptions, `createOrThrow` returns the record directly
 and throws a `ValidationError` whose `errors` carries the same map:
@@ -41,7 +43,8 @@ and throws a `ValidationError` whose `errors` carries the same map:
 const post = await query('Posts').createOrThrow({ title: 'Hello' });
 ```
 
-To catch it, tell it apart from any other failure with `isValidationError`, imported from `ohnejs`:
+When you catch it, use `isValidationError`, imported from `ohnejs`, to separate it from any other
+failure:
 
 ```ts
 import { isValidationError, query } from 'ohnejs';
@@ -54,10 +57,12 @@ try {
 }
 ```
 
-Inside an HTTP handler you rarely catch it yourself: the thrown error becomes a `422`
-whose body carries the errors, each resolved to display text in the request's language, and a busy
-database becomes a `503` with a `Retry-After`. Outside a handler, recognize that busy failure with
-`isBusyError` from `ohnejs` and retry the write.
+Inside an HTTP handler you rarely catch it yourself:
+
+- A validation error becomes a [`422`](../api/errors.md#write-failures) whose body carries the
+  errors, translated into the request's language.
+- A [busy database](./engine.md#transactions) becomes a `503` with a `Retry-After`. Outside a
+  handler, recognize it with `isBusyError` from `ohnejs` and retry the write.
 
 ## Input
 
@@ -74,60 +79,69 @@ await query('Posts').create({
 });
 ```
 
-Relations take `UUID`s, never nested records: `author` is one `UUID`, `tags` a list of them. A
-`records` or `repeater` list defaults to `[]`, so you may omit it. Passing `[]` explicitly is fine
-too, unless the field sets `allowEmpty: false`: that rejects the empty list with an `emptyValue`
-error, while omission still lands the default. An `object` defaults to no child row, and accepts
-`null` to say so explicitly.
+- Relations take `UUID`s, never nested records: `author` is one `UUID`, `tags` a list of them.
+- A `records`, `repeater`, or `blocks` list defaults to `[]`, so you may omit it. Passing `[]` is
+  fine too, unless the field sets `allowEmpty: false`, which rejects it with an `emptyValue` error.
+  If you omit the field, it still gets the default.
+- An `object` defaults to no child row, and accepts `null` to say so explicitly.
+- Unknown keys are rejected, not ignored. A misspelled field fails with an `unknownField` error at
+  that key, so it never silently drops its value.
 
-Unknown keys are rejected, not ignored. A typo in a field name fails the write with an
-`unknownField` error at that key, so a misspelled field never silently drops its value.
-
-A `writable: false` field is absent from both inputs, an `immutable` one from the update input
-alone; see [write-only and locked fields](./collections.md#write-only-and-locked-fields).
+A [`writable: false`](./collections.md#write-only-and-locked-fields) field is not part of either
+input, and an `immutable` field is not part of the update input.
 
 ## Defaults
 
-A [field type](./field-types.md#defaults) may ship a default, and an instance may set its own.
-When create input omits the field, the instance default wins, then the type's, then `null` for a
-nullable field. A non-nullable field with no default requires input.
+If you leave a field out of `create`, it gets its value from the first of these that is available:
+
+1. The field's own `default`.
+2. Its [field type's](./field-types.md#defaults) default.
+3. `null`, if the field is nullable.
+
+A non-nullable field with no default requires input.
 
 ```ts
 field('integer', { default: 10 });
 ```
 
 A default may be a value or a callback. A `records`, `object`, `repeater`, or `blocks` default must
-be a callback, since a shared object or array literal would be shared mutable state across every
-created record. A `record` default is a plain `UUID`, so it stays a value.
+be a callback, because an object or array literal would be one mutable value shared by every created
+record. A `record` default is a plain `UUID`, so it stays a value.
 
 A default runs through the field's [sanitizers and validators](#sanitizers-and-validators) like any
 value. A literal default they reject fails at boot, so `default: ''` on a `text` field needs
-`allowEmpty: true`. A callback default fails the create that computes it.
+`allowEmpty: true`. A callback default they reject fails the create that computes it.
 
 ## Sanitizers and validators
 
 A field cleans and checks its value through ordered lists of sanitizers and validators. Sanitizers
-transform the value and never report; validators return a message when the value is wrong, or
-`undefined` when it is fine. An instance adds its own, run after the ones its
+change the value and never report an error. Validators return a message when the value is wrong, or
+`undefined` when it is fine. A field adds its own to the ones its
 [field type](./field-types.md#sanitizers-and-validators) ships:
 
 ```ts
 field('text', {
-  validators: [(value) => (String(value).length > 280 ? 'Too long' : undefined)],
+  sanitizers: [(value) => value.trim()],
+  validators: [(value) => (value.length > 280 ? 'Too long' : undefined)],
 });
 ```
 
-The tiers run in order - type sanitizers, type validators, instance sanitizers, instance
-validators - and the first message stops the field. A returned message always lands at the field's
-own name. To report a failure inside a composite value, a validator writes into `ctx.errors`
-instead - see [custom field types](./field-types.md#sanitizers-and-validators).
+They run in this order, and the first message stops the run for that field:
+
+1. The field type's sanitizers.
+2. The field type's validators.
+3. The `sanitizers` you pass to `field()`.
+4. The `validators` you pass to `field()`.
+
+A returned message always goes under the field's own name. To report a failure inside a composite
+value, a validator [writes into `ctx.errors`](./field-types.md#sanitizers-and-validators) instead.
 
 ## Uniqueness and references
 
-A `unique` field is prechecked before the insert, so a duplicate fails with a `notUnique` error
-naming the field rather than a raw constraint error. Every relation is checked too: a `record` or
-`records` link to a `UUID` that does not exist fails with an `invalidReference` error at that
-field's path.
+A [`unique`](./collections.md#uniques-and-indexes) field is checked before the insert, so a
+duplicate fails with a `notUnique` error that names the field, not a raw constraint error. Every
+[relation](./collections.md#relations) is checked too: a link to a `UUID` that does not exist fails
+with an `invalidReference` error at that field's path.
 
 ```ts
 const result = await query('Posts').create({ title: 'Hello', author: 'missing' });
@@ -137,22 +151,8 @@ result.errors.author; // the reference does not exist
 
 ## Updating records
 
-`update` changes every record a filter matches. Narrow the query with `where` first, then pass the
-fields to change:
-
-```ts
-const result = await query('Posts').where('status', 'draft').update({ status: 'published' });
-```
-
-An update is partial. Only the fields you pass change; every other column is left exactly as it was.
-A field you omit is never defaulted or cleared. A [when-gated field](./conditional-fields.md) adds
-its own rule: create drops inactive input, and an update writes the field only to the records whose
-condition holds.
-
-It runs the same pipeline `create` does - validation, sanitizers, uniqueness, references - once for
-the whole call. A field error fails the call before anything is written.
-
-`update` returns every matched record, re-read in its final state:
+`update` changes every record a filter matches. `update` and `delete` exist only after a `where`, so
+you can never touch every record by accident:
 
 ```ts
 const result = await query('Posts').where('status', 'draft').update({ status: 'published' });
@@ -164,15 +164,20 @@ if (result.ok) {
 }
 ```
 
-`updateOrThrow` returns the array directly and throws on failure, exactly as `createOrThrow` does.
+`update` returns every matched record, re-read in its final state. `updateOrThrow` returns the array
+directly and throws on failure, exactly as `createOrThrow` does.
 
-A `where` is required. `update` and `delete` are offered only once a filter narrows the query, so an
-unfiltered write that would touch every record can never happen by accident.
+- An update is partial: fields you omit keep their values, and are never reset to a default or
+  cleared.
+- A [when-gated field](./conditional-fields.md#on-update) is written only to the records whose
+  condition is true.
+- It runs the same pipeline `create` does, once for the whole call: validation, sanitizers,
+  uniqueness, references. A field error fails the call before anything is written.
 
 ## Lists on update
 
-An update replaces a list field with the value you pass, but by the shortest path, not by tearing
-the list down and rebuilding it.
+An update replaces a list field with the value you pass. It makes only the changes needed, and does
+not delete the whole list and build it again.
 
 A `records` relation takes the new list of `UUID`s. Links you drop are removed, links you add are
 appended, and the order follows your list. A link that stays keeps its place on the other side of
@@ -182,14 +187,15 @@ the relation, so reordering one side never disturbs the other.
 await query('Posts').where('UUID', id).update({ tags: ['t3', 't1'] });
 ```
 
-A `repeater` takes the new list of items, each a complete item just as `create` expects. Give an
-item its `UUID` to keep it: that row survives with its identity, rewritten to the item you pass.
-Omit the `UUID` to insert a fresh item. An item you leave out is deleted, and the positions renumber
-to your order.
+A `repeater` takes the new list of items, each a complete item just as `create` expects:
 
-A kept item is a rewrite, not a merge. A subfield you leave off does not survive from the stored
-item - it takes its default, exactly as it would on create. Sending `{ UUID, heading }` to change
-one heading resets every other subfield of that item, so always send the complete item.
+- Give an item its `UUID` to keep it. That row keeps its identity and is rewritten to the item you
+  pass.
+- Omit the `UUID` to insert a fresh item.
+- Leave an item out to delete it.
+
+Positions follow your order. A kept item is replaced whole: subfields you leave off reset to their
+defaults, so always send the complete item.
 
 ```ts
 await query('Posts').where('UUID', id).update({
@@ -200,15 +206,14 @@ await query('Posts').where('UUID', id).update({
 }); // any section you did not list is deleted
 ```
 
-A `UUID` that names no item on that record is an error, never a silent adoption from another record.
+- A `UUID` that names no item on that record is an error. The update never silently takes an item
+  from another record.
+- Item `UUID`s tie the update to one record. When the filter matches several, the write fails with a
+  `singleRecord` error at the field, so narrow the filter to one record first. A list without
+  `UUID`s writes fresh items to every matched record.
 
-Item `UUID`s also tie the update to a single record. When the filter matches several, no `UUID` can
-say which record's item it means, so the write fails with a `singleRecord` error at the field -
-narrow the filter to one record first. A list without `UUID`s carries no such tie: fresh items write
-to every matched record.
-
-A `blocks` field takes envelopes - `{ block: 'Hero', fields: { ... } }`, plus the item's `UUID` on
-update - and replaces its list the same way. See [blocks](./blocks.md#writing).
+A `blocks` field takes envelopes and [replaces its list](./blocks.md#writing) the same way. An
+envelope is `{ block: 'Hero', fields: { ... } }`, plus the item's `UUID` on update.
 
 An `object` upserts its single child: pass a value to set it, or `null` to clear it.
 
@@ -224,30 +229,29 @@ await query('Posts').where('UUID', id).update({ meta: null }); // clears the obj
 const { deleted } = await query('Posts').where('status', 'spam').delete();
 ```
 
-A delete cascades: a record's child rows and its relation links go with it. A `record` reference
-from elsewhere follows its own `onDelete` rule - `cascade` deletes the referencing row, `setNull`
-clears the link. A `restrict` reference still pointing at the record blocks the delete, and inside
-an HTTP handler becomes a `409`. Outside a handler, `isReferenceViolation` from `ohnejs` recognizes
-the error the blocked delete throws.
+A delete cascades: a record's child rows and its relation links are deleted with it. A
+[`record` reference](./collections.md#one-reference) from elsewhere follows its own `onDelete` rule:
 
-Like `update`, `delete` requires a `where`.
+- `cascade` deletes the referencing row.
+- `setNull` clears the link.
+- `restrict` blocks the delete while the reference exists. Inside an HTTP handler that becomes a
+  [`409`](../api/errors.md#write-failures). Outside one, `isReferenceViolation` from `ohnejs`
+  recognizes the error the blocked delete throws.
 
 ## Locales
 
-On a collection with [translatable fields](./translations.md), a write lands on the chain's locale:
-`create` stores translatable values there, `update` upserts them, and a locale-scoped chain swaps
-`delete` for `deleteTranslation`. The guide covers each.
+On a collection with [translatable fields](./translations.md), a write goes to the chain's locale.
+[Writing translations](./translations.md#writing) covers creating and updating per locale, and a
+locale-scoped chain has [`deleteTranslation`](./translations.md#deleting-translations) instead of
+`delete`.
 
 ## Transactions
 
-Pass an open transaction with `use` to run the write inside it, rather than opening its own. Open
-one with `useDatabase().transaction`, covered in [the engine guide](./engine.md):
+Pass an open transaction with `use`, and the write runs inside it instead of opening its own.
+[Transactions](./engine.md#transactions) covers opening one:
 
 ```ts
 await useDatabase().transaction(async (tx) => {
   await query('Posts').use(tx).create({ title: 'Hello' });
 });
 ```
-
-Writes on one connection serialize, so two concurrent creates never collide mid-transaction; each
-runs to completion in turn.

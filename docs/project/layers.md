@@ -1,91 +1,141 @@
 # Layers
 
-A layer is an installed ohne package your app builds on. It is a complete ohne project - routes,
-collections, blocks, field types, roles, messages, middleware, boot files, migrations, dashboard
-pages, config - and your app stacks on top, keeping what fits and overriding the rest. ohne itself is a
-layer: the scaffold lists it, and that one line is what gives every app the framework's built-in
-messages and API routes.
+A layer is an installed ohne package your app builds on. Your app stacks on top, keeping what fits
+and overriding the rest. ohne ships its own content as a layer, `ohnejs/base`, which is why the
+[scaffold lists it](../start/installation.md#the-project-files).
+
+A layer can hold anything your app can: routes, collections, messages, dashboard pages, config, and
+the rest.
 
 ```ts
 // ohne.config.ts
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs', '@acme/blog'],
+  layers: ['ohnejs/base', '@acme/blog'],
 });
 ```
 
+## What the base layer ships
+
+`ohnejs/base` holds the parts of ohne that are content, not the framework itself:
+
+- The pages the [dashboard](../dashboard/pages.md) is made of: the overview, the collection tables,
+  the record editor, the account page, and the sign-in and install screens. One endpoint gives them
+  your collections, fields, and roles.
+- [Authentication](../auth/authentication.md): the `Users` and `Sessions` collections, the session
+  cookie, and the sign-in endpoints.
+- The [collections API](../api/collections.md#the-routes) routes, which serve every collection that
+  sets `api`.
+- The [`admin` role](../auth/roles.md#defining-roles), holding `['*']`.
+- The [global CORS policy](../api/middleware.md#cors), plus the opt-in `auth` and `require-auth`
+  [middleware](../api/middleware.md#route-middleware).
+- The field types `Users` is built from: `password`, `roles`, `language`, `locale`, `timezone`, and
+  `datePattern`.
+- The [message catalogs](../i18n/messages.md#layers) that hold every framework string, in English,
+  German, and Bosnian, and the [endpoint](../i18n/messages.md#the-catalog-endpoint) serving them.
+
+The rest of ohne is not in the layer. The router, the query builder, the migration runner, codegen,
+the built-in field types, and the dashboard's runtime and server are the framework, and they are
+there whatever your `layers` list says.
+
+[Uploads](../uploads/uploads.md) are not in it either. They are a layer of their own in the same
+package, `ohnejs/uploads`, which you list when you want them.
+
+## Going without it
+
+ohne never adds an entry to `layers` for you, so an app that leaves `ohnejs/base` out gets none of
+the above. That is a supported way to build: a headless API with its own auth does not need the
+layer.
+
+What you give up:
+
+- The dashboard server still starts and still serves its shell, but no page matches any URL, so
+  every URL renders a plain "Not found".
+- There is no `Users` collection, no session cookie, and no sign-in endpoints.
+  [Rolling your own](../auth/authentication.md#rolling-your-own) explains the pieces to write.
+- No collection gets HTTP endpoints, whatever its `api` option says.
+- Framework strings render as their own keys, because the catalogs that hold their text are in the
+  layer.
+- Every response carries `Access-Control-Allow-Origin: *` without credentials. The layer's policy is
+  what limits it.
+
+To keep the layer and drop one piece of it, use [`disable`](#disabling-parts-of-a-layer) instead.
+
 ## Consuming a layer
 
-Add the package to your `package.json` dependencies, then name it in `layers`. Installing alone
-does nothing - only a listed layer stacks. Once codegen has run, installed layer names
-autocomplete in the list, the layers a package exports as subpaths included; a fresh name codegen
-has not seen yet is still accepted.
+Add the package to your `package.json` dependencies, then name it in `layers`. Installing alone does
+nothing. Only a listed layer stacks.
 
-A name can carry a subpath. `@acme/kit/auth` resolves through the package's `exports`; the
-exported file is by convention that layer's `ohne.config.ts`, and its directory is the layer. One
-package can ship several layers as exported subfolders. The package can be one already in your
-stack, your own app included: an app named `acme` whose `package.json` exports `./uploads` can list
-`acme/uploads`. A conditional target resolves as Node would, through `node`, `import`, or `default`.
+If a listed layer cannot load, the boot fails, and the error names the layer and who listed it. That
+happens when:
 
-A listed layer that cannot be used - the package is not installed, the subpath is not exported, or
-the directory has no `ohne.config.ts` - fails the boot with an error naming the layer and who
-listed it.
+- the package is not installed,
+- the subpath is not exported, or
+- the directory has no `ohne.config.ts`.
 
 ## The stack
 
-Layers merge in one order everywhere: the list runs furthest-first, so a later entry overrides an
-earlier one, and your app overrides them all.
+Layers merge in the same order everywhere. The list starts with the furthest layer, so a later
+entry overrides an earlier one, and your app overrides them all.
 
-Resolution cascades. Each layer's own config lists the layers it extends, and those load before
-it, so listing `@acme/blog` also stacks whatever the blog layer builds on. A layer reached through
-several entries loads once, beneath every layer that lists it. An app listing
-`['ohnejs', '@acme/blog']`, where `@acme/blog` itself lists `['ohnejs']`, resolves to:
+A layer's own layers load too. Each layer's own config lists the layers it extends, and those load
+before it, so listing `@acme/blog` also stacks whatever the blog layer builds on. A layer that is
+listed more than once loads once, below every layer that lists it. An app listing
+`['ohnejs/base', '@acme/blog']`, where `@acme/blog` itself lists `['ohnejs/base']`, resolves to:
 
 ```
-ohnejs -> @acme/blog -> app
+ohnejs/base -> @acme/blog -> app
 ```
 
-`ohnejs` appears once, at the bottom, even though two configs name it.
+`ohnejs/base` appears once, at the bottom, even though two configs name it.
 
 ## What overrides what
 
-Every layer reads its content from its own directories - its own `dirs`, never an inherited one -
-so a layer that renames `api/` to `routes/` moves only its own routes. See
-[directories](./config.md#directories).
+Every layer reads its content from its own [directories](./config.md#directories), so a layer that
+renames `api/` to `routes/` moves only its own routes.
 
-The pieces then merge by identity, and the closer layer wins:
+The pieces merge by identity, and the closer layer wins:
 
-- **Routes** - identity is method plus pattern: a closer `GET /posts` replaces a further one.
-- **Dashboard pages** - identity is the page's pattern.
-- **Dashboard boot files** - identity is the file's path under the dashboard directory: a closer
-  `boot/fields.ts` replaces a further one and runs in its place. See
-  [boot files](../dashboard/pages.md#boot-files).
-- **Messages** - identity is one key in one language. Merging is per key, never per file, so
-  overriding one key leaves the rest of a layer's catalog in place.
-- **Collections, blocks, and field types** - identity is the name; the closer definition replaces
-  the further one entirely. A field type can even replace a built-in. Two surviving collection or
-  block names differing only by case are an error - SQLite matches identifiers case-insensitively.
-- **Middleware** - identity is the name, and the name must keep its tier: global in one layer and
+| Piece                                                    | Identity                                  |
+| -------------------------------------------------------- | ----------------------------------------- |
+| [Routes](../api/routes.md#routes-across-layers)          | Method plus pattern, such as `GET /posts` |
+| Dashboard pages                                          | The page's pattern                        |
+| [Dashboard boot files](../dashboard/pages.md#boot-files) | The path under the dashboard directory    |
+| [Messages](../i18n/messages.md#layers)                   | One key in one language                   |
+| Collections, blocks, field types, middleware, roles      | The name                                  |
+
+- The closer definition replaces the further one entirely, including
+  [roles](../auth/roles.md#roles-across-layers), and a closer dashboard boot file runs instead of
+  the further one.
+- Messages merge per key, never per file, so overriding one key keeps the rest of a layer's
+  catalog.
+- A [field type](../database/field-types.md#where-field-types-live) can replace a built-in.
+- Two surviving collection or block names that differ only by case are an error, since SQLite
+  matches identifiers case-insensitively.
+- A [middleware name](../api/middleware.md#names-and-layers) keeps its tier. Global in one layer and
   opt-in in another is an error.
-- **Roles** - identity is the name; the closer definition replaces the further one entirely.
 
 Some content never collides:
 
-- **Migrations** are layer-qualified, so every layer's run - furthest layer first, file name order
-  within a layer. See [migrations](../database/migrations.md).
-- **Boot files** all run, furthest layer first, so a base layer's hooks register before yours. See
-  [boot](./boot.md).
+- [Migrations](../database/migrations.md#a-migration-file) include their layer in their name, so
+  every layer's migrations run. The furthest layer runs first, and files run in name order within a
+  layer.
+- [Boot files](./boot.md#ordering) all run, furthest layer first, so a base layer's hooks
+  register before yours.
 
 ## Disabling parts of a layer
 
-`disable` subtracts after the whole stack combines - a layer's admin routes, a message group, a
-collection you have no use for. The lists accumulate across layers, so a layer can drop components
-too. The shapes live in [config](./config.md#disabling):
+`disable` removes parts of the stack after the layers are combined, such as a layer's admin routes
+or a collection you do not need. [Config](./config.md#disabling) explains what each list accepts and
+how the lists combine:
 
 ```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
 export default defineConfig({
-  layers: ['ohnejs', '@acme/blog'],
+  layers: ['ohnejs/base', '@acme/blog'],
   disable: {
     routes: ['GET /admin/**'],
     collections: ['Drafts'],
@@ -96,38 +146,92 @@ export default defineConfig({
 ## Authoring a layer
 
 A layer is an ohne project - any directory with an `ohne.config.ts` at its root. There is nothing
-to opt into: the app you already have is a valid layer. Give the package a name, publish it, and a
-consumer can list it.
+to enable: the app you already have is a valid layer. Give the package a name, publish it, and a
+consumer can list it. This is all of `@acme/blog`:
 
-```
-@acme/blog/
-  package.json
-  ohne.config.ts
-  collections/Posts.ts
-  api/posts.get.ts
-  messages/en.json
-```
+`ohne.config.ts`
 
-```ts
-// ohne.config.ts
+```ts files
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs'],
+  layers: ['ohnejs/base'],
 });
 ```
 
-The config holds the layer's own values, like any project's: the layers it extends, its `dirs`,
-whatever it sets for itself. Most keys resolve across the stack, closest first; a few are each
-layer's own and never reach a consumer. See
-[own vs inherited keys](./config.md#own-vs-inherited-keys).
+`package.json`
+
+```json files
+{
+  "name": "@acme/blog",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "ohnejs": "^0.0.1"
+  }
+}
+```
+
+`collections/Posts.ts`
+
+```ts files
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text'),
+    body: field('text'),
+  },
+});
+```
+
+`api/posts.get.ts`
+
+```ts files
+import { defineHandler, query } from 'ohnejs';
+
+export default defineHandler(() => query('Posts').findMany());
+```
+
+`messages/en.json`
+
+```json files
+{
+  "blog": {
+    "empty": "No posts yet"
+  }
+}
+```
+
+The config holds the layer's own values, like any project's. A few keys
+[stay with the layer](./config.md#own-vs-inherited-keys) and never reach a consumer.
+
+## Several layers in one package
+
+A package can ship several layers as exported subpaths. `@acme/kit/auth` resolves through the
+`exports` in its `package.json`:
+
+```json
+{
+  "name": "@acme/kit",
+  "exports": {
+    "./auth": "./auth/ohne.config.ts",
+    "./billing": "./billing/ohne.config.ts"
+  }
+}
+```
+
+- By convention, the exported file is that layer's `ohne.config.ts`, and its directory is the
+  layer.
+- A conditional target resolves as Node would, through `node`, `import`, or `default`.
+- The package can be one already in your stack, including your own app. An app named `acme` whose
+  `package.json` exports `./uploads` can list `acme/uploads`.
+
+Subpath layers autocomplete in `layers` like any other.
 
 ## New config keys
 
-A layer that introduces settings of its own declares them by augmenting `Config`, then ships an
-`ohne.layer.ts` default-exporting `defineLayer` with what it owns: the defaults that floor the
-stack and the merge strategies for its keys. The file is optional - present only when a layer adds
-keys or generates files.
+To add settings of its own, a layer augments `Config` and ships an `ohne.layer.ts`:
 
 ```ts
 // ohne.layer.ts
@@ -148,32 +252,35 @@ export default defineLayer({
 });
 ```
 
-`defaults` fill wherever no project sets the key, never overriding one that does. A defaulted key
-is guaranteed present once codegen has run, so `useConfig().blog.pageSize` reads without a
-fallback.
+`ohne.layer.ts` default-exports `defineLayer` with what the layer owns. A layer needs the file only
+when it adds config keys or generates files.
 
-`strategies` choose how a key merges across the stack, keyed by dot-notation path. Without one,
-plain objects combine per key and everything else is replaced by the closer layer:
+- `defaults` apply when no project sets the key. Once codegen has run, a key with a default is
+  always present, so you read [`useConfig()`](./config.md#reading-config)`.blog.pageSize` without a
+  fallback.
+- `strategies` choose how a key merges across the stack. You name each key by its dot-notation
+  path. Without a strategy, plain objects combine per key, and the closer layer replaces anything
+  else.
 
-- `'replace'` - the closer value wins entirely; a layer that omits the key still inherits it.
-- `'own'` - never inherited: each layer's value applies to that layer alone.
-- `'defaults'` - recurse into objects per key and arrays per index; the longer side fills the rest.
-- `'assign'` - objects merge one level: keys union, the closer layer's value replaces per key without
-  recursing into it; non-objects behave like `'replace'`.
-- `'concat'` - arrays only: the closer layer's items first, then the lower layers'.
-- `'concat-unique'` - `'concat'`, then duplicates are dropped.
+| Strategy          | How the key merges                                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `'replace'`       | The closer value wins entirely. A layer that omits the key still inherits it.                                                      |
+| `'own'`           | Never inherited. Each layer's value applies to that layer alone.                                                                   |
+| `'defaults'`      | Recurses into objects per key and arrays per index. The longer side fills the rest.                                                |
+| `'assign'`        | Objects merge one level: keys union, and the closer value replaces per key without recursing. Non-objects behave like `'replace'`. |
+| `'concat'`        | Arrays only. The closer layer's items first, then the lower layers'.                                                               |
+| `'concat-unique'` | `'concat'`, then duplicates are dropped.                                                                                           |
 
-The augmentation reaches consumers on its own: codegen finds every file in a stacked layer that
-contains `declare module 'ohnejs'` and imports it into the app's type program, so your keys
-autocomplete in a consuming `ohne.config.ts` exactly like the built-ins. Values the layer sets for
-itself still belong in its `ohne.config.ts` - `ohne.layer.ts` describes only what it owns.
+Consumers get autocomplete for your keys automatically, exactly like the built-ins. Values the layer
+sets for itself still belong in its `ohne.config.ts`. `ohne.layer.ts` describes only what it owns.
 
 ## Generating files
 
-A layer can also write into the consuming app's codegen directory. Declare the files under
-`codegen` in `ohne.layer.ts`: each entry names a bucket, a file, and a `code` function that returns
-the content. `code` runs once the whole stack has loaded, so it can read the merged config - the way
-to type something only the app's own `ohne.config.ts` decides.
+A layer can also write files into the consuming app's
+[codegen directory](./config.md#directories). Declare them under
+`codegen` in `ohne.layer.ts`, each with a bucket, a file name, and a `code` function that returns
+the content. `code` runs once the whole stack has loaded, so it can read the merged config. That is
+how a layer gives a type to something that only the app's own `ohne.config.ts` decides:
 
 ```ts
 // ohne.layer.ts
@@ -209,15 +316,15 @@ export default defineLayer({
 });
 ```
 
-`KnownCategories` is an interface the layer exports empty. The generated file fills it with the
+`KnownCategories` is an empty interface that the layer exports. The generated file fills it with the
 app's values, so a field typed `keyof KnownCategories` autocompletes the categories that app
-configured - the same way ohne types messages and collections.
+configured.
 
-The file lands in the app's codegen directory, `.ohne/node/blog-categories.ts` by default, with the
-ohne banner on its first line. It is rewritten only when its content changes and pruned once the
-layer stops declaring it.
+- `bucket` picks which TypeScript program sees the file: `node` for `ohnejs` augmentations and
+  server types, `browser` for `ohnejs/dashboard` ones, `shared` for pure types both include.
+- `file` is a plain `.ts` name inside the bucket. Two entries in the stack cannot use the same
+  name, and the error names both layers.
 
-`bucket` picks which TypeScript program sees the file: `node` for `ohnejs` augmentations and server
-types, `browser` for `ohnejs/dashboard` ones, `shared` for pure types both include. `file` is a plain
-`.ts` name inside the bucket. Two entries in the stack cannot claim the same one; the error names
-both layers.
+The file is written to `.ohne/node/blog-categories.ts` by default, with the
+[ohne banner](./cli.md#ohne-prepare) on its first line. It is rewritten only when its content
+changes, and deleted once the layer stops declaring it.

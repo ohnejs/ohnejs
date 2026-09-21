@@ -1,102 +1,58 @@
 # Uploads
 
-The uploads layer gives your app a media library: files stored behind a pluggable backend, an
-`Uploads` collection that lists them, routes to upload and serve them, field types that reference
-them from your own collections, and a Media page in the dashboard. It is a layer, so an app that
-does not need it never carries it.
+The uploads layer gives your app a media library:
+
+- files stored in a backend you can replace,
+- an `Uploads` collection that lists them,
+- routes to upload and serve them,
+- [field types](./fields.md) that reference them from your own collections,
+- a Media page in the dashboard.
+
+It is a [layer](../project/layers.md#consuming-a-layer), so an app that does not need it does not
+include it:
 
 ```ts
 // ohne.config.ts
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs', 'ohnejs/uploads'],
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
 });
 ```
 
-That line is the whole install. Run the app, sign in to the dashboard, and the sidebar shows
-Media.
+That line is all you need to install it. Run the app, sign in to the dashboard, and the sidebar
+shows Media.
 
-## Configuration
+## The dashboard
 
-Every key under `uploads` is optional; these are the defaults:
+The layer ships the Media page at `/media`, with folders, drag and drop uploads, a details popup
+for alt text and the focal point, and a picker that the [media fields](./fields.md) open.
 
-```ts
-uploads: {
-  storage: 'fs',
-  url: '.uploads',
-  maxFileSize: '128mb',
-  types: '*',
-  cache: { noCache: true },
-  images: {
-    variants: {
-      thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
-    },
-  },
-},
-```
-
-- `storage` - the backend, by the name a boot file registered it under. The layer ships `fs`.
-- `url` - where the backend keeps the files, in whatever form it understands. For `fs` a
-  directory, resolved against the working directory. The `UPLOADS_URL` env var overrides it.
-- `maxFileSize` - the largest file an upload may carry, as a `parseBytes` value.
-- `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
-  wildcards, and category names such as `document`. See [fields](./fields.md#types) for the
-  pattern grammar.
-- `cache` - the `Cache-Control` directives every served file carries. The default revalidates on
-  every use, so a renamed or replaced file is never stale.
-- `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
-  the storage. Omitted, a backend that serves its files itself names the URL; otherwise the API
-  serves every file itself.
-- `images` - the image service that renders resized variants, and the named variants every image
-  read carries. `url` has no default; without it every image URL points at the original. See
-  [image variants](./images.md).
-
-`storage` and `url` are each layer's own: a dependency cannot point your uploads at its storage.
-
-## Storage
-
-A file is stored under its path, `photos/2024/sunset.jpg`, and a folder is a prefix. The `fs`
-backend keeps that layout as real files and directories under `uploads.url`: a write lands in a
-temp file beside its target and renames into place, a delete removes empty parent directories
-behind it, and moving a folder is one rename.
-
-A backend is a `StorageAdapter`: `write`, `read` with an optional byte range, `stat`, `move`,
-`delete`, and an optional `url` for a backend that serves its objects itself. A record's `url` then
-comes from the backend, unless `publicURL` is set. `move` and `delete` take a prefix as well as a
-file, so a folder is one operation. Register one from a [boot file](../project/boot.md) and select
-it by name:
-
-```ts
-// boot/storage.ts
-import { useStorages } from 'ohnejs/uploads';
-
-import { createS3Storage } from '../storage/s3.ts';
-
-useStorages().register('s3', (url) => createS3Storage(url));
-```
-
-```ts
-// ohne.config.ts
-uploads: { storage: 's3', url: 's3://bucket?region=eu-central-1' },
-```
-
-The backend never sees the database. The layer's helpers record each move and delete inside the
-transaction that changes the rows and run it after the commit. A failed one is retried later and at
-every boot, so a crash never leaves a row pointing nowhere. A retry may repeat an effect that
-already ran, so `move` and `delete` must treat a missing path as a no-op.
+The sidebar row replaces the `Uploads` collection's own row, so a viewer who is allowed to read
+`Uploads` sees Media instead of the table. To place it yourself, list `'Uploads'` in
+[`dashboard.menu`](../dashboard/pages.md#the-sidebar) where you want the row.
 
 ## The collection
 
-`Uploads` holds one row per file and per folder. A row's location is `directory`, the parent path
-with no leading slash and `''` at the root, plus `name`; the pair is unique, as on a filesystem,
-and every segment is a slug. A file row also carries `type`, `size`, `hash`, `width` and `height`
-for images, `description` as its alt text per content locale, and `focalX` and `focalY`. Every
-row records its `author` and `uploadedAt`.
+`Uploads` holds one row per file and per folder:
 
-Every read is decorated. `path` joins the location, `url` is where a file's bytes are served from,
-and `variants` holds one signed URL per named variant when an [image service](./images.md) is
-configured. A folder carries `path` alone:
+- `directory` - the parent path, with no leading slash and `''` at the root.
+- `name` - the file or folder name. The `directory` and `name` pair is unique, as on a filesystem,
+  and every segment is a slug.
+- `type`, `size`, `hash`, `focalX`, and `focalY` - on a file.
+- `description` - a file's alt text, one per
+  [content locale](../database/translations.md#marking-fields).
+- `width` and `height` - on an image.
+- `author` and `uploadedAt` - on every row.
+
+Every read is decorated with extra fields:
+
+- `path` joins `directory` and `name`.
+- `url` is where a file's bytes are served from.
+- `variants` holds one signed URL per [named variant](./images.md#named-variants), when an image
+  service is configured.
+
+A folder is decorated with `path` only:
 
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();
@@ -106,13 +62,16 @@ upload.url; // -> '/uploads/photos/2024/sunset.jpg'
 upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/2024/sunset.jpg'
 ```
 
-Only `read` is exposed over the [collections API](../api/collections.md), and it is guarded: the
-caller needs the `collection.Uploads.read` [capability](../auth/roles.md). Every write goes through
-the routes below or the helpers, which are the only code that moves bytes.
+Only `read` is exposed over the [collections API](../api/collections.md#exposure), and it is
+guarded: the caller needs the `collection.Uploads.read`
+[capability](../auth/roles.md#the-collections-api-guard). Every write goes through the
+[routes](#uploading-over-http) or the [helpers](#in-server-code), which are the only code that moves
+bytes.
 
-To open that read to anyone, or scope it with [`access`](../api/collections.md#access), ship your
-own `collections/Uploads.ts`. It replaces the layer's `Uploads` entirely, so spread
-`uploadsDefinition` and change only what you name:
+To open that read to anyone, or limit it with [`access`](../api/collections.md#access), add your
+own `collections/Uploads.ts`. It
+[replaces the layer's `Uploads`](../project/layers.md#what-overrides-what) entirely, so spread
+`uploadsDefinition` and change only the keys you need:
 
 ```ts
 // collections/Uploads.ts
@@ -143,26 +102,24 @@ curl -X POST 'http://localhost:9001/uploads?directory=photos&name=Sunset.JPG' \
   --data-binary @sunset.jpg --cookie "session=..."
 ```
 
-The name and directory are slugified, so the answer's `path` is `photos/sunset.jpg`; a name
-already taken gets a `-2` suffix. Missing folders are created on the way. The file's type comes
-from its extension and is verified against its first bytes, so a PNG named `.jpg` is a `422`; an
-SVG is sanitized before it is stored. Writes need the `collection.Uploads.*` capabilities of
-[roles](../auth/roles.md), and reading the records needs `collection.Uploads.read`; only the bytes
-are public.
+When a file comes in:
+
+- The name and directory are slugified, so the answer's `path` is `photos/sunset.jpg`.
+- A name already taken gets a `-2` suffix.
+- Missing folders are created.
+- The file's type comes from its extension and is verified against its first bytes, so a PNG named
+  `.jpg` is a `422`.
+- An SVG is sanitized before it is stored.
+
+Writes need the `collection.Uploads.*` capabilities of
+[roles](../auth/roles.md#the-collections-api-guard). Only the bytes are public.
 
 `PATCH` with `name` or `directory` renames or moves the row and its object, keeping a file's
-extension; `?locale=` addresses the alt text's locale. The upload and replace routes accept
-bodies up to `uploads.maxFileSize` and run without a handler deadline; `api.requestTimeout`,
-Node's 5 minutes unless you set it, is the ceiling for a slow connection.
+extension. `?locale=` selects the alt text's locale.
 
-## Serving
-
-`GET /uploads/<path>` streams the file with its type, an `ETag` from the file's hash so a fresh
-`If-None-Match` answers `304`, `Cache-Control` from `uploads.cache`, and `Range` support for video
-and audio. Every answer is `nosniff`; a type a browser would run as a document downloads as an
-attachment, and an SVG renders under a sandboxing content security policy. With `publicURL` set,
-records point at that origin and this route stays the origin behind it. Otherwise, when the
-backend has its own `url`, records point there.
+The upload and replace routes accept bodies up to `uploads.maxFileSize` and run with no handler
+timeout. An upload may take up to [`api.requestTimeout`](../project/config.md#the-api-server).
+Unless you set it, that is Node's default of 5 minutes.
 
 ## In server code
 
@@ -178,18 +135,112 @@ await createFolder({ directory: 'archive', name: '2027' });
 await deleteUpload(upload.UUID);
 ```
 
-`body` is a web `ReadableStream`, as `useRequest().body` hands it to you. Every helper throws the
-same errors the routes answer with, and each but `deleteUpload` answers the decorated record, an
-`UploadRecord`. Changing `name` or `directory` through `query('Uploads')` directly moves no object;
-use `moveUpload`.
+- `body` is a web `ReadableStream`, which is what [`useRequest().body`](../api/request.md#the-body)
+  gives you.
+- Every helper throws the same errors the routes answer with.
+- Every helper except `deleteUpload` returns the decorated record, an `UploadRecord`.
+
+Changing `name` or `directory` directly through `query('Uploads')` does not move the object, so use
+`moveUpload`.
 
 `replaceUpload(uuid, body)` swaps a file's bytes and keeps its `UUID`, path, and type, so every
-field that references it stays linked. Bytes that contradict the type are a `422`.
+field that references it stays linked. Bytes that do not match the type are a `422`.
 
-## The dashboard
+## Serving
 
-The layer ships the Media page at `/media`, with folders, drag and drop uploads, a details popup
-for alt text and the focal point, and a picker the [media fields](./fields.md) open. The sidebar
-row replaces the `Uploads` collection's own row, so a viewer who may read `Uploads` sees Media
-where the table would have been. To place it yourself, list `'Uploads'` in
-[`dashboard.menu`](../dashboard/pages.md#the-sidebar) where you want the row.
+`GET /uploads/<path>` streams the file with:
+
+- its type,
+- an `ETag` from the file's hash, so a fresh `If-None-Match` answers
+  [`304`](../api/response.md#caching),
+- `Cache-Control` from `uploads.cache`,
+- `Range` support for video and audio.
+
+Every answer is `nosniff`. A file whose type a browser would run as a document is downloaded as an
+attachment. An SVG renders under a sandboxing content security policy.
+
+Where a record's `url` points:
+
+- With `publicURL` set, at that origin, and this route stays the origin behind it.
+- Otherwise, when the backend has its own `url`, there.
+- Otherwise, at this route.
+
+## Configuration
+
+Every key under `uploads` is optional. These are the defaults:
+
+```ts
+uploads: {
+  storage: 'fs',
+  url: '.uploads',
+  maxFileSize: '128mb',
+  types: '*',
+  cache: { noCache: true },
+  images: {
+    variants: {
+      thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
+    },
+  },
+},
+```
+
+- `storage` - the backend, by the name a boot file [registered](#storage) it under. The layer ships
+  `fs`.
+- `url` - where the backend keeps the files, in whatever form it understands. For `fs` it is a
+  directory, resolved against the working directory. The `UPLOADS_URL` env var overrides it.
+- `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
+- `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
+  wildcards, and category names such as `document`, in the
+  [media fields grammar](./fields.md#types).
+- `cache` - the [`Cache-Control`](../api/response.md#caching) directives every served file carries.
+  The default revalidates on every use, so a renamed or replaced file is never stale.
+- `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
+  the storage. Without it, records point where [serving](#serving) describes.
+- `images` - the [image service](./images.md) that renders resized variants, and the named variants
+  every image read carries. `url` has no default, and without it every image URL points at the
+  original.
+
+`storage` and `url` are each layer's [own](../project/config.md#own-vs-inherited-keys): a dependency
+cannot point your uploads at its storage.
+
+## Storage
+
+A file is stored under its path, `photos/2024/sunset.jpg`, and a folder is a prefix. The `fs`
+backend keeps that layout as real files and directories under `uploads.url`.
+
+To store files elsewhere, register a backend from a [boot file](../project/boot.md) and select it
+by name:
+
+```ts
+// boot/storage.ts
+import { useStorages } from 'ohnejs/uploads';
+
+import { createS3Storage } from '../storage/s3.ts';
+
+useStorages().register('s3', (url) => createS3Storage(url));
+```
+
+```ts
+// ohne.config.ts
+uploads: { storage: 's3', url: 's3://bucket?region=eu-central-1' },
+```
+
+A backend is a `StorageAdapter`:
+
+- `write` stores a file.
+- `read` returns a file, with an optional byte range.
+- `stat` describes a file.
+- `move` and `delete` take a prefix as well as a file, so a folder is one operation.
+- `url` is optional, for a backend that serves its objects itself. A record's `url` then comes from
+  the backend, unless `publicURL` is set.
+
+The backend never sees the database. The layer's helpers record each move and delete inside the
+[transaction](../database/engine.md#transactions) that changes the rows, and run it after the
+commit:
+
+- A failed one is retried later and at every boot, so a crash never leaves a row pointing nowhere.
+- A retry can repeat a move or delete that already ran, so `move` and `delete` must treat a
+  missing path as a no-op.
+
+The `fs` backend writes a file to a temp file beside its target and renames it into place. It
+removes empty parent directories after a delete, and moves a folder in one rename.

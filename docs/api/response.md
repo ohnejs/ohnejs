@@ -1,26 +1,13 @@
 # Shaping the response
 
-A handler returns its value and ohne serializes it - an object becomes JSON, a string HTML, an
-empty return `204`; [routes](./routes.md) has the full rules. Everything else about the response -
-status, headers, redirects, caching, streams - is shaped by composables you call inside the
-handler. They are ambient: valid anywhere within a request, at any call depth, no threading.
+A handler returns its value and ohne serializes it: an object becomes JSON, a string becomes HTML,
+and an empty return becomes `204`. [What a return becomes](./routes.md#what-a-return-becomes) has
+the full rules. You shape the rest of the response (status, headers, redirects, caching, streams)
+with composables you call inside the handler. Call them anywhere inside the request, at any depth.
 
 ## Status and headers
 
-Every request carries mutable response state the serializer reads once the handler returns.
-`useResponse()` hands it to you - assign `status`, mutate `headers` in place:
-
-```ts
-// api/export.get.ts
-import { defineHandler, useResponse } from 'ohnejs';
-
-export default defineHandler(() => {
-  useResponse().headers.set('cache-control', 'no-store');
-  return { ok: true };
-});
-```
-
-`setResponseStatus` is the shorthand for the common case:
+`setResponseStatus` sets the status, the common case:
 
 ```ts
 // api/subscribers.post.ts
@@ -33,12 +20,25 @@ export default defineHandler(async () => {
 });
 ```
 
-You still return the body; these only shape the status and headers around it. `headers` is a
-standard `Headers`, so `set`, `append`, and `delete` all work.
+`useResponse()` gives you the whole response state: assign `status`, and change `headers` in place.
+`headers` is a standard `Headers`, so `set`, `append`, and `delete` all work:
+
+```ts
+// api/export.get.ts
+import { defineHandler, useResponse } from 'ohnejs';
+
+export default defineHandler(() => {
+  useResponse().headers.set('cache-control', 'no-store');
+  return { ok: true };
+});
+```
+
+You still return the body. These only set the status and headers around it, and ohne reads them
+after the handler returns.
 
 ## Redirects
 
-`sendRedirect` sets the status and the `Location` header together; the status defaults to `302`:
+`sendRedirect` sets the status and the `Location` header together. The status defaults to `302`:
 
 ```ts
 // api/old-posts.get.ts
@@ -47,13 +47,15 @@ import { defineHandler, sendRedirect } from 'ohnejs';
 export default defineHandler(() => sendRedirect('/posts', 301));
 ```
 
-It returns nothing, so the handler body is empty and serializes at the redirect status.
+It returns nothing, so the handler's body is empty, and ohne sends it with the redirect status.
 
 ## Caching
 
-The conditional-request pattern is three moves: put a validator on the response, ask whether the
-client's cached copy is still fresh, answer `304` when it is. `etag` computes the validator,
-`isFresh` compares, `sendNotModified` answers:
+The conditional-request pattern has three steps:
+
+1. `etag` computes a validator you put on the response.
+2. `isFresh` asks whether the client's cached copy is still fresh.
+3. `sendNotModified` answers `304` when it is.
 
 ```ts
 // api/posts.get.ts
@@ -71,11 +73,13 @@ export default defineHandler(async () => {
 ```
 
 `isFresh` compares the request's `If-None-Match` / `If-Modified-Since` against the `ETag` /
-`Last-Modified` you set on the response, so set the validator first. The comparison is weak - a
-`W/` prefix is ignored - and a request carrying `Cache-Control: no-cache` is never fresh.
-`sendNotModified` sets `304`; the validators stay on the response, as a `304` should carry them.
+`Last-Modified` you set on the response, so set the validator first.
 
-`cacheControl` builds a `Cache-Control` value from named directives, durations in seconds:
+- The comparison is weak: a `W/` prefix is ignored.
+- A request carrying `Cache-Control: no-cache` is never fresh.
+- `sendNotModified` keeps the validators on the response, because a `304` should include them.
+
+`cacheControl` builds a `Cache-Control` value from named directives, with durations in seconds:
 
 ```ts
 import { cacheControl } from 'ohnejs/utils';
@@ -86,9 +90,9 @@ useResponse().headers.set('cache-control', cacheControl({ public: true, maxAge: 
 
 ## Serving files
 
-`sendFile` serves a file from the first of its roots that contains it. The path is resolved
-against each root and confined to it - `..` and absolute paths cannot escape - and when no root
-has the file, it throws a `404`:
+`sendFile` serves a file from the first of its root directories that contains it. The path is
+resolved against each root and must stay inside it, so `..` and absolute paths cannot escape. When
+no root has the file, it throws a `404`:
 
 ```ts
 // api/assets/[...path].get.ts
@@ -97,10 +101,14 @@ import { defineHandler, sendFile } from 'ohnejs';
 export default defineHandler(({ params }) => sendFile(['public'], params.path));
 ```
 
-Call it inside a request and return its result as the body. The response carries a weak `ETag`
-from the file's size and modification time, so a repeat request short-circuits to `304` on the
-stat alone - the file is never read. The default `Cache-Control` is `no-cache`: cached, but
-revalidated on every use. Pass `cache` to change it, and `notFound` to override the `404` message:
+Call it inside a request and return its result as the body.
+
+- The response carries a weak `ETag` built from the file's size and modification time. On a repeat
+  request for an unchanged file, ohne checks only those two values and answers `304` without reading
+  the file.
+- The default `Cache-Control` is `no-cache`: cached, but checked with the server on every use. Pass
+  `cache` to change it.
+- Pass `notFound` to override the `404` message.
 
 ```ts
 sendFile(['public'], params.path, {
@@ -109,16 +117,15 @@ sendFile(['public'], params.path, {
 });
 ```
 
-A TypeScript file (`.ts` / `.mts`) is stripped to JavaScript on the fly and served as a module -
-the same stripping Node uses to run `.ts`, pointed at the browser. It is how
-[dashboard pages](../dashboard/pages.md) reach the browser. Any other file gets the content type
-for its extension.
+A file gets the content type for its extension. For a TypeScript file (`.ts` / `.mts`), ohne strips
+the types while serving it and sends it as a JavaScript module. Node uses the same stripping to run
+`.ts`. That is how [dashboard pages](../dashboard/pages.md#serving) reach the browser.
 
 ## Server-sent events
 
-`sendEvents` opens a Server-Sent Events stream. It sets `text/event-stream`, returns the controls
-to push and end the stream, and the body you return from the handler. The socket stays open until
-you close it or the client disconnects:
+`sendEvents` opens a Server-Sent Events stream. It sets `text/event-stream` and returns the controls
+to push events and end the stream, together with the body you return from the handler. The socket
+stays open until you close it or the client disconnects:
 
 ```ts
 // api/clock.get.ts
@@ -138,23 +145,25 @@ const clock = new EventSource('/clock');
 clock.onmessage = (event) => console.log(event.data);
 ```
 
-Each `send` pushes one event. The second argument names the frame: `event` emits a typed event the
-browser dispatches under that name, `id` sets the id it replays as `Last-Event-ID` on reconnect. A
-multi-line payload survives intact - each line becomes its own `data:` line.
+Each `send` pushes one event. A multi-line payload stays complete: each of its lines becomes one
+`data:` line. The second argument sets the event's name and id:
 
-`close` ends the stream and the socket; a `send` after that is a no-op. Either ending - yours or
-the client's disconnect - runs `onClose` exactly once, the place to stop timers or drop the stream
+- `event` emits a typed event the browser dispatches under that name.
+- `id` sets the id the browser sends back as `Last-Event-ID` when it reconnects.
+
+`close` ends the stream and the socket, and a `send` after that does nothing. Either ending, yours
+or the client's disconnect, runs `onClose` exactly once. Use it to stop timers or remove the stream
 from a broadcast set.
 
-A client that stops reading does not buffer forever. Once 1024 frames sit unread, the stream closes
-and `onClose` runs, exactly as if the client had disconnected - a stalled socket never grows the
-server's memory.
+A client that stops reading is disconnected. Once 1024 frames wait unread, the stream closes and
+`onClose` runs, so such a client cannot use up the server's memory.
 
 ## After the response
 
-`waitUntil` keeps background work alive past the response. The response is sent immediately; the
-promise runs after it, and a graceful shutdown waits for the work to settle. A rejection is
-isolated and logged, never touching the already-sent response:
+`waitUntil` keeps background work running after the response. The response is sent immediately, the
+promise runs after it, and a [graceful shutdown](../production/deployment.md#graceful-shutdown)
+waits for the work to finish. If the promise rejects, ohne logs the error, and the response that was
+already sent is not affected:
 
 ```ts
 // api/subscribers.post.ts
@@ -167,13 +176,13 @@ export default defineHandler(async () => {
 });
 ```
 
-It is for short side effects - logging, analytics, a notification. Durable work belongs in a
-queue, not here.
+It is for short side effects such as logging, analytics, or a notification. Work that must not be
+lost belongs in a queue, not here.
 
-By default the work has no deadline. `api.waitUntilTimeout` in [config](../project/config.md)
-bounds it - milliseconds or a duration like `'60s'` - and on overrun the promise is abandoned with
-an error line, releasing its hold on shutdown. A single route overrides the limit through
-`defineHandler` options:
+By default the work has no time limit. [`api.waitUntilTimeout`](../project/config.md#the-api-server)
+sets one, in milliseconds or as a duration like `'60s'`. When the work takes longer, ohne logs an
+error line and stops waiting for the promise, so it no longer delays shutdown. A single route
+overrides the limit through its [options](./routes.md#per-route-options):
 
 ```ts
 export default defineHandler(() => track(), { waitUntilTimeout: '5s' });

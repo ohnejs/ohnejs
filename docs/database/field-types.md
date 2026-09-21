@@ -1,8 +1,8 @@
 # Custom field types
 
 A field type is the contract behind `field(...)`: how a value is stored, which options a field
-takes, and how every write cleans and checks the value. Define your own when a value carries rules
-you would otherwise repeat on every field that holds it - a slug, a color, a currency code.
+takes, and how every write cleans and checks the value. Define your own when a value has rules that
+you would otherwise repeat on every field that holds it: a slug, a color, a currency code.
 
 ```ts
 // fields/slug.ts
@@ -35,20 +35,23 @@ export default defineCollection({
 Every `slug` field now cleans and checks its value the same way, in whichever collection declares
 it.
 
-## Where types live
+## Where field types live
 
-A field type lives in one file under `fields/` - each layer's `dirs.fields` directory, set in
-[config](../project/config.md#directories) - and the file names it: `fields/slug.ts` defines
-`slug`, `fields/hex-color.ts` defines `hexColor`. Codegen registers every type, so once
-`ohne prepare` or `ohne dev` has run, `field('slug')` autocompletes and its options type-check.
+A field type lives in one file under `fields/`. That is each layer's `dirs.fields` directory, set in
+[config](../project/config.md#directories). The file name gives the type its name: `fields/slug.ts`
+defines `slug`, `fields/hex-color.ts` defines `hexColor`. Codegen registers every type, so once
+[`ohne prepare`](../project/cli.md#ohne-prepare) or [`ohne dev`](../project/cli.md#ohne-dev) has
+run, `field('slug')` autocompletes and its options type-check.
 
-A `_`-prefixed file is a helper the scan skips, so code your types share can sit beside them. A
-type in a closer [layer](../project/layers.md) replaces a further layer's type of the same name,
-built-in types included.
+A file whose name starts with `_` is a helper that the scan skips, so code that your types share can
+sit beside them.
+
+A type in a closer [layer](../project/layers.md#what-overrides-what) replaces a further layer's
+type of the same name, built-in types included.
 
 ## Options
 
-`options` declares what a `field(...)` call may pass, each entry made with `option()`. Your
+`options` declares what a `field(...)` call may pass. You make each entry with `option()`. Your
 callbacks read the resolved values from `ctx.options`:
 
 ```ts
@@ -70,22 +73,27 @@ fields: {
 }
 ```
 
-An option with a `default` is optional, and `ctx.options` always holds a value for it. An option
-declared with `required: true` must be passed, or the `field(...)` call does not type-check. One
-with neither stays absent when omitted. The value type comes from the default, widened to its
-primitive, so pass a generic to keep a union: `option<'soft' | 'hard'>({ default: 'soft' })`.
+- An option with a `default` is optional, and `ctx.options` always holds a value for it.
+- An option with `required: true` must be passed, or the `field(...)` call does not type-check.
+- An option with neither stays absent when omitted.
 
-Option names are camelCase, and none may reuse the name of an option every field already takes -
-`nullable`, `default`, `label`, and the rest.
+The value type comes from the default, widened to its primitive. Pass a generic to keep a union:
+
+```ts
+option<'soft' | 'hard'>({ default: 'soft' })
+```
+
+Option names are camelCase. None may reuse the name of an option that every field already takes,
+like `nullable`, `default`, or `label`.
 
 ## Storage
 
-`columnType` picks the column the value lands in: `text`, `integer`, `real`, `boolean`, or `json`.
-A write converts input toward that type and rejects what does not fit before your code runs, so
+`columnType` picks the column the value is stored in: `text`, `integer`, `real`, `boolean`, or
+`json`. A write converts input to that type and rejects what does not fit before your code runs, so
 the sanitizers and validators of a `text` type always receive a string.
 
-A `json` column accepts any value, so its validators check the shape. Its value types as `unknown`
-unless `emitType` returns the TypeScript type as source:
+A `json` column accepts any value, so its validators check the shape. Its value has the type
+`unknown` unless `emitType` returns the TypeScript type as source code:
 
 ```ts
 // fields/labels.ts
@@ -105,18 +113,22 @@ export default defineField({
 });
 ```
 
-`jsonList: true` marks a `json` value a list, so a query probes it with `includes`,
-`includesAll`, and `includesAny`. Neither the flag nor `emitType` checks anything at runtime - the
-validators are what keep the value the shape its type promises.
+`jsonList: true` marks a `json` value as a list, so a query can filter it with
+[`includes`, `includesAll`, and `includesAny`](./queries.md#filtering). Neither the flag nor
+`emitType` checks anything at runtime. Only the validators make sure the value has the shape its
+type promises.
 
 `serialize` and `deserialize` convert between the value and what the column stores. `serialize`
-runs after the validators, so they check the value before it is encoded: the `password` type hashes
-there.
+runs after the validators, so they check the value before it is encoded. The `password` type hashes
+its value there.
 
-A type that references another collection returns a storage layout from `schema` instead:
-`columnType: 'text'` with a `foreignKey`, or `columnType: false` with a `junction`, the way the
-uploads layer's `image` and `images` types do. The value type then follows from the layout, so such
-a type declares no `emitType`.
+A type that references another collection, like the uploads layer's
+[`image` and `images`](../uploads/fields.md), returns a storage layout from `schema` instead:
+
+- `columnType: 'text'` with a `foreignKey`, for one reference.
+- `columnType: false` with a `junction`, for a list.
+
+The value type then follows from the layout, so such a type declares no `emitType`.
 
 ## Defaults
 
@@ -130,27 +142,41 @@ export default defineField({ columnType: 'integer', defaultValue: 0 });
 ```
 
 Pass a value, or a callback that computes one from `ctx`: the field's `options`, the record's raw
-`input`, and the `operation`. A field's own `default` replaces the type's; see
-[writing records](./writing.md#defaults) for the full order. A default runs through the type's
-sanitizers and validators like any value, so it must be one they accept. A literal default they
-reject fails at boot. A callback default fails the create that computes it.
+`input`, and the `operation`. A field's own `default` replaces the type's, in the
+[order writing records describes](./writing.md#defaults). A default runs through the type's
+sanitizers and validators like any value, so it must be one they accept. A literal default that they
+reject fails at boot. A callback default that they reject fails the create that computes it.
 
 ## Sanitizers and validators
 
-A type cleans and checks its value through ordered lists of `sanitizers` and `validators`. A
-sanitizer returns the cleaned value and never rejects. A validator returns a message to reject the
-value, or `undefined` to accept it, and the first message stops the field. A message is a key, a
-`{ key, params }` object, or a plain string - see
-[validation messages](../i18n/messages.md#validation-messages).
+Sanitizers clean a value before it is stored, and validators decide whether it may be stored at
+all. A write runs the type's `sanitizers`, then its `validators`, each list in order:
 
-`null` reaches neither list: a nullable field's `null` stores as is. Both receive `ctx` - the
-field's `options`, the record's raw `input`, and the open transaction as `tx` - so a check can read
-a sibling value as sent or query the database. The type's lists run before the ones a field adds,
-and a failure in the type's lists skips the field's; see
-[writing records](./writing.md#sanitizers-and-validators).
+```ts
+sanitizers: [(value) => value.trim()],
+validators: [
+  (value, ctx) => (value === ctx.input.username ? 'Must differ from the username' : undefined),
+],
+```
 
-A returned message lands at the field's own name. A type whose value has parts reports inside it by
-writing into `ctx.errors`, keyed by the sub-path:
+- A sanitizer returns the cleaned value. It never rejects.
+- A validator returns a message to reject the value, or `undefined` to accept it.
+- The first message stops the field: no later validator runs.
+- A message is a [message key](../i18n/messages.md#validation-messages), a `{ key, params }`
+  object, or a plain string.
+- `null` skips both lists: a nullable field's `null` is stored as it is.
+
+Every function receives `ctx` as its second argument:
+
+- `options` - the field's resolved options.
+- `input` - the record's raw input, so a check can read another field's value as it was sent.
+- `tx` - the open [transaction](./engine.md#transactions), so a check can query the database.
+
+The type's lists run before the ones a field adds, in the
+[order writing records describes](./writing.md#sanitizers-and-validators).
+
+A returned message is reported under the field's own name. A type whose value has parts can report
+an error for one part by writing into `ctx.errors`, with the sub-path as the key:
 
 ```ts
 // fields/address.ts
@@ -167,12 +193,13 @@ export default defineField({
 });
 ```
 
-On a field named `address`, that failure lands at `address.city`. A key opening with `[` joins
-without a dot, so `ctx.errors['[2]']` on a field named `labels` lands at `labels[2]`.
+On a field named `address`, that failure is reported at `address.city`. A key that starts with `[`
+is joined without a dot, so `ctx.errors['[2]']` on a field named `labels` is reported at
+`labels[2]`.
 
 ## In the dashboard
 
-A type with a `text`, `integer`, `real`, or `boolean` column and no `schema` edits in the dashboard
-like the matching built-in, with nothing to register. Any other type shows a notice in place of its
-form control until a [dashboard boot file](../dashboard/pages.md#boot-files) registers one with
-`registerFieldType`.
+A type with a `text`, `integer`, `real`, or `boolean` column and no `schema` is edited in the
+dashboard like the matching built-in type, and you do not need to register anything. Any other type
+shows a notice instead of its form control until a
+[dashboard boot file](../dashboard/pages.md#boot-files) registers one with `registerFieldType`.

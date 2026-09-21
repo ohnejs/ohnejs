@@ -1,6 +1,6 @@
 # Configuration
 
-`ohne.config.ts` at the root is what makes a directory an ohne project - the CLI, the servers, and
+`ohne.config.ts` at the root is what makes a directory an ohne project. The CLI, the servers, and
 codegen all recognize the project by this one file. It default-exports a `defineConfig` call, which
 adds type checking and autocomplete to a plain object:
 
@@ -9,46 +9,66 @@ adds type checking and autocomplete to a plain object:
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs'],
+  layers: ['ohnejs/base'],
 });
 ```
 
 Every key is optional and every key has a default, so this scaffold config is already complete.
-The defaults quoted below are what you get by leaving a key out.
 
 ## Layers
 
-`layers` names the layers this project extends. A layer is an npm package that contributes routes,
-collections, messages, and config of its own - ohne itself ships one, which is why the scaffold
-lists it. Add the package to your `package.json` dependencies, then list it here to stack it.
+A layer is an ohne project you install as a package and build on. Everything it ships becomes part
+of your app: routes, collections, messages, dashboard pages. Anything you define yourself wins.
 
-Entries are listed furthest-first: a later entry overrides an earlier one, and your project
-overrides all. Defaults to `[]`. See [layers](./layers.md).
+Say you run several services, and each one needs the same API keys collection, the same roles, and
+the same rate-limit middleware. Put them in one base layer and list it in every service. You fix a
+bug once, and every service gets the fix. If one service needs a stricter limit, it overrides just
+that middleware.
+
+ohne ships its own content as a layer too. That is why the scaffold lists `ohnejs/base`: it brings
+users, sign-in, and the dashboard. A service on your base layer lists both:
+
+```ts
+layers: ['ohnejs/base', '@acme/service-base'],
+```
+
+Later entries override earlier ones, and your project overrides them all. Defaults to `[]`.
+The [layers guide](./layers.md) shows how to add a layer and build your own.
 
 ## Directories
 
-`dirs` sets where each kind of file is read from, resolved against the layer's own root:
+`dirs` sets where ohne reads each kind of file, relative to the layer's own root. `codegen` is the
+only one ohne writes to. It is a single directory for the whole stack, at your project's root:
 
-- `codegen: '.ohne'` - where ohne writes generated `.ts` files, resolved against the app root.
-- `api: 'api'` - API route files.
-- `boot: 'boot'` - boot files, run once at start.
-- `middleware: 'middleware'` - middleware; files under `global/` run on every request.
-- `messages: 'messages'` - message catalogs, one JSON file per language.
-- `collections: 'collections'` - collection definitions.
-- `fields: 'fields'` - custom field types.
-- `blocks: 'blocks'` - block definitions.
-- `roles: 'roles'` - role definitions.
-- `migrations: 'migrations'` - database migrations.
-- `dashboard: 'dashboard'` - dashboard pages and components.
+```ts
+dirs: {
+  api: 'routes',
+},
+```
 
-`dirs` is never inherited. Each layer's directories come from its own config: renaming your `api`
-directory to `routes` moves your routes, not a dependency's, and a layer's choice never moves
-yours.
+- `codegen: '.ohne'` - where [generated `.ts` files](./cli.md#ohne-prepare) land.
+- `api: 'api'` - [API route files](../api/routes.md#files-and-urls).
+- `boot: 'boot'` - [boot files](./boot.md), run once at start.
+- `middleware: 'middleware'` - [middleware](../api/middleware.md). Files in its `global/`
+  subdirectory [run on every request](../api/middleware.md#global-middleware).
+- `messages: 'messages'` - [message catalogs](../i18n/messages.md#catalogs), one JSON file per
+  language.
+- `collections: 'collections'` -
+  [collection definitions](../database/collections.md#files-and-names).
+- `fields: 'fields'` - [custom field types](../database/field-types.md#where-field-types-live).
+- `blocks: 'blocks'` - [block definitions](../database/blocks.md#defining-a-block).
+- `roles: 'roles'` - [role definitions](../auth/roles.md#defining-roles).
+- `migrations: 'migrations'` - [database migrations](../database/migrations.md#a-migration-file).
+- `dashboard: 'dashboard'` - [dashboard pages](../dashboard/pages.md#from-file-to-route) and
+  components.
+
+`dirs` is [never inherited](#own-vs-inherited-keys). Each layer reads its own, so renaming your
+`api` directory to `routes` moves only your routes.
 
 ## Disabling
 
-`disable` drops components after every layer is combined - the tool for taking a layer but not all
-of it:
+`disable` lets you use a layer without taking everything it ships. It drops components after the
+layers are combined, so what you list here applies to anything in the stack, including your own:
 
 ```ts
 disable: {
@@ -58,22 +78,24 @@ disable: {
 },
 ```
 
-- `routes` - globs over route ids. Without a method prefix a glob matches every method; with one
-  (`'GET /admin/**'`) only that method.
+- `routes` - globs over route ids. A glob with a method prefix, like `'GET /admin/**'`, matches only
+  that method. Without one it matches every method.
 - `messages` - globs over the dot-separated key, so `dashboard.**` drops the whole group. A dropped
-  key vanishes from the catalog endpoint, `useT`, and the generated `KnownMessages` type.
+  key vanishes from the [catalog endpoint](../i18n/messages.md#the-catalog-endpoint),
+  [`useT`](../i18n/messages.md#translating-with-uset), and the generated
+  [`KnownMessages`](../i18n/messages.md#typed-keys) type.
 - `collections`, `fields`, `blocks`, `roles` - exact names. A dropped collection or block vanishes
-  from the schema and the generated types; a field still referencing a dropped field type fails at
+  from the schema and the generated types. A field still referencing a dropped field type fails at
   codegen.
 
-The lists accumulate across layers: every layer's entries combine, deduped, so a layer can
-drop components too and you can always add more.
+The lists accumulate across layers: every layer's entries are combined, with duplicates removed. So
+a layer can drop components too, and you can always add more.
 
 ## Content locales
 
-`collections.locales` names the locales records may hold, as BCP-47 tags, and
-`collections.defaultLocale` - which must be one of them - is where existing values land when a
-field turns translatable:
+`collections.locales` names the locales that records may hold, as BCP-47 tags.
+`collections.defaultLocale` must be one of them. When you make a field translatable, its existing
+values move to the default locale.
 
 ```ts
 collections: {
@@ -82,13 +104,23 @@ collections: {
 },
 ```
 
-They default to `['en']` and `'en'`. Content locales are not UI languages - the set is independent
-of your message catalogs. See [translations](../database/translations.md).
+- They default to `['en']` and `'en'`.
+- Tags are canonicalized for you, so `de-at` becomes `de-AT`.
+
+Content locales are separate from the languages of your message catalogs.
+[Translations](../database/translations.md) covers marking fields and reading per locale.
 
 ## Messages
 
-`messages.defaultLanguage` (default `'en'`) is the language a request falls back to when its own
-language, and its parents, have no catalog entry. See [messages](../i18n/messages.md).
+`messages.defaultLanguage` (default `'en'`) is the language a request
+[falls back to](../i18n/messages.md#translating-with-uset) when its own language, and its parents,
+have no catalog entry:
+
+```ts
+messages: {
+  defaultLanguage: 'de',
+},
+```
 
 ## The API server
 
@@ -101,45 +133,59 @@ api: {
 },
 ```
 
-- `port: 9001` - the port the server listens on.
-- `host` - unset binds every interface.
-- `basePath: ''` - the prefix every route mounts under. `'/api'` serves a `/authors` route at
-  `/api/authors`, and the handler still sees `/authors`.
+Durations take milliseconds or a string like `'30s'`. Sizes take bytes or a string like `'1mb'`.
+`false` turns a limit off, or leaves Node's own default where one exists.
 
-The rest are hardening knobs. Durations take milliseconds or a string like `'30s'`, sizes take
-bytes or a string like `'1mb'`, and `false` means off - or Node's own default, where one exists:
+| Key                | Default | What it does                                                                                                          |
+| ------------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `port`             | `9001`  | The port the server listens on.                                                                                       |
+| `host`             | -       | The host to bind. Unset binds every interface.                                                                        |
+| `basePath`         | `''`    | Prefix for every route. With `'/api'`, `/authors` is served at `/api/authors`, and the handler still sees `/authors`. |
+| `handlerTimeout`   | `'30s'` | How long middleware and the handler may run before the server answers with `503`.                                     |
+| `maxBodySize`      | `'1mb'` | Largest request body. A larger body is refused with `413`.                                                            |
+| `preStopDelay`     | `false` | Keeps serving after a shutdown signal, so a load balancer can deregister.                                             |
+| `shutdownTimeout`  | `false` | How long running requests may take to finish on shutdown.                                                             |
+| `deadline`         | `false` | Deadline for every shutdown hook combined.                                                                            |
+| `waitUntilTimeout` | `false` | How long a [`waitUntil`](../api/response.md#after-the-response) promise may run after the response.                   |
+| `headersTimeout`   | `false` | Wait for the complete request headers. Node's default is 60 seconds.                                                  |
+| `requestTimeout`   | `false` | The whole request, headers and body. Node's default is 5 minutes.                                                     |
+| `keepAliveTimeout` | `false` | Idle keep-alive sockets between requests. Node's default is 5 seconds.                                                |
+| `maxConnections`   | `false` | Limit on concurrent sockets.                                                                                          |
+| `maxHeaderSize`    | `false` | Largest request header block. Node's default is 16 KiB.                                                               |
+| `trustProxy`       | `[]`    | CIDR ranges of proxies allowed to set `X-Forwarded-*` headers.                                                        |
+| `allowedHosts`     | `[]`    | Hostnames the server answers to. Empty answers any host.                                                              |
 
-- `handlerTimeout: '30s'` - how long middleware and the handler may run before a `503` answers.
-- `maxBodySize: '1mb'` - largest request body; anything over is refused with `413`.
-- `preStopDelay: false` - keep serving after a shutdown signal, so a load balancer can deregister.
-- `shutdownTimeout: false` - how long in-flight requests may drain on shutdown.
-- `deadline: false` - global deadline for every shutdown hook combined.
-- `waitUntilTimeout: false` - how long a `waitUntil` promise may run after the response.
-- `headersTimeout: false` - wait for the complete request headers; Node's default is 60 seconds.
-- `requestTimeout: false` - the entire request, headers and body; Node's default is 5 minutes.
-- `keepAliveTimeout: false` - idle keep-alive sockets between requests; Node's default is 5 seconds.
-- `maxConnections: false` - cap on concurrent sockets.
-- `maxHeaderSize: false` - largest request header block; Node's default is 16 KiB.
-- `trustProxy: []` - CIDR ranges of proxies allowed to set `X-Forwarded-*` headers.
-- `allowedHosts: []` - hostnames the server answers to; empty answers any host.
+`handlerTimeout`, `maxBodySize`, and `waitUntilTimeout` can also be set
+[per route](../api/routes.md#per-route-options).
 
-When and how to set these for production is covered in [deployment](../production/deployment.md).
+For production, [deployment](../production/deployment.md) covers when to set these: for
+[capacity](../production/deployment.md#capacity), a
+[graceful shutdown](../production/deployment.md#graceful-shutdown), and running
+[behind a proxy](../production/deployment.md#behind-a-proxy).
 
 ## The dashboard
 
 `dashboard` configures the dashboard's server, run by `ohne serve dashboard`:
 
-- `port: 9000` - the port the dashboard listens on.
-- `host` - unset binds every interface.
-- `apiURL` - the absolute API base URL the browser calls, including any `api.basePath`. Omitted, it
-  is derived from `api`; set it when the API sits at a different origin, such as behind a reverse
-  proxy.
-- `origin` - the absolute origin the browser reaches the dashboard at, such as
-  `https://admin.example.com`. The API's [CORS](../api/middleware.md#cors) accepts credentialed
-  requests from it. Omitted, it is `http://localhost` on `port`; set it whenever the browser reaches
-  the dashboard anywhere else.
-- `menu` - the [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Omitted, the sidebar
-  leads with the overview row, then lists every accessible collection in one unlabeled group.
+```ts
+dashboard: {
+  apiURL: 'https://api.example.com',
+  origin: 'https://admin.example.com',
+},
+```
+
+| Key      | Default | What it does                                                                                                                                                                        |
+| -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port`   | `9000`  | The port the dashboard listens on.                                                                                                                                                  |
+| `host`   | -       | The host to bind. Unset binds every interface.                                                                                                                                      |
+| `apiURL` | -       | Absolute base URL of the API the browser calls, including any `api.basePath`. Unset, it is derived from `api`.                                                                      |
+| `origin` | -       | Absolute origin the browser reaches the dashboard at. The API's [CORS](../api/middleware.md#cors) accepts credentialed requests from it. Unset, it is `http://localhost` on `port`. |
+| `menu`   | -       | The [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Unset, the sidebar starts with the overview row, then lists every accessible collection in one unlabeled group.  |
+
+The defaults fit local development, where the browser reaches both servers directly. In production,
+give `apiURL` and `origin` the public URLs instead.
+[Deployment](../production/deployment.md#what-a-deploy-needs) covers the pair behind a proxy, where
+a wrong `origin` makes the browser block every dashboard request.
 
 ## The database
 
@@ -150,21 +196,22 @@ database: {
 },
 ```
 
-- `dialect: 'sqlite'` - ohne ships SQLite; other dialects are added by layers.
+- `dialect: 'sqlite'` - ohne ships SQLite. Layers can add
+  [other dialects](../database/engine.md#other-dialects).
 - `url: '.data/ohne.db'` - where the main database lives, as a URL the dialect understands. For
-  SQLite a file path, created on demand, or `':memory:'` for an ephemeral database.
-- `helpers: {}` - additional databases keyed by name, reached with `useDatabase('name')`. A helper
-  holds no schema, only what you read and write. Any layer can contribute one; on a name clash the
+  SQLite this is a file path, created if missing, or `':memory:'` for a temporary database.
+- `helpers: {}` - additional databases keyed by name, reached with
+  [`useDatabase('name')`](../database/engine.md#helper-databases). A helper holds no schema, only
+  what you read and write. Any layer can contribute one. When two layers use the same name, the
   closer layer wins.
-- `sync.force: false` - authorize destructive schema syncs on every boot. See
-  [schema sync](../database/sync.md).
+- `sync.force: false` - [allow destructive schema syncs](../database/sync.md#force) on every boot.
 
-Connections, transactions, and helpers in depth: [engine](../database/engine.md).
+The [database guide](../database/engine.md) covers connections, transactions, and helper databases.
 
 ## Query guards
 
-`query.guards` overrides the DoS ceilings on wire-driven queries - the URL and POST-body query
-paths. The fluent builder in your own code is trusted and never checked:
+`query.guards` overrides the limits on queries that arrive over HTTP, in the URL or a POST body.
+Queries you build in your own code are trusted and never checked:
 
 ```ts
 query: {
@@ -172,56 +219,37 @@ query: {
 },
 ```
 
-A ceiling you name replaces the framework default; the rest keep theirs. Every ceiling and its
-default is listed in [querying over HTTP](../api/url-queries.md#guards).
+A limit you set replaces its default. The others keep theirs.
+[Querying over HTTP](../api/url-queries.md#guards) lists every limit and its default.
 
 ## The printer
 
 `printer` controls terminal output:
 
+```ts
+printer: {
+  silent: true,
+},
+```
+
 - `silent: false` - `true` drops every print call.
-- `debug: false` - `true` emits debug output.
+- `debug: false` - `true` prints debug output.
 
 ## Env vars win
 
-A handful of env vars override their config counterpart whenever they are set:
+Some env vars override a config key whenever they are set, such as `PORT` over `api.port` and
+`dashboard.port`:
 
-- `PORT` - `api.port` and `dashboard.port`.
-- `HOST` - `api.host` and `dashboard.host`.
-- `API_URL` - `dashboard.apiURL`, and the URL derived from `api`.
-- `DASHBOARD_URL` - `dashboard.origin`.
-- `DATABASE` - `database.url`. `DB` is an alias; setting both throws.
-- `FORCE_SYNC` - `database.sync.force`, for a single boot.
-- `SILENT` - `printer.silent`.
-- `DEBUG` - `printer.debug`.
+```sh
+PORT=4000 npx ohne serve api
+```
 
-A CLI flag or a `.env` entry counts as set too. The full order and every built-in live in
-[env](./env.md#environment-beats-config).
-
-## Own vs inherited keys
-
-Config resolves per key, closest first: your value wins, and a layer's value fills in where you set
-nothing. Nested groups merge key by key, so setting `api.handlerTimeout` does not discard a layer's
-`api.basePath`.
-
-Some keys resolve differently:
-
-- **Accumulating** - each `disable` list combines entries across every layer, deduped.
-- **Own** - never inherited: a layer's value applies to that layer alone, and only your own config
-  reaches your app. These are `dirs`, `printer`, `api.port`, `api.host`, `dashboard.port`,
-  `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`, `dashboard.menu`, `database.dialect`,
-  `database.url`, and `database.sync.force`.
-
-The own list is a trust boundary: a dependency layer cannot move your ports, point you at its
-database, silence your printer, or force a destructive sync. It cuts both ways for
-`dashboard.menu`: a layer that ships dashboard pages cannot add its own sidebar rows, so list them
-yourself or have the layer append them through the [`dashboard:menu`](../api/hooks.md#dashboardmenu)
-hook. Leave an own key unset and the
-framework default applies, no matter what any layer set.
+[Environment variables](./env.md#environment-beats-config) lists each one and the
+full order.
 
 ## Reading config
 
-`useConfig()` returns the resolved config - your `ohne.config.ts` merged with every layer -
+`useConfig()` returns the resolved config: your `ohne.config.ts` merged with every layer. Call it
 anywhere in app code:
 
 ```ts
@@ -229,10 +257,48 @@ import { useConfig } from 'ohnejs';
 
 const config = useConfig();
 
-config.collections.locales;  // -> ['en']
-config.api.basePath;         // -> ''
-config.disable.routes;       // -> every layer's dropped globs, combined
+config.collections.locales; // -> ['en']
+config.api.basePath;        // -> ''
+config.disable.routes;      // -> every layer's dropped globs, combined
 ```
 
-Every defaulted field is guaranteed present, so none of the reads above need a fallback. Read it
-inside a `computed` or an `effect` to re-run when the config changes.
+Every field with a default is always present, so none of the reads above need a fallback. Read it
+inside a [`computed`](../dashboard/reactivity.md#computed) or an
+[`effect`](../dashboard/reactivity.md#effect) to re-run when the config changes.
+
+## Own vs inherited keys
+
+This matters when your project stacks layers. Config resolves per key, closest first: your value
+wins, and a layer's value fills in where you set nothing. Nested groups merge key by key, so setting
+`api.handlerTimeout` keeps a layer's `api.basePath`.
+
+Some keys resolve differently:
+
+- **Accumulating** - each `disable` list combines every layer's entries, without duplicates.
+- **Own** - never inherited. A layer's value applies to that layer alone. An own key you leave unset
+  takes the framework default, even if a layer sets it. These are `dirs`, `printer`, `api.port`,
+  `api.host`, `dashboard.port`, `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`,
+  `dashboard.menu`, `database.dialect`, `database.url`, and `database.sync.force`.
+
+A base layer and your project both set `api`:
+
+```ts
+// the base layer
+api: { basePath: '/v1', port: 4000 },
+
+// your project
+api: { handlerTimeout: '10s' },
+
+// resolved for your project
+api: { basePath: '/v1', handlerTimeout: '10s' },
+```
+
+`basePath` fills in from the layer. `port` is an own key, so it stays with the layer and your server
+listens on the default `9001`.
+
+Own keys are a trust boundary. A dependency layer cannot move your ports, point you at its
+database, silence your printer, or force a destructive sync.
+
+The same boundary covers `dashboard.menu`: a layer that ships dashboard pages cannot add sidebar
+rows. List them yourself, or have the layer append them through the
+[`dashboard:menu`](../api/hooks.md#dashboardmenu) hook.

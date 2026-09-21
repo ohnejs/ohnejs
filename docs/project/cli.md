@@ -1,30 +1,31 @@
 # The CLI
 
-Installing ohne installs one binary, `ohne`. Its commands: `dev` runs a project while you work,
-`prepare` generates its types, `serve` runs one backend in production, and `sync` reconciles the
-database schema. A new project starts from `npm create ohne`, covered below. Run the binary with
-`npx`, which picks up the project's own copy:
+Installing ohne installs one binary, `ohne`:
+
+- [`ohne dev`](#ohne-dev) runs a project while you work.
+- [`ohne prepare`](#ohne-prepare) generates its types.
+- [`ohne serve`](#ohne-serve) runs one backend in production.
+- [`ohne sync`](#ohne-sync) updates the database schema.
+
+[`npm create ohne`](#npm-create-ohne) creates a project. Inside a project, `npx` runs that project's
+own copy of the binary:
 
 ```sh
 npx ohne --help
 ```
 
-The scaffold wires the everyday ones as scripts, so `npm run dev` and `npm run serve:api` work out
-of the box.
+The scaffold also adds the everyday commands to `package.json`, so `npm run dev` and the other
+scripts there run without `npx`.
 
 ## Every command
 
-`--help` prints usage for any command; `ohne --version` prints the installed version. Bare `ohne`
-prints the root help.
-
-Every command takes `--cwd`, the project root to operate on, defaulting to the
-current directory. A command refuses to run without an `ohne.config.ts` at that root - the file
-is what makes a directory an ohne project. It also reads a `.env` at that root before doing
-anything else, filling in the variables the shell did not set - see
-[the `.env` file](./env.md#the-env-file).
-
-Every built-in env var is also a [flag](./env.md#flags) on every command - the kebab-case of its
-name, so `PORT` is `--port` - and the root help lists them under global options.
+- `--help` prints usage for any command, and bare `ohne` prints the root help.
+- `ohne --version` prints the installed version.
+- `--cwd` sets the project root, defaulting to the current directory. A command refuses to run
+  without an `ohne.config.ts` there.
+- The [`.env` file](./env.md#the-env-file) at that root is read before anything else.
+- Every built-in env var is also a [flag](./env.md#flags), so `PORT` is `--port`. The root help
+  lists them under global options.
 
 ```sh
 npx ohne serve api --port 8080 --host 0.0.0.0
@@ -33,11 +34,30 @@ npx ohne serve api --port 8080 --host 0.0.0.0
 ## npm create ohne
 
 `npm create ohne [dir]` scaffolds a new project: `ohne.config.ts`, `package.json`, `tsconfig.json`,
-and a `.gitignore`. On a TTY it prompts for the location, name, package manager, and git, then
-installs the dependencies; `--yes` skips the prompts and the install, taking the defaults. A
-non-empty target directory needs a double confirm to purge - or `--force` to purge without
-asking. Flags go after `--`, as in `npm create ohne my-app -- --yes`, so npm passes them on. The
-[installation guide](../start/installation.md) walks through the result.
+and a `.gitignore`. In a terminal it asks for the location (when you did not pass `dir`), the
+project name, the package manager, and git, then installs the dependencies.
+
+Flags cover every prompt. Put them after `--`, so npm hands them to the scaffold instead of
+reading them itself:
+
+```sh
+npm create ohne my-app -- --yes --git
+```
+
+- `--yes` (`-y`) skips the prompts and the install, taking the defaults.
+- `--name` sets the package name instead of the directory name.
+- `--pm` sets the package manager, `npm` or `pnpm`. Without it, the default is npm when npm runs
+  the scaffold, and pnpm otherwise.
+- `--git` initializes a git repository.
+- `--force` (`-f`) deletes everything in a non-empty directory, then scaffolds into it. Without it,
+  the scaffold asks twice in a terminal before it deletes anything. Outside a terminal it refuses a
+  non-empty directory.
+
+Outside a terminal (CI, a script), `npm create ohne` behaves like `--yes`: no prompts, no
+install, and the target defaults to the current directory. Run `npm install` before the first
+`npm run dev`.
+
+[Getting started](../start/installation.md) takes a new project through its first run.
 
 ## ohne dev
 
@@ -47,50 +67,51 @@ One command runs everything while you work:
 npx ohne dev
 ```
 
-`dev` is a supervisor. It starts the dashboard child, generates the types, then spawns the API
-child - the very processes `serve` runs in production.
+It starts the dashboard and the API, generates the types, and watches every layer in the
+[stack](./layers.md#the-stack). A linked workspace layer reloads like your own code. Only installed
+dependencies are skipped. On a change:
 
-On every change it re-runs just the codegen the changed files affect, then drains the API child
-and respawns it fresh - a new process every time, so no stale module survives a reload. A change
-to `ohne.config.ts` regenerates everything, since config decides what everything else means. The
-watch covers every layer in the stack, not just your app: a linked workspace layer reloads like
-your own code, and only installed dependencies are skipped.
+- **API source or a [message catalog](../i18n/messages.md#catalogs)** - regenerates the types it
+  affects and restarts the API.
+- **A dashboard file** - reloads the open browsers. Nothing restarts.
+- **`ohne.config.ts`** - regenerates everything and restarts both servers.
+- **[`.env`](./env.md#the-env-file)** - restarts both servers with the new values.
 
-The dashboard child restarts only on a config change, since the layer stack it serves is decided
-there; otherwise it reads its modules from disk per request, so a change under
-a dashboard directory just tells the connected browsers to reload, over a live-reload stream the
-dev run injects into the page.
+Each server is a child process, the same one `serve` runs in production. The API restarts as a fresh
+process, so no old module is left after a reload.
 
-Failures never tear the supervisor down. A codegen error or a crashed API child prints its error,
-the supervisor waits for changes, and the next successful reload revives it.
+A codegen error or a crashed API prints its error and waits. The next successful reload brings it
+back.
 
-`PORT` seeds the pair: the dashboard takes it and the API takes the next free port, so the whole
-stack moves together. Without it, each side binds its configured port - `9000` and `9001` by
-default - and a port already in use is skipped past with a warning.
-
-A change to `.env` reloads it and restarts both children, so they run with the new values. `PORT`
-is read once, when `dev` starts, so moving the ports takes a fresh `dev`.
+Each server binds its configured port, `9000` for the dashboard and `9001` for the API by default.
+When a port is already in use, `dev` warns and takes the next free one. `PORT` moves both: the
+dashboard takes it, and the API takes the next free port.
 
 ## ohne prepare
 
-`prepare` runs every codegen and exits:
+`prepare` generates your project's types, then exits:
 
 ```sh
 npx ohne prepare
 ```
 
-The output lands in the codegen dir, `.ohne/` by default: the typed routes, middleware, message
-keys, database shapes, the resolved config, and a browser tsconfig, split into buckets so the
-Node and browser type programs each include only theirs. Your `tsconfig.json` includes those
-buckets - that is what makes queries and messages fully typed in the editor.
+Run it after a pull, or in CI before `tsc`. The rest of the time you do not need it: `dev` and
+`serve api` generate the same types when they boot, and the scaffold adds `prepare` to
+`package.json`, where npm runs it after an install.
 
-Files an earlier run left behind are pruned. Only files carrying the generated banner are ever
-deleted, so a file of your own inside `.ohne/` is never touched. The banner also stamps the ohne
-version that wrote the file.
+The output lands in `.ohne/` by default: typed routes, middleware, message keys, database shapes,
+and the resolved config, with the Node types and the browser types in separate folders. Your
+`tsconfig.json` already includes them, and that is what makes queries and messages typed in the
+editor.
 
-The scaffold wires it as the npm `prepare` script, so a fresh install generates the types before
-you open the editor. `dev` and `serve api` regenerate on boot anyway; `prepare` is for the times
-in between - after a pull, or in CI before `tsc`.
+You never import from `.ohne/` yourself. What it generates extends the types `ohnejs` exports, so
+`import type { RoleName } from 'ohnejs'` gives you your own roles. Server code has no import
+aliases, so use relative paths there. The dashboard's `app/` alias is covered in
+[pages](../dashboard/pages.md#what-a-page-may-import).
+
+Every run deletes what an earlier run generated, so no old file is left behind. It recognizes its
+own files by a banner at the top, which also records the ohne version that wrote them. A file of
+your own inside `.ohne/` is never touched.
 
 ## ohne serve
 
@@ -101,29 +122,31 @@ npx ohne serve api
 npx ohne serve dashboard
 ```
 
-`serve api` boots the API: it runs the boot files, regenerates the types (skipped when
-`SKIP_CODEGEN` is set, as under `dev`), syncs the database schema, then listens. The sync runs
-before the port opens, so a failed sync never serves. With `SKIP_CODEGEN` set, it still reads the
-version stamp on the generated files and warns when a different ohne wrote them.
+`serve api` runs the [boot files](./boot.md#when-they-run), regenerates the types,
+[syncs the database schema](../database/sync.md#what-happens-at-boot), then listens. If the sync
+fails, it never serves. With [`SKIP_CODEGEN`](./env.md#the-built-ins) set it skips the regeneration,
+and warns when a different ohne version wrote the generated files.
 
-`serve dashboard` serves the dashboard as a pure single-page app: a shell document plus the
-modules it imports, type-stripped to JavaScript per request - no build step, nothing to bundle.
-It needs to know where the API lives: `API_URL` (or `dashboard.apiURL` in config) tells it, and
-without either it derives the address from the API's own config.
+`serve dashboard` serves the dashboard as a single-page app. For each request, it strips the types
+from the requested module and sends it as JavaScript. It finds the API through `API_URL` or
+[`dashboard.apiURL`](./config.md#the-dashboard), and otherwise derives the address from the API's
+own config.
 
-Both bind their configured host and port, overridden by `HOST` and `PORT` when set. How the two
-processes fit a deployment is covered in [deployment](../production/deployment.md).
+Both bind their configured host and port, or `HOST` and `PORT` when set.
+[Deployment](../production/deployment.md) covers how the two processes fit together.
 
 ## ohne sync
 
-`sync` reconciles the database schema with your collections and exits - the same sync a server
-boot runs, without opening a port:
+`sync` updates the database schema to match your collections, then exits. It is the same sync a
+server boot runs, without opening a port:
 
 ```sh
 npx ohne sync
 ```
 
-`--force` authorizes the destructive changes the sync would otherwise refuse; `--dry-run`
-rehearses everything against the live database and rolls it back, exiting non-zero where a real
-sync would refuse. [Schema sync](../database/sync.md) covers what the sync does and when to reach
-for each flag.
+- [`--force`](../database/sync.md#force) allows the destructive changes the sync would otherwise
+  refuse.
+- [`--dry-run`](../database/sync.md#syncing-without-serving) runs the whole sync against the live
+  database, then rolls it back. It exits non-zero where a real sync would refuse.
+
+[The destructive guard](../database/sync.md#the-destructive-guard) covers what the sync refuses.

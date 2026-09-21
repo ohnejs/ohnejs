@@ -1,7 +1,7 @@
 # Field layouts
 
-A layout groups a form's fields: two on one line, a card around related ones, tabs for the long
-tail. Declare it beside the fields, and the dashboard renders it wherever that form appears.
+A layout groups a form's fields: two on one line, a card around related ones, tabs for the rest.
+Declare it beside the fields, and the dashboard renders it wherever that form appears.
 
 ```ts
 // collections/Posts.ts
@@ -30,7 +30,7 @@ export default defineCollection({
 
 ## Fields and widths
 
-A string names a field. After a `|`, a width caps it:
+A string names a field. After a `|`, a width limits it:
 
 ```ts
 layout: ['title', 'price | 8rem', 'slug | 40%', 'published | auto']
@@ -42,7 +42,7 @@ layout: ['title', 'price | 8rem', 'slug | 40%', 'published | auto']
 ## Rows
 
 `row` puts fields, cards, or tabs side by side. They share the width, each shrinking equally
-unless a width caps it:
+unless a width limits it:
 
 ```ts
 layout: [
@@ -66,8 +66,8 @@ layout: [
 
 - `label` is a plain string or a [message key](../i18n/messages.md). Without one, the card has no
   header.
-- `collapsible: true` adds a toggle that shows on hover. A collapsed card whose fields carry errors
-  turns its border destructive.
+- `collapsible: true` adds a toggle that shows on hover. A collapsed card whose fields have errors
+  shows its border in the destructive color.
 
 ## Tabs
 
@@ -85,8 +85,8 @@ layout: [
 ```
 
 - Every panel is built at once, so switching keeps what the user typed and undo works across tabs.
-- A tab counts the errors its fields carry beside its label. A failed save opens the tab holding
-  the first error, and a `#field-name` link opens the tab holding that field.
+- A tab shows the number of errors in its fields beside its label. A failed save opens the tab
+  holding the first error, and a `#field-name` link opens the tab holding that field.
 
 ## Rules
 
@@ -99,12 +99,12 @@ layout: ['title', 'body', '---', 'notes']
 ## Where layouts apply
 
 - A collection's record editor, through
-  [`dashboard.layout`](../database/collections.md#the-collection-in-the-dashboard), for creating
-  and editing alike.
+  [`dashboard.layout`](../database/collections.md#the-collection-in-the-dashboard), for both
+  creating and editing.
 - A [block](../database/blocks.md#naming-a-block), through `dashboard.layout` on `defineBlock`.
 - An [`object` or `repeater`](../database/collections.md#composite-fields), through its `layout`
   option over its own subfields.
 - The [account page](./account.md#extending-the-page), through the `auth:account-layout` hook.
 
-A field the editor does not show, like a write-only field for a viewer who cannot write, drops out
-with any row, card, or tab it leaves empty.
+When the editor does not show a field, like a write-only field for a viewer who cannot write, the
+layout leaves it out. A row, card, or tab that becomes empty is left out too.
