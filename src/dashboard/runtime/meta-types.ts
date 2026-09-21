@@ -338,6 +338,11 @@ export interface DashboardCollection {
   translatable: boolean;
 
   /**
+   * Whether the collection holds exactly one record, so its menu row opens the editor directly.
+   */
+  singleton: boolean;
+
+  /**
    * The collection's operations, each `null` when closed.
    */
   operations: DashboardOperations;
