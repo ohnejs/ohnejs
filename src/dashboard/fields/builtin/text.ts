@@ -41,8 +41,8 @@ export const textType: FieldType = {
   },
   control({ field, initial, path, disabled, onInput }) {
     const off = disabled === true;
-    let base = initial;
-    const seed = isNullish(base) ? '' : String(base as string);
+    const base = ref(initial);
+    const seed = isNullish(initial) ? '' : String(initial as string);
     const raw = ref(seed);
     const multiline = ref(field.options?.multiline === true || seed.includes('\n'));
     const routed = ref('');
@@ -93,7 +93,7 @@ export const textType: FieldType = {
 
     const wire = (): unknown => {
       if (raw.value !== '') return raw.value;
-      return base === '' ? '' : parseTextValue(field, '');
+      return base.value === '' ? '' : parseTextValue(field, '');
     };
 
     return {
@@ -103,7 +103,7 @@ export const textType: FieldType = {
         when(() => multiline.value, multiLine, singleLine),
       ),
       read() {
-        if (isUndefined(base) && raw.value === '') return {};
+        if (isUndefined(base.value) && raw.value === '') return {};
         return { value: wire() };
       },
       setErrors(errors) {
@@ -115,18 +115,18 @@ export const textType: FieldType = {
       },
       error,
       dirty() {
-        if (isUndefined(base)) return raw.value !== '';
-        return wire() !== (isNull(base) ? null : String(base as string));
+        if (isUndefined(base.value)) return raw.value !== '';
+        return wire() !== (isNull(base.value) ? null : String(base.value as string));
       },
       focus() {
         element?.focus();
       },
       revert() {
-        raw.value = isNullish(base) ? '' : String(base as string);
+        raw.value = isNullish(base.value) ? '' : String(base.value as string);
         routed.value = '';
       },
       rebase(value) {
-        base = value;
+        base.value = value;
         routed.value = '';
       },
     };

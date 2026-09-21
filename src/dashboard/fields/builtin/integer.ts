@@ -43,8 +43,8 @@ export const integerType: FieldType = {
   control({ field, initial, path, disabled, onInput }) {
     const t = useT();
     const off = disabled === true;
-    let base = initial;
-    const raw = ref(isNullish(base) ? '' : String(base as number));
+    const base = ref(initial);
+    const raw = ref(isNullish(initial) ? '' : String(initial as number));
     const local = ref('');
     const routed = ref('');
 
@@ -78,7 +78,7 @@ export const integerType: FieldType = {
     return {
       element: control,
       read() {
-        if (isUndefined(base) && raw.value.trim() === '') return {};
+        if (isUndefined(base.value) && raw.value.trim() === '') return {};
         const parsed = parseIntegerValue(field, raw.value);
         if (!isUndefined(parsed.error)) {
           const message = t(parsed.error);
@@ -97,20 +97,20 @@ export const integerType: FieldType = {
       },
       error,
       dirty() {
-        if (isUndefined(base)) return raw.value.trim() !== '';
+        if (isUndefined(base.value)) return raw.value.trim() !== '';
         const parsed = parseIntegerValue(field, raw.value);
-        return !isUndefined(parsed.error) || parsed.value !== base;
+        return !isUndefined(parsed.error) || parsed.value !== base.value;
       },
       focus() {
         input.focus();
       },
       revert() {
-        raw.value = isNullish(base) ? '' : String(base as number);
+        raw.value = isNullish(base.value) ? '' : String(base.value as number);
         local.value = '';
         routed.value = '';
       },
       rebase(value) {
-        base = value;
+        base.value = value;
         routed.value = '';
       },
     };
