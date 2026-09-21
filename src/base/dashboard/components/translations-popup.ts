@@ -8,10 +8,12 @@ import {
   dashboardMeta,
   h,
   icon,
+  loadVerdicts,
   navigate,
   openDialog,
   popup,
   type Popup,
+  type RowVerdicts,
   toast,
   useT,
   when,
@@ -24,6 +26,7 @@ import {
   ref,
   sleep,
   stringifySearchParams,
+  untracked,
 } from 'ohnejs/utils';
 
 import {
@@ -112,24 +115,33 @@ css`
  * New and Edit close the popup, route to the record when elsewhere, and switch the content locale.
  * Copy projects the current locale's translatable values onto the target locale, staying open.
  * Delete confirms first, then removes the locale's translation whole, staying open too.
- * The actions render once the record's translated locales are read; a failed read toasts and closes.
+ * Each action follows the record's verdicts at its row's locale, and Copy at the current locale as well.
+ * The actions render once the translated locales and the verdicts are read; a failed read toasts and closes.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function translationsPopup(options: TranslationsPopupOptions): Popup {
   const t = useT();
   const { collection, uuid } = options;
   const showEditCurrent = options.showEditCurrent ?? false;
-  const canWrite = collection.operations.update?.allowed === true;
-  const canDelete = collection.operations.delete?.allowed === true;
   const existing = ref<string[] | undefined>(undefined);
+  const verdicts = ref<ReadonlyMap<string, RowVerdicts> | undefined>(undefined);
   const copying = ref(false);
   const deleting = ref(false);
 
-  const fetchExisting = async (): Promise<boolean> => {
+  const refresh = async (): Promise<boolean> => {
+    const locales = untracked(dashboardMeta)?.locales ?? [];
     try {
-      const response = await api(`GET /collections/${collection.segment}/${uuid}/translations`);
+      const [response, answered] = await Promise.all([
+        api(`GET /collections/${collection.segment}/${uuid}/translations`),
+        Promise.all(
+          locales.map(
+            async (code) => [code, await loadVerdicts(collection, [uuid], code)] as const,
+          ),
+        ),
+      ]);
       if (!response.ok) return false;
       const answer = (await response.json()) as { locales?: string[] };
+      verdicts.value = new Map(answered);
       existing.value = answer.locales ?? [];
       return true;
     } catch {
@@ -137,7 +149,10 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     }
   };
 
-  void fetchExisting().then((loaded) => {
+  const admits = (operation: 'update' | 'deleteTranslation', code: string): boolean =>
+    verdicts.value?.get(code)?.[operation].has(uuid) === true;
+
+  void refresh().then((loaded) => {
     if (!loaded) {
       toast(t('dashboard.unreachable'), { type: 'error' });
       options.onClose(handle.close);
@@ -163,7 +178,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     copying.value = false;
     if (outcome.kind === 'saved') {
       toast(t('dashboard.translations.copied'), { type: 'success' });
-      void fetchExisting();
+      void refresh();
       options.onCopied?.(code);
       return;
     }
@@ -198,12 +213,13 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     } else {
       toast(t('dashboard.translations.deleteFailed'), { type: 'error' });
     }
-    void fetchExisting();
+    void refresh();
   };
 
   const actions = (code: string): Child[] => {
     const current = effectiveContentLocale();
     const translated = existing.value ?? [];
+    const canWrite = admits('update', code);
     const items: Child[] = [];
     if (code === current && !showEditCurrent) return items;
 
@@ -230,7 +246,12 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
       items.push(editButton);
     }
 
-    const copyOff = !canWrite || copying.value || !translated.includes(current) || code === current;
+    const copyOff =
+      !canWrite ||
+      !admits('update', current) ||
+      copying.value ||
+      !translated.includes(current) ||
+      code === current;
     const copyButton = button(icon('file-import'), {
       size: -2,
       variant: copyOff ? 'ghost' : 'outline',
@@ -250,7 +271,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     }
     items.push(copyButton);
 
-    if (canDelete) {
+    if (admits('deleteTranslation', code)) {
       const deleteOff = deleting.value || !translated.includes(code);
       const deleteButton = button(icon('trash-x'), {
         size: -2,
@@ -299,7 +320,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
           'div',
           { class: 'ohne-row ohne-shrink-0' },
           when(
-            () => !isUndefined(existing.value),
+            () => !isUndefined(existing.value) && !isUndefined(verdicts.value),
             () => actions(code),
           ),
         ),
