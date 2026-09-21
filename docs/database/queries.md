@@ -12,7 +12,8 @@ const posts = await query('Posts').findMany();
 
 `findMany` returns every record as a full object: your fields, plus the `UUID` primary key, the
 `_updatedAt` timestamp, and on a [translatable](./translations.md#reading) collection the
-`_translations` locale list. `findFirst` returns the first match or `undefined`.
+`_translations` locale list. `findFirst` returns the first match or `undefined`. On a
+[singleton](./collections.md#singletons) it returns the one record.
 
 ```ts
 const post = await query('Posts').findFirst();

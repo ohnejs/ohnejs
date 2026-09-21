@@ -36,6 +36,7 @@ collection.Posts.*
 - `*` alone covers everything. A user who holds it is an admin.
 - Only roles use wildcards: a role holds `collection.Posts.*`, but a check always asks for one
   concrete capability.
+- A [singleton](../database/collections.md#singletons) adds `read` and `update` only.
 
 [Codegen](../project/cli.md#ohne-prepare) generates these names from your collections, so they
 autocomplete wherever a capability is expected.

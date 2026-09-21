@@ -88,6 +88,9 @@ await query('Posts').create({
   explicitly.
 - Unknown keys are rejected, not ignored. A misspelled field fails with an `unknownField` error at
   that key, so it never silently drops its value.
+- A value in the wrong primitive is converted when it reads as the right one, so form input works
+  as sent. `text` stores `42` as `'42'`, `boolean` takes `'true'`, `'1'`, and `1`, and the number
+  types take a number sent as a string. Anything else fails with an `invalidValue` error.
 
 A [`writable: false`](./collections.md#write-only-and-locked-fields) field is not part of either
 input, and an `immutable` field is not part of the update input.
@@ -170,6 +173,9 @@ if (result.ok) {
 
 `update` returns every matched record, re-read in its final state. `updateOrThrow` returns the array
 directly and throws on failure, exactly as `createOrThrow` does.
+
+A [singleton](./collections.md#singletons) is the exception: it holds one record, so its `update`
+needs no `where`.
 
 - An update is partial: fields you omit keep their values, and are never reset to a default or
   cleared.

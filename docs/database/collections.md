@@ -60,7 +60,10 @@ fields: {
 }
 ```
 
-- `text` rejects the empty string by default. Pass `allowEmpty: true` to allow it.
+- `text` rejects the empty string by default. Pass `allowEmpty: true` to allow it. A value of only
+  spaces passes, so add a [trimming sanitizer](./writing.md#sanitizers-and-validators) to reject it.
+- `boolean` has no default of its own, so `featured` above must be sent on every create. Pass
+  `default: false` to make it optional.
 - `integer` holds whole numbers within JavaScript's safe range.
 - `number` holds finite decimals, exactly like a JavaScript number. `NaN` and the infinities are
   rejected.
@@ -69,7 +72,8 @@ For money, use `integer` minor units (cents), not `number`. A double cannot repr
 exactly, so float arithmetic builds up small errors that money must not have.
 
 `text`, `integer`, and `number` take `min` and `max`. On `integer` and `number` they limit the
-value, and on `text` they limit the length in characters:
+value, and on `text` they limit the length in characters. The length is counted like
+`String#length`, so an emoji counts as 2:
 
 ```ts
 fields: {
@@ -173,8 +177,9 @@ fields: {
 ```
 
 Each takes `min` and `max` in its own value form, and `dateTime` also accepts ISO 8601 strings
-there. `date` and `time` store fixed-width text, so they compare and sort in calendar and clock
-order.
+there. A `dateTime` write is stricter: it takes epoch milliseconds only, so pass
+`date.getTime()`, not a `Date` or an ISO string. `date` and `time` store fixed-width text, so they
+compare and sort in calendar and clock order.
 
 `dateTime` also takes display options:
 
@@ -204,7 +209,8 @@ takes them - columns, relations, composites, and blocks alike.
   completely.
 
 Server code reads a write-only field by selecting it explicitly. That is the only way to read it,
-and it is how the framework's own `Users.password` works:
+and it is how the framework's own `Users.password` works. Without the flag, every read would return
+the password hash, including over the collections API:
 
 ```ts
 fields: {
@@ -238,10 +244,12 @@ fields: {
 ```
 
 The column stores the target's `UUID`. It is always nullable, because the target can be deleted
-while the reference still points to it. `onDelete` decides what happens then:
+while the reference still points to it. No option makes it required, not even a validator, because
+`null` skips validators. `onDelete` decides what happens on that delete:
 
 - `setNull` (the default) clears the reference.
-- `cascade` deletes the referencing row too.
+- `cascade` deletes the referencing row too. Inside a repeater, that row is the item, not the record
+  that owns it.
 - `restrict` blocks the delete while the reference exists.
 
 ```ts
@@ -265,6 +273,9 @@ fields: {
 - `onDelete` is `cascade` (the default) or `restrict`. `cascade` removes the link when its target
   is deleted, and the referencing row stays.
 - `min` and `max` limit how many links a written list may hold.
+- `allowEmpty: false` rejects a written `[]`.
+- A list that names the same `UUID` twice fails with a `notUnique` error. It is not deduplicated
+  like a `multiSelect`.
 
 ### Both sides of a relation
 
@@ -325,7 +336,8 @@ The subfields are ordinary `field(...)` instances, so a composite may nest furth
 relations to any depth. Every item has its own `UUID`, which stays the same across writes. This is
 how an [update keeps an item](./writing.md#lists-on-update).
 
-- `min` and `max` limit how many items a written repeater list may hold.
+- `min` and `max` limit how many items a written repeater list may hold, and `allowEmpty: false`
+  rejects a written `[]`.
 - A `unique` subfield is unique across every item of every record. `uniquePerParent: true` limits it
   to each record's own list, so a value may repeat across records.
 - `layout` arranges the subfields in the editor, in the same
@@ -343,6 +355,49 @@ Any top-level collection field takes [`translatable: true`](./translations.md#ma
 hold one value per locale.
 [Translations](./translations.md) covers which fields can be translated, the locale set, and
 reading and writing per locale.
+
+## Singletons
+
+A singleton is a collection that holds exactly one record, like site settings. Mark it with
+`singleton: true`:
+
+```ts
+// collections/Settings.ts
+export default defineCollection({
+  singleton: true,
+  api: { read: 'public', update: true },
+  fields: {
+    siteName: field('text', { translatable: true, default: 'My site' }),
+    contactEmail: field('text', { nullable: true }),
+    links: field('repeater', { fields: { url: field('text') } }),
+  },
+});
+```
+
+[Schema sync](./sync.md#what-happens-at-boot) creates the record from the field defaults, so it
+always exists. You never create or delete it yourself:
+
+- Every field must work without input. Give it `nullable: true` or a `default`, unless it is a
+  relation, a composite, or a blocks field - those start empty on their own.
+- [`api`](../api/collections.md#exposure) may open `read` and `update` only.
+- A top-level [`record`](#one-reference) field cannot use `onDelete: 'cascade'`, since deleting its
+  target would delete the record. The same goes for an upload's
+  [`image` or `file`](../uploads/fields.md#options) field.
+
+Reading and writing need no filter:
+
+```ts
+const settings = await query('Settings').findFirst();
+
+await query('Settings').update({ contactEmail: 'hello@example.com' });
+```
+
+- An unfiltered `findFirst` returns the record, never `undefined`.
+- [`update`](./writing.md#updating-records) and
+  [`deleteTranslation`](./translations.md#deleting-translations) work without a `where`. `create`
+  and `delete` do not exist.
+
+In the dashboard, the collection's menu row opens the record's editor instead of a list.
 
 ## Dashboard appearance
 

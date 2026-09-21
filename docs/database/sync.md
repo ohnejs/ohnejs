@@ -19,6 +19,9 @@ inside one transaction. When several instances of the app boot at once, a
 [cluster lock](./with-lock.md) picks one to run the sync. The others wait, then boot against the
 finished schema.
 
+After the sync, each [singleton](./collections.md#singletons) that has no record gets one, created
+from its field defaults. Instances booting together create it once.
+
 ## The destructive guard
 
 The sync never destroys data silently. It refuses to boot when a change would lose something:

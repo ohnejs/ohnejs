@@ -189,6 +189,7 @@ const { deleted } = await query('Posts')
 
 It removes the matched records' German values and German list items. The records themselves and
 every other locale survive. `deleted` counts the records that actually held something in German.
+On a [singleton](./collections.md#singletons) it needs no `where`.
 
 [`delete`](./writing.md#deleting-records) stays on the unscoped chain, where its meaning is clear:
 it removes whole records, every locale included.

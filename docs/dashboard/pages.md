@@ -115,7 +115,8 @@ A group's `items` hold its rows, in the order you write them:
 - A **string** names a [collection](../database/collections.md) and renders its list link. The
   label and [icon](../database/collections.md#the-collection-in-the-dashboard) come from the
   collection itself, and the row is left out for a viewer who cannot reach it. A collection listed
-  twice renders only where it first appears.
+  twice renders only where it first appears. A
+  [singleton](../database/collections.md#singletons)'s row opens its record instead.
 - An **object** links to any dashboard path: `to`, a `label`, and an optional
   [Tabler icon](https://tabler.io/icons). Nothing filters it, since the dashboard has no
   [capability](../auth/roles.md#capabilities) for a page. To show one only to some viewers, use the

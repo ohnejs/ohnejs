@@ -159,6 +159,9 @@ account, no role needed.
 `read` covers every read endpoint. An unknown collection, an unexposed one, and a closed operation
 all answer the identical `404`, so the API never reveals what exists.
 
+A [singleton](../database/collections.md#singletons) opens `read` and `update` only. Its create,
+delete, and translation delete routes always answer that `404`, and its list returns the one record.
+
 ## Access
 
 The guard decides whether a caller may run an operation at all. `access` decides which records and
