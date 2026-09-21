@@ -9,10 +9,10 @@ import type { ConditionObject } from './condition-object.ts';
  *
  * @example
  * ```ts
- * keywordsCondition(['ada', 'math'], ['name', 'bio'])
+ * keywordsCondition(['anduin', 'priest'], ['name', 'bio'])
  * // -> { and: [
- * //   { or: [{ name: { contains: 'ada' } }, { bio: { contains: 'ada' } }] },
- * //   { or: [{ name: { contains: 'math' } }, { bio: { contains: 'math' } }] }
+ * //   { or: [{ name: { contains: 'anduin' } }, { bio: { contains: 'anduin' } }] },
+ * //   { or: [{ name: { contains: 'priest' } }, { bio: { contains: 'priest' } }] }
  * // ] }
  * ```
  */
