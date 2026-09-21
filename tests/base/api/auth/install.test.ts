@@ -91,16 +91,16 @@ describe('POST /auth/install', () => {
   it('creates the first admin with the name and signs it in', async () => {
     strictEqual(await required(), true);
     const response = await call(ROUTES.post, {
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      email: 'ada@example.com',
+      firstName: 'Anduin',
+      lastName: 'Wrynn',
+      email: 'anduin@example.com',
       password: 'correct horse',
     });
     strictEqual(response.status, 200);
     const user = (await response.json()) as User;
-    strictEqual(user.firstName, 'Ada');
-    strictEqual(user.lastName, 'Lovelace');
-    strictEqual(user.email, 'ada@example.com');
+    strictEqual(user.firstName, 'Anduin');
+    strictEqual(user.lastName, 'Wrynn');
+    strictEqual(user.email, 'anduin@example.com');
     deepStrictEqual(user.roles, ['admin']);
     ok(response.headers.getSetCookie().some((c) => c.startsWith('session=')));
     strictEqual(await required(), false);
@@ -110,7 +110,7 @@ describe('POST /auth/install', () => {
   it('stores an omitted or empty name as null', async () => {
     const response = await call(ROUTES.post, {
       firstName: null,
-      email: 'grace@example.com',
+      email: 'garrosh@example.com',
       password: 'correct horse',
     });
     strictEqual(response.status, 200);

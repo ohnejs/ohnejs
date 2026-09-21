@@ -36,7 +36,7 @@ await syncDatabase(db, dialect, {
 describe('language field', () => {
   it('stores a registered catalog language', async () => {
     const record = await queryUntyped('LanguageAccounts').createOrThrow({
-      name: 'Ada',
+      name: 'Anduin',
       language: 'de',
     });
     strictEqual(record.language, 'de');
@@ -44,7 +44,7 @@ describe('language field', () => {
 
   it('canonicalizes the tag before storing it', async () => {
     const record = await queryUntyped('LanguageAccounts').createOrThrow({
-      name: 'Bea',
+      name: 'Bolvar',
       language: 'de-at',
     });
     strictEqual(record.language, 'de-AT');

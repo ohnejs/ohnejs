@@ -73,21 +73,21 @@ async function storedHash(email: string): Promise<string> {
 
 describe('login rehashes a stale-cost password', () => {
   it('rewrites the stored hash at the raised cost on a successful sign-in', async () => {
-    await queryUntyped('Users').createOrThrow({ email: 'ada@example.com', password: 'hunter2' });
-    ok((await storedHash('ada@example.com')).startsWith('scrypt$1024$'));
+    await queryUntyped('Users').createOrThrow({ email: 'anduin@example.com', password: 'hunter2' });
+    ok((await storedHash('anduin@example.com')).startsWith('scrypt$1024$'));
 
     useLayers().add({ path: '/auth-rehash-raise', input: { auth: { password: { cost: 2048 } } } });
 
-    const wrong = await attempt('ada@example.com', 'nope');
+    const wrong = await attempt('anduin@example.com', 'nope');
     strictEqual(wrong.status, 401);
-    ok((await storedHash('ada@example.com')).startsWith('scrypt$1024$'));
+    ok((await storedHash('anduin@example.com')).startsWith('scrypt$1024$'));
 
-    const raised = await attempt('ada@example.com', 'hunter2');
+    const raised = await attempt('anduin@example.com', 'hunter2');
     strictEqual(raised.status, 200);
-    ok((await storedHash('ada@example.com')).startsWith('scrypt$2048$'));
+    ok((await storedHash('anduin@example.com')).startsWith('scrypt$2048$'));
 
-    const settled = await attempt('ada@example.com', 'hunter2');
+    const settled = await attempt('anduin@example.com', 'hunter2');
     strictEqual(settled.status, 200);
-    ok((await storedHash('ada@example.com')).startsWith('scrypt$2048$'));
+    ok((await storedHash('anduin@example.com')).startsWith('scrypt$2048$'));
   });
 });

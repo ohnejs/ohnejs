@@ -104,8 +104,8 @@ async function seed(collection: string, input: Record<string, unknown>): Promise
   return record.UUID as string;
 }
 
-const ada = await seed('CrudAuthors', { name: 'Ada' });
-const sel = await seed('CrudPosts', { title: 'Sel', secret: 'hush', slug: 'sel', author: ada });
+const anduin = await seed('CrudAuthors', { name: 'Anduin' });
+const sel = await seed('CrudPosts', { title: 'Sel', secret: 'hush', slug: 'sel', author: anduin });
 for (let n = 1; n <= 25; n++) await seed('CrudMany', { n });
 await runCreate('CrudSettings', {}, null);
 
@@ -165,7 +165,7 @@ const many = { collection: 'crud-many' };
 describe('create', () => {
   it('answers 201 with the record, hiding readable: false fields', async () => {
     const { status, body } = await call(ROUTES.create, posts, {
-      body: { title: 'One', secret: 's3cret', slug: 'one', author: ada },
+      body: { title: 'One', secret: 's3cret', slug: 'one', author: anduin },
     });
     strictEqual(status, 201);
     const record = body as Record<string, unknown>;
@@ -259,7 +259,7 @@ describe('read one', () => {
     strictEqual(status, 200);
     const record = body as Record<string, unknown>;
     strictEqual(record.title, 'Sel');
-    strictEqual(record.author, ada);
+    strictEqual(record.author, anduin);
     ok(!('secret' in record));
   });
 
@@ -271,8 +271,8 @@ describe('read one', () => {
     const populated = await call(ROUTES.read, { ...posts, uuid: sel }, { qs: '?populate=author' });
     strictEqual(populated.status, 200);
     const author = (populated.body as { author: Record<string, unknown> }).author;
-    strictEqual(author.name, 'Ada');
-    strictEqual(author.UUID, ada);
+    strictEqual(author.name, 'Anduin');
+    strictEqual(author.UUID, anduin);
   });
 
   it('404s a missing UUID', async () => {
@@ -290,7 +290,7 @@ describe('read one', () => {
 
 describe('update', () => {
   it('patches and returns the record', async () => {
-    const uuid = await seed('CrudPosts', { title: 'P1', slug: 'p1', author: ada });
+    const uuid = await seed('CrudPosts', { title: 'P1', slug: 'p1', author: anduin });
     const { status, body } = await call(
       ROUTES.patch,
       { ...posts, uuid },
@@ -325,7 +325,7 @@ describe('update', () => {
 
 describe('delete', () => {
   it('rejects params before deleting, then 204s and 404s a repeat', async () => {
-    const uuid = await seed('CrudPosts', { title: 'D1', slug: 'd1', author: ada });
+    const uuid = await seed('CrudPosts', { title: 'D1', slug: 'd1', author: anduin });
     const rejected = await call(ROUTES.del, { ...posts, uuid }, { qs: '?foo=1' });
     strictEqual(rejected.status, 400);
     deepStrictEqual(wireData(rejected.body), { code: 'unknownParam', path: 'foo' });

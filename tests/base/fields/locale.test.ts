@@ -38,7 +38,7 @@ await syncDatabase(db, dialect, {
 describe('locale field', () => {
   it('stores a configured content locale', async () => {
     const record = await queryUntyped('LocaleAccounts').createOrThrow({
-      name: 'Ada',
+      name: 'Anduin',
       locale: 'de',
     });
     strictEqual(record.locale, 'de');

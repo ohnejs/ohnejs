@@ -32,7 +32,7 @@ await syncDatabase(db, dialect, {
 describe('datePattern field', () => {
   it('stores a pattern as sent', async () => {
     const record = await queryUntyped('PatternAccounts').createOrThrow({
-      name: 'Ada',
+      name: 'Anduin',
       pattern: 'LL',
     });
     strictEqual(record.pattern, 'LL');

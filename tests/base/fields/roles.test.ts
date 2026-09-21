@@ -38,7 +38,7 @@ await syncDatabase(db, dialect, {
 describe('roles field', () => {
   it('stores role names and defaults to an empty list', async () => {
     const named = await queryUntyped('RolesAccounts').createOrThrow({
-      name: 'Ada',
+      name: 'Anduin',
       roles: ['editor', 'viewer'],
     });
     deepStrictEqual(named.roles, ['editor', 'viewer']);

@@ -137,12 +137,12 @@ async function assertSessionLifetime(userUUID: string, lifetime: string): Promis
 
 describe('auth flow', () => {
   it('logs in, matching the email case-insensitively, and sets the safe session cookie', async () => {
-    await createUser('Ada@Example.com', 'correct horse');
-    const response = await login('ADA@example.com', 'correct horse');
+    await createUser('Anduin@Example.com', 'correct horse');
+    const response = await login('ANDUIN@example.com', 'correct horse');
     strictEqual(response.status, 200);
     const user = (await response.json()) as User;
     match(user.UUID, /^[0-9a-f]{8}-[0-9a-f]{4}-/);
-    deepStrictEqual(user, defaults(user.UUID, 'ada@example.com'));
+    deepStrictEqual(user, defaults(user.UUID, 'anduin@example.com'));
 
     const setCookie = response.headers.getSetCookie()[0];
     match(setCookie, /HttpOnly/);
@@ -164,12 +164,12 @@ describe('auth flow', () => {
   });
 
   it('logs in only with the right password, and hides whether an email exists', async () => {
-    await createUser('grace@example.com', 'battery staple');
-    strictEqual((await login('grace@example.com', 'nope')).status, 401);
+    await createUser('garrosh@example.com', 'battery staple');
+    strictEqual((await login('garrosh@example.com', 'nope')).status, 401);
     strictEqual((await login('ghost@example.com', 'nope')).status, 401);
-    const good = await login('grace@example.com', 'battery staple');
+    const good = await login('garrosh@example.com', 'battery staple');
     strictEqual(good.status, 200);
-    strictEqual(((await good.json()) as { email: string }).email, 'grace@example.com');
+    strictEqual(((await good.json()) as { email: string }).email, 'garrosh@example.com');
   });
 
   it('answers a clean 4xx, not 500, for a JSON null body', async () => {

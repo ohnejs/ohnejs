@@ -146,8 +146,8 @@ describe('PATCH /auth/me', () => {
   it('round-trips every account setting and reads it back', async () => {
     const cookie = await signIn('settings@example.com');
     const settings = {
-      firstName: 'Ada',
-      lastName: 'Lovelace',
+      firstName: 'Anduin',
+      lastName: 'Wrynn',
       dashboardLanguage: 'de',
       contentLanguage: 'de',
       timezone: 'Europe/Berlin',
