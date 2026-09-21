@@ -62,6 +62,12 @@ export interface DashboardOperation {
    * Whether the operation is open to anonymous requests, skipping the capability guard.
    */
   public: boolean;
+
+  /**
+   * Whether the operation declares an `access` resolver, so its verdict can differ per row.
+   * Static per collection, so it holds for every user and request.
+   */
+  scoped: boolean;
 }
 
 /**
@@ -757,6 +763,7 @@ function describeOperation(
   return {
     allowed: open || userCan(user, `collection.${collection}.${operation}` as Capability),
     public: open,
+    scoped: !isUndefined(endpoint.access),
   };
 }
 

@@ -121,7 +121,7 @@ useMessages().register('bs', { 'auth.users.timezone.label': 'Vremenska zona' });
 useCollections().register('DashNotes', {
   name: 'DashNotes',
   collection: {
-    api: { read: true, create: true, update: true, delete: true },
+    api: { read: true, create: true, update: { access: () => true }, delete: true },
     dashboard: {
       recordLabel: ['title', 'note'],
       table: { columns: ['title | 20rem', 'note'] },
@@ -396,22 +396,22 @@ describe('capabilities', () => {
 });
 
 describe('operations', () => {
-  it('carries the per-operation verdicts', async () => {
+  it('carries the per-operation verdicts, `scoped` where an `access` resolver is declared', async () => {
     const { body } = await call(user);
     deepStrictEqual(collection(body, 'DashNotes').operations, {
-      read: { allowed: true, public: false },
-      create: { allowed: true, public: false },
-      update: { allowed: true, public: false },
-      delete: { allowed: true, public: false },
+      read: { allowed: true, public: false, scoped: false },
+      create: { allowed: true, public: false, scoped: false },
+      update: { allowed: true, public: false, scoped: true },
+      delete: { allowed: true, public: false, scoped: false },
     });
     deepStrictEqual(collection(body, 'DashOwners').operations, {
-      read: { allowed: true, public: false },
+      read: { allowed: true, public: false, scoped: false },
       create: null,
       update: null,
       delete: null,
     });
     deepStrictEqual(collection(body, 'DashPublic').operations, {
-      read: { allowed: true, public: true },
+      read: { allowed: true, public: true, scoped: false },
       create: null,
       update: null,
       delete: null,
@@ -423,9 +423,9 @@ describe('operations', () => {
     strictEqual(collection(body, 'DashSettings').singleton, true);
     strictEqual(collection(body, 'DashNotes').singleton, false);
     deepStrictEqual(collection(body, 'DashSettings').operations, {
-      read: { allowed: true, public: true },
+      read: { allowed: true, public: true, scoped: false },
       create: null,
-      update: { allowed: true, public: false },
+      update: { allowed: true, public: false, scoped: false },
       delete: null,
     });
   });
