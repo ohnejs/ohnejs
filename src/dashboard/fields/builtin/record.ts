@@ -7,6 +7,7 @@ import type {
   DynamicSelectPaginatedChoices,
 } from '../../ui/dynamic-select.ts';
 
+import { keywordsCondition } from '../../../utils/condition/keywords-condition.ts';
 import { isEmpty } from '../../../utils/is/is-empty.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -113,15 +114,7 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
             order: [...names],
             page,
             perPage: PER_PAGE,
-            ...(isEmpty(tokens)
-              ? {}
-              : {
-                  where: {
-                    and: tokens.map((token) => ({
-                      or: names.map((name) => ({ [name]: { contains: token } })),
-                    })),
-                  },
-                }),
+            ...(isEmpty(tokens) ? {} : { where: keywordsCondition(tokens, names) }),
           }),
         });
         if (!response.ok) return emptyPage();
