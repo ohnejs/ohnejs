@@ -82,6 +82,8 @@ export interface CollectionEndpoint<
 
   /**
    * Resolves the operation's per-request scope, once the guard and the middleware have passed.
+   * The verdicts endpoint resolves an update or delete scope without the operation's middleware.
+   * A resolver therefore never relies on state a middleware set.
    * The context names the operation; a create or update carries `input`, the write the caller intends.
    * The collections API hands it the JSON body, or an empty write when the body fails to read.
    * A translation copy hands it an empty write to reach the source, then the values it copies.

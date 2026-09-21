@@ -35,6 +35,7 @@ POST   /collections/posts                             create a record
 GET    /collections/posts/[uuid]                      read one record
 PATCH  /collections/posts/[uuid]                      update one record
 DELETE /collections/posts/[uuid]                      delete one record
+POST   /collections/posts/verdicts                    ask which records a write may touch
 GET    /collections/posts/[uuid]/translations         list the locales holding a translation
 POST   /collections/posts/[uuid]/translations/copy    copy one locale's translation onto another
 DELETE /collections/posts/[uuid]/translations         delete one locale's translation
@@ -166,7 +167,8 @@ delete, and translation delete routes always answer that `404`, and its list ret
 
 The guard decides whether a caller may run an operation at all. `access` decides which records and
 fields the operation reaches. It is a function on the operation. It runs once per request, after the
-guard and the middleware, and what it returns is applied to every query the operation runs:
+guard and the middleware. [Asking before a write](#asking-before-a-write) runs it without the
+middleware. What it returns is applied to every query the operation runs:
 
 ```ts
 // collections/Posts.ts
@@ -221,8 +223,9 @@ A field outside `select` is refused in `where`, `order`, `select`, and `populate
 that does not exist. That includes `UUID`, so name it when clients address rows.
 
 A `read` scope applies to every read endpoint. An `update` or `delete` scope decides which rows the
-write may touch: a row outside `where` answers `404` as if it did not exist. A create has no rows
-yet, so only `true` or `false` applies.
+write may touch: a row outside `where` answers `404` as if it did not exist. A client can
+[ask before it writes](#asking-before-a-write). A create has no rows yet, so only `true` or `false`
+applies.
 
 The filter checks the row as it is stored, so an update body can move a row out of the scope, for
 example when an author gives a post to someone else. Protect such a field through the scope's
@@ -315,6 +318,37 @@ validation. A rule can judge the write itself, not only the row it changes. The 
 only the author reassign `author`, and with `input.status === 'published'` a rule can require a
 manager before a post is published. A read or delete carries no input. Its context names only the
 operation, so one function can serve every operation by branching on `operation`.
+
+### Asking before a write
+
+An `update` or `delete` scope shows only when the write answers `404`. A client that wants to know
+sooner, to hide an Edit button for example, names the records and asks:
+
+```
+POST /collections/posts/verdicts
+{ "UUIDs": ["0198c3a2-7b1e-7d40-9f2a-5c1e8d3b6a10"] }
+```
+
+It answers `{ update, delete }`. Each holds the `UUIDs` that operation's scope allows, and `update`
+adds the scope's [`select`](#the-scope) when it has one. The answer is a label, not a promise: the
+write still checks for itself.
+
+- The request runs under [`read`](#exposure)'s rules and never names a record the read hides. A
+  closed operation, a missing capability, and a `false` from `access` allow no records.
+- Without `UUIDs` it counts instead: the body takes the list's
+  [`where`](./url-queries.md#filtering), and each operation answers a `total`.
+- `locale` in the body is the locale the update writes. `delete` always checks the default locale,
+  as the record delete does.
+- A translatable collection also answers `deleteTranslation`: the
+  [translation delete](#translations) at `locale`.
+
+Asking runs `access` with an [empty input](#the-write-input) and without the operation's
+[middleware](#exposure), so a question never counts against a write's rate limit. Read the caller
+[as a handler does](#who-is-asking), never from something a middleware set. An `access` that throws
+an HTTP error, like `requireUser` without a user, allows no records.
+
+The dashboard asks this for every collection whose `update` or `delete` has `access`, so an editor
+sees Edit and Delete only where the rule allows.
 
 ### Your own routes
 
