@@ -85,6 +85,16 @@ useCollections().register('LGatedCompanion', {
     },
   },
 });
+useCollections().register('LGatedList', {
+  name: 'LGatedList',
+  collection: {
+    fields: {
+      status: field('text'),
+      title: field('text', { translatable: true }),
+      picks: field('multiSelect', { translatable: true, min: 1, when: { status: 'live' } }),
+    },
+  },
+});
 useCollections().register('LGatedDefault', {
   name: 'LGatedDefault',
   collection: {
@@ -362,6 +372,28 @@ describe('runUpdate companion upsert', () => {
       [uuid, 'de'],
     );
     strictEqual(de?.caption, 'y');
+  });
+
+  it('requires an omitted gated list that forbids empty when a row must materialize', async () => {
+    const created = await runCreate(
+      'LGatedList',
+      { status: 'live', title: 'en', picks: ['a'] },
+      null,
+    );
+    ok(created.ok);
+    const uuid = (created.record as { UUID: string }).UUID;
+    const result = await runUpdate('LGatedList', { title: 'de' }, uuidIs(uuid), 'de');
+    ok(!result.ok);
+    deepStrictEqual({ ...result.errors }, { picks: 'validation.required' });
+  });
+
+  it("materializes a provided gated list's inactive fallback past `min`", async () => {
+    const created = await runCreate('LGatedList', { status: 'idle', title: 'en' }, null);
+    ok(created.ok);
+    const uuid = (created.record as { UUID: string }).UUID;
+    const result = await runUpdate('LGatedList', { title: 'de', picks: ['a'] }, uuidIs(uuid), 'de');
+    ok(result.ok);
+    deepStrictEqual(result.records[0].picks, []);
   });
 
   it('materializes nothing when the update touches only plain fields', async () => {

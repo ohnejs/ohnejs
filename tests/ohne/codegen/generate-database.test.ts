@@ -1014,6 +1014,11 @@ describe('generateDatabase', () => {
         "  rank: { type: 'integer', options: { default: 0 } },\n" +
         "  author: { type: 'record', options: { collection: 'Users' } },\n" +
         "  tags: { type: 'records', options: { collection: 'Tags' } },\n" +
+        "  links: { type: 'records', options: { collection: 'Tags', min: 1 } },\n" +
+        "  picks: { type: 'multiSelect', options: { min: 1 } },\n" +
+        "  loose: { type: 'multiSelect', options: { min: 1, nullable: true } },\n" +
+        "  gatedLinks: { type: 'records', options: { collection: 'Tags', min: 1, when: { title: 'x' } } },\n" +
+        "  gatedPicks: { type: 'multiSelect', options: { min: 1, when: { title: 'x' } } },\n" +
         "  items: { type: 'repeater', options: { fields: { label: { type: 'text', options: {} } } } },\n" +
         '} };\n',
     );
@@ -1022,7 +1027,16 @@ describe('generateDatabase', () => {
     const paths = await generateDatabase(app);
     const shared = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const node = readFileSync(paths[1] ?? '', 'utf8');
+    const inserts = shared.slice(
+      shared.indexOf('export interface GeneratedInserts {'),
+      shared.indexOf('export interface GeneratedUpdates {'),
+    );
 
+    ok(inserts.includes('links: string[];'));
+    ok(inserts.includes('picks: string[];'));
+    ok(inserts.includes('loose?: string[] | null;'));
+    ok(inserts.includes('gatedLinks?: string[];'));
+    ok(inserts.includes('gatedPicks?: string[];'));
     ok(shared.includes('export interface GeneratedInserts {'));
     ok(shared.includes('summary?: string | null;'));
     ok(shared.includes('rank?: number;'));

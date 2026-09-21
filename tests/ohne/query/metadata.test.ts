@@ -1,4 +1,4 @@
-import { deepStrictEqual, match, ok, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, doesNotThrow, match, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { FieldInstance } from '../../../src/ohne/fields/field.ts';
@@ -633,6 +633,20 @@ describe('queryMetadata singletons', () => {
       links: field('repeater', { fields: { url: field('text') } }),
     });
     ok(queryMetadata('QSingleOpen'));
+  });
+
+  it('rejects a singleton list that forbids the empty list', () => {
+    register('QSingleList', { tags: field('multiSelect', { min: 1 }) });
+    throws(
+      () => queryMetadata('QSingleList'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        strictEqual(error.title, 'Singleton field `tags` cannot start empty');
+        return true;
+      },
+    );
+    register('QSingleListDefault', { tags: field('multiSelect', { min: 1, default: ['a'] }) });
+    doesNotThrow(() => queryMetadata('QSingleListDefault'));
   });
 
   it('rejects a singleton field that is neither nullable nor defaulted', () => {

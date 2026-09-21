@@ -14,12 +14,16 @@ import type { FieldOutput, Prepared, ScopeContext } from './run-record.ts';
 
 import {
   hasKey,
+  isArray,
   isEmpty,
   isFunction,
   isNull,
+  isObject,
   isString,
   isUndefined,
 } from '../../../utils/index.ts';
+import { forbidsEmpty } from '../../fields/forbids-empty.ts';
+import { isListField } from '../list-field.ts';
 import { prefixErrors, prefixPath } from './prefix-errors.ts';
 import { coerceColumn, isValidColumn } from './preflight.ts';
 
@@ -70,28 +74,74 @@ export function isProvided(input: Readonly<Record<string, unknown>>, name: strin
 }
 
 /**
+ * Whether a declared default holds the shape its field stores, the gate a provided value also passes.
+ * A scalar's base type is checked in phase B, so only a composite or relation list is checked here.
+ */
+function isDefaultShaped(meta: FieldQueryMeta, value: unknown): boolean {
+  if (meta.kind === 'column' || meta.kind === 'record') return true;
+  if (meta.kind === 'childOne') return isNull(value) || isObject(value);
+  if (!isArray(value)) return false;
+  return meta.kind === 'records' ? value.every(isString) : value.every(isObject);
+}
+
+/**
+ * An inactive field's fallback as phase B takes it, `trusted` when it is the list's own empty `[]`.
+ *
+ * An inactive field holds no value, and a list has no `null`, so its `[]` lands without running the tiers.
+ * A declared `default` stays a value like any other, empty or not.
+ */
+function inactiveValue(meta: FieldQueryMeta, value: unknown): Prepared {
+  const declared = !isUndefined(meta.options) && hasKey(meta.options, 'default');
+  return !declared && isArray(value) && isEmpty(value) ? { value, trusted: true } : { value };
+}
+
+/**
+ * An omitted field's inactive fallback, taken from what phase A already resolved.
+ *
+ * A landed default is kept, so its callback never runs twice.
+ * A list that failed `required` lands its own `[]` instead: `min` binds it only while it is active.
+ * Any other failure stands, since a declared `default` fails the same way inactive.
+ */
+export function inactiveAbsent(meta: FieldQueryMeta, prepared: Prepared): Prepared {
+  if ('value' in prepared) return inactiveValue(meta, prepared.value);
+  const declared = !isUndefined(meta.options) && hasKey(meta.options, 'default');
+  return isListField(meta) && !declared ? { value: [], trusted: true } : prepared;
+}
+
+/**
  * The default path, keyed on the field's storage kind.
  *
- * An instance `default` wins; then a column's type `defaultValue`; then the kind's empty value.
+ * An instance `default` wins; then the kind's empty value; then a column's type `defaultValue`.
+ * A declared composite or list default of the wrong shape is rejected as `invalidValue`.
+ * A list that `forbidsEmpty` has no empty value, so its `[]` is skipped and the field is `required`.
+ * `inactive` resolves a gated field's fallback instead: a list that has nothing else lands its `[]`.
  * A non-nullable column with no default is `required`.
  */
 export async function defaultPath(
   name: string,
   meta: FieldQueryMeta,
   wctx: FieldWriteContext,
+  inactive = false,
 ): Promise<Prepared> {
   const options = meta.options as ValueOptions | undefined;
   if (options && hasKey(options, 'default')) {
-    return { value: await resolveDefaultValue(options.default, wctx) };
+    const value = await resolveDefaultValue(options.default, wctx);
+    return isDefaultShaped(meta, value)
+      ? { value }
+      : { errors: { [name]: 'validation.invalidValue' } };
   }
+  const land = (value: unknown): Prepared => (inactive ? inactiveValue(meta, value) : { value });
+  const forbidden = isListField(meta) && forbidsEmpty(meta.options);
   if (meta.kind === 'records' || meta.kind === 'childMany' || meta.kind === 'blocks') {
-    return { value: [] };
+    return forbidden && !inactive ? { errors: { [name]: 'validation.required' } } : land([]);
   }
   if (meta.kind === 'childOne') return { value: null };
   if (!isUndefined(meta.fieldType?.defaultValue)) {
-    return { value: await resolveDefaultValue(meta.fieldType.defaultValue, wctx) };
+    const value = await resolveDefaultValue(meta.fieldType.defaultValue, wctx);
+    if (!forbidden || !isArray(value) || !isEmpty(value)) return land(value);
   }
   if (meta.nullable) return { value: null };
+  if (inactive && isListField(meta)) return land([]);
   return { errors: { [name]: 'validation.required' } };
 }
 
@@ -134,6 +184,7 @@ export async function prepareScalar(
  * A carried `null` skips every check and stores as-is.
  * A column checks its base type first; a wrong type stops the field.
  * The type tier runs before the instance tier, and any type-tier error skips the instance tier.
+ * A `trusted` value skips both tiers and still serializes.
  */
 export async function finishScalar(
   name: string,
@@ -141,6 +192,7 @@ export async function finishScalar(
   value: unknown,
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
+  trusted = false,
 ): Promise<FieldOutput> {
   const column = meta.column as string;
   if (isNull(value)) return { column: { name: column, value: null } };
@@ -150,18 +202,18 @@ export async function finishScalar(
   }
 
   const wctx = writeContext(name, meta, input, ctx);
-  const errors: FieldErrors = {};
-  const vctx = validateContext(wctx, errors);
-  const tiered = await runTiers(value, meta, wctx, vctx);
-  if (tiered.error) return { errors: { [name]: tiered.error } };
-  if (!isEmpty(errors)) return { errors: prefixErrors(name, errors) };
+  if (!trusted) {
+    const errors: FieldErrors = {};
+    const tiered = await runTiers(value, meta, wctx, validateContext(wctx, errors));
+    if (tiered.error) return { errors: { [name]: tiered.error } };
+    if (!isEmpty(errors)) return { errors: prefixErrors(name, errors) };
+    value = tiered.value;
+  }
 
-  const stored = meta.fieldType?.serialize
-    ? await meta.fieldType.serialize(tiered.value, wctx)
-    : tiered.value;
+  const stored = meta.fieldType?.serialize ? await meta.fieldType.serialize(value, wctx) : value;
   const output: FieldOutput = { column: { name: column, value: stored } };
-  if (meta.kind === 'record' && isString(tiered.value)) {
-    output.refs = [{ path: wctx.path, target: meta.target as string, uuid: tiered.value }];
+  if (meta.kind === 'record' && isString(value)) {
+    output.refs = [{ path: wctx.path, target: meta.target as string, uuid: value }];
   }
   return output;
 }

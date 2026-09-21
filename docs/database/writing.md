@@ -81,9 +81,8 @@ await query('Posts').create({
 
 - Relations take `UUID`s, never nested records: `author` is one `UUID`, `tags` a list of them.
 - A [`records`](./field-types.md#records), [`repeater`](./field-types.md#repeater), or
-  [`blocks`](./field-types.md#blocks) list defaults to `[]`, so you may omit it. Passing `[]` is
-  fine too, unless the field sets `allowEmpty: false`, which rejects it with an `emptyValue` error.
-  If you omit the field, it still gets the default.
+  [`blocks`](./field-types.md#blocks) list defaults to `[]`, so you may omit it, unless
+  `allowEmpty: false` or a `min` of 1 or more forbids the empty list.
 - An [`object`](./field-types.md#object) defaults to no child row, and accepts `null` to say so
   explicitly.
 - Unknown keys are rejected, not ignored. A misspelled field fails with an `unknownField` error at

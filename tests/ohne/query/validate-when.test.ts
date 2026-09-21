@@ -159,6 +159,16 @@ useCollections().register('WHEmptyAnchor', {
   },
 });
 
+useCollections().register('WHGatedList', {
+  name: 'WHGatedList',
+  collection: {
+    fields: {
+      status: field('text'),
+      channels: field('multiSelect', { min: 1, when: { status: 'live' } }),
+    },
+  },
+});
+
 function throwsOhne(run: () => unknown, pattern: RegExp): void {
   throws(run, (error: unknown) => {
     ok(isOhneError(error));
@@ -183,6 +193,10 @@ describe('validateWhen', () => {
 
   it('rejects a gated field that is neither nullable nor defaulted', () => {
     throwsOhne(() => queryMetadata('WHNoDefault'), /must be nullable or have a default/);
+  });
+
+  it('accepts a gated list that forbids empty, since its inactive fallback is `[]`', () => {
+    ok(queryMetadata('WHGatedList').fields.channels.when);
   });
 
   it('rejects a path that addresses no field', () => {

@@ -59,6 +59,8 @@ export function emptyCompanionPlan(): CompanionPlan {
  *
  * A write touching no companion column plans nothing - records without a translation keep lacking one.
  * Defaults resolve through the default path and value tiers under the update's own context.
+ * A provided gated field resolves its inactive fallback, the value a row takes when its gate is off.
+ * An omitted one resolves its active default, since nothing gates a field the write leaves out.
  * A required companion field with no default lands in `errors`.
  * `materializeFailure` decides whether they fail the call, since a gated write may materialize nothing.
  * A field that is provided and ungated lands in every materialized row, so it never needs a default.
@@ -100,13 +102,21 @@ export async function planCompanion(
   for (const [name, field] of Object.entries(meta.fields)) {
     if (field.companion !== true) continue;
     if (hasKey(scope.columns, field.column as string) && isUndefined(field.when)) continue;
-    const prepared = await defaultPath(name, field, writeContext(name, field, {}, ctx));
+    const inactive = hasKey(scope.columns, field.column as string);
+    const prepared = await defaultPath(name, field, writeContext(name, field, {}, ctx), inactive);
     if ('errors' in prepared) {
       errors[field.column as string] = prepared.errors;
       continue;
     }
     if (!('value' in prepared)) continue;
-    const finished = await finishScalar(name, field, prepared.value, {}, ctx);
+    const finished = await finishScalar(
+      name,
+      field,
+      prepared.value,
+      {},
+      ctx,
+      'trusted' in prepared,
+    );
     if (!isUndefined(finished.errors)) errors[field.column as string] = finished.errors;
     else defaults[field.column as string] = finished.column?.value ?? null;
   }

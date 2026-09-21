@@ -95,6 +95,64 @@ useCollections().register('PGatedList', {
   },
 });
 
+useCollections().register('PChoices', {
+  name: 'PChoices',
+  collection: {
+    fields: {
+      kind: field('text', { default: 'lite' }),
+      tags: field('multiSelect', { min: 1 }),
+      gated: field('multiSelect', { min: 1, when: { kind: 'full' } }),
+      loose: field('multiSelect', { min: 1, nullable: true }),
+      gatedLoose: field('multiSelect', { min: 1, nullable: true, when: { kind: 'full' } }),
+    },
+  },
+});
+
+useCollections().register('PNestedStrict', {
+  name: 'PNestedStrict',
+  collection: {
+    fields: {
+      sections: field('repeater', {
+        fields: { links: field('records', { collection: 'PTag', min: 1 }) },
+      }),
+    },
+  },
+});
+
+useCollections().register('PDeclaredEmpty', {
+  name: 'PDeclaredEmpty',
+  collection: { fields: { tags: field('multiSelect', { min: 1, default: () => [] }) } },
+});
+
+useCollections().register('PDefaults', {
+  name: 'PDefaults',
+  collection: {
+    fields: {
+      tags: field('records', { collection: 'PTag', max: 1, default: () => ['t1', 't2'] }),
+      sections: field('repeater', {
+        fields: sectionFields,
+        default: () => [{ heading: 'a' }],
+        sanitizers: [
+          (value) =>
+            (value as { heading: string }[]).map((item) => ({ heading: `${item.heading}!` })),
+        ],
+      }),
+      meta: field('object', {
+        fields: metaFields,
+        default: () => ({ note: 'n' }),
+        validators: [() => 'object-validator-ran'],
+      }),
+    },
+  },
+});
+
+useCollections().register('PMalformed', {
+  name: 'PMalformed',
+  collection: {
+    fields: { tags: field('records', { collection: 'PTag', default: () => 't1' as never }) },
+  },
+});
+
 const tx = {} as Transaction;
 
 async function create(input: Record<string, unknown>) {
@@ -337,6 +395,122 @@ describe('runRecord list emptiness', () => {
     );
     ok(!result.ok);
     strictEqual(result.errors.items, 'validation.emptyValue');
+  });
+
+  it('requires a list that forbids empty when a create omits it, per kind', async () => {
+    const result = await runRecord(queryMetadata('PStrict'), {}, { operation: 'create', tx });
+    ok(!result.ok);
+    deepStrictEqual(
+      { ...result.errors },
+      {
+        tags: 'validation.required',
+        sections: 'validation.required',
+        content: 'validation.required',
+      },
+    );
+  });
+
+  it('requires a gated list that forbids empty once its gate activates', async () => {
+    const result = await runRecord(
+      queryMetadata('PGatedList'),
+      { kind: 'full' },
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    strictEqual(result.errors.items, 'validation.required');
+  });
+
+  it('requires a multiSelect with a `min` when a create omits it', async () => {
+    const result = await runRecord(queryMetadata('PChoices'), {}, { operation: 'create', tx });
+    ok(!result.ok);
+    deepStrictEqual({ ...result.errors }, { tags: 'validation.required' });
+  });
+
+  it("lands an inactive multiSelect's own `[]` past `min`, and `null` on an omitted nullable one", async () => {
+    const result = await runRecord(
+      queryMetadata('PChoices'),
+      { tags: ['a'], gated: ['b'] },
+      { operation: 'create', tx },
+    );
+    ok(result.ok);
+    deepStrictEqual(result.scope.columns.gated, []);
+    strictEqual(result.scope.columns.loose, null);
+  });
+
+  it('lands the same inactive fallback whether the list was sent or omitted', async () => {
+    const meta = queryMetadata('PChoices');
+    const sent = await runRecord(
+      meta,
+      { tags: ['a'], gated: ['b'], gatedLoose: ['c'] },
+      { operation: 'create', tx },
+    );
+    const omitted = await runRecord(meta, { tags: ['a'] }, { operation: 'create', tx });
+    ok(sent.ok);
+    ok(omitted.ok);
+    deepStrictEqual(sent.scope.columns.gated, []);
+    deepStrictEqual(omitted.scope.columns.gated, []);
+    strictEqual(sent.scope.columns.gatedLoose, null);
+    strictEqual(omitted.scope.columns.gatedLoose, null);
+  });
+
+  it('rejects a provided empty multiSelect below `min`', async () => {
+    const result = await runRecord(
+      queryMetadata('PChoices'),
+      { kind: 'full', tags: [], gated: [] },
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    deepStrictEqual(result.errors.tags, { key: 'validation.minItems', params: { min: 1 } });
+    deepStrictEqual(result.errors.gated, { key: 'validation.minItems', params: { min: 1 } });
+  });
+
+  it('runs a declared empty default through the tiers, so `min` rejects it', async () => {
+    const result = await runRecord(
+      queryMetadata('PDeclaredEmpty'),
+      {},
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    deepStrictEqual(result.errors.tags, { key: 'validation.minItems', params: { min: 1 } });
+  });
+});
+
+describe('runRecord nested items that omit a required list', () => {
+  it('treats an explicit undefined as absent, failing `required` instead of throwing', async () => {
+    const result = await runRecord(
+      queryMetadata('PNestedStrict'),
+      { sections: [{ links: undefined }] },
+      { operation: 'create', tx },
+    );
+    ok(!result.ok);
+    deepStrictEqual({ ...result.errors }, { 'sections[0].links': 'validation.required' });
+  });
+});
+
+describe('runRecord declared composite defaults', () => {
+  it("runs each field's own tiers over its declared default", async () => {
+    const result = await runRecord(queryMetadata('PDefaults'), {}, { operation: 'create', tx });
+    ok(!result.ok);
+    deepStrictEqual(result.errors.tags, { key: 'validation.maxItems', params: { max: 1 } });
+    strictEqual(result.errors.meta, 'object-validator-ran');
+    strictEqual(result.errors.sections, undefined);
+  });
+
+  it('lands the sanitized default when the tiers accept it', async () => {
+    const result = await runRecord(
+      queryMetadata('PDefaults'),
+      { tags: ['t1'], meta: null },
+      { operation: 'create', tx },
+    );
+    ok(result.ok);
+    const sections = result.scope.children.find((child) => child.path === 'sections');
+    strictEqual(sections?.items[0].columns.heading, 'a!');
+  });
+
+  it('rejects a declared default of the wrong shape at the field', async () => {
+    const result = await runRecord(queryMetadata('PMalformed'), {}, { operation: 'create', tx });
+    ok(!result.ok);
+    strictEqual(result.errors.tags, 'validation.invalidValue');
   });
 });
 

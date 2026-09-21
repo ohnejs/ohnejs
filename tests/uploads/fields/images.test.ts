@@ -37,6 +37,13 @@ useCollections().register('ImageGalleries', {
     fields: {
       title: field('text'),
       images: field('images'),
+    },
+  },
+});
+useCollections().register('ImagePicks', {
+  name: 'ImagePicks',
+  collection: {
+    fields: {
       picks: field('images', {
         allowEmpty: false,
         min: 2,
@@ -83,6 +90,13 @@ async function failing(input: Record<string, unknown>): Promise<Record<string, u
   return { ...result.errors };
 }
 
+async function failingPicks(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const result = await queryUntyped('ImagePicks').create(input);
+  strictEqual(result.ok, false);
+  ok(!result.ok);
+  return { ...result.errors };
+}
+
 describe('images references', () => {
   it('stores the linked UUIDs in order', async () => {
     const gallery = await queryUntyped('ImageGalleries').createOrThrow({
@@ -106,7 +120,7 @@ describe('images references', () => {
   });
 
   it('applies the constraints per item', async () => {
-    const errors = await failing({ picks: [sunset, wide] });
+    const errors = await failingPicks({ picks: [sunset, wide] });
     deepStrictEqual(errors, {
       'picks[1]': { key: 'uploads.errors.maxWidth', params: { max: 4000 } },
     });
@@ -120,25 +134,26 @@ describe('images references', () => {
 
 describe('images count', () => {
   it('rejects a provided empty list under `allowEmpty: false`', async () => {
-    const errors = await failing({ picks: [] });
+    const errors = await failingPicks({ picks: [] });
     strictEqual(errors.picks, 'validation.emptyValue');
   });
 
+  it('requires a list that forbids empty when a create omits it', async () => {
+    deepStrictEqual(await failingPicks({}), { picks: 'validation.required' });
+  });
+
   it('rejects a list below `min`', async () => {
-    const errors = await failing({ picks: [sunset] });
+    const errors = await failingPicks({ picks: [sunset] });
     deepStrictEqual(errors.picks, { key: 'validation.minItems', params: { min: 2 } });
   });
 
   it('rejects a list above `max`', async () => {
-    const errors = await failing({ picks: [sunset, dawn, dusk, wide] });
+    const errors = await failingPicks({ picks: [sunset, dawn, dusk, wide] });
     deepStrictEqual(errors.picks, { key: 'validation.maxItems', params: { max: 3 } });
   });
 
   it('accepts a list within bounds', async () => {
-    const gallery = await queryUntyped('ImageGalleries').createOrThrow({
-      title: 'Picked',
-      picks: [sunset, dawn],
-    });
+    const gallery = await queryUntyped('ImagePicks').createOrThrow({ picks: [sunset, dawn] });
     deepStrictEqual(gallery.picks, [sunset, dawn]);
   });
 });

@@ -37,6 +37,13 @@ useCollections().register('FileBundles', {
     fields: {
       title: field('text'),
       files: field('files'),
+    },
+  },
+});
+useCollections().register('FilePapers', {
+  name: 'FilePapers',
+  collection: {
+    fields: {
       papers: field('files', { min: 1, max: 2, types: ['document'], maxSize: '1mb' }),
     },
   },
@@ -82,6 +89,13 @@ async function failing(input: Record<string, unknown>): Promise<Record<string, u
   return { ...result.errors };
 }
 
+async function failingPapers(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const result = await queryUntyped('FilePapers').create(input);
+  strictEqual(result.ok, false);
+  ok(!result.ok);
+  return { ...result.errors };
+}
+
 describe('files references', () => {
   it('stores the linked UUIDs of any files in order', async () => {
     const bundle = await queryUntyped('FileBundles').createOrThrow({
@@ -97,7 +111,7 @@ describe('files references', () => {
   });
 
   it('applies the constraints per item', async () => {
-    const errors = await failing({ papers: [sunset, huge] });
+    const errors = await failingPapers({ papers: [sunset, huge] });
     deepStrictEqual(errors, {
       'papers[0]': { key: 'uploads.errors.typeNotAllowed', params: { type: 'image/png' } },
       'papers[1]': { key: 'uploads.errors.fileTooLarge', params: { max: '1mb' } },
@@ -107,20 +121,21 @@ describe('files references', () => {
 
 describe('files count', () => {
   it('rejects a list below `min`', async () => {
-    const errors = await failing({ papers: [] });
+    const errors = await failingPapers({ papers: [] });
     deepStrictEqual(errors.papers, { key: 'validation.minItems', params: { min: 1 } });
   });
 
+  it('requires a list with a `min` when a create omits it', async () => {
+    deepStrictEqual(await failingPapers({}), { papers: 'validation.required' });
+  });
+
   it('rejects a list above `max`', async () => {
-    const errors = await failing({ papers: [brief, report, huge] });
+    const errors = await failingPapers({ papers: [brief, report, huge] });
     deepStrictEqual(errors.papers, { key: 'validation.maxItems', params: { max: 2 } });
   });
 
   it('accepts a list within bounds', async () => {
-    const bundle = await queryUntyped('FileBundles').createOrThrow({
-      title: 'Papers',
-      papers: [report, brief],
-    });
+    const bundle = await queryUntyped('FilePapers').createOrThrow({ papers: [report, brief] });
     deepStrictEqual(bundle.papers, [report, brief]);
   });
 });

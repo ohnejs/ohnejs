@@ -36,7 +36,7 @@ function fieldPath(name: string, ctx: ScopeContext): string {
 }
 
 /**
- * Runs a composite field's own sanitizer and validator tiers over its provided value, in Phase B.
+ * Runs a composite field's own sanitizer and validator tiers over its value, in Phase B.
  *
  * Mirrors `finishScalar`'s tier run, so a composite validates and cleans exactly as a scalar does.
  * A type or instance own-message keys at the field; a validator's sub-path failures lift out prefixed.
@@ -64,8 +64,8 @@ export async function runCompositeTiers(
  * An explicit `undefined` counts as absent, exactly as `prepareScalar` reads it.
  * A nested composite item is always full, so an absent list or object subfield defaults even under an update.
  * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
- * A provided value is marked `provided`, so Phase B runs the field's own sanitizers and validators over it.
- * A default is trusted and unmarked: its tiers never run, so an absent or inactive list lands `[]` untiered.
+ * Phase B runs the field's own sanitizers and validators over every value, a default included.
+ * Only an inactive list's own `[]` is `trusted`, which the scope processor resolves.
  * A provided `object` or repeater also carries its coerced `snapshot`, the view a sibling `when` reads.
  * A `records` or `blocks` value stays raw: a gate can only test its membership, never walk it.
  */
@@ -86,14 +86,14 @@ export async function prepareComposite(
   if (meta.kind === 'childOne') {
     if (isNull(value)) return { value: null };
     if (!isObject(value)) return { errors: { [name]: 'validation.invalidValue' } };
-    return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
+    return { value, snapshot: await fieldSnapshot(name, meta, value, ctx) };
   }
   if (isNull(value)) return { errors: { [name]: 'validation.notNullable' } };
   if (!isArray(value)) return { errors: { [name]: 'validation.invalidValue' } };
   const wellShaped = meta.kind === 'records' ? value.every(isString) : value.every(isObject);
   if (!wellShaped) return { errors: { [name]: 'validation.invalidValue' } };
-  if (meta.kind !== 'childMany') return { value, provided: true };
-  return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
+  if (meta.kind !== 'childMany') return { value };
+  return { value, snapshot: await fieldSnapshot(name, meta, value, ctx) };
 }
 
 /**
@@ -140,6 +140,7 @@ async function itemSnapshot(
     if (!isProvided(item, name)) {
       const prepared = await defaultPath(name, sub, writeContext(name, sub, item, ctx));
       if ('value' in prepared) view[name] = prepared.value;
+      else delete view[name];
       continue;
     }
     const raw = item[name];

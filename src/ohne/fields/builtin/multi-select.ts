@@ -14,7 +14,7 @@ import { validationMessage } from '../validation-message.ts';
  * With `choices`, every entry must come from the list and the value type is the choice union.
  * Without, any strings are legal and the value type is `string[]`.
  * Duplicate entries collapse on write, keeping the first occurrence.
- * A create that omits the field stores `[]`.
+ * A create that omits the field stores `[]`, unless `min` forbids it.
  */
 export const multiSelect = defineField({
   columnType: 'json',

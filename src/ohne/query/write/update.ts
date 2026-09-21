@@ -400,7 +400,7 @@ async function attemptGatedUpdate(
   const companionPlan = await planCompanion(tx, dialect, meta, scope, matched, code);
   for (const record of records) {
     const ancestry = [overlays.get(record.UUID as string) as ScopeValues];
-    const failure = gatedResetErrors(scope.children, ancestry);
+    const failure = gatedErrors(scope.children, ancestry);
     if (!isNull(failure)) return { ok: false, errors: failure };
   }
 
@@ -506,14 +506,15 @@ async function updateColumns(
 }
 
 /**
- * The failures of gated defaults this walk's deactivations actually need, or `null` when none.
+ * The failures this walk's gates actually raise for one matched record, or `null` when none.
  *
  * Mirrors `gateNested`'s decision purely: each item's subfield `when` resolves over the same ancestry.
  * An inactive subfield whose default failed contributes its errors at the item's absolute path.
+ * An active subfield that was omitted but needs input contributes its `required` the same way.
  * A create with that item's input fails identically, so the update rejects cleanly before any write.
  * Runs per matched record, since a gate may deactivate for one record and hold for another.
  */
-function gatedResetErrors(
+function gatedErrors(
   children: readonly ProcessedChild[],
   ancestry: readonly ScopeValues[],
 ): FieldErrors | null {
@@ -526,19 +527,21 @@ function gatedResetErrors(
           : child.meta.kind === 'blocks'
             ? `${child.path}[${index}].fields`
             : `${child.path}[${index}]`;
-      const failures = item.gatedDefaultErrors;
-      if (!isUndefined(failures)) {
+      if (!isUndefined(item.gatedDefaultErrors) || !isUndefined(item.gatedRequiredErrors)) {
         const resolve = whenResolver(item.values, ancestry);
         for (const [name, meta] of Object.entries(itemSubfields(child, item))) {
-          if (isUndefined(meta.when) || evaluateCondition(meta.when, resolve)) continue;
-          for (const [key, message] of Object.entries(failures)) {
+          if (isUndefined(meta.when)) continue;
+          const failures = evaluateCondition(meta.when, resolve)
+            ? item.gatedRequiredErrors
+            : item.gatedDefaultErrors;
+          for (const [key, message] of Object.entries(failures ?? {})) {
             if (key !== name && !key.startsWith(`${name}.`) && !key.startsWith(`${name}[`))
               continue;
             (errors ??= {})[prefixPath(itemPath, key)] = message;
           }
         }
       }
-      const nested = gatedResetErrors(item.children, [...ancestry, item.values]);
+      const nested = gatedErrors(item.children, [...ancestry, item.values]);
       if (!isNull(nested)) Object.assign((errors ??= {}), nested);
     }
   }

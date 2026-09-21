@@ -40,7 +40,6 @@ export const repeater = defineField({
     /**
      * Whether an empty list is a legal value.
      * With `false`, supplying `[]` is rejected, so the field requires at least one item.
-     * Absent input still defaults to `[]`; only a provided empty list is rejected.
      *
      * @default
      * true

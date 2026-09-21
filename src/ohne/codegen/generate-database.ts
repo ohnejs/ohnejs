@@ -50,6 +50,7 @@ import { collectMigrations } from '../database/migrations/collect-migrations.ts'
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
 import { isExpandableDescription, resolveFieldOptions } from '../fields/field.ts';
+import { forbidsEmpty } from '../fields/forbids-empty.ts';
 import {
   type FieldStorageKind,
   resolveFieldStorage,
@@ -1287,12 +1288,35 @@ function inputScalarType(
 }
 
 /**
+ * Whether a create may omit a list field: it declares a `default`, or its options admit the empty `[]`.
+ * A gated list stays optional, since a create whose gate is off lands `[]` without it.
+ */
+function listOptional(options: Readonly<Record<string, unknown>>): boolean {
+  return hasKey(options, 'default') || hasKey(options, 'when') || !forbidsEmpty(options);
+}
+
+/**
+ * Whether a column field is defaulted: by its own `default`, or by its type's `defaultValue`.
+ * A `jsonList` type's default is read as its empty list, which a field that `forbidsEmpty` cannot take.
+ * A gated one still takes it, as its inactive fallback.
+ */
+function columnDefaulted(
+  options: Readonly<Record<string, unknown>>,
+  fieldType: { defaultValue?: unknown; jsonList?: true },
+): boolean {
+  if (hasKey(options, 'default')) return true;
+  if (isUndefined(fieldType.defaultValue)) return false;
+  return !(fieldType.jsonList === true && forbidsEmpty(options)) || hasKey(options, 'when');
+}
+
+/**
  * Emits one field's create-input type and whether it is optional.
  *
  * A column or `record` takes its value type, optional when nullable or defaulted.
  * A `records` list is optional and defaults to `[]`; an `object` is optional and accepts `null`.
  * A `repeater` is an optional list of item shapes; a create item carries no `UUID`.
  * A blocks field is an optional list of `{ block; fields }` envelopes, defaulting to `[]`.
+ * A list that `forbidsEmpty` is required instead, as `listOptional` decides.
  * `fields` references the type's `GeneratedBlockInserts` member, so self-nesting terminates.
  */
 function insertFieldType(
@@ -1307,9 +1331,9 @@ function insertFieldType(
     const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map((block) =>
       blockArm(block, 'GeneratedBlockInserts', null),
     );
-    return { type: blocksListType(items), optional: true };
+    return { type: blocksListType(items), optional: listOptional(options) };
   }
-  if (kind === 'junction') return { type: 'string[]', optional: true };
+  if (kind === 'junction') return { type: 'string[]', optional: listOptional(options) };
   if (kind === 'childOne') {
     return {
       type: `${insertObjectType(owner, hint as ChildHint, context)} | null`,
@@ -1317,11 +1341,13 @@ function insertFieldType(
     };
   }
   if (kind === 'childMany') {
-    return { type: `${insertObjectType(owner, hint as ChildHint, context)}[]`, optional: true };
+    return {
+      type: `${insertObjectType(owner, hint as ChildHint, context)}[]`,
+      optional: listOptional(options),
+    };
   }
 
-  const defaulted =
-    hasKey(options, 'default') || !isUndefined(resolved.registered.fieldType.defaultValue);
+  const defaulted = columnDefaulted(options, resolved.registered.fieldType);
   const { type, nullable } = inputScalarType(name, instance, context, resolved);
   return { type, optional: nullable || defaulted };
 }
@@ -1382,9 +1408,9 @@ function updateFieldType(
     const items = allowedBlocksOf(owner, name, hint as BlocksHint, context).map((block) =>
       blockArm(block, 'GeneratedBlockUpdates', 'UUID?: string;'),
     );
-    return { type: blocksListType(items), optional: true };
+    return { type: blocksListType(items), optional: listOptional(options) };
   }
-  if (kind === 'junction') return { type: 'string[]', optional: true };
+  if (kind === 'junction') return { type: 'string[]', optional: listOptional(options) };
   if (kind === 'childOne') {
     return {
       type: `${updateObjectType(owner, hint as ChildHint, context, false)} | null`,
@@ -1394,11 +1420,10 @@ function updateFieldType(
   if (kind === 'childMany') {
     return {
       type: `${updateObjectType(owner, hint as ChildHint, context, true)}[]`,
-      optional: true,
+      optional: listOptional(options),
     };
   }
-  const defaulted =
-    hasKey(options, 'default') || !isUndefined(resolved.registered.fieldType.defaultValue);
+  const defaulted = columnDefaulted(options, resolved.registered.fieldType);
   const { type, nullable } = inputScalarType(name, instance, context, resolved);
   return { type, optional: nullable || defaulted };
 }

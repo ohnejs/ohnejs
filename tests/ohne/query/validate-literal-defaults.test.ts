@@ -122,6 +122,14 @@ describe('validateLiteralDefaults', () => {
     );
   });
 
+  it('rejects an empty list default that `min` forbids', async () => {
+    await rejectsTitled(
+      checkCollection('LDEmptyList', { tags: field('multiSelect', { min: 1, default: [] }) }),
+      'Field `tags` defaults to a value it rejects',
+      /defaults to `\[\]`\.\n.*validation\.minItems/,
+    );
+  });
+
   it('names a nested subfield by its dotted path', async () => {
     await rejectsTitled(
       checkCollection('LDNested', {

@@ -1,12 +1,14 @@
 import type { CollectionQueryMeta } from './metadata.ts';
 
 import { ohneError } from '../error/ohne-error.ts';
+import { isListField } from './list-field.ts';
 import { landsWithoutInput } from './validate-when.ts';
 
 /**
  * Validates the declared fields of a singleton against its one-record invariant.
  *
  * The record is created from the field defaults alone, so a bare required field would fail the seed.
+ * A list that forbids the empty list is required too, since its `[]` cannot land.
  * A top-level `onDelete: 'cascade'` reference would delete the record along with the row it points at.
  * Composite subfields are not walked: an omitted composite lands `null` or `[]` as a whole.
  * A cascade inside a composite removes only that item, never the record.
@@ -16,6 +18,16 @@ export function validateSingleton(meta: CollectionQueryMeta, declared: readonly 
   if (meta.singleton !== true) return;
   for (const name of declared) {
     const field = meta.fields[name];
+    if (isListField(field) && !landsWithoutInput(field)) {
+      throw ohneError({
+        title: `Singleton field \`${name}\` cannot start empty`,
+        body: [
+          `Field \`${name}\` in collection \`${meta.collection}\` forbids the empty list through \`min\` or \`allowEmpty\`.`,
+          'The record is created from the field defaults when the schema syncs, so every field needs a value.',
+          'Give it a `default` that holds enough entries, or allow the empty list.',
+        ],
+      });
+    }
     if (!landsWithoutInput(field)) {
       throw ohneError({
         title: `Singleton field \`${name}\` must be nullable or have a default`,

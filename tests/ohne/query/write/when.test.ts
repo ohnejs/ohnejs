@@ -257,6 +257,20 @@ useCollections().register('WNCrash', {
     },
   },
 });
+useCollections().register('WNList', {
+  name: 'WNList',
+  collection: {
+    fields: {
+      kind: field('text'),
+      sections: field('repeater', {
+        fields: {
+          picks: field('multiSelect', { min: 1, when: { '../kind': 'full' } }),
+          links: field('records', { collection: 'WRTag', min: 1, when: { '../kind': 'full' } }),
+        },
+      }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -596,6 +610,49 @@ describe('when gate on update, nested subfield', () => {
     strictEqual(promo[0].code, 'C');
     strictEqual(regular[0].tag, 'none');
     strictEqual(regular[0].code, 'X');
+  });
+});
+
+describe('when gate on update, nested list that forbids empty', () => {
+  it('lets an item omit the list while its gate is off, as a create does', async () => {
+    const record = await created('WNList', { kind: 'lite', sections: [{}] });
+    const updated = await runUpdate(
+      'WNList',
+      { sections: [{}] },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    deepStrictEqual(
+      (updated.records[0] as { sections: { picks: string[]; links: string[] }[] }).sections.map(
+        ({ picks, links }) => ({ picks, links }),
+      ),
+      [{ picks: [], links: [] }],
+    );
+  });
+
+  it('requires the list once a matched record holds the gate active, writing nothing', async () => {
+    const record = await created('WNList', { kind: 'lite', sections: [{}] });
+    const uuid = record.UUID as string;
+    const updated = await runUpdate(
+      'WNList',
+      { kind: 'full', sections: [{}] },
+      inUUIDs([uuid]),
+      null,
+    );
+    ok(!updated.ok);
+    deepStrictEqual(
+      { ...updated.errors },
+      {
+        'sections[0].picks': 'validation.required',
+        'sections[0].links': 'validation.required',
+      },
+    );
+    const row = await db.queryOne<{ kind: string }>(
+      'SELECT "kind" FROM "WNList" WHERE "UUID" = ?',
+      [uuid],
+    );
+    strictEqual(row?.kind, 'lite');
   });
 });
 

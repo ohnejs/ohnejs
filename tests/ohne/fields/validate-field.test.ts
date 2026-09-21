@@ -108,6 +108,20 @@ describe('validateField write flags', () => {
     throwsTitled(() => check({ writable: false }), 'Field `field` could never take a value');
   });
 
+  it('rejects `writable: false` on a list that forbids the empty list', () => {
+    const list: FieldType = defineField({
+      columnType: 'json',
+      jsonList: true,
+      defaultValue: () => [],
+    });
+    throwsTitled(
+      () => check({ writable: false, min: 1 }, list),
+      'Field `field` could never take a value',
+    );
+    doesNotThrow(() => check({ writable: false }, list));
+    doesNotThrow(() => check({ writable: false, min: 1, default: ['a'] }, list));
+  });
+
   it('accepts `writable: false` with a default', () => {
     doesNotThrow(() => check({ writable: false, default: 'seed' }));
   });

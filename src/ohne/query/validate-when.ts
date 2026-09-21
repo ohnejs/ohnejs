@@ -3,6 +3,8 @@ import type { CollectionQueryMeta, FieldQueryMeta } from './metadata.ts';
 
 import { hasKey, isNull, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { forbidsEmpty } from '../fields/forbids-empty.ts';
+import { isListField } from './list-field.ts';
 import { allowedOperators } from './operators.ts';
 
 /**
@@ -62,21 +64,25 @@ function validateFieldWhen(
   home: string,
   anchors: boolean,
 ): void {
-  if (!landsWithoutInput(field)) throw whenNeedsDefault(name, home);
+  if (!isListField(field) && !landsWithoutInput(field)) throw whenNeedsDefault(name, home);
   checkNode(when, name, ancestry, home, true, anchors);
 }
 
 /**
- * Whether a field lands a value when a create omits it.
- * A nullable field takes `null`; a list its empty `[]`; a defaulted field its default.
+ * Whether a field lands a value when a create omits it, the static mirror of `defaultPath`.
+ *
+ * A defaulted field takes its default; a list its empty `[]`; a nullable field `null`.
+ * A list that `forbidsEmpty` has no empty value, so only a declared `default` or `null` lands it.
+ * A `jsonList` type's `defaultValue` is read as its empty list, since a callback cannot resolve here.
  */
 export function landsWithoutInput(field: FieldQueryMeta): boolean {
-  if (field.nullable) return true;
-  if (field.kind === 'records' || field.kind === 'childMany' || field.kind === 'blocks') {
-    return true;
-  }
   if (!isUndefined(field.options) && hasKey(field.options, 'default')) return true;
-  return !isUndefined(field.fieldType?.defaultValue);
+  const forbidden = isListField(field) && forbidsEmpty(field.options);
+  if (field.kind === 'records' || field.kind === 'childMany' || field.kind === 'blocks') {
+    return !forbidden;
+  }
+  if (!isUndefined(field.fieldType?.defaultValue) && !forbidden) return true;
+  return field.nullable;
 }
 
 /**

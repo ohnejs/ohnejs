@@ -13,6 +13,7 @@ import {
   isUndefined,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { forbidsEmpty } from './forbids-empty.ts';
 import { validateLayout } from './layout.ts';
 
 const RESERVED_OPTIONS = new Set([
@@ -349,6 +350,26 @@ export function validateField(args: ValidateFieldArgs): void {
       body: [
         `${where} is required, but \`writable: false\` removes it from every write input and it has no default.`,
         'Give it a `default`, or make it nullable.',
+      ],
+    });
+  }
+  const list =
+    fieldType.jsonList === true ||
+    hint?.kind === 'junction' ||
+    hint?.kind === 'blocks' ||
+    (hint?.kind === 'child' && hint.cardinality === 'many');
+  if (
+    options.writable === false &&
+    list &&
+    forbidsEmpty(options) &&
+    options.nullable !== true &&
+    (!hasKey(options, 'default') || isUndefined(options.default))
+  ) {
+    throw ohneError({
+      title: `Field \`${name}\` could never take a value`,
+      body: [
+        `${where} forbids the empty list, but \`writable: false\` removes it from every write input and it has no default.`,
+        'Give it a `default`, or allow the empty list.',
       ],
     });
   }
