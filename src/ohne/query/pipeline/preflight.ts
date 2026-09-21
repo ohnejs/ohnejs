@@ -2,7 +2,6 @@ import type { LogicalType } from '../../database/dialect.ts';
 
 import {
   coerceToBoolean,
-  coerceToInteger,
   coerceToNumber,
   coerceToString,
   isBoolean,
@@ -16,12 +15,14 @@ import {
  *
  * A string that reads as an integer becomes one, `'true'`/`'1'` become booleans, and so on.
  * Coercion never fails: a value it cannot convert passes through for the base-type check to reject.
- * A real `-0` becomes `0`, since SQLite drops the sign in storage; every other value stays bit-exact.
+ * An `integer` never truncates: `'1.9'` becomes `1.9`, which the base-type check rejects.
+ * A `-0` becomes `0`, since SQLite drops the sign in storage; every other value stays bit-exact.
  * A `json` column takes any value as-is, since every value is a candidate for JSON storage.
  *
  * @example
  * ```ts
  * coerceColumn('42', 'integer')   // -> 42
+ * coerceColumn('1.9', 'integer')  // -> 1.9
  * coerceColumn('nope', 'integer') // -> 'nope'
  * ```
  */
@@ -30,7 +31,6 @@ export function coerceColumn(value: unknown, type: LogicalType): unknown {
     case 'text':
       return coerceToString(value);
     case 'integer':
-      return coerceToInteger(value);
     case 'real': {
       const coerced = coerceToNumber(value);
       return Object.is(coerced, -0) ? 0 : coerced;

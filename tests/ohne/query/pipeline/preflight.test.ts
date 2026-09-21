@@ -11,9 +11,18 @@ describe('coerceColumn', () => {
     strictEqual(coerceColumn(42, 'text'), '42');
   });
 
-  it('normalizes a real -0 to 0', () => {
+  it('keeps a fractional string fractional under integer, so the gate rejects it', () => {
+    strictEqual(coerceColumn('1.9', 'integer'), 1.9);
+    strictEqual(coerceColumn('-1.9', 'integer'), -1.9);
+    strictEqual(isValidColumn(coerceColumn('1.9', 'integer'), 'integer'), false);
+    strictEqual(coerceColumn('1.0', 'integer'), 1);
+    strictEqual(coerceColumn('1e3', 'integer'), 1000);
+  });
+
+  it('normalizes -0 to 0', () => {
     strictEqual(Object.is(coerceColumn(-0, 'real'), 0), true);
     strictEqual(Object.is(coerceColumn('-0', 'real'), 0), true);
+    strictEqual(Object.is(coerceColumn('-0', 'integer'), 0), true);
   });
 
   it('passes a value it cannot convert through unchanged', () => {
