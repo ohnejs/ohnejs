@@ -1,7 +1,12 @@
 import type { APIRouteID } from './known-api-routes.ts';
 
 import { untracked } from '../../utils/reactive/untracked.ts';
-import { handleUnauthorized, requestTarget, withAcceptLanguage } from './_request.ts';
+import {
+  currentSession,
+  handleUnauthorized,
+  requestTarget,
+  withAcceptLanguage,
+} from './_request.ts';
 import { dashboardConfig } from './config.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
 
@@ -14,6 +19,7 @@ export { setUnauthorizedHandler } from './_request.ts';
  * Requests carry credentials, so the session cookie flows to the API; `init.credentials` overrides.
  * They also carry `Accept-Language` for the dashboard language, so answers speak it; a given one wins.
  * A `401` from a route outside `/auth/` calls the handler installed with `setUnauthorizedHandler`.
+ * A request sent while signed out, or before the user last signed in or out, never calls it.
  * Returns the raw `Response`; the caller decides how to read it.
  *
  * @example
@@ -39,7 +45,8 @@ export async function api(route: APIRouteID, init?: RequestInit): Promise<Respon
     headers: withAcceptLanguage(init?.headers, language),
   };
   if (method) request.method = method;
+  const sentUnder = currentSession();
   const response = await fetch(url, request);
-  handleUnauthorized(response.status, path);
+  handleUnauthorized(response.status, path, sentUnder);
   return response;
 }

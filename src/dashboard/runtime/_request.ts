@@ -22,12 +22,14 @@ export interface RequestTarget {
 }
 
 let unauthorizedHandler: (() => void) | null = null;
+let session: symbol | null = null;
 
 /**
  * Installs the handler called when a non-auth route answers `401`, or uninstalls it with `null`.
  * A signed-in dashboard reaching a `401` means the session expired.
  * The layer's login popup registers here to reopen sign-in in place.
  * Every `/auth/` route is excluded: their `401`s are answers, not expiries.
+ * So is a request sent while signed out, or before the user last signed in or out.
  */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
@@ -56,10 +58,35 @@ export function isSessionExpiry(status: number, path: string): boolean {
 }
 
 /**
- * Calls the installed unauthorized handler when an answer means the session expired.
+ * Opens a fresh session for the requests sent from now on, once a sign-in succeeds.
+ * A `401` answers for the session its request was sent under, so one from an earlier session is no expiry.
  */
-export function handleUnauthorized(status: number, path: string): void {
-  if (isSessionExpiry(status, path) && !isNull(unauthorizedHandler)) unauthorizedHandler();
+export function startSession(): void {
+  session = Symbol('session');
+}
+
+/**
+ * Closes the session as a sign-out begins, so no `401` counts as an expiry until the next sign-in.
+ */
+export function endSession(): void {
+  session = null;
+}
+
+/**
+ * The session a request is sent under, `null` while signed out.
+ * Hand it back to `handleUnauthorized` with the answer.
+ */
+export function currentSession(): symbol | null {
+  return session;
+}
+
+/**
+ * Calls the installed unauthorized handler when an answer means the session expired.
+ * `sentUnder` is the `currentSession` at send time; a request the session has since moved past is dropped.
+ */
+export function handleUnauthorized(status: number, path: string, sentUnder: symbol | null): void {
+  const current = !isNull(session) && sentUnder === session;
+  if (current && isSessionExpiry(status, path)) unauthorizedHandler?.();
 }
 
 /**

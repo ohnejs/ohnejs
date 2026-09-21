@@ -1,8 +1,10 @@
 import type { LoginOutcome } from './_session.ts';
 import type { DashboardLanguage } from './use-dashboard-language.ts';
 
+import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { endSession, startSession } from './_request.ts';
 import { loginRefusal } from './_session.ts';
 import { api } from './api.ts';
 import { dashboardConfig } from './config.ts';
@@ -151,6 +153,7 @@ export async function login(
     return { kind: 'unreachable' };
   }
   if (!response.ok) return loginRefusal(response.status);
+  startSession();
   apply((await response.json()) as SessionUser);
   invalidateDashboardMeta();
   return { kind: 'signed-in' };
@@ -191,6 +194,7 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
  * The server-side session is revoked too; an unreachable API still signs the browser out locally.
  */
 export async function logout(): Promise<void> {
+  endSession();
   try {
     await api('POST /auth/logout');
   } catch {}
@@ -209,7 +213,9 @@ async function resolve(): Promise<void> {
     const response = await api('GET /auth/me');
     if (response.ok) answer = (await response.json()) as SessionUser;
   } catch {}
-  if (isUndefined(user.value) && apply(answer)) invalidateDashboardMeta();
+  if (!isUndefined(user.value)) return;
+  if (!isNull(answer)) startSession();
+  if (apply(answer)) invalidateDashboardMeta();
 }
 
 /**

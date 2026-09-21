@@ -1,7 +1,12 @@
 import type { APIRouteID } from './known-api-routes.ts';
 
 import { untracked } from '../../utils/reactive/untracked.ts';
-import { handleUnauthorized, requestTarget, withAcceptLanguage } from './_request.ts';
+import {
+  currentSession,
+  handleUnauthorized,
+  requestTarget,
+  withAcceptLanguage,
+} from './_request.ts';
 import { dashboardConfig } from './config.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
 
@@ -69,6 +74,7 @@ export function apiUpload(
   const { method = 'POST', path, url } = requestTarget(dashboardConfig().apiURL, route);
   // Untracked: an upload started inside a render must not subscribe that region to the language.
   const language = untracked(() => useDashboardLanguage().value);
+  const sentUnder = currentSession();
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
@@ -83,7 +89,7 @@ export function apiUpload(
       xhr.upload.addEventListener('progress', (event) => onProgress(event.loaded, event.total));
     }
     xhr.addEventListener('load', () => {
-      handleUnauthorized(xhr.status, path);
+      handleUnauthorized(xhr.status, path, sentUnder);
       resolve(responseOf(xhr));
     });
     xhr.addEventListener('error', () => reject(new TypeError('Network request failed')));

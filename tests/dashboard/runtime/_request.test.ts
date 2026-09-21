@@ -1,11 +1,14 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
+  currentSession,
+  endSession,
   handleUnauthorized,
   isSessionExpiry,
   requestTarget,
   setUnauthorizedHandler,
+  startSession,
   withAcceptLanguage,
 } from '../../../src/dashboard/runtime/_request.ts';
 
@@ -51,19 +54,52 @@ describe('isSessionExpiry', () => {
 });
 
 describe('handleUnauthorized', () => {
-  it('calls the installed handler for a session expiry alone', () => {
-    let calls = 0;
+  let calls = 0;
+
+  beforeEach(() => {
+    calls = 0;
     setUnauthorizedHandler(() => {
       calls += 1;
     });
-    handleUnauthorized(200, '/collections/posts');
-    handleUnauthorized(401, '/auth/me');
+  });
+
+  afterEach(() => setUnauthorizedHandler(null));
+
+  it('calls the installed handler for a session expiry alone', () => {
+    startSession();
+    const sentUnder = currentSession();
+    handleUnauthorized(200, '/collections/posts', sentUnder);
+    handleUnauthorized(401, '/auth/me', sentUnder);
     strictEqual(calls, 0);
-    handleUnauthorized(401, '/collections/posts');
+    handleUnauthorized(401, '/collections/posts', sentUnder);
     strictEqual(calls, 1);
     setUnauthorizedHandler(null);
-    handleUnauthorized(401, '/collections/posts');
+    handleUnauthorized(401, '/collections/posts', sentUnder);
     strictEqual(calls, 1);
+  });
+
+  it('drops a 401 for a request sent while signed out', () => {
+    endSession();
+    const sentUnder = currentSession();
+    startSession();
+    handleUnauthorized(401, '/collections/posts', sentUnder);
+    strictEqual(calls, 0);
+  });
+
+  it('drops a 401 that answers after a sign-out began', () => {
+    startSession();
+    const sentUnder = currentSession();
+    endSession();
+    handleUnauthorized(401, '/collections/posts', sentUnder);
+    strictEqual(calls, 0);
+  });
+
+  it('drops a 401 for a request from a session a sign-in replaced', () => {
+    startSession();
+    const sentUnder = currentSession();
+    startSession();
+    handleUnauthorized(401, '/collections/posts', sentUnder);
+    strictEqual(calls, 0);
   });
 });
 
