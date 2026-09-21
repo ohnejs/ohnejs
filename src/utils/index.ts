@@ -41,6 +41,7 @@ export * from './coerce/coerce-to-positive-integer.ts';
 export * from './coerce/coerce-to-string.ts';
 export * from './condition/condition-object.ts';
 export * from './condition/evaluate-condition.ts';
+export * from './condition/keywords-condition.ts';
 export * from './condition/operators.ts';
 export * from './condition/parse-condition.ts';
 export * from './condition/serialize-condition.ts';
