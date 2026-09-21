@@ -7,6 +7,7 @@ import {
   createFieldForm,
   css,
   type DashboardCollection,
+  type DashboardField,
   dashboardMeta,
   dropdown,
   dropdownItem,
@@ -16,10 +17,12 @@ import {
   icon,
   joinLabel,
   knownLabel,
+  loadVerdicts,
   navigate,
   openDialog,
   overlayCount,
   queueToast,
+  type RowVerdicts,
   seedLabel,
   setNavigationGuard,
   toast,
@@ -131,6 +134,8 @@ css`
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
+ * An edit asks the record's verdicts too: update refused opens read-only, delete refused hides Delete.
+ * Fields outside the update scope's `select` lock, and a save names the sent fields the scope dropped.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
  * A `?locale=` on the URL switches the content locale once and strips itself, so a link opens one locale.
  */
@@ -138,14 +143,16 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   const t = useT();
   const create = isUndefined(uuid) && !collection.singleton;
   let id = uuid ?? '';
+  let loaded: RecordRow = {};
   const listPath = `/collections/${collection.segment}`;
   const canCreate = collection.operations.create?.allowed === true;
-  const canUpdate = collection.operations.update?.allowed === true;
-  const canDelete = collection.operations.delete?.allowed === true;
   const canTranslate =
     collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
-  const readOnly = !create && !canUpdate;
-  const showFooter = create || canCreate || canUpdate || canDelete;
+
+  // `load` writes this and the constructor runs tracked, so a synchronous read here re-mounts in a loop.
+  const verdicts = ref<RowVerdicts | undefined>(undefined);
+  const canWrite = (): boolean => create || verdicts.value?.update.has(id) === true;
+  const canDelete = (): boolean => verdicts.value?.delete.has(id) === true;
 
   const formFields = collection.fields.filter((field) => !SYSTEM_FIELDS.has(field.name));
 
@@ -156,11 +163,11 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   });
 
   const buildForm = (initial: RecordRow | undefined): FieldForm =>
-    createFieldForm(formFields, initial, {
+    createFieldForm(lockOutside(formFields, verdicts.value?.select), initial, {
       mode: create ? 'create' : 'edit',
       path: '',
       readOnlyRows: true,
-      readOnly,
+      readOnly: !canWrite(),
       layout: collection.layout,
       language: () => useDashboardLanguage().value,
       onInput: () => {
@@ -171,7 +178,9 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   // The form lives in its own ref so a save or a restore rebuilds only the fieldset, not the body.
   const state = ref<'loading' | 'ready' | 'failed'>(create ? 'ready' : 'loading');
-  const form = ref<FieldForm | undefined>(create ? buildForm(undefined) : undefined);
+  const form = ref<FieldForm | undefined>(
+    create ? untracked(() => buildForm(undefined)) : undefined,
+  );
   const busy = ref(false);
   onCleanup(() => form.value?.dispose());
 
@@ -183,7 +192,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   const restore = (restored: RecordRow): void => {
     form.value?.dispose();
-    form.value = buildForm(restored);
+    form.value = buildForm({ ...loaded, ...restored });
   };
 
   const redirectGone = (): void => {
@@ -197,11 +206,10 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   const load = async (): Promise<void> => {
     state.value = 'loading';
-    const row = await readRecord(
-      collection.segment,
-      isEmpty(id) ? undefined : id,
-      collection.translatable ? untracked(activeContentLocale) : undefined,
-    );
+    const locale = collection.translatable ? untracked(activeContentLocale) : undefined;
+    const ask = (): Promise<RowVerdicts> => loadVerdicts(collection, [id], locale);
+    const asked = isEmpty(id) ? undefined : ask();
+    const row = await readRecord(collection.segment, isEmpty(id) ? undefined : id, locale);
     if (isUndefined(row)) {
       state.value = 'failed';
       return;
@@ -211,6 +219,8 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       return;
     }
     if (isString(row.UUID)) id = row.UUID;
+    verdicts.value = await (asked ?? ask());
+    loaded = row;
     seedRecordLabel(collection, row);
     form.value?.dispose();
     form.value = buildForm(row);
@@ -280,7 +290,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   const save = async (): Promise<void> => {
     const live = form.value;
-    if (isUndefined(live) || busy.value || readOnly) return;
+    if (isUndefined(live) || busy.value || !canWrite()) return;
     const reading = live.read();
     if (!isUndefined(reading.errors)) {
       live.focusError();
@@ -301,16 +311,24 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     // The saving fieldset blurs whatever was focused; the element survives the save, so restore.
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
-      live.rebase(outcome.record);
+      // A scoped answer omits the fields outside its `select`; the last read still holds their values.
+      loaded = { ...loaded, ...outcome.record };
+      live.rebase(loaded);
       const settled = currentState();
       if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
-      seedRecordLabel(collection, outcome.record);
+      seedRecordLabel(collection, loaded);
       if (create) {
         queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
         if (isString(outcome.record.UUID)) navigate(`${listPath}/${outcome.record.UUID}`);
-      } else {
-        queueToast(t('dashboard.saved'), { type: 'success' });
+        return;
       }
+      const dropped = droppedLabels(formFields, body, outcome.record);
+      if (dropped.length === 0) {
+        queueToast(t('dashboard.saved'), { type: 'success' });
+        return;
+      }
+      // The catalog backticks the value whole, so the separator closes one highlight and opens the next.
+      toast(t('dashboard.record.notSaved', { fields: dropped.join('`, `') }), { type: 'error' });
       return;
     }
     if (outcome.kind === 'invalid') {
@@ -435,33 +453,34 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     saveButton.classList.toggle('ohne-button-outline', !dirty);
   });
 
-  const footerEl = showFooter
-    ? h(
+  const footerEl = when(
+    () => canWrite() || canCreate || canDelete(),
+    () =>
+      h(
         'div',
         { class: 'o-record-editor-footer' },
         h(
           'div',
           { class: 'ohne-justify-between ohne-w-full' },
           when(
-            () => (create || canUpdate) && !isUndefined(form.value),
+            () => canWrite() && !isUndefined(form.value),
             () => historyButtons(history, restore),
           ),
           h(
             'div',
             { class: 'ohne-row ohne-ml-auto' },
-            create || canUpdate ? saveButton : null,
-            create ? null : recordMenu(),
+            when(canWrite, () => saveButton),
+            create ? null : when(() => canCreate || canTranslate || canDelete(), recordMenu),
           ),
         ),
-      )
-    : null;
+      ),
+  );
 
   /**
    * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
    * New links to the create page, Translate opens the translations popup, Delete confirms first.
    */
   function recordMenu(): Child {
-    if (!canCreate && !canDelete && !canTranslate) return null;
     const open = ref(false);
     const translationsOpen = ref(false);
     const close = (): void => {
@@ -496,7 +515,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             });
             items.push(item);
           }
-          if (canCreate && (canTranslate || canDelete)) items.push(h('hr'));
+          if (canCreate && (canTranslate || canDelete())) items.push(h('hr'));
           if (canTranslate) {
             const item = dropdownItem(
               [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
@@ -512,7 +531,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
             });
             items.push(item);
           }
-          if (canDelete) {
+          if (canDelete()) {
             const item = dropdownItem(
               [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
               {
@@ -652,6 +671,34 @@ function changedSince(full: RecordRow, original: RecordRow): RecordRow {
     if (!deepEqual(value, original[key])) changed[key] = value;
   }
   return changed;
+}
+
+/**
+ * The fields, each one outside `select` cloned with `writable: false` so the form locks its row.
+ * An `undefined` `select` sets no limit.
+ */
+function lockOutside(
+  fields: readonly DashboardField[],
+  select: readonly string[] | undefined,
+): readonly DashboardField[] {
+  if (isUndefined(select)) return fields;
+  return fields.map((field) =>
+    select.includes(field.name) ? field : { ...field, writable: false },
+  );
+}
+
+/**
+ * The labels of the sent fields the answered record lacks: the update scope's `select` dropped them.
+ * A write-only field never reads back, so only a readable one counts.
+ */
+function droppedLabels(
+  fields: readonly DashboardField[],
+  body: RecordRow,
+  answered: RecordRow,
+): string[] {
+  return fields
+    .filter((field) => field.readable && hasKey(body, field.name) && !hasKey(answered, field.name))
+    .map((field) => field.label);
 }
 
 /**

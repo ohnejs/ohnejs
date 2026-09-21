@@ -20,6 +20,7 @@ import {
 } from 'ohnejs/dashboard';
 import {
   effect,
+  hasKey,
   isNull,
   isString,
   isUndefined,
@@ -141,6 +142,7 @@ export function setEditQueryParam(value: string[] | null): void {
  * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`.
  * Cmd/Ctrl+S saves, and closing is dirty-guarded through the `unsavedChanges` prompt.
  * The save patches only this field; a `422` routes onto the control and raises the error count toast.
+ * A save whose answer lacks the field toasts it as not saved: the update scope's `select` dropped it.
  * A vanished record toasts and closes.
  * The popup follows the `edit` query parameter: when it disappears, the popup closes.
  * Unmounting removes it, so the deep link and the popup stay in step.
@@ -191,19 +193,27 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       form.value.focusError();
       return;
     }
+    const body = (reading.value ?? {}) as Record<string, unknown>;
     busy.value = true;
     const outcome = await writeField(
       collection.segment,
       uuid,
-      (reading.value ?? {}) as Record<string, unknown>,
+      body,
       collection.translatable ? activeContentLocale() : undefined,
     );
     busy.value = false;
     if (outcome.kind === 'saved') {
-      const state = { [field.name]: outcome.record[field.name] };
-      form.value.rebase(outcome.record);
+      // A scoped answer omits a field outside its `select`; the seed still holds its value.
+      const record = { ...seed, ...outcome.record };
+      const state = { [field.name]: record[field.name] };
+      form.value.rebase(record);
       history.push(state).setOriginalState(state);
-      toast(t('dashboard.saved'), { type: 'success', description: field.label });
+      // The answer lacking a sent readable field means the scope's `select` dropped it from the write.
+      if (field.readable && hasKey(body, field.name) && !hasKey(outcome.record, field.name)) {
+        toast(t('dashboard.record.notSaved', { fields: field.label }), { type: 'error' });
+      } else {
+        toast(t('dashboard.saved'), { type: 'success', description: field.label });
+      }
       options.onUpdated?.(outcome.record);
       options.onClose(handle.close);
       return;

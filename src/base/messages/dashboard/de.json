@@ -198,7 +198,8 @@
     "confirmDelete": "Diesen Eintrag wirklich löschen?",
     "deleted": "Gelöscht",
     "gone": "Dieser Datensatz existiert nicht mehr",
-    "moreActions": "Weitere Aktionen"
+    "moreActions": "Weitere Aktionen",
+    "notSaved": "Nicht gespeichert: `{fields}`"
   },
   "recordNotFound": "Datensatz nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
