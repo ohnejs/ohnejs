@@ -109,5 +109,6 @@ node_modules/
 `ohne dev` also writes `.ohne/`, the [types it generates](../project/cli.md#ohne-prepare) from your
 project. ohne rebuilds it when needed, so you never edit it.
 
-From here, the [tutorial](./tutorial.md) builds your first app: a collection, an endpoint, a
-query, and a dashboard page.
+Next, [Directory structure](./directory-structure.md) shows where the rest of your app will live.
+Then the [tutorial](./tutorial.md) builds your first app: a collection, two endpoints, and a
+dashboard page.

@@ -9,6 +9,8 @@ source, your app is `.ts` source, and Node 26 runs both directly. What you write
 New to ohne? Read these in order:
 
 - [Installation](./start/installation.md) - install, scaffold a project, and run it.
+- [Directory structure](./start/directory-structure.md) - where each kind of file lives, and what
+  ohne does with it.
 - [Your first app](./start/tutorial.md) - build a small blog end to end: a collection, two
   endpoints, and a dashboard page.
 
