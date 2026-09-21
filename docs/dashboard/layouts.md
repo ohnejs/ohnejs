@@ -102,8 +102,9 @@ layout: ['title', 'body', '---', 'notes']
   [`dashboard.layout`](../database/collections.md#the-collection-in-the-dashboard), for both
   creating and editing.
 - A [block](../database/blocks.md#naming-a-block), through `dashboard.layout` on `defineBlock`.
-- An [`object` or `repeater`](../database/collections.md#composite-fields), through its `layout`
-  option over its own subfields.
+- An [`object`](../database/field-types.md#object) or
+  [`repeater`](../database/field-types.md#repeater), through its `layout` option over its own
+  subfields.
 - The [account page](./account.md#extending-the-page), through the `auth:account-layout` hook.
 
 When the editor does not show a field, like a write-only field for a viewer who cannot write, the

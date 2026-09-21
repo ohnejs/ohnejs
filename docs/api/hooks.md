@@ -497,8 +497,8 @@ hook('populate:targets', (targets, { collection }) => {
 });
 ```
 
-- A dropped target leaves a `record` link `null` and removes a `records` element, and its whole
-  subtree disappears with it.
+- A dropped target leaves a [`record`](../database/field-types.md#record) link `null` and removes a
+  [`records`](../database/field-types.md#records) element, and its whole subtree disappears with it.
 - Return the filtered `QueryRecord[]`, or nothing to keep every target.
 - The `context` carries the populate `node` and its target `collection`.
 - It covers only `record` and `records` populates.

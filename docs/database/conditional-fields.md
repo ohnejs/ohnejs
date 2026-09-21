@@ -25,8 +25,9 @@ await query('Products').create({ kind: 'gift', discount: 20 }); // discount: its
 ```
 
 Give a gated field (a field with a `when`) a fallback: make it **nullable or give it a default**.
-List fields (`records`, `repeater`, `blocks`) fall back to `[]` and need neither. A collection with
-a gated field that has no fallback fails to load.
+List fields ([`records`](./field-types.md#records), [`repeater`](./field-types.md#repeater),
+[`blocks`](./field-types.md#blocks)) fall back to `[]` and need neither. A collection with a gated
+field that has no fallback fails to load.
 
 ## Conditions
 
@@ -51,8 +52,8 @@ operator that a field cannot support, is caught before anything runs.
 ## Paths
 
 A condition reads other fields by name. A bare name is a sibling in the same scope. At the top
-level, that is another top-level field. Inside an `object` or `repeater` item, it is another
-subfield of that item.
+level, that is another top-level field. Inside an [`object`](./field-types.md#object) or
+`repeater` item, it is another subfield of that item.
 
 - A leading `/` starts at the record root.
 - Each `../` goes up one level, so a subfield can read a top-level field.

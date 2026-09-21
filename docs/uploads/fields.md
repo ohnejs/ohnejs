@@ -1,9 +1,11 @@
 # Media fields
 
-Media field types let your own collections reference uploads: `image` and `file` hold one upload,
-and `images` and `files` hold an ordered list. Each stores the upload's `UUID`, exactly as a
-[relation](../database/collections.md#relations) does, and checks the referenced file against
-the limits you declare.
+Media field types let your own collections reference uploads:
+[`image`](../database/field-types.md#image) and [`file`](../database/field-types.md#file) hold one
+upload, and [`images`](../database/field-types.md#images) and
+[`files`](../database/field-types.md#files) hold an ordered list. Each stores the upload's `UUID`,
+exactly as a [relation](../database/collections.md#relations) does, and checks the referenced file
+against the limits you declare.
 
 ```ts
 // collections/Posts.ts

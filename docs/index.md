@@ -32,7 +32,8 @@ you a typed query builder for reads and writes.
 
 - [Collections and fields](./database/collections.md) - your data model, and the built-in field
   types it is made of.
-- [Custom field types](./database/field-types.md) - define a field type once, use it in any
+- [Field types](./database/field-types.md) - every field type ohne ships, with all of its options.
+- [Custom field types](./database/custom-field-types.md) - define a field type once, use it in any
   collection.
 - [Conditional fields](./database/conditional-fields.md) - fields that are active only when a
   condition is true.

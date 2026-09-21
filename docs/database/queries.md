@@ -42,14 +42,14 @@ await query('Posts')
   .findMany();
 ```
 
-| Operators                                      | Fields                                                                                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `equalsTo`, `in`                               | Text and number columns                                                                                                            |
-| `greaterThan`, `atLeast`, `lessThan`, `atMost` | Text and number columns                                                                                                            |
-| `contains`, `startsWith`, `endsWith`, `like`   | Text columns                                                                                                                       |
-| `includes`, `includesAll`, `includesAny`       | `multiSelect`, a [custom field type](./field-types.md#storage) marked `jsonList`, and [`_translations`](./translations.md#reading) |
-| `isNull`                                       | [Nullable fields](#null)                                                                                                           |
-| `has`, `empty`                                 | [Relations](#filtering-relations), `object`, `repeater`, and [blocks](#blocks)                                                     |
+| Operators                                      | Fields                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `equalsTo`, `in`                               | Text and number columns                                                                                                                                                   |
+| `greaterThan`, `atLeast`, `lessThan`, `atMost` | Text and number columns                                                                                                                                                   |
+| `contains`, `startsWith`, `endsWith`, `like`   | Text columns                                                                                                                                                              |
+| `includes`, `includesAll`, `includesAny`       | [`multiSelect`](./field-types.md#multiselect), a [custom field type](./custom-field-types.md#storage) marked `jsonList`, and [`_translations`](./translations.md#reading) |
+| `isNull`                                       | [Nullable fields](#null)                                                                                                                                                  |
+| `has`, `empty`                                 | [Relations](#filtering-relations), [`object`](./field-types.md#object), [`repeater`](./field-types.md#repeater), and [blocks](#blocks)                                    |
 
 An operator the field does not allow, like ordering on a boolean or `contains` on a number, does not
 compile.
@@ -103,8 +103,9 @@ featured or popular" by placing it after a `where`.
 
 ## Filtering relations
 
-A [`record` or `records`](./collections.md#relations) field relates to another collection. `has`
-filters by the related rows. Its callback filters on the target collection's fields:
+A [`record`](./field-types.md#record) or [`records`](./field-types.md#records) field relates to
+another collection. `has` filters by the related rows. Its callback filters on the target
+collection's fields:
 
 ```ts
 await query('Posts')
@@ -162,8 +163,8 @@ row. Parents that link to the same row share one object, so do not mutate a popu
 
 ## Blocks
 
-A `blocks` field filters with the same `has` and `empty`, with one extra step: `has` names the block
-type first, and then a callback filters on its fields.
+A [`blocks`](./field-types.md#blocks) field filters with the same `has` and `empty`, with one extra
+step: `has` names the block type first, and then a callback filters on its fields.
 
 ```ts
 await query('Pages')

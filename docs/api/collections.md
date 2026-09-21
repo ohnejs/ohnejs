@@ -292,8 +292,9 @@ export default defineCollection({
 });
 ```
 
-`manager` is a `record` field to `Users` that your own `Users` collection declares. `editors` is a
-`records` field, so `has` matches a listed editor, and `author` reaches the author's own `manager`.
+`manager` is a [`record`](../database/field-types.md#record) field to `Users` that your own `Users`
+collection declares. `editors` is a [`records`](../database/field-types.md#records) field, so `has`
+matches a listed editor, and `author` reaches the author's own `manager`.
 
 `author` defaults to the signed-in user, and the create rule lets a body name only the caller, so a
 create gets its owner. An update that names `author` is limited to the author's own rows, so when an

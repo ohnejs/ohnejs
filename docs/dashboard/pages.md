@@ -139,8 +139,8 @@ A declared menu replaces the default:
 
 A dashboard boot file is a `.ts` file at the top level of `dashboard/boot/`. It runs once: the
 dashboard imports it when it loads, before the first page renders. Use it for registrations the
-pages rely on, like a [field type](../database/field-types.md#in-the-dashboard) or a piece of UI
-mounted for the whole dashboard.
+pages rely on, like a [field type](../database/custom-field-types.md#in-the-dashboard) or a piece of
+UI mounted for the whole dashboard.
 
 ```ts
 // dashboard/boot/rating.ts

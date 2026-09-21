@@ -101,9 +101,10 @@ export default defineHandler(async () => {
 });
 ```
 
-You pass the password as plain text. The `password` field hashes it with scrypt just before it is
-stored, so the plaintext is never saved anywhere and there is no hashing step to remember. The field
-is [write-only](../database/collections.md#write-only-and-locked-fields) (`readable: false`), so no
+You pass the password as plain text. The [`password`](../database/field-types.md#password) field
+hashes it with scrypt just before it is stored, so the plaintext is never saved anywhere and there
+is no hashing step to remember. The field is
+[write-only](../database/collections.md#write-only-and-locked-fields) (`readable: false`), so no
 read returns the hash, not even `record` here.
 
 - [`createOrThrow`](../database/writing.md#the-result) runs the collection's own email validation

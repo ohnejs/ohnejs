@@ -40,9 +40,9 @@ migrations to write - [schema sync](../database/sync.md#what-happens-at-boot) ex
 
 Both fields are required. A field needs a value unless you pass
 [`nullable: true`](../database/collections.md#column-fields) or give it a
-[`default`](../database/writing.md#defaults). A `text` field rejects the empty string unless you
-pass `allowEmpty: true`. [Collections](../database/collections.md) covers every field type and
-option.
+[`default`](../database/writing.md#defaults). A [`text`](../database/field-types.md#text) field
+rejects the empty string unless you pass `allowEmpty: true`.
+[Field types](../database/field-types.md) lists every type and its options.
 
 ## The first endpoint
 

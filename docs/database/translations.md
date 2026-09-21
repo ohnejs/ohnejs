@@ -39,10 +39,10 @@ fields: {
 }
 ```
 
-- A scalar or a `record` reference keeps one value per locale.
-- A composite, a `records`, or a [blocks](./blocks.md) field keeps one item list per locale. The
-  German query reads and writes the German sections, and the English ones stay untouched beside
-  them.
+- A scalar or a [`record`](./field-types.md#record) reference keeps one value per locale.
+- A composite, a [`records`](./field-types.md#records), or a [blocks](./blocks.md) field keeps one
+  item list per locale. The German query reads and writes the German sections, and the English ones
+  stay untouched beside them.
 - A composite translates as a whole. Marking one of its subfields is rejected when the collection
   loads, so there is no half-translated repeater item.
 - A block's fields are never individually translatable. Mark the blocks field holding them instead.

@@ -75,7 +75,8 @@ string is shown unchanged. If you leave out the label, the name is sentence-case
 
 ## Assigning roles
 
-The `Users` collection has a `roles` field, the list of role names the user holds:
+The `Users` collection has a [`roles`](../database/field-types.md#roles) field, the list of role
+names the user holds:
 
 - It defaults to `[]` and removes duplicate names on write.
 - It rejects a name that no role file defines.

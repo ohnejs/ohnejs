@@ -17,15 +17,16 @@ export default defineCollection({
 });
 ```
 
-This page covers the built-in field types. Every field also takes common options covered elsewhere:
+This page covers the built-in field types, and [field types](./field-types.md) lists every option
+each one takes. Every field also takes common options covered elsewhere:
 
 - [`default`](./writing.md#defaults),
   [`sanitizers` and `validators`](./writing.md#sanitizers-and-validators) act when a record is
   written.
 - [`when`](./conditional-fields.md) activates a field per record.
 
-When no built-in type fits, [define your own](./field-types.md). To read records back, use the
-[query builder](./queries.md).
+When no built-in type fits, [define your own](./custom-field-types.md). To read records back, use
+the [query builder](./queries.md).
 
 ## Files and names
 
@@ -46,8 +47,9 @@ Every collection also gets columns you never declare:
 
 ## Column fields
 
-`text`, `integer`, `number`, and `boolean` are the plain column types. Each stores one value per
-row.
+[`text`](./field-types.md#text), [`integer`](./field-types.md#integer),
+[`number`](./field-types.md#number), and [`boolean`](./field-types.md#boolean) are the plain column
+types. Each stores one value per row.
 
 A field is required unless you pass `nullable: true`, which lets it hold `null`:
 
@@ -110,8 +112,8 @@ existing values contain duplicates.
 
 ## Choice fields
 
-`select` holds one value out of a list you declare. The generated record type narrows to exactly
-that union, and a write with a value outside the list is rejected:
+[`select`](./field-types.md#select) holds one value out of a list you declare. The generated record
+type narrows to exactly that union, and a write with a value outside the list is rejected:
 
 ```ts
 fields: {
@@ -131,7 +133,8 @@ status: field('select', {
 }),
 ```
 
-`multiSelect` holds an ordered list of distinct strings, stored as a JSON list:
+[`multiSelect`](./field-types.md#multiselect) holds an ordered list of distinct strings, stored as
+a JSON list:
 
 ```ts
 fields: {
@@ -153,13 +156,13 @@ In queries, the [`includes` operators](./queries.md#filtering) check the list, s
 
 The date and time types store each value in the form that matches what it is:
 
-- `date` is a calendar day, stored as `YYYY-MM-DD` text. A day is not an instant, so no timezone
-  is involved and no conversion can shift it.
-- `time` is a time of day, stored as `HH:MM:SS` text. `HH:MM` input is accepted and stored with
-  `:00` seconds.
-- `dateTime` is an instant, stored as epoch milliseconds, like `_updatedAt`. The dashboard renders
-  it in the viewer's own [time zone setting](../dashboard/account.md#the-settings), unless the
-  field sets a fixed zone.
+- [`date`](./field-types.md#date) is a calendar day, stored as `YYYY-MM-DD` text. A day is not an
+  instant, so no timezone is involved and no conversion can shift it.
+- [`time`](./field-types.md#time) is a time of day, stored as `HH:MM:SS` text. `HH:MM` input is
+  accepted and stored with `:00` seconds.
+- [`dateTime`](./field-types.md#datetime) is an instant, stored as epoch milliseconds, like
+  `_updatedAt`. The dashboard renders it in the viewer's own
+  [time zone setting](../dashboard/account.md#the-settings), unless the field sets a fixed zone.
 
 ```ts
 fields: {
@@ -226,7 +229,7 @@ A relation points at another collection instead of storing a value.
 
 ### One reference
 
-`record` holds a reference to one row of another collection:
+[`record`](./field-types.md#record) holds a reference to one row of another collection:
 
 ```ts
 fields: {
@@ -250,7 +253,8 @@ at most one row may reference each target.
 
 ### Many references
 
-`records` holds an ordered list of references, stored in a junction table:
+[`records`](./field-types.md#records) holds an ordered list of references, stored in a junction
+table:
 
 ```ts
 fields: {
@@ -291,7 +295,7 @@ To read related records, [populate](./queries.md#populating-relations) them.
 
 A composite field stores a nested shape in its own table, not a reference to another collection.
 
-`object` holds one nested group per row, or none:
+[`object`](./field-types.md#object) holds one nested group per row, or none:
 
 ```ts
 fields: {
@@ -304,7 +308,7 @@ fields: {
 }
 ```
 
-`repeater` holds an ordered list of such groups - zero, one, or many:
+[`repeater`](./field-types.md#repeater) holds an ordered list of such groups - zero, one, or many:
 
 ```ts
 fields: {
@@ -329,8 +333,9 @@ how an [update keeps an item](./writing.md#lists-on-update).
 
 ## Blocks
 
-A repeater repeats one shape. A `blocks` field holds an ordered list of mixed, reusable shapes, each
-defined once under `blocks/`. [Blocks](./blocks.md) covers defining, reading, and writing them.
+A repeater repeats one shape. A [`blocks`](./field-types.md#blocks) field holds an ordered list of
+mixed, reusable shapes, each defined once under `blocks/`. [Blocks](./blocks.md) covers defining,
+reading, and writing them.
 
 ## Translations
 

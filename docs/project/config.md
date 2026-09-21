@@ -55,7 +55,8 @@ dirs: {
   language.
 - `collections: 'collections'` -
   [collection definitions](../database/collections.md#files-and-names).
-- `fields: 'fields'` - [custom field types](../database/field-types.md#where-field-types-live).
+- `fields: 'fields'` -
+  [custom field types](../database/custom-field-types.md#where-field-types-live).
 - `blocks: 'blocks'` - [block definitions](../database/blocks.md#defining-a-block).
 - `roles: 'roles'` - [role definitions](../auth/roles.md#defining-roles).
 - `migrations: 'migrations'` - [database migrations](../database/migrations.md#a-migration-file).

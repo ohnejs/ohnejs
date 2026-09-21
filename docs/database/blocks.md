@@ -1,7 +1,7 @@
 # Blocks
 
 A block is a reusable content shape, like a section of a website page: a hero, a quote, a gallery.
-A `blocks` field holds an ordered list of them, mixed freely. A
+A [`blocks`](./field-types.md#blocks) field holds an ordered list of them, mixed freely. A
 [repeater](./collections.md#composite-fields) repeats one shape, but blocks let each item be a
 different one.
 

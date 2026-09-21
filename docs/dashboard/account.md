@@ -45,15 +45,16 @@ Every token is listed under [format tokens](#format-tokens).
 
 ## Where the settings apply
 
-- A `dateTime` field renders the instant in the date and time formats, in the user's zone, and
-  hovering it shows how long ago that was. A field declared with `relativeTime: true` swaps the
-  two, and one declared with `timezone` always uses its own zone, as
-  [date and time fields](../database/collections.md#date-and-time-fields) describes.
+- A [`dateTime`](../database/field-types.md#datetime) field renders the instant in the date and
+  time formats, in the user's zone, and hovering it shows how long ago that was. A field declared
+  with `relativeTime: true` swaps the two, and one declared with `timezone` always uses its own
+  zone, as [date and time fields](../database/collections.md#date-and-time-fields) describes.
 - The [`Updated` column](../database/collections.md#table-columns) of every collection table and
   the activity feed on the overview show how much time has passed, with the exact instant on hover.
-- A `date` field renders its calendar day in the date format. A day is not an instant, so the time
-  zone does not apply.
-- A `time` field renders its clock in the time format. The zone does not apply there either.
+- A [`date`](../database/field-types.md#date) field renders its calendar day in the date format. A
+  day is not an instant, so the time zone does not apply.
+- A [`time`](../database/field-types.md#time) field renders its clock in the time format. The zone
+  does not apply there either.
 - The calendar pickers open in the user's zone and name their months and days in the dashboard
   language.
 

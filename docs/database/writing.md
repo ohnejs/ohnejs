@@ -80,10 +80,12 @@ await query('Posts').create({
 ```
 
 - Relations take `UUID`s, never nested records: `author` is one `UUID`, `tags` a list of them.
-- A `records`, `repeater`, or `blocks` list defaults to `[]`, so you may omit it. Passing `[]` is
+- A [`records`](./field-types.md#records), [`repeater`](./field-types.md#repeater), or
+  [`blocks`](./field-types.md#blocks) list defaults to `[]`, so you may omit it. Passing `[]` is
   fine too, unless the field sets `allowEmpty: false`, which rejects it with an `emptyValue` error.
   If you omit the field, it still gets the default.
-- An `object` defaults to no child row, and accepts `null` to say so explicitly.
+- An [`object`](./field-types.md#object) defaults to no child row, and accepts `null` to say so
+  explicitly.
 - Unknown keys are rejected, not ignored. A misspelled field fails with an `unknownField` error at
   that key, so it never silently drops its value.
 
@@ -95,7 +97,7 @@ input, and an `immutable` field is not part of the update input.
 If you leave a field out of `create`, it gets its value from the first of these that is available:
 
 1. The field's own `default`.
-2. Its [field type's](./field-types.md#defaults) default.
+2. Its [field type's](./custom-field-types.md#defaults) default.
 3. `null`, if the field is nullable.
 
 A non-nullable field with no default requires input.
@@ -106,18 +108,19 @@ field('integer', { default: 10 });
 
 A default may be a value or a callback. A `records`, `object`, `repeater`, or `blocks` default must
 be a callback, because an object or array literal would be one mutable value shared by every created
-record. A `record` default is a plain `UUID`, so it stays a value.
+record. A [`record`](./field-types.md#record) default is a plain `UUID`, so it stays a value.
 
 A default runs through the field's [sanitizers and validators](#sanitizers-and-validators) like any
-value. A literal default they reject fails at boot, so `default: ''` on a `text` field needs
-`allowEmpty: true`. A callback default they reject fails the create that computes it.
+value. A literal default they reject fails at boot, so `default: ''` on a
+[`text`](./field-types.md#text) field needs `allowEmpty: true`. A callback default they reject
+fails the create that computes it.
 
 ## Sanitizers and validators
 
 A field cleans and checks its value through ordered lists of sanitizers and validators. Sanitizers
 change the value and never report an error. Validators return a message when the value is wrong, or
 `undefined` when it is fine. A field adds its own to the ones its
-[field type](./field-types.md#sanitizers-and-validators) ships:
+[field type](./custom-field-types.md#sanitizers-and-validators) ships:
 
 ```ts
 field('text', {
@@ -134,7 +137,8 @@ They run in this order, and the first message stops the run for that field:
 4. The `validators` you pass to `field()`.
 
 A returned message always goes under the field's own name. To report a failure inside a composite
-value, a validator [writes into `ctx.errors`](./field-types.md#sanitizers-and-validators) instead.
+value, a validator [writes into `ctx.errors`](./custom-field-types.md#sanitizers-and-validators)
+instead.
 
 ## Uniqueness and references
 

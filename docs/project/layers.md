@@ -30,14 +30,16 @@ export default defineConfig({
 - The [`admin` role](../auth/roles.md#defining-roles), holding `['*']`.
 - The [global CORS policy](../api/middleware.md#cors), plus the opt-in `auth` and `require-auth`
   [middleware](../api/middleware.md#route-middleware).
-- The field types `Users` is built from: `password`, `roles`, `language`, `locale`, `timezone`, and
-  `datePattern`.
+- The field types `Users` is built from: [`password`](../database/field-types.md#password),
+  [`roles`](../database/field-types.md#roles), [`language`](../database/field-types.md#language),
+  [`locale`](../database/field-types.md#locale), [`timezone`](../database/field-types.md#timezone),
+  and [`datePattern`](../database/field-types.md#datepattern).
 - The [message catalogs](../i18n/messages.md#layers) that hold every framework string, in English,
   German, and Bosnian, and the [endpoint](../i18n/messages.md#the-catalog-endpoint) serving them.
 
 The rest of ohne is not in the layer. The router, the query builder, the migration runner, codegen,
-the built-in field types, and the dashboard's runtime and server are the framework, and they are
-there whatever your `layers` list says.
+the [built-in field types](../database/field-types.md#built-in-types), and the dashboard's runtime
+and server are the framework, and they are there whatever your `layers` list says.
 
 [Uploads](../uploads/uploads.md) are not in it either. They are a layer of their own in the same
 package, `ohnejs/uploads`, which you list when you want them.
@@ -110,7 +112,7 @@ The pieces merge by identity, and the closer layer wins:
   the further one.
 - Messages merge per key, never per file, so overriding one key keeps the rest of a layer's
   catalog.
-- A [field type](../database/field-types.md#where-field-types-live) can replace a built-in.
+- A [field type](../database/custom-field-types.md#where-field-types-live) can replace a built-in.
 - Two surviving collection or block names that differ only by case are an error, since SQLite
   matches identifiers case-insensitively.
 - A [middleware name](../api/middleware.md#names-and-layers) keeps its tier. Global in one layer and

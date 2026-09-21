@@ -234,8 +234,9 @@ scope or `false`. Only that scope's `where` and `select` apply to a crossed read
 The shipped collection endpoints cross only into what the caller could read from the target
 directly:
 
-- A target the caller cannot read matches nothing in a `has`. A `record` that points to it populates
-  as `null`, and a `records` element from it is left out.
+- A target the caller cannot read matches nothing in a `has`. A
+  [`record`](../database/field-types.md#record) that points to it populates as `null`, and a
+  [`records`](../database/field-types.md#records) element from it is left out.
 - A target's read scope narrows which of its rows match or populate, and which fields come back, at
   every level.
 - A target field outside that scope is refused exactly as a field that does not exist.

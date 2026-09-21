@@ -1,24 +1,7 @@
-# Custom field types
+# Field types
 
-A field type is the contract behind `field(...)`: how a value is stored, which options a field
-takes, and how every write cleans and checks the value. Define your own when a value has rules that
-you would otherwise repeat on every field that holds it: a slug, a color, a currency code.
-
-```ts
-// fields/slug.ts
-import { defineField } from 'ohnejs';
-
-export default defineField({
-  columnType: 'text',
-  sanitizers: [(value) => value.trim().toLowerCase().replace(/\s+/g, '-')],
-  validators: [
-    (value) =>
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
-        ? undefined
-        : 'Must be lowercase words joined by hyphens',
-  ],
-});
-```
+Every field has a type, named by the first argument of `field()`. The second argument holds that
+type's options:
 
 ```ts
 // collections/Posts.ts
@@ -26,180 +9,736 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    title: field('text'),
-    slug: field('slug', { unique: true }),
+    title: field('text', { max: 120 }),
+    status: field('select', { choices: ['draft', 'published'] }),
   },
 });
 ```
 
-Every `slug` field now cleans and checks its value the same way, in whichever collection declares
-it.
+This page lists every type ohne ships, with all the options each one takes.
+[Collections and fields](./collections.md) shows how the types work together, and
+[custom field types](./custom-field-types.md) shows how to add your own.
 
-## Where field types live
+Types and options are sorted alphabetically. The default is what an omitted option resolves to. A
+`-` means the option stays unset, and "required" means the `field()` call does not type-check
+without it.
 
-A field type lives in one file under `fields/`. That is each layer's `dirs.fields` directory, set in
-[config](../project/config.md#directories). The file name gives the type its name: `fields/slug.ts`
-defines `slug`, `fields/hex-color.ts` defines `hexColor`. Codegen registers every type, so once
-[`ohne prepare`](../project/cli.md#ohne-prepare) or [`ohne dev`](../project/cli.md#ohne-dev) has
-run, `field('slug')` autocompletes and its options type-check.
+## Built-in types
 
-A file whose name starts with `_` is a helper that the scan skips, so code that your types share can
-sit beside them.
+These are part of the framework, so every app has them.
 
-A type in a closer [layer](../project/layers.md#what-overrides-what) replaces a further layer's
-type of the same name, built-in types included.
+### `blocks`
 
-## Options
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/blocks-dark.png">
+  <img alt="The blocks field in the dashboard" src="../images/field-types/blocks-light.png">
+</picture>
 
-`options` declares what a `field(...)` call may pass. You make each entry with `option()`. Your
-callbacks read the resolved values from `ctx.options`:
+An ordered list of mixed, reusable shapes, each defined once under `blocks/`. [Blocks](./blocks.md)
+covers them in depth.
 
-```ts
-// fields/handle.ts
-import { defineField, option } from 'ohnejs';
+| Option         | Default | What it does                                                                                                                                                            |
+| -------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allow`        | -       | The block types the field may hold. Omitted, it accepts every block the app defines.                                                                                    |
+| `allowEmpty`   | `true`  | Accepts an empty list. With `false`, a written `[]` is rejected, so the field needs at least one block.                                                                 |
+| `default`      | `[]`    | A function that returns the list a [create](./writing.md#defaults) stores when its input leaves the field out.                                                          |
+| `description`  | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `readable`     | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false` | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
+| `validators`   | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-export default defineField({
-  columnType: 'text',
-  options: {
-    max: option({ default: 30 }),
-  },
-  validators: [(value, ctx) => (value.length > ctx.options.max ? 'Too long' : undefined)],
-});
-```
+### `boolean`
 
-```ts
-fields: {
-  handle: field('handle', { max: 20 }),
-}
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/boolean-dark.png">
+  <img alt="The boolean field in the dashboard" src="../images/field-types/boolean-light.png">
+</picture>
 
-- An option with a `default` is optional, and `ctx.options` always holds a value for it.
-- An option with `required: true` must be passed, or the `field(...)` call does not type-check.
-- An option with neither stays absent when omitted.
+`true` or `false`.
 
-The value type comes from the default, widened to its primitive. Pass a generic to keep a union:
+| Option            | Default      | What it does                                                                                                                                                            |
+| ----------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -            | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -            | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `display`         | `'checkbox'` | The editor: `'checkbox'`, `'switch'`, or `'buttons'`. The stored value is the same either way.                                                                          |
+| `falseLabel`      | -            | The `false` button's label under `display: 'buttons'`, as a string or a [message key](../i18n/messages.md). Omitted, it reads "No".                                     |
+| `immutable`       | `false`      | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false`      | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -            | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false`      | Lets the field hold `null`.                                                                                                                                             |
+| `readable`        | `true`       | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -            | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false`      | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `trueLabel`       | -            | The `true` button's label under `display: 'buttons'`, as a string or a [message key](../i18n/messages.md). Omitted, it reads "Yes".                                     |
+| `unique`          | `false`      | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false`      | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`      | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -            | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -            | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`       | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-```ts
-option<'soft' | 'hard'>({ default: 'soft' })
-```
+### `date`
 
-Option names are camelCase. None may reuse the name of an option that every field already takes,
-like `nullable`, `default`, or `label`.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/date-dark.png">
+  <img alt="The date field in the dashboard" src="../images/field-types/date-light.png">
+</picture>
 
-## Storage
+A calendar day, stored as `YYYY-MM-DD` text. No time zone is involved.
 
-`columnType` picks the column the value is stored in: `text`, `integer`, `real`, `boolean`, or
-`json`. A write converts input to that type and rejects what does not fit before your code runs, so
-the sanitizers and validators of a `text` type always receive a string.
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The latest day, as `YYYY-MM-DD`.                                                                                                                                        |
+| `min`             | -       | The earliest day, as `YYYY-MM-DD`.                                                                                                                                      |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-A `json` column accepts any value, so its validators check the shape. Its value has the type
-`unknown` unless `emitType` returns the TypeScript type as source code:
+### `dateTime`
 
-```ts
-// fields/labels.ts
-import { defineField } from 'ohnejs';
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/date-time-dark.png">
+  <img alt="The dateTime field in the dashboard" src="../images/field-types/date-time-light.png">
+</picture>
 
-export default defineField({
-  columnType: 'json',
-  jsonList: true,
-  defaultValue: () => [],
-  emitType: () => 'string[]',
-  validators: [
-    (value) =>
-      Array.isArray(value) && value.every((label) => typeof label === 'string')
-        ? undefined
-        : 'Must be a list of labels',
-  ],
-});
-```
+An instant, stored as epoch milliseconds. The dashboard shows it in the viewer's time zone.
 
-`jsonList: true` marks a `json` value as a list, so a query can filter it with
-[`includes`, `includesAll`, and `includesAny`](./queries.md#filtering). Neither the flag nor
-`emitType` checks anything at runtime. Only the validators make sure the value has the shape its
-type promises.
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The latest instant, as epoch milliseconds or an ISO 8601 string.                                                                                                        |
+| `min`             | -       | The earliest instant, as epoch milliseconds or an ISO 8601 string.                                                                                                      |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `relativeTime`    | `false` | Shows the instant as elapsed time, like "2 hours ago", with the exact date on hover.                                                                                    |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `timezone`        | -       | A fixed IANA zone the dashboard shows and edits the instant in. Omitted, the viewer's own zone applies.                                                                 |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-`serialize` and `deserialize` convert between the value and what the column stores. `serialize`
-runs after the validators, so they check the value before it is encoded. The `password` type hashes
-its value there.
+### `integer`
 
-A type that references another collection, like the uploads layer's
-[`image` and `images`](../uploads/fields.md), returns a storage layout from `schema` instead:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/integer-dark.png">
+  <img alt="The integer field in the dashboard" src="../images/field-types/integer-light.png">
+</picture>
 
-- `columnType: 'text'` with a `foreignKey`, for one reference.
-- `columnType: false` with a `junction`, for a list.
+A whole number within JavaScript's safe range. For money, store minor units like cents.
 
-The value type then follows from the layout, so such a type declares no `emitType`.
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The largest value.                                                                                                                                                      |
+| `min`             | -       | The smallest value.                                                                                                                                                     |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-## Defaults
+### `multiSelect`
 
-`defaultValue` is what a create stores in the field's column when its input leaves the field out:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/multi-select-dark.png">
+  <img alt="The multiSelect field in the dashboard" src="../images/field-types/multi-select-light.png">
+</picture>
 
-```ts
-// fields/rating.ts
-import { defineField } from 'ohnejs';
+An ordered list of distinct strings, stored as a JSON list. Duplicates are removed on write.
 
-export default defineField({ columnType: 'integer', defaultValue: 0 });
-```
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `choices`         | -       | The values each entry must come from. Each is a string, or `{ value, label }`. Omitted, any strings are accepted.                                                       |
+| `default`         | `[]`    | The list a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                        |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The most entries the list may hold.                                                                                                                                     |
+| `min`             | -       | The fewest entries the list may hold.                                                                                                                                   |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-Pass a value, or a callback that computes one from `ctx`: the field's `options`, the record's raw
-`input`, and the `operation`. A field's own `default` replaces the type's, in the
-[order writing records describes](./writing.md#defaults). A default runs through the type's
-sanitizers and validators like any value, so it must be one they accept. A literal default that they
-reject fails at boot. A callback default that they reject fails the create that computes it.
+### `number`
 
-## Sanitizers and validators
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/number-dark.png">
+  <img alt="The number field in the dashboard" src="../images/field-types/number-light.png">
+</picture>
 
-Sanitizers clean a value before it is stored, and validators decide whether it may be stored at
-all. A write runs the type's `sanitizers`, then its `validators`, each list in order:
+A finite decimal, exactly like a JavaScript number. `NaN` and the infinities are rejected.
 
-```ts
-sanitizers: [(value) => value.trim()],
-validators: [
-  (value, ctx) => (value === ctx.input.username ? 'Must differ from the username' : undefined),
-],
-```
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The largest value.                                                                                                                                                      |
+| `min`             | -       | The smallest value.                                                                                                                                                     |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-- A sanitizer returns the cleaned value. It never rejects.
-- A validator returns a message to reject the value, or `undefined` to accept it.
-- The first message stops the field: no later validator runs.
-- A message is a [message key](../i18n/messages.md#validation-messages), a `{ key, params }`
-  object, or a plain string.
-- `null` skips both lists: a nullable field's `null` is stored as it is.
+### `object`
 
-Every function receives `ctx` as its second argument:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/object-dark.png">
+  <img alt="The object field in the dashboard" src="../images/field-types/object-light.png">
+</picture>
 
-- `options` - the field's resolved options.
-- `input` - the record's raw input, so a check can read another field's value as it was sent.
-- `tx` - the open [transaction](./engine.md#transactions), so a check can query the database.
+One nested [group of fields](./collections.md#composite-fields), stored in its own table. A record
+holds one group or none.
 
-The type's lists run before the ones a field adds, in the
-[order writing records describes](./writing.md#sanitizers-and-validators).
+| Option         | Default  | What it does                                                                                                                                                            |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`      | -        | A function that returns the group a [create](./writing.md#defaults) stores when its input leaves the field out.                                                         |
+| `description`  | -        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `fields`       | required | The subfields, each a `field(...)`.                                                                                                                                     |
+| `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `layout`       | -        | How the editor [arranges the subfields](../dashboard/layouts.md). Omitted, they stack in order.                                                                         |
+| `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false`  | Keeps [one group per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-A returned message is reported under the field's own name. A type whose value has parts can report
-an error for one part by writing into `ctx.errors`, with the sub-path as the key:
+### `record`
 
-```ts
-// fields/address.ts
-import { defineField } from 'ohnejs';
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/record-dark.png">
+  <img alt="The record field in the dashboard" src="../images/field-types/record-light.png">
+</picture>
 
-export default defineField({
-  columnType: 'json',
-  validators: [
-    (value, ctx) => {
-      const address = value as { city?: string };
-      if (!address.city) ctx.errors.city = 'This value must not be empty';
-    },
-  ],
-});
-```
+A [reference](./collections.md#one-reference) to one record of another collection, stored as its
+`UUID`. It is always nullable and always indexed.
 
-On a field named `address`, that failure is reported at `address.city`. A key that starts with `[`
-is joined without a dot, so `ctx.errors['[2]']` on a field named `labels` is reported at
-`labels[2]`.
+| Option            | Default     | What it does                                                                                                                                                            |
+| ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `collection`      | required    | The collection the field references.                                                                                                                                    |
+| `default`         | -           | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`           | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `onDelete`        | `'setNull'` | What happens when the target is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
+| `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
+| `unique`          | `false`     | Lets at most one row reference each target, for a one-to-one relation.                                                                                                  |
+| `uniquePerLocale` | `false`     | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`     | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
-## In the dashboard
+### `records`
 
-A type with a `text`, `integer`, `real`, or `boolean` column and no `schema` is edited in the
-dashboard like the matching built-in type, and you do not need to register anything. Any other type
-shows a notice instead of its form control until a
-[dashboard boot file](../dashboard/pages.md#boot-files) registers one with `registerFieldType`.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/records-dark.png">
+  <img alt="The records field in the dashboard" src="../images/field-types/records-light.png">
+</picture>
+
+An ordered list of [references](./collections.md#many-references) to records of another collection,
+stored in a junction table.
+
+| Option         | Default     | What it does                                                                                                                                                            |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`   | `true`      | Accepts an empty list. With `false`, a written `[]` is rejected, so the field needs at least one link.                                                                  |
+| `collection`   | required    | The collection the field references.                                                                                                                                    |
+| `default`      | `[]`        | A function that returns the list a [create](./writing.md#defaults) stores when its input leaves the field out.                                                          |
+| `description`  | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `inverse`      | -           | The owning `records` field on the target collection. This field then [shares its junction](./collections.md#both-sides-of-a-relation).                                  |
+| `label`        | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`          | -           | The most links a written list may hold.                                                                                                                                 |
+| `min`          | -           | The fewest links a written list may hold.                                                                                                                               |
+| `onDelete`     | `'cascade'` | What happens to a link when its target is deleted: `'cascade'` removes the link, and `'restrict'` blocks the delete. Not on an `inverse` field.                         |
+| `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only, and not on an `inverse` field.                                         |
+| `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `repeater`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/repeater-dark.png">
+  <img alt="The repeater field in the dashboard" src="../images/field-types/repeater-light.png">
+</picture>
+
+An ordered list of nested [groups of fields](./collections.md#composite-fields), stored in its own
+table. Every item keeps its own `UUID`.
+
+| Option         | Default  | What it does                                                                                                                                                            |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`   | `true`   | Accepts an empty list. With `false`, a written `[]` is rejected, so the field needs at least one item.                                                                  |
+| `default`      | `[]`     | A function that returns the list a [create](./writing.md#defaults) stores when its input leaves the field out.                                                          |
+| `description`  | -        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `fields`       | required | The fields of one item, each a `field(...)`.                                                                                                                            |
+| `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `layout`       | -        | How the editor [arranges the fields](../dashboard/layouts.md) of an item. Omitted, they stack in order.                                                                 |
+| `max`          | -        | The most items a written list may hold.                                                                                                                                 |
+| `min`          | -        | The fewest items a written list may hold.                                                                                                                               |
+| `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false`  | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
+| `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `select`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/select-dark.png">
+  <img alt="The select field in the dashboard" src="../images/field-types/select-light.png">
+</picture>
+
+One value out of a list you declare. The record type narrows to that union, and a value outside the
+list is rejected.
+
+| Option            | Default  | What it does                                                                                                                                                            |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `choices`         | required | The values the field accepts. Each is a string, or `{ value, label }` with a label the dashboard shows.                                                                 |
+| `default`         | -        | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false`  | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false`  | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -        | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false`  | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false`  | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false`  | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`  | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `text`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/text-dark.png">
+  <img alt="The text field in the dashboard" src="../images/field-types/text-light.png">
+</picture>
+
+A string. It rejects the empty string unless `allowEmpty` is set.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`      | `false` | Accepts the empty string `''`.                                                                                                                                          |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The most characters a value may hold.                                                                                                                                   |
+| `min`             | -       | The fewest characters a value may hold.                                                                                                                                 |
+| `multiline`       | `false` | Edits the value in a text area. The stored value is the same either way.                                                                                                |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `time`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/time-dark.png">
+  <img alt="The time field in the dashboard" src="../images/field-types/time-light.png">
+</picture>
+
+A time of day, stored as `HH:MM:SS` text. `HH:MM` input is stored with `:00` seconds.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The latest time, as `HH:MM:SS` or `HH:MM`.                                                                                                                              |
+| `min`             | -       | The earliest time, as `HH:MM:SS` or `HH:MM`.                                                                                                                            |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+## Base layer types
+
+The [`ohnejs/base`](../project/layers.md#what-the-base-layer-ships) layer ships the types its
+`Users` collection is built from. Any collection can use them while your app stacks the layer.
+
+### `datePattern`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/date-pattern-dark.png">
+  <img alt="The datePattern field in the dashboard" src="../images/field-types/date-pattern-light.png">
+</picture>
+
+A date or time [format pattern](../dashboard/account.md#format-tokens), like `YYYY-MM-DD`. It holds
+at most 64 characters and may not be blank.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `language`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/language-dark.png">
+  <img alt="The language field in the dashboard" src="../images/field-types/language-light.png">
+</picture>
+
+A dashboard language, stored as its canonical BCP-47 tag like `de-AT`. Only a language that has a
+[message catalog](../i18n/messages.md#catalogs) is accepted.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `locale`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/locale-dark.png">
+  <img alt="The locale field in the dashboard" src="../images/field-types/locale-light.png">
+</picture>
+
+One of your [content locales](../project/config.md#content-locales), as its canonical tag like
+`de-AT`.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `password`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/password-dark.png">
+  <img alt="The password field in the dashboard" src="../images/field-types/password-light.png">
+</picture>
+
+Takes a plain-text password and stores its scrypt hash. Sanitizers and validators see the plain
+text, so a policy rule checks what the caller sent.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `roles`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/roles-dark.png">
+  <img alt="The roles field in the dashboard" src="../images/field-types/roles-light.png">
+</picture>
+
+A list of [role names](../auth/roles.md#assigning-roles), stored as a JSON list. Each entry must
+name a defined role, and duplicates are removed on write.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | `[]`    | The list a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                        |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `timezone`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/timezone-dark.png">
+  <img alt="The timezone field in the dashboard" src="../images/field-types/timezone-light.png">
+</picture>
+
+An IANA time zone name, like `Europe/Berlin`.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+## Uploads layer types
+
+The [uploads layer](../uploads/uploads.md) adds types that reference files in its `Uploads`
+collection. [Media fields](../uploads/fields.md) covers how a write checks them and how you read
+them.
+
+### `file`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/file-dark.png">
+  <img alt="The file field in the dashboard" src="../images/field-types/file-light.png">
+</picture>
+
+A reference to one uploaded file, stored as its `UUID`. It is always nullable and always indexed.
+
+| Option            | Default     | What it does                                                                                                                                                            |
+| ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -           | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`           | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `maxSize`         | -           | The largest file accepted, in bytes or as a size like `'5mb'`.                                                                                                          |
+| `minSize`         | -           | The smallest file accepted, in bytes or as a size like `'10kb'`.                                                                                                        |
+| `onDelete`        | `'setNull'` | What happens when the upload is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
+| `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
+| `types`           | -           | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). Omitted, any file is accepted.                                        |
+| `unique`          | `false`     | Lets at most one row reference each upload.                                                                                                                             |
+| `uniquePerLocale` | `false`     | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`     | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `files`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/files-dark.png">
+  <img alt="The files field in the dashboard" src="../images/field-types/files-light.png">
+</picture>
+
+An ordered list of references to uploaded files, stored in a junction table.
+
+| Option         | Default     | What it does                                                                                                                                                            |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`   | `true`      | Accepts an empty list. With `false`, a written `[]` is rejected, so the field needs at least one upload.                                                                |
+| `default`      | `[]`        | A function that returns the list a [create](./writing.md#defaults) stores when its input leaves the field out.                                                          |
+| `description`  | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`          | -           | The most links a written list may hold.                                                                                                                                 |
+| `maxSize`      | -           | The largest file accepted, in bytes or as a size like `'5mb'`.                                                                                                          |
+| `min`          | -           | The fewest links a written list may hold.                                                                                                                               |
+| `minSize`      | -           | The smallest file accepted, in bytes or as a size like `'10kb'`.                                                                                                        |
+| `onDelete`     | `'cascade'` | What happens to a link when its upload is deleted: `'cascade'` removes the link, and `'restrict'` blocks the delete.                                                    |
+| `placeholder`  | -           | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
+| `types`        | -           | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). Omitted, any file is accepted.                                        |
+| `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `image`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/image-dark.png">
+  <img alt="The image field in the dashboard" src="../images/field-types/image-light.png">
+</picture>
+
+A reference to one uploaded image, stored as its `UUID`. It is always nullable and always indexed.
+
+| Option            | Default     | What it does                                                                                                                                                            |
+| ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -           | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`           | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `maxHeight`       | -           | The most pixels tall an accepted image is.                                                                                                                              |
+| `maxSize`         | -           | The largest file accepted, in bytes or as a size like `'5mb'`.                                                                                                          |
+| `maxWidth`        | -           | The most pixels wide an accepted image is.                                                                                                                              |
+| `minHeight`       | -           | The fewest pixels tall an accepted image is.                                                                                                                            |
+| `minSize`         | -           | The smallest file accepted, in bytes or as a size like `'10kb'`.                                                                                                        |
+| `minWidth`        | -           | The fewest pixels wide an accepted image is.                                                                                                                            |
+| `onDelete`        | `'setNull'` | What happens when the upload is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
+| `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
+| `types`           | `['image']` | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). The file must be an image either way.                                 |
+| `unique`          | `false`     | Lets at most one row reference each upload.                                                                                                                             |
+| `uniquePerLocale` | `false`     | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`     | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `images`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/images-dark.png">
+  <img alt="The images field in the dashboard" src="../images/field-types/images-light.png">
+</picture>
+
+An ordered list of references to uploaded images, stored in a junction table.
+
+| Option         | Default     | What it does                                                                                                                                                            |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`   | `true`      | Accepts an empty list. With `false`, a written `[]` is rejected, so the field needs at least one upload.                                                                |
+| `default`      | `[]`        | A function that returns the list a [create](./writing.md#defaults) stores when its input leaves the field out.                                                          |
+| `description`  | -           | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false`     | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -           | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`          | -           | The most links a written list may hold.                                                                                                                                 |
+| `maxHeight`    | -           | The most pixels tall an accepted image is.                                                                                                                              |
+| `maxSize`      | -           | The largest file accepted, in bytes or as a size like `'5mb'`.                                                                                                          |
+| `maxWidth`     | -           | The most pixels wide an accepted image is.                                                                                                                              |
+| `min`          | -           | The fewest links a written list may hold.                                                                                                                               |
+| `minHeight`    | -           | The fewest pixels tall an accepted image is.                                                                                                                            |
+| `minSize`      | -           | The smallest file accepted, in bytes or as a size like `'10kb'`.                                                                                                        |
+| `minWidth`     | -           | The fewest pixels wide an accepted image is.                                                                                                                            |
+| `onDelete`     | `'cascade'` | What happens to a link when its upload is deleted: `'cascade'` removes the link, and `'restrict'` blocks the delete.                                                    |
+| `placeholder`  | -           | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
+| `types`        | `['image']` | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). The file must be an image either way.                                 |
+| `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |

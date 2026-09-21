@@ -54,8 +54,8 @@ with read-only `query` and `queryOne` for lookups during the migration. Await th
 A move across tables must know which row receives which value:
 
 - Rows are matched by their shared primary key.
-- A field moving into or out of an `object` composite is matched through the parent link, and a
-  missing object row is created on the way in.
+- A field moving into or out of an [`object`](./field-types.md#object) composite is matched
+  through the parent link, and a missing object row is created on the way in.
 - A source row with no target row would silently lose its value, so the move refuses instead.
 
 ## Renaming
