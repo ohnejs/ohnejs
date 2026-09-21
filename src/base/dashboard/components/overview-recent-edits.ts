@@ -20,12 +20,15 @@ import {
 } from 'ohnejs/dashboard';
 import {
   computed,
+  type ConditionObject,
+  debounce,
   effect,
   first,
   isEmpty,
   isNumber,
   isString,
   isUndefined,
+  keywordsCondition,
   onCleanup,
   ref,
   untracked,
@@ -47,10 +50,12 @@ interface RecentEdit {
 
 /**
  * One collection's cursor into the merged feed.
+ * `where` narrows the collection's read to the search, `undefined` when nothing narrows it.
  * `rows` buffers the records the feed has fetched but not emitted, newest first.
  */
 interface Bucket {
   collection: DashboardCollection;
+  where: ConditionObject | undefined;
   rows: RecentEdit[];
   offset: number;
   done: boolean;
@@ -184,7 +189,9 @@ css`
  * Each readable collection answers the body-query `POST` ordered by `-_updatedAt`.
  * The collections merge newest first, one page at a time.
  * `Load more` extends the feed and hides once every collection has run out.
- * The shared `search` filters the rows; while searching, an empty card hides.
+ * The shared `search` narrows each collection's read, so the feed pages through matches only.
+ * A changed query restarts the feed after a pause; meanwhile the loaded rows filter in place.
+ * While searching, an empty card hides.
  */
 export function overviewRecentEdits(search: OverviewSearch): Child {
   const t = useT();
@@ -192,25 +199,36 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
   const loaded = ref(false);
   const loading = ref(false);
   const exhausted = ref(false);
-  let buckets: Bucket[] = [];
-  let started = false;
+  let buckets: Bucket[] | undefined;
 
-  const loadMore = async (): Promise<void> => {
-    if (loading.value || exhausted.value) return;
+  const load = async (feed: Bucket[], reset: boolean): Promise<void> => {
     loading.value = true;
-    const page = await takePage(buckets);
-    entries.value = [...entries.value, ...page];
-    exhausted.value = isDrained(buckets);
+    const page = await takePage(feed);
+    if (feed !== buckets) return;
+    entries.value = reset ? page : [...entries.value, ...page];
+    exhausted.value = isDrained(feed);
     loading.value = false;
     loaded.value = true;
   };
 
+  const loadMore = (): void => {
+    if (loading.value || exhausted.value || isUndefined(buckets)) return;
+    void load(buckets, false);
+  };
+
+  const loadSoon = debounce((feed: Bucket[]) => void load(feed, true), 250);
+  onCleanup(loadSoon.cancel);
+
   effect(() => {
     const meta = dashboardMeta();
-    if (isUndefined(meta) || started) return;
-    started = true;
-    buckets = bucketsOf(meta);
-    void untracked(loadMore);
+    const tokens = search.tokens();
+    if (isUndefined(meta)) return;
+    const initial = isUndefined(buckets);
+    const feed = bucketsOf(meta, tokens);
+    buckets = feed;
+    loading.value = true;
+    if (initial) untracked(() => void load(feed, true));
+    else loadSoon(feed);
   });
 
   const filtered = computed(() =>
@@ -219,7 +237,9 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
     ),
   );
 
-  effect(() => search.registerCount('overview-recent-edits', filtered.value.length));
+  effect(() => {
+    if (!loading.value) search.registerCount('overview-recent-edits', filtered.value.length);
+  });
   onCleanup(() => search.unregisterCount('overview-recent-edits'));
 
   return when(
@@ -255,7 +275,7 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
                   disabled: () => loading.value,
                   type: 'button',
                   class: 'o-overview-recent-more ohne-raw',
-                  onClick: () => void loadMore(),
+                  onClick: loadMore,
                 },
                 () => t('dashboard.overview.loadMore'),
               ),
@@ -303,13 +323,20 @@ function recentRow(entry: () => RecentEdit): Child {
 }
 
 /**
- * One cursor per readable collection, each starting empty at offset zero.
+ * One cursor per readable collection that can match every search token, each starting empty at offset zero.
+ * A token in the collection's label or name holds for all its records, so only the rest narrow its read.
+ * The rest must each appear in a label field, so a singleton or a collection without one drops out.
  */
-function bucketsOf(meta: DashboardMeta): Bucket[] {
+function bucketsOf(meta: DashboardMeta, tokens: readonly string[]): Bucket[] {
   const buckets: Bucket[] = [];
   for (const collection of meta.collections) {
     if (collection.operations.read?.allowed !== true) continue;
-    buckets.push({ collection, rows: [], offset: 0, done: false });
+    const own = `${collection.label} ${collection.name}`.toLowerCase();
+    const rest = tokens.filter((token) => !own.includes(token)).slice(0, 10);
+    const { singleton, labelFields } = collection;
+    if (!isEmpty(rest) && (singleton || isEmpty(labelFields))) continue;
+    const where = isEmpty(rest) ? undefined : keywordsCondition(rest, labelFields);
+    buckets.push({ collection, where, rows: [], offset: 0, done: false });
   }
   return buckets;
 }
@@ -369,7 +396,13 @@ async function fillBucket(bucket: Bucket): Promise<void> {
   try {
     const response = await api(`POST /collections/${bucket.collection.segment}/query`, {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ select, order: ['-_updatedAt'], limit, offset: bucket.offset }),
+      body: JSON.stringify({
+        select,
+        where: bucket.where,
+        order: ['-_updatedAt'],
+        limit,
+        offset: bucket.offset,
+      }),
     });
     if (!response.ok) {
       bucket.done = true;

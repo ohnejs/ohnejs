@@ -28,6 +28,11 @@ export interface OverviewSearch {
   query: Ref<string>;
 
   /**
+   * The query's lowercased, whitespace-separated tokens; empty while the query is blank.
+   */
+  tokens: () => readonly string[];
+
+  /**
    * Whether the query holds at least one non-whitespace token.
    */
   active: () => boolean;
@@ -291,6 +296,7 @@ function createOverviewSearch(): OverviewSearch {
 
   return {
     query,
+    tokens: () => tokens.value,
     active: () => tokens.value.length > 0,
     hasAnyResults: () => Object.values(counts.value).some((count) => count > 0),
     matches: (...haystacks) => {
