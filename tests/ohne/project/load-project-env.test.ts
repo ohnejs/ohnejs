@@ -18,10 +18,12 @@ describe('loadProjectEnv', () => {
 
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-project-env-'));
+    useEnv().set('NO_COLOR', true);
   });
 
   after(() => {
     rmSync(root, { recursive: true, force: true });
+    useEnv().unset('NO_COLOR');
   });
 
   afterEach(() => {
@@ -63,7 +65,7 @@ describe('loadProjectEnv', () => {
 
   it('a `DEBUG` in the file enables its own loaded line', async () => {
     const out: string[] = [];
-    usePrinter().configure({ color: false, stream: { write: (s: string) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s: string) => out.push(s) } });
     try {
       await loadProjectEnv(app('debug', 'DEBUG=1\n'));
       match(out.join(''), /Loaded DEBUG from .*\.env/);

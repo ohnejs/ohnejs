@@ -145,6 +145,7 @@ describe('serveAPI', () => {
     useEnv().set('SILENT', true);
     useEnv().set('DATABASE', ':memory:');
     useEnv().set('PORT', 0);
+    useEnv().set('NO_COLOR', true);
   });
 
   afterEach(async () => {
@@ -164,6 +165,7 @@ describe('serveAPI', () => {
     useEnv().unset('SILENT');
     useEnv().unset('DATABASE');
     useEnv().unset('PORT');
+    useEnv().unset('NO_COLOR');
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -227,7 +229,7 @@ describe('serveAPI', () => {
     const out: string[] = [];
     useEnv().set('SILENT', false);
     useEnv().set('SKIP_CODEGEN', true);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       http = await serveAPI(dir);
     } finally {
@@ -250,7 +252,7 @@ describe('serveAPI', () => {
     const out: string[] = [];
     useEnv().set('SILENT', false);
     useEnv().set('SKIP_CODEGEN', true);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       http = await serveAPI(dir);
     } finally {

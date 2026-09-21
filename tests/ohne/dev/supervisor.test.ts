@@ -115,10 +115,12 @@ describe('dev', () => {
 
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-supervisor-'));
+    useEnv().set('NO_COLOR', true);
   });
 
   after(() => {
     rmSync(root, { recursive: true, force: true });
+    useEnv().unset('NO_COLOR');
   });
 
   beforeEach(() => {
@@ -182,7 +184,7 @@ describe('dev', () => {
 
     const out: string[] = [];
     useEnv().set('SILENT', false);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN, dashboard: false });
       servers.push(server);
@@ -207,7 +209,7 @@ describe('dev', () => {
 
     const out: string[] = [];
     useEnv().set('SILENT', false);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN, dashboard: false });
       servers.push(server);
@@ -237,7 +239,7 @@ describe('dev', () => {
 
     const out: string[] = [];
     useEnv().set('SILENT', false);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN, dashboard: false });
       servers.push(server);
@@ -328,7 +330,7 @@ describe('dev', () => {
 
     const out: string[] = [];
     useEnv().set('SILENT', false);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN });
       servers.push(server);
@@ -417,7 +419,7 @@ describe('dev', () => {
 
     const out: string[] = [];
     useEnv().set('SILENT', false);
-    usePrinter().configure({ color: false, stream: { write: (s) => out.push(s) } });
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
       const server = await dev(app, { entry: BIN, dashboard: false });
       servers.push(server);
