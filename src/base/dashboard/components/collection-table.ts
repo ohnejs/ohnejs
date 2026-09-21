@@ -3,6 +3,7 @@ import {
   attachTooltip,
   bubble,
   button,
+  countVerdicts,
   css,
   type DashboardCollection,
   type DashboardField,
@@ -14,11 +15,13 @@ import {
   icon,
   isEditingText,
   lastNavigation,
+  loadVerdicts,
   navigate,
   openDialog,
   overlayCount,
   pagination,
   queueToast,
+  type RowVerdicts,
   table,
   tableColumn,
   type TableColumns,
@@ -62,6 +65,14 @@ import {
   type TableRecord,
 } from './collection-table-data.ts';
 import {
+  admitsRow,
+  deletableRows,
+  deletableSelection,
+  pageUUIDs,
+  selectAllStateOf,
+  selectedCountOf,
+} from './collection-table-selection.ts';
+import {
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -77,6 +88,13 @@ import { filterPopup } from './filter-popup.ts';
 import { sortingPopup } from './sorting-popup.ts';
 import { translationsCell, type TranslationsCellOptions } from './translations-cell.ts';
 import { translationsPopup } from './translations-popup.ts';
+
+const NO_VERDICTS: RowVerdicts = {
+  update: new Set(),
+  delete: new Set(),
+  deleteTranslation: new Set(),
+  select: undefined,
+};
 
 css`
   .o-collection-table {
@@ -141,13 +159,13 @@ css`
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
  * Rows select with shift ranges into the batch delete.
  * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
+ * Each page loads with its row verdicts, so a row offers only what the `access` scopes admit for it.
  */
 export function collectionTable(collection: DashboardCollection): HTMLElement {
   const t = useT();
   const segment = collection.segment;
   const canCreate = collection.operations.create?.allowed === true;
-  const canUpdate = collection.operations.update?.allowed === true;
-  const canDelete = collection.operations.delete?.allowed === true;
+  const deleteScoped = collection.operations.delete?.scoped === true;
   const canTranslate =
     collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
 
@@ -198,17 +216,17 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     fields.find((field) => field.name === name);
 
   const data = ref<TableRow<TableColumns>[]>([]);
+  const verdicts = ref(NO_VERDICTS);
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
   const initialized = ref(false);
   const reload = ref(0);
   const selectable = ref(false);
   const selected = ref<Record<number | string, boolean>>({});
   const allSelected = ref(false);
+  const allCount = ref(0);
   const selectAllState = ref<boolean | 'indeterminate'>(false);
   const selectedCount = computed(() =>
-    allSelected.value
-      ? paginated.value.total
-      : Object.values(selected.value).filter(Boolean).length,
+    selectedCountOf(selected.value, allSelected.value, allCount.value),
   );
   const filterOpen = ref(false);
   const columnsOpen = ref(false);
@@ -216,12 +234,16 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const translationsUUID = ref<string | null>(null);
   let generation = 0;
   let deleteBusy = false;
+  let countBusy = false;
 
   const refresh = (): void => {
     reload.value += 1;
   };
 
-  const queryBody = (): Record<string, unknown> => {
+  const activeLocale = (): string | undefined =>
+    collection.translatable ? activeContentLocale() : undefined;
+
+  const queryBody = (locale: string | undefined): Record<string, unknown> => {
     const body: Record<string, unknown> = {
       // The explicit `UUID` keeps the row identity when it is not a visible column.
       select: uniqueArray(['UUID', ...specs.map((spec) => spec.name)]),
@@ -230,8 +252,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       order: state.order,
     };
     if (!isUndefined(state.where)) body.where = state.where;
-    // Read inside the load effect, so a content-language switch reloads the page at that locale.
-    const locale = collection.translatable ? activeContentLocale() : undefined;
     if (!isUndefined(locale)) body.locale = locale;
     return body;
   };
@@ -240,9 +260,13 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     void reload.value;
     if (redirected) return;
     const mine = (generation += 1);
-    void loadPage(segment, queryBody()).then((loaded) => {
+    // Read inside the load effect, so a content-language switch reloads the page at that locale.
+    const locale = activeLocale();
+    void loadPage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
       if (!isUndefined(loaded)) {
+        const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);
+        if (generation !== mine) return;
         data.value = loaded.records.map(
           (record, index): TableRow<TableColumns> => ({
             ...record,
@@ -255,12 +279,18 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
           perPage: loaded.perPage,
           total: loaded.total,
         };
+        verdicts.value = answered;
         seedLabels(collection, loaded.records);
         deselectAll();
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 }, true);
       }
       initialized.value = true;
     });
+  });
+
+  // Drops the in-flight answers of a table the user has left.
+  onCleanup(() => {
+    generation += 1;
   });
 
   const sortValue = sortFromOrder(state.order);
@@ -280,30 +310,27 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       return selected.value;
     },
     set value(next) {
-      selected.value = next;
+      selected.value = deletableSelection(next, verdicts.value.delete);
       refreshSelectable();
     },
   };
+
+  const deletable = (): TableRow<TableColumns>[] =>
+    deletableRows(data.value, verdicts.value.delete);
 
   /**
    * Rederives selection mode and the select-all state from `selected`.
    */
   function refreshSelectable(): void {
-    if (Object.values(selected.value).some((value) => value)) {
-      selectable.value = true;
-      allSelected.value = allSelected.value && data.value.every((row) => selected.value[row.id]);
-      selectAllState.value = allSelected.value
-        ? true
-        : data.value.every((row) => selected.value[row.id])
-          ? paginated.value.lastPage === 1
-            ? true
-            : 'indeterminate'
-          : false;
-    } else {
-      selectable.value = false;
-      allSelected.value = false;
-      selectAllState.value = false;
-    }
+    const state = selectAllStateOf(
+      deletable(),
+      selected.value,
+      allSelected.value,
+      paginated.value.lastPage,
+    );
+    selectable.value = Object.values(selected.value).some((value) => value);
+    allSelected.value = allSelected.value && state === true;
+    selectAllState.value = state;
   }
 
   const select = (id: number | string): void => {
@@ -325,30 +352,41 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   };
 
   const selectPage = (): void => {
-    selected.value = Object.fromEntries(data.value.map((row) => [row.id, true]));
+    selected.value = Object.fromEntries(deletable().map((row) => [row.id, true]));
+  };
+
+  const deletableTotal = async (): Promise<number> => {
+    const counts = deleteScoped
+      ? await countVerdicts(collection, state.where, activeLocale())
+      : undefined;
+    return counts?.delete ?? paginated.value.total;
   };
 
   const onSelectAll = async (): Promise<void> => {
+    const perPage = deletable().length;
+    if (perPage === 0 || countBusy) return;
     if (selectAllState.value) {
       selected.value = {};
       allSelected.value = false;
       refreshSelectable();
     } else if (paginated.value.lastPage > 1) {
+      const mine = generation;
+      countBusy = true;
+      const total = await deletableTotal();
+      countBusy = false;
+      if (generation !== mine) return;
       const action = await openDialog({
-        content: t('dashboard.table.selectPageOrAll', {
-          perPage: data.value.length,
-          total: paginated.value.total,
-        }),
+        content: t('dashboard.table.selectPageOrAll', { perPage, total }),
         actions: [
           { name: 'cancel', label: t('dashboard.cancel') },
           {
             name: 'page',
-            label: t('dashboard.table.pageCount', { count: data.value.length }),
+            label: t('dashboard.table.pageCount', { count: perPage }),
             variant: 'primary',
           },
           {
             name: 'all',
-            label: t('dashboard.table.allCount', { count: paginated.value.total }),
+            label: t('dashboard.table.allCount', { count: total }),
             variant: 'primary',
           },
         ],
@@ -359,11 +397,13 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         refreshSelectable();
       } else if (action === 'all') {
         selectPage();
+        allCount.value = total;
         allSelected.value = true;
         refreshSelectable();
       }
     } else {
       selectPage();
+      allCount.value = perPage;
       allSelected.value = true;
       refreshSelectable();
     }
@@ -392,11 +432,16 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const allUUIDs = async (): Promise<string[]> => {
     const collected: string[] = [];
+    const locale = activeLocale();
     for (let page = 1; ; page++) {
-      const loaded = await loadPage(segment, { ...queryBody(), page });
+      const loaded = await loadPage(segment, { ...queryBody(locale), page });
       if (isUndefined(loaded)) break;
-      for (const record of loaded.records) {
-        if (isString(record.UUID)) collected.push(record.UUID);
+      const uuids = pageUUIDs(loaded.records);
+      if (deleteScoped) {
+        const answered = await loadVerdicts(collection, uuids, locale);
+        collected.push(...uuids.filter((uuid) => answered.delete.has(uuid)));
+      } else {
+        collected.push(...uuids);
       }
       if (page >= loaded.lastPage) break;
     }
@@ -438,14 +483,22 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const rowHref = (id: number | string): string => `/collections/${segment}/${String(id)}`;
 
-  const canEditField = (field: DashboardField): boolean =>
-    canUpdate && field.writable && !field.immutable;
+  const mayUpdate = (id: number | string): boolean => admitsRow(verdicts.value.update, id);
+
+  const mayDelete = (id: number | string): boolean => admitsRow(verdicts.value.delete, id);
+
+  const canEditField = (field: DashboardField, id: number | string): boolean =>
+    mayUpdate(id) &&
+    field.writable &&
+    !field.immutable &&
+    (verdicts.value.select?.includes(field.name) ?? true);
 
   const grid = table<TableColumns>({
     columns,
     data: () => data.value,
     sort,
     selectable: () => selectable.value,
+    rowSelectable: (row) => mayDelete(row.id),
     selected: selectedBridge,
     selectAllState: () => selectAllState.value,
     showEmptyState: () => initialized.value,
@@ -477,7 +530,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       const row = payload.row as TableRecord;
       if (field.name === '_translations') {
         const rowID = String(payload.row.id);
-        const chips: TranslationsCellOptions = { canUpdate };
+        const chips: TranslationsCellOptions = { canUpdate: mayUpdate(payload.row.id) };
         if (isString(payload.row.id)) {
           chips.href = (code) => `${rowHref(rowID)}?${stringifySearchParams({ locale: code })}`;
         }
@@ -499,12 +552,14 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         cell: payload,
         collection,
         field,
-        editable: canEditField(field) && isString(payload.row.id),
+        editable: canEditField(field, payload.row.id),
         onUpdated: (record) => replaceRow(payload.row.id, record),
       });
     },
     actions: ({ row, reference, close }) => {
       const href = rowHref(row.id);
+      const canUpdate = mayUpdate(row.id);
+      const canDelete = mayDelete(row.id);
       const openItem = canUpdate
         ? dropdownItem([icon('pencil'), h('span', null, () => t('dashboard.edit'))], {
             href,
@@ -675,8 +730,10 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       h(
         'div',
         { class: 'ohne-row ohne-ml-auto' },
-        when(() => canDelete && selectable.value, deleteButton),
-        when(() => selectable.value, clearButton),
+        when(
+          () => selectable.value,
+          () => [deleteButton(), clearButton()],
+        ),
         filterButton,
         columnsButton,
         sortingButton,
@@ -777,13 +834,13 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const { listen } = useHotkeys();
   listen('selectAll', (event) => {
-    if (canDelete && paginated.value.total > 0) {
+    if (deletable().length > 0) {
       event.preventDefault();
       void onSelectAll();
     }
   });
   listen('delete', () => {
-    if (canDelete && selectable.value) void onDeleteSelection();
+    if (selectable.value) void onDeleteSelection();
   });
 
   const onArrowKey = (event: KeyboardEvent): void => {

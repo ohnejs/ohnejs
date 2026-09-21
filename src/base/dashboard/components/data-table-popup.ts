@@ -11,6 +11,7 @@ import {
   icon,
   type IconName,
   isEditingText,
+  loadVerdicts,
   overlayCount,
   pagination,
   popup,
@@ -56,6 +57,7 @@ import {
   tableMemory,
   type TableRecord,
 } from './collection-table-data.ts';
+import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
 import {
   orderedSelection,
   parseTableState,
@@ -151,7 +153,7 @@ css`
  * Its view state is remembered per collection; the first open seeds from the collection page's own view.
  * Single mode picks on double-click or the row's Select action and closes.
  * Multiple mode selects with checkboxes and shift ranges across pages, and applies explicitly.
- * A row's actions also open the record in a new tab, as edit or view by the update permission.
+ * A row's actions also open the record in a new tab, as edit or view by the row's update verdict.
  * Cmd/Ctrl+S applies or closes, Cmd/Ctrl+A toggles the page's selection, and arrow keys page.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
@@ -160,7 +162,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   const collection = options.collection;
   const segment = collection.segment;
   const multiple = options.multiple ?? false;
-  const canUpdate = collection.operations.update?.allowed === true;
 
   const state = pickerState(collection);
   const revision = ref(0);
@@ -203,6 +204,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   });
 
   const data = ref<TableRow<TableColumns>[]>([]);
+  const updatable = ref<ReadonlySet<string>>(new Set());
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
   const initialized = ref(false);
   const filterOpen = ref(false);
@@ -210,7 +212,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   const sortingOpen = ref(false);
   let generation = 0;
 
-  const queryBody = (): Record<string, unknown> => {
+  const queryBody = (locale: string | undefined): Record<string, unknown> => {
     const body: Record<string, unknown> = {
       // The explicit `UUID` keeps the row identity when it is not a visible column.
       select: uniqueArray(['UUID', ...specs().map((spec) => spec.name)]),
@@ -219,8 +221,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       order: state.order,
     };
     if (!isUndefined(state.where)) body.where = state.where;
-    // Read inside the load effect, so a content-language switch reloads the page at that locale.
-    const locale = collection.translatable ? activeContentLocale() : undefined;
     if (!isUndefined(locale)) body.locale = locale;
     return body;
   };
@@ -228,9 +228,13 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   effect(() => {
     void revision.value;
     const mine = (generation += 1);
-    void loadPage(segment, queryBody()).then((loaded) => {
+    // Read inside the load effect, so a content-language switch reloads the page at that locale.
+    const locale = collection.translatable ? activeContentLocale() : undefined;
+    void loadPage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
       if (!isUndefined(loaded)) {
+        const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);
+        if (generation !== mine) return;
         data.value = loaded.records.map(
           (record, index): TableRow<TableColumns> => ({
             ...record,
@@ -243,6 +247,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
           perPage: loaded.perPage,
           total: loaded.total,
         };
+        updatable.value = answered.update;
         seedLabels(collection, loaded.records);
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 });
       }
@@ -391,6 +396,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
           });
           return item;
         };
+        const canUpdate = admitsRow(updatable.value, row.id);
         const openItem = dropdownItem(
           [
             icon(canUpdate ? 'pencil' : 'list-search'),
