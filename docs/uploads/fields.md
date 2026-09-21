@@ -50,6 +50,7 @@ the same grammar.
 
 A write checks each referenced upload against the field's options, in one read. The upload must be
 a file, an image for the image fields, and within `types`, the size limits, and the pixel limits.
+An image whose `width` and `height` could not be read passes the pixel limits.
 
 A failure is reported at the field, or at `attachments[2]` for the third item of a list, with a
 [message](../i18n/messages.md#validation-messages) such as `The file must be at most 5 MB`. A `UUID`
