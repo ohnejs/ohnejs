@@ -2,7 +2,7 @@
 
 A hook is a named event the framework fires at a fixed point in its lifecycle: the server starting,
 a record about to be written, a response about to be sent to the socket. You register a callback for
-the name, and the framework calls it when the moment comes. [Middleware](./middleware.md) runs
+the name, and the framework calls it when the moment comes. [Middleware](../api/middleware.md) runs
 inside each request's pipeline and can answer the request. A hook, by contrast, is process-wide: you
 register it once, and it fires every time its event happens, in a request or not.
 
@@ -20,13 +20,13 @@ hook('server:ready', async ({ host, port }) => {
 
 `hook(name, fn)` appends the callback to the hook's chain, and checks its signature against the
 hook's declared type, so an unknown name or a wrong parameter is a compile error. Register from a
-[boot file](../project/boot.md): boot runs before the port opens, so the callback is ready the first
+[boot file](./boot.md): boot runs before the port opens, so the callback is ready the first
 time the hook fires.
 
 - When a hook fires, its callbacks run in the order they were registered. Each one is awaited before
   the next, so a mix of sync and async callbacks always runs in the same order.
-- Across [layers](../project/layers.md), the
-  [furthest layer boots first](../project/boot.md#ordering), so a base layer's callbacks run before
+- Across [layers](./layers.md), the
+  [furthest layer boots first](./boot.md#ordering), so a base layer's callbacks run before
   yours.
 
 ## Actions and filters
@@ -96,15 +96,15 @@ Runs once the API server is listening, after the socket accepts and before
 announce the address to discovery, as the snippet at the top of this page does.
 
 - The callback receives the bound `host` and `port`. Read `port` to learn the real port when
-  [`api.port`](../project/config.md#the-api-server) is `0`.
+  [`api.port`](./config.md#the-api-server) is `0`.
 - To clean up, register `onShutdown` instead. It runs when the process
   [shuts down](../production/deployment.md#graceful-shutdown).
 
 ### `request:complete`
 
 Fires once a dispatched request finishes: the response is written and every
-[`waitUntil`](./response.md#after-the-response) promise has settled. Use it when a trace must also
-cover background work, instead of ending when the response is sent.
+[`waitUntil`](../api/response.md#after-the-response) promise has settled. Use it when a trace must
+also cover background work, instead of ending when the response is sent.
 
 ```ts
 // boot/access-log.ts
@@ -139,7 +139,7 @@ resolve. The list arrives with the globals first, then the route's selection, an
 names to run.
 
 It exists for the cases that need dynamic, per-request control, shown in
-[middleware](./middleware.md#per-request-control). Routine selection belongs on the route.
+[middleware](../api/middleware.md#per-request-control). Routine selection belongs on the route.
 
 ### `handler:result`
 
@@ -157,8 +157,8 @@ hook('handler:result', (result) =>
 ```
 
 - It fires for a handler result and for a middleware short-circuit, each before serialization runs.
-- The replacement serializes by the [same rules](./routes.md#what-a-return-becomes): a `Response`,
-  an [`HTTPError`](./errors.md), a string, or JSON.
+- The replacement serializes by the [same rules](../api/routes.md#what-a-return-becomes): a
+  `Response`, an [`HTTPError`](../api/errors.md), a string, or JSON.
 - A returned `HTTPError` also goes through this hook. A thrown error goes to
   [`error:response`](#errorresponse) instead.
 
@@ -182,9 +182,9 @@ hook('error:response', (response, error) => {
 });
 ```
 
-- It fires for a mapped [`HTTPError`](./errors.md) and for an
-  [unhandled error's generic `500`](./errors.md#unhandled-errors).
-- A timeout `503` from [`handlerTimeout`](../project/config.md#the-api-server) does not throw, so it
+- It fires for a mapped [`HTTPError`](../api/errors.md) and for an
+  [unhandled error's generic `500`](../api/errors.md#unhandled-errors).
+- A timeout `503` from [`handlerTimeout`](./config.md#the-api-server) does not throw, so it
   does not count as an error and does not fire this hook.
 - The callback receives the error response, the thrown `error`, and the `event`.
 - It runs before `response:send`, which then sees whatever this returns.
@@ -406,12 +406,12 @@ hook('record:committed', async ({ collection, operation, uuids }) => {
 
 ## Reading records
 
-These hooks fire around [reads](../database/queries.md). They scope the query before it runs and
+These hooks fire around [reads](../database/reading.md). They scope the query before it runs and
 shape the rows after. Their payloads are typed `QueryIR` and `QueryRecord`: import those from
 `ohnejs` to type a callback you declare separately from its `hook` call.
 
 - `query:records` and `query:complete` fire only for reads that return records.
-  [`count`, `exists`](../database/queries.md#counting-and-checking), and `pluck`'s column path
+  [`count`, `exists`](../database/reading.md#counting-and-checking), and `pluck`'s column path
   return a scalar and fire neither.
 - Junction `UUID` lists, child composites, and blocks load outside both `query:filter` and
   `populate:targets`, so neither hook sees them.
@@ -525,15 +525,15 @@ hook('schema:synced', async (report) => {
 - The report lists only destructive outcomes: `deletions` are rows deleted under
   [force or a migration](../database/sync.md#force), and `warnings` are orphan rows left in place.
 - A clean sync that only creates or alters tables reports both as empty, but still fires.
-- It fires under both [`ohne serve api`](../project/cli.md#ohne-serve) and
-  [`ohne sync`](../project/cli.md#ohne-sync), but never on a dry run, which commits nothing.
+- It fires under both [`ohne serve api`](./cli.md#ohne-serve) and
+  [`ohne sync`](./cli.md#ohne-sync), but never on a dry run, which commits nothing.
 
 ## The dashboard
 
 ### `dashboard:menu`
 
 Filters the [sidebar menu](../dashboard/pages.md#the-sidebar) after
-[`dashboard.menu`](../project/config.md#the-dashboard) resolves, just before `GET /dashboard`
+[`dashboard.menu`](./config.md#the-dashboard) resolves, just before `GET /dashboard`
 answers. The groups arrive resolved, so a layer can append a group without knowing the config.
 
 Collection rows are already scoped to

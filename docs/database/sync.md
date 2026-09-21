@@ -16,7 +16,7 @@ database.
 
 The engine reads the live schema, diffs it against your collections, and applies the difference
 inside one transaction. When several instances of the app boot at once, a
-[cluster lock](./with-lock.md) picks one to run the sync. The others wait, then boot against the
+[cluster lock](./locks.md) picks one to run the sync. The others wait, then boot against the
 finished schema.
 
 After the sync, each [singleton](./collections.md#singletons) that has no record gets one, created

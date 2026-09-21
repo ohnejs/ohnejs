@@ -1,7 +1,7 @@
 # Translations
 
 A translatable field holds one value per locale. You mark the field, configure the locales your
-content uses, and scope a query with `.locale()` to pick the locale you [read](./queries.md) or
+content uses, and scope a query with `.locale()` to pick the locale you [read](./reading.md) or
 [write](./writing.md).
 
 ```ts
@@ -108,7 +108,7 @@ const untranslated = await query('Posts')
 - The answer is the same whatever locale the query reads.
 
 To test one field instead, filter at that locale. Any translatable scalar or `record` takes
-[`isNull`](./queries.md#null), even a non-nullable one. Translatable lists read `[]`, so use
+[`isNull`](./reading.md#null), even a non-nullable one. Translatable lists read `[]`, so use
 `empty()`:
 
 ```ts
@@ -119,7 +119,7 @@ const withoutSummary = await query('Posts')
 ```
 
 Filters, ordering, and `pluck` on translatable fields act on the queried locale's values.
-[`populate`](./queries.md#populating-relations) uses the query's locale for the target too, so a
+[`populate`](./reading.md#populating-relations) uses the query's locale for the target too, so a
 populated author reads its own translatable fields at the same locale.
 
 A query reads one locale. `.locale()` exists only on collections with a translatable field, and only

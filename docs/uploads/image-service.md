@@ -3,7 +3,7 @@
 An image service renders the variants ohne signs: it answers a variant URL with the resized,
 re-encoded image and caches the result. The reference implementation, `ohne-images`, is one. This
 page is for writing your own, or checking one against the protocol. To use variants in an app, read
-[image variants](./images.md) instead.
+[image variants](./image-variants.md) instead.
 
 ## The URL
 
@@ -58,8 +58,8 @@ in any language. Test your implementation against these values:
 | `another` | `w_320,h_320,fit_inside` | `photos/sunset.jpg` | `s9YxH4SXC6gGsS97gs_WMTAcNvgSnZe7zUBB__NeUMs` |
 
 A service holds a list of secrets and accepts a URL signed by any of them, so an app can
-[rotate its secret](./images.md#rotating-the-secret) without breaking pages. A URL has no expiry
-date: variant URLs live in pages and in caches, and a leaked URL gives access only to the one
+[rotate its secret](./image-variants.md#rotating-the-secret) without breaking pages. A URL has no
+expiry date: variant URLs live in pages and in caches, and a leaked URL gives access only to the one
 variant it names.
 
 ## What a service does
@@ -68,8 +68,8 @@ variant it names.
    transforms, and the rest is the source path. Answer `404` to fewer than three segments. Ignore
    the query string, for routing and for the cache key, so nobody forces a re-render by changing it.
 2. Verify the signature over the raw `{transforms}/{path}` string before parsing anything. Answer
-   `403` when it is not valid. An [unsigned service](./images.md#connecting-a-service), meant for
-   a local machine, skips this step.
+   `403` when it is not valid. An [unsigned service](./image-variants.md#connecting-a-service),
+   meant for a local machine, skips this step.
 3. Parse the transforms. Answer `400` to an empty segment, an unknown token, an out-of-range value,
    a duplicate, or both `p` and `fp`.
 4. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
@@ -103,4 +103,4 @@ variant it names.
    part of the cache key, since the URL alone no longer identifies the bytes.
 
 A service may also refuse
-[every variant the app did not name](./images.md#allowing-only-your-variants).
+[every variant the app did not name](./image-variants.md#allowing-only-your-variants).

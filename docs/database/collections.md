@@ -26,7 +26,7 @@ each one takes. Every field also takes common options covered elsewhere:
 - [`when`](./conditional-fields.md) activates a field per record.
 
 When no built-in type fits, [define your own](./custom-field-types.md). To read records back, use
-the [query builder](./queries.md).
+the [query builder](./reading.md).
 
 ## Files and names
 
@@ -153,7 +153,7 @@ fields: {
 - A create that omits the field stores `[]`.
 - `min` and `max` limit the number of entries.
 
-In queries, the [`includes` operators](./queries.md#filtering) check the list, so
+In queries, the [`includes` operators](./reading.md#filtering) check the list, so
 `.where('channels', (w) => w.includes('web'))` finds records that have that entry.
 
 ## Date and time fields
@@ -300,7 +300,7 @@ fields: {
 Reading `posts` on a tag uses the same links as `tags` on a post, in the opposite direction. The
 inverse side has no `onDelete` of its own. It follows the owner.
 
-To read related records, [populate](./queries.md#populating-relations) them.
+To read related records, [populate](./reading.md#populating-relations) them.
 
 ## Composite fields
 
@@ -341,7 +341,7 @@ how an [update keeps an item](./writing.md#lists-on-update).
 - A `unique` subfield is unique across every item of every record. `uniquePerParent: true` limits it
   to each record's own list, so a value may repeat across records.
 - `layout` arranges the subfields in the editor, in the same
-  [grammar](../dashboard/layouts.md) a collection uses.
+  [grammar](../dashboard/field-layouts.md) a collection uses.
 
 ## Blocks
 
@@ -465,7 +465,7 @@ export default defineCollection({
 - `recordLabel` - the field that gives a record its title, as [record labels](#record-labels)
   describes.
 - `table` - the list view's [default columns](#table-columns).
-- `layout` - how the record editor [arranges the fields](../dashboard/layouts.md).
+- `layout` - how the record editor [arranges the fields](../dashboard/field-layouts.md).
 
 ### Record labels
 

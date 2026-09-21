@@ -120,7 +120,7 @@ A group's `items` hold its rows, in the order you write them:
 - An **object** links to any dashboard path: `to`, a `label`, and an optional
   [Tabler icon](https://tabler.io/icons). Nothing filters it, since the dashboard has no
   [capability](../auth/roles.md#capabilities) for a page. To show one only to some viewers, use the
-  [`dashboard:menu`](../api/hooks.md#dashboardmenu) hook.
+  [`dashboard:menu`](../project/hooks.md#dashboardmenu) hook.
 
 The group's own `label` is its heading. Omit it for a list without one. Both labels take a
 [message key](../i18n/messages.md#catalogs), so a heading and a link translate per viewer:

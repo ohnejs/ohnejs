@@ -85,7 +85,7 @@ an error block naming the route, and the stack shows only under
 request is answered and the process keeps serving.
 
 To replace the generic response, such as with a branded error page, filter it with the
-[`error:response`](./hooks.md#errorresponse) hook.
+[`error:response`](../project/hooks.md#errorresponse) hook.
 
 ## Write failures
 

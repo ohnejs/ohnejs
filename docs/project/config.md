@@ -14,6 +14,8 @@ export default defineConfig({
 ```
 
 Every key is optional and every key has a default, so this scaffold config is already complete.
+Layers document the keys they add, like [`auth`](../auth/authentication.md#configuration) and
+[`uploads`](../uploads/uploads.md#configuration).
 
 ## Layers
 
@@ -302,4 +304,4 @@ database, silence your printer, or force a destructive sync.
 
 The same boundary covers `dashboard.menu`: a layer that ships dashboard pages cannot add sidebar
 rows. List them yourself, or have the layer append them through the
-[`dashboard:menu`](../api/hooks.md#dashboardmenu) hook.
+[`dashboard:menu`](./hooks.md#dashboardmenu) hook.

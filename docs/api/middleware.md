@@ -113,9 +113,9 @@ another.
 
 ## Per-request control
 
-The [`middleware:resolve`](./hooks.md#middlewareresolve) hook filters or reorders the resolved list
-just before it runs. The list has the globals first, then the route's selection. Use the hook only
-for dynamic, per-request decisions. Normal selection belongs on the route.
+The [`middleware:resolve`](../project/hooks.md#middlewareresolve) hook filters or reorders the
+resolved list just before it runs. The list has the globals first, then the route's selection. Use
+the hook only for dynamic, per-request decisions. Normal selection belongs on the route.
 
 ```ts
 // boot/middleware.ts

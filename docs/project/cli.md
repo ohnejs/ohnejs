@@ -57,7 +57,7 @@ Outside a terminal (CI, a script), `npm create ohne` behaves like `--yes`: no pr
 install, and the target defaults to the current directory. Run `npm install` before the first
 `npm run dev`.
 
-[Getting started](../start/installation.md) takes a new project through its first run.
+[Installation](../start/installation.md) takes a new project through its first run.
 
 ## ohne dev
 

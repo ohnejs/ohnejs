@@ -344,4 +344,4 @@ export default defineHandler(async () => {
 A create or update takes the input you plan to write as its third argument, so the rule can judge
 it. The operation's own middleware do not run here, so your route needs its own. For a rule that
 must apply to every read in the process, shipped or not, use a
-[`query:filter` hook](./hooks.md#queryfilter).
+[`query:filter` hook](../project/hooks.md#queryfilter).

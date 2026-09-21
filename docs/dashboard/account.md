@@ -75,9 +75,9 @@ out at its next request, while the current session stays.
 ## Extending the page
 
 An app that [adds fields to `Users`](../auth/authentication.md#adding-fields-to-users) can offer
-them on the account page. The page is a [field layout](./layouts.md) with one card per group of
-settings. The `auth:account-layout` [hook](../api/hooks.md#the-hooks-at-a-glance) is a
-[filter](../api/hooks.md#actions-and-filters) that receives this layout. Return a new layout, or
+them on the account page. The page is a [field layout](./field-layouts.md) with one card per group
+of settings. The `auth:account-layout` [hook](../project/hooks.md#the-hooks-at-a-glance) is a
+[filter](../project/hooks.md#actions-and-filters) that receives this layout. Return a new layout, or
 change it in place:
 
 ```ts

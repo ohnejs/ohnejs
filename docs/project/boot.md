@@ -4,7 +4,7 @@ A boot file is a `.ts` file at the top level of `boot/`. It runs once at startup
 serves. Use it for anything that must exist before the first request. `dirs.boot` in
 [config](./config.md#directories) moves the directory elsewhere.
 
-The most common registration is a [hook](../api/hooks.md#registering):
+The most common registration is a [hook](./hooks.md#registering):
 
 ```ts
 // boot/ready.ts

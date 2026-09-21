@@ -253,7 +253,7 @@ holds one group or none.
 | `fields`       | required | The subfields, each a `field(...)`.                                                                                                                                     |
 | `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
 | `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `layout`       | -        | How the editor [arranges the subfields](../dashboard/layouts.md). Omitted, they stack in order.                                                                         |
+| `layout`       | -        | How the editor [arranges the subfields](../dashboard/field-layouts.md). Omitted, they stack in order.                                                                   |
 | `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
 | `translatable` | `false`  | Keeps [one group per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
@@ -336,7 +336,7 @@ table. Every item keeps its own `UUID`.
 | `fields`       | required | The fields of one item, each a `field(...)`.                                                                                                                            |
 | `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
 | `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `layout`       | -        | How the editor [arranges the fields](../dashboard/layouts.md) of an item. Omitted, they stack in order.                                                                 |
+| `layout`       | -        | How the editor [arranges the fields](../dashboard/field-layouts.md) of an item. Omitted, they stack in order.                                                           |
 | `max`          | -        | The most items a written list may hold.                                                                                                                                 |
 | `min`          | -        | The fewest items a written list may hold.                                                                                                                               |
 | `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |

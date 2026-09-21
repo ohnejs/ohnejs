@@ -40,7 +40,7 @@ only parameters. Any other top-level parameter is a `400` with the code `unknown
 ## Filtering
 
 `where` is a condition object, the same shape the fluent `.where()` builds, with the same
-[operators per field type](../database/queries.md#filtering):
+[operators per field type](../database/reading.md#filtering):
 
 - A bare `field:value` matches when the field equals the value.
 - A `{ op: value }` object is a comparison.
@@ -59,13 +59,13 @@ conditions, and `not` to negate a comparison:
 ?where={status:{not:{equalsTo:draft}}}
 ```
 
-`null` is never a value. To match a null field, use [`isNull`](../database/queries.md#null):
+`null` is never a value. To match a null field, use [`isNull`](../database/reading.md#null):
 
 ```
 ?where={summary:{isNull:true}}
 ```
 
-Filter on a relation with [`has`](../database/queries.md#filtering-relations). Its conditions apply
+Filter on a relation with [`has`](../database/reading.md#filtering-relations). Its conditions apply
 to the target's fields. Use `empty` for the opposite:
 
 ```
@@ -126,7 +126,7 @@ to it:
 Mixing `limit` or `offset` with `page` or `perPage` is a `400`.
 
 `applyQuery` leaves `page` and `perPage` to your endpoint, which decides whether to paginate. Read
-them from the parsed query and call [`paginate`](../database/queries.md#pagination) yourself:
+them from the parsed query and call [`paginate`](../database/reading.md#pagination) yourself:
 
 ```ts
 export default defineHandler(async () => {
@@ -143,7 +143,7 @@ everything a pager needs to render its controls.
 ## Populating relations
 
 `populate` replaces a relation's ids with the full related records, exactly as the fluent
-[`populate`](../database/queries.md#populating-relations) does:
+[`populate`](../database/reading.md#populating-relations) does:
 
 ```
 ?populate=[author,tags]
@@ -178,7 +178,7 @@ as [across relations](#across-relations) describes.
 ## Locales
 
 On a collection with [translatable fields](../database/translations.md), `locale` scopes the query
-exactly as the fluent [`.locale()`](../database/queries.md#locales) does:
+exactly as the fluent [`.locale()`](../database/reading.md#locales) does:
 
 ```
 ?locale=de&where={title:{isNull:true}}

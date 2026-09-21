@@ -49,8 +49,8 @@ Every read is decorated with extra fields:
 
 - `path` joins `directory` and `name`.
 - `url` is where a file's bytes are served from.
-- `variants` holds one signed URL per [named variant](./images.md#named-variants), when an image
-  service is configured.
+- `variants` holds one signed URL per [named variant](./image-variants.md#named-variants), when an
+  image service is configured.
 
 A folder is decorated with `path` only:
 
@@ -196,9 +196,9 @@ uploads: {
   The default revalidates on every use, so a renamed or replaced file is never stale.
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
   the storage. Without it, records point where [serving](#serving) describes.
-- `images` - the [image service](./images.md) that renders resized variants, and the named variants
-  every image read carries. `url` has no default, and without it every image URL points at the
-  original.
+- `images` - the [image service](./image-variants.md) that renders resized variants, and the named
+  variants every image read carries. `url` has no default, and without it every image URL points at
+  the original.
 
 `storage` and `url` are each layer's [own](../project/config.md#own-vs-inherited-keys): a dependency
 cannot point your uploads at its storage.

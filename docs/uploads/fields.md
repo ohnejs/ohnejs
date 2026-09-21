@@ -59,8 +59,9 @@ that belongs to no upload fails like any other
 
 ## Reading
 
-[Populate](../database/queries.md#populating-relations) the field to get the upload's record,
-decorated with `url`, and with `variants` when an [image service](./images.md) is configured:
+[Populate](../database/reading.md#populating-relations) the field to get the upload's record,
+decorated with `url`, and with `variants` when an [image service](./image-variants.md) is
+configured:
 
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();
@@ -75,6 +76,6 @@ Over the [collections API](../api/collections.md), a media field
 signed in, gets `null` for `image` and `file` and an empty list for `images` and `files`. To serve
 media fields to everyone, make that read public.
 
-For a page of your own, [`imageURL`](./images.md#named-variants) builds a variant URL and
-[`imageSrcSet`](./images.md#responsive-images) builds a `srcset`. Without a service, both fall back
-to the original's URL, so a template needs no special case.
+For a page of your own, [`imageURL`](./image-variants.md#named-variants) builds a variant URL and
+[`imageSrcSet`](./image-variants.md#responsive-images) builds a `srcset`. Without a service, both
+fall back to the original's URL, so a template needs no special case.

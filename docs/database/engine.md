@@ -1,4 +1,4 @@
-# The database
+# The database engine
 
 ohne ships with SQLite as its engine and uses it through Node's built-in `node:sqlite`. There is no
 driver to install and no server to run. The first boot creates the database file at `.data/ohne.db`
@@ -60,7 +60,7 @@ export default defineConfig({
 
 ## Raw SQL
 
-[Read](./queries.md) and [write](./writing.md) your collections through the query builder. Raw SQL
+[Read](./reading.md) and [write](./writing.md) your collections through the query builder. Raw SQL
 is for what the builder does not cover: a helper database or a table of your own.
 
 `useDatabase()` returns the main connection as a small async adapter. A helper has the same methods.
@@ -173,7 +173,7 @@ try {
 - `closeDatabases` closes them, whether the work succeeds or throws.
 
 Your collections are not registered in such a script, so `query` throws `Unknown collection`. Use
-[raw SQL](#raw-sql) there. The [cluster lock](./with-lock.md) needs no sync first: it creates its
+[raw SQL](#raw-sql) there. The [cluster lock](./locks.md) needs no sync first: it creates its
 table the first time it is used.
 
 Run the script from the project root, with ohne's `register` hook so Node can load ohne's
@@ -199,7 +199,7 @@ cd /srv/app && DATABASE=/srv/data/app.db node --import ohnejs/register scripts/p
 ohne keeps its own state in the main database, in tables prefixed `ohne_`. The framework manages
 them itself, so do not use the prefix in your own SQL:
 
-- `ohne_locks` stores the data for the [cluster lock](./with-lock.md).
+- `ohne_locks` stores the data for the [cluster lock](./locks.md).
 - `ohne_migrations` records which [migrations](./migrations.md#each-migration-runs-once) ran.
 - `ohne_schema` holds the sync's schema snapshot.
 

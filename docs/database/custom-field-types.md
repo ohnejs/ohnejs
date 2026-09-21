@@ -114,7 +114,7 @@ export default defineField({
 ```
 
 `jsonList: true` marks a `json` value as a list, so a query can filter it with
-[`includes`, `includesAll`, and `includesAny`](./queries.md#filtering). Neither the flag nor
+[`includes`, `includesAll`, and `includesAny`](./reading.md#filtering). Neither the flag nor
 `emitType` checks anything at runtime. Only the validators make sure the value has the shape its
 type promises.
 

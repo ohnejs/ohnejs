@@ -6,7 +6,7 @@ once: the database, the API, and the dashboard, each in its smallest working for
 
 ## Scaffold
 
-Create a project named `blog` and start the dev server. [Getting started](./installation.md)
+Create a project named `blog` and start the dev server. [Installation](./installation.md)
 covers what this sets up.
 
 ```sh
@@ -61,7 +61,7 @@ response, and [objects and arrays are sent as JSON](../api/routes.md#what-a-retu
 
 `query('Posts')` is fully typed. [Codegen](../project/cli.md#ohne-prepare) turned your collection
 into types when you saved, so field names and results are checked as you type.
-[Reading records](../database/queries.md) covers the query builder.
+[Reading records](../database/reading.md) covers the query builder.
 
 Try it:
 

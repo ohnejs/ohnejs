@@ -83,7 +83,7 @@ export default defineBlock({
 A plain string shows as written. A message key is replaced by its text in the viewer's language, so
 the label lives in your [catalogs](../i18n/messages.md#catalogs) with the rest of your UI strings.
 
-A block also takes a `dashboard.layout`, the same [field layout](../dashboard/layouts.md) a
+A block also takes a `dashboard.layout`, the same [field layout](../dashboard/field-layouts.md) a
 collection declares, to arrange its fields in the editor.
 
 ## The blocks field
@@ -128,13 +128,13 @@ for (const item of page.content) {
 }
 ```
 
-[`select`](./queries.md#selecting-fields) may name a blocks field like any other. `orderBy` and
+[`select`](./reading.md#selecting-fields) may name a blocks field like any other. `orderBy` and
 `populate` do not accept one: a list of mixed shapes has no sort key, and its items arrive in full
 already.
 
 ## Querying
 
-You filter a blocks field with the same [`has` and `empty`](./queries.md#filtering-relations) as a
+You filter a blocks field with the same [`has` and `empty`](./reading.md#filtering-relations) as a
 relation. Bare `has()` matches records whose list holds anything, and `empty()` matches the empty
 list:
 

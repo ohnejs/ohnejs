@@ -51,7 +51,7 @@ Supervisors get more signals once the server listens:
 - A process spawned with an IPC channel sends a `'ready'` process message.
 
 To announce the address yourself, to a service registry for example, register the
-[`server:ready`](../api/hooks.md#serverready) hook from a boot file.
+[`server:ready`](../project/hooks.md#serverready) hook from a boot file.
 
 ## Schema changes
 
