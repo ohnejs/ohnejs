@@ -119,7 +119,8 @@ A calendar day, stored as `YYYY-MM-DD` text. No time zone is involved.
   <img alt="The dateTime field in the dashboard" src="../images/field-types/date-time-light.png">
 </picture>
 
-An instant, stored as epoch milliseconds. The dashboard shows it in the viewer's time zone.
+An instant, stored as epoch milliseconds. A write takes that number only, so convert a `Date` with
+`getTime()` first. The dashboard shows it in the viewer's time zone.
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -268,7 +269,7 @@ holds one group or none.
 </picture>
 
 A [reference](./collections.md#one-reference) to one record of another collection, stored as its
-`UUID`. It is always nullable and always indexed.
+`UUID`. It is always nullable and always indexed, so no option makes it required.
 
 | Option            | Default     | What it does                                                                                                                                                            |
 | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -296,7 +297,7 @@ A [reference](./collections.md#one-reference) to one record of another collectio
 </picture>
 
 An ordered list of [references](./collections.md#many-references) to records of another collection,
-stored in a junction table.
+stored in a junction table. A list that names the same `UUID` twice is rejected.
 
 | Option         | Default     | What it does                                                                                                                                                            |
 | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -392,8 +393,8 @@ A string. It rejects the empty string unless `allowEmpty` is set.
 | `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
 | `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
 | `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `max`             | -       | The most characters a value may hold.                                                                                                                                   |
-| `min`             | -       | The fewest characters a value may hold.                                                                                                                                 |
+| `max`             | -       | The most characters a value may hold, counted like `String#length`, so an emoji counts as 2.                                                                            |
+| `min`             | -       | The fewest characters a value may hold, counted the same way.                                                                                                           |
 | `multiline`       | `false` | Edits the value in a text area. The stored value is the same either way.                                                                                                |
 | `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
@@ -477,8 +478,8 @@ at most 64 characters and may not be blank.
   <img alt="The language field in the dashboard" src="../images/field-types/language-light.png">
 </picture>
 
-A dashboard language, stored as its canonical BCP-47 tag like `de-AT`. Only a language that has a
-[message catalog](../i18n/messages.md#catalogs) is accepted.
+A dashboard language, stored as its canonical BCP-47 tag, so `de-at` is stored as `de-AT`. Only a
+language that has a [message catalog](../i18n/messages.md#catalogs) is accepted.
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -507,7 +508,7 @@ A dashboard language, stored as its canonical BCP-47 tag like `de-AT`. Only a la
 </picture>
 
 One of your [content locales](../project/config.md#content-locales), as its canonical tag like
-`de-AT`.
+`de-AT`. The tag must arrive in that form: `de-at` is rejected.
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -536,7 +537,8 @@ One of your [content locales](../project/config.md#content-locales), as its cano
 </picture>
 
 Takes a plain-text password and stores its scrypt hash. Sanitizers and validators see the plain
-text, so a policy rule checks what the caller sent.
+text, so a policy like a minimum length goes in a validator. Pass
+[`readable: false`](./collections.md#write-only-and-locked-fields), or reads return the hash.
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -624,7 +626,8 @@ them.
   <img alt="The file field in the dashboard" src="../images/field-types/file-light.png">
 </picture>
 
-A reference to one uploaded file, stored as its `UUID`. It is always nullable and always indexed.
+A reference to one uploaded file, stored as its `UUID`. It is always nullable and always indexed,
+so no option makes it required.
 
 | Option            | Default     | What it does                                                                                                                                                            |
 | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -683,7 +686,8 @@ An ordered list of references to uploaded files, stored in a junction table.
   <img alt="The image field in the dashboard" src="../images/field-types/image-light.png">
 </picture>
 
-A reference to one uploaded image, stored as its `UUID`. It is always nullable and always indexed.
+A reference to one uploaded image, stored as its `UUID`. It is always nullable and always indexed,
+so no option makes it required.
 
 | Option            | Default     | What it does                                                                                                                                                            |
 | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
