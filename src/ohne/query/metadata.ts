@@ -24,6 +24,7 @@ import {
 import { ohneError } from '../error/ohne-error.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
+import { validateSingleton } from './validate-singleton.ts';
 import { validateBlockWhen, validateWhen } from './validate-when.ts';
 
 /**
@@ -200,6 +201,11 @@ export interface CollectionQueryMeta {
   translatable?: true;
 
   /**
+   * Marks a singleton collection: one record, seeded at sync, never created or deleted through a query.
+   */
+  singleton?: true;
+
+  /**
    * The `<Owner>__translations` table holding the translatable columns, one row per (record, locale).
    * Present when at least one translatable field carries a column.
    */
@@ -219,6 +225,7 @@ const cache = new Map<string, CollectionQueryMeta>();
  * Built from the collection and field-type registries through the shared field-walk.
  * It therefore partitions fields exactly as the desired schema does.
  * Building validates every declared `when` against the field graph, so a bad condition throws here.
+ * A singleton's fields must each land a value without input, so a bare required field throws here too.
  * An unknown collection throws.
  *
  * @example
@@ -234,6 +241,7 @@ export function queryMetadata(collection: string): CollectionQueryMeta {
   if (isUndefined(meta)) throw ohneError(`Unknown collection \`${collection}\``);
   const built = buildCollectionMeta(meta);
   validateWhen(built);
+  validateSingleton(built, Object.keys(meta.collection.fields));
   cache.set(collection, built);
   return built;
 }
@@ -378,6 +386,7 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
     fields,
     compositeUniques,
     ...(translatable ? { translatable: true } : {}),
+    ...(meta.collection.singleton === true ? { singleton: true } : {}),
     ...(companion ? { companionTable: companionTableName(meta.name) } : {}),
   };
 }

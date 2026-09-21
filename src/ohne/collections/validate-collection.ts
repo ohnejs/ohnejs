@@ -23,6 +23,8 @@ import { isRecordLabelTemplate } from './record-label.ts';
 
 const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
 
+const SINGLETON_CLOSED = ['create', 'delete'] as const;
+
 /**
  * Validates a collection definition.
  *
@@ -30,6 +32,7 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
  * - Each composite index must cover only declared fields, at least one, with no repeat.
  * - No two composite indexes may be identical.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
+ * - `singleton` must be a boolean; when `true`, `api` may name `read` and `update` only.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
  * - `dashboard` must be an object holding only `icon`, `recordLabel`, `table`, and `layout`.
  * - `dashboard.icon` must name an icon the vendored set carries.
@@ -48,6 +51,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateUniqueNames(fieldNames, 'field', collection);
   validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
   validateAPI(definition.api, collection);
+  validateSingleton(definition.singleton, definition.api, collection);
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
   validateDashboard(definition.dashboard, definition.fields, collection);
 }
@@ -168,6 +172,35 @@ function validateAPI(api: unknown, collection?: string): void {
       });
     }
   }
+}
+
+/**
+ * Rejects a malformed `singleton` flag, and an `api` exposing an operation a singleton never has.
+ * `api: true` fails too, since it opens `create` and `delete` along with the rest.
+ */
+function validateSingleton(singleton: unknown, api: unknown, collection?: string): void {
+  if (isUndefined(singleton)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (!isBoolean(singleton)) {
+    throw ohneError({
+      title: 'Invalid `singleton` declaration',
+      body: [`The \`singleton\` option${scope} must be a boolean.`],
+    });
+  }
+  if (!singleton) return;
+  const exposed = isPlainObject(api)
+    ? SINGLETON_CLOSED.find((operation) => !isUndefined(api[operation]) && api[operation] !== false)
+    : undefined;
+  if (api !== true && isUndefined(exposed)) return;
+  throw ohneError({
+    title: isUndefined(exposed)
+      ? 'A singleton cannot take `api: true`'
+      : `A singleton cannot expose \`${exposed}\``,
+    body: [
+      `The singleton${scope} holds exactly one record, so \`create\` and \`delete\` have no meaning.`,
+      "Expose `read` and `update` only: `api: { read: 'public', update: true }`.",
+    ],
+  });
 }
 
 /**

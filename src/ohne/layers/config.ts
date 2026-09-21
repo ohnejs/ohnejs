@@ -626,6 +626,7 @@ export interface Config {
       /**
        * The rows the group holds, in order.
        * A collection name renders that collection's list link; a link object opens any dashboard page.
+       * A singleton's row opens its record instead of a list.
        */
       items: DashboardMenuEntry[];
     }[];

@@ -2,6 +2,7 @@ import type { DeepPrettify } from '../../utils/index.ts';
 import type { BlockName } from '../blocks/known-blocks.ts';
 import type { CollectionName, KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
+import type { KnownSingletons } from '../collections/known-singletons.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
 import type { BlockQueryFieldsOf } from './known-block-query-fields.ts';
@@ -735,8 +736,9 @@ export interface PopulateQuery<C extends CollectionName, S = never, P = never> {
 
 /**
  * The refinements every state offers; each returns a read-only query for the rest of the chain.
+ * `limit` and `offset` mark the chain narrowed (`N`), since a row window can leave nothing to read.
  */
-interface Refinements<C extends CollectionName, S, P, L extends boolean> {
+interface Refinements<C extends CollectionName, S, P, L extends boolean, N extends boolean> {
   /**
    * Narrows the read to the named fields, accumulating across calls.
    * The returned rows carry only the selected fields.
@@ -747,7 +749,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * const rows = await query('Posts').select('title', 'views').findMany()
    * ```
    */
-  select<F extends SelectableField<C>>(...fields: F[]): ReadOnlyQuery<C, S | F, P, L>;
+  select<F extends SelectableField<C>>(...fields: F[]): ReadOnlyQuery<C, S | F, P, L, N>;
 
   /**
    * Swaps a `record` or `records` field from its `UUID`s to the full target records, one level deep.
@@ -759,7 +761,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * const author = rows[0].author // the full author record, or null
    * ```
    */
-  populate<F extends PopulatableField<C>>(...fields: F[]): ReadOnlyQuery<C, S, P | F, L>;
+  populate<F extends PopulatableField<C>>(...fields: F[]): ReadOnlyQuery<C, S, P | F, L, N>;
 
   /**
    * Swaps one relation through a callback sub-builder scoped to its target collection.
@@ -781,7 +783,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
     build: (
       sub: PopulateQuery<PopulateTarget<C, F>>,
     ) => PopulateQuery<PopulateTarget<C, F>, SubS, SubP>,
-  ): ReadOnlyQuery<C, S, P | PopulateEntry<F, SubS, SubP>, L>;
+  ): ReadOnlyQuery<C, S, P | PopulateEntry<F, SubS, SubP>, L, N>;
 
   /**
    * Adds a sort key, stacking after the keys already set; call it again for a tiebreaker.
@@ -792,7 +794,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * query('Posts').orderBy('publishedAt', 'desc').orderBy('title')
    * ```
    */
-  orderBy(field: OrderableField<C>, direction?: OrderDirection): ReadOnlyQuery<C, S, P, L>;
+  orderBy(field: OrderableField<C>, direction?: OrderDirection): ReadOnlyQuery<C, S, P, L, N>;
 
   /**
    * Caps the number of rows read, replacing any previous cap.
@@ -802,7 +804,7 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * query('Posts').orderBy('publishedAt', 'desc').limit(10)
    * ```
    */
-  limit(count: number): ReadOnlyQuery<C, S, P, L>;
+  limit(count: number): ReadOnlyQuery<C, S, P, L, true>;
 
   /**
    * Skips the given number of rows, replacing any previous offset.
@@ -812,13 +814,14 @@ interface Refinements<C extends CollectionName, S, P, L extends boolean> {
    * query('Posts').orderBy('publishedAt', 'desc').limit(10).offset(20)
    * ```
    */
-  offset(count: number): ReadOnlyQuery<C, S, P, L>;
+  offset(count: number): ReadOnlyQuery<C, S, P, L, true>;
 }
 
 /**
  * The read terminals every state offers, each typed by the current select and populate.
+ * `N` marks a chain narrowed by a filter or a row window, whose read may match nothing.
  */
-interface Terminals<C extends CollectionName, S, P> {
+interface Terminals<C extends CollectionName, S, P, N extends boolean> {
   /**
    * Reads every matching record as a full object, in the query's order.
    *
@@ -831,13 +834,20 @@ interface Terminals<C extends CollectionName, S, P> {
 
   /**
    * Reads the first matching record, or `undefined` when none match.
+   * An unnarrowed singleton chain always answers the record, so nothing is `undefined` there.
    *
    * @example
    * ```ts
    * const post = await query('Posts').where('slug', 'hello-world').findFirst()
    * ```
    */
-  findFirst(): Promise<QueryRow<C, S, P> | undefined>;
+  findFirst(): Promise<
+    N extends false
+      ? IsSingleton<C> extends true
+        ? QueryRow<C, S, P>
+        : QueryRow<C, S, P> | undefined
+      : QueryRow<C, S, P> | undefined
+  >;
 
   /**
    * Counts every matching record, ignoring ordering and the row window.
@@ -936,6 +946,7 @@ interface WriteEntry<C extends CollectionName, S, P> {
 
 /**
  * The update terminals, available once a filter has narrowed the query to a set of rows.
+ * A singleton offers them unfiltered too, where they reach its one record.
  */
 interface UpdateMutations<C extends CollectionName, S, P> {
   /**
@@ -985,6 +996,7 @@ interface DeleteMutation {
 /**
  * The `deleteTranslation` terminal a locale-scoped filtered query offers, where `delete` disappeared.
  * A locale-scoped chain must not cascade-delete every locale, so the swap is structural.
+ * A singleton's locale-scoped chain offers it unfiltered too.
  */
 interface DeleteTranslationMutation {
   /**
@@ -1019,6 +1031,12 @@ type IsTranslatable<C extends CollectionName> = string extends keyof FieldsOf<C>
     : false;
 
 /**
+ * Whether a collection is a singleton, read from the generated marker.
+ * Nothing is a singleton before codegen, so `create` and `delete` stay offered there.
+ */
+type IsSingleton<C extends CollectionName> = C extends keyof KnownSingletons ? true : false;
+
+/**
  * The `locale` scope, moving a chain into its locale-scoped shape.
  */
 interface LocaleMethod<Localed> {
@@ -1043,14 +1061,14 @@ interface LocaleMethod<Localed> {
 interface PendingBase<C extends CollectionName, S, P, L extends boolean>
   extends
     WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P, L>>,
-    Refinements<C, S, P, L>,
-    Terminals<C, S, P>,
-    WriteEntry<C, S, P>,
+    Refinements<C, S, P, L, false>,
+    Terminals<C, S, P, false>,
     Joinable<PendingQuery<C, S, P, L>> {}
 
 /**
  * A query before any filter: reads, refinements, `create`, and the filters that move it to `ReadyQuery`.
  * `L` marks a locale-scoped chain; `.locale()` sets it and exists only while it is unset.
+ * A singleton offers `update` here instead of `create`, and `deleteTranslation` once locale-scoped.
  */
 export type PendingQuery<
   C extends CollectionName,
@@ -1058,8 +1076,11 @@ export type PendingQuery<
   P = never,
   L extends boolean = false,
 > = PendingBase<C, S, P, L> &
+  (IsSingleton<C> extends true ? UpdateMutations<C, S, P> : WriteEntry<C, S, P>) &
   (L extends true
-    ? object
+    ? IsSingleton<C> extends true
+      ? DeleteTranslationMutation
+      : object
     : IsTranslatable<C> extends true
       ? LocaleMethod<PendingQuery<C, S, P, true>>
       : object);
@@ -1070,14 +1091,15 @@ export type PendingQuery<
 interface ReadyBase<C extends CollectionName, S, P, L extends boolean>
   extends
     WhereMethods<FieldsOf<C>, ReadyQuery<C, S, P, L>>,
-    Refinements<C, S, P, L>,
-    Terminals<C, S, P>,
+    Refinements<C, S, P, L, true>,
+    Terminals<C, S, P, true>,
     UpdateMutations<C, S, P>,
     Joinable<ReadyQuery<C, S, P, L>> {}
 
 /**
  * A query with a filter in place: reads, refinements, mutations, and further filters that keep it here.
  * A locale-scoped chain (`L`) offers `deleteTranslation` where an unscoped one offers `delete`.
+ * A singleton never offers `delete`.
  */
 export type ReadyQuery<
   C extends CollectionName,
@@ -1087,33 +1109,35 @@ export type ReadyQuery<
 > = ReadyBase<C, S, P, L> &
   (L extends true
     ? DeleteTranslationMutation
-    : DeleteMutation &
+    : (IsSingleton<C> extends true ? object : DeleteMutation) &
         (IsTranslatable<C> extends true ? LocaleMethod<ReadyQuery<C, S, P, true>> : object));
 
 /**
  * The unconditional members of `ReadOnlyQuery`; an interface, so the self-references defer.
  */
-interface ReadOnlyBase<C extends CollectionName, S, P, L extends boolean>
+interface ReadOnlyBase<C extends CollectionName, S, P, L extends boolean, N extends boolean>
   extends
-    WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P, L>>,
-    Refinements<C, S, P, L>,
-    Terminals<C, S, P>,
-    Joinable<ReadOnlyQuery<C, S, P, L>> {}
+    WhereMethods<FieldsOf<C>, ReadOnlyQuery<C, S, P, L, true>>,
+    Refinements<C, S, P, L, N>,
+    Terminals<C, S, P, N>,
+    Joinable<ReadOnlyQuery<C, S, P, L, N>> {}
 
 /**
  * A read-only query: one refinement stripped the write terminals for the rest of the chain.
  * Filtering still composes, but it can never return to a writable state.
+ * `N` marks a chain narrowed by a filter or a row window, whose read may match nothing.
  */
 export type ReadOnlyQuery<
   C extends CollectionName,
   S = never,
   P = never,
   L extends boolean = false,
-> = ReadOnlyBase<C, S, P, L> &
+  N extends boolean = false,
+> = ReadOnlyBase<C, S, P, L, N> &
   (L extends true
     ? object
     : IsTranslatable<C> extends true
-      ? LocaleMethod<ReadOnlyQuery<C, S, P, true>>
+      ? LocaleMethod<ReadOnlyQuery<C, S, P, true, N>>
       : object);
 
 /**

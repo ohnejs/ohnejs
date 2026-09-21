@@ -614,3 +614,66 @@ describe('the `_translations` entry', () => {
     strictEqual('_translations' in blockQueryMetadata('QHero').fields, false);
   });
 });
+
+describe('queryMetadata singletons', () => {
+  const register = (name: string, fields: Record<string, FieldInstance>, singleton = true) =>
+    useCollections().register(name, { name, collection: { singleton, fields } });
+
+  it('marks a singleton, and nothing else', () => {
+    register('QSingle', { title: field('text', { default: 'x' }) });
+    strictEqual(queryMetadata('QSingle').singleton, true);
+    strictEqual('singleton' in queryMetadata('QPosts'), false);
+  });
+
+  it('accepts fields that land a value without input', () => {
+    register('QSingleOpen', {
+      title: field('text', { default: 'x' }),
+      tagline: field('text', { nullable: true }),
+      tags: field('records', { collection: 'QTags' }),
+      links: field('repeater', { fields: { url: field('text') } }),
+    });
+    ok(queryMetadata('QSingleOpen'));
+  });
+
+  it('rejects a singleton field that is neither nullable nor defaulted', () => {
+    register('QSingleBare', { title: field('text') });
+    throws(
+      () => queryMetadata('QSingleBare'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        strictEqual(error.title, 'Singleton field `title` must be nullable or have a default');
+        match(String(error.body), /collection `QSingleBare`/);
+        return true;
+      },
+    );
+  });
+
+  it('rejects a top-level cascade, which would delete the one record', () => {
+    register('QSingleCascade', {
+      owner: field('record', { collection: 'QUsers', onDelete: 'cascade' }),
+    });
+    throws(
+      () => queryMetadata('QSingleCascade'),
+      (error: unknown) => {
+        ok(isOhneError(error));
+        strictEqual(error.title, 'Singleton field `owner` cannot cascade');
+        return true;
+      },
+    );
+  });
+
+  it('accepts a cascade inside a composite, and any other `onDelete`', () => {
+    register('QSingleNested', {
+      owner: field('record', { collection: 'QUsers', onDelete: 'restrict' }),
+      links: field('repeater', {
+        fields: { who: field('record', { collection: 'QUsers', onDelete: 'cascade' }) },
+      }),
+    });
+    ok(queryMetadata('QSingleNested'));
+  });
+
+  it('leaves the same bare field alone on a plain collection', () => {
+    register('QSinglePlain', { title: field('text') }, false);
+    ok(queryMetadata('QSinglePlain'));
+  });
+});

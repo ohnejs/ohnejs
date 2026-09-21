@@ -198,6 +198,46 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts a singleton exposing read and update, or nothing', () => {
+    const fields = { title: field('text', { default: 'x' }) };
+    doesNotThrow(() => defineCollection({ singleton: true, fields }));
+    doesNotThrow(() =>
+      defineCollection({ singleton: true, fields, api: { read: 'public', update: true } }),
+    );
+    doesNotThrow(() =>
+      defineCollection({ singleton: true, fields, api: { create: false, delete: false } }),
+    );
+    doesNotThrow(() => defineCollection({ singleton: false, fields, api: true }));
+  });
+
+  it('rejects a singleton exposing create, delete, or every operation', () => {
+    const fields = { title: field('text', { default: 'x' }) };
+    throws(
+      () => defineCollection({ singleton: true, fields, api: { create: true } }),
+      /A singleton cannot expose `create`/,
+    );
+    throws(
+      () => defineCollection({ singleton: true, fields, api: { read: true, delete: 'public' } }),
+      /A singleton cannot expose `delete`/,
+    );
+    throws(
+      () => defineCollection({ singleton: true, fields, api: true }),
+      /A singleton cannot take `api: true`/,
+    );
+  });
+
+  it('rejects a non-boolean singleton flag', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `singleton` is not a boolean
+          singleton: 'yes',
+        }),
+      /Invalid `singleton` declaration/,
+    );
+  });
+
   it('rejects a non-object dashboard declaration', () => {
     throws(
       () =>

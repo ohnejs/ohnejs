@@ -219,6 +219,17 @@ describe('the typed builder narrows in a consumer app', () => {
         '} });\n',
     );
 
+    write(
+      app,
+      'collections/Settings.ts',
+      "import { defineCollection, field } from 'ohnejs';\n" +
+        'export default defineCollection({ singleton: true, fields: {\n' +
+        "  siteName: field('text', { translatable: true, default: 'My site' }),\n" +
+        "  theme: field('text', { default: 'light' }),\n" +
+        "  owner: field('record', { collection: 'Users' }),\n" +
+        '} });\n',
+    );
+
     write(app, 'typing.ts', TYPING);
 
     await loadLayers(app);
@@ -243,6 +254,10 @@ describe('the typed builder narrows in a consumer app', () => {
       ),
     );
     ok(shared.includes('export interface GeneratedLocales {\n  en: true;\n  de: true;\n}'));
+    ok(shared.includes('export interface GeneratedSingletons {\n  Settings: true;\n}'));
+    ok(shared.includes("'collection.Settings.update': true;"));
+    ok(!shared.includes("'collection.Settings.create'"));
+    ok(!shared.includes("'collection.Settings.delete'"));
 
     execFileSync(
       process.execPath,
@@ -478,6 +493,48 @@ export async function locales(): Promise<void> {
   await query('Posts').locale('de').where('title', 'x').deleteTranslation();
 }
 
+export async function singletons(): Promise<void> {
+  const settings = await query('Settings').findFirst();
+  const theme: string = settings.theme;
+  const localized = await query('Settings').locale('de').findFirst();
+  const siteName: string | null = localized.siteName;
+  const populated = await query('Settings').populate('owner').select('theme', 'owner').findFirst();
+  const owner: string | undefined = populated.owner?.name;
+  void theme;
+  void siteName;
+  void owner;
+
+  const post = await query('Posts').findFirst();
+  // @ts-expect-error a plain collection may hold nothing
+  void post.title;
+  const filtered = await query('Settings').where('theme', 'dark').findFirst();
+  // @ts-expect-error a filter may miss the record
+  void filtered.theme;
+  const skipped = await query('Settings').select('theme').offset(1).findFirst();
+  // @ts-expect-error a row window may leave nothing
+  void skipped.theme;
+  const narrowed = await query('Settings').populate('owner').where('theme', 'dark').findFirst();
+  // @ts-expect-error a filter after a refinement may miss the record too
+  void narrowed.theme;
+
+  await query('Settings').update({ theme: 'dark' });
+  const [updated] = await query('Settings').locale('de').updateOrThrow({ siteName: 'Meine Seite' });
+  void updated;
+  await query('Settings').where('theme', 'dark').update({ theme: 'light' });
+  await query('Settings').locale('de').deleteTranslation();
+  await query('Settings').locale('de').where('theme', 'dark').deleteTranslation();
+}
+
+// @ts-expect-error a singleton is never created
+query('Settings').create({});
+// @ts-expect-error a singleton is never created
+query('Settings').createOrThrow({});
+// @ts-expect-error a singleton is never deleted
+query('Settings').where('theme', 'dark').delete();
+// @ts-expect-error deleteTranslation exists only after locale, on a singleton too
+query('Settings').deleteTranslation();
+// @ts-expect-error a refinement strips the write terminals on a singleton too
+query('Settings').select('theme').update({ theme: 'dark' });
 // @ts-expect-error the locale is outside the configured set
 query('Posts').locale('fr');
 // @ts-expect-error a chain scopes to one locale

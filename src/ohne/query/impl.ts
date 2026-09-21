@@ -161,10 +161,12 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   create(input: Record<string, unknown>): Promise<CreateOutcome> {
+    if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
     return runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
   }
 
   async createOrThrow(input: Record<string, unknown>): Promise<QueryRecord> {
+    if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
     const outcome = await runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.record;
@@ -193,6 +195,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   delete(): Promise<DeleteOutcome> {
+    if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'delete');
     if (!isNull(this.localeValue)) {
       throw ohneError({
         title: `Cannot \`delete\` a locale-scoped query`,
@@ -230,19 +233,19 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   /**
    * Folds the accumulated conditions into one node, refusing a write that would touch every record.
    * The typed `ReadyQuery` state already gates this, so the throw catches only an untyped caller.
+   * A singleton's writes need no filter: an empty `and` matches its one record.
    */
   private requireCondition(operation: 'update' | 'delete' | 'deleteTranslation'): ConditionNode {
     const condition = readCondition(this.freeze());
-    if (isNull(condition)) {
-      throw ohneError({
-        title: `Cannot \`${operation}\` without a filter`,
-        body: [
-          `A \`${operation}\` on \`${this.meta.collection}\` must be narrowed by \`where\` or \`whereAny\` first.`,
-          'An unfiltered write would touch every record, so the builder requires a condition.',
-        ],
-      });
-    }
-    return condition;
+    if (!isNull(condition)) return condition;
+    if (this.meta.singleton) return { kind: 'and', nodes: [] };
+    throw ohneError({
+      title: `Cannot \`${operation}\` without a filter`,
+      body: [
+        `A \`${operation}\` on \`${this.meta.collection}\` must be narrowed by \`where\` or \`whereAny\` first.`,
+        'An unfiltered write would touch every record, so the builder requires a condition.',
+      ],
+    });
   }
 
   /**
@@ -261,6 +264,24 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       wire: this.wireState,
     });
   }
+}
+
+/**
+ * The failure a singleton raises for the operations it never has.
+ */
+function singletonRefuses(
+  collection: string,
+  operation: 'create' | 'delete',
+): ReturnType<typeof ohneError> {
+  return ohneError({
+    title: `Cannot \`${operation}\` on singleton \`${collection}\``,
+    body: [
+      'A singleton holds exactly one record, created when the schema syncs.',
+      operation === 'create'
+        ? 'Use `update` to change it.'
+        : 'Use `deleteTranslation` on a locale-scoped chain to drop one locale.',
+    ],
+  });
 }
 
 /**

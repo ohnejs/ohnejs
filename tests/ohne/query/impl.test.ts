@@ -11,6 +11,7 @@ import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
+import { runCreate } from '../../../src/ohne/query/write/create.ts';
 
 useLayers().add({
   path: '/impl',
@@ -30,6 +31,17 @@ useCollections().register('INotes', {
   },
 });
 
+useCollections().register('ISettings', {
+  name: 'ISettings',
+  collection: {
+    singleton: true,
+    fields: {
+      title: field('text', { translatable: true, default: 'My site' }),
+      theme: field('text', { default: 'light' }),
+    },
+  },
+});
+
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
 registerDialect(dialect);
@@ -37,6 +49,8 @@ registerDatabase(db);
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
+
+await runCreate('ISettings', {}, null);
 
 let counter = 0;
 async function insert(title: string, views: number, featured: boolean): Promise<void> {
@@ -254,5 +268,52 @@ describe('QueryBuilderImpl locale', () => {
       /roll back/,
     );
     strictEqual(await queryUntyped('INotes').count(), before);
+  });
+});
+
+describe('QueryBuilderImpl singleton', () => {
+  const refuses = (operation: string) => (error: unknown) => {
+    ok(isOhneError(error));
+    strictEqual(error.title, `Cannot \`${operation}\` on singleton \`ISettings\``);
+    return true;
+  };
+
+  it('refuses `create`, `createOrThrow`, and `delete`', async () => {
+    throws(() => queryUntyped('ISettings').create({}), refuses('create'));
+    await rejects(queryUntyped('ISettings').createOrThrow({}), refuses('create'));
+    throws(() => queryUntyped('ISettings').delete(), refuses('delete'));
+    throws(() => queryUntyped('ISettings').where({ theme: 'light' }).delete(), refuses('delete'));
+    strictEqual(await queryUntyped('ISettings').count(), 1);
+  });
+
+  it('updates the one record without a filter', async () => {
+    const outcome = await queryUntyped('ISettings').update({ theme: 'dark' });
+    ok(outcome.ok);
+    strictEqual(outcome.records.length, 1);
+    strictEqual(outcome.records[0].theme, 'dark');
+    const [record] = await queryUntyped('ISettings').updateOrThrow({ theme: 'light' });
+    strictEqual(record.theme, 'light');
+  });
+
+  it('still honors a filter, matching nothing when it misses', async () => {
+    const records = await queryUntyped('ISettings')
+      .where({ theme: 'absent' })
+      .updateOrThrow({ theme: 'x' });
+    deepStrictEqual(records, []);
+    strictEqual((await queryUntyped('ISettings').findFirst())?.theme, 'light');
+  });
+
+  it('drops one locale without a filter, keeping the record', async () => {
+    await queryUntyped('ISettings').locale('de').update({ title: 'Meine Seite' });
+    deepStrictEqual(await queryUntyped('ISettings').locale('de').deleteTranslation(), {
+      deleted: 1,
+    });
+    const de = await queryUntyped('ISettings').locale('de').findFirst();
+    strictEqual(de?.title, null);
+    strictEqual((await queryUntyped('ISettings').findFirst())?.title, 'My site');
+  });
+
+  it('keeps the filter requirement on a plain collection', () => {
+    throws(() => queryUntyped('IPosts').update({ views: 1 }), /without a filter/);
   });
 });

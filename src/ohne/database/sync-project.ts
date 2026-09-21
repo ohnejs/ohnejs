@@ -16,6 +16,7 @@ import { connect } from './connect.ts';
 import { useMigrations } from './migrations/use-migrations.ts';
 import { buildDesiredSchema } from './schema/desired.ts';
 import { syncDatabase } from './schema/sync.ts';
+import { seedSingletons } from './seed-singletons.ts';
 import { useDatabase } from './use-database.ts';
 
 declare module 'ohnejs' {
@@ -28,6 +29,7 @@ declare module 'ohnejs' {
      * A clean sync that only creates or alters tables reports both empty, yet still fires.
      * `serveAPI` and `ohne sync` share the reconcile, so it fires under both.
      * A dry run commits nothing, so it does not fire there.
+     * Singleton records exist by the time it fires.
      * An action: its return is ignored, and a throw aborts the caller through the error funnel.
      */
     'schema:synced': (report: GuardReport) => void | Promise<void>;
@@ -64,6 +66,7 @@ export interface SyncProjectOptions {
  * The default content locale resolves from `Config.collections`, feeding the translatable fan-out.
  * Deletions - forced, or authorized by an applied migration - land in a warn block.
  * Orphan warnings land in another; a refusal throws through the funnel.
+ * Singleton records are seeded after the reconcile, never under `dryRun`.
  * Under `dryRun` the reconciliation rolls back and the warn blocks read in the future tense.
  * `serveAPI` runs it before `listen()`; `ohne sync` runs it standalone.
  */
@@ -104,6 +107,7 @@ export async function syncProjectDatabase(options: SyncProjectOptions = {}): Pro
       ].join('\n'),
     });
   }
+  if (!dryRun) await seedSingletons();
   const callbacks = useHooks().get('schema:synced');
   if (!dryRun && !isUndefined(callbacks) && callbacks.length > 0) {
     await applyHook('schema:synced', report);

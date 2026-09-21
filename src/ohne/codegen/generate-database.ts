@@ -251,6 +251,7 @@ function messageResolver(messages: readonly MessageMeta[]): MessageResolver {
 /**
  * Writes `shared/database.ts`, the pure type bucket holding every `Generated*` type this generator emits.
  * `GeneratedCapabilities` derives the capability names from the collection set.
+ * A singleton contributes no `create` or `delete` name, and `GeneratedSingletons` lists it.
  * `GeneratedLocales` closes the file with the configured locale set.
  * The traversals run before emission, so `importType` records its `import type` lines first.
  */
@@ -480,13 +481,26 @@ async function writeShared(
     code.line("'*': true;");
     code.line("'collection.*': true;");
     for (const collection of collections) {
+      const singleton = collection.collection.singleton === true;
       for (const operation of CAPABILITY_OPERATIONS) {
+        if (singleton && (operation === 'create' || operation === 'delete')) continue;
         code.line(`'collection.${collection.name}.${operation}': true;`);
       }
       code.line(`'collection.${collection.name}.*': true;`);
     }
   });
   code.line('}');
+  code.line();
+  const singletons = collections.filter((collection) => collection.collection.singleton === true);
+  if (singletons.length === 0) {
+    code.line('export interface GeneratedSingletons {}');
+  } else {
+    code.line('export interface GeneratedSingletons {');
+    code.indent(() => {
+      for (const { name } of singletons) code.line(`${propertyKey(name)}: true;`);
+    });
+    code.line('}');
+  }
   code.line();
   code.line('export interface GeneratedLocales {');
   code.indent(() => {
@@ -669,13 +683,14 @@ async function writeNode(
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
   code.line(
-    "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCapabilities, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedUpdates } from '../shared/database.ts';",
+    "import type { GeneratedBlockQueryFields, GeneratedBlocks, GeneratedCapabilities, GeneratedCollections, GeneratedDatabases, GeneratedInserts, GeneratedLocales, GeneratedQueryFields, GeneratedRelations, GeneratedSingletons, GeneratedUpdates } from '../shared/database.ts';",
   );
   code.line();
   code.line("declare module 'ohnejs' {");
   code.indent(() => {
     code.line('interface KnownCollections extends GeneratedCollections {}');
     code.line('interface KnownRelations extends GeneratedRelations {}');
+    code.line('interface KnownSingletons extends GeneratedSingletons {}');
     code.line('interface KnownQueryFields extends GeneratedQueryFields {}');
     code.line('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}');
     code.line('interface KnownInserts extends GeneratedInserts {}');

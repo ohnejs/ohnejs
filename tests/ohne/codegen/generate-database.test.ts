@@ -103,6 +103,8 @@ describe('generateDatabase', () => {
     ok(shared.includes('export interface GeneratedBlockInserts {}'));
     ok(shared.includes('export interface GeneratedBlockUpdates {}'));
     ok(shared.includes('export interface GeneratedDatabases {}'));
+    ok(shared.includes('export interface GeneratedSingletons {}'));
+    ok(node.includes('interface KnownSingletons extends GeneratedSingletons {}'));
     ok(node.includes('interface KnownCollections extends GeneratedCollections {}'));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}'));
@@ -405,6 +407,26 @@ describe('generateDatabase', () => {
     ok(capabilities.includes("'collection.Posts.*': true;"));
     ok(capabilities.includes("'collection.Authors.*': true;"));
     ok(node.includes('interface KnownCapabilities extends GeneratedCapabilities {}'));
+  });
+
+  it('lists a singleton in GeneratedSingletons and drops its create and delete capabilities', async () => {
+    const app = join(root, 'singletons');
+    writePackage(app, 'singletons');
+    write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
+    write(app, 'collections/Settings.ts', 'export default { singleton: true, fields: {} };\n');
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes('export interface GeneratedSingletons {\n  Settings: true;\n}'));
+    const capabilities = section(shared, 'GeneratedCapabilities');
+    ok(capabilities.includes("'collection.Settings.read': true;"));
+    ok(capabilities.includes("'collection.Settings.update': true;"));
+    ok(capabilities.includes("'collection.Settings.*': true;"));
+    ok(!capabilities.includes("'collection.Settings.create'"));
+    ok(!capabilities.includes("'collection.Settings.delete'"));
+    ok(capabilities.includes("'collection.Posts.create': true;"));
   });
 
   it('emits only the wildcard capabilities when there are no collections', async () => {

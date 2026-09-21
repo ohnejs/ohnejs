@@ -62,15 +62,15 @@ function validateFieldWhen(
   home: string,
   anchors: boolean,
 ): void {
-  if (!satisfiesInactive(field)) throw whenNeedsDefault(name, home);
+  if (!landsWithoutInput(field)) throw whenNeedsDefault(name, home);
   checkNode(when, name, ancestry, home, true, anchors);
 }
 
 /**
- * Whether a `when`-gated field can still land a value when it is inactive on a create.
+ * Whether a field lands a value when a create omits it.
  * A nullable field takes `null`; a list its empty `[]`; a defaulted field its default.
  */
-function satisfiesInactive(field: FieldQueryMeta): boolean {
+export function landsWithoutInput(field: FieldQueryMeta): boolean {
   if (field.nullable) return true;
   if (field.kind === 'records' || field.kind === 'childMany' || field.kind === 'blocks') {
     return true;

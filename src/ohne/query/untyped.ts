@@ -373,6 +373,7 @@ export interface UntypedQueryBuilder {
   /**
    * Creates one record, returning it on success or the field failures on validation error.
    * The whole write runs in one transaction; nothing persists when it returns a failure.
+   * Refused on a singleton, whose one record already exists.
    *
    * @example
    * ```ts
@@ -383,6 +384,7 @@ export interface UntypedQueryBuilder {
 
   /**
    * Creates one record and returns it, throwing an `isValidationError` error carrying the failures instead.
+   * Refused on a singleton, whose one record already exists.
    *
    * @example
    * ```ts
@@ -420,6 +422,7 @@ export interface UntypedQueryBuilder {
    * Deletes every matching record and reports how many were removed.
    * A `restrict` reference still pointing at a matched row throws an `isReferenceViolation` error.
    * Refused on a locale-scoped chain, which must not cascade-delete every locale.
+   * Refused on a singleton, whose one record must stay.
    *
    * @example
    * ```ts

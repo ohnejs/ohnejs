@@ -380,6 +380,19 @@ export interface CollectionDefinition<
   api?: boolean | CollectionAPI<keyof TFields & string>;
 
   /**
+   * Makes the collection hold exactly one record.
+   * The record is created from the field defaults right after the schema syncs.
+   * Every field must therefore be nullable or carry a `default`.
+   * A top-level reference cannot `cascade`, since deleting its target would delete the record.
+   * `create` and `delete` exist nowhere: `api` may expose `read` and `update` only.
+   * The dashboard menu row opens the record editor directly, and `findFirst` always answers the record.
+   *
+   * @default
+   * false
+   */
+  singleton?: boolean;
+
+  /**
    * Shapes the write input when a translation copies to another locale.
    * The context carries the source record, the computed default `input`, and both resolved locales.
    * The returned object replaces the default input, and the function may be async.
@@ -444,6 +457,14 @@ export interface AnyCollectionDefinition {
    * false
    */
   api?: boolean | CollectionAPI;
+
+  /**
+   * Makes the collection hold exactly one record, created from the field defaults after the schema syncs.
+   *
+   * @default
+   * false
+   */
+  singleton?: boolean;
 
   /**
    * Shapes the write input when a translation copies to another locale; omitted, the default input writes.

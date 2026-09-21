@@ -31,6 +31,7 @@ export interface DashboardMenuLink {
 /**
  * One row of a dashboard menu group.
  * A collection name renders that collection's list link, dropping when the viewer cannot reach it.
+ * A singleton's row opens its record instead of a list.
  * A `DashboardMenuLink` renders a link to any dashboard page.
  *
  * @example
