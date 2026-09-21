@@ -13,22 +13,22 @@ function matches(keywords: string[], fields: string[], record: Record<string, un
 
 describe('keywordsCondition', () => {
   it('ors each keyword over the fields and ands the keywords', () => {
-    deepStrictEqual(keywordsCondition(['ada', 'love'], ['first', 'last']), {
+    deepStrictEqual(keywordsCondition(['anduin', 'wry'], ['first', 'last']), {
       and: [
-        { or: [{ first: { contains: 'ada' } }, { last: { contains: 'ada' } }] },
-        { or: [{ first: { contains: 'love' } }, { last: { contains: 'love' } }] },
+        { or: [{ first: { contains: 'anduin' } }, { last: { contains: 'anduin' } }] },
+        { or: [{ first: { contains: 'wry' } }, { last: { contains: 'wry' } }] },
       ],
     });
   });
 
   it('holds when every keyword appears in some field', () => {
-    const ada = { first: 'Ada', last: 'Lovelace' };
-    strictEqual(matches(['ada', 'love'], ['first', 'last'], ada), true);
-    strictEqual(matches(['ada', 'turing'], ['first', 'last'], ada), false);
+    const anduin = { first: 'Anduin', last: 'Wrynn' };
+    strictEqual(matches(['anduin', 'wry'], ['first', 'last'], anduin), true);
+    strictEqual(matches(['anduin', 'arthas'], ['first', 'last'], anduin), false);
   });
 
   it('holds for every record without keywords and for none without fields', () => {
-    strictEqual(matches([], ['first'], { first: 'Ada' }), true);
-    strictEqual(matches(['ada'], [], { first: 'Ada' }), false);
+    strictEqual(matches([], ['first'], { first: 'Anduin' }), true);
+    strictEqual(matches(['anduin'], [], { first: 'Anduin' }), false);
   });
 });

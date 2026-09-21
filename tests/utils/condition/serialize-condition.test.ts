@@ -178,12 +178,12 @@ describe('serializeCondition', () => {
           kind: 'compare',
           path: ['name'],
           op: 'equalsTo',
-          value: 'Alice',
+          value: 'Azshara',
           negated: false,
         },
         negated: true,
       }),
-      { author: { not: { has: { name: 'Alice' } } } },
+      { author: { not: { has: { name: 'Azshara' } } } },
     );
   });
 

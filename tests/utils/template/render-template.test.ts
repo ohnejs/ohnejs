@@ -6,14 +6,14 @@ import { renderTemplate } from '../../../src/utils/index.ts';
 describe('renderTemplate', () => {
   it('renders every field with its literals', () => {
     strictEqual(
-      renderTemplate('{last}, {first}', { last: 'Lovelace', first: 'Ada' }),
-      'Lovelace, Ada',
+      renderTemplate('{last}, {first}', { last: 'Wrynn', first: 'Anduin' }),
+      'Wrynn, Anduin',
     );
   });
 
   it('drops a literal beside an absent field', () => {
-    strictEqual(renderTemplate('{last}, {first}', { last: 'Lovelace' }), 'Lovelace');
-    strictEqual(renderTemplate('{last}, {first}', { first: 'Ada' }), 'Ada');
+    strictEqual(renderTemplate('{last}, {first}', { last: 'Wrynn' }), 'Wrynn');
+    strictEqual(renderTemplate('{last}, {first}', { first: 'Anduin' }), 'Anduin');
   });
 
   it('drops leading and trailing literals with their fields', () => {

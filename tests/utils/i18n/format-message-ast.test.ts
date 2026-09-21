@@ -14,7 +14,7 @@ describe('formatMessageAST - literals and arguments', () => {
   });
 
   it('renders a simple argument by name', () => {
-    strictEqual(render('Hello, {name}!', { name: 'Anna' }), 'Hello, Anna!');
+    strictEqual(render('Hello, {name}!', { name: 'Jaina' }), 'Hello, Jaina!');
   });
 
   it('coerces numeric arguments to string via String()', () => {
@@ -274,9 +274,9 @@ describe('formatMessageAST - nesting', () => {
     strictEqual(
       render('{role, select, admin {Welcome, {name}!} other {Hi}}', {
         role: 'admin',
-        name: 'Anna',
+        name: 'Jaina',
       }),
-      'Welcome, Anna!',
+      'Welcome, Jaina!',
     );
   });
 
@@ -352,7 +352,7 @@ describe('formatMessageAST - onError', () => {
 
   it('does not notify on successful formats', () => {
     let count = 0;
-    formatMessageAST(parseMessage('Hello, {name}!'), { name: 'Anna' }, 'en-US', {
+    formatMessageAST(parseMessage('Hello, {name}!'), { name: 'Jaina' }, 'en-US', {
       onError: () => count++,
     });
     strictEqual(count, 0);
@@ -369,7 +369,7 @@ describe('formatMessageAST - structural sanity', () => {
   });
 
   it('does not mutate the params object', () => {
-    const params = { name: 'Anna' };
+    const params = { name: 'Jaina' };
     const snapshot = structuredClone(params);
     formatMessageAST(parseMessage('Hello, {name}!'), params, 'en-US');
     deepStrictEqual(params, snapshot);

@@ -112,10 +112,10 @@ describe('parseCondition', () => {
       condition: null,
       negated: false,
     });
-    deepStrictEqual(node({ author: { has: { name: 'Alice' } } }), {
+    deepStrictEqual(node({ author: { has: { name: 'Azshara' } } }), {
       kind: 'has',
       path: ['author'],
-      condition: compare(['name'], 'equalsTo', 'Alice'),
+      condition: compare(['name'], 'equalsTo', 'Azshara'),
       negated: false,
     });
   });

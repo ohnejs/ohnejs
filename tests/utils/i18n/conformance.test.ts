@@ -227,8 +227,8 @@ const CASES: readonly Case[] = [
   {
     name: 'apostrophe before non-syntax (s) is literal',
     template: "{who}'s book",
-    params: { who: 'Anna' },
-    expected: "Anna's book",
+    params: { who: 'Jaina' },
+    expected: "Jaina's book",
   },
   {
     name: 'apostrophe before { opens a literal span',

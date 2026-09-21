@@ -130,16 +130,16 @@ describe('evaluateCondition', () => {
   });
 
   it('nested has matches some array item', () => {
-    const items = [{ name: 'Alice' }, { name: 'Bob' }];
-    strictEqual(run({ v: { has: { name: 'Bob' } } }, { v: items }), true);
-    strictEqual(run({ v: { has: { name: 'Carol' } } }, { v: items }), false);
-    strictEqual(run({ v: { not: { has: { name: 'Carol' } } } }, { v: items }), true);
+    const items = [{ name: 'Azshara' }, { name: 'Baine' }];
+    strictEqual(run({ v: { has: { name: 'Baine' } } }, { v: items }), true);
+    strictEqual(run({ v: { has: { name: 'Cairne' } } }, { v: items }), false);
+    strictEqual(run({ v: { not: { has: { name: 'Cairne' } } } }, { v: items }), true);
   });
 
   it('nested has evaluates a non-null object directly', () => {
-    strictEqual(run({ v: { has: { name: 'Alice' } } }, { v: { name: 'Alice' } }), true);
-    strictEqual(run({ v: { has: { name: 'Alice' } } }, { v: 5 }), false);
-    strictEqual(run({ v: { has: { name: 'Alice' } } }, { v: null }), false);
+    strictEqual(run({ v: { has: { name: 'Azshara' } } }, { v: { name: 'Azshara' } }), true);
+    strictEqual(run({ v: { has: { name: 'Azshara' } } }, { v: 5 }), false);
+    strictEqual(run({ v: { has: { name: 'Azshara' } } }, { v: null }), false);
   });
 
   it('nested has paths descend by plain own properties', () => {
