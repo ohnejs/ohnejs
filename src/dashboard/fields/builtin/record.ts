@@ -13,11 +13,13 @@ import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
+import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
 import { api } from '../../runtime/api.ts';
 import { useT } from '../../runtime/use-t.ts';
+import { loadVerdicts } from '../../runtime/verdicts.ts';
 import { button } from '../../ui/button.ts';
 import { dynamicSelect } from '../../ui/dynamic-select.ts';
 import { icon } from '../../ui/icon.ts';
@@ -262,10 +264,19 @@ export const recordType: FieldType = {
           change();
         },
       });
-      const canUpdate = target.operations.update?.allowed === true;
+      const updatable = ref<ReadonlySet<string>>(new Set());
+      effect(() => {
+        const uuid = current();
+        if (isNull(uuid)) return;
+        void loadVerdicts(target, [uuid]).then((verdicts) => {
+          // A slower answer for a replaced value must not overwrite the current one's.
+          if (untracked(current) === uuid) updatable.value = verdicts.update;
+        });
+      });
       element = h('div', { class: 'ohne-row' }, picker?.trigger, select, picker?.host, () => {
         const value = current();
         if (isNull(value)) return null;
+        const canUpdate = updatable.value.has(value);
         const open = button(icon(canUpdate ? 'pencil' : 'list-search'), {
           variant: 'outline',
           href: `/collections/${target.segment}/${value}`,
