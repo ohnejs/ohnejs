@@ -72,8 +72,8 @@ const A = (n: number): string => id('a', n);
 const T = (n: number): string => id('b', n);
 const P = (n: number): string => id('c', n);
 
-await author(A(1), 'Ada');
-await author(A(2), 'Alan');
+await author(A(1), 'Anduin');
+await author(A(2), 'Arthas');
 await tag(T(1), 'red');
 await post(P(1), 'First', 100, A(1));
 await post(P(2), 'Second', 50, null);
@@ -169,7 +169,7 @@ describe('fluent where lowers to the object grammar', () => {
 describe('fluent has re-scopes to the relation target', () => {
   it('a conditioned has probes the target row', async () => {
     deepStrictEqual(
-      await titles(posts().where('author', (w) => w.has((q) => q.where('name', 'Ada')))),
+      await titles(posts().where('author', (w) => w.has((q) => q.where('name', 'Anduin')))),
       ['First', 'Fourth'],
     );
   });
@@ -190,7 +190,7 @@ describe('fluent has re-scopes to the relation target', () => {
     deepStrictEqual(
       await titles(
         posts().where('author', (w) =>
-          w.has((q) => q.whereAny((g) => [g.where('name', 'Ada'), g.where('name', 'Alan')])),
+          w.has((q) => q.whereAny((g) => [g.where('name', 'Anduin'), g.where('name', 'Arthas')])),
         ),
       ),
       ['First', 'Fourth', 'Third'],

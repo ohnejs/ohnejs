@@ -52,7 +52,7 @@ describe('freezeIR deep-freezes the condition tree and order entries', () => {
   const has: ConditionNode = {
     kind: 'has',
     path: ['author'],
-    condition: { kind: 'compare', path: ['name'], op: 'equalsTo', value: 'Ada', negated: false },
+    condition: { kind: 'compare', path: ['name'], op: 'equalsTo', value: 'Anduin', negated: false },
     negated: false,
   };
   const ir = freezeIR({

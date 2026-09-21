@@ -105,8 +105,8 @@ async function item(uuid: string, parent: string, pos: number, label: string): P
   );
 }
 
-await author(A(1), 'Ada');
-await author(A(2), 'Alan');
+await author(A(1), 'Anduin');
+await author(A(2), 'Arthas');
 await tag(T(1), 'red');
 await tag(T(2), 'green');
 await tag(T(3), 'blue');
@@ -145,14 +145,14 @@ describe('record conditions', () => {
   });
 
   it('a conditioned has filters the target', async () => {
-    deepStrictEqual(await titles(posts().where({ author: { has: { name: 'Ada' } } })), [
+    deepStrictEqual(await titles(posts().where({ author: { has: { name: 'Anduin' } } })), [
       'First',
       'Fourth',
     ]);
   });
 
   it('a negated has keeps the rows the relation does not reach, null included', async () => {
-    deepStrictEqual(await titles(posts().where({ author: { not: { has: { name: 'Ada' } } } })), [
+    deepStrictEqual(await titles(posts().where({ author: { not: { has: { name: 'Anduin' } } } })), [
       'Second',
       'Third',
     ]);
@@ -210,7 +210,7 @@ describe('composite conditions', () => {
 describe('has composes with the rest of the where', () => {
   it('ANDs with sibling scalar conditions', async () => {
     deepStrictEqual(
-      await titles(posts().where({ views: { atLeast: 100 }, author: { has: { name: 'Ada' } } })),
+      await titles(posts().where({ views: { atLeast: 100 }, author: { has: { name: 'Anduin' } } })),
       ['First'],
     );
   });
@@ -230,7 +230,7 @@ describe('whereAny', () => {
     deepStrictEqual(
       await titles(
         posts().whereAny((q) => [
-          q.where({ views: 100 }).where({ author: { has: { name: 'Ada' } } }),
+          q.where({ views: 100 }).where({ author: { has: { name: 'Anduin' } } }),
         ]),
       ),
       ['First'],
@@ -241,7 +241,7 @@ describe('whereAny', () => {
     deepStrictEqual(
       await titles(
         posts().whereAny((q) => [
-          q.where({ author: { has: { name: 'Alan' } } }),
+          q.where({ author: { has: { name: 'Arthas' } } }),
           q.where({ views: { atLeast: 100 } }),
         ]),
       ),
@@ -267,8 +267,8 @@ describe('whereAny', () => {
         posts()
           .where({ views: { atLeast: 100 } })
           .whereAny((q) => [
-            q.where({ author: { has: { name: 'Ada' } } }),
-            q.where({ author: { has: { name: 'Alan' } } }),
+            q.where({ author: { has: { name: 'Anduin' } } }),
+            q.where({ author: { has: { name: 'Arthas' } } }),
           ]),
       ),
       ['First', 'Third'],

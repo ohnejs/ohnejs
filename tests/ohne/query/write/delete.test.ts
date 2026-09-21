@@ -42,7 +42,11 @@ registerDatabase(db);
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
-await db.run('INSERT INTO "DAuthor" ("UUID","_updatedAt","name") VALUES (?,?,?)', ['a1', 1, 'Ada']);
+await db.run('INSERT INTO "DAuthor" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  'a1',
+  1,
+  'Anduin',
+]);
 await db.run('INSERT INTO "DTag" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t1', 1, 'A']);
 
 let counter = 0;
@@ -118,7 +122,7 @@ describe('runDelete', () => {
     await db.run('INSERT INTO "DAuthor" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
       'a2',
       1,
-      'Lin',
+      'Liadrin',
     ]);
     await seedPost({ author: 'a2' });
     await rejects(() => runDelete('DAuthor', uuidIs('a2')), isReferenceViolation);

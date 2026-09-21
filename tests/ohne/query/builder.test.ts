@@ -127,8 +127,8 @@ describe('the collector lowers every blocks has form onto one grammar', () => {
 
   it('keeps the callback-only form', () => {
     deepStrictEqual(
-      lowerField('author', (w: Ops) => w.has((q) => q.where('name', 'Ada'))),
-      { author: { has: { name: 'Ada' } } },
+      lowerField('author', (w: Ops) => w.has((q) => q.where('name', 'Anduin'))),
+      { author: { has: { name: 'Anduin' } } },
     );
   });
 });
@@ -332,7 +332,7 @@ export async function reads(): Promise<void> {
   await query('Posts').where('title', (c) => c.contains('oh')).findMany();
   await query('Posts').where('title', (c) => c.not.equalsTo('x')).findMany();
   await query('Posts').where('summary', (c) => c.isNull()).findMany();
-  await query('Posts').where('author', (c) => c.has((q) => q.where('name', 'Ada'))).findMany();
+  await query('Posts').where('author', (c) => c.has((q) => q.where('name', 'Anduin'))).findMany();
   await query('Posts').where('author', (c) => c.has()).findMany();
   await query('Posts').where('tags', (c) => c.empty()).findMany();
   await query('Posts')

@@ -98,19 +98,19 @@ await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
-const alan = '00000000-0000-7000-8000-00000000000a';
-const ada = '00000000-0000-7000-8000-00000000000b';
+const arthas = '00000000-0000-7000-8000-00000000000a';
+const anduin = '00000000-0000-7000-8000-00000000000b';
 await db.run('INSERT INTO "MAuthors" ("UUID","_updatedAt","name","boss") VALUES (?,?,?,?)', [
-  alan,
+  arthas,
   0,
-  'Alan',
+  'Arthas',
   null,
 ]);
 await db.run('INSERT INTO "MAuthors" ("UUID","_updatedAt","name","boss") VALUES (?,?,?,?)', [
-  ada,
+  anduin,
   0,
-  'Ada',
-  alan,
+  'Anduin',
+  arthas,
 ]);
 
 let seq = 0;
@@ -129,9 +129,9 @@ async function insert(
   );
 }
 
-await insert('Alpha', 100, true, 'first', ada);
-await insert('Beta', 50, false, null, alan);
-await insert('Gamma', 100, true, 'third', ada);
+await insert('Alpha', 100, true, 'first', anduin);
+await insert('Beta', 50, false, null, arthas);
+await insert('Gamma', 100, true, 'third', anduin);
 await insert('Delta', 200, false, 'fourth');
 
 await queryUntyped('MPages').createOrThrow({

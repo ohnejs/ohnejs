@@ -78,10 +78,10 @@ async function translateDE(uuid: string, input: Record<string, unknown>): Promis
   await queryUntyped('LPosts').locale('de').where({ UUID: uuid }).updateOrThrow(input);
 }
 
-const ada = await create('LAuthors', { name: 'Ada', handle: 'ada' });
-const alan = await create('LAuthors', { name: 'Alan', handle: 'alan' });
-await queryUntyped('LAuthors').locale('de').where({ UUID: ada }).updateOrThrow({
-  name: 'Ada (de)',
+const anduin = await create('LAuthors', { name: 'Anduin', handle: 'anduin' });
+const arthas = await create('LAuthors', { name: 'Arthas', handle: 'arthas' });
+await queryUntyped('LAuthors').locale('de').where({ UUID: anduin }).updateOrThrow({
+  name: 'Anduin (de)',
 });
 
 const red = await create('LTags', { label: 'red' });
@@ -92,18 +92,18 @@ const first = await create('LPosts', {
   title: 'First',
   subtitle: 'intro',
   views: 100,
-  author: ada,
+  author: anduin,
   tags: [red, green],
-  reviewers: [ada, alan],
+  reviewers: [anduin, arthas],
   meta: { note: 'note-en' },
   sections: [{ heading: 'S1' }, { heading: 'S2' }],
 });
 await translateDE(first, {
   title: 'Erste',
   subtitle: 'einfuehrung',
-  author: alan,
+  author: arthas,
   tags: [green, blue],
-  reviewers: [ada],
+  reviewers: [anduin],
   meta: { note: 'note-de' },
   sections: [{ heading: 'DE-S1' }],
 });
@@ -111,7 +111,7 @@ await translateDE(first, {
 const second = await create('LPosts', {
   title: 'Second',
   views: 50,
-  author: alan,
+  author: arthas,
   tags: [red],
 });
 
@@ -123,7 +123,7 @@ const third = await create('LPosts', {
 await translateDE(third, {
   title: 'Dritte',
   subtitle: null,
-  author: ada,
+  author: anduin,
   tags: [red],
 });
 
@@ -139,9 +139,9 @@ describe('locale views', () => {
     const unlocaled = await posts().where({ UUID: first }).findFirst();
     strictEqual(unlocaled?.title, 'First');
     strictEqual(unlocaled.subtitle, 'intro');
-    strictEqual(unlocaled.author, ada);
+    strictEqual(unlocaled.author, anduin);
     deepStrictEqual(unlocaled.tags, [red, green]);
-    deepStrictEqual(unlocaled.reviewers, [ada, alan]);
+    deepStrictEqual(unlocaled.reviewers, [anduin, arthas]);
     strictEqual((unlocaled.meta as { note: string }).note, 'note-en');
     deepStrictEqual(
       (unlocaled.sections as { heading: string }[]).map((section) => section.heading),
@@ -156,9 +156,9 @@ describe('locale views', () => {
     strictEqual(record?.title, 'Erste');
     strictEqual(record.subtitle, 'einfuehrung');
     strictEqual(record.views, 100);
-    strictEqual(record.author, alan);
+    strictEqual(record.author, arthas);
     deepStrictEqual(record.tags, [green, blue]);
-    deepStrictEqual(record.reviewers, [ada]);
+    deepStrictEqual(record.reviewers, [anduin]);
     strictEqual((record.meta as { note: string }).note, 'note-de');
     deepStrictEqual(
       (record.sections as { heading: string }[]).map((section) => section.heading),
@@ -245,13 +245,13 @@ describe('pluck per locale', () => {
   });
 
   it('plucks a translatable record foreign key at the effective locale', async () => {
-    deepStrictEqual(await posts().orderBy('views').pluck('author'), [alan, ada, null]);
-    deepStrictEqual(await de().orderBy('views').pluck('author'), [null, alan, ada]);
+    deepStrictEqual(await posts().orderBy('views').pluck('author'), [arthas, anduin, null]);
+    deepStrictEqual(await de().orderBy('views').pluck('author'), [null, arthas, anduin]);
   });
 
   it('plucks a populated relation hydrated at the query locale', async () => {
     const [author] = await de().where({ UUID: third }).populate('author').pluck('author');
-    strictEqual((author as { name: string }).name, 'Ada (de)');
+    strictEqual((author as { name: string }).name, 'Anduin (de)');
   });
 });
 
@@ -271,10 +271,10 @@ describe('populate per locale', () => {
   it('swaps a record foreign key for the target read at the query locale', async () => {
     const en = await posts().where({ UUID: first }).populate('author').findFirst();
     ok(en);
-    strictEqual((en.author as { name: string }).name, 'Ada');
+    strictEqual((en.author as { name: string }).name, 'Anduin');
     const record = await de().where({ UUID: third }).populate('author').findFirst();
     ok(record);
-    strictEqual((record.author as { name: string }).name, 'Ada (de)');
+    strictEqual((record.author as { name: string }).name, 'Anduin (de)');
   });
 
   it('reads a populated untranslated target with its translatable fields null', async () => {
@@ -285,9 +285,9 @@ describe('populate per locale', () => {
       name: string | null;
       handle: string;
     };
-    strictEqual(author.UUID, alan);
+    strictEqual(author.UUID, arthas);
     strictEqual(author.name, null);
-    strictEqual(author.handle, 'alan');
+    strictEqual(author.handle, 'arthas');
   });
 
   it('swaps a records list for targets read at the query locale', async () => {
@@ -295,23 +295,23 @@ describe('populate per locale', () => {
     ok(en);
     deepStrictEqual(
       (en.reviewers as { name: string }[]).map((reviewer) => reviewer.name),
-      ['Ada', 'Alan'],
+      ['Anduin', 'Arthas'],
     );
     const record = await de().where({ UUID: first }).populate('reviewers').findFirst();
     ok(record);
     const reviewers = record.reviewers as { UUID: string; name: string }[];
     deepStrictEqual(
       reviewers.map((reviewer) => [reviewer.UUID, reviewer.name]),
-      [[ada, 'Ada (de)']],
+      [[anduin, 'Anduin (de)']],
     );
   });
 });
 
 describe('has per locale', () => {
   it("matches a condition on the target's translatable field per locale", async () => {
-    deepStrictEqual(await uuids(posts().where({ author: { has: { name: 'Ada' } } })), [first]);
-    deepStrictEqual(await uuids(de().where({ author: { has: { name: 'Ada (de)' } } })), [third]);
-    deepStrictEqual(await uuids(de().where({ author: { has: { name: 'Ada' } } })), []);
+    deepStrictEqual(await uuids(posts().where({ author: { has: { name: 'Anduin' } } })), [first]);
+    deepStrictEqual(await uuids(de().where({ author: { has: { name: 'Anduin (de)' } } })), [third]);
+    deepStrictEqual(await uuids(de().where({ author: { has: { name: 'Anduin' } } })), []);
   });
 
   it("respects the locale's links over a locale-scoped junction", async () => {

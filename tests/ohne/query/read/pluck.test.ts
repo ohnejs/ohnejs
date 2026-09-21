@@ -61,7 +61,7 @@ const id = (kind: string, n: number): string =>
 await db.run('INSERT INTO "KAuthors" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
   id('a', 1),
   0,
-  'Ada',
+  'Anduin',
 ]);
 await db.run('INSERT INTO "KTags" ("UUID","_updatedAt","label") VALUES (?,?,?)', [
   id('b', 1),
@@ -145,7 +145,7 @@ describe('pluck', () => {
   it('populates a plucked relation through the loader path', async () => {
     deepStrictEqual(
       await queryUntyped('KPosts').where({ title: 'Alpha' }).populate('author').pluck('author'),
-      [{ UUID: id('a', 1), _updatedAt: 0, name: 'Ada' }],
+      [{ UUID: id('a', 1), _updatedAt: 0, name: 'Anduin' }],
     );
   });
 });

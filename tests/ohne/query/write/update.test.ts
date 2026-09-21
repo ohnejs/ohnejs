@@ -106,8 +106,16 @@ registerDatabase(db);
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
-await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', ['u1', 1, 'Ada']);
-await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', ['u2', 1, 'Lin']);
+await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  'u1',
+  1,
+  'Anduin',
+]);
+await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  'u2',
+  1,
+  'Liadrin',
+]);
 for (const [uuid, label] of [
   ['t1', 'A'],
   ['t2', 'B'],

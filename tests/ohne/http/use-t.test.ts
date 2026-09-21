@@ -68,7 +68,7 @@ describe('useT', () => {
   it('formats a message in the negotiated language', async () => {
     await setup({ en: { greeting: 'Hi {name}' }, de: { greeting: 'Hallo {name}' } });
     runWithEvent(makeEvent('de'), () => {
-      strictEqual(useT()('greeting', { name: 'Mo' }), 'Hallo Mo');
+      strictEqual(useT()('greeting', { name: 'Medivh' }), 'Hallo Medivh');
     });
   });
 
@@ -100,7 +100,7 @@ describe('useT', () => {
   it('prefers context.locale over Accept-Language', async () => {
     await setup({ en: { greeting: 'Hi {name}' }, de: { greeting: 'Hallo {name}' } });
     runWithEvent(makeEvent('en', 'de'), () => {
-      strictEqual(useT()('greeting', { name: 'Mo' }), 'Hallo Mo');
+      strictEqual(useT()('greeting', { name: 'Medivh' }), 'Hallo Medivh');
     });
   });
 
@@ -122,7 +122,7 @@ describe('useT', () => {
  */
 export function assertMessageTypes(): void {
   const t = useT();
-  t('greeting', { name: 'Mo' });
+  t('greeting', { name: 'Medivh' });
   t('plain');
   // @ts-expect-error - unknown key
   t('unknown.key');

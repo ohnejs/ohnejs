@@ -215,7 +215,7 @@ describe('applyTableDiff', () => {
       ],
     });
     await apply(db, [], [users, posts]);
-    await db.run('INSERT INTO "Users" ("UUID", "name") VALUES (?, ?)', ['u1', 'ada']);
+    await db.run('INSERT INTO "Users" ("UUID", "name") VALUES (?, ?)', ['u1', 'anduin']);
     await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'u1']);
     const rebuilt = table('Users', {
       columns: [UUID, { name: 'name', type: 'text', notNull: true }],

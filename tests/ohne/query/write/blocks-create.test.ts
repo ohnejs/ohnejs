@@ -100,7 +100,7 @@ await syncDatabase(db, dialect, {
 await db.run('INSERT INTO "BCAuthors" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
   'a1',
   1,
-  'Ada',
+  'Anduin',
 ]);
 await db.run('INSERT INTO "BCTags" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t1', 1, 'A']);
 await db.run('INSERT INTO "BCTags" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t2', 1, 'B']);

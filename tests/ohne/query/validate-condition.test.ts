@@ -151,13 +151,13 @@ describe('validateCondition gates a blocks has behind its discriminator', () => 
   it('re-scopes a nested has on a record inside the block to its target collection', () => {
     doesNotThrow(() =>
       queryUntyped('VPosts').where({
-        content: { has: { block: 'VHero', author: { has: { name: 'Alice' } } } },
+        content: { has: { block: 'VHero', author: { has: { name: 'Azshara' } } } },
       }),
     );
     throws(
       () =>
         queryUntyped('VPosts').where({
-          content: { has: { block: 'VHero', author: { has: { nam: 'Alice' } } } },
+          content: { has: { block: 'VHero', author: { has: { nam: 'Azshara' } } } },
         }),
       blockError(/Unknown field `nam` on `VUsers`/, /Did you mean `name`\?/),
     );

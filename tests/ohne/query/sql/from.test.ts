@@ -86,7 +86,7 @@ describe('compileFrom', () => {
     deepStrictEqual(
       compileFrom(
         posts,
-        { condition: condition({ author: { has: { name: 'Ada' } } }) },
+        { condition: condition({ author: { has: { name: 'Anduin' } } }) },
         'de',
         dialect,
       ),

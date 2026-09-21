@@ -187,8 +187,8 @@ async function card(
   );
 }
 
-await author(A(1), 'Ada');
-await author(A(2), 'Alan');
+await author(A(1), 'Anduin');
+await author(A(2), 'Arthas');
 await tag(T(1), 'red');
 await tag(T(2), 'green');
 await tag(T(3), 'blue');
@@ -281,12 +281,12 @@ describe('junction order', () => {
 describe('populate', () => {
   it('swaps a record foreign key for the full target, or null', async () => {
     const rows = await queryUntyped('HPosts').populate('author').orderBy('title').findMany();
-    deepStrictEqual(rows[0]?.author, { UUID: A(1), _updatedAt: TS, name: 'Ada' });
+    deepStrictEqual(rows[0]?.author, { UUID: A(1), _updatedAt: TS, name: 'Anduin' });
     deepStrictEqual(rows.find((row) => row.title === 'Second')?.author, null);
     deepStrictEqual(rows.find((row) => row.title === 'Third')?.author, {
       UUID: A(2),
       _updatedAt: TS,
-      name: 'Alan',
+      name: 'Arthas',
     });
   });
 

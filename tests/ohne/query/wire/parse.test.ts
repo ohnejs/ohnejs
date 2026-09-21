@@ -188,8 +188,8 @@ describe('parseQueryParams reads a query chain off a URL', () => {
   });
 
   it('accepts a has into a relation', () => {
-    deepStrictEqual(parse('where={author:{has:{name:Alice}}}').where, {
-      author: { has: { name: 'Alice' } },
+    deepStrictEqual(parse('where={author:{has:{name:Azshara}}}').where, {
+      author: { has: { name: 'Azshara' } },
     });
   });
 });
@@ -213,9 +213,12 @@ describe('parseQueryParams accepts the blocks grammar', () => {
   });
 
   it('accepts a nested has on a record inside the block scope', () => {
-    deepStrictEqual(parse('where={content:{has:{block:WHero,author:{has:{name:Alice}}}}}').where, {
-      content: { has: { block: 'WHero', author: { has: { name: 'Alice' } } } },
-    });
+    deepStrictEqual(
+      parse('where={content:{has:{block:WHero,author:{has:{name:Azshara}}}}}').where,
+      {
+        content: { has: { block: 'WHero', author: { has: { name: 'Azshara' } } } },
+      },
+    );
   });
 
   it('accepts a blocks tower, each level discriminated', () => {

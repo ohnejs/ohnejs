@@ -45,7 +45,11 @@ registerDatabase(db);
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
-await db.run('INSERT INTO "LCUsers" ("UUID","_updatedAt","name") VALUES (?,?,?)', ['u1', 1, 'Ada']);
+await db.run('INSERT INTO "LCUsers" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  'u1',
+  1,
+  'Anduin',
+]);
 await db.run('INSERT INTO "LCTags" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t1', 1, 'A']);
 await db.run('INSERT INTO "LCTags" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t2', 1, 'B']);
 

@@ -295,7 +295,7 @@ describe('executeMigrations', () => {
       columns: [UUID, { name: 'handle', type: 'text', notNull: false }],
     });
     await materialize(db, [posts, authors]);
-    await db.run('INSERT INTO "Authors" ("UUID", "handle") VALUES (?, ?)', ['u1', 'ada']);
+    await db.run('INSERT INTO "Authors" ("UUID", "handle") VALUES (?, ?)', ['u1', 'anduin']);
     await db.run('INSERT INTO "Posts" ("UUID", "author", "pinned") VALUES (?, ?, ?)', [
       'a',
       'u1',
@@ -325,7 +325,7 @@ describe('executeMigrations', () => {
     const rows = await db.query<{ authorHandle: string }>('SELECT "authorHandle" FROM "Posts"');
     deepStrictEqual(
       rows.map((row) => row.authorHandle),
-      ['ada'],
+      ['anduin'],
     );
     await db.close();
   });

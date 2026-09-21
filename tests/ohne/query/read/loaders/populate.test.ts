@@ -101,23 +101,23 @@ async function create(collection: string, input: Record<string, unknown>): Promi
   return record.UUID as string;
 }
 
-const ada = await create('PAuthors', { name: 'Ada', email: 'ada@ohne.dev' });
-const alan = await create('PAuthors', { name: 'Alan', email: 'alan@ohne.dev' });
-await queryUntyped('PAuthors').locale('de').where({ UUID: ada }).updateOrThrow({
-  name: 'Ada (de)',
+const anduin = await create('PAuthors', { name: 'Anduin', email: 'anduin@ohne.dev' });
+const arthas = await create('PAuthors', { name: 'Arthas', email: 'arthas@ohne.dev' });
+await queryUntyped('PAuthors').locale('de').where({ UUID: anduin }).updateOrThrow({
+  name: 'Anduin (de)',
 });
 
-const c1 = await create('PComments', { text: 'c1', author: ada });
-const c2 = await create('PComments', { text: 'c2', author: alan });
+const c1 = await create('PComments', { text: 'c1', author: anduin });
+const c2 = await create('PComments', { text: 'c2', author: arthas });
 const c3 = await create('PComments', { text: 'c3' });
 
 const p1 = await create('PPosts', {
   title: 'First',
-  author: ada,
-  editor: ada,
+  author: anduin,
+  editor: anduin,
   comments: [c1, c2, c3],
 });
-await create('PPosts', { title: 'Second', author: ada, editor: alan, comments: [c2] });
+await create('PPosts', { title: 'Second', author: anduin, editor: arthas, comments: [c2] });
 
 const posts = (): ReturnType<typeof queryUntyped> => queryUntyped('PPosts');
 const first = (): ReturnType<typeof queryUntyped> => posts().where({ UUID: p1 });
@@ -127,14 +127,14 @@ describe('subselect exactness', () => {
     const record = await first()
       .populate('author', (a) => a.select('name'))
       .findFirst();
-    deepStrictEqual(record?.author, { name: 'Ada' });
+    deepStrictEqual(record?.author, { name: 'Anduin' });
   });
 
   it('returns UUID and _updatedAt only when named', async () => {
     const record = await first()
       .populate('author', (a) => a.select('UUID', 'name'))
       .findFirst();
-    deepStrictEqual(record?.author, { UUID: ada, name: 'Ada' });
+    deepStrictEqual(record?.author, { UUID: anduin, name: 'Anduin' });
 
     const stamped = await first()
       .populate('author', (a) => a.select('_updatedAt'))
@@ -162,8 +162,8 @@ describe('deep population', () => {
     deepStrictEqual(record, {
       title: 'First',
       comments: [
-        { text: 'c1', author: { name: 'Ada' } },
-        { text: 'c2', author: { name: 'Alan' } },
+        { text: 'c1', author: { name: 'Anduin' } },
+        { text: 'c2', author: { name: 'Arthas' } },
         { text: 'c3', author: null },
       ],
     });
@@ -176,7 +176,7 @@ describe('deep population', () => {
     const comments = record?.comments as Record<string, unknown>[];
     strictEqual(comments[0]?.UUID, c1);
     const author = comments[0]?.author as Record<string, unknown> | undefined;
-    deepStrictEqual(author?.email, 'ada@ohne.dev');
+    deepStrictEqual(author?.email, 'anduin@ohne.dev');
   });
 
   it('drops a populated child the subselect does not name', async () => {
@@ -194,7 +194,7 @@ describe('deep population', () => {
       )
       .findFirst();
     deepStrictEqual(record?.comments, [
-      { text: 'c1', author: { name: 'Ada (de)' } },
+      { text: 'c1', author: { name: 'Anduin (de)' } },
       { text: 'c2', author: { name: null } },
       { text: 'c3', author: null },
     ]);
@@ -248,7 +248,7 @@ describe('duplicate rejection', () => {
   it('dedups a bare repeat of a bare populate', async () => {
     const record = await first().populate('author').populate('author').findFirst();
     const author = record?.author as Record<string, unknown> | undefined;
-    deepStrictEqual(author?.name, 'Ada');
+    deepStrictEqual(author?.name, 'Anduin');
   });
 
   it('rejects a repeat involving a spec', () => {
@@ -330,7 +330,7 @@ describe('populate:targets', () => {
     const seen = new Map<string, PopulateNode>();
     hook('populate:targets', (targets, context) => {
       seen.set(context.collection, context.node);
-      if (context.collection === 'PAuthors') return targets.filter((t) => t.UUID !== ada);
+      if (context.collection === 'PAuthors') return targets.filter((t) => t.UUID !== anduin);
       if (context.collection === 'PComments') return targets.filter((t) => t.UUID !== c2);
       return targets;
     });
@@ -356,7 +356,7 @@ describe('pluck through a populate node', () => {
   });
 });
 
-const vault = await create('PVault', { label: 'v1', owner: ada, links: [c1, c2] });
+const vault = await create('PVault', { label: 'v1', owner: anduin, links: [c1, c2] });
 await create('PDeep', { note: 'n1', vault });
 
 describe('populating a hidden relation', () => {
@@ -372,7 +372,7 @@ describe('populating a hidden relation', () => {
       .populate('links', (l) => l.select('text'))
       .findFirst();
     const owner = record?.owner as { email?: string } | undefined;
-    strictEqual(owner?.email, 'ada@ohne.dev');
+    strictEqual(owner?.email, 'anduin@ohne.dev');
     deepStrictEqual(record?.links, [{ text: 'c1' }, { text: 'c2' }]);
   });
 
@@ -381,7 +381,7 @@ describe('populating a hidden relation', () => {
       .populate('vault', (v) => v.populate('owner'))
       .findFirst();
     const nested = record?.vault as { owner?: { email?: string }; links?: unknown };
-    strictEqual(nested.owner?.email, 'ada@ohne.dev');
+    strictEqual(nested.owner?.email, 'anduin@ohne.dev');
     strictEqual('links' in nested, false);
   });
 });

@@ -291,9 +291,9 @@ describe('compileWhere relational', () => {
   });
 
   it('a conditioned `record` has probes the target row through a correlated EXISTS', () => {
-    deepStrictEqual(compile({ author: { has: { name: 'Ada' } } }), {
+    deepStrictEqual(compile({ author: { has: { name: 'Anduin' } } }), {
       sql: 'EXISTS (SELECT 1 FROM "WAuthors" "_sub0" WHERE "_sub0"."UUID" = "WPosts"."author" AND "_sub0"."name" = ?)',
-      params: ['Ada'],
+      params: ['Anduin'],
     });
   });
 
@@ -352,9 +352,9 @@ describe('compileWhere relational', () => {
   });
 
   it('negation wraps the relational fragment, double-negating an `empty`', () => {
-    deepStrictEqual(compile({ author: { not: { has: { name: 'Ada' } } } }), {
+    deepStrictEqual(compile({ author: { not: { has: { name: 'Anduin' } } } }), {
       sql: 'NOT (EXISTS (SELECT 1 FROM "WAuthors" "_sub0" WHERE "_sub0"."UUID" = "WPosts"."author" AND "_sub0"."name" = ?))',
-      params: ['Ada'],
+      params: ['Anduin'],
     });
     deepStrictEqual(compile({ tags: { not: { empty: true } } }), {
       sql: 'NOT (NOT EXISTS (SELECT 1 FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_parentUUID" = "WPosts"."UUID"))',
@@ -387,9 +387,9 @@ describe('compileWhere companion columns', () => {
   });
 
   it('a conditioned companion `record` has correlates the foreign key through the companion', () => {
-    deepStrictEqual(compileTranslatable({ author: { has: { name: 'Ada' } } }), {
+    deepStrictEqual(compileTranslatable({ author: { has: { name: 'Anduin' } } }), {
       sql: 'EXISTS (SELECT 1 FROM "WAuthors" "_sub0" WHERE "_sub0"."UUID" = "WLPosts__translations"."author" AND "_sub0"."name" = ?)',
-      params: ['Ada'],
+      params: ['Anduin'],
     });
   });
 
@@ -584,11 +584,11 @@ describe('compileWhere blocks', () => {
   it('a record subfield has re-scopes to its target collection with a fresh alias', () => {
     deepStrictEqual(
       compileOn('WBPages', {
-        content: { has: { block: 'WBHero', author: { has: { name: 'Ada' } } } },
+        content: { has: { block: 'WBHero', author: { has: { name: 'Anduin' } } } },
       }),
       {
         sql: 'EXISTS (SELECT 1 FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_parentUUID" = "WBPages"."UUID" AND "_sub0"."_blockType" = ? AND EXISTS (SELECT 1 FROM "WAuthors" "_sub2" WHERE "_sub2"."UUID" = "_sub1"."author" AND "_sub2"."name" = ?))',
-        params: ['WBHero', 'Ada'],
+        params: ['WBHero', 'Anduin'],
       },
     );
   });

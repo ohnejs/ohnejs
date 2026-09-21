@@ -69,17 +69,23 @@ await syncDatabase(db, dialect, {
 });
 
 const authors = queryUntyped('WrAuthors');
-const ada = (await authors.createOrThrow({ name: 'Ada', secret: 's1', active: true }))
+const anduin = (await authors.createOrThrow({ name: 'Anduin', secret: 's1', active: true }))
   .UUID as string;
-const bob = (await authors.createOrThrow({ name: 'Bob', secret: 's2', active: false, boss: ada }))
-  .UUID as string;
-const cy = (await authors.createOrThrow({ name: 'Cy', secret: 's3', active: true, boss: bob }))
-  .UUID as string;
+const baine = (
+  await authors.createOrThrow({ name: 'Baine', secret: 's2', active: false, boss: anduin })
+).UUID as string;
+const chen = (
+  await authors.createOrThrow({ name: 'Chen', secret: 's3', active: true, boss: baine })
+).UUID as string;
 const news = (await queryUntyped('WrTags').createOrThrow({ label: 'news' })).UUID as string;
 const misc = (await queryUntyped('WrTags').createOrThrow({ label: 'misc' })).UUID as string;
-await queryUntyped('WrPosts').createOrThrow({ title: 'By Ada', author: ada, tags: [news] });
-await queryUntyped('WrPosts').createOrThrow({ title: 'By Bob', author: bob, tags: [news, misc] });
-await queryUntyped('WrPosts').createOrThrow({ title: 'By Cy', author: cy, tags: [misc] });
+await queryUntyped('WrPosts').createOrThrow({ title: 'By Anduin', author: anduin, tags: [news] });
+await queryUntyped('WrPosts').createOrThrow({
+  title: 'By Baine',
+  author: baine,
+  tags: [news, misc],
+});
+await queryUntyped('WrPosts').createOrThrow({ title: 'By Chen', author: chen, tags: [misc] });
 const noteA = (await queryUntyped('WrNotes').createOrThrow({ title: 'Note', views: 1 })).UUID;
 await queryUntyped('WrNotes').createOrThrow({ title: 'Other', views: 2 });
 
@@ -124,7 +130,7 @@ describe('parseWireQuery resolves the reach of every crossed collection', () => 
     const parsed = await parseWireQuery(
       {
         populate: ['author', { tags: { select: ['label'] } }],
-        where: { author: { has: { name: 'Ada' } } },
+        where: { author: { has: { name: 'Anduin' } } },
       },
       meta,
       guards,
@@ -158,7 +164,7 @@ describe('parseWireQuery resolves the reach of every crossed collection', () => 
     );
     await rejects(
       parseWireQuery(
-        { where: { author: { has: { name: 'Ada' } } } },
+        { where: { author: { has: { name: 'Anduin' } } } },
         meta,
         guards,
         resolver({ WrAuthors: false }).resolve,
@@ -232,18 +238,18 @@ describe('a wire read composes under its reach', () => {
     );
     deepStrictEqual(
       rows.map((row) => row.author),
-      [{ name: 'Ada' }, null, { name: 'Cy' }],
+      [{ name: 'Anduin' }, null, { name: 'Chen' }],
     );
   });
 
   it('keeps a reach condition whole when it probes a relation itself', async () => {
     const rows = await read(
       { populate: ['author'] },
-      { WrAuthors: { where: { boss: { has: { name: 'Ada' } } }, select: ['name'] } },
+      { WrAuthors: { where: { boss: { has: { name: 'Anduin' } } }, select: ['name'] } },
     );
     deepStrictEqual(
       rows.map((row) => row.author),
-      [null, { name: 'Bob' }, null],
+      [null, { name: 'Baine' }, null],
     );
   });
 
@@ -260,7 +266,7 @@ describe('a wire read composes under its reach', () => {
     );
     deepStrictEqual(
       reached.map((row) => row.title),
-      ['By Ada'],
+      ['By Anduin'],
     );
   });
 
@@ -271,13 +277,13 @@ describe('a wire read composes under its reach', () => {
     const admitted = await read({ where: { tags: { has: { label: 'misc' } } } }, answers);
     deepStrictEqual(
       admitted.map((row) => row.title),
-      ['By Bob', 'By Cy'],
+      ['By Baine', 'By Chen'],
     );
   });
 
   it('counts and paginates under the same reach as the row read', async () => {
     const parsed = await parseWireQuery(
-      { where: { author: { has: { name: 'Ada' } } } },
+      { where: { author: { has: { name: 'Anduin' } } } },
       meta,
       guards,
       resolver({ WrAuthors: { where: { active: false } } }).resolve,
@@ -295,17 +301,17 @@ describe('a wire read composes under its reach', () => {
       resolver({ WrAuthors: false }).resolve,
     );
     const rows = await applyQuery(queryUntyped('WrPosts').orderBy('title', 'asc'), parsed, {
-      where: { author: { has: { name: 'Bob' } } },
+      where: { author: { has: { name: 'Baine' } } },
     }).findMany();
     deepStrictEqual(
       rows.map((row) => [row.title, row.author]),
-      [['By Bob', null]],
+      [['By Baine', null]],
     );
   });
 
   it('fails closed on a target the reach never named', async () => {
     const rows = await queryUntyped('WrPosts')
-      .wire({ author: { has: { name: 'Ada' } } }, new Map())
+      .wire({ author: { has: { name: 'Anduin' } } }, new Map())
       .populate('tags')
       .findMany();
     deepStrictEqual(rows, []);
@@ -328,19 +334,19 @@ describe('a wire read composes under its reach', () => {
 
   it('folds the wire condition into a write, unscoped', async () => {
     const parsed = await parseWireQuery(
-      { where: { title: 'By Cy' }, populate: ['tags'] },
+      { where: { title: 'By Chen' }, populate: ['tags'] },
       meta,
       guards,
       resolver({ WrTags: false }).resolve,
     );
     const updated = await applyQuery(queryUntyped('WrPosts'), parsed).updateOrThrow({
-      title: 'By Cy!',
+      title: 'By Chen!',
     });
     deepStrictEqual(
       updated.map((row) => row.title),
-      ['By Cy!'],
+      ['By Chen!'],
     );
-    await queryUntyped('WrPosts').where({ title: 'By Cy!' }).updateOrThrow({ title: 'By Cy' });
+    await queryUntyped('WrPosts').where({ title: 'By Chen!' }).updateOrThrow({ title: 'By Chen' });
   });
 
   it('freezes each reach entry inside a frozen IR', () => {
