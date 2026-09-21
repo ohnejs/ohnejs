@@ -129,6 +129,12 @@ export interface FieldQueryMeta {
   tables?: readonly string[];
 
   /**
+   * Marks a `translations` entry whose list a locale-sensitive scope narrows per record.
+   * It admits no operator: a probe of the stored rows would reveal a locale the scope hides.
+   */
+  narrowed?: true;
+
+  /**
    * The child table's own fields, its item `UUID` included; child kinds only.
    */
   subfields?: Record<string, FieldQueryMeta>;

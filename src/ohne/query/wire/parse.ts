@@ -300,9 +300,11 @@ function checkValues(
 /**
  * Whether a wire value matches a field's storage type.
  * A UUID is a string, an integer a safe number, a real a finite one.
+ * A `_translations` value is a configured locale, as the `locale` param is.
  */
 function matchesLogical(value: unknown, field: FieldQueryMeta): boolean {
   if (field.kind === 'record' || field.id === true) return isString(value);
+  if (field.kind === 'translations') return queryLocales().locales.includes(value as string);
   switch (field.logicalType) {
     case 'integer':
       return isInteger(value);

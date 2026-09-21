@@ -3,7 +3,8 @@ import type { CollectionQueryMeta } from '../metadata.ts';
 import type { ConditionInput, UntypedQueryBuilder } from '../untyped.ts';
 import type { ParsedQuery } from './parse.ts';
 
-import { intersection, isNull, isUndefined, mapValues } from '../../../utils/index.ts';
+import { intersection, isNull, isUndefined } from '../../../utils/index.ts';
+import { localeSensitive, withheldMetadata } from './withheld-metadata.ts';
 
 /**
  * The endpoint-installed scope a wire query composes onto, narrowing what a request may read.
@@ -84,7 +85,9 @@ export function applyQuery(
 /**
  * The metadata a scoped wire query parses against: a field outside the scope's `select` reads as hidden.
  * The parser then refuses it in `where`, `order`, `select`, and `populate` exactly as an unknown field.
- * A scope without `select` parses against the metadata as is.
+ * A `where` that reads per locale makes the parser refuse a `_translations` filter.
+ * That filter reads the stored rows, and would reveal a locale the scope hides.
+ * A scope with neither parses against the metadata as is.
  *
  * @example
  * ```ts
@@ -92,14 +95,9 @@ export function applyQuery(
  * ```
  */
 export function scopedMetadata(meta: CollectionQueryMeta, scope: QueryScope): CollectionQueryMeta {
-  if (isUndefined(scope.select)) return meta;
-  const visible = new Set(scope.select);
-  return {
-    ...meta,
-    fields: mapValues(meta.fields, (name, entry) =>
-      visible.has(name) ? entry : { ...entry, readable: false as const },
-    ),
-  };
+  const sealed =
+    meta.translatable === true && !isUndefined(scope.where) && localeSensitive(scope.where, meta);
+  return withheldMetadata(meta, scope.select ?? null, sealed);
 }
 
 /**

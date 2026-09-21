@@ -50,7 +50,7 @@ export interface QueryFieldMeta {
 
   /**
    * Marks the translatable collection's `_translations` entry: the locales holding a translation.
-   * It carries no `scalar`, so `select` and `pluck` alone address it.
+   * It carries no `scalar`: a `where` reaches it through the `includes*` operators alone.
    */
   translations?: true;
 

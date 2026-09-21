@@ -86,6 +86,19 @@ useCollections().register('WHBadOp', {
   },
 });
 
+useCollections().register('WHTranslations', {
+  name: 'WHTranslations',
+  collection: {
+    fields: {
+      title: field('text', { translatable: true }),
+      discount: field('integer', {
+        nullable: true,
+        when: { _translations: { includes: 'en' } },
+      }),
+    },
+  },
+});
+
 useCollections().register('WHUnderflow', {
   name: 'WHUnderflow',
   collection: {
@@ -178,6 +191,10 @@ describe('validateWhen', () => {
 
   it('rejects an operator the field does not support', () => {
     throwsOhne(() => queryMetadata('WHBadOp'), /Operator `contains` does not apply/);
+  });
+
+  it('rejects `_translations`, which no written record carries', () => {
+    throwsOhne(() => queryMetadata('WHTranslations'), /Operator `includes` does not apply/);
   });
 
   it('rejects a `../` that climbs past the record root', () => {

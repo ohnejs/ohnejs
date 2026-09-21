@@ -36,17 +36,16 @@ import {
   isPlainObject,
   isString,
   isUndefined,
-  parseCondition,
   pick,
   toArray,
   toKebabCase,
-  walkCondition,
 } from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { unknownParamError } from '../../ohne/query/wire/errors.ts';
+import { localeSensitive } from '../../ohne/query/wire/withheld-metadata.ts';
 import { requireCapability, userCan } from '../auth/capabilities.ts';
 import { useUser } from '../auth/use-user.ts';
 
@@ -298,25 +297,6 @@ export async function visibleLocales(
     visible.set(locale, admitted);
   }
   return visible;
-}
-
-/**
- * Whether a scope `where` can admit a record at one locale and hide it at another.
- * A leaf over a companion field reads that locale's value; a `has` or `empty` reaches per-locale rows.
- * A condition over plain columns alone answers alike at every locale.
- * An unparsable condition counts as sensitive; the read it scopes has already refused it.
- */
-function localeSensitive(where: Defined<QueryScope['where']>, meta: CollectionQueryMeta): boolean {
-  const parsed = parseCondition(where);
-  if (!parsed.ok) return true;
-  let sensitive = false;
-  walkCondition(parsed.node, (node) => {
-    if (node.kind === 'has' || node.kind === 'empty') sensitive = true;
-    else if (node.kind === 'compare' && meta.fields[node.path[0]]?.companion === true) {
-      sensitive = true;
-    }
-  });
-  return sensitive;
 }
 
 /**

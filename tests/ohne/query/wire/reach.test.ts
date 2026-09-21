@@ -55,6 +55,10 @@ useCollections().register('WrNotes', {
     fields: { title: field('text', { translatable: true }), views: field('integer') },
   },
 });
+useCollections().register('WrPins', {
+  name: 'WrPins',
+  collection: { fields: { note: field('record', { collection: 'WrNotes' }) } },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -161,6 +165,27 @@ describe('parseWireQuery resolves the reach of every crossed collection', () => 
       ),
       (error) => pathOf(error) === 'where.author.name',
     );
+  });
+
+  it('refuses a `_translations` filter into a target whose reach reads per locale', async () => {
+    const pins = queryMetadata('WrPins');
+    const probe = { where: { note: { has: { _translations: { includes: 'de' } } } } };
+    await rejects(
+      parseWireQuery(
+        probe,
+        pins,
+        guards,
+        resolver({ WrNotes: { where: { title: 'Note' } } }).resolve,
+      ),
+      (error) => pathOf(error) === 'where.note._translations',
+    );
+    const open = await parseWireQuery(
+      probe,
+      pins,
+      guards,
+      resolver({ WrNotes: { where: { views: 1 } } }).resolve,
+    );
+    deepStrictEqual(open.where, probe.where);
   });
 
   it('names nothing about an unreachable target: a near miss and a wrong type read as unknown', async () => {

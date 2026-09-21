@@ -18,8 +18,8 @@ import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
 import { queryMetadata } from '../metadata.ts';
 import { blockScope, targetScope, validateCondition } from '../validate-condition.ts';
-import { scopedMetadata } from './apply.ts';
 import { parseQueryParams } from './parse.ts';
+import { conditionLocaleSensitive, withheldMetadata } from './withheld-metadata.ts';
 
 /**
  * Resolves a caller's read reach into one collection.
@@ -159,6 +159,7 @@ function reachCondition(where: ConditionInput, collection: string): ConditionNod
 
 /**
  * The metadata a crossed collection parses against: its reach's `select` hides the rest, `false` hides all.
+ * A locale-sensitive reach condition seals the target's `_translations` against a probe's filter.
  */
 function reachedMetadata(
   collection: string,
@@ -167,6 +168,10 @@ function reachedMetadata(
   const meta = queryMetadata(collection);
   const entry = reach.get(collection);
   if (isUndefined(entry)) return meta;
-  if (entry === false) return scopedMetadata(meta, { select: [] });
-  return isNull(entry.select) ? meta : scopedMetadata(meta, { select: [...entry.select] });
+  if (entry === false) return withheldMetadata(meta, [], false);
+  const sealed =
+    meta.translatable === true &&
+    !isNull(entry.condition) &&
+    conditionLocaleSensitive(entry.condition, meta);
+  return withheldMetadata(meta, entry.select, sealed);
 }

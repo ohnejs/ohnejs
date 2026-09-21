@@ -243,6 +243,46 @@ type JsonOps<M extends QueryFieldMeta> = M extends { jsonList: true }
   : object;
 
 /**
+ * The list-membership operators over `_translations`, typed to the configured locale codes.
+ * They test the locales a record holds a translation at, whatever locale the chain reads.
+ */
+type TranslationsOps<M extends QueryFieldMeta> = M extends { translations: true }
+  ? {
+      /**
+       * Matches records translated at `locale`.
+       *
+       * @example
+       * ```ts
+       * query('Posts').where('_translations', (w) => w.includes('de'))
+       *
+       * query('Posts').where('_translations', (w) => w.not.includes('de'))
+       * ```
+       */
+      includes(locale: LocaleCode): WhereFieldAfterOp<M>;
+
+      /**
+       * Matches records translated at every one of `locales`.
+       *
+       * @example
+       * ```ts
+       * query('Posts').where('_translations', (w) => w.includesAll(['en', 'de']))
+       * ```
+       */
+      includesAll(locales: readonly LocaleCode[]): WhereFieldAfterOp<M>;
+
+      /**
+       * Matches records translated at one of `locales` or more.
+       *
+       * @example
+       * ```ts
+       * query('Posts').where('_translations', (w) => w.includesAny(['de', 'fr']))
+       * ```
+       */
+      includesAny(locales: readonly LocaleCode[]): WhereFieldAfterOp<M>;
+    }
+  : object;
+
+/**
  * `isNull`, the only null test, admitted for a nullable column or a nullable `record`.
  * A translatable (`companion`) field admits it too.
  * A missing translation reads `null` whatever its option says.
@@ -366,6 +406,7 @@ type FieldOps<M extends QueryFieldMeta> = EqualityOps<M> &
   OrderingOps<M> &
   TextOps<M> &
   JsonOps<M> &
+  TranslationsOps<M> &
   NullOps<M> &
   RelationalOps<M>;
 
@@ -422,7 +463,7 @@ export type WhereBuild<M extends QueryFieldMeta> = (w: WhereFieldFresh<M>) => Wh
 
 /**
  * The equality shorthand's value type: the field's scalar, or `never` where a scalar cannot compare.
- * `records`, composite, and blocks fields have no shorthand (use `has`); `_translations` has none at all.
+ * `records`, composite, and blocks fields have no shorthand (use `has`); `_translations` takes `includes`.
  * `null` is never a value (use `isNull`).
  */
 type EqValue<M extends QueryFieldMeta> = M extends { records: string }

@@ -113,12 +113,21 @@ describe('allowedOperators', () => {
 });
 
 describe('allowedOperators on the translations entry', () => {
-  it('admits nothing: the entry is read-only, addressed by select and pluck alone', () => {
-    const entry: FieldQueryMeta = {
-      kind: 'translations',
-      nullable: false,
-      tables: ['Posts__translations'],
-    };
-    deepStrictEqual([...allowedOperators(entry)], []);
+  const entry: FieldQueryMeta = {
+    kind: 'translations',
+    nullable: false,
+    tables: ['Posts__translations'],
+  };
+
+  it('admits list membership alone', () => {
+    deepStrictEqual([...allowedOperators(entry)].sort(), [
+      'includes',
+      'includesAll',
+      'includesAny',
+    ]);
+  });
+
+  it('admits nothing once a scope marks it narrowed', () => {
+    deepStrictEqual([...allowedOperators({ ...entry, narrowed: true })], []);
   });
 });

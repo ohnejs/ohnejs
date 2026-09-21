@@ -520,8 +520,17 @@ query('Posts').populate('author', (a) => a.populate('name'));
 query('Posts').populate('author', (a) => a.limit(1));
 // @ts-expect-error a non-relation field has no callback form either
 query('Posts').populate('title', (a) => a);
+query('Posts').where('_translations', (w) => w.includes('de'));
+query('Posts').where('_translations', (w) => w.not.includes('de').or.includesAll(['en', 'de']));
+query('Posts').where('_translations', (w) => w.includesAny(['en', 'de']));
 // @ts-expect-error _translations has no equality shorthand
 query('Posts').where('_translations', ['en']);
+// @ts-expect-error _translations takes a configured locale
+query('Posts').where('_translations', (w) => w.includes('fr'));
+// @ts-expect-error _translations takes list membership alone
+query('Posts').where('_translations', (w) => w.isNull());
+// @ts-expect-error _translations is not a relation to probe
+query('Posts').where('_translations', (w) => w.empty());
 // @ts-expect-error _translations cannot be ordered
 query('Posts').orderBy('_translations');
 // @ts-expect-error _translations is not a relation

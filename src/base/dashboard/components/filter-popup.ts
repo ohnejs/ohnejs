@@ -46,6 +46,7 @@ import {
 import { historyButtons } from './history-buttons.ts';
 import { History, unsavedChanges } from './history.ts';
 import { actionButton } from './item-actions.ts';
+import { translationsFilter } from './translations-filter.ts';
 
 /**
  * Options for `filterPopup`.
@@ -58,7 +59,7 @@ export interface FilterPopupOptions {
 
   /**
    * The filterable field candidates, read reactively.
-   * The builder keeps the column-backed ones whose storage primitive it can compare.
+   * The builder keeps the ones whose field type carries a filter, and `_translations`.
    */
   fields: () => DashboardField[];
 
@@ -233,7 +234,8 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     commit();
   };
 
-  const filterOf = (field: DashboardField): FieldFilter | undefined => fieldTypeFor(field).filter;
+  const filterOf = (field: DashboardField): FieldFilter | undefined =>
+    field.kind === 'translations' ? translationsFilter : fieldTypeFor(field).filter;
 
   const fieldChoices = (): DashboardField[] =>
     options

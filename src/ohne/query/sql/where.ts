@@ -4,9 +4,10 @@ import type { Dialect, ListMembershipOperator, LogicalType } from '../../databas
 import type { QueryIR, TargetReach } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
-import { isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
+import { intersection, isEmpty, isNull, isUndefined, uniqueArray } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
+import { queryLocales } from '../locale.ts';
 import { blockQueryMetadata, queryMetadata } from '../metadata.ts';
 import { escapeLike } from './escape-like.ts';
 import { inFragment, joinFragments, rawFragment, type SQLFragment } from './fragment.ts';
@@ -52,6 +53,7 @@ interface CompileContext {
  * An `EXISTS` target whose condition addresses companion columns joins its companion at the locale.
  * Negation wraps the positive fragment in `NOT (...)`; parsing already folded `not` groups by De Morgan.
  * A list-membership leaf keeps its non-`NULL` column guard outside that `NOT`, per the evaluator's rule.
+ * One over `_translations` probes the collection's locale-scoped tables instead of a column.
  * Every value binds through a `?`, so nothing inlines into the SQL.
  */
 export function compileWhere(
@@ -122,7 +124,9 @@ function compileNode(
     case 'compare': {
       const field = scope.fields[node.path[0]];
       if (node.op === 'includes' || node.op === 'includesAll' || node.op === 'includesAny') {
-        return membershipFragment(node, scope, field, dialect);
+        return field.kind === 'translations'
+          ? negateIf(node.negated, translationsFragment(node, scope, field, dialect, ctx))
+          : membershipFragment(node, scope, field, dialect);
       }
       if (node.op === 'in' && node.negated && isEmpty(node.value)) {
         // The empty-set probe is column-free, so a bare `NOT` over it would match `NULL` rows.
@@ -211,6 +215,50 @@ function membershipFragment(
   const match = dialect.listMembership(column, node.op as ListMembershipOperator, values);
   const probe = node.negated ? `NOT (${match.sql})` : match.sql;
   return { sql: `(${column} IS NOT NULL AND ${probe})`, params: match.params };
+}
+
+/**
+ * Compiles a list-membership leaf over `_translations`, probing the very rows `loadTranslations` reads.
+ * One `UNION ALL` source spans `field.tables`, so a locale binds once however many tables hold rows.
+ * `includesAll` ANDs one `EXISTS` per locale: each flattens onto the tables' `_parentUUID` indexes.
+ * A counted `DISTINCT` over the source would not, and scans it whole per row.
+ * A locale the configuration does not name never lists on a read, so here it matches nothing.
+ * The context's locale never binds: the entry spans every locale at once.
+ */
+function translationsFragment(
+  node: Extract<ConditionNode, { kind: 'compare' }>,
+  scope: WhereScope,
+  field: FieldQueryMeta,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment {
+  const all = node.op === 'includesAll';
+  const wanted = uniqueArray(
+    node.op === 'includes' ? [node.value as string] : (node.value as string[]),
+  );
+  if (isEmpty(wanted)) return rawFragment(all ? '1 = 1' : '1 = 0');
+  const held = intersection(queryLocales().locales, wanted);
+  if (all ? held.length < wanted.length : isEmpty(held)) return rawFragment('1 = 0');
+
+  const parent = dialect.quote('_parentUUID');
+  const locale = dialect.quote('_localeCode');
+  const source = (field.tables as readonly string[])
+    .map((table) => `SELECT ${parent}, ${locale} FROM ${dialect.quote(table)}`)
+    .join(' UNION ALL ');
+  const exists = (locales: readonly string[]): SQLFragment => {
+    const alias = dialect.quote(nextAlias(ctx));
+    const match = inFragment(`${alias}.${locale}`, locales);
+    return {
+      sql: `EXISTS (SELECT 1 FROM (${source}) ${alias} WHERE ${alias}.${parent} = ${selfUUID(scope, dialect)} AND ${match.sql})`,
+      params: match.params,
+    };
+  };
+  if (!all || held.length === 1) return exists(held);
+  const joined = joinFragments(
+    held.map((code) => exists([code])),
+    ' AND ',
+  );
+  return { sql: `(${joined.sql})`, params: joined.params };
 }
 
 /**

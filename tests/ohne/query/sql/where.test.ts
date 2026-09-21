@@ -12,9 +12,15 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { defineField } from '../../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { compileWhere } from '../../../../src/ohne/query/sql/where.ts';
 import { parseCondition } from '../../../../src/utils/index.ts';
+
+useLayers().add({
+  path: '/where-compile',
+  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
 
 useCollections().register('WAuthors', {
   name: 'WAuthors',
@@ -472,6 +478,79 @@ describe('compileWhere locale-scoped tables', () => {
     const de = compileTranslatable({ tags: { has: { label: 'rot' } } }, 'de');
     strictEqual(de.sql, en.sql);
     deepStrictEqual(de.params, ['de', 'de', 'rot']);
+  });
+});
+
+describe('compileWhere `_translations`', () => {
+  const source =
+    '(SELECT "_parentUUID", "_localeCode" FROM "WLPosts__translations"' +
+    ' UNION ALL SELECT "_parentUUID", "_localeCode" FROM "WLPosts_tags"' +
+    ' UNION ALL SELECT "_parentUUID", "_localeCode" FROM "WLPosts_sections")';
+  const probe = (alias: string, marks: string): string =>
+    `EXISTS (SELECT 1 FROM ${source} "${alias}" WHERE "${alias}"."_parentUUID" = "WLPosts"."UUID" AND "${alias}"."_localeCode" IN (${marks}))`;
+
+  it('`includes` probes every locale-scoped table through one source, the locale bound once', () => {
+    deepStrictEqual(compileTranslatable({ _translations: { includes: 'de' } }), {
+      sql: probe('_sub0', '?'),
+      params: ['de'],
+    });
+  });
+
+  it('never binds the read locale', () => {
+    deepStrictEqual(
+      compileTranslatable({ _translations: { includes: 'de' } }, 'en'),
+      compileTranslatable({ _translations: { includes: 'de' } }, 'de'),
+    );
+  });
+
+  it('negation wraps the probe whole', () => {
+    deepStrictEqual(compileTranslatable({ _translations: { not: { includes: 'de' } } }), {
+      sql: `NOT (${probe('_sub0', '?')})`,
+      params: ['de'],
+    });
+  });
+
+  it('`includesAny` shares one probe, duplicates folded into configured order', () => {
+    deepStrictEqual(compileTranslatable({ _translations: { includesAny: ['de', 'en', 'de'] } }), {
+      sql: probe('_sub0', '?, ?'),
+      params: ['en', 'de'],
+    });
+  });
+
+  it('`includesAll` ANDs one probe per locale, each freshly aliased', () => {
+    deepStrictEqual(compileTranslatable({ _translations: { includesAll: ['en', 'de'] } }), {
+      sql: `(${probe('_sub0', '?')} AND ${probe('_sub1', '?')})`,
+      params: ['en', 'de'],
+    });
+  });
+
+  it('a locale the configuration does not name matches nothing', () => {
+    const nothing = { sql: '1 = 0', params: [] };
+    deepStrictEqual(compileTranslatable({ _translations: { includes: 'fr' } }), nothing);
+    deepStrictEqual(compileTranslatable({ _translations: { includesAll: ['en', 'fr'] } }), nothing);
+    deepStrictEqual(compileTranslatable({ _translations: { includesAny: ['fr', 'de'] } }), {
+      sql: probe('_sub0', '?'),
+      params: ['de'],
+    });
+  });
+
+  it('an empty list is a constant, as over a json list', () => {
+    deepStrictEqual(compileTranslatable({ _translations: { includesAll: [] } }), {
+      sql: '1 = 1',
+      params: [],
+    });
+    deepStrictEqual(compileTranslatable({ _translations: { includesAny: [] } }), {
+      sql: '1 = 0',
+      params: [],
+    });
+  });
+
+  it('inside a `has` it correlates to the probed target, not the root', () => {
+    const fragment = compileOn('WLTags', {
+      posts: { has: { _translations: { includes: 'de' } } },
+    });
+    ok(fragment.sql.includes('"_sub2"."_parentUUID" = "_sub1"."UUID"'));
+    deepStrictEqual(fragment.params, ['en', 'de']);
   });
 });
 

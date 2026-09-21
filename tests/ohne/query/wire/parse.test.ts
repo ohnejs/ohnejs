@@ -9,6 +9,7 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
+import { scopedMetadata } from '../../../../src/ohne/query/wire/apply.ts';
 import { DEFAULT_QUERY_GUARDS, type QueryGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
 import { parseSearchParams, type SearchParamValue } from '../../../../src/utils/index.ts';
@@ -730,7 +731,7 @@ describe('`_translations` over the wire', () => {
     deepStrictEqual(parseLocalized('select=[_translations]').select, ['_translations']);
   });
 
-  it('cannot order, populate, or filter', () => {
+  it('cannot order or populate', () => {
     deepStrictEqual(localizedFailure('order=[_translations]'), {
       code: 'invalidField',
       path: 'order[0]',
@@ -739,7 +740,49 @@ describe('`_translations` over the wire', () => {
       code: 'invalidField',
       path: 'populate[0]',
     });
+  });
+
+  it('filters by list membership alone', () => {
+    deepStrictEqual(parseLocalized('where={_translations:{includes:de}}').where, {
+      _translations: { includes: 'de' },
+    });
+    deepStrictEqual(parseLocalized('where={_translations:{not:{includesAll:[en,de-AT]}}}').where, {
+      _translations: { not: { includesAll: ['en', 'de-AT'] } },
+    });
     strictEqual(localizedFailure('where={_translations:en}').code, 'invalidField');
-    strictEqual(localizedFailure('where={_translations:{includes:en}}').code, 'invalidField');
+    strictEqual(localizedFailure('where={_translations:{empty:true}}').code, 'invalidField');
+  });
+
+  it('refuses a locale the configuration does not name', () => {
+    deepStrictEqual(localizedFailure('where={_translations:{includes:fr}}'), {
+      code: 'invalidValue',
+      path: 'where._translations',
+    });
+    strictEqual(
+      localizedFailure('where={_translations:{includesAny:[de,7]}}').code,
+      'invalidValue',
+    );
+  });
+
+  it('refuses a filter under a scope whose `where` reads per locale', () => {
+    const sealed = scopedMetadata(translatableMeta, { where: { title: 'Hello' } });
+    const error = caught(() =>
+      parseQueryParams(
+        parseSearchParams('where={_translations:{includes:de}}'),
+        sealed,
+        DEFAULT_QUERY_GUARDS,
+      ),
+    );
+    strictEqual((error.data as WireErrorData).code, 'invalidField');
+    deepStrictEqual(
+      parseQueryParams(parseSearchParams('select=[_translations]'), sealed, DEFAULT_QUERY_GUARDS)
+        .select,
+      ['_translations'],
+    );
+  });
+
+  it('keeps the filter under a scope whose `where` reads alike at every locale', () => {
+    const open = scopedMetadata(translatableMeta, { where: { _translations: { includes: 'en' } } });
+    strictEqual(open, translatableMeta);
   });
 });

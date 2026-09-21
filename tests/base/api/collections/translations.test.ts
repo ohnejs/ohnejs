@@ -249,6 +249,41 @@ describe('`_translations` under an access scope', () => {
   });
 });
 
+describe('filtering by `_translations` over the API', () => {
+  const includesDE = '{_translations:{includes:de}}';
+
+  it('filters an unscoped collection and one scoped over plain columns', async () => {
+    const posts = await send(LIST, `http://x.test/collections/tr-posts?where=${includesDE}`, {
+      collection: 'tr-posts',
+    });
+    deepStrictEqual(heldBy(posts.body), { [post]: ['en', 'de'] });
+    const missing = '{_translations:{not:{includes:de}}}';
+    const ownedMissing = await send(LIST, `http://x.test/collections/tr-owned?where=${missing}`, {
+      collection: 'tr-owned',
+    });
+    deepStrictEqual(ownedMissing.body, []);
+  });
+
+  it('refuses the filter under a scope that hides a locale, so none leaks', async () => {
+    const { status, body } = await send(
+      LIST,
+      `http://x.test/collections/tr-scoped?where=${includesDE}`,
+      { collection: 'tr-scoped' },
+    );
+    strictEqual(status, 400);
+    strictEqual((body as { data: { code: string } }).data.code, 'invalidField');
+  });
+
+  it('refuses it through a probe into that collection too', async () => {
+    const probe = '{scoped:{has:{_translations:{includes:de}}}}';
+    const { status, body } = await send(LIST, `http://x.test/collections/tr-links?where=${probe}`, {
+      collection: 'tr-links',
+    });
+    strictEqual(status, 400);
+    strictEqual((body as { data: { path: string } }).data.path, 'where.scoped._translations');
+  });
+});
+
 describe('populated targets under a reach', () => {
   it("narrows a populated target's _translations to the locales its scope admits", async () => {
     const url = `http://x.test/collections/tr-links/${linked}?populate=[scoped]`;

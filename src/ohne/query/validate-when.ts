@@ -109,7 +109,8 @@ function checkNode(
     throw whenPathThroughRepeater(resolved.repeater, node.path, field, home);
   const target = resolved.field;
   const operator = node.kind === 'compare' ? node.op : node.kind;
-  if (!allowedOperators(target).has(operator)) {
+  // `_translations` is probed from tables, so the written record a `when` reads never carries it.
+  if (target.kind === 'translations' || !allowedOperators(target).has(operator)) {
     throw inapplicableWhenOp(operator, node.path, field, home);
   }
   if (node.kind === 'has' && !isNull(node.condition)) {
