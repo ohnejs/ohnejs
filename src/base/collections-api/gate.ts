@@ -42,7 +42,7 @@ import {
 } from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
-import { notFound } from '../../ohne/http/http-error.ts';
+import { HTTPError, notFound } from '../../ohne/http/http-error.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { unknownParamError } from '../../ohne/query/wire/errors.ts';
 import { localeSensitive } from '../../ohne/query/wire/withheld-metadata.ts';
@@ -151,6 +151,31 @@ export function readReach(collection: string): Promise<QueryScope | false> {
     memo.set(collection, reach);
   }
   return reach;
+}
+
+/**
+ * The caller's reach into a collection's update or delete, as a verdict asks it before any write runs.
+ * A closed operation, a guarded one the caller lacks the capability for, and a `false` verdict reach nothing.
+ * The operation's middleware never run: asking must not fire a write's rate limiter or audit log.
+ * An update resolves with an empty input, so it answers whether the caller may touch the row at all.
+ * An `HTTPError` the resolver throws reaches nothing, as the write itself would refuse the caller.
+ * Any other throw propagates, so a misconfigured scope is a `500`, never an open door.
+ */
+export async function writeReach(
+  collection: string,
+  operation: 'update' | 'delete',
+): Promise<QueryScope | false> {
+  const endpoint = await reachedEndpoint(collection, operation);
+  if (isUndefined(endpoint)) return false;
+  try {
+    return await resolveAccess(
+      endpoint,
+      operation === 'update' ? { operation, input: {} } : { operation },
+    );
+  } catch (error) {
+    if (error instanceof HTTPError) return false;
+    throw error;
+  }
 }
 
 /**
@@ -273,8 +298,6 @@ async function narrowTranslations(
 
 /**
  * The `UUID`s among `uuids` the scope `where` admits at each configured locale.
- * Each locale probes once per chunk, selecting `UUID` alone under `{ where }`.
- * The scope's `select` would drop the key and its `limit` would cap the probe, so neither rides.
  */
 export async function visibleLocales(
   collection: string,
@@ -284,19 +307,35 @@ export async function visibleLocales(
 ): Promise<Map<string, Set<string>>> {
   const visible = new Map<string, Set<string>>();
   for (const locale of queryLocales().locales) {
-    const admitted = new Set<string>();
-    const parsed = parseQueryParams({ select: 'UUID', locale }, meta, resolveGuards());
-    for (const batch of chunk(uuids, 900)) {
-      const rows = await applyQuery(
-        queryUntyped(collection).where({ UUID: { in: batch } }),
-        parsed,
-        { where },
-      ).findMany();
-      for (const row of rows) admitted.add(row.UUID as string);
-    }
-    visible.set(locale, admitted);
+    visible.set(locale, await admittedUUIDs(collection, meta, where, uuids, locale));
   }
   return visible;
+}
+
+/**
+ * The `UUID`s among `uuids` the scope `where` admits at one locale; `null` reads the default locale.
+ * The locale probes once per chunk, selecting `UUID` alone under `{ where }`.
+ * The scope's `select` would drop the key and its `limit` would cap the probe, so neither rides.
+ */
+export async function admittedUUIDs(
+  collection: string,
+  meta: CollectionQueryMeta,
+  where: Defined<QueryScope['where']>,
+  uuids: readonly string[],
+  locale: string | null,
+): Promise<Set<string>> {
+  const admitted = new Set<string>();
+  const parsed = parseQueryParams(
+    isNull(locale) ? { select: 'UUID' } : { select: 'UUID', locale },
+    meta,
+    resolveGuards(),
+  );
+  for (const batch of chunk(uuids, 900)) {
+    const builder = queryUntyped(collection).where({ UUID: { in: batch } });
+    const rows = await applyQuery(builder, parsed, { where }).findMany();
+    for (const row of rows) admitted.add(row.UUID as string);
+  }
+  return admitted;
 }
 
 /**
@@ -363,14 +402,26 @@ function requestReaches(): Map<string, Promise<QueryScope | false>> {
  * Resolves the caller's read reach into one collection through the same rules the read gate applies.
  */
 async function resolveReadReach(collection: string): Promise<QueryScope | false> {
-  const endpoint = endpointOf(useCollections().get(collection)?.collection.api, 'read');
+  const endpoint = await reachedEndpoint(collection, 'read');
   if (isUndefined(endpoint)) return false;
-  if (endpoint.public !== true) {
-    const user = await useUser();
-    if (isNull(user) || !userCan(user, `collection.${collection}.read`)) return false;
-  }
   if (!isUndefined(await runMiddleware(endpoint, collection))) return false;
   return resolveAccess(endpoint, { operation: 'read' });
+}
+
+/**
+ * The operation's endpoint when the caller may run it, `undefined` otherwise.
+ * The operation must be exposed, and either `public` or covered by the caller's capabilities.
+ */
+async function reachedEndpoint<O extends CollectionOperation>(
+  collection: string,
+  operation: O,
+): Promise<CollectionEndpoint<string, O> | undefined> {
+  const endpoint = endpointOf(useCollections().get(collection)?.collection.api, operation);
+  if (isUndefined(endpoint) || endpoint.public === true) return endpoint;
+  const user = await useUser();
+  return !isNull(user) && userCan(user, `collection.${collection}.${operation}`)
+    ? endpoint
+    : undefined;
 }
 
 /**
