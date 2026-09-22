@@ -1,4 +1,5 @@
 import {
+  isEmpty,
   isNullish,
   isString,
   isUndefined,
@@ -7,7 +8,7 @@ import {
   parseMediaType,
 } from 'ohnejs/utils';
 
-import type { UploadLocation } from '../uploads/path.ts';
+import type { UploadURLSource } from '../uploads/url.ts';
 import type { ImageTransforms } from './transforms.ts';
 import type { ImageVariantName } from './variants.ts';
 
@@ -20,10 +21,10 @@ import { stringifyImageTransforms } from './transforms.ts';
 import { resolveImageVariant } from './variants.ts';
 
 /**
- * An upload an image URL is built for: its location, and what the row knows about the image.
+ * An upload an image URL is built for: its location, its privacy, and what the row knows about the image.
  * A record straight from a read fits; so does a hand-built location with a name.
  */
-export interface ImageSource extends UploadLocation {
+export interface ImageSource extends UploadURLSource {
   /**
    * The media type; omitted, the extension names it.
    */
@@ -76,6 +77,14 @@ export function hasImageService(): boolean {
 }
 
 /**
+ * Whether variant URLs can be signed: `IMAGES_SECRET` names a secret.
+ * Without one a public variant reads `unsigned`, and a private image gets no variants at all.
+ */
+export function hasImageSecret(): boolean {
+  return !isEmpty(imageSecrets());
+}
+
+/**
  * The signed image service URL of a variant, or the original's URL when there is nothing to render.
  *
  * `variant` is a configured name, ad hoc transforms for trusted server code, or nothing for the original.
@@ -84,6 +93,8 @@ export function hasImageService(): boolean {
  * It is also answered for a type the service does not render.
  * A focal point stored on the upload fills the position when a `cover` fit names none.
  * Without an `IMAGES_SECRET` the signature reads `unsigned`, which only an unsigned service renders.
+ * A private image's URLs carry an `e_<expires>` token last and are always signed.
+ * Without an `IMAGES_SECRET` or an `expires` they point at the original instead.
  *
  * @example
  * ```ts
@@ -108,13 +119,15 @@ export function imageURL(
   if (!isOptimizableImage(type)) return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
   if (tokens === '') return uploadURL(upload);
+  const [secret] = imageSecrets();
+  const signed = tokensToSign(upload, tokens, secret);
+  if (isUndefined(signed)) return uploadURL(upload);
   const path = uploadPath(upload);
   const base = images.url.replace(TRAILING_SLASHES, '');
-  const [secret] = imageSecrets();
   const signature = isUndefined(secret)
     ? UNSIGNED_SIGNATURE
-    : signImageVariant(tokens, path, secret);
-  return `${base}/${signature}/${tokens}/${path}`;
+    : signImageVariant(signed, path, secret);
+  return `${base}/${signature}/${signed}/${path}`;
 }
 
 /**
@@ -160,6 +173,20 @@ function srcSetEntry(upload: ImageSource, entry: ImageVariantName | ImageTransfo
     throw ohneError(`${subject} has no \`width\`, which the \`w\` descriptor needs`);
   }
   return `${imageURL(upload, transforms)} ${transforms.width}w`;
+}
+
+/**
+ * The signed segment: `tokens` for a public image, `tokens` with `e_<expires>` last for a private one.
+ * `undefined` for a private image nothing can sign, without a secret or an `expires`.
+ */
+function tokensToSign(
+  upload: ImageSource,
+  tokens: string,
+  secret: string | undefined,
+): string | undefined {
+  if (upload.private !== true) return tokens;
+  if (isUndefined(secret) || isUndefined(upload.expires)) return undefined;
+  return `${tokens},e_${upload.expires}`;
 }
 
 /**

@@ -58,6 +58,7 @@ const NAME_ATTEMPTS = 5;
  * The bytes stream to a temp object first, verified against the extension's type and measured.
  * One transaction then creates the missing folder rows, picks a free name, and creates the row.
  * The same transaction journals the move into place.
+ * A file inside a private folder is born private, and the same journal locks its object once it lands.
  * The journal drains after the commit, so the object lands at its path once the row exists.
  * A type outside `uploads.types` is a `422`; so is content that contradicts the extension.
  * A failure after staging removes the temp object.
@@ -81,9 +82,11 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
-      await ensureFolders(tx, directory, author);
-      const row = await createFile(tx, { directory, name, type, author }, staged);
-      await journalStorage(tx, { op: 'move', from: staged.temp, to: uploadPath(row) });
+      const locked = await ensureFolders(tx, directory, author);
+      const row = await createFile(tx, { directory, name, type, author, private: locked }, staged);
+      const path = uploadPath(row);
+      await journalStorage(tx, { op: 'move', from: staged.temp, to: path });
+      if (locked) await journalStorage(tx, { op: 'lock', from: path });
       return row;
     }, 'immediate');
   } catch (error) {
@@ -99,7 +102,7 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
  */
 async function createFile(
   tx: Transaction,
-  file: { directory: string; name: string; type: string; author: string | null },
+  file: { directory: string; name: string; type: string; author: string | null; private: boolean },
   { size, hash, width, height }: StagedUpload,
 ): Promise<QueryRecord & { directory: string; name: string }> {
   const siblings = (await queryUntyped('Uploads')

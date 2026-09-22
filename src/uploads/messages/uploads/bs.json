@@ -5,6 +5,7 @@
     "bytes": "{count, plural, one {# bajt} few {# bajta} other {# bajtova}}",
     "completed": "Završeno",
     "copied": "Kopirano",
+    "copyTemporaryLink": "Kopiraj privremeni link",
     "copyURL": "Kopiraj URL",
     "deleteConfirm": "Da li zaista želite obrisati `{name}`?",
     "deleteFolderNote": "Brisanje foldera briše i sve što se nalazi u njemu.",
@@ -41,6 +42,13 @@
     "image": "Slika",
     "imageNotFound": "Slika nije pronađena",
     "itemsConflict": "Neke stavke već postoje na odredištu",
+    "linkCopied": "Privremeni link kopiran",
+    "linkFailed": "Link nije moguće napraviti",
+    "linksExpire": "Ovi linkovi ističu `{when}`",
+    "madePrivate": "{count, plural, one {# stavka je sada privatna} few {# stavke su sada privatne} other {# stavki je sada privatno}}",
+    "madePublic": "{count, plural, one {# stavka je sada javna} few {# stavke su sada javne} other {# stavki je sada javno}}",
+    "makePrivate": "Učini privatnim",
+    "makePublic": "Učini javnim",
     "media": "Mediji",
     "mediaLibrary": "Medijska biblioteka",
     "move": "Premjesti",
@@ -60,6 +68,8 @@
     "openInNewTab": "Otvori u novoj kartici",
     "pending": "Na čekanju",
     "pixels": "piksela",
+    "private": "Privatno",
+    "privateHint": "Datoteku može otvoriti samo privremeni link ili prijavljeni čitalac s pristupom.",
     "rename": "Preimenuj",
     "renameFailed": "Došlo je do greške pri preimenovanju",
     "renameFile": "Preimenuj datoteku",
@@ -99,6 +109,10 @@
     "kind": {
       "label": "Vrsta",
       "description": "Da li je ovaj zapis datoteka ili folder."
+    },
+    "private": {
+      "label": "Privatno",
+      "description": "Da li se datoteka može otvoriti samo putem privremenog linka ili za prijavljenog čitaoca s pristupom; folder zaključava sve u sebi."
     },
     "directory": {
       "label": "Folder",
@@ -150,9 +164,13 @@
     }
   },
   "journal": {
+    "sequence": {
+      "label": "Redoslijed",
+      "description": "Redoslijed kojim je efekat zapisan; efekti se izvršavaju tim redoslijedom."
+    },
     "op": {
       "label": "Operacija",
-      "description": "Efekat na pohrani koji treba izvršiti, premještanje ili brisanje."
+      "description": "Efekat na pohrani koji treba izvršiti."
     },
     "from": {
       "label": "Od",
@@ -160,7 +178,7 @@
     },
     "to": {
       "label": "Do",
-      "description": "Odredište premještanja; prazno pri brisanju."
+      "description": "Odredište premještanja; prazno za svaku drugu operaciju."
     }
   },
   "menu": {

@@ -155,6 +155,7 @@ export function stringifyImageTransforms(transforms: ImageTransforms): string {
  *
  * Every token must be known, well-formed, in range, and unique; `p` and `fp` exclude each other.
  * Order is not enforced, so a service can parse a string it already verified by signature.
+ * The `e_<expires>` token of a private image URL is not a transform and is rejected as well.
  * `''` parses to no transforms at all.
  *
  * @example

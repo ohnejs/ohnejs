@@ -72,6 +72,7 @@ export interface StorageAdapter {
   /**
    * Moves the object at `from` to `to`, or every object under the prefix `from/` beneath `to/`.
    * An existing object at `to` is replaced; a missing `from` is a no-op, so a replay is harmless.
+   * An object keeps its visibility as it moves, since a private file moved anywhere stays private.
    */
   move(from: string, to: string): Promise<void>;
 
@@ -80,6 +81,14 @@ export interface StorageAdapter {
    * A missing path is a no-op, so a replay is harmless.
    */
   delete(path: string): Promise<void>;
+
+  /**
+   * Marks the object at `path`, or every object under the prefix `path/`, private or public again.
+   * `true` locks: a backend that serves its objects itself stops opening them without the API.
+   * A backend that leaves serving to the API omits it, since the API route guards every read.
+   * A missing path is a no-op, so a replay is harmless.
+   */
+  setPrivate?(path: string, value: boolean): Promise<void>;
 
   /**
    * The public URL of the object at `path`, when the backend serves its objects itself.

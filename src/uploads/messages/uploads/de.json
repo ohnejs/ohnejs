@@ -5,6 +5,7 @@
     "bytes": "{count, plural, one {# Byte} other {# Bytes}}",
     "completed": "Abgeschlossen",
     "copied": "Kopiert",
+    "copyTemporaryLink": "Temporären Link kopieren",
     "copyURL": "URL kopieren",
     "deleteConfirm": "`{name}` wirklich löschen?",
     "deleteFolderNote": "Beim Löschen eines Ordners wird auch alles darin gelöscht.",
@@ -41,6 +42,13 @@
     "image": "Bild",
     "imageNotFound": "Bild nicht gefunden",
     "itemsConflict": "Einige Elemente existieren am Ziel bereits",
+    "linkCopied": "Temporärer Link kopiert",
+    "linkFailed": "Der Link konnte nicht erstellt werden",
+    "linksExpire": "Diese Links laufen `{when}` ab",
+    "madePrivate": "{count, plural, one {# Element ist jetzt privat} other {# Elemente sind jetzt privat}}",
+    "madePublic": "{count, plural, one {# Element ist jetzt öffentlich} other {# Elemente sind jetzt öffentlich}}",
+    "makePrivate": "Privat machen",
+    "makePublic": "Öffentlich machen",
     "media": "Medien",
     "mediaLibrary": "Medienbibliothek",
     "move": "Verschieben",
@@ -60,6 +68,8 @@
     "openInNewTab": "In neuem Tab öffnen",
     "pending": "Ausstehend",
     "pixels": "Pixel",
+    "private": "Privat",
+    "privateHint": "Nur ein temporärer Link oder ein angemeldeter Leser mit Zugriff kann die Datei öffnen.",
     "rename": "Umbenennen",
     "renameFailed": "Beim Umbenennen ist ein Fehler aufgetreten",
     "renameFile": "Datei umbenennen",
@@ -99,6 +109,10 @@
     "kind": {
       "label": "Art",
       "description": "Ob dieser Datensatz eine Datei oder ein Ordner ist."
+    },
+    "private": {
+      "label": "Privat",
+      "description": "Ob die Datei nur über einen temporären Link oder für einen angemeldeten Leser mit Zugriff geöffnet werden kann; ein Ordner sperrt alles darin."
     },
     "directory": {
       "label": "Ordner",
@@ -150,9 +164,13 @@
     }
   },
   "journal": {
+    "sequence": {
+      "label": "Reihenfolge",
+      "description": "Die Reihenfolge, in der der Effekt geschrieben wurde; Effekte laufen in dieser Reihenfolge."
+    },
     "op": {
       "label": "Vorgang",
-      "description": "Der auszuführende Speichereffekt, ein Verschieben oder ein Löschen."
+      "description": "Der auszuführende Speichereffekt."
     },
     "from": {
       "label": "Von",
@@ -160,7 +178,7 @@
     },
     "to": {
       "label": "Nach",
-      "description": "Das Ziel eines Verschiebens; beim Löschen leer."
+      "description": "Das Ziel eines Verschiebens; bei jedem anderen Vorgang leer."
     }
   },
   "menu": {

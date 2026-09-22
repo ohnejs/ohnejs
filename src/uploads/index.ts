@@ -15,6 +15,7 @@ export * from './uploads/move-upload.ts';
 export * from './uploads/path.ts';
 export * from './uploads/put-upload.ts';
 export * from './uploads/replace-upload.ts';
+export * from './uploads/sign.ts';
 export * from './uploads/types.ts';
 export * from './uploads/update-upload.ts';
 export * from './uploads/url.ts';

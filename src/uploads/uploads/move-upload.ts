@@ -1,15 +1,13 @@
-import type { Transaction } from 'ohnejs';
-
-import { queryMetadata, queryUntyped, useDatabase, useDialect } from 'ohnejs';
+import { queryUntyped, useDatabase } from 'ohnejs';
 import { extname, isUndefined } from 'ohnejs/utils';
 
 import type { UploadRecord } from './types.ts';
 
-import { escapeLike } from '../../ohne/query/sql/escape-like.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
 import { ensureFolders } from './_folders.ts';
 import { decorated, readUpload } from './_row.ts';
+import { moveDescendants, setDescendantsPrivate } from './_subtree.ts';
 import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';
 
 /**
@@ -33,6 +31,9 @@ export interface MoveUploadTarget {
  *
  * One transaction creates the missing folder rows of the target, updates the row, and journals the move.
  * A folder's descendants have their `directory` rewritten by prefix in one statement.
+ * A public row moved into a private folder becomes private, a folder with everything inside it.
+ * The same journal then locks its object; moving out of a private folder never unlocks.
+ * A rename that stays in its folder leaves `private` as it is.
  * The journal drains after the commit, so the object moves once the row points at its new path.
  * A file whose extension would change is a `422`; so is a folder moved into itself.
  * A target already taken is the pipeline's `422`; an unknown `UUID` a `404`.
@@ -60,31 +61,20 @@ export async function moveUpload(uuid: string, to: MoveUploadTarget): Promise<Up
       throw uploadsError('directory', 'folderIntoItself');
     }
 
-    await ensureFolders(tx, target.directory, row.author);
+    const locked = await ensureFolders(tx, target.directory, row.author);
+    const lock = locked && target.directory !== row.directory && !row.private;
     const [moved] = await queryUntyped('Uploads')
       .use(tx)
       .where({ UUID: uuid })
-      .updateOrThrow(target);
-    if (row.kind === 'folder') await moveDescendants(tx, from, path);
+      .updateOrThrow(lock ? { ...target, private: true } : target);
+    if (row.kind === 'folder') {
+      await moveDescendants(tx, from, path);
+      if (lock) await setDescendantsPrivate(tx, path, true);
+    }
     await journalStorage(tx, { op: 'move', from, to: path });
+    if (lock) await journalStorage(tx, { op: 'lock', from: path });
     return moved;
   }, 'immediate');
   await drainJournal();
   return decorated(record);
-}
-
-/**
- * Rewrites the `directory` of every row under a folder from its old path to its new one, in one statement.
- */
-async function moveDescendants(tx: Transaction, from: string, to: string): Promise<void> {
-  const dialect = useDialect();
-  const meta = queryMetadata('Uploads');
-  const table = dialect.quote(meta.table);
-  const directory = dialect.quote(meta.fields.directory.column as string);
-  const updatedAt = dialect.quote('_updatedAt');
-  await tx.run(
-    `UPDATE ${table} SET ${directory} = ? || substr(${directory}, ?), ${updatedAt} = ? ` +
-      `WHERE ${directory} = ? OR ${dialect.textMatch(directory)}`,
-    [to, from.length + 1, Date.now(), from, `${escapeLike(from)}/%`],
-  );
 }

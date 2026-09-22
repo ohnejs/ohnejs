@@ -28,6 +28,7 @@ export interface CreateFolderInput {
 
 /**
  * Creates a folder row, and the rows of every ancestor it implies, in one transaction.
+ * A folder inside a private one is born private, as are the ancestors it implies.
  * A folder holds no bytes, so storage is untouched.
  * A name already taken in the directory is a `422`.
  *
@@ -42,10 +43,10 @@ export async function createFolder(input: CreateFolderInput): Promise<UploadReco
   const name = canonicalName(input.name);
   const author = input.author ?? null;
   const record = await useDatabase().transaction(async (tx) => {
-    await ensureFolders(tx, directory, author);
+    const locked = await ensureFolders(tx, directory, author);
     return queryUntyped('Uploads')
       .use(tx)
-      .createOrThrow({ kind: 'folder', directory, name, author });
+      .createOrThrow({ kind: 'folder', directory, name, author, private: locked });
   }, 'immediate');
   return decorated(record);
 }

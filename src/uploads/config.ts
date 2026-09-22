@@ -64,6 +64,21 @@ declare module 'ohnejs' {
       publicURL?: string;
 
       /**
+       * How long a private file's links stay valid, as a `parseDuration` value.
+       * Reads align links to these windows for browser caches, so a link lives one to two windows.
+       *
+       * @default
+       * '1h'
+       *
+       * @example
+       * ```ts
+       * 3600000 // 1 hour, as raw milliseconds
+       * '1h'    // 1 hour
+       * ```
+       */
+      privateMaxAge?: number | string;
+
+      /**
        * The image optimization service that answers signed variant URLs, and the variants it renders.
        */
       images?: {
@@ -103,6 +118,16 @@ declare module 'ohnejs' {
      * undefined
      */
     IMAGES_SECRET: string | undefined;
+
+    /**
+     * The secret that signs a private file's expiring links.
+     * Several secrets may be listed, comma-separated; the first signs, any verifies.
+     * Unset, a private file opens only for a signed-in reader and no temporary link can be made.
+     *
+     * @default
+     * undefined
+     */
+    UPLOADS_SECRET: string | undefined;
   }
 }
 
@@ -141,6 +166,11 @@ export interface ResolvedUploadsConfig {
   publicURL?: string;
 
   /**
+   * How long a private file's links stay valid, as a `parseDuration` value.
+   */
+  privateMaxAge: number | string;
+
+  /**
    * The image optimization service and the named variants it renders.
    */
   images: {
@@ -165,6 +195,7 @@ export const UPLOADS_DEFAULTS = {
   maxFileSize: '128mb',
   types: '*',
   cache: { noCache: true },
+  privateMaxAge: '1h',
   images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
 } satisfies ResolvedUploadsConfig;
 
@@ -181,6 +212,7 @@ export const UPLOADS_STRATEGIES: LayerStrategies = {
 
 useEnv().define('UPLOADS_URL', { default: undefined });
 useEnv().define('IMAGES_SECRET', { default: undefined });
+useEnv().define('UPLOADS_SECRET', { default: undefined });
 
 /**
  * Returns the resolved uploads settings, `Config.uploads` merged over the layer defaults.

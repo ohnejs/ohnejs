@@ -28,6 +28,7 @@ export interface ReplaceUploadOptions {
  *
  * The bytes stream to a temp object first, verified against the row's type and measured.
  * One transaction then updates `size`, `hash`, `width`, and `height` and journals the move into place.
+ * A private file's object is locked again by the same journal, once the new bytes are in place.
  * The journal drains after the commit.
  * A folder is a `422`; content that contradicts the type is too; an unknown `UUID` a `404`.
  * A failure after staging removes the temp object.
@@ -58,7 +59,10 @@ export async function replaceUpload(
         .where({ UUID: uuid })
         .updateOrThrow(measured);
       if (isUndefined(updated)) throw notFound();
-      await journalStorage(tx, { op: 'move', from: temp, to: uploadPath(updated as UploadRow) });
+      const landed = updated as UploadRow;
+      const path = uploadPath(landed);
+      await journalStorage(tx, { op: 'move', from: temp, to: path });
+      if (landed.private) await journalStorage(tx, { op: 'lock', from: path });
       return updated;
     }, 'immediate');
   } catch (error) {

@@ -1,18 +1,27 @@
-import { isNumber, isString } from 'ohnejs/utils';
+import { isNumber, isString, isUndefined } from 'ohnejs/utils';
 
-import { hasImageService, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
+import {
+  hasImageSecret,
+  hasImageService,
+  imageVariantURLs,
+  isOptimizableImage,
+} from '../images/image-url.ts';
+import { privateExpiry } from './_expiry.ts';
 import { uploadPath } from './path.ts';
 import { uploadURL } from './url.ts';
 
 /**
  * Adds `path` and `url` to an `Uploads` record in place.
  * Adds `variants` too, one signed URL per configured variant, when the image service can render them.
+ * A private file gets the signed API route as `url`, and `expires`, while `UPLOADS_SECRET` is set.
+ * Its `variants` need an `IMAGES_SECRET` as well, since an unsigned service could not guard the original.
+ * A file whose `select` left out `private` is decorated as private, since it may be one.
  * A folder gets `path` alone: it has no bytes to serve.
  * A record whose `select` dropped `directory` or `name` is left untouched.
  *
  * @example
  * ```ts
- * const record = { directory: 'photos', name: 'sunset.jpg' }
+ * const record = { directory: 'photos', name: 'sunset.jpg', private: false }
  * decorateUpload(record)
  * record.path // -> 'photos/sunset.jpg'
  * record.url  // -> '/uploads/photos/sunset.jpg'
@@ -23,17 +32,22 @@ export function decorateUpload(record: Record<string, unknown>): void {
   if (!isString(directory) || !isString(name)) return;
   record.path = uploadPath({ directory, name });
   if (record.kind === 'folder') return;
-  record.url = uploadURL({ directory, name });
+  const locked = record.private === true || isUndefined(record.private);
+  const expires = locked ? privateExpiry() : undefined;
+  if (!isUndefined(expires)) record.expires = expires;
+  record.url = uploadURL({ directory, name, private: locked, expires });
   const { type, focalX, focalY } = record;
-  if (isString(type) && isOptimizableImage(type) && hasImageService()) {
-    record.variants = imageVariantURLs({
-      directory,
-      name,
-      type,
-      focalX: numberOrNull(focalX),
-      focalY: numberOrNull(focalY),
-    });
-  }
+  if (!isString(type) || !isOptimizableImage(type) || !hasImageService()) return;
+  if (locked && (isUndefined(expires) || !hasImageSecret())) return;
+  record.variants = imageVariantURLs({
+    directory,
+    name,
+    type,
+    focalX: numberOrNull(focalX),
+    focalY: numberOrNull(focalY),
+    private: locked,
+    expires,
+  });
 }
 
 /**

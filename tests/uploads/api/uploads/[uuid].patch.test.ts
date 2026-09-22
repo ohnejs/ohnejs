@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
@@ -61,6 +61,40 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual((await send(uuid, null)).status, 400);
     strictEqual((await send(uuid, { name: 7 })).status, 400);
     strictEqual((await send(uuid, { focalX: 'left' })).status, 400);
+    strictEqual((await send(uuid, { private: 'yes' })).status, 400);
+  });
+
+  it('locks a folder and everything inside it', async () => {
+    await putUpload({ directory: 'patch/tree', name: 'leaf.txt', body: stream(bytes('leaf')) });
+    const folder = await queryUntyped('Uploads')
+      .where({ directory: 'patch', name: 'tree' })
+      .findFirst();
+    ok(folder);
+    const response = await send(folder.UUID as string, { private: true });
+    strictEqual(response.status, 200);
+    const record = (await response.json()) as Record<string, unknown>;
+    strictEqual(record.private, true);
+    const leaf = await queryUntyped('Uploads')
+      .where({ directory: 'patch/tree', name: 'leaf.txt' })
+      .findFirst();
+    strictEqual(leaf?.private, true);
+    strictEqual(storage.visibility.get('patch/tree/leaf.txt'), true);
+  });
+
+  it('moves into a private folder and unlocks in one body, the explicit private winning', async () => {
+    await queryUntyped('Uploads').createOrThrow({
+      kind: 'folder',
+      directory: 'patch',
+      name: 'vault',
+      private: true,
+    });
+    const response = await send(await seed('j.txt'), { directory: 'patch/vault', private: false });
+    strictEqual(response.status, 200);
+    const record = (await response.json()) as Record<string, unknown>;
+    strictEqual(record.path, 'patch/vault/j.txt');
+    strictEqual(record.private, false);
+    const moved = await send(await seed('k.txt'), { directory: 'patch/vault' });
+    strictEqual(((await moved.json()) as Record<string, unknown>).private, true);
   });
 
   it('422s an extension change and a focal point out of range', async () => {

@@ -1,32 +1,50 @@
 import type { StorageAdapter } from '../../src/uploads/storage/adapter.ts';
 
 /**
- * A `StorageAdapter` over a `Map`, with the objects exposed and a switch to fail the next effect once.
+ * The effects `failNext` can make throw once.
+ */
+export type MemoryStorageOp = 'move' | 'delete' | 'setPrivate';
+
+/**
+ * A `StorageAdapter` over a `Map`, with the objects and their visibility exposed.
+ * `failNext` makes the next effect of one kind throw once.
  */
 export interface MemoryStorage extends StorageAdapter {
   objects: Map<string, Uint8Array>;
-  failNext(op: 'move' | 'delete'): void;
+  visibility: Map<string, boolean>;
+  failNext(op: MemoryStorageOp): void;
 }
 
 /**
  * Builds an adapter that keeps every object in `objects`, keyed by path.
  * `move` and `delete` also carry a prefix's descendants, as a folder effect needs.
+ * An object's visibility moves with it and goes with it on a delete.
+ * `setPrivate` records the object at the path and every one under it in `visibility`, `true` for private.
+ * Like `move` and `delete`, it passes over a path that holds nothing.
  * `failNext(op)` makes the next call of that op throw once, then the adapter works again.
  */
 export function createMemoryStorage(): MemoryStorage {
   const objects = new Map<string, Uint8Array>();
-  let failing: 'move' | 'delete' | null = null;
+  const visibility = new Map<string, boolean>();
+  let failing: MemoryStorageOp | null = null;
 
-  const fail = (op: 'move' | 'delete'): void => {
+  const fail = (op: MemoryStorageOp): void => {
     if (failing !== op) return;
     failing = null;
     throw new Error(`memory storage ${op} failed`);
   };
   const under = (prefix: string): string[] =>
     [...objects.keys()].filter((key) => key.startsWith(`${prefix}/`));
+  const carry = (from: string, to: string): void => {
+    const value = visibility.get(from);
+    visibility.delete(from);
+    if (value === undefined) visibility.delete(to);
+    else visibility.set(to, value);
+  };
 
   return {
     objects,
+    visibility,
     failNext(op) {
       failing = op;
     },
@@ -55,16 +73,28 @@ export function createMemoryStorage(): MemoryStorage {
       if (bytes !== undefined) {
         objects.delete(from);
         objects.set(to, bytes);
+        carry(from, to);
       }
       for (const key of under(from)) {
-        objects.set(to + key.slice(from.length), objects.get(key)!);
+        const target = to + key.slice(from.length);
+        objects.set(target, objects.get(key)!);
         objects.delete(key);
+        carry(key, target);
       }
     },
     async delete(path) {
       fail('delete');
       objects.delete(path);
-      for (const key of under(path)) objects.delete(key);
+      visibility.delete(path);
+      for (const key of under(path)) {
+        objects.delete(key);
+        visibility.delete(key);
+      }
+    },
+    async setPrivate(path, value) {
+      fail('setPrivate');
+      if (objects.has(path)) visibility.set(path, value);
+      for (const key of under(path)) visibility.set(key, value);
     },
   };
 }

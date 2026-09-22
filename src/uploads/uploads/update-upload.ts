@@ -1,10 +1,12 @@
-import { queryUntyped } from 'ohnejs';
-import { isUndefined } from 'ohnejs/utils';
+import { queryUntyped, useDatabase } from 'ohnejs';
+import { isBoolean, isUndefined } from 'ohnejs/utils';
 
 import type { UploadRecord } from './types.ts';
 
-import { notFound } from '../../ohne/http/http-error.ts';
-import { decorated } from './_row.ts';
+import { drainJournal, journalStorage } from '../storage/journal.ts';
+import { decorated, readUpload } from './_row.ts';
+import { setDescendantsPrivate } from './_subtree.ts';
+import { uploadPath } from './path.ts';
 
 /**
  * The metadata `updateUpload` changes; an omitted field keeps its value.
@@ -24,6 +26,12 @@ export interface UpdateUploadInput {
    * The focal point's vertical position, `0` to `1`, `null` to clear it.
    */
   focalY?: number | null;
+
+  /**
+   * Whether the bytes open only through an expiring link or for a signed-in reader with access.
+   * A folder applies it to everything inside it.
+   */
+  private?: boolean;
 }
 
 /**
@@ -37,14 +45,15 @@ export interface UpdateUploadOptions {
 }
 
 /**
- * Updates a row's metadata: the alt text and the focal point.
- * Storage is untouched.
+ * Updates a row's metadata: the alt text, the focal point, and whether it is private.
+ * A folder's `private` applies to everything inside it, and storage locks or unlocks the objects to match.
  * An out-of-range value is the pipeline's `422`; an unknown `UUID` a `404`.
  *
  * @example
  * ```ts
  * await updateUpload(uuid, { description: 'Sunset over the bay' }, { locale: 'de' })
  * await updateUpload(uuid, { focalX: 0.3, focalY: 0.7 })
+ * await updateUpload(uuid, { private: true })
  * ```
  */
 export async function updateUpload(
@@ -52,11 +61,18 @@ export async function updateUpload(
   input: UpdateUploadInput,
   options: UpdateUploadOptions = {},
 ): Promise<UploadRecord> {
-  const builder = queryUntyped('Uploads').where({ UUID: uuid });
-  const records = await (
-    isUndefined(options.locale) ? builder : builder.locale(options.locale)
-  ).updateOrThrow({ ...input });
-  const [record] = records;
-  if (isUndefined(record)) throw notFound();
+  const record = await useDatabase().transaction(async (tx) => {
+    const row = await readUpload(uuid, tx);
+    const builder = queryUntyped('Uploads').use(tx).where({ UUID: uuid });
+    const [updated] = await (
+      isUndefined(options.locale) ? builder : builder.locale(options.locale)
+    ).updateOrThrow({ ...input });
+    if (!isBoolean(input.private) || input.private === (row.private === true)) return updated;
+    const path = uploadPath(row);
+    if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private);
+    await journalStorage(tx, { op: input.private ? 'lock' : 'unlock', from: path });
+    return updated;
+  }, 'immediate');
+  await drainJournal();
   return decorated(record);
 }

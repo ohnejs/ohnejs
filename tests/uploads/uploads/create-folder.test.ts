@@ -39,6 +39,27 @@ describe('createFolder', () => {
     strictEqual(folder.author, user.UUID);
   });
 
+  it('is born private inside a private folder, with the ancestors it implies', async () => {
+    await queryUntyped('Uploads').createOrThrow({
+      kind: 'folder',
+      directory: '',
+      name: 'sealed',
+      private: true,
+    });
+    const folder = await createFolder({ directory: 'sealed/a/b', name: 'c' });
+    strictEqual(folder.private, true);
+    const rows = await queryUntyped('Uploads')
+      .where({ directory: { startsWith: 'sealed' } })
+      .findMany();
+    deepStrictEqual(
+      Object.fromEntries(rows.map((row) => [`${row.directory}/${row.name}`, row.private])),
+      { 'sealed/a': true, 'sealed/a/b': true, 'sealed/a/b/c': true },
+    );
+    const open = await createFolder({ directory: 'unsealed', name: 'd' });
+    strictEqual(open.private, false);
+    strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
   it('refuses a name already taken in the directory', async () => {
     await createFolder({ directory: 'dup', name: 'twice' });
     await rejects(createFolder({ directory: 'dup', name: 'Twice' }), (error: unknown) => {

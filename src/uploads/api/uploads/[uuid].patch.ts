@@ -7,7 +7,7 @@ import {
   useSearchParams,
 } from 'ohnejs';
 import { requireCapability } from 'ohnejs/auth';
-import { isNull, isNumber, isPlainObject, isString, isUndefined } from 'ohnejs/utils';
+import { isBoolean, isNull, isNumber, isPlainObject, isString, isUndefined } from 'ohnejs/utils';
 
 import type { MoveUploadTarget } from '../../uploads/move-upload.ts';
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -19,8 +19,10 @@ import { updateUpload } from '../../uploads/update-upload.ts';
 /**
  * `PATCH /uploads/[uuid]`
  *
- * Changes a row from `{ name?, directory?, description?, focalX?, focalY? }` and answers its final record.
+ * Changes a row from `{ name?, directory?, description?, focalX?, focalY?, private? }` and answers the row.
  * `name` and `directory` move the row and its object; the rest change its metadata.
+ * `private` locks or unlocks it, a folder with everything inside; a move into a private folder locks too.
+ * The move runs first, so an explicit `private` in the same body wins.
  * `?locale=` writes `description` at that content locale.
  * Needs `collection.Uploads.update`: no user `401`, no capability `403`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`; an unknown `UUID` a `404`.
@@ -57,11 +59,12 @@ function readTarget(input: Record<string, unknown>): MoveUploadTarget | undefine
  * The metadata changes a body asks for, or `undefined` when it names none.
  */
 function readChanges(input: Record<string, unknown>): UpdateUploadInput | undefined {
-  const { description, focalX, focalY } = input;
-  if (isUndefined(description) && isUndefined(focalX) && isUndefined(focalY)) return undefined;
+  const { description, focalX, focalY, private: locked } = input;
+  if ([description, focalX, focalY, locked].every(isUndefined)) return undefined;
   const validDescription = isUndefined(description) || isNull(description) || isString(description);
   const validX = isUndefined(focalX) || isNull(focalX) || isNumber(focalX);
   const validY = isUndefined(focalY) || isNull(focalY) || isNumber(focalY);
-  if (!validDescription || !validX || !validY) throw badRequest();
-  return { description, focalX, focalY };
+  const validPrivate = isUndefined(locked) || isBoolean(locked);
+  if (!validDescription || !validX || !validY || !validPrivate) throw badRequest();
+  return { description, focalX, focalY, private: locked };
 }

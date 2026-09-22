@@ -16,6 +16,16 @@ function temps(): string[] {
   return [...storage.objects.keys()].filter((key) => key.startsWith('.tmp/'));
 }
 
+async function privacy(prefix: string): Promise<Record<string, unknown>> {
+  const rows = await queryUntyped('Uploads')
+    .whereAny((g) => [
+      g.where({ directory: prefix }),
+      g.where({ directory: { startsWith: `${prefix}/` } }),
+    ])
+    .findMany();
+  return Object.fromEntries(rows.map((row) => [`${row.directory}/${row.name}`, row.private]));
+}
+
 async function failure(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
   let caught: unknown;
   await rejects(run, (error: unknown) => {
@@ -150,5 +160,50 @@ describe('putUpload', () => {
     );
     deepStrictEqual(temps(), []);
     strictEqual(storage.objects.has('orphan.txt'), false);
+  });
+
+  it('lands a file inside a private folder as private, locking its object', async () => {
+    await queryUntyped('Uploads').createOrThrow({
+      kind: 'folder',
+      directory: '',
+      name: 'vault',
+      private: true,
+    });
+    const upload = await putUpload({
+      directory: 'vault',
+      name: 'secret.txt',
+      body: stream(bytes('s')),
+    });
+    strictEqual(upload.private, true);
+    strictEqual(upload.url, '/uploads/vault/secret.txt');
+    strictEqual(storage.visibility.get('vault/secret.txt'), true);
+    strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('creates the folders a private one implies as private too', async () => {
+    const upload = await putUpload({
+      directory: 'vault/deep/er',
+      name: 'n.txt',
+      body: stream(bytes('n')),
+    });
+    strictEqual(upload.private, true);
+    strictEqual(storage.visibility.get('vault/deep/er/n.txt'), true);
+    deepStrictEqual(await privacy('vault'), {
+      'vault/deep': true,
+      'vault/deep/er': true,
+      'vault/deep/er/n.txt': true,
+      'vault/secret.txt': true,
+    });
+  });
+
+  it('lands a file in a public folder as public, touching no visibility', async () => {
+    const upload = await putUpload({
+      directory: 'open',
+      name: 'plain.txt',
+      body: stream(bytes('p')),
+    });
+    strictEqual(upload.private, false);
+    strictEqual(storage.visibility.has('open/plain.txt'), false);
+    deepStrictEqual(await privacy('open'), { 'open/plain.txt': false });
   });
 });

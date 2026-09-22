@@ -10,6 +10,8 @@ export interface UploadDecorations<Variant extends string = string> {
   /**
    * Where the bytes are served from: the configured `publicURL` origin, else the backend's own URL.
    * Without either, it is the API's `/uploads/<path>`.
+   * A private file's is always the API's, signed with `?e=&s=` while `UPLOADS_SECRET` is set.
+   * So is that of a file read without `private`, since it may be one.
    * Absent on a folder, which has no bytes.
    */
   url?: string;
@@ -19,6 +21,12 @@ export interface UploadDecorations<Variant extends string = string> {
    * Present only for an optimizable image when a service is configured.
    */
   variants?: Record<Variant, string>;
+
+  /**
+   * When the `url` and `variants` of a private file stop working, in epoch milliseconds.
+   * Present only on a private file, or one read without `private`, while `UPLOADS_SECRET` is set.
+   */
+  expires?: number;
 }
 
 /**
@@ -34,6 +42,13 @@ export interface UploadRecord extends UploadDecorations {
    * Whether the row is a file or a folder.
    */
   kind: 'file' | 'folder';
+
+  /**
+   * Whether the bytes open only through an expiring link or for a signed-in reader with access.
+   * A private folder locks everything inside it.
+   * `null` only on a row older than the column, until the boot fills it with `false`; either is public.
+   */
+  private: boolean | null;
 
   /**
    * The parent path with no leading slash, `''` at the root.

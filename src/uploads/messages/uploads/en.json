@@ -5,6 +5,7 @@
     "bytes": "{count, plural, one {# byte} other {# bytes}}",
     "completed": "Completed",
     "copied": "Copied",
+    "copyTemporaryLink": "Copy temporary link",
     "copyURL": "Copy URL",
     "deleteConfirm": "Are you sure you want to delete `{name}`?",
     "deleteFolderNote": "Deleting a folder also deletes everything inside it.",
@@ -41,6 +42,13 @@
     "image": "Image",
     "imageNotFound": "Image not found",
     "itemsConflict": "Some items already exist at the destination",
+    "linkCopied": "Temporary link copied",
+    "linkFailed": "The link could not be made",
+    "linksExpire": "These links expire `{when}`",
+    "madePrivate": "{count, plural, one {# item is now private} other {# items are now private}}",
+    "madePublic": "{count, plural, one {# item is now public} other {# items are now public}}",
+    "makePrivate": "Make private",
+    "makePublic": "Make public",
     "media": "Media",
     "mediaLibrary": "Media library",
     "move": "Move",
@@ -60,6 +68,8 @@
     "openInNewTab": "Open in new tab",
     "pending": "Pending",
     "pixels": "pixels",
+    "private": "Private",
+    "privateHint": "Only a temporary link or a signed-in reader with access can open the file.",
     "rename": "Rename",
     "renameFailed": "An error occurred while renaming",
     "renameFile": "Rename file",
@@ -99,6 +109,10 @@
     "kind": {
       "label": "Kind",
       "description": "Whether this row is a file or a folder."
+    },
+    "private": {
+      "label": "Private",
+      "description": "Whether the file opens only through a temporary link or for a signed-in reader with access; a folder locks everything inside it."
     },
     "directory": {
       "label": "Folder",
@@ -150,9 +164,13 @@
     }
   },
   "journal": {
+    "sequence": {
+      "label": "Sequence",
+      "description": "The order the effect was written in; effects run in this order."
+    },
     "op": {
       "label": "Operation",
-      "description": "The storage effect to run, a move or a delete."
+      "description": "The storage effect to run."
     },
     "from": {
       "label": "From",
@@ -160,7 +178,7 @@
     },
     "to": {
       "label": "To",
-      "description": "The destination of a move; empty for a delete."
+      "description": "The destination of a move; empty for every other operation."
     }
   },
   "menu": {
