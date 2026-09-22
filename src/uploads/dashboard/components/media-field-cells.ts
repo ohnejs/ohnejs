@@ -1,5 +1,5 @@
 import { attachTooltip, css, dimMark, type FieldType, h, icon } from 'ohnejs/dashboard';
-import { isArray, isNull, isString, isUndefined, onCleanup } from 'ohnejs/utils';
+import { isArray, isNull, isString, isUndefined, onCleanup, shortUUID } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -70,7 +70,7 @@ function uploadCell(uuid: string, image: boolean): HTMLElement {
   const root = h('span', { class: 'o-media-cell' }, () => {
     const record = mediaRecords.get(uuid);
     if (isUndefined(record)) {
-      return h('span', { class: 'cell-mono cell-dim', title: uuid }, uuid.slice(0, 8));
+      return h('span', { class: 'cell-mono cell-dim', title: uuid }, shortUUID(uuid));
     }
     if (isNull(record)) {
       return h('span', { class: 'cell-dim ohne-truncate' }, notFoundLabel(t, image, uuid));
