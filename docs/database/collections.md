@@ -483,7 +483,7 @@ Search and sorting use the label's fields. A picker search matches each of its f
 against every field.
 
 If you omit the option, the first readable text field gives the record its title. A record with no
-label text shows `#` plus the first eight characters of its `UUID`.
+label text shows `#` plus the last eight characters of its `UUID`.
 
 ### Table columns
 
