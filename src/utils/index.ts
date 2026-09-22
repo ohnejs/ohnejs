@@ -60,6 +60,7 @@ export * from './dot-notation/dot-set.ts';
 export * from './dot-notation/dot-unflatten.ts';
 export * from './dot-notation/dot-unset.ts';
 export * from './dot-notation/parse-dot-notation.ts';
+export * from './duration/align-expiry.ts';
 export * from './duration/format-duration.ts';
 export * from './duration/measure.ts';
 export * from './duration/parse-duration.ts';
