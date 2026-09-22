@@ -1,8 +1,8 @@
 /**
  * Generates an RFC 9562 UUIDv7.
  * The first 48 bits hold the Unix-millisecond timestamp, big-endian; the remaining 74 are random.
- * Ids therefore sort lexicographically in generation order.
- * That keeps inserts local in a text primary-key B-tree and UUID tiebreakers roughly chronological.
+ * Ids sort by the millisecond they were minted in; within one millisecond they order at random.
+ * The timestamp prefix keeps inserts local in a text primary-key B-tree.
  *
  * Isomorphic: uses `globalThis.crypto`, available in Node and browsers alike.
  *
