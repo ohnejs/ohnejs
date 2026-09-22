@@ -28,6 +28,7 @@ function upload(path: string, kind: 'file' | 'folder' = 'file'): UploadRecord {
   return {
     UUID: path,
     kind,
+    private: false,
     directory,
     name,
     type: kind === 'file' ? 'image/png' : null,

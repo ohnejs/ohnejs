@@ -10,6 +10,7 @@ import {
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
+import { useUploadsT } from './_messages.ts';
 import { previewURL } from './media-library-data.ts';
 import { mediaPath, type MediaSelectionMode, type MediaView } from './media-library-state.ts';
 
@@ -149,21 +150,28 @@ css`
     opacity: 0.5;
   }
 
+  .o-media-lock,
   .o-media-image-dimensions,
   .o-media-image-size {
-    position: absolute;
     padding: 0 0.1875rem;
     font-size: 0.75rem;
     line-height: 1rem;
-    pointer-events: none;
     background-color: hsl(var(--ohne-muted));
     border-radius: 0.25rem;
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .o-media-lock {
+    display: inline-flex;
+    align-items: center;
+    height: 1rem;
+  }
+
   .o-media-image-dimensions {
+    position: absolute;
     top: 0.5rem;
     left: 0.5rem;
+    pointer-events: none;
   }
 
   .o-media-image-compact .o-media-image-dimensions {
@@ -171,12 +179,19 @@ css`
     left: 0.375rem;
   }
 
-  .o-media-image-size {
+  .o-media-image-meta {
+    position: absolute;
     bottom: 0.5rem;
     right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
   }
 
-  .o-media-image-compact .o-media-image-size {
+  .o-media-image-size {
+    pointer-events: none;
+  }
+
+  .o-media-image-compact .o-media-image-meta {
     bottom: 0.375rem;
     right: 0.375rem;
   }
@@ -194,7 +209,7 @@ css`
       left: 0.375rem;
     }
 
-    .o-media-image-size {
+    .o-media-image-meta {
       bottom: 0.375rem;
       right: 0.375rem;
     }
@@ -280,8 +295,18 @@ export function disabledIndicator(className: string, reason: () => string): HTML
 }
 
 /**
+ * The corner pill marking a private row, its meaning in a tooltip.
+ */
+export function lockPill(className: string): HTMLElement {
+  const t = useUploadsT();
+  const el = h('span', { class: `o-media-lock ${className}` }, icon('lock'));
+  onCleanup(attachTooltip(el, () => t('uploads.dashboard.private')));
+  return el;
+}
+
+/**
  * An image tile: the thumbnail over a checkerboard, its byte size in a corner caption.
- * A sized image also captions its pixel dimensions.
+ * A sized image also captions its pixel dimensions; a private one wears a lock pill beside its size.
  * Hover, focus, and selection shrink the thumbnail onto a card-colored ground.
  * The link opens the file's details; a picker click picks or toggles instead.
  */
@@ -323,7 +348,15 @@ export function mediaImageItem(
             () => `${record().width} x ${record().height}`,
           ),
       ),
-      h('span', { class: 'o-media-image-size' }, () => formatBytes(record().size ?? 0)),
+      h(
+        'span',
+        { class: 'o-media-image-meta' },
+        when(
+          () => record().private,
+          () => lockPill('o-media-image-lock'),
+        ),
+        h('span', { class: 'o-media-image-size' }, () => formatBytes(record().size ?? 0)),
+      ),
     ),
     when(
       () => disabled().value,

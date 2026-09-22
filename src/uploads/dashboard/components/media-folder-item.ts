@@ -1,8 +1,9 @@
-import { css, h, icon } from 'ohnejs/dashboard';
+import { css, h, icon, when } from 'ohnejs/dashboard';
 import { ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
+import { lockPill } from './media-image-item.ts';
 import { moveUploads } from './media-library-data.ts';
 import { mediaPath, type MediaView } from './media-library-state.ts';
 
@@ -69,6 +70,24 @@ css`
     stroke-width: 1;
   }
 
+  .o-media-folder-lock {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+  }
+
+  /* Transparent to a drag, so the drop highlight never flickers while the pointer crosses it. */
+  .o-media-library-moving .o-media-folder-lock {
+    pointer-events: none;
+  }
+
+  @media (max-width: 767px) {
+    .o-media-folder-lock {
+      bottom: 0.375rem;
+      right: 0.375rem;
+    }
+  }
+
   .o-media-item-selected .o-media-folder-item-button,
   .o-media-item-box:hover .o-media-folder-item-button,
   .o-media-item-box:focus-within .o-media-folder-item-button,
@@ -84,6 +103,7 @@ css`
 
 /**
  * A folder tile: a square link into the folder with the open-folder glyph.
+ * A private folder wears a lock pill in the corner.
  * While the view is moving it is a drop target, highlighted under the dragged selection.
  * A drop moves the selection into the folder, unless the folder is part of it.
  */
@@ -139,6 +159,10 @@ export function mediaFolderItem(
         },
       },
       glyph,
+      when(
+        () => record().private,
+        () => lockPill('o-media-folder-lock'),
+      ),
     ),
   );
 }

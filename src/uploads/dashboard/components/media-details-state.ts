@@ -32,6 +32,11 @@ export type DetailsState = {
    * The focal point's vertical position, `0` to `1`, `null` when none is set.
    */
   focalY: number | null;
+
+  /**
+   * Whether the file opens only through an expiring link or for a signed-in reader with access.
+   */
+  private: boolean;
 };
 
 /**
@@ -74,7 +79,8 @@ export function isSmallPreview(record: UploadRecord): boolean {
  * The editable details of a record, as the history stores them.
  */
 export function detailsStateOf(record: UploadRecord): DetailsState {
-  return { description: record.description, focalX: record.focalX, focalY: record.focalY };
+  const { description, focalX, focalY } = record;
+  return { description, focalX, focalY, private: record.private === true };
 }
 
 /**
@@ -110,10 +116,18 @@ export function focalPercent(fraction: number): string {
 }
 
 /**
- * The `PATCH` body a saved state sends: the description, and the focal point when the file is an image.
+ * The `PATCH` body a saved state sends: the description, plus the focal point of an image.
+ * `private` joins only when it differs from `saved`, so saving a description never undoes a lock set meanwhile.
  */
-export function detailsPatch(state: DetailsState, image: boolean): Record<string, unknown> {
-  return image ? { ...state } : { description: state.description };
+export function detailsPatch(
+  state: DetailsState,
+  image: boolean,
+  saved: DetailsState,
+): Record<string, unknown> {
+  const { description, focalX, focalY } = state;
+  const body: Record<string, unknown> = image ? { description, focalX, focalY } : { description };
+  if (state.private !== saved.private) body.private = state.private;
+  return body;
 }
 
 /**

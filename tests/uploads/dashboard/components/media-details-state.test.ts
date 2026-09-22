@@ -22,6 +22,7 @@ function upload(
   return {
     UUID: name,
     kind: 'file',
+    private: false,
     directory: '',
     name,
     type,
@@ -71,8 +72,18 @@ describe('detailsStateOf', () => {
       description: 'Sunset',
       focalX: 0.5,
       focalY: 0.25,
+      private: true,
     });
-    deepStrictEqual(detailsStateOf(record), { description: 'Sunset', focalX: 0.5, focalY: 0.25 });
+    deepStrictEqual(detailsStateOf(record), {
+      description: 'Sunset',
+      focalX: 0.5,
+      focalY: 0.25,
+      private: true,
+    });
+  });
+
+  it('reads a row from before private uploads, holding null, as public', () => {
+    strictEqual(detailsStateOf(upload('b.png', 'image/png', { private: null })).private, false);
   });
 });
 
@@ -103,9 +114,21 @@ describe('focalPercent', () => {
 
 describe('detailsPatch', () => {
   it('sends the focal point for an image only', () => {
-    const state = { description: 'Sunset', focalX: 0.5, focalY: 0.5 };
-    deepStrictEqual(detailsPatch(state, true), state);
-    deepStrictEqual(detailsPatch(state, false), { description: 'Sunset' });
+    const state = { description: 'Sunset', focalX: 0.5, focalY: 0.5, private: false };
+    deepStrictEqual(detailsPatch(state, true, state), {
+      description: 'Sunset',
+      focalX: 0.5,
+      focalY: 0.5,
+    });
+    deepStrictEqual(detailsPatch(state, false, state), { description: 'Sunset' });
+  });
+
+  it('sends privacy only when it changed, so a save never undoes a lock set meanwhile', () => {
+    const saved = { description: 'Sunset', focalX: null, focalY: null, private: false };
+    deepStrictEqual(detailsPatch({ ...saved, private: true }, false, saved), {
+      description: 'Sunset',
+      private: true,
+    });
   });
 });
 

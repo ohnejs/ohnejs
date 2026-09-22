@@ -48,6 +48,7 @@ import {
   parseMediaQuery,
   resolveUploadURL,
   serializeMediaQuery,
+  setUploadsPrivate,
   stripDetailsParam,
   uploadsCollection,
   uploadsPermissions,
@@ -251,7 +252,7 @@ export function mediaActionsRegistry(): MediaActions {
  * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
  * Escape clears, and Delete deletes.
  * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
- * A right-click opens the record's context menu: open, rename, move, details, and delete.
+ * A right-click opens the record's context menu: open, rename, move, make private or public, details, delete.
  * Empty folders say so once the read has answered.
  */
 export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
@@ -378,6 +379,13 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
       canUpdate && actions.onMove
         ? menuItem('file-arrow-right', t('uploads.dashboard.move'), () =>
             actions.onMove?.([record]),
+          )
+        : null,
+      canUpdate
+        ? menuItem(
+            record.private ? 'lock-open' : 'lock',
+            t(record.private ? 'uploads.dashboard.makePublic' : 'uploads.dashboard.makePrivate'),
+            () => void setUploadsPrivate([record], !record.private),
           )
         : null,
       folder ? null : menuItem('info-circle', t('uploads.dashboard.details'), details),

@@ -38,6 +38,7 @@ import { useUploadsT } from './_messages.ts';
 import { mediaActions } from './media-actions.ts';
 import {
   confirmDeleteUploads,
+  setUploadsPrivate,
   uploadsCollection,
   uploadsPermissions,
 } from './media-library-data.ts';
@@ -125,6 +126,8 @@ css`
 /**
  * The footer row: pagination on the left, the action cluster on the right.
  * The cluster holds the selection actions while something is selected, then search, filter, and sorting.
+ * The selection actions are delete, clear, move, make private, and make public.
+ * Make private shows while a public item is selected, make public while a private one is.
  * On the page it ends with New folder and Upload; in a multiple picker with Apply.
  * Left and right arrows page while no overlay sits above the footer's own surface.
  * Cmd/Ctrl+K opens the search popup, whose keyword filters file names across the folder's subtree.
@@ -217,6 +220,20 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       () => t('uploads.dashboard.move'),
       () => options.onMove?.(untracked(() => view.selection.value)),
     );
+
+  const privacyButton = (value: boolean): HTMLElement =>
+    iconButton(
+      value ? 'lock' : 'lock-open',
+      () => t(value ? 'uploads.dashboard.makePrivate' : 'uploads.dashboard.makePublic'),
+      () =>
+        void setUploadsPrivate(
+          untracked(() => view.selection.value),
+          value,
+        ),
+    );
+
+  const selects = (locked: boolean): boolean =>
+    view.selection.value.some((record) => (record.private === true) === locked);
 
   const searchButton = iconButton(
     'search',
@@ -419,6 +436,14 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       when(() => hasSelection() && canDelete, deleteButton),
       when(hasSelection, clearButton),
       when(() => hasSelection() && canUpdate && !isUndefined(options.onMove), moveButton),
+      when(
+        () => hasSelection() && canUpdate && selects(false),
+        () => privacyButton(true),
+      ),
+      when(
+        () => hasSelection() && canUpdate && selects(true),
+        () => privacyButton(false),
+      ),
       searchButton,
       filterButton,
       sortingButton,

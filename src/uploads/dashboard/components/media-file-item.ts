@@ -7,6 +7,7 @@ import {
   detailsHref,
   disabledIndicator,
   fileTileClick,
+  lockPill,
   type MediaFileTileOptions,
   type MediaItemDisabled,
 } from './media-image-item.ts';
@@ -102,17 +103,23 @@ css`
     stroke-width: 0.75;
   }
 
-  .o-media-file-size {
+  .o-media-file-meta {
     position: absolute;
     bottom: 0.5rem;
     right: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .o-media-file-size {
     pointer-events: none;
     font-size: 0.75rem;
     line-height: 1rem;
     color: hsl(var(--ohne-muted-foreground));
   }
 
-  .o-media-file-compact .o-media-file-size {
+  .o-media-file-compact .o-media-file-meta {
     bottom: 0.375rem;
     right: 0.375rem;
   }
@@ -125,7 +132,7 @@ css`
   }
 
   @media (max-width: 767px) {
-    .o-media-file-size {
+    .o-media-file-meta {
       bottom: 0.375rem;
       right: 0.375rem;
     }
@@ -158,6 +165,7 @@ export function fileIcon(record: UploadRecord): IconName {
 
 /**
  * A file tile: the type's glyph centered on a square, the byte size in the corner.
+ * A private file wears a lock pill beside its size.
  * Hover, focus, and selection lift it onto a card-colored ground.
  * The link opens the file's details; a picker click picks or toggles instead.
  */
@@ -187,7 +195,15 @@ export function mediaFileItem(
         onClick: (event: MouseEvent) => fileTileClick(record, options, event),
       },
       glyph,
-      h('span', { class: 'o-media-file-size' }, () => formatBytes(record().size ?? 0)),
+      h(
+        'span',
+        { class: 'o-media-file-meta' },
+        when(
+          () => record().private,
+          () => lockPill('o-media-file-lock'),
+        ),
+        h('span', { class: 'o-media-file-size' }, () => formatBytes(record().size ?? 0)),
+      ),
     ),
     when(
       () => disabled().value,

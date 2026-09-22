@@ -1,4 +1,4 @@
-import { isUndefined, type Ref, ref, untracked } from 'ohnejs/utils';
+import { isNull, isNumber, isUndefined, type Ref, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -22,6 +22,14 @@ export interface MediaCacheOptions {
    * 500
    */
   capacity?: number;
+
+  /**
+   * The clock a record's `expires` is checked against, in epoch milliseconds.
+   *
+   * @default
+   * Date.now
+   */
+  now?: () => number;
 }
 
 /**
@@ -32,11 +40,12 @@ export interface MediaCache {
   /**
    * The record for `uuid`, reactive.
    * An unknown `uuid` schedules a batched fetch, so a binding resolves in place.
+   * A record whose `expires` has passed schedules one too and stays in place until the answer lands.
    */
   get(uuid: string): UploadRecord | null | undefined;
 
   /**
-   * Resolves the records for `uuids` in the given order, fetching only the unseen ones.
+   * Resolves the records for `uuids` in the given order, fetching only the unseen and the expired ones.
    * An entry stays `undefined` when its request failed.
    * Never subscribes a reactive caller; a binding reads through `get`.
    */
@@ -65,6 +74,7 @@ const DEFAULT_CAPACITY = 500;
  * Creates a `MediaCache` over `load`.
  * Reads within one microtask coalesce into one request; a `UUID` already in flight is never asked twice.
  * A failed request leaves its entries unresolved, so a later read re-enqueues them.
+ * An expired record is re-asked once per `expires` value, so an already expired answer never loops.
  *
  * @example
  * ```ts
@@ -81,9 +91,11 @@ export function createMediaCache(
   options: MediaCacheOptions = {},
 ): MediaCache {
   const capacity = options.capacity ?? DEFAULT_CAPACITY;
+  const now = options.now ?? Date.now;
   const entries = new Map<string, Ref<UploadRecord | null | undefined>>();
   const pending = new Set<string>();
   const inFlight = new Map<string, Promise<void>>();
+  const renewed = new Map<string, number>();
   let batch: Batch | undefined;
 
   const entryOf = (uuid: string): Ref<UploadRecord | null | undefined> => {
@@ -102,8 +114,19 @@ export function createMediaCache(
   const evict = (): void => {
     for (const uuid of entries.keys()) {
       if (entries.size <= capacity) return;
-      if (!pending.has(uuid) && !inFlight.has(uuid)) entries.delete(uuid);
+      if (!pending.has(uuid) && !inFlight.has(uuid)) {
+        entries.delete(uuid);
+        renewed.delete(uuid);
+      }
     }
+  };
+
+  const stale = (uuid: string, value: UploadRecord | null | undefined): boolean => {
+    if (isUndefined(value)) return true;
+    if (isNull(value) || !isNumber(value.expires) || value.expires > now()) return false;
+    if (renewed.get(uuid) === value.expires) return false;
+    renewed.set(uuid, value.expires);
+    return true;
   };
 
   const flush = async (): Promise<void> => {
@@ -127,8 +150,11 @@ export function createMediaCache(
         for (const uuid of uuids) {
           if (!answered.has(uuid)) entryOf(uuid).value = null;
         }
+      } else {
+        for (const uuid of uuids) renewed.delete(uuid);
       }
     } catch {
+      for (const uuid of uuids) renewed.delete(uuid);
     } finally {
       for (const uuid of uuids) inFlight.delete(uuid);
       current.resolve();
@@ -156,12 +182,12 @@ export function createMediaCache(
   return {
     get(uuid) {
       const value = entryOf(uuid).value;
-      if (isUndefined(value)) void enqueue(uuid);
+      if (stale(uuid, value)) void enqueue(uuid);
       return value;
     },
     async load(uuids) {
       const waits = untracked(() =>
-        uuids.filter((uuid) => isUndefined(entryOf(uuid).value)).map((uuid) => enqueue(uuid)),
+        uuids.filter((uuid) => stale(uuid, entryOf(uuid).value)).map((uuid) => enqueue(uuid)),
       );
       await Promise.all(waits);
       return uuids.map((uuid) => entryOf(uuid).value);

@@ -10,6 +10,7 @@ function upload(uuid: string): UploadRecord {
   return {
     UUID: uuid,
     kind: 'file',
+    private: false,
     directory: '',
     name: `${uuid}.png`,
     type: 'image/png',
@@ -133,6 +134,78 @@ describe('createMediaCache', () => {
       ['a', 'b'],
       ['a', 'b'],
     ]);
+  });
+
+  it('re-fetches a record whose links have expired and keeps it until the answer lands', async () => {
+    let clock = 1000;
+    let expires = 2000;
+    const backend = loader((uuids) =>
+      uuids.map((uuid) => ({ ...upload(uuid), private: true, expires })),
+    );
+    const cache = createMediaCache(backend.load, { now: () => clock });
+    await cache.load(['a']);
+    strictEqual(cache.get('a')?.expires, 2000);
+    await settle();
+    deepStrictEqual(backend.calls, [['a']]);
+    clock = 2000;
+    expires = 3000;
+    strictEqual(cache.get('a')?.expires, 2000);
+    await settle();
+    strictEqual(cache.get('a')?.expires, 3000);
+    deepStrictEqual(backend.calls, [['a'], ['a']]);
+  });
+
+  it('resolves a load with the renewed record once its links have expired', async () => {
+    let clock = 1000;
+    let expires = 2000;
+    const backend = loader((uuids) =>
+      uuids.map((uuid) => ({ ...upload(uuid), private: true, expires })),
+    );
+    const cache = createMediaCache(backend.load, { now: () => clock });
+    await cache.load(['a', 'b']);
+    clock = 2000;
+    expires = 3000;
+    const records = await cache.load(['a', 'b']);
+    deepStrictEqual(
+      records.map((record) => record?.expires),
+      [3000, 3000],
+    );
+    deepStrictEqual(backend.calls, [
+      ['a', 'b'],
+      ['a', 'b'],
+    ]);
+  });
+
+  it('asks once for an expiry the server keeps answering, and again after a failed request', async () => {
+    let fail = false;
+    const backend = loader((uuids) =>
+      fail ? undefined : uuids.map((uuid) => ({ ...upload(uuid), private: true, expires: 500 })),
+    );
+    const cache = createMediaCache(backend.load, { now: () => 1000 });
+    await cache.load(['a']);
+    strictEqual(cache.get('a')?.expires, 500);
+    await settle();
+    strictEqual(cache.get('a')?.expires, 500);
+    await settle();
+    deepStrictEqual(backend.calls, [['a'], ['a']]);
+    fail = true;
+    const cacheB = createMediaCache(backend.load, { now: () => 1000 });
+    cacheB.seed({ ...upload('b'), private: true, expires: 500 });
+    strictEqual(cacheB.get('b')?.expires, 500);
+    await settle();
+    strictEqual(cacheB.get('b')?.expires, 500);
+    await settle();
+    deepStrictEqual(backend.calls, [['a'], ['a'], ['b'], ['b']]);
+  });
+
+  it('never re-fetches a record without an expiry or one the server lacks', async () => {
+    const backend = loader((uuids) => known(uuids.filter((uuid) => uuid !== 'gone')));
+    const cache = createMediaCache(backend.load, { now: () => Number.MAX_SAFE_INTEGER });
+    await cache.load(['a', 'gone']);
+    strictEqual(cache.get('a')?.UUID, 'a');
+    strictEqual(cache.get('gone'), null);
+    await settle();
+    deepStrictEqual(backend.calls, [['a', 'gone']]);
   });
 
   it('evicts the least recently read record over capacity, never one still owed an answer', async () => {

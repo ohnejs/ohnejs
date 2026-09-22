@@ -91,7 +91,7 @@ export interface UploadsPermissions {
 export const UPLOADS_COLLECTION = 'Uploads';
 
 /**
- * How many move or delete requests run at once.
+ * How many requests of a bulk action run at once.
  */
 export const BATCH_LIMIT = 5;
 
@@ -241,6 +241,47 @@ export async function moveUploads(
     });
   }
   return moved;
+}
+
+/**
+ * Makes records private or public, one `PATCH` each with bounded concurrency.
+ * The server takes a folder's contents along, so the rows go as given.
+ * Refreshes the libraries and toasts the changed count; nothing changing on a non-empty set is an error.
+ * Resolves the number of rows changed.
+ */
+export async function setUploadsPrivate(
+  records: readonly UploadRecord[],
+  value: boolean,
+): Promise<number> {
+  const t = useUploadsT();
+  const results = await runBatched(records, BATCH_LIMIT, (record) =>
+    api(`PATCH /uploads/${record.UUID}`, {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ private: value }),
+    }),
+  );
+  const changed = results.filter((result) => landed(result)).length;
+  if (changed > 0) refreshMedia();
+  if (records.length > 0) {
+    const key = value ? 'uploads.dashboard.madePrivate' : 'uploads.dashboard.madePublic';
+    toast(t(key, { count: changed }), { type: changed > 0 ? 'success' : 'error' });
+  }
+  return changed;
+}
+
+/**
+ * Asks the server for a link to a private file that anyone can open for `maxAge`, a duration like `7d`.
+ * Resolves the absolute URL, or `undefined` when the server declined or could not be reached.
+ */
+export async function temporaryLink(uuid: string, maxAge: string): Promise<string | undefined> {
+  try {
+    const response = await api(`GET /uploads/${uuid}/link?${stringifySearchParams({ maxAge })}`);
+    if (!response.ok) return undefined;
+    const { url } = (await response.json()) as { url: string };
+    return new URL(url, dashboardConfig().apiURL).href;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
