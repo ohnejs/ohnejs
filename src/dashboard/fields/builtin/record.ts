@@ -17,6 +17,7 @@ import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
 import { h } from '../../render/h.ts';
 import { api } from '../../runtime/api.ts';
 import { useT } from '../../runtime/use-t.ts';
@@ -181,7 +182,7 @@ export const recordType: FieldType = {
       const target = field.target ?? '';
       const resolved = labelOf(target, uuid);
       if (isUndefined(resolved)) {
-        return h('span', { class: 'cell-mono cell-dim', title: uuid }, uuid.slice(0, 8));
+        return h('span', { class: 'cell-mono cell-dim', title: uuid }, shortUUID(uuid));
       }
       return h('span', { class: 'ohne-truncate', title: uuid }, resolved);
     };

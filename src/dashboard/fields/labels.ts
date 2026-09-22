@@ -7,6 +7,7 @@ import { effect } from '../../utils/reactive/effect.ts';
 import { ref, type Ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { renderTemplate } from '../../utils/template/render-template.ts';
+import { shortUUID } from '../../utils/uuid/short-uuid.ts';
 import { api } from '../runtime/api.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
 
@@ -62,10 +63,10 @@ export function seedLabel(target: string, uuid: string, label: string): void {
 }
 
 /**
- * The placeholder naming a record without label text: `#` plus the `UUID`'s first eight characters.
+ * The placeholder naming a record without label text: `#` plus the `UUID`'s last eight characters.
  */
 export function fallbackLabel(uuid: string): string {
-  return `#${uuid.slice(0, 8)}`;
+  return `#${shortUUID(uuid)}`;
 }
 
 /**

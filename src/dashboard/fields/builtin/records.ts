@@ -9,6 +9,7 @@ import { deepEqual } from '../../../utils/object/deep-equal.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
@@ -46,7 +47,7 @@ export const recordsType: FieldType = {
       const resolved = labelOf(field.target ?? '', first);
       return [
         isUndefined(resolved)
-          ? h('span', { class: 'cell-mono cell-dim' }, first.slice(0, 8))
+          ? h('span', { class: 'cell-mono cell-dim' }, shortUUID(first))
           : h('span', { class: 'ohne-truncate', title: first }, resolved),
         links.length > 1 ? dimMark(` +${links.length - 1}`) : null,
       ];
