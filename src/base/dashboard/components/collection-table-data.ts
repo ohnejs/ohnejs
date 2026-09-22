@@ -14,7 +14,7 @@ import {
   seedLabel,
   useDashboardLanguage,
 } from 'ohnejs/dashboard';
-import { hasKey, isEmpty, isNumber, isString, onCleanup, untracked } from 'ohnejs/utils';
+import { hasKey, isEmpty, isNumber, isString, onCleanup, shortUUID, untracked } from 'ohnejs/utils';
 
 import { sortableFieldsOf } from './collection-table-state.ts';
 import { translationsCell } from './translations-cell.ts';
@@ -151,7 +151,7 @@ export function displayFor(field: DashboardField, row: TableRecord): Child {
     return () => {
       const value = row['UUID'];
       if (!isString(value)) return dimMark('-');
-      return h('span', { class: 'cell-mono cell-dim', title: value }, value.slice(0, 8));
+      return h('span', { class: 'cell-mono cell-dim', title: value }, shortUUID(value));
     };
   }
   return fieldTypeFor(field).display({
