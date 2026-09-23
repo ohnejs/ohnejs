@@ -115,8 +115,10 @@ temporaryUploadURL(upload, '7d');
 
 ## Storage and the image service
 
-A [storage backend](./uploads.md#storage) that serves its objects by path can lock them too, with
-`setPrivate`.
+A [storage backend](./uploads.md#storage) whose objects are readable without the API can lock them
+too, with `setPrivate`. [`@ohnejs/uploads-s3`](./uploads.md#storing-files-in-s3) tags a private
+object, and its [README](https://github.com/ohnejs/uploads-s3#private-files) has the bucket policy
+that refuses it.
 
 An [image service](./image-service.md#what-a-service-does) fetches a private original through a
 signed link of its own, made with `IMAGES_SOURCE_SECRET`, one of the values in `UPLOADS_SECRET`.

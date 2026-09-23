@@ -84,8 +84,8 @@ export interface StorageAdapter {
 
   /**
    * Marks the object at `path`, or every object under the prefix `path/`, private or public again.
-   * `true` locks: a backend that serves its objects itself stops opening them without the API.
-   * A backend that leaves serving to the API omits it, since the API route guards every read.
+   * `true` locks an object readable without the API, from the backend or through `uploads.publicURL`.
+   * A backend whose objects only the API route serves omits it, since the route guards every read.
    * A missing path is a no-op, so a replay is harmless.
    */
   setPrivate?(path: string, value: boolean): Promise<void>;

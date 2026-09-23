@@ -199,9 +199,10 @@ export default defineConfig({
 ```
 
 - `storage` - the backend, by the name a boot file [registered](#storage) it under. The layer ships
-  `fs`.
+  `fs`; [`@ohnejs/uploads-s3`](#storing-files-in-s3) adds `s3`.
 - `url` - where the backend keeps the files, in whatever form it understands. For `fs` it is a
-  directory, resolved against the working directory. The `UPLOADS_URL` env var overrides it.
+  directory, resolved against the working directory. For `s3` it is a bucket and prefix, as
+  [Storing files in S3](#storing-files-in-s3) shows. The `UPLOADS_URL` env var overrides it.
 - `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
 - `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
   wildcards, and category names such as `document`, in the
@@ -231,14 +232,14 @@ by name:
 // boot/storage.ts
 import { useStorages } from 'ohnejs/uploads';
 
-import { createS3Storage } from '../storage/s3.ts';
+import { createGCSStorage } from '../storage/gcs.ts';
 
-useStorages().register('s3', (url) => createS3Storage(url));
+useStorages().register('gcs', (url) => createGCSStorage(url));
 ```
 
 ```ts
 // ohne.config.ts
-uploads: { storage: 's3', url: 's3://bucket?region=eu-central-1' },
+uploads: { storage: 'gcs', url: 'gs://my-bucket/uploads' },
 ```
 
 A backend is a `StorageAdapter`:
@@ -261,3 +262,26 @@ and run it after the commit:
 
 The `fs` backend writes a file to a temp file beside its target and renames it into place. It
 removes empty parent directories after a delete, and moves a folder in one rename.
+
+## Storing files in S3
+
+For S3 and S3-compatible services, install
+[`@ohnejs/uploads-s3`](https://github.com/ohnejs/uploads-s3).
+
+```sh
+pnpm add @ohnejs/uploads-s3
+```
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/uploads-s3'],
+  uploads: { storage: 's3', url: 's3://my-bucket/uploads?region=eu-central-1' },
+});
+```
+
+Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The
+[package README](https://github.com/ohnejs/uploads-s3#readme) covers bucket setup, private files,
+and services such as R2 and MinIO.

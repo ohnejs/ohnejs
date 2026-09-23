@@ -13,7 +13,9 @@ declare module 'ohnejs' {
     uploads?: {
       /**
        * The storage backend, by the name a boot file registered it under.
-       * The layer ships `fs`, which keeps files on the local filesystem.
+       *
+       * - The layer ships `fs`, which keeps files on the local filesystem.
+       * - `@ohnejs/uploads-s3` adds `s3`.
        *
        * @default
        * 'fs'
@@ -22,7 +24,10 @@ declare module 'ohnejs' {
 
       /**
        * Where the backend keeps the files, in whatever form the backend understands.
-       * For `fs` it is a directory, resolved against the working directory.
+       *
+       * - For `fs` it is a directory, resolved against the working directory.
+       * - For `s3` it is `s3://<bucket>/<prefix>`, with options in the query.
+       *
        * The `UPLOADS_URL` env var takes precedence whenever it is set.
        *
        * @default
