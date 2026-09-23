@@ -136,6 +136,9 @@ IMAGES_SECRET=you-are-not-prepared
 UPLOADS_SECRET=frostmourne-hungers
 ```
 
+When you store files with [`@ohnejs/uploads-s3`](../uploads/uploads.md#storing-files-in-s3), also set
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
 Set them in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project
 root on a single-host deploy. The file only sets variables the environment does not have and never
 overrides it, so a value set by the platform always wins.
