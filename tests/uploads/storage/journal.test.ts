@@ -1,6 +1,7 @@
 import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { withLock } from '../../../src/ohne/database/with-lock.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
@@ -10,6 +11,7 @@ import {
   type JournalEntry,
 } from '../../../src/uploads/storage/journal.ts';
 import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
+import { sleep } from '../../../src/utils/index.ts';
 import { bytes, db, storage, text } from '../_fixture.ts';
 import { createMemoryStorage } from '../_storage.ts';
 
@@ -284,5 +286,21 @@ describe('drainJournal', () => {
     } finally {
       useLayers().remove('/journal-plain');
     }
+  });
+
+  it('waits while another instance holds the drain, so no entry replays twice at once', async () => {
+    storage.objects.set('drain/held.txt', bytes('h'));
+    await journal({ op: 'lock', from: 'drain/held.txt' });
+    let release = (): void => undefined;
+    const other = withLock('uploads:journal', () => new Promise<void>((done) => (release = done)));
+
+    const drained = drainJournal();
+    await sleep(50);
+    deepStrictEqual(await pending(), ['lock drain/held.txt']);
+
+    release();
+    await other;
+    strictEqual(await drained, true);
+    deepStrictEqual(await pending(), []);
   });
 });

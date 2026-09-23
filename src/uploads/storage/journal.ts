@@ -1,6 +1,6 @@
 import type { Transaction } from 'ohnejs';
 
-import { queryUntyped, usePrinter } from 'ohnejs';
+import { queryUntyped, usePrinter, withLock } from 'ohnejs';
 import { createMutex, errorMessage, isNull, isPathInside } from 'ohnejs/utils';
 
 import type { StorageAdapter } from './adapter.ts';
@@ -27,6 +27,8 @@ type StoredEntry = {
 };
 
 const draining = createMutex();
+
+const JOURNAL_LOCK = 'uploads:journal';
 
 /**
  * Records a storage effect on `tx`, so it commits or rolls back with the row change it belongs to.
@@ -64,7 +66,8 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
  * An effect that fails is warned about and left for the next drain.
  * So is every later entry on its path, or above or below it, since that entry may build on it.
  * So is a journal that cannot be read or a storage that cannot be built; nothing here throws.
- * Drains serialize, so two callers never replay the same entry at once.
+ * Drains serialize across every instance under a cluster lock, so no two replay the same entry at once.
+ * Otherwise a slow replay of an older entry could land after a newer one on the same path.
  * Resolves `true` when every entry settled, and `false` when any was held or nothing could be drained.
  *
  * @example
@@ -74,26 +77,31 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
  */
 export function drainJournal(): Promise<boolean> {
   return draining(async () => {
-    let storage: StorageAdapter;
-    let entries: StoredEntry[];
     try {
-      storage = useStorage();
-      entries = (await queryUntyped('UploadsJournal')
-        .orderBy('sequence')
-        .findMany()) as StoredEntry[];
+      return await withLock(JOURNAL_LOCK, drain);
     } catch (error) {
       usePrinter().warn(`Storage journal not drained: ${errorMessage(error)}`);
       return false;
     }
-    const held: string[] = [];
-    for (const entry of entries) {
-      if (entry.op === 'stage') continue;
-      const paths = isNull(entry.to) ? [entry.from] : [entry.from, entry.to];
-      const waits = paths.some((path) => held.some((other) => overlaps(path, other)));
-      if (waits || !(await settle(storage, entry))) held.push(...paths);
-    }
-    return held.length === 0;
   });
+}
+
+/**
+ * Settles every pending entry in `sequence` order, holding back the later ones on a failed entry's paths.
+ */
+async function drain(): Promise<boolean> {
+  const storage = useStorage();
+  const entries = (await queryUntyped('UploadsJournal')
+    .orderBy('sequence')
+    .findMany()) as StoredEntry[];
+  const held: string[] = [];
+  for (const entry of entries) {
+    if (entry.op === 'stage') continue;
+    const paths = isNull(entry.to) ? [entry.from] : [entry.from, entry.to];
+    const waits = paths.some((path) => held.some((other) => overlaps(path, other)));
+    if (waits || !(await settle(storage, entry))) held.push(...paths);
+  }
+  return held.length === 0;
 }
 
 /**
