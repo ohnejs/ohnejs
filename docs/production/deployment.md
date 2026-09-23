@@ -122,11 +122,21 @@ dashboard's origin may read API responses, cookies included.
 
 ## Secrets
 
-[Signed cookies](../api/request.md#signed-cookies) are signed with the `COOKIE_SECRET` env var, a
-long random value. Without it, signing throws instead of signing with an empty key, so set it before
-the app needs it.
+Each secret is a long random value. Set the ones your app uses:
 
-Set it in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project
+- `COOKIE_SECRET` signs [cookies](../api/request.md#signed-cookies). Without it, signing throws.
+- `IMAGES_SECRET` signs [image variant URLs](../uploads/image-variants.md#connecting-a-service).
+  Without it, an image service that checks signatures refuses every variant.
+- `UPLOADS_SECRET` signs the links of [private files](../uploads/private-files.md#the-secret).
+  Without it, every file is public.
+
+```sh
+COOKIE_SECRET=zug-zug-work-work-jobs-done
+IMAGES_SECRET=you-are-not-prepared
+UPLOADS_SECRET=frostmourne-hungers
+```
+
+Set them in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project
 root on a single-host deploy. The file only sets variables the environment does not have and never
 overrides it, so a value set by the platform always wins.
 
