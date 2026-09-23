@@ -122,7 +122,7 @@ declare module 'ohnejs' {
     /**
      * The secret that signs a private file's expiring links.
      * Several secrets may be listed, comma-separated; the first signs, any verifies.
-     * Unset, a private file opens only for a signed-in reader and no temporary link can be made.
+     * Unset, the layer keeps no private files: every file is served to anyone and no link can be made.
      *
      * @default
      * undefined
