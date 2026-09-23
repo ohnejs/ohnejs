@@ -47,6 +47,7 @@ import {
   DEFAULT_ORDER,
   type MediaSelectionMode,
   type MediaView,
+  pinned,
   searchKeyword,
   searchWhere,
 } from './media-library-state.ts';
@@ -131,6 +132,7 @@ css`
  * Make private shows while a public item is selected, make public while a private one is.
  * Both stay hidden while the layer keeps no private files.
  * On the page it ends with New folder and Upload; in a multiple picker with Apply.
+ * New folder and Upload stay hidden in a folder whose own row the scope hides.
  * Left and right arrows page while no overlay sits above the footer's own surface.
  * Cmd/Ctrl+K opens the search popup, whose keyword filters file names across the folder's subtree.
  */
@@ -223,19 +225,18 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       () => options.onMove?.(untracked(() => view.selection.value)),
     );
 
+  const changeable = (): UploadRecord[] =>
+    view.selection.value.filter((record) => !pinned(record, view.privateFolders.value));
+
   const privacyButton = (value: boolean): HTMLElement =>
     iconButton(
       value ? 'lock' : 'lock-open',
       () => t(value ? 'uploads.dashboard.makePrivate' : 'uploads.dashboard.makePublic'),
-      () =>
-        void setUploadsPrivate(
-          untracked(() => view.selection.value),
-          value,
-        ),
+      () => void setUploadsPrivate(untracked(changeable), value),
     );
 
   const selects = (locked: boolean): boolean =>
-    privateUploads() && view.selection.value.some((record) => (record.private === true) === locked);
+    privateUploads() && changeable().some((record) => (record.private === true) === locked);
 
   const searchButton = iconButton(
     'search',
@@ -274,15 +275,19 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
 
   const createEl =
     mode === 'none'
-      ? mediaActions({
-          compact: () => compact.value,
-          onCreateFolder: () => options.onCreateFolder?.(untracked(() => view.directory.value)),
-          onUpload: (files) =>
-            options.onUpload?.(
-              files,
-              untracked(() => view.directory.value),
-            ),
-        })
+      ? when(
+          () => !view.hidden.value,
+          () =>
+            mediaActions({
+              compact: () => compact.value,
+              onCreateFolder: () => options.onCreateFolder?.(untracked(() => view.directory.value)),
+              onUpload: (files) =>
+                options.onUpload?.(
+                  files,
+                  untracked(() => view.directory.value),
+                ),
+            }),
+        )
       : null;
 
   const searchHost = when(

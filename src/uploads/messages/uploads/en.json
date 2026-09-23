@@ -96,6 +96,7 @@
     "fileTooLarge": "The file must be at most `{max}`",
     "fileTooSmall": "The file must be at least `{min}`",
     "folderIntoItself": "A folder cannot be moved into itself",
+    "insidePrivateFolder": "Everything inside the private folder `{folder}` is private",
     "maxHeight": "The image must be at most `{max}` pixels tall",
     "maxWidth": "The image must be at most `{max}` pixels wide",
     "minHeight": "The image must be at least `{min}` pixels tall",

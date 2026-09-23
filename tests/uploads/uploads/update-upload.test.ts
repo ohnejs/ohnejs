@@ -21,6 +21,29 @@ async function privacy(prefix: string): Promise<Record<string, unknown>> {
   return Object.fromEntries(rows.map((row) => [`${row.directory}/${row.name}`, row.private]));
 }
 
+async function failure(run: Promise<unknown>): Promise<Record<string, unknown>> {
+  let caught: unknown;
+  await rejects(run, (error: unknown) => {
+    caught = error;
+    return isValidationError(error);
+  });
+  return (caught as { errors: Record<string, unknown> }).errors;
+}
+
+async function privateFolder(directory: string, name: string): Promise<string> {
+  const folder = await queryUntyped('Uploads').createOrThrow({
+    kind: 'folder',
+    directory,
+    name,
+    private: true,
+  });
+  return folder.UUID as string;
+}
+
+function insideFolder(folder: string): Record<string, unknown> {
+  return { private: { key: 'uploads.errors.insidePrivateFolder', params: { folder } } };
+}
+
 describe('updateUpload', () => {
   it('sets the description and the focal point, touching no storage', async () => {
     const upload = await putUpload({ directory: 'meta', name: 'a.txt', body: stream(bytes('a')) });
@@ -121,6 +144,55 @@ describe('updateUpload', () => {
     });
     strictEqual(storage.visibility.get('toggle/a/b/two.txt'), false);
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('refuses to make a file public inside a private folder', async () => {
+    await privateFolder('pin', 'vault');
+    const upload = await putUpload({
+      directory: 'pin/vault',
+      name: 'a.txt',
+      body: stream(bytes('a')),
+    });
+    strictEqual(upload.private, true);
+    deepStrictEqual(
+      await failure(updateUpload(upload.UUID, { private: false })),
+      insideFolder('pin/vault'),
+    );
+    const row = await queryUntyped('Uploads').where({ UUID: upload.UUID }).findFirst();
+    strictEqual(row?.private, true);
+    strictEqual(storage.visibility.get('pin/vault/a.txt'), true);
+    strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('refuses to make a subfolder public inside a private folder, keeping its subtree locked', async () => {
+    await privateFolder('pin-tree', 'vault');
+    await putUpload({ directory: 'pin-tree/vault/sub', name: 'b.txt', body: stream(bytes('b')) });
+    const sub = await queryUntyped('Uploads')
+      .where({ directory: 'pin-tree/vault', name: 'sub' })
+      .findFirst();
+    ok(sub);
+    deepStrictEqual(
+      await failure(updateUpload(sub.UUID as string, { private: false })),
+      insideFolder('pin-tree/vault'),
+    );
+    deepStrictEqual(await privacy('pin-tree/vault'), {
+      'pin-tree/vault/sub': true,
+      'pin-tree/vault/sub/b.txt': true,
+    });
+    strictEqual(storage.visibility.get('pin-tree/vault/sub/b.txt'), true);
+  });
+
+  it('edits a row left public inside a private folder, and locks it on request', async () => {
+    const upload = await putUpload({ directory: 'mixed', name: 'c.txt', body: stream(bytes('c')) });
+    await queryUntyped('Uploads')
+      .where({ kind: 'folder', directory: '', name: 'mixed' })
+      .updateOrThrow({ private: true });
+    const edited = await updateUpload(upload.UUID, { description: 'Still public' });
+    strictEqual(edited.private, false);
+    strictEqual(edited.description, 'Still public');
+    const locked = await updateUpload(upload.UUID, { private: true });
+    strictEqual(locked.private, true);
+    strictEqual(storage.visibility.get('mixed/c.txt'), true);
   });
 
   it('404s an unknown UUID', async () => {

@@ -1,6 +1,7 @@
-import { rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { patchUpload } from '../../../src/uploads/uploads/_patch.ts';
@@ -30,5 +31,45 @@ describe('patchUpload', () => {
     const record = await patchUpload(folder.UUID, { target: { name: 'moved' } });
     strictEqual(record.path, 'r/moved');
     strictEqual(text(storage.objects.get('r/moved/b.txt')), 'b');
+  });
+
+  it('422s a move into a private folder with private false, creating and moving nothing', async () => {
+    useEnv().set('UPLOADS_SECRET', 'secret');
+    try {
+      await queryUntyped('Uploads').createOrThrow({
+        kind: 'folder',
+        directory: 'x',
+        name: 'vault',
+        private: true,
+      });
+      const file = await putUpload({ directory: 'x', name: 'c.txt', body: stream(bytes('c')) });
+      await rejects(
+        patchUpload(file.UUID, {
+          target: { directory: 'x/vault/new' },
+          changes: { private: false },
+        }),
+        (error: unknown) => {
+          if (!isValidationError(error)) return false;
+          deepStrictEqual(error.errors, {
+            private: {
+              key: 'uploads.errors.insidePrivateFolder',
+              params: { folder: 'x/vault/new' },
+            },
+          });
+          return true;
+        },
+      );
+      const row = await queryUntyped('Uploads').where({ UUID: file.UUID }).findFirst();
+      strictEqual(row?.directory, 'x');
+      strictEqual(row?.private, false);
+      strictEqual(
+        await queryUntyped('Uploads').where({ directory: 'x/vault', name: 'new' }).exists(),
+        false,
+      );
+      strictEqual(text(storage.objects.get('x/c.txt')), 'c');
+      strictEqual(storage.objects.has('x/vault/new/c.txt'), false);
+    } finally {
+      useEnv().unset('UPLOADS_SECRET');
+    }
   });
 });

@@ -42,10 +42,11 @@ import { detailsHref, type MediaItemDisabled } from './media-image-item.ts';
 import { mediaItem, type MediaItemActions } from './media-item.ts';
 import {
   confirmDeleteUploads,
-  directoryExists,
+  directoryPresence,
   loadUploads,
   mediaMemory,
   parseMediaQuery,
+  privateFolders,
   privateUploads,
   resolveUploadURL,
   serializeMediaQuery,
@@ -67,6 +68,7 @@ import {
   type MediaSelectionMode,
   type MediaView,
   PER_PAGE,
+  pinned,
 } from './media-library-state.ts';
 
 /**
@@ -248,7 +250,7 @@ export function mediaActionsRegistry(): MediaActions {
  * Sorting by kind, media type, or folder splits the page into runs under sticky labels.
  * Only a folder has no media type, so that run reads `Folders` under either field.
  * A directory or query change reloads with a short debounce; the `media:refresh` trigger reloads in place.
- * A folder that no longer exists sends the view to the root.
+ * A folder with neither a visible row nor a visible child sends the view to the root.
  * A load clears the media page's selection, so no moved or deleted row lingers; a picker keeps its picks.
  * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
  * Escape clears, and Delete deletes.
@@ -290,17 +292,24 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     const mine = ++generation;
     const directory = untracked(() => view.directory.value);
     const query = untracked(() => view.query.value);
-    const [page, exists] = await Promise.all([
+    const [page, presence] = await Promise.all([
       loadUploads(directory, query),
-      directoryExists(directory),
+      directoryPresence(directory),
     ]);
     if (mine !== generation) return;
-    if (!exists) {
+    view.hidden.value = presence === 'hidden';
+    if (presence === 'missing') {
       view.uploads.value = [];
       view.paginated.value = { currentPage: 1, lastPage: 1, perPage: PER_PAGE, total: 0 };
       view.directory.value = '';
     } else if (!isUndefined(page)) {
       view.uploads.value = page.records;
+      view.privateFolders.value = new Set();
+      if (mode === 'none' && canUpdate && privateUploads()) {
+        void privateFolders(page.records.map((record) => record.directory)).then((folders) => {
+          if (mine === generation) view.privateFolders.value = folders;
+        });
+      }
       view.paginated.value = {
         currentPage: page.page,
         lastPage: page.lastPage,
@@ -383,7 +392,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
             actions.onMove?.([record]),
           )
         : null,
-      canUpdate && privateUploads()
+      canUpdate && privateUploads() && !pinned(record, view.privateFolders.value)
         ? menuItem(
             record.private ? 'lock-open' : 'lock',
             t(record.private ? 'uploads.dashboard.makePublic' : 'uploads.dashboard.makePrivate'),
@@ -510,7 +519,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
  * The grid state rides in the URL as `page`, `order`, and `where`, exactly as a collection table's does.
  * The last query string per folder is remembered and restored when the folder is revisited bare.
  * Back and forward never restore, so a bare history entry stays bare.
- * A folder the read cannot find sends the page to the root.
+ * A folder with neither a visible row nor a visible child sends the page to the root.
  * A viewer without read access to `Uploads` sees the no-permission line instead.
  * The actions default to the registration made through `registerMediaActions`.
  * The page hosts the create-folder, rename, move, and details popups.

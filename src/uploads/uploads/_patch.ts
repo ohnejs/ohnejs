@@ -11,7 +11,7 @@ import type { UpdateUploadInput } from './update-upload.ts';
 
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
-import { ensureFolders } from './_folders.ts';
+import { ensureFolders, folderLocked } from './_folders.ts';
 import { privateUploads } from './_private.ts';
 import { assertReached, assertUploadReach, reachedSubtree } from './_reader.ts';
 import { decorated, readUpload } from './_row.ts';
@@ -72,6 +72,9 @@ export async function updateRow(
 ): Promise<QueryRecord> {
   const locks = isBoolean(input.private) && privateUploads();
   const row = await readUpload(uuid, tx);
+  if (locks && input.private === false && (await folderLocked(tx, row.directory))) {
+    throw uploadsError('private', 'insidePrivateFolder', { folder: row.directory });
+  }
   const builder = queryUntyped('Uploads').use(tx).where({ UUID: uuid });
   const changes = locks || !isBoolean(input.private) ? input : omit(input, ['private']);
   const [updated] = await (isUndefined(locale) ? builder : builder.locale(locale)).updateOrThrow({
@@ -86,7 +89,7 @@ export async function updateRow(
 
 /**
  * Moves the row `uuid` to `target` and applies `changes`, in one transaction.
- * An explicit `private` among `changes` decides alone, so the move never locks.
+ * An explicit `private` among `changes` is applied after the move, so the move itself never locks.
  * With `reach`, a row it hides is a `404`.
  * After the write, it must still admit that row, every row below it that matched, and every folder created.
  * Otherwise the write is a `422` and rolls back.

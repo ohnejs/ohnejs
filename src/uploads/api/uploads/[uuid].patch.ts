@@ -24,12 +24,12 @@ import { assertUploadReach, uploadReach } from '../../uploads/_reader.ts';
  * `name` and `directory` move the row and its object; the rest change its metadata.
  * `private` locks or unlocks it, a folder with everything inside; a move into a private folder locks too.
  * Without `UPLOADS_SECRET` there are no private files, so `private` is ignored.
- * An explicit `private` in the same body decides alone, and the move then never locks.
  * `?locale=` writes `description` at that content locale.
  * Needs `collection.Uploads.update` and the `Uploads` read guard: no user `401`, no capability `403`.
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any `400`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`.
  * A changed extension, a folder moved into itself, a taken target, or an out-of-range value is a `422`.
+ * So is a row made public inside a private folder, or moved into one with `private: false`.
  * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
  */
 export default defineHandler(async ({ params }): Promise<UploadRecord> => {

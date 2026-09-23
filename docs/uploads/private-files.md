@@ -23,8 +23,10 @@ A folder locks everything inside it:
 - Toggling a folder rewrites its whole subtree.
 - A file uploaded into a private folder, or a folder created in one, is private.
 - Moving into a private folder makes the moved row private, a folder with its subtree. Moving out,
-  or renaming in place, changes nothing. A `PATCH` that also sends `private` leaves it to that
-  value instead.
+  or renaming in place, changes nothing.
+- Making a row public inside a private folder is a `422`, and so is moving one in with
+  `private: false`.
+- A row that was already public inside a private folder stays public. ohne lists each one at boot.
 
 ## What a read carries
 

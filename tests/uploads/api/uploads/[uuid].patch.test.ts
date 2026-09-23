@@ -32,6 +32,7 @@ useRoles().register('uploads-updater', {
 });
 const updater = await userWith('updater@example.com', ['uploads-updater']);
 const visibleOnly = () => ({ where: { private: false } });
+const filesOnly = () => ({ where: { kind: 'file' } });
 
 async function vault(name: string): Promise<string> {
   const folder = await createFolder({ directory: 'patch', name });
@@ -42,6 +43,11 @@ async function vault(name: string): Promise<string> {
 async function refused(response: Response): Promise<void> {
   strictEqual(response.status, 422);
   strictEqual(errorsOf(await response.json())[''], 'uploads.errors.outOfReach');
+}
+
+async function pinned(response: Response): Promise<void> {
+  strictEqual(response.status, 422);
+  strictEqual(errorsOf(await response.json()).private, 'uploads.errors.insidePrivateFolder');
 }
 
 async function seed(name: string): Promise<string> {
@@ -130,18 +136,18 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual(storage.visibility.get('patch/tree/leaf.txt'), true);
   });
 
-  it('moves into a private folder and unlocks in one body, the explicit private winning', async () => {
+  it('422s a move into a private folder that also unlocks, leaving the row in place', async () => {
     await queryUntyped('Uploads').createOrThrow({
       kind: 'folder',
       directory: 'patch',
       name: 'vault',
       private: true,
     });
-    const response = await send(await seed('j.txt'), { directory: 'patch/vault', private: false });
-    strictEqual(response.status, 200);
-    const record = (await response.json()) as Record<string, unknown>;
-    strictEqual(record.path, 'patch/vault/j.txt');
-    strictEqual(record.private, false);
+    const uuid = await seed('j.txt');
+    await pinned(await send(uuid, { directory: 'patch/vault', private: false }));
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.directory, 'patch');
+    strictEqual(row?.private, false);
     const moved = await send(await seed('k.txt'), { directory: 'patch/vault' });
     strictEqual(((await moved.json()) as Record<string, unknown>).private, true);
   });
@@ -216,7 +222,7 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual(text(storage.objects.get('patch/renamed/inner.txt')), 'inner');
   });
 
-  it('keeps hidden files private when a visible folder moves into a private one and unlocks', async () => {
+  it('422s a visible folder moving into a private one and unlocking, keeping hidden files private', async () => {
     const folder = await createFolder({ directory: 'patch', name: 'open' });
     const inner = await putUpload({
       directory: 'patch/open',
@@ -227,14 +233,14 @@ describe('PATCH /uploads/[uuid]', () => {
     const vault = await createFolder({ directory: 'patch', name: 'safe' });
     await updateUpload(vault.UUID, { private: true });
     await withReadAccess(visibleOnly, async () => {
-      const response = await send(folder.UUID, { directory: 'patch/safe', private: false });
-      strictEqual(response.status, 200);
-      strictEqual(((await response.json()) as Record<string, unknown>).private, false);
+      await pinned(await send(folder.UUID, { directory: 'patch/safe', private: false }));
     });
+    const open = await queryUntyped('Uploads').where({ UUID: folder.UUID }).findFirst();
+    strictEqual(open?.directory, 'patch');
     const hidden = await queryUntyped('Uploads').where({ UUID: inner.UUID }).findFirst();
-    strictEqual(hidden?.directory, 'patch/safe/open');
+    strictEqual(hidden?.directory, 'patch/open');
     strictEqual(hidden?.private, true);
-    strictEqual(storage.visibility.get('patch/safe/open/hush.txt'), true);
+    strictEqual(storage.visibility.get('patch/open/hush.txt'), true);
   });
 
   it('404s a row the scope hides by the time a slow body arrives', async () => {
@@ -311,12 +317,14 @@ describe('PATCH /uploads/[uuid]', () => {
   });
 
   it('422s a move that creates a hidden folder on the way, creating nothing', async () => {
-    await vault('cellar');
     const uuid = await seed('down.txt');
-    await withReadAccess(visibleOnly, async () => {
-      await refused(await send(uuid, { directory: 'patch/cellar/new', private: false }));
+    await withReadAccess(filesOnly, async () => {
+      await refused(await send(uuid, { directory: 'patch/cellar/new' }));
     });
-    strictEqual(await queryUntyped('Uploads').where({ directory: 'patch/cellar' }).count(), 0);
+    strictEqual(
+      await queryUntyped('Uploads').where({ directory: 'patch', name: 'cellar' }).count(),
+      0,
+    );
     strictEqual(
       (await queryUntyped('Uploads').where({ UUID: uuid }).findFirst())?.directory,
       'patch',

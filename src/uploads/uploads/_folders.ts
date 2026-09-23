@@ -42,3 +42,16 @@ export async function ensureFolders(
   }
   return { locked, created };
 }
+
+/**
+ * Whether the folder at `directory` is private, read on `tx`.
+ * The root never is.
+ */
+export async function folderLocked(tx: Transaction, directory: string): Promise<boolean> {
+  if (directory === '') return false;
+  const folder = await queryUntyped('Uploads')
+    .use(tx)
+    .where({ ...splitUploadPath(directory) })
+    .findFirst();
+  return folder?.private === true;
+}

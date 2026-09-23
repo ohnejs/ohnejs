@@ -7,7 +7,6 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { moveUpload } from '../../../src/uploads/uploads/move-upload.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
-import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream, text } from '../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
@@ -49,6 +48,12 @@ async function privateFolder(directory: string, name: string): Promise<void> {
 
 function objects(prefix: string): string[] {
   return [...storage.objects.keys()].filter((key) => key.startsWith(prefix)).sort();
+}
+
+async function lockFolder(directory: string, name: string): Promise<void> {
+  await queryUntyped('Uploads')
+    .where({ kind: 'folder', directory, name })
+    .updateOrThrow({ private: true });
 }
 
 async function failure(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
@@ -149,21 +154,19 @@ describe('moveUpload', () => {
   });
 
   it('leaves a public file public when renamed inside a private folder', async () => {
-    await privateFolder('rename-in', 'vault');
     const uuid = await put('rename-in/vault', 'brochure.txt', 'b');
-    await updateUpload(uuid, { private: false });
+    await lockFolder('rename-in', 'vault');
     const renamed = await moveUpload(uuid, { name: 'brochure-2026.txt' });
     strictEqual(renamed.path, 'rename-in/vault/brochure-2026.txt');
     strictEqual(renamed.private, false);
-    strictEqual(storage.visibility.get('rename-in/vault/brochure-2026.txt'), false);
+    strictEqual(storage.visibility.has('rename-in/vault/brochure-2026.txt'), false);
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
   });
 
   it('leaves a public folder and its subtree public when renamed inside a private folder', async () => {
-    await privateFolder('rename-tree', 'vault');
     await put('rename-tree/vault/open', 'one.txt', '1');
+    await lockFolder('rename-tree', 'vault');
     const uuid = await folderUUID('rename-tree/vault', 'open');
-    await updateUpload(uuid, { private: false });
     await moveUpload(uuid, { name: 'shared' });
     deepStrictEqual(await privacy('rename-tree/vault'), {
       'rename-tree/vault/shared': false,

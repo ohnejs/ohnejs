@@ -11,10 +11,12 @@ import {
   toast,
 } from 'ohnejs/dashboard';
 import {
+  type ConditionObject,
   hasCapability,
   isUndefined,
   parseSearchParams,
   stringifySearchParams,
+  uniqueArray,
   untracked,
 } from 'ohnejs/utils';
 
@@ -36,6 +38,9 @@ import { useUploadsT } from './_messages.ts';
 import { versionedURL } from './media-details-state.ts';
 import {
   DEFAULT_ORDER,
+  folderPresence,
+  type FolderPresence,
+  folderWhere,
   MEDIA_REFRESH,
   type MediaQuery,
   movePlan,
@@ -207,21 +212,31 @@ export function loadUploads(
 }
 
 /**
- * Whether a folder row exists at `directory`; the root always does.
- * A failed read resolves `true`, so a network blip never bounces the viewer to the root.
+ * How the folder at `directory` stands for the viewer; the root is always visible.
+ * A scope may hide the row alone, so a hidden row still stands while a direct child is visible.
  */
-export async function directoryExists(directory: string): Promise<boolean> {
-  if (directory === '') return true;
-  const slash = directory.lastIndexOf('/');
-  const parent = slash === -1 ? '' : directory.slice(0, slash);
-  const name = directory.slice(slash + 1);
-  const page = await loadPage('uploads', {
-    where: { kind: 'folder', directory: parent, name },
-    select: ['UUID'],
+export async function directoryPresence(directory: string): Promise<FolderPresence> {
+  if (directory === '') return 'visible';
+  const total = async (where: ConditionObject) =>
+    (await loadPage('uploads', { where, select: ['UUID'], page: 1, perPage: 1 }))?.total;
+  const row = await total(folderWhere(directory));
+  return folderPresence(row, row === 0 ? await total({ directory }) : undefined);
+}
+
+/**
+ * Which of `directories` are private folders, in one read; the root never is.
+ * A failed read resolves an empty set, and the server still refuses to make a row inside one public.
+ */
+export async function privateFolders(directories: readonly string[]): Promise<ReadonlySet<string>> {
+  const folders = uniqueArray(directories).filter((directory) => directory !== '');
+  if (folders.length === 0) return new Set();
+  const page = (await loadPage('uploads', {
+    where: { and: [{ kind: 'folder', private: true }, { or: folders.map(folderWhere) }] },
+    select: ['kind', 'directory', 'name'],
     page: 1,
-    perPage: 1,
-  });
-  return isUndefined(page) || page.total > 0;
+    perPage: PER_PAGE,
+  })) as UploadsPage | undefined;
+  return new Set(page?.records.map((record) => record.path) ?? []);
 }
 
 /**

@@ -8,11 +8,14 @@ import {
   createMediaView,
   DEFAULT_ORDER,
   directoryFromParam,
+  folderPresence,
+  folderWhere,
   groupUploads,
   isDisplayableImage,
   mediaGroupField,
   mediaPath,
   movePlan,
+  pinned,
   pruneDescendants,
   rangeBetween,
   scopedWhere,
@@ -221,6 +224,37 @@ describe('scopedWhere', () => {
         { kind: 'file' },
       ],
     });
+  });
+});
+
+describe('private folders', () => {
+  it('finds a folder row by its path', () => {
+    deepStrictEqual(folderWhere('photos'), { kind: 'folder', directory: '', name: 'photos' });
+    deepStrictEqual(folderWhere('photos/2024'), {
+      kind: 'folder',
+      directory: 'photos',
+      name: '2024',
+    });
+  });
+
+  it('pins only a private record directly inside a listed folder', () => {
+    const folders = new Set(['vault']);
+    strictEqual(pinned({ ...upload('vault/a.png'), private: true }, folders), true);
+    strictEqual(pinned({ ...upload('photos/a.png'), private: true }, folders), false);
+    strictEqual(pinned(upload('vault/b.png'), folders), false);
+  });
+
+  it('starts a view with no private folders', () => {
+    strictEqual(createMediaView().privateFolders.value.size, 0);
+  });
+
+  it('keeps a folder whose row the scope hides while something inside is visible', () => {
+    strictEqual(folderPresence(1, undefined), 'visible');
+    strictEqual(folderPresence(undefined, undefined), 'visible');
+    strictEqual(folderPresence(0, 2), 'hidden');
+    strictEqual(folderPresence(0, undefined), 'hidden');
+    strictEqual(folderPresence(0, 0), 'missing');
+    strictEqual(createMediaView().hidden.value, false);
   });
 });
 

@@ -140,6 +140,16 @@ export interface MediaView {
   uploads: Ref<readonly UploadRecord[]>;
 
   /**
+   * The page's directories that are private folders, known only to a viewer who may make rows public.
+   */
+  privateFolders: Ref<ReadonlySet<string>>;
+
+  /**
+   * Whether the read scope hides the shown folder's own row, so the viewer only sees into it.
+   */
+  hidden: Ref<boolean>;
+
+  /**
    * The selected records, in pick order.
    */
   selection: Ref<readonly UploadRecord[]>;
@@ -285,6 +295,8 @@ export function createMediaView(options: MediaViewOptions = {}): MediaView {
   });
   const ready = ref(false);
   const uploads = ref<readonly UploadRecord[]>([]);
+  const privateFolders = ref<ReadonlySet<string>>(new Set());
+  const hidden = ref(false);
   const selection = ref<readonly UploadRecord[]>([]);
   const origin = ref<UploadRecord | null>(null);
   const moving = ref(false);
@@ -334,6 +346,8 @@ export function createMediaView(options: MediaViewOptions = {}): MediaView {
     paginated,
     ready,
     uploads,
+    privateFolders,
+    hidden,
     selection,
     origin,
     moving,
@@ -391,6 +405,62 @@ export function breadcrumbsOf(directory: string): MediaBreadcrumb[] {
   if (directory === '') return [];
   const segments = directory.split('/');
   return segments.map((name, index) => ({ name, path: segments.slice(0, index + 1).join('/') }));
+}
+
+/**
+ * The `where` that finds the folder row at `path`.
+ *
+ * @example
+ * ```ts
+ * folderWhere('photos')      // -> { kind: 'folder', directory: '', name: 'photos' }
+ * folderWhere('photos/2024') // -> { kind: 'folder', directory: 'photos', name: '2024' }
+ * ```
+ */
+export function folderWhere(path: string): ConditionObject {
+  const slash = path.lastIndexOf('/');
+  const directory = slash === -1 ? '' : path.slice(0, slash);
+  return { kind: 'folder', directory, name: path.slice(slash + 1) };
+}
+
+/**
+ * How a folder stands for the viewer: its row visible, only its contents visible, or nothing at all.
+ */
+export type FolderPresence = 'visible' | 'hidden' | 'missing';
+
+/**
+ * How a folder stands, from the totals of reading its own row and its direct children.
+ * An unanswered read is `undefined` and never counts as missing, so a network blip keeps the viewer in place.
+ *
+ * @example
+ * ```ts
+ * folderPresence(1, undefined) // -> 'visible'
+ * folderPresence(0, 3)         // -> 'hidden'
+ * folderPresence(0, 0)         // -> 'missing'
+ * ```
+ */
+export function folderPresence(
+  row: number | undefined,
+  inside: number | undefined,
+): FolderPresence {
+  if (row !== 0) return 'visible';
+  return inside === 0 ? 'missing' : 'hidden';
+}
+
+/**
+ * Whether a private record sits directly inside one of the private `folders`, so it cannot be made public.
+ *
+ * @example
+ * ```ts
+ * pinned({ private: true, directory: 'vault' }, new Set(['vault']))  // -> true
+ * pinned({ private: true, directory: 'photos' }, new Set(['vault'])) // -> false
+ * pinned({ private: false, directory: 'vault' }, new Set(['vault'])) // -> false
+ * ```
+ */
+export function pinned(
+  record: Pick<UploadRecord, 'private' | 'directory'>,
+  folders: ReadonlySet<string>,
+): boolean {
+  return record.private === true && folders.has(record.directory);
 }
 
 /**

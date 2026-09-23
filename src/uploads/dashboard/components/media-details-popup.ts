@@ -85,6 +85,7 @@ import {
 import { mediaFileName } from './media-file-name.ts';
 import {
   confirmDeleteUploads,
+  privateFolders,
   privateUploads,
   refreshMedia,
   resolveUploadURL,
@@ -420,6 +421,7 @@ export async function loadUpload(
  *
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
  * Details leads with the Private switch, kept for a layer with private files, then the upload time and author.
+ * The switch locks on a private file inside a private folder.
  * The type, size, and dimensions follow.
  * It ends with the URL and a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
@@ -453,6 +455,13 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     focalY: seed.focalY,
   });
   const priv = ref(seed.private);
+  const inherited = ref(false);
+  if (privateUploads() && canUpdate) {
+    void privateFolders([record.directory]).then((folders) => {
+      inherited.value = folders.has(record.directory);
+    });
+  }
+  const locked = (): boolean => inherited.value && current.value.private === true;
   const edits = new History<DetailsState>().push(seed);
   const descriptionField = collection?.fields.find((entry) => entry.name === 'description');
 
@@ -753,8 +762,14 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const privateRow = (): HTMLElement =>
     field([
       fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.private'))),
-      switchInput(privateModel, undefined, { disabled: () => !canUpdate || busy.value }),
-      fieldMessage(() => t('uploads.dashboard.privateHint')),
+      switchInput(privateModel, undefined, {
+        disabled: () => !canUpdate || busy.value || locked(),
+      }),
+      fieldMessage(() =>
+        locked()
+          ? t('uploads.errors.insidePrivateFolder', { folder: record.directory })
+          : t('uploads.dashboard.privateHint'),
+      ),
     ]);
 
   const detailsPanel = (): Child => [

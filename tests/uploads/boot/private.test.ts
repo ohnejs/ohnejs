@@ -1,4 +1,4 @@
-import { match, strictEqual } from 'node:assert';
+import { doesNotMatch, match, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
@@ -50,6 +50,30 @@ describe('the private boot file', () => {
       private: true,
     });
     match(await readyOutput(), /UPLOADS_SECRET/);
+    useEnv().set('UPLOADS_SECRET', 'secret');
+    strictEqual(await readyOutput(), '');
+  });
+
+  it('lists public rows directly inside a private folder once a secret is set', async () => {
+    const create = (row: Record<string, unknown>) => queryUntyped('Uploads').createOrThrow(row);
+    await create({ kind: 'folder', directory: '', name: 'locked', private: true });
+    await create({ kind: 'file', directory: 'locked', name: 'sealed.txt', private: true });
+    await create({ kind: 'file', directory: 'locked', name: 'leak.txt', private: false });
+    await create({ kind: 'folder', directory: 'locked', name: 'open', private: false });
+    await create({ kind: 'file', directory: 'locked/open', name: 'deep.txt', private: false });
+    doesNotMatch(await readyOutput(), /Public uploads/);
+    useEnv().set('UPLOADS_SECRET', 'secret');
+    const output = await readyOutput();
+    match(output, /Public uploads inside a private folder/);
+    match(output, /locked\/leak\.txt/);
+    match(output, /locked\/open\b/);
+    doesNotMatch(output, /sealed|deep/);
+  });
+
+  it('stays silent with a secret while every row inside a private folder is private', async () => {
+    await queryUntyped('Uploads')
+      .where({ directory: { in: ['locked', 'locked/open'] } })
+      .updateOrThrow({ private: true });
     useEnv().set('UPLOADS_SECRET', 'secret');
     strictEqual(await readyOutput(), '');
   });

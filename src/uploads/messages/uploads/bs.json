@@ -96,6 +96,7 @@
     "fileTooLarge": "Datoteka može imati najviše `{max}`",
     "fileTooSmall": "Datoteka mora imati najmanje `{min}`",
     "folderIntoItself": "Folder se ne može premjestiti u samog sebe",
+    "insidePrivateFolder": "Sve u privatnom folderu `{folder}` je privatno",
     "maxHeight": "Slika može biti visoka najviše `{max}` piksela",
     "maxWidth": "Slika može biti široka najviše `{max}` piksela",
     "minHeight": "Slika mora biti visoka najmanje `{min}` piksela",
