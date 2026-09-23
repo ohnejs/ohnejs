@@ -85,6 +85,7 @@ import {
 import { mediaFileName } from './media-file-name.ts';
 import {
   confirmDeleteUploads,
+  privateUploads,
   refreshMedia,
   resolveUploadURL,
   temporaryLink,
@@ -418,7 +419,8 @@ export async function loadUpload(
  * The file details popup; the media page deep-links it by `?details=<uuid>`.
  *
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
- * Details leads with the Private switch, then the upload time and author, the type, size, and dimensions.
+ * Details leads with the Private switch, kept for a layer with private files, then the upload time and author.
+ * The type, size, and dimensions follow.
  * It ends with the URL and a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
  * Variants lists every named image variant with its tokens, byte size, rendered size, and a copy button.
@@ -756,7 +758,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     ]);
 
   const detailsPanel = (): Child => [
-    privateRow(),
+    privateUploads() ? privateRow() : null,
     wrappingRow(
       () => t('uploads.dashboard.uploadedOn'),
       () => formatDateTime(current.value.uploadedAt),

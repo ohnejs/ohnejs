@@ -11,7 +11,7 @@ import {
 import type { UploadRecord } from '../../uploads/types.ts';
 
 import { useUploadsT } from './_messages.ts';
-import { previewURL } from './media-library-data.ts';
+import { previewURL, privateUploads } from './media-library-data.ts';
 import { mediaPath, type MediaSelectionMode, type MediaView } from './media-library-state.ts';
 
 /**
@@ -352,7 +352,7 @@ export function mediaImageItem(
         'span',
         { class: 'o-media-image-meta' },
         when(
-          () => record().private,
+          () => privateUploads() && record().private === true,
           () => lockPill('o-media-image-lock'),
         ),
         h('span', { class: 'o-media-image-size' }, () => formatBytes(record().size ?? 0)),

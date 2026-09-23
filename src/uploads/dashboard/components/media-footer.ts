@@ -38,6 +38,7 @@ import { useUploadsT } from './_messages.ts';
 import { mediaActions } from './media-actions.ts';
 import {
   confirmDeleteUploads,
+  privateUploads,
   setUploadsPrivate,
   uploadsCollection,
   uploadsPermissions,
@@ -128,6 +129,7 @@ css`
  * The cluster holds the selection actions while something is selected, then search, filter, and sorting.
  * The selection actions are delete, clear, move, make private, and make public.
  * Make private shows while a public item is selected, make public while a private one is.
+ * Both stay hidden while the layer keeps no private files.
  * On the page it ends with New folder and Upload; in a multiple picker with Apply.
  * Left and right arrows page while no overlay sits above the footer's own surface.
  * Cmd/Ctrl+K opens the search popup, whose keyword filters file names across the folder's subtree.
@@ -233,7 +235,7 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     );
 
   const selects = (locked: boolean): boolean =>
-    view.selection.value.some((record) => (record.private === true) === locked);
+    privateUploads() && view.selection.value.some((record) => (record.private === true) === locked);
 
   const searchButton = iconButton(
     'search',
