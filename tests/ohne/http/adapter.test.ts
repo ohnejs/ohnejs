@@ -292,6 +292,32 @@ describe('sendResponse', () => {
     );
   });
 
+  it('cancels the body of a HEAD answer unread, keeping its headers', async () => {
+    let pulls = 0;
+    let cancelled = false;
+    await withServer(
+      async (_req, res) => {
+        const stream = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (++pulls === 100) controller.close();
+            else controller.enqueue(new Uint8Array(64 * 1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        });
+        await sendResponse(res, new Response(stream, { headers: { 'content-length': '999999' } }));
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'HEAD' });
+        strictEqual(res.status, 200);
+        strictEqual(res.headers.get('content-length'), '999999');
+      },
+    );
+    ok(cancelled);
+    ok(pulls <= 1);
+  });
+
   it('pipes a streamed response body', async () => {
     await withServer(
       async (_req, res) => {

@@ -182,12 +182,14 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  * The open CORS default is then applied, unless a policy already set or denied an origin.
  * The pipe carries backpressure and destroys both ends on error.
  * A bodyless response (e.g. `204`) just ends the socket.
+ * So does the answer to a `HEAD`, whose body is cancelled unread, since Node would pull and discard it whole.
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
   res.setHeaders(await resolveHeaders(response, res.req.method));
 
-  if (isNull(response.body)) {
+  if (isNull(response.body) || res.req.method === 'HEAD') {
+    await response.body?.cancel().catch(() => {});
     res.end();
     return;
   }
