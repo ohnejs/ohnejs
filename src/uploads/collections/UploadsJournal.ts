@@ -9,6 +9,7 @@ import { defineCollection, field } from 'ohnejs';
  * Each entry takes the next `sequence`, and a drain runs entries in that order.
  * An entry from before entries were numbered holds `null` and runs first, as it was written first.
  * An entry that fails waits for the next drain, and so does every later entry touching its paths.
+ * A `stage` entry is no effect: it records a staged object until its row claims it, and a drain skips it.
  * A drain also runs at `schema:synced`.
  * Never exposed over the API.
  */
@@ -23,7 +24,7 @@ export default defineCollection({
     }),
 
     op: field('select', {
-      choices: ['move', 'delete', 'lock', 'unlock'],
+      choices: ['move', 'delete', 'lock', 'unlock', 'stage'],
       immutable: true,
       label: 'uploads.journal.op.label',
       description: 'uploads.journal.op.description',

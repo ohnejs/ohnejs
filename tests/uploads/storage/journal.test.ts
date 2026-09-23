@@ -98,7 +98,7 @@ describe('drainJournal', () => {
     );
     deepStrictEqual(await pending(), ['move .tmp/one', 'delete drain/old.txt']);
 
-    await drainJournal();
+    strictEqual(await drainJournal(), true);
     deepStrictEqual(await pending(), []);
     ok(storage.objects.has('drain/one.txt'));
     strictEqual(storage.objects.has('.tmp/one'), false);
@@ -111,12 +111,12 @@ describe('drainJournal', () => {
     storage.failNext('move');
     written.length = 0;
 
-    await drainJournal();
+    strictEqual(await drainJournal(), false);
     deepStrictEqual(await pending(), ['move .tmp/two']);
     strictEqual(storage.objects.has('drain/two.txt'), false);
     match(written.join(''), /Storage move of \.tmp\/two failed/);
 
-    await drainJournal();
+    strictEqual(await drainJournal(), true);
     deepStrictEqual(await pending(), []);
     ok(storage.objects.has('drain/two.txt'));
   });
@@ -128,7 +128,7 @@ describe('drainJournal', () => {
 
     await db.exec('ALTER TABLE "UploadsJournal" RENAME TO "UploadsJournalAside"');
     try {
-      await drainJournal();
+      strictEqual(await drainJournal(), false);
     } finally {
       await db.exec('ALTER TABLE "UploadsJournalAside" RENAME TO "UploadsJournal"');
     }
@@ -199,11 +199,11 @@ describe('drainJournal', () => {
     }, 'immediate');
     storage.failNext('setPrivate');
 
-    await drainJournal();
+    strictEqual(await drainJournal(), false);
     deepStrictEqual(await pending(), ['lock .tmp/nine', 'move .tmp/nine']);
     strictEqual(storage.objects.has('drain/nine.txt'), false);
 
-    await drainJournal();
+    strictEqual(await drainJournal(), true);
     strictEqual(storage.visibility.get('drain/nine.txt'), true);
   });
 

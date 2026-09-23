@@ -1,5 +1,8 @@
+import type { Transaction } from 'ohnejs';
+
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
+import { ohneError, queryUntyped, useDatabase } from 'ohnejs';
 import {
   decodeText,
   imageSize,
@@ -9,8 +12,10 @@ import {
   sanitizeSVG,
   sniffMediaType,
   uuidv7,
+  uuidv7Time,
 } from 'ohnejs/utils';
 
+import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';
 import { uploadsError } from './_errors.ts';
 import { TEMP_PREFIX } from './path.ts';
@@ -56,6 +61,7 @@ const SVG = 'image/svg+xml';
  * An image's dimensions are read from that head.
  * An SVG is buffered whole, sanitized, and re-measured; input without an `<svg>` root is refused as `notSVG`.
  * The bytes then flow through a sha256 counter into `storage.write` under the `.tmp/` prefix.
+ * The temp object is journaled as a `stage` entry first, so `sweepStaged` finds it if its row never commits.
  * `size` is the request's declared length, a hint for a backend that needs it up front.
  */
 export async function stageUpload(
@@ -86,7 +92,18 @@ export async function stageUpload(
     }),
   );
   const temp = `${TEMP_PREFIX}/${uuidv7()}`;
-  await useStorage().write(temp, metered, { type, size: declared });
+  await queryUntyped('UploadsJournal').createOrThrow({
+    sequence: null,
+    op: 'stage',
+    from: temp,
+    to: null,
+  });
+  try {
+    await useStorage().write(temp, metered, { type, size: declared });
+  } catch (error) {
+    await discardStaged(temp);
+    throw error;
+  }
 
   return {
     temp,
@@ -95,6 +112,78 @@ export async function stageUpload(
     width: measured?.width ?? null,
     height: measured?.height ?? null,
   };
+}
+
+/**
+ * Claims the staged object `temp` for the row `tx` commits, so no sweep deletes it from then on.
+ * Throws when `sweepStaged` claimed it first, since its bytes may already be gone.
+ *
+ * @example
+ * ```ts
+ * await useDatabase().transaction(async (tx) => {
+ *   await claimStaged(tx, staged.temp)
+ *   await journalStorage(tx, { op: 'move', from: staged.temp, to: 'photos/sunset.jpg' })
+ * }, 'immediate')
+ * ```
+ */
+export async function claimStaged(tx: Transaction, temp: string): Promise<void> {
+  if (!(await release(tx, temp))) {
+    throw ohneError(`Staged upload \`${temp}\` was swept before its row committed`);
+  }
+}
+
+/**
+ * Deletes the staged object `temp` and its `stage` entry, for an upload that failed before its row committed.
+ * A failed delete keeps the entry for `sweepStaged` and never replaces the failure that led here.
+ *
+ * @example
+ * ```ts
+ * await discardStaged(staged.temp)
+ * ```
+ */
+export async function discardStaged(temp: string): Promise<void> {
+  try {
+    await useStorage().delete(temp);
+  } catch {
+    return;
+  }
+  await queryUntyped('UploadsJournal').where({ op: 'stage', from: temp }).delete();
+}
+
+/**
+ * Deletes every staged object minted before `before`, a Unix-millisecond time, whose row never committed.
+ * Each one is claimed and journaled as a `delete` in one transaction.
+ * So a commit racing the sweep fails instead of keeping a row whose bytes are gone.
+ * The drain then deletes the objects, and a failed delete waits for the next drain.
+ *
+ * @example
+ * ```ts
+ * await sweepStaged(Date.now() - 24 * 60 * 60 * 1000)
+ * ```
+ */
+export async function sweepStaged(before: number): Promise<void> {
+  const temps = (await queryUntyped('UploadsJournal')
+    .where({ op: 'stage' })
+    .pluck('from')) as string[];
+  const stale = temps.filter((temp) => uuidv7Time(temp.slice(TEMP_PREFIX.length + 1)) < before);
+  if (stale.length === 0) return;
+  await useDatabase().transaction(async (tx) => {
+    for (const temp of stale) {
+      if (await release(tx, temp)) await journalStorage(tx, { op: 'delete', from: temp });
+    }
+  }, 'immediate');
+  await drainJournal();
+}
+
+/**
+ * Deletes the `stage` entry of `temp` on `tx`, resolving whether there was one to delete.
+ */
+async function release(tx: Transaction, temp: string): Promise<boolean> {
+  const { deleted } = await queryUntyped('UploadsJournal')
+    .use(tx)
+    .where({ op: 'stage', from: temp })
+    .delete();
+  return deleted > 0;
 }
 
 /**

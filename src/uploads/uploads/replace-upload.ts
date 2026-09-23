@@ -7,10 +7,9 @@ import type { UploadRecord } from './types.ts';
 
 import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
-import { useStorage } from '../storage/use-storages.ts';
 import { uploadsError } from './_errors.ts';
 import { decorated, readUpload } from './_row.ts';
-import { stageUpload } from './_stage.ts';
+import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { uploadPath } from './path.ts';
 
 /**
@@ -28,7 +27,7 @@ export interface ReplaceUploadOptions {
  *
  * The bytes stream to a temp object first, verified against the row's type and measured.
  * One transaction then updates `size`, `hash`, `width`, and `height` and journals the move into place.
- * A private file's object is locked again by the same journal, once the new bytes are in place.
+ * A private file's staged object is locked by the same journal before it moves into place.
  * The journal drains after the commit.
  * A folder is a `422`; content that contradicts the type is too; an unknown `UUID` a `404`.
  * A failure after staging removes the temp object.
@@ -54,6 +53,7 @@ export async function replaceUpload(
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
+      await claimStaged(tx, temp);
       const [updated] = await queryUntyped('Uploads')
         .use(tx)
         .where({ UUID: uuid })
@@ -61,12 +61,12 @@ export async function replaceUpload(
       if (isUndefined(updated)) throw notFound();
       const landed = updated as UploadRow;
       const path = uploadPath(landed);
+      if (landed.private) await journalStorage(tx, { op: 'lock', from: temp });
       await journalStorage(tx, { op: 'move', from: temp, to: path });
-      if (landed.private) await journalStorage(tx, { op: 'lock', from: path });
       return updated;
     }, 'immediate');
   } catch (error) {
-    await useStorage().delete(temp);
+    await discardStaged(temp);
     throw error;
   }
   await drainJournal();

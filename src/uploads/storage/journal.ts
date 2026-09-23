@@ -19,7 +19,12 @@ export type JournalEntry =
 /**
  * A journal row as a drain reads it.
  */
-type StoredEntry = { UUID: string; op: JournalEntry['op']; from: string; to: string | null };
+type StoredEntry = {
+  UUID: string;
+  op: JournalEntry['op'] | 'stage';
+  from: string;
+  to: string | null;
+};
 
 const draining = createMutex();
 
@@ -55,17 +60,19 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
 
 /**
  * Runs every pending storage effect in the order it was journaled, deleting each entry once it succeeded.
+ * A `stage` entry is no effect, so it stays for `claimStaged` or `sweepStaged`.
  * An effect that fails is warned about and left for the next drain.
  * So is every later entry on its path, or above or below it, since that entry may build on it.
  * So is a journal that cannot be read or a storage that cannot be built; nothing here throws.
  * Drains serialize, so two callers never replay the same entry at once.
+ * Resolves `true` when every entry settled, and `false` when any was held or nothing could be drained.
  *
  * @example
  * ```ts
- * await drainJournal()
+ * await drainJournal() // -> true
  * ```
  */
-export function drainJournal(): Promise<void> {
+export function drainJournal(): Promise<boolean> {
   return draining(async () => {
     let storage: StorageAdapter;
     let entries: StoredEntry[];
@@ -76,14 +83,16 @@ export function drainJournal(): Promise<void> {
         .findMany()) as StoredEntry[];
     } catch (error) {
       usePrinter().warn(`Storage journal not drained: ${errorMessage(error)}`);
-      return;
+      return false;
     }
     const held: string[] = [];
     for (const entry of entries) {
+      if (entry.op === 'stage') continue;
       const paths = isNull(entry.to) ? [entry.from] : [entry.from, entry.to];
       const waits = paths.some((path) => held.some((other) => overlaps(path, other)));
       if (waits || !(await settle(storage, entry))) held.push(...paths);
     }
+    return held.length === 0;
   });
 }
 

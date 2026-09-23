@@ -2,11 +2,14 @@ import { hook } from 'ohnejs';
 
 import { drainJournal } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';
-import { TEMP_PREFIX } from '../uploads/path.ts';
+import { sweepStaged } from '../uploads/_stage.ts';
 
-// Before the socket opens, so no live upload is staged when the sweep runs.
+const STAGED_TTL = 24 * 60 * 60 * 1000;
+
 hook('schema:synced', async () => {
+  // Built before the drain, which only warns, so a storage that cannot be built throws its full error once.
+  useStorage();
   await drainJournal();
-  // After the replay, whatever is still staged belongs to a row that never committed.
-  await useStorage().delete(TEMP_PREFIX);
+  // Another instance may share the storage and still be staging, so only stale objects are swept.
+  await sweepStaged(Date.now() - STAGED_TTL);
 });

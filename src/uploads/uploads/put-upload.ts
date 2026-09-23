@@ -10,11 +10,10 @@ import type { UploadRecord } from './types.ts';
 import { validationError } from '../../ohne/query/write/errors.ts';
 import { useUploadsConfig } from '../config.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
-import { useStorage } from '../storage/use-storages.ts';
 import { isNotUnique, uploadsError } from './_errors.ts';
 import { ensureFolders } from './_folders.ts';
 import { decorated } from './_row.ts';
-import { stageUpload } from './_stage.ts';
+import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { canonicalDirectory, canonicalName, uniqueUploadName, uploadPath } from './path.ts';
 
 /**
@@ -58,7 +57,7 @@ const NAME_ATTEMPTS = 5;
  * The bytes stream to a temp object first, verified against the extension's type and measured.
  * One transaction then creates the missing folder rows, picks a free name, and creates the row.
  * The same transaction journals the move into place.
- * A file inside a private folder is born private, and the same journal locks its object once it lands.
+ * A file inside a private folder is born private; the journal locks its staged object before the move.
  * The journal drains after the commit, so the object lands at its path once the row exists.
  * A type outside `uploads.types` is a `422`; so is content that contradicts the extension.
  * A failure after staging removes the temp object.
@@ -82,15 +81,16 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
+      await claimStaged(tx, staged.temp);
       const locked = await ensureFolders(tx, directory, author);
       const row = await createFile(tx, { directory, name, type, author, private: locked }, staged);
       const path = uploadPath(row);
+      if (locked) await journalStorage(tx, { op: 'lock', from: staged.temp });
       await journalStorage(tx, { op: 'move', from: staged.temp, to: path });
-      if (locked) await journalStorage(tx, { op: 'lock', from: path });
       return row;
     }, 'immediate');
   } catch (error) {
-    await useStorage().delete(staged.temp);
+    await discardStaged(staged.temp);
     throw error;
   }
   await drainJournal();

@@ -156,12 +156,13 @@ describe('putUpload', () => {
     deepStrictEqual(temps(), []);
   });
 
-  it('removes the temp object when the row cannot be written', async () => {
+  it('removes the temp object and its stage entry when the row cannot be written', async () => {
     await rejects(
       putUpload({ directory: '', name: 'orphan.txt', body: stream(bytes('x')), author: 'nobody' }),
       isValidationError,
     );
     deepStrictEqual(temps(), []);
+    deepStrictEqual(await queryUntyped('UploadsJournal').findMany(), []);
     strictEqual(storage.objects.has('orphan.txt'), false);
   });
 
