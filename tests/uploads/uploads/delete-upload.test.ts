@@ -1,11 +1,15 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { HTTPError } from '../../../src/ohne/http/http-error.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { deleteUpload } from '../../../src/uploads/uploads/delete-upload.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
+import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream } from '../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 async function put(directory: string, name: string): Promise<string> {
   const upload = await putUpload({ directory, name, body: stream(bytes(name)) });
@@ -58,5 +62,16 @@ describe('deleteUpload', () => {
         (error: unknown) => error instanceof HTTPError && error.status === 404,
       );
     }
+  });
+
+  it('404s a row its reach hides, keeping it', async () => {
+    const uuid = await put('reach', 'hidden.txt');
+    await updateUpload(uuid, { private: true });
+    await rejects(
+      deleteUpload(uuid, { reach: { where: { private: false } } }),
+      (error: unknown) => error instanceof HTTPError && error.status === 404,
+    );
+    strictEqual(await queryUntyped('Uploads').where({ UUID: uuid }).exists(), true);
+    deepStrictEqual(objects('reach/'), ['reach/hidden.txt']);
   });
 });
