@@ -1,12 +1,21 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
 import foldersPost from '../../../../src/uploads/api/uploads/folders.post.ts';
-import { call, errorsOf, route, storage, userWith } from '../../_fixture.ts';
+import { call, errorsOf, route, storage, userWith, withReadAccess } from '../../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 const folders = route('POST', '/uploads/folders', foldersPost);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
+useRoles().register('uploads-creator', {
+  name: 'uploads-creator',
+  role: { capabilities: ['collection.Uploads.create'] },
+});
+const creator = await userWith('creator@example.com', ['uploads-creator']);
 
 describe('POST /uploads/folders', () => {
   it('creates the folder and its ancestors, answering 201', async () => {
@@ -71,5 +80,47 @@ describe('POST /uploads/folders', () => {
 
   it('401s without a user', async () => {
     strictEqual((await call(folders, '/uploads/folders', {}, { json: { name: 'x' } })).status, 401);
+  });
+
+  it('422s a folder the read access scope would hide, creating nothing', async () => {
+    await queryUntyped('Uploads').createOrThrow({
+      kind: 'folder',
+      directory: '',
+      name: 'locked',
+      private: true,
+    });
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        const response = await call(
+          folders,
+          '/uploads/folders',
+          {},
+          { bearer: admin, json: { directory: 'locked/deep', name: 'inner' } },
+        );
+        strictEqual(response.status, 422);
+        strictEqual(errorsOf(await response.json())[''], 'uploads.errors.outOfReach');
+      },
+    );
+    const inside = { directory: { startsWith: 'locked' } };
+    strictEqual(await queryUntyped('Uploads').where(inside).count(), 0);
+  });
+
+  it('422s a creator whose public read scope would hide the folder', async () => {
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        const response = await call(
+          folders,
+          '/uploads/folders',
+          {},
+          { bearer: creator, json: { directory: 'locked', name: 'public' } },
+        );
+        strictEqual(response.status, 422);
+        strictEqual(errorsOf(await response.json())[''], 'uploads.errors.outOfReach');
+      },
+      true,
+    );
+    strictEqual(await queryUntyped('Uploads').where({ name: 'public' }).count(), 0);
   });
 });

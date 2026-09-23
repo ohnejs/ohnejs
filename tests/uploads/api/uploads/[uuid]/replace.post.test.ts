@@ -102,4 +102,25 @@ describe('POST /uploads/[uuid]/replace', () => {
     strictEqual(text(storage.objects.get('rep/late.txt')), 'l');
     deepStrictEqual(new Set(storage.objects.keys()), staged);
   });
+
+  it('422s bytes the read access scope would hide, keeping the old ones', async () => {
+    const upload = await putUpload({
+      directory: 'rep',
+      name: 'small.txt',
+      body: stream(bytes('s')),
+    });
+    const staged = new Set(storage.objects.keys());
+    await withReadAccess(
+      () => ({ where: { size: { lessThan: 10 } } }),
+      async () => {
+        const response = await send(upload.UUID, stream(bytes('twenty bytes of text')), admin);
+        strictEqual(response.status, 422);
+        strictEqual(errorsOf(await response.json())[''], 'uploads.errors.outOfReach');
+      },
+    );
+    const row = await queryUntyped('Uploads').where({ UUID: upload.UUID }).findFirst();
+    strictEqual(row?.hash, upload.hash);
+    strictEqual(text(storage.objects.get('rep/small.txt')), 's');
+    deepStrictEqual(new Set(storage.objects.keys()), staged);
+  });
 });

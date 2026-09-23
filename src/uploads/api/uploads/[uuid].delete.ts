@@ -1,7 +1,7 @@
 import { defineHandler } from 'ohnejs';
 import { requireCapability } from 'ohnejs/auth';
 
-import { assertUploadReach } from '../../uploads/_reader.ts';
+import { assertUploadReach, uploadReach } from '../../uploads/_reader.ts';
 import { deleteUpload } from '../../uploads/delete-upload.ts';
 
 /**
@@ -13,7 +13,7 @@ import { deleteUpload } from '../../uploads/delete-upload.ts';
  */
 export default defineHandler(async ({ params }): Promise<null> => {
   await requireCapability('collection.Uploads.delete');
-  await assertUploadReach(params.uuid);
+  await assertUploadReach(params.uuid, await uploadReach());
   await deleteUpload(params.uuid);
   return null;
 });

@@ -1,15 +1,15 @@
-import type { Transaction } from 'ohnejs';
-
 import { queryUntyped, useDatabase } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
+import type { UploadReach } from './_reader.ts';
 import type { UploadRow } from './_row.ts';
 import type { UploadRecord } from './types.ts';
 
 import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
+import { assertReached, assertUploadReach } from './_reader.ts';
 import { decorated, readUpload } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { uploadPath } from './path.ts';
@@ -24,10 +24,9 @@ export interface ReplaceUploadOptions {
   size?: number;
 
   /**
-   * Runs inside the write's transaction once the bytes are staged.
-   * A throw refuses the replace and drops the staged bytes.
+   * The read scope every row this write touches or creates must stay inside; omitted writes unscoped.
    */
-  admit?: (tx: Transaction) => Promise<void>;
+  reach?: UploadReach;
 }
 
 /**
@@ -61,13 +60,14 @@ export async function replaceUpload(
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
-      await options.admit?.(tx);
+      if (!isUndefined(options.reach)) await assertUploadReach(uuid, options.reach, tx);
       await claimStaged(tx, temp);
       const [updated] = await queryUntyped('Uploads')
         .use(tx)
         .where({ UUID: uuid })
         .updateOrThrow(measured);
       if (isUndefined(updated)) throw notFound();
+      await assertReached(tx, options.reach, [uuid]);
       const landed = updated as UploadRow;
       const path = uploadPath(landed);
       if (landed.private) await journalStorage(tx, { op: 'lock', from: temp });

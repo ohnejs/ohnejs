@@ -13,10 +13,9 @@ import type { MoveUploadTarget } from '../../uploads/move-upload.ts';
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { UpdateUploadInput } from '../../uploads/update-upload.ts';
 
+import { patchUpload } from '../../uploads/_patch.ts';
 import { privateUploads } from '../../uploads/_private.ts';
-import { assertUploadReach } from '../../uploads/_reader.ts';
-import { moveUpload } from '../../uploads/move-upload.ts';
-import { updateUpload } from '../../uploads/update-upload.ts';
+import { assertUploadReach, uploadReach } from '../../uploads/_reader.ts';
 
 /**
  * `PATCH /uploads/[uuid]`
@@ -31,26 +30,19 @@ import { updateUpload } from '../../uploads/update-upload.ts';
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any `400`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`.
  * A changed extension, a folder moved into itself, a taken target, or an out-of-range value is a `422`.
+ * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
  */
 export default defineHandler(async ({ params }): Promise<UploadRecord> => {
   await requireCapability('collection.Uploads.update');
-  const read = readJSONBody<unknown>();
-  // The body streams before the reach check, so a slow client cannot hold a stale verdict open.
-  await Promise.allSettled([read]);
-  await assertUploadReach(params.uuid);
-  const body = await read;
+  const reach = await uploadReach();
+  await assertUploadReach(params.uuid, reach);
+  const body = await readJSONBody<unknown>();
   const input = isPlainObject(body) ? body : {};
   const locale = parseLocaleParam(useSearchParams().locale, queryMetadata('Uploads')) ?? undefined;
   const target = readTarget(input);
   const changes = readChanges(input);
-  if (!isUndefined(changes)) {
-    if (!isUndefined(target)) {
-      await moveUpload(params.uuid, target, { lock: isUndefined(changes.private) });
-    }
-    return updateUpload(params.uuid, changes, { locale });
-  }
-  if (isUndefined(target)) throw badRequest();
-  return moveUpload(params.uuid, target);
+  if (isUndefined(target) && isUndefined(changes)) throw badRequest();
+  return patchUpload(params.uuid, { target, changes }, { locale, reach });
 });
 
 /**

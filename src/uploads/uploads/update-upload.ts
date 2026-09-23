@@ -1,13 +1,10 @@
-import { queryUntyped, useDatabase } from 'ohnejs';
-import { isBoolean, isUndefined, omit } from 'ohnejs/utils';
+import { useDatabase } from 'ohnejs';
 
 import type { UploadRecord } from './types.ts';
 
-import { drainJournal, journalStorage } from '../storage/journal.ts';
-import { privateUploads } from './_private.ts';
-import { decorated, readUpload } from './_row.ts';
-import { setDescendantsPrivate } from './_subtree.ts';
-import { uploadPath } from './path.ts';
+import { drainJournal } from '../storage/journal.ts';
+import { updateRow } from './_patch.ts';
+import { decorated } from './_row.ts';
 
 /**
  * The metadata `updateUpload` changes; an omitted field keeps its value.
@@ -63,20 +60,10 @@ export async function updateUpload(
   input: UpdateUploadInput,
   options: UpdateUploadOptions = {},
 ): Promise<UploadRecord> {
-  const locks = isBoolean(input.private) && privateUploads();
-  const record = await useDatabase().transaction(async (tx) => {
-    const row = await readUpload(uuid, tx);
-    const builder = queryUntyped('Uploads').use(tx).where({ UUID: uuid });
-    const changes = locks || !isBoolean(input.private) ? input : omit(input, ['private']);
-    const [updated] = await (
-      isUndefined(options.locale) ? builder : builder.locale(options.locale)
-    ).updateOrThrow({ ...changes });
-    if (!locks || input.private === (row.private === true)) return updated;
-    const path = uploadPath(row);
-    if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private === true);
-    await journalStorage(tx, { op: input.private ? 'lock' : 'unlock', from: path });
-    return updated;
-  }, 'immediate');
+  const record = await useDatabase().transaction(
+    (tx) => updateRow(tx, uuid, input, options.locale),
+    'immediate',
+  );
   await drainJournal();
   return decorated(record);
 }

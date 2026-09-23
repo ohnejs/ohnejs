@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
@@ -16,6 +16,7 @@ import {
   storage,
   stream,
   text,
+  errorsOf,
   userWith,
   withReadAccess,
 } from '../../_fixture.ts';
@@ -31,6 +32,17 @@ useRoles().register('uploads-updater', {
 });
 const updater = await userWith('updater@example.com', ['uploads-updater']);
 const visibleOnly = () => ({ where: { private: false } });
+
+async function vault(name: string): Promise<string> {
+  const folder = await createFolder({ directory: 'patch', name });
+  await updateUpload(folder.UUID, { private: true });
+  return folder.UUID;
+}
+
+async function refused(response: Response): Promise<void> {
+  strictEqual(response.status, 422);
+  strictEqual(errorsOf(await response.json())[''], 'uploads.errors.outOfReach');
+}
 
 async function seed(name: string): Promise<string> {
   const upload = await putUpload({ directory: 'patch', name, body: stream(bytes(name)) });
@@ -256,5 +268,67 @@ describe('PATCH /uploads/[uuid]', () => {
         strictEqual((await send(uuid, { description: 'x' })).status, 404);
       },
     );
+  });
+
+  it('422s making a visible file private, leaving it public', async () => {
+    const uuid = await seed('shy.txt');
+    await withReadAccess(visibleOnly, async () => {
+      await refused(await send(uuid, { private: true }));
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.private, false);
+    strictEqual(storage.visibility.has('patch/shy.txt'), false);
+  });
+
+  it('422s locking a visible folder with a visible file inside, changing neither', async () => {
+    const folder = await createFolder({ directory: 'patch', name: 'plain' });
+    const inner = await putUpload({
+      directory: 'patch/plain',
+      name: 'seen.txt',
+      body: stream(bytes('seen')),
+    });
+    await withReadAccess(visibleOnly, async () => {
+      await refused(await send(folder.UUID, { private: true }));
+    });
+    const rows = await queryUntyped('Uploads')
+      .where({ UUID: { in: [folder.UUID, inner.UUID] } })
+      .pluck('private');
+    deepStrictEqual(rows, [false, false]);
+    strictEqual(storage.visibility.has('patch/plain/seen.txt'), false);
+  });
+
+  it('422s moving a visible file into a private folder, leaving it in place', async () => {
+    await vault('crypt');
+    const uuid = await seed('stay.txt');
+    await withReadAccess(visibleOnly, async () => {
+      await refused(await send(uuid, { directory: 'patch/crypt' }));
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.directory, 'patch');
+    strictEqual(row?.private, false);
+    strictEqual(text(storage.objects.get('patch/stay.txt')), 'stay.txt');
+    strictEqual(storage.objects.has('patch/crypt/stay.txt'), false);
+  });
+
+  it('422s a move that creates a hidden folder on the way, creating nothing', async () => {
+    await vault('cellar');
+    const uuid = await seed('down.txt');
+    await withReadAccess(visibleOnly, async () => {
+      await refused(await send(uuid, { directory: 'patch/cellar/new', private: false }));
+    });
+    strictEqual(await queryUntyped('Uploads').where({ directory: 'patch/cellar' }).count(), 0);
+    strictEqual(
+      (await queryUntyped('Uploads').where({ UUID: uuid }).findFirst())?.directory,
+      'patch',
+    );
+  });
+
+  it('applies a move and its changes together or not at all', async () => {
+    const uuid = await seed('whole.txt');
+    strictEqual((await send(uuid, { name: 'part.txt', focalX: 5 })).status, 422);
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.name, 'whole.txt');
+    strictEqual(text(storage.objects.get('patch/whole.txt')), 'whole.txt');
+    strictEqual(storage.objects.has('patch/part.txt'), false);
   });
 });

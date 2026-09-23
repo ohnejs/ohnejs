@@ -4,6 +4,7 @@ import { queryUntyped, useDatabase } from 'ohnejs';
 import { extname, mediaTypeMatches, mimeTypeFor, parseMediaType } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
+import type { UploadReach } from './_reader.ts';
 import type { StagedUpload } from './_stage.ts';
 import type { UploadRecord } from './types.ts';
 
@@ -12,6 +13,7 @@ import { useUploadsConfig } from '../config.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { isNotUnique, uploadsError } from './_errors.ts';
 import { ensureFolders } from './_folders.ts';
+import { assertReached } from './_reader.ts';
 import { decorated } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { canonicalDirectory, canonicalName, uniqueUploadName, uploadPath } from './path.ts';
@@ -45,6 +47,11 @@ export interface PutUploadInput {
    * The `UUID` of the uploading user, `null` when there is none.
    */
   author?: string | null;
+
+  /**
+   * The read scope every row this write touches or creates must stay inside; omitted writes unscoped.
+   */
+  reach?: UploadReach;
 }
 
 const OCTET_STREAM = 'application/octet-stream';
@@ -82,8 +89,9 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
   try {
     record = await useDatabase().transaction(async (tx) => {
       await claimStaged(tx, staged.temp);
-      const locked = await ensureFolders(tx, directory, author);
+      const { locked, created } = await ensureFolders(tx, directory, author);
       const row = await createFile(tx, { directory, name, type, author, private: locked }, staged);
+      await assertReached(tx, input.reach, [row.UUID as string, ...created]);
       const path = uploadPath(row);
       if (locked) await journalStorage(tx, { op: 'lock', from: staged.temp });
       await journalStorage(tx, { op: 'move', from: staged.temp, to: path });

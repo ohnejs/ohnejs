@@ -20,6 +20,8 @@ import {
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
+import { readWireError } from './_wire-error.ts';
+
 declare module 'ohnejs/dashboard' {
   interface DashboardMeta {
     /**
@@ -232,7 +234,8 @@ export function refreshMedia(): void {
 /**
  * Moves records into `directory`, one `PATCH` each with bounded concurrency, deepest path first.
  * Rows already there and folders that would move into themselves stay put.
- * Refreshes the libraries and toasts the moved count; a taken name toasts the conflict.
+ * Refreshes the libraries and toasts the moved count.
+ * A taken name toasts the conflict; a refusal toasts its reason.
  * Resolves the number of rows moved.
  */
 export async function moveUploads(
@@ -247,12 +250,16 @@ export async function moveUploads(
     }),
   );
   const moved = results.filter((result) => landed(result)).length;
-  const conflicts = results.filter(
-    (result) => result.status === 'fulfilled' && result.value.status === 422,
-  ).length;
+  const failures = await Promise.all(
+    results.filter(unprocessable).map(({ value }) => readWireError(value)),
+  );
+  const refusals = failures.map(({ errors }) => errors['']);
+  const reason = refusals.find((message) => !isUndefined(message));
+  const conflicts = refusals.filter(isUndefined).length;
   if (moved > 0) refreshMedia();
   if (conflicts > 0) toast(t('uploads.dashboard.itemsConflict'), { type: 'error' });
-  if (moved > 0 || conflicts === 0) {
+  if (!isUndefined(reason)) toast(reason, { type: 'error' });
+  if (moved > 0 || failures.length === 0) {
     toast(t('uploads.dashboard.moved', { count: moved }), {
       type: moved > 0 ? 'success' : 'default',
     });
@@ -281,7 +288,11 @@ export async function setUploadsPrivate(
   if (changed > 0) refreshMedia();
   if (records.length > 0) {
     const key = value ? 'uploads.dashboard.madePrivate' : 'uploads.dashboard.madePublic';
-    toast(t(key, { count: changed }), { type: changed > 0 ? 'success' : 'error' });
+    const failure = results.find(unprocessable);
+    const description = isUndefined(failure)
+      ? undefined
+      : (await readWireError(failure.value)).message;
+    toast(t(key, { count: changed }), { type: changed > 0 ? 'success' : 'error', description });
   }
   return changed;
 }
@@ -344,4 +355,13 @@ export async function confirmDeleteUploads(records: readonly UploadRecord[]): Pr
  */
 function landed(result: PromiseSettledResult<Response>): boolean {
   return result.status === 'fulfilled' && result.value.ok;
+}
+
+/**
+ * Whether a batched request was answered with a `422`.
+ */
+function unprocessable(
+  result: PromiseSettledResult<Response>,
+): result is PromiseFulfilledResult<Response> {
+  return result.status === 'fulfilled' && result.value.status === 422;
 }

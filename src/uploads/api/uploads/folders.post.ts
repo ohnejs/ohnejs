@@ -4,6 +4,7 @@ import { isString } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
+import { readerReach } from '../../uploads/_reader.ts';
 import { createFolder } from '../../uploads/create-folder.ts';
 
 /**
@@ -11,6 +12,7 @@ import { createFolder } from '../../uploads/create-folder.ts';
  *
  * Creates a folder from `{ directory?, name }` and answers `201` with its record.
  * Needs `collection.Uploads.create`: no user `401`, no capability `403`.
+ * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
  * A body without a `name` is a `400`; a name already taken a `422`.
  */
 export default defineHandler(async (): Promise<UploadRecord> => {
@@ -20,5 +22,5 @@ export default defineHandler(async (): Promise<UploadRecord> => {
   const directory = body?.directory ?? '';
   if (!isString(name) || !isString(directory)) throw badRequest();
   setResponseStatus(201);
-  return createFolder({ directory, name, author: user.UUID });
+  return createFolder({ directory, name, author: user.UUID, reach: await readerReach() });
 });

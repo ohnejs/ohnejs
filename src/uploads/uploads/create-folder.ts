@@ -1,8 +1,10 @@
 import { queryUntyped, useDatabase } from 'ohnejs';
 
+import type { UploadReach } from './_reader.ts';
 import type { UploadRecord } from './types.ts';
 
 import { ensureFolders } from './_folders.ts';
+import { assertReached } from './_reader.ts';
 import { decorated } from './_row.ts';
 import { canonicalDirectory, canonicalName } from './path.ts';
 
@@ -24,6 +26,11 @@ export interface CreateFolderInput {
    * The `UUID` of the creating user, `null` when there is none.
    */
   author?: string | null;
+
+  /**
+   * The read scope every row this write touches or creates must stay inside; omitted writes unscoped.
+   */
+  reach?: UploadReach;
 }
 
 /**
@@ -43,10 +50,12 @@ export async function createFolder(input: CreateFolderInput): Promise<UploadReco
   const name = canonicalName(input.name);
   const author = input.author ?? null;
   const record = await useDatabase().transaction(async (tx) => {
-    const locked = await ensureFolders(tx, directory, author);
-    return queryUntyped('Uploads')
+    const { locked, created } = await ensureFolders(tx, directory, author);
+    const folder = await queryUntyped('Uploads')
       .use(tx)
       .createOrThrow({ kind: 'folder', directory, name, author, private: locked });
+    await assertReached(tx, input.reach, [folder.UUID as string, ...created]);
+    return folder;
   }, 'immediate');
   return decorated(record);
 }

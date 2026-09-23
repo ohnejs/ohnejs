@@ -103,6 +103,7 @@
     "notAFile": "Dies ist ein Ordner, keine Datei",
     "notAnImage": "Die Datei ist kein Bild",
     "notSVG": "Die Datei ist kein SVG-Bild",
+    "outOfReach": "Das würde es vor dir verbergen",
     "typeNotAllowed": "Der Dateityp `{type}` ist nicht erlaubt"
   },
   "fields": {

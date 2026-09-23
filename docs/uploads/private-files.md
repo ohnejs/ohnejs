@@ -95,7 +95,9 @@ api: {
 
 A caller outside the scope does not see the row, cannot fetch its bytes, and gets `null` where a
 [media field](./fields.md#reading) references it. They cannot change, move, replace, or delete it
-either: those routes answer the same `404` as an unknown file.
+either: those routes answer the same `404` as an unknown file. Nor can a write hide a row from
+them: making it private, moving it into a private folder, or adding to one answers `422`, and
+nothing changes.
 
 A write to a folder you can see applies to its whole subtree, files the scope hides included.
 

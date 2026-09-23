@@ -103,6 +103,7 @@
     "notAFile": "Ovo je folder, a ne datoteka",
     "notAnImage": "Datoteka nije slika",
     "notSVG": "Datoteka nije SVG slika",
+    "outOfReach": "Ovo bi vam to sakrilo",
     "typeNotAllowed": "Tip datoteke `{type}` nije dozvoljen"
   },
   "fields": {

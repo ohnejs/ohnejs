@@ -14,13 +14,15 @@ import { ancestorDirectories, splitUploadPath } from './path.ts';
  * Walking shallowest first, a missing folder is born as private as the nearest one above it.
  * Without an `UPLOADS_SECRET` nothing is private, so every missing folder is born public.
  * Resolves whether the deepest folder is private, so what lands inside it can inherit; the root never is.
+ * Resolves too the `UUID`s of the folder rows this call created.
  */
 export async function ensureFolders(
   tx: Transaction,
   directory: string,
   author: string | null,
-): Promise<boolean> {
+): Promise<{ locked: boolean; created: string[] }> {
   const keepsPrivate = privateUploads();
+  const created: string[] = [];
   let locked = false;
   for (const path of ancestorDirectories(directory)) {
     const location = splitUploadPath(path);
@@ -35,7 +37,8 @@ export async function ensureFolders(
     const outcome = await queryUntyped('Uploads')
       .use(tx)
       .create({ kind: 'folder', ...location, author, private: locked });
-    if (!outcome.ok && !isNotUnique(outcome.errors)) throw validationError(outcome.errors);
+    if (outcome.ok) created.push(outcome.record.UUID as string);
+    else if (!isNotUnique(outcome.errors)) throw validationError(outcome.errors);
   }
-  return locked;
+  return { locked, created };
 }

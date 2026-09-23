@@ -221,14 +221,16 @@ export function errorsOf(body: unknown): Record<string, string> {
 
 /**
  * Runs `run` with the `Uploads` read guarded by `access`, restoring the read afterwards.
+ * `isPublic` opens that read to callers without `collection.Uploads.read`.
  */
 export async function withReadAccess(
   access: CollectionEndpoint<string, 'read'>['access'],
   run: () => Promise<void>,
+  isPublic = false,
 ): Promise<void> {
   const api = useCollections().get('Uploads')!.collection.api as CollectionAPI;
   const original = api.read;
-  api.read = { access };
+  api.read = { public: isPublic, access };
   try {
     await run();
   } finally {
