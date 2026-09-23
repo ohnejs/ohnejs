@@ -21,8 +21,8 @@ const adapters = new Map<string, StorageAdapter>();
  *
  * @example
  * ```ts
- * // in a storage layer's boot/ file
- * useStorages().register('s3', (url) => createS3Storage(url))
+ * // boot/storage.ts in `@ohnejs/uploads-s3`
+ * useStorages().register('s3', createS3Storage)
  * ```
  */
 export function useStorages(): Registry<StorageFactory> {
@@ -52,7 +52,7 @@ export function useStorage(): StorageAdapter {
       title: `Unknown storage \`${storage}\``,
       body: [
         `\`uploads.storage\` names a backend no boot file registered.`,
-        `The uploads layer ships \`fs\`; a storage layer registers its own with \`useStorages()\`.`,
+        `The uploads layer ships \`fs\`, \`@ohnejs/uploads-s3\` adds \`s3\`, and a storage layer registers its own with \`useStorages()\`.`,
       ],
     });
   }
