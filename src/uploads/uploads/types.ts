@@ -10,8 +10,8 @@ export interface UploadDecorations<Variant extends string = string> {
   /**
    * Where the bytes are served from: the configured `publicURL` origin, else the backend's own URL.
    * Without either, it is the API's `/uploads/<path>`.
-   * A private file's is always the API's, signed with `?e=&s=` while `UPLOADS_SECRET` is set.
-   * So is that of a file read without `private`, since it may be one.
+   * A private file's is always the API's, signed with `?e=&s=`; so is that of a file read without `private`.
+   * Without an `UPLOADS_SECRET` no file is private, so every record points where a public one does.
    * Absent on a folder, which has no bytes.
    */
   url?: string;

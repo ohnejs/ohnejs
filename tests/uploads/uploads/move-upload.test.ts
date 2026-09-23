@@ -1,6 +1,7 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { HTTPError } from '../../../src/ohne/http/http-error.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
@@ -8,6 +9,8 @@ import { moveUpload } from '../../../src/uploads/uploads/move-upload.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream, text } from '../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 async function put(directory: string, name: string, content: string): Promise<string> {
   const upload = await putUpload({ directory, name, body: stream(bytes(content)) });

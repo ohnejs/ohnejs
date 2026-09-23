@@ -22,6 +22,7 @@ import {
 
 import { useUploadsConfig } from '../../config.ts';
 import { useStorage } from '../../storage/use-storages.ts';
+import { privateUploads } from '../../uploads/_private.ts';
 import { readerReaches } from '../../uploads/_reader.ts';
 import { splitUploadPath, uploadPath } from '../../uploads/path.ts';
 import { uploadSecrets, verifyUploadLink } from '../../uploads/sign.ts';
@@ -50,7 +51,7 @@ const ATTACHMENT_TYPES = new Set([
  * `GET /uploads/[...path]`
  *
  * Serves a file's bytes by its path.
- * A public file opens for anyone.
+ * A public file opens for anyone, as does every file while no `UPLOADS_SECRET` is set.
  * A private one opens through an unexpired link signed under `UPLOADS_SECRET`, or for a signed-in reader.
  * The link carries `?e=&s=`, and any other query is ignored.
  * The reader holds `collection.Uploads.read`, and the collection's read `access` scope admits the row.
@@ -74,7 +75,7 @@ export default defineHandler(async ({ params }) => {
     size: number;
     hash: string;
   };
-  const locked = isBoolean(row.private) && row.private;
+  const locked = privateUploads() && isBoolean(row.private) && row.private;
   if (locked && !linkVerifies(path) && !(await readerReaches(UUID))) throw notFound();
 
   const { cache } = useUploadsConfig();

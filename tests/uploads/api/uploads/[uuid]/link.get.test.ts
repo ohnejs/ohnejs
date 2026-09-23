@@ -14,6 +14,8 @@ import { uploadURL } from '../../../../../src/uploads/uploads/url.ts';
 import { parseDuration } from '../../../../../src/utils/index.ts';
 import { bytes, call, errorsOf, route, stream, userWith } from '../../../_fixture.ts';
 
+useEnv().set('UPLOADS_SECRET', 'secret');
+
 const link = route('GET', '/uploads/[uuid]/link', linkGet);
 
 useRoles().register('uploads-reader', {
@@ -108,9 +110,13 @@ describe('GET /uploads/[uuid]/link', () => {
     strictEqual((await send(uuid, '', nobody)).status, 403);
   });
 
-  it('fails a private file without a secret, a public one still answering', async () => {
+  it('404s every file while no secret makes the layer keep private files', async () => {
     useEnv().unset('UPLOADS_SECRET');
-    strictEqual((await send(hidden.UUID)).status, 500);
-    strictEqual((await send(open.UUID)).status, 200);
+    try {
+      strictEqual((await send(hidden.UUID)).status, 404);
+      strictEqual((await send(open.UUID)).status, 404);
+    } finally {
+      useEnv().set('UPLOADS_SECRET', 'secret');
+    }
   });
 });

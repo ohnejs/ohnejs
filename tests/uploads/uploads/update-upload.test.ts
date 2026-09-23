@@ -1,12 +1,15 @@
-import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { HTTPError } from '../../../src/ohne/http/http-error.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream } from '../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 async function privacy(prefix: string): Promise<Record<string, unknown>> {
   const rows = await queryUntyped('Uploads')
@@ -53,7 +56,7 @@ describe('updateUpload', () => {
     const upload = await putUpload({ directory: 'meta', name: 'd.txt', body: stream(bytes('d')) });
     const locked = await updateUpload(upload.UUID, { private: true });
     strictEqual(locked.private, true);
-    strictEqual(locked.url, '/uploads/meta/d.txt');
+    match(locked.url ?? '', /^\/uploads\/meta\/d\.txt\?e=\d+&s=/);
     strictEqual(storage.visibility.get('meta/d.txt'), true);
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
     const open = await updateUpload(upload.UUID, { private: false });
@@ -74,6 +77,20 @@ describe('updateUpload', () => {
     const updated = await updateUpload(upload.UUID, { private: false });
     strictEqual(updated.private, false);
     strictEqual(storage.visibility.has('meta/f.txt'), false);
+  });
+
+  it('ignores private while no secret makes the layer keep private files', async () => {
+    const upload = await putUpload({ directory: 'meta', name: 'g.txt', body: stream(bytes('g')) });
+    useEnv().unset('UPLOADS_SECRET');
+    try {
+      const updated = await updateUpload(upload.UUID, { private: true, description: 'Note' });
+      strictEqual(updated.private, false);
+      strictEqual(updated.description, 'Note');
+      strictEqual(storage.visibility.has('meta/g.txt'), false);
+      strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+    } finally {
+      useEnv().set('UPLOADS_SECRET', 'secret');
+    }
   });
 
   it('applies a folder toggle to everything inside it', async () => {

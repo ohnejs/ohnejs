@@ -10,8 +10,8 @@ hook('server:ready', async () => {
   if (!isEmpty(uploadSecrets())) return;
   if (!(await queryUntyped('Uploads').where({ private: true }).exists())) return;
   usePrinter().warn(
-    '`UPLOADS_SECRET` is unset, so private files open only for signed-in readers ' +
-      'and no temporary links can be made',
+    '`UPLOADS_SECRET` is unset, so the layer keeps no private files: ' +
+      'every row marked private is served to anyone',
   );
 });
 

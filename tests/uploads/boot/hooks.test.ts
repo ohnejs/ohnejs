@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DashboardMenuGroup } from '../../../src/base/api/dashboard.get.ts';
+import type { DashboardMenuGroup, DashboardMeta } from '../../../src/base/api/dashboard.get.ts';
 import type { User } from '../../../src/base/auth/types.ts';
 
 import '../_fixture.ts';
@@ -11,6 +11,7 @@ import { useCollections } from '../../../src/ohne/collections/use-collections.ts
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { useDatabase, useDialect } from '../../../src/ohne/database/use-database.ts';
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
@@ -133,5 +134,17 @@ describe('the dashboard:menu hook', () => {
     deepStrictEqual(await menuFor(admin, { label: '', items: [library] }), [
       { label: '', items: [library] },
     ]);
+  });
+});
+
+describe('the dashboard:meta hook', () => {
+  it('tells the dashboard whether the layer keeps private files', async () => {
+    const meta = { privateUploads: undefined } as unknown as DashboardMeta;
+    useEnv().set('UPLOADS_SECRET', 'secret');
+    await applyHook('dashboard:meta', meta, { user: admin });
+    strictEqual(meta.privateUploads, true);
+    useEnv().unset('UPLOADS_SECRET');
+    await applyHook('dashboard:meta', meta, { user: admin });
+    strictEqual(meta.privateUploads, false);
   });
 });

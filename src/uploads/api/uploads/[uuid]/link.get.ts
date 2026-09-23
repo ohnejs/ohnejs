@@ -8,6 +8,7 @@ import type { UploadRow } from '../../../uploads/_row.ts';
 
 import { useUploadsConfig } from '../../../config.ts';
 import { uploadsError } from '../../../uploads/_errors.ts';
+import { privateUploads } from '../../../uploads/_private.ts';
 import { temporaryUploadURL, uploadURL } from '../../../uploads/url.ts';
 
 /**
@@ -20,10 +21,11 @@ import { temporaryUploadURL, uploadURL } from '../../../uploads/url.ts';
  * Guarded like the `Uploads` read: no user `401` and no capability `403`, unless that read is public.
  * A `maxAge` that does not parse is a `400`; a folder a `422`.
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`.
- * Without `UPLOADS_SECRET` no link can be signed, so a private file fails the request.
+ * Without `UPLOADS_SECRET` the layer has no private files, so the route itself answers `404`.
  */
 export default defineHandler(
   async ({ params }): Promise<{ url: string; expires: number | null }> => {
+    if (!privateUploads()) throw notFound();
     const uploads = await queryScoped('Uploads', 'read');
     const maxAge = readMaxAge(useSearchParams().maxAge);
     const row = (await uploads.where({ UUID: params.uuid }).findFirst()) as UploadRow | undefined;

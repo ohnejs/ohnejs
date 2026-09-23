@@ -1,9 +1,10 @@
 import { queryUntyped, useDatabase } from 'ohnejs';
-import { isBoolean, isUndefined } from 'ohnejs/utils';
+import { isBoolean, isUndefined, omit } from 'ohnejs/utils';
 
 import type { UploadRecord } from './types.ts';
 
 import { drainJournal, journalStorage } from '../storage/journal.ts';
+import { privateUploads } from './_private.ts';
 import { decorated, readUpload } from './_row.ts';
 import { setDescendantsPrivate } from './_subtree.ts';
 import { uploadPath } from './path.ts';
@@ -47,6 +48,7 @@ export interface UpdateUploadOptions {
 /**
  * Updates a row's metadata: the alt text, the focal point, and whether it is private.
  * A folder's `private` applies to everything inside it, and storage locks or unlocks the objects to match.
+ * Without an `UPLOADS_SECRET` the layer has no private files, so `private` is ignored.
  * An out-of-range value is the pipeline's `422`; an unknown `UUID` a `404`.
  *
  * @example
@@ -61,15 +63,17 @@ export async function updateUpload(
   input: UpdateUploadInput,
   options: UpdateUploadOptions = {},
 ): Promise<UploadRecord> {
+  const locks = isBoolean(input.private) && privateUploads();
   const record = await useDatabase().transaction(async (tx) => {
     const row = await readUpload(uuid, tx);
     const builder = queryUntyped('Uploads').use(tx).where({ UUID: uuid });
+    const changes = locks || !isBoolean(input.private) ? input : omit(input, ['private']);
     const [updated] = await (
       isUndefined(options.locale) ? builder : builder.locale(options.locale)
-    ).updateOrThrow({ ...input });
-    if (!isBoolean(input.private) || input.private === (row.private === true)) return updated;
+    ).updateOrThrow({ ...changes });
+    if (!locks || input.private === (row.private === true)) return updated;
     const path = uploadPath(row);
-    if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private);
+    if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private === true);
     await journalStorage(tx, { op: input.private ? 'lock' : 'unlock', from: path });
     return updated;
   }, 'immediate');

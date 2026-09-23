@@ -15,6 +15,8 @@ import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import { stringifySearchParams } from '../../../../src/utils/index.ts';
 import { bytes, call, png, route, stream, userWith } from '../../_fixture.ts';
 
+useEnv().set('UPLOADS_SECRET', 'secret');
+
 const serve = route('GET', '/uploads/[...path]', pathGet);
 
 useRoles().register('uploads-reader', {
@@ -63,11 +65,26 @@ function signed(expires: number, secret = 'secret'): string {
 }
 
 async function withSecret<T>(value: string, run: () => Promise<T>): Promise<T> {
+  const previous = useEnv().get('UPLOADS_SECRET');
   useEnv().set('UPLOADS_SECRET', value);
   try {
     return await run();
   } finally {
-    useEnv().unset('UPLOADS_SECRET');
+    if (previous === undefined) useEnv().unset('UPLOADS_SECRET');
+    else useEnv().set('UPLOADS_SECRET', previous);
+  }
+}
+
+/**
+ * Runs `run` with the layer's private files switched off, restoring the secret afterwards.
+ */
+async function withoutSecret<T>(run: () => Promise<T>): Promise<T> {
+  const previous = useEnv().get('UPLOADS_SECRET');
+  useEnv().unset('UPLOADS_SECRET');
+  try {
+    return await run();
+  } finally {
+    if (previous !== undefined) useEnv().set('UPLOADS_SECRET', previous);
   }
 }
 
@@ -194,7 +211,15 @@ describe('GET /uploads/[...path] on a private file', () => {
       strictEqual((await getHidden(`?s=${s}`)).status, 404);
       strictEqual((await getHidden()).status, 404);
     });
-    strictEqual((await getHidden(signed(expires))).status, 404);
+  });
+
+  it('serves the row to anyone while no secret makes the layer keep private files', async () => {
+    await withoutSecret(async () => {
+      const response = await getHidden();
+      strictEqual(response.status, 200);
+      strictEqual(await response.text(), 'hush');
+      strictEqual(response.headers.get('cache-control'), 'no-cache');
+    });
   });
 
   it('opens for a signed-in reader with the capability, and for no one else', async () => {

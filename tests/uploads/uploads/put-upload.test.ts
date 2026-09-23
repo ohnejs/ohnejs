@@ -1,12 +1,15 @@
-import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, ok, rejects, strictEqual } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { bytes, JPEG_HEAD, png, storage, stream, text } from '../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 function sha256(source: Uint8Array): string {
   return createHash('sha256').update(source).digest('hex');
@@ -175,9 +178,31 @@ describe('putUpload', () => {
       body: stream(bytes('s')),
     });
     strictEqual(upload.private, true);
-    strictEqual(upload.url, '/uploads/vault/secret.txt');
+    match(upload.url ?? '', /^\/uploads\/vault\/secret\.txt\?e=\d+&s=/);
     strictEqual(storage.visibility.get('vault/secret.txt'), true);
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('lands every file public while no secret makes the layer keep private files', async () => {
+    await queryUntyped('Uploads').createOrThrow({
+      kind: 'folder',
+      directory: '',
+      name: 'open-vault',
+      private: true,
+    });
+    useEnv().unset('UPLOADS_SECRET');
+    try {
+      const upload = await putUpload({
+        directory: 'open-vault',
+        name: 'plain.txt',
+        body: stream(bytes('p')),
+      });
+      strictEqual(upload.private, false);
+      strictEqual(upload.url, '/uploads/open-vault/plain.txt');
+      strictEqual(storage.visibility.has('open-vault/plain.txt'), false);
+    } finally {
+      useEnv().set('UPLOADS_SECRET', 'secret');
+    }
   });
 
   it('creates the folders a private one implies as private too', async () => {

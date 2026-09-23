@@ -1,10 +1,13 @@
 import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { createFolder } from '../../../src/uploads/uploads/create-folder.ts';
 import { storage } from '../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 describe('createFolder', () => {
   it('creates the folder row and its ancestors, touching no storage', async () => {

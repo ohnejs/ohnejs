@@ -1,10 +1,13 @@
 import { ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import uuidPatch from '../../../../src/uploads/api/uploads/[uuid].patch.ts';
 import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
 import { bytes, call, route, storage, stream, text, userWith } from '../../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 const patch = route('PATCH', '/uploads/[uuid]', uuidPatch);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
@@ -62,6 +65,21 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual((await send(uuid, { name: 7 })).status, 400);
     strictEqual((await send(uuid, { focalX: 'left' })).status, 400);
     strictEqual((await send(uuid, { private: 'yes' })).status, 400);
+  });
+
+  it('ignores private while no secret makes the layer keep private files', async () => {
+    const uuid = await seed('p.txt');
+    useEnv().unset('UPLOADS_SECRET');
+    try {
+      strictEqual((await send(uuid, { private: true })).status, 400);
+      const response = await send(uuid, { private: true, description: 'Note' });
+      strictEqual(response.status, 200);
+      const record = (await response.json()) as Record<string, unknown>;
+      strictEqual(record.private, false);
+      strictEqual(record.description, 'Note');
+    } finally {
+      useEnv().set('UPLOADS_SECRET', 'secret');
+    }
   });
 
   it('locks a folder and everything inside it', async () => {
