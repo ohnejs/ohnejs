@@ -1,9 +1,8 @@
-import { createHash } from 'node:crypto';
-
 import type { Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
 import type { DerivedOrigin, TableSchema } from './table-schema.ts';
 
+import { digest } from '../../../utils/crypto/index.ts';
 import { isUndefined, jsonSerialize, mapValues, pick } from '../../../utils/index.ts';
 import { OHNE_SCHEMA } from '../naming/table-names.ts';
 
@@ -144,7 +143,7 @@ export function advanceSnapshot(
  */
 export function schemaHash(tables: readonly TableSchema[]): string {
   const sorted = [...tables].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return createHash('sha256').update(jsonSerialize(sorted)).digest('hex');
+  return digest('sha256', jsonSerialize(sorted)).toHex();
 }
 
 /**
