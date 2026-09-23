@@ -4,7 +4,7 @@ import { queryUntyped, useDatabase } from 'ohnejs';
 import { extname, isBoolean, isUndefined, omit } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
-import type { UploadReach } from './_reader.ts';
+import type { UploadReach } from './_reach.ts';
 import type { MoveUploadTarget } from './move-upload.ts';
 import type { UploadRecord } from './types.ts';
 import type { UpdateUploadInput } from './update-upload.ts';
@@ -13,7 +13,7 @@ import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
 import { ensureFolders, folderLocked } from './_folders.ts';
 import { privateUploads } from './_private.ts';
-import { assertReached, assertUploadReach, reachedSubtree } from './_reader.ts';
+import { assertReached, assertUploadReach, reachedSubtree } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { moveDescendants, setDescendantsPrivate } from './_subtree.ts';
 import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';

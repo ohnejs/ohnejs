@@ -4,7 +4,8 @@ import { requireCapability } from 'ohnejs/auth';
 import type { UploadRecord } from '../../../uploads/types.ts';
 
 import { UPLOAD_ROUTE_OPTIONS, uploadBody } from '../../../uploads/_body.ts';
-import { assertUploadReach, uploadReach } from '../../../uploads/_reader.ts';
+import { assertUploadReach } from '../../../uploads/_reach.ts';
+import { uploadReach } from '../../../uploads/_reader.ts';
 import { replaceUpload } from '../../../uploads/replace-upload.ts';
 
 /**

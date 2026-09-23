@@ -15,7 +15,8 @@ import type { UpdateUploadInput } from '../../uploads/update-upload.ts';
 
 import { patchUpload } from '../../uploads/_patch.ts';
 import { privateUploads } from '../../uploads/_private.ts';
-import { assertUploadReach, uploadReach } from '../../uploads/_reader.ts';
+import { assertUploadReach } from '../../uploads/_reach.ts';
+import { uploadReach } from '../../uploads/_reader.ts';
 
 /**
  * `PATCH /uploads/[uuid]`

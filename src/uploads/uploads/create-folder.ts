@@ -1,10 +1,10 @@
 import { queryUntyped, useDatabase } from 'ohnejs';
 
-import type { UploadReach } from './_reader.ts';
+import type { UploadReach } from './_reach.ts';
 import type { UploadRecord } from './types.ts';
 
 import { ensureFolders } from './_folders.ts';
-import { assertReached } from './_reader.ts';
+import { assertReached } from './_reach.ts';
 import { decorated } from './_row.ts';
 import { canonicalDirectory, canonicalName } from './path.ts';
 

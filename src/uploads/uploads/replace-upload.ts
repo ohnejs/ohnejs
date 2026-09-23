@@ -2,14 +2,14 @@ import { queryUntyped, useDatabase } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
-import type { UploadReach } from './_reader.ts';
+import type { UploadReach } from './_reach.ts';
 import type { UploadRow } from './_row.ts';
 import type { UploadRecord } from './types.ts';
 
 import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
-import { assertReached, assertUploadReach } from './_reader.ts';
+import { assertReached, assertUploadReach } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { uploadPath } from './path.ts';

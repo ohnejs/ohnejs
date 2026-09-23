@@ -1,7 +1,8 @@
 import { defineHandler } from 'ohnejs';
 import { requireCapability } from 'ohnejs/auth';
 
-import { assertUploadReach, uploadReach } from '../../uploads/_reader.ts';
+import { assertUploadReach } from '../../uploads/_reach.ts';
+import { uploadReach } from '../../uploads/_reader.ts';
 import { deleteUpload } from '../../uploads/delete-upload.ts';
 
 /**
