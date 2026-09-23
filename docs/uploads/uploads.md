@@ -45,7 +45,7 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
 - `width` and `height` - on an image.
 - `author` and `uploadedAt` - on every row.
 - `private` - whether only a [signed link or a signed-in reader](./private-files.md) opens the
-  bytes.
+  bytes. Ignored while no `UPLOADS_SECRET` is set.
 
 Every read is decorated with extra fields:
 

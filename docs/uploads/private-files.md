@@ -1,7 +1,7 @@
 # Private files
 
 A private file opens only through a link that expires, or for a signed-in reader who may read
-`Uploads`.
+`Uploads`. The feature runs on `UPLOADS_SECRET`: without it every file is public.
 
 Mark a file or folder private in the dashboard, or in server code:
 
@@ -52,8 +52,10 @@ UPLOADS_SECRET=a-long-random-value
 
 - It may list several secrets, comma-separated. The first signs and any verifies, so it
   [rotates](./image-variants.md#rotating-the-secret) like `IMAGES_SECRET`.
-- Without it, `url` is the bare route, which only a signed-in reader can open, `expires` is
-  absent, and a private image has no `variants`. ohne warns at boot.
+- Without it the layer keeps no private files at all. Every file is served to anyone, a stored
+  `private` is ignored, `PATCH` drops it, the link route answers `404`, and the dashboard hides
+  the switch, the badges, and the bulk actions. ohne warns at boot while a private row exists.
+- The column stays, so nothing is lost: set the secret and the same rows are private again.
 
 ## How long a link lives
 
