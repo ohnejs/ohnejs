@@ -1,8 +1,9 @@
 # The image service
 
 An image service renders the variants ohne signs: it answers a variant URL with the resized,
-re-encoded image and caches the result. The reference implementation, `ohne-images`, is one. This
-page is for writing your own, or checking one against the protocol. To use variants in an app, read
+re-encoded image and caches the result. The reference implementation,
+[`@ohnejs/images`](https://github.com/ohnejs/images), is one. This page is for writing your own, or
+checking one against the protocol. To use variants in an app, read
 [image variants](./image-variants.md) instead.
 
 ## The URL
@@ -67,14 +68,24 @@ URL has no expiry date: it lives in pages and in caches, and a leaked URL gives 
 one variant it names. A [private file's](./private-files.md) URL carries its expiry as `e` inside
 the signed transforms, so nobody can extend it without the secret.
 
+The fetch of a private original ([step 5](#what-a-service-does)) signs `e_<expires>/<path>` the
+same way, under an `UPLOADS_SECRET` value:
+
+| secret    | expires         | path                | signature                                     |
+| --------- | --------------- | ------------------- | --------------------------------------------- |
+| `secret`  | `1700000000000` | `photos/sunset.jpg` | `lbshLgROalNk_URHWIraK7YDalfVmPq9WlenM8B9Ytg` |
+| `another` | `1700000000000` | `private/scan.jpg`  | `FxcSFpGtqzYAID5ZQj1GmHfMzvs3SlcTa86NlasSgrU` |
+
 ## What a service does
 
-1. Split the path into three parts: the first segment is the signature, the second is the
-   transforms, and the rest is the source path. Answer `404` to fewer than three segments. Ignore
-   the query string, for routing and for the cache key, so nobody forces a re-render by changing it.
-2. Verify the signature over the raw `{transforms}/{path}` string before parsing anything. Answer
-   `403` when it is not valid. An [unsigned service](./image-variants.md#connecting-a-service),
-   meant for a local machine, skips this step.
+1. Answer `405` to any method but `GET` and `HEAD`. Split the path into three parts: the first
+   segment is the signature, the second is the transforms, and the rest is the source path. Answer
+   `404` to fewer than three segments. Ignore the query string, for routing and for the cache key,
+   so nobody forces a re-render by changing it.
+2. Verify the signature over the raw `{transforms}/{path}` string, in constant time, before parsing
+   anything. Answer `403` when it is not valid. An
+   [unsigned service](./image-variants.md#connecting-a-service), meant for a local machine, skips
+   this step.
 3. Parse the transforms. Answer `400` to an empty segment, an unknown token, an out-of-range value,
    a duplicate, or both `p` and `fp`.
 4. Refuse an expired URL: when `e` is present and not after the current time, answer `403`.
@@ -90,8 +101,8 @@ the signed transforms, so nobody can extend it without the secret.
    - Answer `404` when the origin does, and `502` when it is unreachable, both with
      `Cache-Control: no-store`.
    - Revalidate a fetched source with `If-None-Match` at a short interval, for example one minute.
-     Drop its variants when the `ETag` changes, so a [replaced file](./uploads.md#in-server-code)
-     gets new variants.
+     Key its variants by the `ETag`, so a [replaced file](./uploads.md#in-server-code) gets new
+     variants.
    - When the origin sends no `ETag`, hash the bytes and use the hash instead.
 6. Render:
    - **Size.** Multiply `w` and `h` by `dpr` before fitting. At `dpr` 1 never scale the source up:
@@ -100,9 +111,10 @@ the signed transforms, so nobody can extend it without the secret.
    - **Crop.** Position by `p` or `fp` only for `cover`, since `contain` and `inside` do not crop.
      Pad `contain` to the full box with transparency, or white for `jpeg`. Padding is not
      enlargement.
-   - **Metadata.** Apply the EXIF orientation, then strip the metadata.
-   - **Encode.** Encode in `f` at `q`. On `png`, `q` is palette quantization. Without `f`, keep the
-     source format, and encode a vector source as `png`.
+   - **Metadata.** Apply the EXIF orientation, convert to sRGB, then strip the metadata.
+   - **Encode.** Encode in `f` at `q`. On `png`, `q` is palette quantization; without it, `png` is
+     lossless. Flatten `jpeg` onto white. Without `f`, keep the source format, and encode a vector
+     source as `png`. Render the first frame of an animated source.
    - **`f_auto`.** Pick `avif` when `Accept` contains `image/avif`, else `webp` when it contains
      `image/webp`, else the source format. `image/*` alone means the source format. Add
      `Vary: Accept` to the answer.
@@ -110,13 +122,16 @@ the signed transforms, so nobody can extend it without the secret.
      it at the density the output needs, then fit, since scaling up a low-density raster blurs every
      edge. An SVG without `width`, `height`, or `viewBox` may render at the size of its drawn
      shapes, depending on the rasterizer, so give an uploaded SVG a `viewBox`. Its thumbnail is a
-     WebP raster like any other.
-7. Answer with the rendered bytes, `Content-Type`, and a long `Cache-Control: public, max-age`, or
-   `private, max-age` bounded by the time left when the URL carries `e`. Keep the result cached by
-   URL for the next request, with `e` left out of the key, so a private file's successive windows
-   share one render. Serve a cached render only once step 5 has found its source, so a URL without
-   `e` never reaches a private one. With `f_auto` the negotiated format is also part of the cache
-   key, since the URL alone no longer identifies the bytes.
+     WebP raster like any other. Never let the rasterizer load external files, URLs, or entities.
+7. Answer with the rendered bytes, `Content-Type`, `Content-Length`, and a long
+   `Cache-Control: public, max-age`, or `private, max-age` bounded by the time left when the URL
+   carries `e`.
+   - **`HEAD`.** Send the same headers and no body. The dashboard reads a variant's size this way.
+   - **CORS.** Send `Access-Control-Allow-Origin: *`, since the dashboard asks from another origin.
+   - **Cache.** Key a render by the transforms without `e`, the path, the source's `ETag`, and the
+     negotiated format for `f_auto`. Leave the signature out, so a private file's successive windows
+     share one render. Serve a cached render only once step 5 has found its source, so a URL without
+     `e` never reaches a private one.
 
 A service may also refuse
 [every variant the app did not name](./image-variants.md#allowing-only-your-variants).

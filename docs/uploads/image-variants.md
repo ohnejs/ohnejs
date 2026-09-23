@@ -159,10 +159,11 @@ accepts a URL signed by any of them. To rotate:
 
 ## The reference service
 
-ohne ships the protocol. The reference implementation, `ohne-images`, runs on Node and sharp. It
-lives in its own package, because sharp is a native dependency and ohne has none. Any
-implementation that follows [the image service protocol](./image-service.md) works, including one
-behind a CDN or on an edge runtime.
+ohne ships the protocol. The reference implementation,
+[`@ohnejs/images`](https://github.com/ohnejs/images), runs on Node and sharp. It lives in its own
+package, because sharp is a native dependency and ohne has none. Any implementation that follows
+[the image service protocol](./image-service.md) works, including one behind a CDN or on an edge
+runtime.
 
 ## Allowing only your variants
 
@@ -184,7 +185,7 @@ IMAGES_VARIANTS='w_320,h_320,fit_inside,f_webp;w_640,h_360,f_webp;w_1280,h_720,f
 ```
 
 - A URL with a valid signature gets a `403` when its tokens are not in the list.
-- The match ignores `fp`, `p`, and `e`, which carry the upload's focal point and a
+- The match ignores `fp`, `p`, and `e`, which carry where a crop keeps its subject and a
   [private file's](./private-files.md) expiry rather than a size.
 
 With the list set, a leaked secret or a careless template cannot ask the service for a size you did
