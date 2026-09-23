@@ -35,6 +35,13 @@ describe('stringifyImageTransforms', () => {
     strictEqual(stringifyImageTransforms({ position: 'topRight' }), 'p_topRight');
   });
 
+  it('rounds a ratio to two decimals the parser accepts', () => {
+    strictEqual(stringifyImageTransforms({ dpr: 1.555 }), 'dpr_1.56');
+    strictEqual(stringifyImageTransforms({ dpr: 1.005 }), 'dpr_1.01');
+    strictEqual(stringifyImageTransforms({ dpr: 1.001 }), '');
+    deepStrictEqual(parseImageTransforms(stringifyImageTransforms({ dpr: 2.333 })), { dpr: 2.33 });
+  });
+
   it('throws on an out-of-range value', () => {
     throws(() => stringifyImageTransforms({ width: 0 }), /`width`/);
     throws(() => stringifyImageTransforms({ height: 1.5 }), /`height`/);

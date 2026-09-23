@@ -1,4 +1,4 @@
-import { isInteger, isNull, isRealNumber, isUndefined } from 'ohnejs/utils';
+import { isInteger, isNull, isRealNumber, isUndefined, roundTo } from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 
@@ -88,7 +88,7 @@ export interface ImageTransforms {
   };
 
   /**
-   * The device pixel ratio the target size is multiplied by, `1` to `4`.
+   * The device pixel ratio the target size is multiplied by, `1` to `4`, rounded to two decimals.
    *
    * @default
    * 1
@@ -121,7 +121,7 @@ const FOCAL = /^(\d(?:\.\d{1,3})?)_(\d(?:\.\d{1,3})?)$/;
  * A full one reads `w_800,h_600,fit_contain,f_webp,q_80,fp_0.3_0.6,dpr_2`.
  *
  * Tokens keep a fixed order and a default is never written, so equal transforms always produce one string.
- * A `focalPoint` replaces `position`; a focal axis is rounded to three decimals.
+ * A `focalPoint` replaces `position`; a focal axis is rounded to three decimals, a `dpr` to two.
  * Returns `''` when nothing is asked for.
  * An out-of-range value throws, since transforms come from server code.
  *
@@ -146,7 +146,10 @@ export function stringifyImageTransforms(transforms: ImageTransforms): string {
   } else if (!isUndefined(position) && position !== 'center') {
     tokens.push(`p_${oneOf('position', position, POSITIONS)}`);
   }
-  if (!isUndefined(dpr) && dpr !== 1) tokens.push(`dpr_${bounded('dpr', dpr, 1, 4, false)}`);
+  if (!isUndefined(dpr)) {
+    const ratio = roundTo(bounded('dpr', dpr, 1, 4, false), 2);
+    if (ratio !== 1) tokens.push(`dpr_${ratio}`);
+  }
   return tokens.join(',');
 }
 
@@ -264,7 +267,7 @@ function bounded(name: string, value: number, min: number, max: number, integer:
 function focalAxis(axis: string, value: number): number {
   if (!isRealNumber(value) || value < 0 || value > 1)
     invalid(`focalPoint.${axis}`, value, 'between `0` and `1`');
-  return Math.round(value * 1000) / 1000;
+  return roundTo(value, 3);
 }
 
 /**
