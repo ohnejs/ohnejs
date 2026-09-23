@@ -578,6 +578,14 @@ declare module 'ohnejs' {
       menu: DashboardMenuGroup[],
       context: { user: User; collections: readonly DashboardCollection[] },
     ) => void | DashboardMenuGroup[] | Promise<void | DashboardMenuGroup[]>;
+
+    /**
+     * Extends the discovery payload after everything else resolved, before `GET /dashboard` answers.
+     * Fires once per read, inside the request context, so the viewer and their language are in scope.
+     * A layer adds a key by augmenting `DashboardMeta` here and in `ohnejs/dashboard` for the browser.
+     * Mutate the object in place; whatever it holds afterwards is the answer.
+     */
+    'dashboard:meta': (meta: DashboardMeta, context: { user: User }) => void | Promise<void>;
   }
 }
 
@@ -637,7 +645,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
   const menu = await applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
   const account = await describeAccount(user);
-  return {
+  const meta: DashboardMeta = {
     menu,
     collections,
     blocks: describeBlocks([
@@ -651,6 +659,8 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     languages: catalogLanguages(),
     ...account,
   };
+  await applyHook('dashboard:meta', meta, { user });
+  return meta;
 });
 
 /**
