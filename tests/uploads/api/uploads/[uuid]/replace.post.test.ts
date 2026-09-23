@@ -2,20 +2,27 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
+import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 import replacePost from '../../../../../src/uploads/api/uploads/[uuid]/replace.post.ts';
 import { createFolder } from '../../../../../src/uploads/uploads/create-folder.ts';
 import { putUpload } from '../../../../../src/uploads/uploads/put-upload.ts';
+import { updateUpload } from '../../../../../src/uploads/uploads/update-upload.ts';
 import {
   bytes,
   call,
   errorsOf,
   png,
   route,
+  stalled,
   storage,
   stream,
   text,
   userWith,
+  withReadAccess,
 } from '../../../_fixture.ts';
+
+useEnv().set('UPLOADS_SECRET', 'secret');
 
 const replace = route('POST', '/uploads/[uuid]/replace', replacePost);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
@@ -54,5 +61,45 @@ describe('POST /uploads/[uuid]/replace', () => {
     const upload = await putUpload({ directory: 'rep', name: 'b.txt', body: stream(bytes('b')) });
     strictEqual((await send(upload.UUID, stream(bytes('c')))).status, 401);
     strictEqual(text(storage.objects.get('rep/b.txt')), 'b');
+  });
+
+  it('404s a file the read access scope hides before staging a byte', async () => {
+    const upload = await putUpload({ directory: 'rep', name: 'hid.txt', body: stream(bytes('h')) });
+    await updateUpload(upload.UUID, { private: true });
+    const staged = new Set(storage.objects.keys());
+    const journal = await queryUntyped('UploadsJournal').where({ op: 'stage' }).count();
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        strictEqual((await send(upload.UUID, stream(bytes('new')), admin)).status, 404);
+        strictEqual((await send(upload.UUID, undefined, admin)).status, 404);
+      },
+    );
+    const row = await queryUntyped('Uploads').where({ UUID: upload.UUID }).findFirst();
+    strictEqual(row?.hash, upload.hash);
+    strictEqual(text(storage.objects.get('rep/hid.txt')), 'h');
+    deepStrictEqual(new Set(storage.objects.keys()), staged);
+    strictEqual(await queryUntyped('UploadsJournal').where({ op: 'stage' }).count(), journal);
+  });
+
+  it('404s a file the scope hides by the time its bytes are staged, dropping them', async () => {
+    const upload = await putUpload({
+      directory: 'rep',
+      name: 'late.txt',
+      body: stream(bytes('l')),
+    });
+    const staged = new Set(storage.objects.keys());
+    const lock = () => updateUpload(upload.UUID, { private: true }).then(() => undefined);
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        const response = await send(upload.UUID, stalled('new ', lock, 'bytes'), admin);
+        strictEqual(response.status, 404);
+      },
+    );
+    const row = await queryUntyped('Uploads').where({ UUID: upload.UUID }).findFirst();
+    strictEqual(row?.hash, upload.hash);
+    strictEqual(text(storage.objects.get('rep/late.txt')), 'l');
+    deepStrictEqual(new Set(storage.objects.keys()), staged);
   });
 });

@@ -1,3 +1,7 @@
+import type {
+  CollectionAPI,
+  CollectionEndpoint,
+} from '../../src/ohne/collections/define-collection.ts';
 import type { AnyHandler, Route } from '../../src/ohne/routes/route.ts';
 import type { HTTPMethod } from '../../src/utils/index.ts';
 import type { MemoryStorage } from './_storage.ts';
@@ -123,6 +127,25 @@ export function stream(source: Uint8Array, chunk = 5): ReadableStream<Uint8Array
 }
 
 /**
+ * Streams `head`, runs `meanwhile` once the reader asks for more, then streams `tail`.
+ */
+export function stalled(
+  head: string,
+  meanwhile: () => Promise<void>,
+  tail: string,
+): ReadableStream<Uint8Array> {
+  const chunks = [bytes(head), bytes(tail)];
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (chunks.length === 1) await meanwhile();
+      const next = chunks.shift();
+      if (next === undefined) controller.close();
+      else controller.enqueue(next);
+    },
+  });
+}
+
+/**
  * A PNG signature and `IHDR` header, enough to sniff and to measure.
  */
 export function png(width: number, height: number): Uint8Array {
@@ -194,4 +217,21 @@ export async function call(
  */
 export function errorsOf(body: unknown): Record<string, string> {
   return (body as { data: { errors: Record<string, string> } }).data.errors;
+}
+
+/**
+ * Runs `run` with the `Uploads` read guarded by `access`, restoring the read afterwards.
+ */
+export async function withReadAccess(
+  access: CollectionEndpoint<string, 'read'>['access'],
+  run: () => Promise<void>,
+): Promise<void> {
+  const api = useCollections().get('Uploads')!.collection.api as CollectionAPI;
+  const original = api.read;
+  api.read = { access };
+  try {
+    await run();
+  } finally {
+    api.read = original;
+  }
 }

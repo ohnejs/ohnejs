@@ -15,6 +15,7 @@ import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
  * A file row's path is also its storage key and its public URL, so moving a file moves its object.
  * The helpers in `ohnejs/uploads` keep rows and objects in agreement.
  * The collections API opens only `read`, guarded by the `collection.Uploads.read` capability.
+ * The row a `/uploads` write route names must fall in the read `access` scope, or it is a `404`.
  * Every read row is decorated with `path`, and a file row with `url`.
  * A file row gets `variants` too when an image service is configured and renders its type.
  */

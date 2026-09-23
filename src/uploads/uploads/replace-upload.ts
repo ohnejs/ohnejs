@@ -1,3 +1,5 @@
+import type { Transaction } from 'ohnejs';
+
 import { queryUntyped, useDatabase } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
@@ -20,6 +22,12 @@ export interface ReplaceUploadOptions {
    * The declared byte length, when the request carried one.
    */
   size?: number;
+
+  /**
+   * Runs inside the write's transaction once the bytes are staged.
+   * A throw refuses the replace and drops the staged bytes.
+   */
+  admit?: (tx: Transaction) => Promise<void>;
 }
 
 /**
@@ -53,6 +61,7 @@ export async function replaceUpload(
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
+      await options.admit?.(tx);
       await claimStaged(tx, temp);
       const [updated] = await queryUntyped('Uploads')
         .use(tx)

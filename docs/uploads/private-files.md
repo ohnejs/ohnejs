@@ -23,7 +23,8 @@ A folder locks everything inside it:
 - Toggling a folder rewrites its whole subtree.
 - A file uploaded into a private folder, or a folder created in one, is private.
 - Moving into a private folder makes the moved row private, a folder with its subtree. Moving out,
-  or renaming in place, changes nothing.
+  or renaming in place, changes nothing. A `PATCH` that also sends `private` leaves it to that
+  value instead.
 
 ## What a read carries
 
@@ -93,7 +94,10 @@ api: {
 ```
 
 A caller outside the scope does not see the row, cannot fetch its bytes, and gets `null` where a
-[media field](./fields.md#reading) references it.
+[media field](./fields.md#reading) references it. They cannot change, move, replace, or delete it
+either: those routes answer the same `404` as an unknown file.
+
+A write to a folder you can see applies to its whole subtree, files the scope hides included.
 
 ## Temporary links
 

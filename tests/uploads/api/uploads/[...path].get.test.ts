@@ -1,9 +1,6 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { CollectionAPI } from '../../../../src/ohne/collections/define-collection.ts';
-
-import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
@@ -13,7 +10,7 @@ import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
 import { signUploadLink } from '../../../../src/uploads/uploads/sign.ts';
 import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import { stringifySearchParams } from '../../../../src/utils/index.ts';
-import { bytes, call, png, route, stream, userWith } from '../../_fixture.ts';
+import { bytes, call, png, route, stream, userWith, withReadAccess } from '../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
@@ -242,28 +239,26 @@ describe('GET /uploads/[...path] on a private file', () => {
   });
 
   it('honours a read access scope that hides the row, a signed link still opening it', async () => {
-    const api = useCollections().get('Uploads')!.collection.api as CollectionAPI;
-    const original = api.read;
-    api.read = { access: async () => ({ where: { private: false } }) };
-    try {
-      strictEqual((await getHidden('', { bearer: reader })).status, 404);
-      strictEqual(
-        (
-          await call(
-            serve,
-            '/uploads/serve/note.txt',
-            { path: 'serve/note.txt' },
-            { bearer: reader },
-          )
-        ).status,
-        200,
-      );
-      await withSecret('secret', async () => {
-        strictEqual((await getHidden(signed(Date.now() + 60_000))).status, 200);
-      });
-    } finally {
-      api.read = original;
-    }
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        strictEqual((await getHidden('', { bearer: reader })).status, 404);
+        strictEqual(
+          (
+            await call(
+              serve,
+              '/uploads/serve/note.txt',
+              { path: 'serve/note.txt' },
+              { bearer: reader },
+            )
+          ).status,
+          200,
+        );
+        await withSecret('secret', async () => {
+          strictEqual((await getHidden(signed(Date.now() + 60_000))).status, 200);
+        });
+      },
+    );
   });
 
   it('marks uploads.cache private for a private file, never public', async () => {

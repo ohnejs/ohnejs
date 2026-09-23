@@ -116,7 +116,9 @@ When a file comes in:
 - An SVG is sanitized before it is stored.
 
 Writes need the `collection.Uploads.*` capabilities of
-[roles](../auth/roles.md#the-collections-api-guard). The bytes are public unless the file is
+[roles](../auth/roles.md#the-collections-api-guard). Changing, replacing, or deleting a row also
+needs the `Uploads` read, and reaches only rows its [`access`](./private-files.md#who-can-open-the-bytes)
+scope lets you see. Any other row is a `404`. The bytes are public unless the file is
 [private](./private-files.md).
 
 `PATCH` with `name` or `directory` renames or moves the row and its object, keeping a file's

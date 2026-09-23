@@ -3,15 +3,34 @@ import { describe, it } from 'node:test';
 
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
 import uuidPatch from '../../../../src/uploads/api/uploads/[uuid].patch.ts';
+import { createFolder } from '../../../../src/uploads/uploads/create-folder.ts';
 import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
-import { bytes, call, route, storage, stream, text, userWith } from '../../_fixture.ts';
+import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
+import {
+  bytes,
+  call,
+  route,
+  stalled,
+  storage,
+  stream,
+  text,
+  userWith,
+  withReadAccess,
+} from '../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
 const patch = route('PATCH', '/uploads/[uuid]', uuidPatch);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
 const nobody = await userWith('nobody@example.com', []);
+useRoles().register('uploads-updater', {
+  name: 'uploads-updater',
+  role: { capabilities: ['collection.Uploads.update'] },
+});
+const updater = await userWith('updater@example.com', ['uploads-updater']);
+const visibleOnly = () => ({ where: { private: false } });
 
 async function seed(name: string): Promise<string> {
   const upload = await putUpload({ directory: 'patch', name, body: stream(bytes(name)) });
@@ -138,5 +157,104 @@ describe('PATCH /uploads/[uuid]', () => {
     );
     strictEqual((await send(uuid, { name: 'i.txt' }, nobody)).status, 403);
     strictEqual(storage.objects.has('patch/h.txt'), true);
+  });
+
+  it('404s a row the read access scope hides, leaving it untouched', async () => {
+    const uuid = await seed('secret.txt');
+    await updateUpload(uuid, { private: true });
+    await withReadAccess(visibleOnly, async () => {
+      const bodies = [
+        { description: 'x' },
+        { name: 'moved.txt' },
+        { directory: 'patch/elsewhere', description: 'x' },
+        { private: false },
+        { name: 7 },
+      ];
+      for (const body of bodies) strictEqual((await send(uuid, body)).status, 404);
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.name, 'secret.txt');
+    strictEqual(row?.directory, 'patch');
+    strictEqual(row?.description, null);
+    strictEqual(row?.private, true);
+    strictEqual(storage.objects.has('patch/secret.txt'), true);
+    strictEqual(storage.visibility.get('patch/secret.txt'), true);
+  });
+
+  it('changes a row the read access scope admits', async () => {
+    const uuid = await seed('seen.txt');
+    await withReadAccess(visibleOnly, async () => {
+      strictEqual((await send(uuid, { description: 'seen' })).status, 200);
+    });
+  });
+
+  it('moves a visible folder with a file the scope hides inside it', async () => {
+    const folder = await createFolder({ directory: 'patch', name: 'shown' });
+    const inner = await putUpload({
+      directory: 'patch/shown',
+      name: 'inner.txt',
+      body: stream(bytes('inner')),
+    });
+    await updateUpload(inner.UUID, { private: true });
+    await withReadAccess(visibleOnly, async () => {
+      strictEqual((await send(folder.UUID, { name: 'renamed' })).status, 200);
+    });
+    const moved = await queryUntyped('Uploads').where({ UUID: inner.UUID }).findFirst();
+    strictEqual(moved?.directory, 'patch/renamed');
+    strictEqual(text(storage.objects.get('patch/renamed/inner.txt')), 'inner');
+  });
+
+  it('keeps hidden files private when a visible folder moves into a private one and unlocks', async () => {
+    const folder = await createFolder({ directory: 'patch', name: 'open' });
+    const inner = await putUpload({
+      directory: 'patch/open',
+      name: 'hush.txt',
+      body: stream(bytes('hush')),
+    });
+    await updateUpload(inner.UUID, { private: true });
+    const vault = await createFolder({ directory: 'patch', name: 'safe' });
+    await updateUpload(vault.UUID, { private: true });
+    await withReadAccess(visibleOnly, async () => {
+      const response = await send(folder.UUID, { directory: 'patch/safe', private: false });
+      strictEqual(response.status, 200);
+      strictEqual(((await response.json()) as Record<string, unknown>).private, false);
+    });
+    const hidden = await queryUntyped('Uploads').where({ UUID: inner.UUID }).findFirst();
+    strictEqual(hidden?.directory, 'patch/safe/open');
+    strictEqual(hidden?.private, true);
+    strictEqual(storage.visibility.get('patch/safe/open/hush.txt'), true);
+  });
+
+  it('404s a row the scope hides by the time a slow body arrives', async () => {
+    const uuid = await seed('slow.txt');
+    const lock = () => updateUpload(uuid, { private: true }).then(() => undefined);
+    await withReadAccess(visibleOnly, async () => {
+      const body = stalled('{"private":', lock, 'false}');
+      const headers = { 'content-type': 'application/json' };
+      const response = await call(
+        patch,
+        `/uploads/${uuid}`,
+        { uuid },
+        { bearer: admin, body, headers },
+      );
+      strictEqual(response.status, 404);
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).findFirst();
+    strictEqual(row?.private, true);
+  });
+
+  it('403s the update capability without the read one', async () => {
+    const uuid = await seed('l.txt');
+    strictEqual((await send(uuid, { description: 'x' }, updater)).status, 403);
+  });
+
+  it('404s every row under a false read verdict', async () => {
+    const uuid = await seed('m.txt');
+    await withReadAccess(
+      () => false,
+      async () => {
+        strictEqual((await send(uuid, { description: 'x' })).status, 404);
+      },
+    );
   });
 });

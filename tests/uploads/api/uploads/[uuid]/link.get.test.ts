@@ -1,9 +1,6 @@
 import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import type { CollectionAPI } from '../../../../../src/ohne/collections/define-collection.ts';
-
-import { useCollections } from '../../../../../src/ohne/collections/use-collections.ts';
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
 import { useRoles } from '../../../../../src/ohne/roles/use-roles.ts';
 import linkGet from '../../../../../src/uploads/api/uploads/[uuid]/link.get.ts';
@@ -12,7 +9,15 @@ import { putUpload } from '../../../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../../../src/uploads/uploads/update-upload.ts';
 import { uploadURL } from '../../../../../src/uploads/uploads/url.ts';
 import { parseDuration } from '../../../../../src/utils/index.ts';
-import { bytes, call, errorsOf, route, stream, userWith } from '../../../_fixture.ts';
+import {
+  bytes,
+  call,
+  errorsOf,
+  route,
+  stream,
+  userWith,
+  withReadAccess,
+} from '../../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
@@ -93,15 +98,13 @@ describe('GET /uploads/[uuid]/link', () => {
 
   it('404s an unknown UUID and a row the read access scope hides', async () => {
     strictEqual((await send('missing')).status, 404);
-    const api = useCollections().get('Uploads')!.collection.api as CollectionAPI;
-    const original = api.read;
-    api.read = { access: async () => ({ where: { private: false } }) };
-    try {
-      strictEqual((await send(hidden.UUID)).status, 404);
-      strictEqual((await send(open.UUID)).status, 200);
-    } finally {
-      api.read = original;
-    }
+    await withReadAccess(
+      () => ({ where: { private: false } }),
+      async () => {
+        strictEqual((await send(hidden.UUID)).status, 404);
+        strictEqual((await send(open.UUID)).status, 200);
+      },
+    );
   });
 
   it('401s without a user and 403s without the capability', async () => {

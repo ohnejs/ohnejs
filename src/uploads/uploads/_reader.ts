@@ -1,5 +1,14 @@
-import { applyScope, endpointOf, queryUntyped, resolveAccess, useCollections } from 'ohnejs';
-import { userCan, useUser } from 'ohnejs/auth';
+import type { Transaction } from 'ohnejs';
+
+import {
+  applyScope,
+  endpointOf,
+  notFound,
+  queryUntyped,
+  resolveAccess,
+  useCollections,
+} from 'ohnejs';
+import { queryScoped, userCan, useUser } from 'ohnejs/auth';
 import { isNull, isUndefined } from 'ohnejs/utils';
 
 /**
@@ -15,4 +24,17 @@ export async function readerReaches(uuid: string): Promise<boolean> {
   const scope = await resolveAccess(endpoint, { operation: 'read' });
   if (scope === false) return false;
   return applyScope(queryUntyped('Uploads'), scope).where({ UUID: uuid }).exists();
+}
+
+/**
+ * Refuses the row `uuid` unless the request's user may read it, answering as the `Uploads` read does.
+ * No user is a `401` and no capability a `403`, unless that read is public.
+ * An unknown `UUID`, or one the read `access` scope hides, is a `404`.
+ * So is every row while `Uploads` exposes no read.
+ * On `tx` the check reads inside that transaction, atomic with the write it guards.
+ */
+export async function assertUploadReach(uuid: string, tx?: Transaction): Promise<void> {
+  const uploads = await queryScoped('Uploads', 'read');
+  if (!isUndefined(tx)) uploads.use(tx);
+  if (!(await uploads.where({ UUID: uuid }).exists())) throw notFound();
 }

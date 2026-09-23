@@ -27,11 +27,25 @@ export interface MoveUploadTarget {
 }
 
 /**
+ * Options for `moveUpload`.
+ */
+export interface MoveUploadOptions {
+  /**
+   * Whether a public row moved into a private folder becomes private.
+   *
+   * @default
+   * true
+   */
+  lock?: boolean;
+}
+
+/**
  * Renames a row, moves it to another directory, or both, moving its object along.
  *
  * One transaction creates the missing folder rows of the target, updates the row, and journals the move.
  * A folder's descendants have their `directory` rewritten by prefix in one statement.
  * A public row moved into a private folder becomes private, a folder with everything inside it.
+ * `lock: false` skips that, for a caller that sets `private` itself right after.
  * The same journal locks its object before the move; moving out of a private folder never unlocks.
  * A rename that stays in its folder leaves `private` as it is.
  * The journal drains after the commit, so the object moves once the row points at its new path.
@@ -44,7 +58,11 @@ export interface MoveUploadTarget {
  * await moveUpload(uuid, { name: 'Dusk.jpg' })
  * ```
  */
-export async function moveUpload(uuid: string, to: MoveUploadTarget): Promise<UploadRecord> {
+export async function moveUpload(
+  uuid: string,
+  to: MoveUploadTarget,
+  options: MoveUploadOptions = {},
+): Promise<UploadRecord> {
   const record = await useDatabase().transaction(async (tx) => {
     const row = await readUpload(uuid, tx);
     const target = {
@@ -62,7 +80,8 @@ export async function moveUpload(uuid: string, to: MoveUploadTarget): Promise<Up
     }
 
     const locked = await ensureFolders(tx, target.directory, row.author);
-    const lock = locked && target.directory !== row.directory && !row.private;
+    const lock =
+      (options.lock ?? true) && locked && target.directory !== row.directory && !row.private;
     const [moved] = await queryUntyped('Uploads')
       .use(tx)
       .where({ UUID: uuid })
