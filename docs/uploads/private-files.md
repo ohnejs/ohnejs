@@ -97,11 +97,16 @@ api: {
 
 A caller outside the scope does not see the row, cannot fetch its bytes, and gets `null` where a
 [media field](./fields.md#reading) references it. They cannot change, move, replace, or delete it
-either: those routes answer the same `404` as an unknown file. Nor can a write hide a row from
-them: making it private, moving it into a private folder, or adding to one answers `422`, and
-nothing changes.
+either: those routes answer the same `404` as an unknown file.
 
-A write to a folder you can see applies to its whole subtree, files the scope hides included.
+Nor can they make a write that would hide a row from themselves. Making it private, moving it into
+a private folder, or uploading into one answers `422`, and nothing changes.
+
+A write they make to a folder they can see still applies to its whole subtree, files the scope
+hides included.
+
+The scope hides rows, not names. A name stays unique in its folder, so a caller who guesses a
+hidden name finds it taken. Keep secrets out of the names of private files and folders.
 
 ## Temporary links
 
