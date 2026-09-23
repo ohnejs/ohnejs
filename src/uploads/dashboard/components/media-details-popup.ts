@@ -78,6 +78,7 @@ import {
   focalPercent,
   focalPointAt,
   isSmallPreview,
+  privateErrors,
   previewKindOf,
   variantTokens,
   versionedURL,
@@ -449,6 +450,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     requestedTab === 'variants' && isUndefined(record.variants) ? 'details' : requestedTab,
   );
   const unplaced = ref('');
+  const refused = ref('');
   const seed = detailsStateOf(record);
   const focal = ref<Pick<DetailsState, 'focalX' | 'focalY'>>({
     focalX: seed.focalX,
@@ -521,6 +523,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     },
     set value(next) {
       priv.value = next;
+      refused.value = '';
       recordEdit();
     },
   };
@@ -551,6 +554,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       priv.value = next.private;
       edits.push(next).setOriginalState(next);
       unplaced.value = '';
+      refused.value = '';
       refreshMedia();
       toast(t('dashboard.saved'), { type: 'success' });
       options.onUpdated?.(outcome.record);
@@ -558,9 +562,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       return;
     }
     if (outcome.kind === 'invalid') {
-      unplaced.value = isEmpty(outcome.errors)
-        ? outcome.message
-        : (form.value?.setErrors(outcome.errors) ?? outcome.message);
+      const { toggle, rest } = privateErrors(outcome.errors);
+      refused.value = toggle;
+      if (isEmpty(outcome.errors)) unplaced.value = outcome.message;
+      else if (!isEmpty(rest)) unplaced.value = form.value?.setErrors(rest) ?? outcome.message;
+      if (toggle !== '' && isEmpty(rest)) activeTab.value = 'details';
       toast(
         t('dashboard.foundErrors', { count: Math.max(1, Object.keys(outcome.errors).length) }),
         {
@@ -759,18 +765,22 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       copyButton(url, 'o-media-details-url-copy'),
     );
 
-  const privateRow = (): HTMLElement =>
-    field([
+  const privateRow = (): HTMLElement => {
+    const message = h('div');
+    effect(() => {
+      const hint = locked()
+        ? t('uploads.errors.insidePrivateFolder', { folder: current.value.directory })
+        : t('uploads.dashboard.privateHint');
+      renderProse(message, refused.value === '' ? hint : refused.value);
+    });
+    return field([
       fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.private'))),
       switchInput(privateModel, undefined, {
         disabled: () => !canUpdate || busy.value || locked(),
       }),
-      fieldMessage(() =>
-        locked()
-          ? t('uploads.errors.insidePrivateFolder', { folder: record.directory })
-          : t('uploads.dashboard.privateHint'),
-      ),
+      fieldMessage(message, { error: () => refused.value !== '' }),
     ]);
+  };
 
   const detailsPanel = (): Child => [
     privateUploads() ? privateRow() : null,
@@ -956,6 +966,10 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     expiryNote(),
   ];
 
+  const errorBubble = (on: boolean): TabsListItem<DetailsTab>['bubble'] =>
+    on
+      ? { content: '1', tooltip: t('dashboard.foundErrors', { count: 1 }), variant: 'destructive' }
+      : undefined;
   const detailsLabel = (): string => t('uploads.dashboard.details');
   const descriptionLabel = (): string => t('uploads.dashboard.description');
   const variantsLabel = (): string => t('uploads.dashboard.variants');
@@ -968,18 +982,8 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     {
       list: () => {
         const items: TabsListItem<DetailsTab>[] = [
-          { name: 'details', label: detailsLabel },
-          {
-            name: 'description',
-            label: descriptionLabel,
-            bubble: errored()
-              ? {
-                  content: '1',
-                  tooltip: t('dashboard.foundErrors', { count: 1 }),
-                  variant: 'destructive',
-                }
-              : undefined,
-          },
+          { name: 'details', label: detailsLabel, bubble: errorBubble(refused.value !== '') },
+          { name: 'description', label: descriptionLabel, bubble: errorBubble(errored()) },
         ];
         if (!isUndefined(current.value.variants)) {
           items.push({ name: 'variants', label: variantsLabel });

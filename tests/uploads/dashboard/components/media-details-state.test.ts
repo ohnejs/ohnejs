@@ -10,6 +10,7 @@ import {
   focalPointAt,
   isSmallPreview,
   previewKindOf,
+  privateErrors,
   variantTokens,
   versionedURL,
 } from '../../../../src/uploads/dashboard/components/media-details-state.ts';
@@ -154,5 +155,19 @@ describe('variantTokens', () => {
   it('answers nothing when the URL does not end with the path', () => {
     strictEqual(variantTokens('https://img.test/sig/w_320/other.jpg', 'photos/a.jpg'), '');
     strictEqual(variantTokens('https://img.test/sig/w_320/xphotos/a.jpg', 'photos/a.jpg'), '');
+  });
+});
+
+describe('privateErrors', () => {
+  it('takes a refused private write off the description form', () => {
+    deepStrictEqual(privateErrors({ '': 'Hidden' }), { toggle: 'Hidden', rest: {} });
+    deepStrictEqual(privateErrors({ private: 'Locked', description: 'Long' }), {
+      toggle: 'Locked',
+      rest: { description: 'Long' },
+    });
+    deepStrictEqual(privateErrors({ description: 'Long' }), {
+      toggle: '',
+      rest: { description: 'Long' },
+    });
   });
 });

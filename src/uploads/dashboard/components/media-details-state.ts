@@ -1,4 +1,4 @@
-import { basename, clamp, isNull } from 'ohnejs/utils';
+import { basename, clamp, isNull, omit } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -128,6 +128,24 @@ export function detailsPatch(
   const body: Record<string, unknown> = image ? { description, focalX, focalY } : { description };
   if (state.private !== saved.private) body.private = state.private;
   return body;
+}
+
+/**
+ * Splits a refused save's field errors into the Private switch's message and the rest.
+ * The server keys a refused `private` under `private`, or under `''` when the write would hide the row.
+ * The switch's message is `''` when neither key is present.
+ *
+ * @example
+ * ```ts
+ * privateErrors({ '': 'Hidden', description: 'Too long' })
+ * // -> { toggle: 'Hidden', rest: { description: 'Too long' } }
+ * ```
+ */
+export function privateErrors(errors: Readonly<Record<string, string>>): {
+  toggle: string;
+  rest: Record<string, string>;
+} {
+  return { toggle: errors.private ?? errors[''] ?? '', rest: omit(errors, ['private', '']) };
 }
 
 /**

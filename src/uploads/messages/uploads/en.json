@@ -104,7 +104,7 @@
     "notAFile": "This is a folder, not a file",
     "notAnImage": "The file is not an image",
     "notSVG": "The file is not an SVG image",
-    "outOfReach": "This would hide it from you",
+    "outOfReach": "You would no longer see the result",
     "typeNotAllowed": "File type `{type}` is not allowed"
   },
   "fields": {

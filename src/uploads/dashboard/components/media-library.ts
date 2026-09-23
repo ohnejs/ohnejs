@@ -67,6 +67,7 @@ import {
   type MediaQuery,
   type MediaSelectionMode,
   type MediaView,
+  pageFolderHidden,
   PER_PAGE,
   pinned,
 } from './media-library-state.ts';
@@ -569,6 +570,13 @@ function mediaPage(directory: string, actions: MediaActions): Child {
   effect(() => {
     const target = view.directory.value;
     if (target !== directory) navigate(mediaPath(target));
+  });
+
+  effect(() => {
+    pageFolderHidden.value = view.hidden.value;
+  });
+  onCleanup(() => {
+    pageFolderHidden.value = false;
   });
 
   const popups = mediaPopups(view);

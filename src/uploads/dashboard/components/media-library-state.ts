@@ -233,6 +233,12 @@ export interface MediaViewOptions {
 export const MEDIA_REFRESH = 'media:refresh';
 
 /**
+ * Whether the media page shows a folder whose own row the read scope hides.
+ * The page keeps it in step with its view, so the window-wide drop target stays shut there.
+ */
+export const pageFolderHidden: Ref<boolean> = ref(false);
+
+/**
  * The page size the grid reads with.
  * A grid of 50 thumbnails stays light with lazy images, and paging beyond it costs one click.
  */

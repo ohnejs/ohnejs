@@ -13,7 +13,7 @@ import { isNull, isUndefined, joinPath, onCleanup, parseDuration, ref } from 'oh
 import type { UploadItem } from './upload-queue-state.ts';
 
 import { useUploadsT } from './_messages.ts';
-import { directoryFromParam, mediaPath } from './media-library-state.ts';
+import { directoryFromParam, mediaPath, pageFolderHidden } from './media-library-state.ts';
 import { uploadFiles } from './upload-queue.ts';
 
 css`
@@ -77,6 +77,7 @@ css`
  * The window-wide drop target.
  * Dragging files over the window fades in a full-screen panel above every other surface.
  * A drop uploads into the folder the media library shows, or the root elsewhere.
+ * Like the footer's Upload, it never opens over a folder whose own row the read scope hides.
  * A stray drop never navigates the window.
  * Dropped folders are walked and rebuilt under that folder.
  * A drag that starts inside the page never opens the panel, so a dragged thumbnail cannot re-upload itself.
@@ -144,7 +145,8 @@ export function dropUploader(): HTMLElement {
 
   const onDragEnter = (event: DragEvent): void => {
     event.preventDefault();
-    if (!internal && event.dataTransfer?.types.includes('Files')) show();
+    if (internal || pageFolderHidden.value) return;
+    if (event.dataTransfer?.types.includes('Files')) show();
   };
 
   const onDrop = async (event: DragEvent): Promise<void> => {
