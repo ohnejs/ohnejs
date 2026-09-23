@@ -1,4 +1,6 @@
+export * from './digest.ts';
 export * from './hash-password.ts';
+export * from './hmac-bytes.ts';
 export * from './hmac.ts';
 export * from './password-needs-rehash.ts';
 export * from './random-token.ts';
