@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { digest } from './digest.ts';
 
 /**
  * Caps a name at `max` characters, marking truncation with a hash of the full name.
@@ -22,6 +22,6 @@ export function truncateWithHash(name: string, max = 63): string {
   if (name.length <= max) {
     return name;
   }
-  const hash = createHash('sha256').update(name).digest('hex').slice(0, 8);
+  const hash = digest('sha256', name).toHex().slice(0, 8);
   return `${name.slice(0, Math.max(0, max - 9))}$${hash}`;
 }

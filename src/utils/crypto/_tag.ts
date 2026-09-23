@@ -1,5 +1,4 @@
-import { createHmac } from 'node:crypto';
-
+import { hmacBytes } from './hmac-bytes.ts';
 import { hmac } from './hmac.ts';
 
 /**
@@ -16,6 +15,6 @@ import { hmac } from './hmac.ts';
  * ```
  */
 export function hmacTag(value: string, secret: string, context: string): string {
-  const key = context ? createHmac('sha256', secret).update(context).digest() : secret;
+  const key = context ? hmacBytes(context, secret) : secret;
   return hmac(value, key);
 }

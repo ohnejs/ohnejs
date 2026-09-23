@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-
+import { digest } from '../crypto/digest.ts';
 import { isString } from '../is/is-string.ts';
 
 /**
@@ -33,7 +32,7 @@ export interface ETagOptions {
  */
 function contentTag(entity: string | Uint8Array): string {
   const size = isString(entity) ? Buffer.byteLength(entity) : entity.length;
-  const hash = createHash('sha1').update(entity).digest('base64').slice(0, 27);
+  const hash = digest('sha1', entity).toBase64().slice(0, 27);
   return `"${size.toString(16)}-${hash}"`;
 }
 
