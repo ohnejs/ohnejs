@@ -60,8 +60,8 @@ that belongs to no upload fails like any other
 ## Reading
 
 [Populate](../database/reading.md#populating-relations) the field to get the upload's record,
-decorated with `url`, and with `variants` when an [image service](./image-variants.md) is
-configured:
+decorated with `url`, with `variants` when an [image service](./image-variants.md) is configured,
+and with `expires` for a [private file](./private-files.md):
 
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();
@@ -70,11 +70,16 @@ post.cover.url; // -> '/uploads/photos/sunset.jpg'
 post.cover.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 ```
 
+A private file's `url` and `variants` stop working at `expires`, so render them per request rather
+than storing them.
+
 Over the [collections API](../api/collections.md), a media field
 [populates](../api/url-queries.md#populating-relations) only for a caller who
 [may read `Uploads`](./uploads.md#the-collection). Anyone else, including a visitor who is not
 signed in, gets `null` for `image` and `file` and an empty list for `images` and `files`. To serve
-media fields to everyone, make that read public.
+media fields to everyone, make that read public. A public read also hands out a private file's
+expiring links, unless its [`access`](./private-files.md#who-can-open-the-bytes) scope hides
+private rows.
 
 For a page of your own, [`imageURL`](./image-variants.md#named-variants) builds a variant URL and
 [`imageSrcSet`](./image-variants.md#responsive-images) builds a `srcset`. Without a service, both

@@ -33,15 +33,18 @@ did not sign. Signing happens in server code, and the secret never reaches a bro
 | `p`   | where a `cover` crop keeps its subject: `center`, `top`, `topRight`, `right`, `bottomRight`, `bottom`, `bottomLeft`, `left`, `topLeft` | `center`                                     |
 | `fp`  | focal point of a `cover` crop as `fp_x_y`, each axis `0` to `1` with up to three decimals. Replaces `p`                                |                                              |
 | `dpr` | device pixel ratio the size is multiplied by, `1` to `4`, up to two decimals                                                           | `1`                                          |
+| `e`   | when the URL stops working, in epoch milliseconds, a positive integer. Written for a [private file](./private-files.md) only           |                                              |
 
 The token string is canonical, and ohne writes no other spelling:
 
 - Tokens follow the table's order.
 - A default is never written.
 - A token appears at most once.
+- `e`, when present, comes last.
 
 Equal transforms therefore always give one string and one URL, so the service and every cache in
-front of it can identify a variant by its URL.
+front of it can identify a variant by its URL. A private file's URL changes once per
+[expiry window](./private-files.md#how-long-a-link-lives), with `e`.
 
 ## Signing
 
@@ -52,15 +55,17 @@ signature = base64url(HMAC-SHA256(secret, transforms + '/' + path))
 This is plain HMAC over the raw string, with no derived keys, so you can implement it in three lines
 in any language. Test your implementation against these values:
 
-| secret    | transforms               | path                | signature                                     |
-| --------- | ------------------------ | ------------------- | --------------------------------------------- |
-| `secret`  | `w_800,f_webp`           | `photos/sunset.jpg` | `2ObrtBfM78cHtN36wuvyNQXgSGGcr4cZtUQeqAhJyck` |
-| `another` | `w_320,h_320,fit_inside` | `photos/sunset.jpg` | `s9YxH4SXC6gGsS97gs_WMTAcNvgSnZe7zUBB__NeUMs` |
+| secret    | transforms                     | path                | signature                                     |
+| --------- | ------------------------------ | ------------------- | --------------------------------------------- |
+| `secret`  | `w_800,f_webp`                 | `photos/sunset.jpg` | `2ObrtBfM78cHtN36wuvyNQXgSGGcr4cZtUQeqAhJyck` |
+| `another` | `w_320,h_320,fit_inside`       | `photos/sunset.jpg` | `s9YxH4SXC6gGsS97gs_WMTAcNvgSnZe7zUBB__NeUMs` |
+| `secret`  | `w_800,f_webp,e_1700000000000` | `photos/sunset.jpg` | `lznJAVjMklhx4zqJ2JblQECAwz3_EDRvDnho4upa-YA` |
 
 A service holds a list of secrets and accepts a URL signed by any of them, so an app can
-[rotate its secret](./image-variants.md#rotating-the-secret) without breaking pages. A URL has no
-expiry date: variant URLs live in pages and in caches, and a leaked URL gives access only to the one
-variant it names.
+[rotate its secret](./image-variants.md#rotating-the-secret) without breaking pages. A public file's
+URL has no expiry date: it lives in pages and in caches, and a leaked URL gives access only to the
+one variant it names. A [private file's](./private-files.md) URL carries its expiry as `e` inside
+the signed transforms, so nobody can extend it without the secret.
 
 ## What a service does
 
@@ -72,15 +77,23 @@ variant it names.
    meant for a local machine, skips this step.
 3. Parse the transforms. Answer `400` to an empty segment, an unknown token, an out-of-range value,
    a duplicate, or both `p` and `fp`.
-4. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
+4. Refuse an expired URL: when `e` is present and not after the current time, answer `403`.
+5. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
    normally the app's [`/uploads` origin](./uploads.md#serving).
+   - With a source secret, one of the app's `UPLOADS_SECRET` values, sign the fetch for a URL that
+     carries `e` with `?e=<expires>&s=<signature>`: `expires` a minute ahead in epoch milliseconds,
+     and `signature` the HMAC over `e_<expires>/<path>` under that secret. A
+     [private file's](./private-files.md) original answers `404` to anything else. An unsigned
+     service must not hold one, since anyone could then make it fetch any private original.
+   - Fetch bare for a URL without `e`, and cache the two fetches apart, so a URL that never expires
+     cannot open a private original.
    - Answer `404` when the origin does, and `502` when it is unreachable, both with
      `Cache-Control: no-store`.
    - Revalidate a fetched source with `If-None-Match` at a short interval, for example one minute.
      Drop its variants when the `ETag` changes, so a [replaced file](./uploads.md#in-server-code)
      gets new variants.
    - When the origin sends no `ETag`, hash the bytes and use the hash instead.
-5. Render:
+6. Render:
    - **Size.** Multiply `w` and `h` by `dpr` before fitting. At `dpr` 1 never scale the source up:
      `inside` and `contain` do not enlarge, and `cover` shrinks the box at its own ratio until the
      source fills it.
@@ -98,9 +111,12 @@ variant it names.
      edge. An SVG without `width`, `height`, or `viewBox` may render at the size of its drawn
      shapes, depending on the rasterizer, so give an uploaded SVG a `viewBox`. Its thumbnail is a
      WebP raster like any other.
-6. Answer with the rendered bytes, `Content-Type`, and a long `Cache-Control: public, max-age`, and
-   keep the result cached by URL for the next request. With `f_auto` the negotiated format is also
-   part of the cache key, since the URL alone no longer identifies the bytes.
+7. Answer with the rendered bytes, `Content-Type`, and a long `Cache-Control: public, max-age`, or
+   `private, max-age` bounded by the time left when the URL carries `e`. Keep the result cached by
+   URL for the next request, with `e` left out of the key, so a private file's successive windows
+   share one render. Serve a cached render only once step 5 has found its source, so a URL without
+   `e` never reaches a private one. With `f_auto` the negotiated format is also part of the cache
+   key, since the URL alone no longer identifies the bytes.
 
 A service may also refuse
 [every variant the app did not name](./image-variants.md#allowing-only-your-variants).

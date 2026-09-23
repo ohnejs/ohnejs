@@ -103,6 +103,8 @@ and serve routes, media fields, and the dashboard's Media page.
 - [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
 - [Media fields](./uploads/fields.md) - reference uploads from your collections.
 - [Image variants](./uploads/image-variants.md) - signed URLs an image service renders on demand.
+- [Private files](./uploads/private-files.md) - files that open only through an expiring link or
+  for a signed-in reader.
 - [The image service](./uploads/image-service.md) - the protocol a service follows to render
   variants.
 

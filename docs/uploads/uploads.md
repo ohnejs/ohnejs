@@ -44,6 +44,8 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
   [content locale](../database/translations.md#marking-fields).
 - `width` and `height` - on an image.
 - `author` and `uploadedAt` - on every row.
+- `private` - whether only a [signed link or a signed-in reader](./private-files.md) opens the
+  bytes.
 
 Every read is decorated with extra fields:
 
@@ -51,6 +53,7 @@ Every read is decorated with extra fields:
 - `url` is where a file's bytes are served from.
 - `variants` holds one signed URL per [named variant](./image-variants.md#named-variants), when an
   image service is configured.
+- `expires` says when a [private file's](./private-files.md) `url` and `variants` stop working.
 
 A folder is decorated with `path` only:
 
@@ -91,9 +94,10 @@ The request body is the file. One file per request, metadata in the query:
 ```
 POST   /uploads?directory=photos&name=Sunset.JPG   the body is the file, answers 201 with the record
 POST   /uploads/folders                             { "directory": "photos", "name": "2024" }
-PATCH  /uploads/[uuid]                              { "name"?, "directory"?, "description"?, "focalX"?, "focalY"? }
+PATCH  /uploads/[uuid]                              { "name"?, "directory"?, "description"?, "focalX"?, "focalY"?, "private"? }
 POST   /uploads/[uuid]/replace                      the body replaces the file's bytes
 DELETE /uploads/[uuid]                              a folder takes everything inside it
+GET    /uploads/[uuid]/link?maxAge=7d               a temporary link to a private file
 GET    /uploads/[...path]                           the bytes
 ```
 
@@ -112,7 +116,8 @@ When a file comes in:
 - An SVG is sanitized before it is stored.
 
 Writes need the `collection.Uploads.*` capabilities of
-[roles](../auth/roles.md#the-collections-api-guard). Only the bytes are public.
+[roles](../auth/roles.md#the-collections-api-guard). The bytes are public unless the file is
+[private](./private-files.md).
 
 `PATCH` with `name` or `directory` renames or moves the row and its object, keeping a file's
 extension. `?locale=` selects the alt text's locale.
@@ -153,7 +158,7 @@ field that references it stays linked. Bytes that do not match the type are a `4
 - its type,
 - an `ETag` from the file's hash, so a fresh `If-None-Match` answers
   [`304`](../api/response.md#caching),
-- `Cache-Control` from `uploads.cache`,
+- `Cache-Control` from `uploads.cache`, `private` for a private file,
 - `Range` support for video and audio.
 
 Every answer is `nosniff`. A file whose type a browser would run as a document is downloaded as an
@@ -165,23 +170,32 @@ Where a record's `url` points:
 - Otherwise, when the backend has its own `url`, there.
 - Otherwise, at this route.
 
+A [private file's](./private-files.md) `url` always points at this route.
+
 ## Configuration
 
 Every key under `uploads` is optional. These are the defaults:
 
 ```ts
-uploads: {
-  storage: 'fs',
-  url: '.uploads',
-  maxFileSize: '128mb',
-  types: '*',
-  cache: { noCache: true },
-  images: {
-    variants: {
-      thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  uploads: {
+    storage: 'fs',
+    url: '.uploads',
+    maxFileSize: '128mb',
+    types: '*',
+    cache: { noCache: true },
+    privateMaxAge: '1h',
+    images: {
+      variants: {
+        thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
+      },
     },
   },
-},
+});
 ```
 
 - `storage` - the backend, by the name a boot file [registered](#storage) it under. The layer ships
@@ -196,6 +210,8 @@ uploads: {
   The default revalidates on every use, so a renamed or replaced file is never stale.
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
   the storage. Without it, records point where [serving](#serving) describes.
+- `privateMaxAge` - how long a [private file's](./private-files.md) links stay valid, as a
+  `parseDuration` value.
 - `images` - the [image service](./image-variants.md) that renders resized variants, and the named
   variants every image read carries. `url` has no default, and without it every image URL points at
   the original.
@@ -233,14 +249,15 @@ A backend is a `StorageAdapter`:
 - `move` and `delete` take a prefix as well as a file, so a folder is one operation.
 - `url` is optional, for a backend that serves its objects itself. A record's `url` then comes from
   the backend, unless `publicURL` is set.
+- `setPrivate` is optional: it locks or unlocks a file or a prefix as a row turns
+  [private](./private-files.md) or public. A `move` keeps what it set.
 
-The backend never sees the database. The layer's helpers record each move and delete inside the
-[transaction](../database/engine.md#transactions) that changes the rows, and run it after the
-commit:
+The backend never sees the database. The layer's helpers record each move, delete, and
+`setPrivate` inside the [transaction](../database/engine.md#transactions) that changes the rows,
+and run it after the commit:
 
 - A failed one is retried later and at every boot, so a crash never leaves a row pointing nowhere.
-- A retry can repeat a move or delete that already ran, so `move` and `delete` must treat a
-  missing path as a no-op.
+- A retry can repeat an effect that already ran, so a missing path must be a no-op.
 
 The `fs` backend writes a file to a temp file beside its target and renames it into place. It
 removes empty parent directories after a delete, and moves a folder in one rename.

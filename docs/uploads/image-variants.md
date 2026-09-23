@@ -84,7 +84,8 @@ upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_in
 upload.variants.card; // -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg'
 ```
 
-Without a service, or for a file that is not an image, `variants` is absent. Signing stays in server
+Without a service, or for a file that is not an image, `variants` is absent. A
+[private image's](./private-files.md) variants expire with its `url`. Signing stays in server
 code, and the dashboard's [details popup](./uploads.md#the-dashboard) lists the variants under
 Variants.
 
@@ -183,7 +184,8 @@ IMAGES_VARIANTS='w_320,h_320,fit_inside,f_webp;w_640,h_360,f_webp;w_1280,h_720,f
 ```
 
 - A URL with a valid signature gets a `403` when its tokens are not in the list.
-- The match ignores `fp` and `p`, which carry the upload's focal point rather than a size.
+- The match ignores `fp`, `p`, and `e`, which carry the upload's focal point and a
+  [private file's](./private-files.md) expiry rather than a size.
 
 With the list set, a leaked secret or a careless template cannot ask the service for a size you did
 not choose. The focal point is not restricted, so the list limits the sizes a service renders, not
