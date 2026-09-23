@@ -179,15 +179,32 @@ describe('drainJournal', () => {
     strictEqual(storage.visibility.get('drain/late.txt'), true);
   });
 
-  it('runs a move before a lock journaled in the same transaction', async () => {
+  it('carries a lock journaled before its move to where the object lands', async () => {
     storage.objects.set('.tmp/six', bytes('6'));
     await db.transaction(async (tx) => {
+      await journalStorage(tx, { op: 'lock', from: '.tmp/six' });
       await journalStorage(tx, { op: 'move', from: '.tmp/six', to: 'drain/same/six.txt' });
-      await journalStorage(tx, { op: 'lock', from: 'drain/same' });
     }, 'immediate');
     await drainJournal();
     deepStrictEqual(await pending(), []);
     strictEqual(storage.visibility.get('drain/same/six.txt'), true);
+    strictEqual(storage.visibility.has('.tmp/six'), false);
+  });
+
+  it('holds the move while the lock before it fails', async () => {
+    storage.objects.set('.tmp/nine', bytes('9'));
+    await db.transaction(async (tx) => {
+      await journalStorage(tx, { op: 'lock', from: '.tmp/nine' });
+      await journalStorage(tx, { op: 'move', from: '.tmp/nine', to: 'drain/nine.txt' });
+    }, 'immediate');
+    storage.failNext('setPrivate');
+
+    await drainJournal();
+    deepStrictEqual(await pending(), ['lock .tmp/nine', 'move .tmp/nine']);
+    strictEqual(storage.objects.has('drain/nine.txt'), false);
+
+    await drainJournal();
+    strictEqual(storage.visibility.get('drain/nine.txt'), true);
   });
 
   it('holds back every later entry on a path whose effect failed', async () => {

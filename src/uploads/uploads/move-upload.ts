@@ -32,7 +32,7 @@ export interface MoveUploadTarget {
  * One transaction creates the missing folder rows of the target, updates the row, and journals the move.
  * A folder's descendants have their `directory` rewritten by prefix in one statement.
  * A public row moved into a private folder becomes private, a folder with everything inside it.
- * The same journal then locks its object; moving out of a private folder never unlocks.
+ * The same journal locks its object before the move; moving out of a private folder never unlocks.
  * A rename that stays in its folder leaves `private` as it is.
  * The journal drains after the commit, so the object moves once the row points at its new path.
  * A file whose extension would change is a `422`; so is a folder moved into itself.
@@ -71,8 +71,8 @@ export async function moveUpload(uuid: string, to: MoveUploadTarget): Promise<Up
       await moveDescendants(tx, from, path);
       if (lock) await setDescendantsPrivate(tx, path, true);
     }
+    if (lock) await journalStorage(tx, { op: 'lock', from });
     await journalStorage(tx, { op: 'move', from, to: path });
-    if (lock) await journalStorage(tx, { op: 'lock', from: path });
     return moved;
   }, 'immediate');
   await drainJournal();
