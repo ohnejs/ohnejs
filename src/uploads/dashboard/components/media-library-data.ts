@@ -359,7 +359,8 @@ export async function confirmDeleteUploads(records: readonly UploadRecord[]): Pr
 }
 
 /**
- * Sends one bulk request and refreshes the libraries when it lands.
+ * Sends one bulk request and refreshes the libraries once the API answered, refused or not.
+ * A refusal may name a row gone elsewhere, and the refresh drops it from the grid and the selection.
  * Resolves `undefined` on success, else the refusal: the answer's error, or that the API is unreachable.
  */
 async function sendBulk(
@@ -371,11 +372,11 @@ async function sendBulk(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
+    refreshMedia();
     if (!response.ok) return readWireError(response);
   } catch {
     return { errors: {}, message: useUploadsT()('dashboard.unreachable') };
   }
-  refreshMedia();
   return undefined;
 }
 

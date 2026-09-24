@@ -208,7 +208,17 @@ describe('createMediaCache', () => {
     deepStrictEqual(backend.calls, [['a', 'gone']]);
   });
 
-  it('evicts the least recently read record over capacity, never one still owed an answer', async () => {
+  it('never evicts a record still owed an answer', async () => {
+    const backend = loader(known);
+    const cache = createMediaCache(backend.load, { capacity: 1 });
+    cache.get('c');
+    cache.get('d');
+    await settle();
+    strictEqual(cache.get('c')?.UUID, 'c');
+    strictEqual(cache.get('d')?.UUID, 'd');
+  });
+
+  it('evicts the least recently read record over capacity', async () => {
     const backend = loader(known);
     const cache = createMediaCache(backend.load, { capacity: 2 });
     await cache.load(['a', 'b']);

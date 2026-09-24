@@ -225,18 +225,23 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       () => options.onMove?.(untracked(() => view.selection.value)),
     );
 
-  const changeable = (): UploadRecord[] =>
-    view.selection.value.filter((record) => !pinned(record, view.privateFolders.value));
+  const targets = (value: boolean): UploadRecord[] =>
+    view.selection.value.filter(
+      (record) => (record.private === true) !== value && !pinned(record, view.privateFolders.value),
+    );
 
   const privacyButton = (value: boolean): HTMLElement =>
     iconButton(
       value ? 'lock' : 'lock-open',
       () => t(value ? 'uploads.dashboard.makePrivate' : 'uploads.dashboard.makePublic'),
-      () => void setUploadsPrivate(untracked(changeable), value),
+      () =>
+        void setUploadsPrivate(
+          untracked(() => targets(value)),
+          value,
+        ),
     );
 
-  const selects = (locked: boolean): boolean =>
-    privateUploads() && changeable().some((record) => (record.private === true) === locked);
+  const selects = (locked: boolean): boolean => privateUploads() && targets(!locked).length > 0;
 
   const searchButton = iconButton(
     'search',

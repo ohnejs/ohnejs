@@ -24,6 +24,7 @@ import {
   effect,
   hasKey,
   isNull,
+  isRealNumber,
   isUndefined,
   onCleanup,
   parseSearchParams,
@@ -288,6 +289,14 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     window.removeEventListener('blur', onBlur);
   });
 
+  let renew: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(renew));
+  const renewAt = (records: readonly UploadRecord[]): void => {
+    clearTimeout(renew);
+    const soonest = Math.min(...records.map((record) => record.expires ?? Infinity));
+    if (isRealNumber(soonest)) renew = setTimeout(reload, Math.max(0, soonest - Date.now()));
+  };
+
   let generation = 0;
   const load = async (): Promise<void> => {
     const mine = ++generation;
@@ -305,6 +314,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
       view.directory.value = '';
     } else if (!isUndefined(page)) {
       view.uploads.value = page.records;
+      renewAt(page.records);
       view.privateFolders.value = new Set();
       if (mode === 'none' && canUpdate && privateUploads()) {
         void privateFolders(page.records.map((record) => record.directory)).then((folders) => {

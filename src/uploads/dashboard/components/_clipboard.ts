@@ -9,7 +9,8 @@ import { isUndefined } from 'ohnejs/utils';
 export async function copyText(text: Promise<string>): Promise<boolean> {
   try {
     if (isUndefined(globalThis.ClipboardItem)) {
-      await navigator.clipboard.writeText(await text);
+      const value = await text;
+      await navigator.clipboard.writeText(value);
     } else {
       const blob = text.then((value) => new Blob([value], { type: 'text/plain' }));
       await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
