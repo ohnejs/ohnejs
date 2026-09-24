@@ -47,6 +47,8 @@
     "linksExpire": "Ovi linkovi ističu `{when}`",
     "madePrivate": "{count, plural, one {# stavka je sada privatna} few {# stavke su sada privatne} other {# stavki je sada privatno}}",
     "madePublic": "{count, plural, one {# stavka je sada javna} few {# stavke su sada javne} other {# stavki je sada javno}}",
+    "notMadePrivate": "{count, plural, one {# stavka nije mogla postati privatna} few {# stavke nisu mogle postati privatne} other {# stavki nije moglo postati privatno}}",
+    "notMadePublic": "{count, plural, one {# stavka nije mogla postati javna} few {# stavke nisu mogle postati javne} other {# stavki nije moglo postati javno}}",
     "makePrivate": "Učini privatnim",
     "makePublic": "Učini javnim",
     "media": "Mediji",

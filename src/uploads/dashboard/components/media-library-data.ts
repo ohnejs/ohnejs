@@ -286,7 +286,7 @@ export async function moveUploads(
  * Makes records private or public, one `PATCH` each with bounded concurrency.
  * The server takes a folder's contents along, so the rows go as given.
  * Refreshes the libraries and toasts the changed count, with the first refusal's reason beneath it.
- * When nothing changes on a non-empty set, the toast is that reason as an error.
+ * When nothing changes, the toast names the refused change instead, with the same reason.
  * Resolves the number of rows changed.
  */
 export async function setUploadsPrivate(
@@ -307,7 +307,10 @@ export async function setUploadsPrivate(
     const failure = results.find(unprocessable);
     const reason = isUndefined(failure) ? undefined : (await readWireError(failure.value)).message;
     if (changed === 0 && !isUndefined(reason)) {
-      toast(reason, { type: 'error' });
+      const refused = value
+        ? 'uploads.dashboard.notMadePrivate'
+        : 'uploads.dashboard.notMadePublic';
+      toast(t(refused, { count: records.length }), { type: 'error', description: reason });
     } else {
       toast(t(key, { count: changed }), {
         type: changed > 0 ? 'success' : 'error',

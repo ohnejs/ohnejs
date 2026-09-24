@@ -47,6 +47,8 @@
     "linksExpire": "Diese Links laufen `{when}` ab",
     "madePrivate": "{count, plural, one {# Element ist jetzt privat} other {# Elemente sind jetzt privat}}",
     "madePublic": "{count, plural, one {# Element ist jetzt öffentlich} other {# Elemente sind jetzt öffentlich}}",
+    "notMadePrivate": "{count, plural, one {# Element konnte nicht privat werden} other {# Elemente konnten nicht privat werden}}",
+    "notMadePublic": "{count, plural, one {# Element konnte nicht öffentlich werden} other {# Elemente konnten nicht öffentlich werden}}",
     "makePrivate": "Privat machen",
     "makePublic": "Öffentlich machen",
     "media": "Medien",

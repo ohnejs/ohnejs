@@ -47,6 +47,8 @@
     "linksExpire": "These links expire `{when}`",
     "madePrivate": "{count, plural, one {# item is now private} other {# items are now private}}",
     "madePublic": "{count, plural, one {# item is now public} other {# items are now public}}",
+    "notMadePrivate": "{count, plural, one {# item could not be made private} other {# items could not be made private}}",
+    "notMadePublic": "{count, plural, one {# item could not be made public} other {# items could not be made public}}",
     "makePrivate": "Make private",
     "makePublic": "Make public",
     "media": "Media",
