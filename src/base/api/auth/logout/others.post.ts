@@ -17,6 +17,7 @@ export default defineHandler(async (): Promise<{ ok: true }> => {
   const user = await requireUser();
   const session = (await useSession()) as Session;
   await queryUntyped('Sessions')
+    .unscoped()
     .where({ user: user.UUID, UUID: { not: { equalsTo: session.UUID } } })
     .delete();
   return { ok: true };

@@ -1,4 +1,4 @@
-import { query, queryUntyped } from 'ohnejs';
+import { queryUntyped } from 'ohnejs';
 import { randomToken } from 'ohnejs/utils/crypto';
 
 import { writeSessionCookie } from './_cookie.ts';
@@ -23,12 +23,15 @@ export async function createSession(userUUID: string, remember = true): Promise<
   const now = Date.now();
   const lifetime = sessionLifetime(remember);
   await queryUntyped('Sessions')
+    .unscoped()
     .where({ expiresAt: { atMost: now } })
     .delete();
-  await query('Sessions').createOrThrow({
-    user: userUUID,
-    tokenHash: hashSessionToken(token),
-    expiresAt: now + lifetime,
-  });
+  await queryUntyped('Sessions')
+    .unscoped()
+    .createOrThrow({
+      user: userUUID,
+      tokenHash: hashSessionToken(token),
+      expiresAt: now + lifetime,
+    });
   writeSessionCookie(token, remember ? lifetime : undefined);
 }

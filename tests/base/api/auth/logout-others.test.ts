@@ -20,6 +20,8 @@ import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
@@ -109,5 +111,26 @@ describe('POST /auth/logout/others', () => {
 
   it('answers 401 without a session', async () => {
     strictEqual(await status(ROUTES.others), 401);
+  });
+
+  it('ends the other sessions past an app scope on Sessions', async () => {
+    await queryUntyped('Users').createOrThrow({
+      email: 'scoped@example.com',
+      password: 'correct horse',
+    });
+    const phone = await login('scoped@example.com');
+    const laptop = await login('scoped@example.com');
+    hook('record:condition', (condition, { collection }) =>
+      collection === 'Sessions'
+        ? { kind: 'compare', path: ['UUID'], op: 'equalsTo', value: 'none', negated: false }
+        : condition,
+    );
+    try {
+      strictEqual((await call(ROUTES.others, phone)).status, 200);
+      strictEqual(await status(ROUTES.me, phone), 200);
+      strictEqual(await status(ROUTES.me, laptop), 401);
+    } finally {
+      useHooks().clear();
+    }
   });
 });

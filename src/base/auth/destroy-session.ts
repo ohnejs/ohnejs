@@ -1,4 +1,4 @@
-import { query } from 'ohnejs';
+import { queryUntyped } from 'ohnejs';
 import { isNull } from 'ohnejs/utils';
 
 import { clearSessionCookie, readSessionToken } from './_cookie.ts';
@@ -20,7 +20,10 @@ import { hashSessionToken } from './_token.ts';
 export async function destroySession(): Promise<void> {
   const token = readSessionToken();
   if (!isNull(token)) {
-    await query('Sessions').where('tokenHash', hashSessionToken(token)).delete();
+    await queryUntyped('Sessions')
+      .unscoped()
+      .where({ tokenHash: hashSessionToken(token) })
+      .delete();
   }
   clearSessionCookie();
 }

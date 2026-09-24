@@ -1,4 +1,4 @@
-import { type Event, query, tryUseEvent } from 'ohnejs';
+import { type Event, queryUntyped, tryUseEvent } from 'ohnejs';
 import { isNull, isUndefined } from 'ohnejs/utils';
 
 import type { Session } from './types.ts';
@@ -40,13 +40,13 @@ async function resolveSession(): Promise<Session | null> {
   if (isNull(token)) return null;
 
   const tokenHash = hashSessionToken(token);
-  const session = (await query('Sessions').where('tokenHash', tokenHash).findFirst()) as
+  const session = (await queryUntyped('Sessions').unscoped().where({ tokenHash }).findFirst()) as
     | Session
     | undefined;
   if (isUndefined(session)) return null;
 
   if (session.expiresAt <= Date.now()) {
-    await query('Sessions').where('tokenHash', tokenHash).delete();
+    await queryUntyped('Sessions').unscoped().where({ tokenHash }).delete();
     return null;
   }
   return session;
