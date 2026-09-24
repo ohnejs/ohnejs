@@ -70,6 +70,13 @@ export interface StorageAdapter {
   stat(path: string): Promise<{ size: number } | null>;
 
   /**
+   * Yields the path of every stored object: the one at `prefix` and every one under `prefix/`.
+   * An omitted `prefix` yields every object, and a write still in progress is never among them.
+   * A backend that cannot enumerate its objects omits it, and `pruneUploads` then refuses to run.
+   */
+  list?(prefix?: string): AsyncIterable<string>;
+
+  /**
    * Moves the object at `from` to `to`, or every object under the prefix `from/` beneath `to/`.
    * An existing object at `to` is replaced; a missing `from` is a no-op, so a replay is harmless.
    * An object keeps its visibility as it moves, since a private file moved anywhere stays private.

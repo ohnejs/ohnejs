@@ -281,6 +281,33 @@ describe('createFSStorage', () => {
     deepStrictEqual(readdirSync(dir), []);
   });
 
+  it('lists every object, a dot-prefixed one included, but never a write in progress', async () => {
+    await storage.write('photos/2024/sunset.jpg', streamOf('a'), { type: 'image/jpeg' });
+    await storage.write('.tmp/staged', streamOf('b'), { type: 'text/plain' });
+    const { body, pulled, release } = stalledStream('late');
+    const writing = storage.write('photos/late.jpg', body, { type: 'image/jpeg' });
+    await pulled;
+
+    const listed = await Array.fromAsync(storage.list!());
+    release();
+    await writing;
+
+    deepStrictEqual(listed.sort(), ['.tmp/staged', 'photos/2024/sunset.jpg']);
+  });
+
+  it('lists the object at a prefix, or every object under it', async () => {
+    await storage.write('photos/2024/sunset.jpg', streamOf('a'), { type: 'image/jpeg' });
+    await storage.write('photos/dusk.jpg', streamOf('b'), { type: 'image/jpeg' });
+    await storage.write('photoshop.psd', streamOf('c'), { type: 'image/vnd.adobe.photoshop' });
+
+    deepStrictEqual((await Array.fromAsync(storage.list!('photos'))).sort(), [
+      'photos/2024/sunset.jpg',
+      'photos/dusk.jpg',
+    ]);
+    deepStrictEqual(await Array.fromAsync(storage.list!('photos/dusk.jpg')), ['photos/dusk.jpg']);
+    deepStrictEqual(await Array.fromAsync(storage.list!('missing')), []);
+  });
+
   it('refuses a path that escapes the root', async () => {
     const body = streamOf('x');
     await rejects(storage.write('../escape.txt', body, { type: 'text/plain' }), isOhneError);
@@ -288,6 +315,7 @@ describe('createFSStorage', () => {
     await rejects(storage.stat('/etc/passwd'), /escapes the uploads root/);
     await rejects(storage.move('a.txt', '../escape.txt'), /escapes the uploads root/);
     await rejects(storage.delete('..'), /escapes the uploads root/);
+    await rejects(Array.fromAsync(storage.list!('..')), /escapes the uploads root/);
     strictEqual(existsSync(join(dir, '..', 'escape.txt')), false);
   });
 

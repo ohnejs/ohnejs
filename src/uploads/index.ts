@@ -15,6 +15,7 @@ export * from './uploads/delete-uploads.ts';
 export * from './uploads/move-upload.ts';
 export * from './uploads/move-uploads.ts';
 export * from './uploads/path.ts';
+export * from './uploads/prune-uploads.ts';
 export * from './uploads/put-upload.ts';
 export * from './uploads/replace-upload.ts';
 export * from './uploads/set-uploads-private.ts';

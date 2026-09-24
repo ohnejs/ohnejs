@@ -3,11 +3,13 @@ import { cp, open, rename, rmdir } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
-import { ensureDir, exists, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
+import { ensureDir, exists, listDir, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
 import type { StorageAdapter } from './adapter.ts';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
+
+const WRITE_TEMP = /\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.tmp$/;
 
 /**
  * Builds the `fs` storage backend, which keeps every object as a file under `root`.
@@ -15,6 +17,7 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
  * A key maps onto its path beneath `root`, so a folder prefix is a real directory.
  * A write lands in a sibling temp file and renames into place, so a reader never sees a partial object.
  * A delete also removes the parent directories it leaves empty, so the tree never accumulates them.
+ * A listing walks the tree and passes over those temp files.
  *
  * @example
  * ```ts
@@ -49,6 +52,18 @@ export function createFSStorage(root: string): StorageAdapter {
     async stat(path) {
       const size = await fileSize(locate(base, path));
       return isNull(size) ? null : { size };
+    },
+
+    async *list(prefix = '') {
+      const target = locate(base, prefix);
+      if (!isNull(await fileSize(target))) {
+        yield prefix;
+        return;
+      }
+      for (const entry of (await listDir(target, { hidden: true })) ?? []) {
+        if (WRITE_TEMP.test(entry.name)) continue;
+        yield prefix === '' ? entry.relativePath : `${prefix}/${entry.relativePath}`;
+      }
     },
 
     async move(from, to) {

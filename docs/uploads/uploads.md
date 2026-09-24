@@ -286,6 +286,7 @@ A backend is a `StorageAdapter`:
 - `setPrivate` is optional: it locks or unlocks a file or a prefix as a row turns
   [private](./private-files.md) or public. A `move` keeps what it set.
 - `check` is optional: it confirms at boot that the backend can be reached.
+- `list` is optional: it yields the path of every stored file, which `pruneUploads` needs.
 
 The backend never sees the database. The layer's helpers record each move, delete, and
 `setPrivate` inside the [transaction](../database/engine.md#transactions) that changes the rows,
@@ -296,6 +297,20 @@ and run it after the commit:
 
 The `fs` backend writes a file to a temp file beside its target and renames it into place. It
 removes empty parent directories after a delete, and moves a folder in one rename.
+
+A file can end up in storage with no row behind it, after a database restored from an older
+backup or a file copied in by hand. `pruneUploads` lists those files, and deletes them when you
+pass `delete: true`:
+
+```ts
+import { pruneUploads } from 'ohnejs/uploads';
+
+const stray = await pruneUploads();
+await pruneUploads({ delete: true });
+```
+
+A file that is still uploading is never among them, and neither is one your app's
+[read hooks](../project/hooks.md) hide. Each call returns the paths it found.
 
 ## Storing files in S3
 

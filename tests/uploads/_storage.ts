@@ -67,6 +67,11 @@ export function createMemoryStorage(): MemoryStorage {
       const bytes = objects.get(path);
       return bytes === undefined ? null : { size: bytes.byteLength };
     },
+    async *list(prefix = '') {
+      for (const key of objects.keys()) {
+        if (prefix === '' || key === prefix || key.startsWith(`${prefix}/`)) yield key;
+      }
+    },
     async move(from, to) {
       fail('move');
       const bytes = objects.get(from);
