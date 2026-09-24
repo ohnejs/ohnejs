@@ -14,10 +14,12 @@ import { warmQueryMetadata } from '../query/metadata.ts';
 import { validateLiteralDefaults } from '../query/validate-literal-defaults.ts';
 import { connect } from './connect.ts';
 import { useMigrations } from './migrations/use-migrations.ts';
+import { OHNE_SCHEMA } from './naming/table-names.ts';
 import { buildDesiredSchema } from './schema/desired.ts';
+import { readSnapshot, schemaHash } from './schema/snapshot.ts';
 import { syncDatabase } from './schema/sync.ts';
 import { seedSingletons } from './seed-singletons.ts';
-import { useDatabase } from './use-database.ts';
+import { useDatabase, useDialect } from './use-database.ts';
 
 declare module 'ohnejs' {
   interface Hooks {
@@ -113,4 +115,15 @@ export async function syncProjectDatabase(options: SyncProjectOptions = {}): Pro
     await applyHook('schema:synced', report);
   }
   return report;
+}
+
+/**
+ * Whether the connected database holds the schema the registries declare, as the last sync wrote it.
+ */
+export async function isProjectSynced(): Promise<boolean> {
+  const desired = buildDesiredSchema(useCollections(), useFields(), useBlocks());
+  if (desired.length === 0) return true;
+  const [db, dialect] = [useDatabase(), useDialect()];
+  if (!(await dialect.listTables(db)).includes(OHNE_SCHEMA)) return false;
+  return (await readSnapshot(db, dialect))?.hash === schemaHash(desired);
 }

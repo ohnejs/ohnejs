@@ -257,6 +257,28 @@ describe('withLayerCommands', () => {
     throws(() => useDatabase(), /The database is not connected/);
   });
 
+  it('warns before running a command on a database its schema is not synced to', async () => {
+    const app = project('unsynced');
+    mkdirSync(join(app, 'node_modules'));
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
+    write(
+      join(app, 'collections', 'Posts.ts'),
+      "import { defineCollection, field } from 'ohnejs';\n" +
+        "export default defineCollection({ fields: { title: field('text') } });\n",
+    );
+    command(
+      app,
+      'seed',
+      "{ meta: { name: 'seed' }, run() { globalThis.__ohneCommandRan = true; } }",
+    );
+
+    const cli = await withLayerCommands(ohne, ['seed', '--cwd', app]);
+    scope.__ohneCommandRan = false;
+    strictEqual(await runCommand(cli, ['seed', '--cwd', app]), 0);
+    strictEqual(scope.__ohneCommandRan, true);
+    match(written, /Database not synced/);
+  });
+
   it('throws `Not an ohne project` for a command name outside a project, unless it is a built-in typo', async () => {
     const dir = join(root, 'outside');
     mkdirSync(dir);

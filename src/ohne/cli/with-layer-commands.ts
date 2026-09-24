@@ -18,6 +18,7 @@ import { bootProject } from '../boot/boot-project.ts';
 import { collectCommands } from '../commands/collect-commands.ts';
 import { importCommand } from '../commands/import-command.ts';
 import { connect } from '../database/connect.ts';
+import { isProjectSynced } from '../database/sync-project.ts';
 import { closeDatabases } from '../database/use-database.ts';
 import { envGlobals } from '../env/env-flags.ts';
 import { ohneError } from '../error/ohne-error.ts';
@@ -124,12 +125,22 @@ function mount(command: Command, file: string, project: string, reserved: Set<st
 }
 
 /**
- * Boots `project`, connects its database, and runs `work`.
+ * Boots `project`, connects its database, warns when it is not synced, and runs `work`.
  */
 async function runInProject(project: string, work: () => void | Promise<void>): Promise<void> {
   try {
     await bootProject(project);
     await connect();
+    if (!(await isProjectSynced())) {
+      usePrinter().warnBlock({
+        title: 'Database not synced',
+        body: [
+          'Its tables do not match the collections, so a query may fail.',
+          '',
+          'Run `ohne sync`.',
+        ],
+      });
+    }
     await work();
   } finally {
     await useShutdown().run();
