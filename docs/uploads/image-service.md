@@ -118,11 +118,9 @@ same way, under an `UPLOADS_SECRET` value:
    - **`f_auto`.** Pick `avif` when `Accept` contains `image/avif`, else `webp` when it contains
      `image/webp`, else the source format. `image/*` alone means the source format. Add
      `Vary: Accept` to the answer.
-   - **SVG.** An SVG has no pixels of its own, so the `dpr` 1 limit does not apply to it. Rasterize
-     it at the density the output needs, then fit, since scaling up a low-density raster blurs every
-     edge. An SVG without `width`, `height`, or `viewBox` may render at the size of its drawn
-     shapes, depending on the rasterizer, so give an uploaded SVG a `viewBox`. Its thumbnail is a
-     WebP raster like any other. Never let the rasterizer load external files, URLs, or entities.
+   - **SVG.** An SVG has no pixels of its own, so the `dpr` 1 limit does not apply: rasterize it at
+     the density the output needs, then fit. Never let the rasterizer load external files, URLs, or
+     entities.
 7. Answer with the rendered bytes, `Content-Type`, `Content-Length`, and a long
    `Cache-Control: public, max-age`, or `private, max-age` bounded by the time left when the URL
    carries `e`.

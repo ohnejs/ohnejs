@@ -1,9 +1,15 @@
 # Private files
 
 A private file opens only through a link that expires, or for a signed-in reader who may read
-`Uploads`. The feature runs on `UPLOADS_SECRET`: without it every file is public.
+`Uploads`.
 
-Mark a file or folder private in the dashboard, or in server code:
+Set `UPLOADS_SECRET` first. It signs every link:
+
+```sh
+UPLOADS_SECRET=a-long-random-value
+```
+
+Then mark a file or folder private in the dashboard, or in server code:
 
 ```ts
 import { updateUpload } from 'ohnejs/uploads';
@@ -11,7 +17,7 @@ import { updateUpload } from 'ohnejs/uploads';
 await updateUpload(upload.UUID, { private: true });
 ```
 
-With `UPLOADS_SECRET` set, every read of it now carries a signed link that expires.
+Every read of it now carries a signed link that expires.
 
 ## Marking files private
 
@@ -26,7 +32,6 @@ A folder locks everything inside it:
   or renaming in place, changes nothing.
 - Making a row public inside a private folder is a `422`, and so is moving one in with
   `private: false`.
-- A row that was already public inside a private folder stays public. ohne lists each one at boot.
 
 ## What a read carries
 
@@ -47,19 +52,11 @@ upload.expires; // -> 1700000000000
 
 ## The secret
 
-`UPLOADS_SECRET` signs every link:
-
-```sh
-UPLOADS_SECRET=a-long-random-value
-```
-
-- It may list several secrets, comma-separated. The first signs and any verifies, so it
-  [rotates](./image-variants.md#rotating-the-secret) like `IMAGES_SECRET`.
-- Without it the layer keeps no private files at all. Every file is served to anyone, a stored
-  `private` is ignored, `PATCH` drops it, `POST /uploads/private` answers `400`, the link route
-  answers `404`, and the dashboard hides the switch, the badges, and the bulk actions. ohne warns
-  at boot while a private row exists.
-- The column stays, so nothing is lost: set the secret and the same rows are private again.
+- `UPLOADS_SECRET` may list several secrets, comma-separated. The first signs and any verifies, so
+  it [rotates](./image-variants.md#rotating-the-secret) like `IMAGES_SECRET`.
+- Without it no file can be made private, and a private file opens only for a signed-in reader,
+  with no links and no variants. The dashboard hides the private controls.
+- The rows keep their flag, so setting the secret later makes the same files linkable again.
 
 ## How long a link lives
 
@@ -96,18 +93,13 @@ api: {
 },
 ```
 
-A caller outside the scope does not see the row, cannot fetch its bytes, and gets `null` where a
-[media field](./fields.md#reading) references it. They cannot change, move, replace, or delete it
-either: those routes answer the same `404` as an unknown file.
-
-Nor can they make a write that would hide a row from themselves. Making it private, moving it into
-a private folder, or uploading into one answers `422`, and nothing changes.
-
-A write they make to a folder they can see still applies to its whole subtree, files the scope
-hides included.
-
-The scope hides rows, not names. A name stays unique in its folder, so a caller who guesses a
-hidden name finds it taken. Keep secrets out of the names of private files and folders.
+- A caller outside the scope does not see the row, cannot open its bytes, and gets `null` where a
+  [media field](./fields.md#reading) references it. Changing, moving, replacing, or deleting it is
+  the same `404`.
+- A write that would hide a row from its own writer, such as making it private, is a `422`.
+- A write to a folder the caller can see applies to its whole subtree, hidden files included.
+- The scope hides rows, not names, so a hidden name is still taken. Keep secrets out of file and
+  folder names.
 
 ## Temporary links
 
@@ -121,19 +113,15 @@ temporaryUploadURL(upload, '7d');
 ```
 
 - `maxAge` is a `parseDuration` value counted from now, not aligned to a window.
-- `GET /uploads/[uuid]/link?maxAge=7d` answers the same `{ url, expires }` to a caller who may read
-  `Uploads`. `maxAge` defaults to `privateMaxAge`. A public file answers its plain `url` with
-  `expires: null`.
+- `POST /uploads/[uuid]/link` with the body `{ "maxAge": "7d" }` answers the same `{ url, expires }`
+  to a caller who may read `Uploads`. `maxAge` defaults to `privateMaxAge`. A public file answers
+  its plain `url` with `expires: null`.
 - The details popup offers the same as `Copy temporary link`.
 - Without `UPLOADS_SECRET`, `temporaryUploadURL` throws.
 
 ## Storage and the image service
 
-A [storage backend](./uploads.md#storage) whose objects are readable without the API can lock them
-too, with `setPrivate`. [`@ohnejs/uploads-s3`](./uploads.md#storing-files-in-s3) tags a private
-object, and its [README](https://github.com/ohnejs/uploads-s3#private-files) has the bucket policy
-that refuses it.
-
-An [image service](./image-service.md#what-a-service-does) fetches a private original through a
-signed link of its own, made with `IMAGES_SOURCE_SECRET`, one of the values in `UPLOADS_SECRET`.
-Only a variant URL that expires gets one, so a link from before the file went private stops working.
+[`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) tags a private object so the bucket can
+refuse it. Its [README](https://github.com/ohnejs/uploads-s3#private-files) has the policy. An
+[image service](https://github.com/ohnejs/images#private-files) fetches a private original only
+with one of your `UPLOADS_SECRET` values, so give it `--source-secret`.

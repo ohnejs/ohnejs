@@ -39,13 +39,13 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
 - `directory` - the parent path, with no leading slash and `''` at the root.
 - `name` - the file or folder name. The `directory` and `name` pair is unique, as on a filesystem,
   and every segment is a slug.
-- `type`, `size`, `hash`, `focalX`, and `focalY` - on a file.
 - `description` - a file's alt text, one per
   [content locale](../database/translations.md#marking-fields).
-- `width` and `height` - on an image.
-- `author` and `uploadedAt` - on every row.
 - `private` - whether only a [signed link or a signed-in reader](./private-files.md) opens the
-  bytes. Ignored while no `UPLOADS_SECRET` is set.
+  bytes. Without `UPLOADS_SECRET` it can no longer change, and the file opens only for a signed-in
+  reader.
+- `type`, `size`, `hash`, `width`, `height`, `focalX`, `focalY`, `author`, and `uploadedAt`
+  describe the file.
 
 Every read is decorated with extra fields:
 
@@ -94,13 +94,13 @@ The request body is the file. One file per request, metadata in the query:
 ```
 POST   /uploads?directory=photos&name=Sunset.JPG   the body is the file, answers 201 with the record
 POST   /uploads/folders                             { "directory": "photos", "name": "2024" }
-PATCH  /uploads/[uuid]                              { "name"?, "directory"?, "description"?, "focalX"?, "focalY"?, "private"? }
+PATCH  /uploads/[uuid]                              rename, move, or edit a file
 POST   /uploads/[uuid]/replace                      the body replaces the file's bytes
 DELETE /uploads/[uuid]                              a folder takes everything inside it
 POST   /uploads/move                                { "uuids": [...], "directory": "archive" }
 POST   /uploads/private                             { "uuids": [...], "private": true }
 POST   /uploads/delete                              { "uuids": [...] }
-GET    /uploads/[uuid]/link?maxAge=7d               a temporary link to a private file
+POST   /uploads/[uuid]/link                         { "maxAge"?: "7d" }   a link to a private file
 GET    /uploads/[...path]                           the bytes
 ```
 
@@ -118,35 +118,21 @@ When a file comes in:
   `.jpg` is a `422`.
 - An SVG is sanitized before it is stored.
 
-Writes need the `collection.Uploads.*` capabilities of
-[roles](../auth/roles.md#the-collections-api-guard). Changing, replacing, or deleting a row also
-needs the `Uploads` read, and reaches only rows its [`access`](./private-files.md#who-can-open-the-bytes)
-scope lets you see. Any other row is a `404`. The bytes are public unless the file is
-[private](./private-files.md).
+The bulk routes take up to 1000 `uuids` and are all or nothing: if one row fails, nothing changes,
+and the answer is the error that row would get on its own.
 
-`PATCH` with `name` or `directory` renames or moves the row and its object, keeping a file's
-extension. `?locale=` selects the alt text's locale.
+Writes need the `collection.Uploads.*` capabilities of
+[roles](../auth/roles.md#the-collections-api-guard) and reach only the rows the read's
+[`access`](./private-files.md#who-can-open-the-bytes) scope shows. The bytes are public unless the
+file is [private](./private-files.md).
+
+`PATCH` takes any of `name`, `directory`, `description`, `focalX`, `focalY`, and `private`. With
+`name` or `directory` it renames or moves the row and its object, keeping a file's extension.
+`?locale=` selects the alt text's locale.
 
 The upload and replace routes accept bodies up to `uploads.maxFileSize` and run with no handler
 timeout. An upload may take up to [`api.requestTimeout`](../project/config.md#the-api-server).
 Unless you set it, that is Node's default of 5 minutes.
-
-## Changing many rows at once
-
-The bulk routes move, lock, or delete every row in `uuids` in one request. It is all or nothing:
-if one row fails, nothing changes, and the answer is the error that row would get on its own.
-
-```sh
-curl -X POST 'http://localhost:9001/uploads/move' --cookie "session=..." \
-  -H 'content-type: application/json' \
-  --data '{ "uuids": ["0b7c...", "4f1e..."], "directory": "archive" }'
-```
-
-- `uuids` holds up to 1000 entries. Duplicates are dropped.
-- An unknown `UUID`, or one you cannot see, is a `404`.
-- A row inside a folder you also named goes along with that folder.
-- A move skips rows already in `directory`. A folder moved into itself is a `422`.
-- Move and privacy answer the records in the order you gave. Delete answers `204`.
 
 ## In server code
 
@@ -160,14 +146,18 @@ import {
   moveUpload,
   moveUploads,
   putUpload,
+  replaceUpload,
+  setUploadsPrivate,
   updateUpload,
 } from 'ohnejs/uploads';
 
 const upload = await putUpload({ directory: 'imports', name: 'report.pdf', body });
 await updateUpload(upload.UUID, { description: 'Quarterly report' }, { locale: 'de' });
+await replaceUpload(upload.UUID, newBody);
 await moveUpload(upload.UUID, { directory: 'archive/2026' });
 const folder = await createFolder({ directory: 'archive', name: '2027' });
 await moveUploads([upload.UUID], folder.path);
+await setUploadsPrivate([upload.UUID], true);
 await deleteUpload(upload.UUID);
 await deleteUploads([folder.UUID]);
 ```
@@ -176,13 +166,13 @@ await deleteUploads([folder.UUID]);
   gives you.
 - Every helper throws the same errors the routes answer with.
 - Every helper except the deletes returns the decorated record, an `UploadRecord`, or a list of them.
-- `moveUploads`, `setUploadsPrivate`, and `deleteUploads` are all or nothing, like the bulk routes.
+- `moveUploads`, `setUploadsPrivate`, and `deleteUploads` are
+  [all or nothing](#uploading-over-http), like the bulk routes.
+- `replaceUpload` keeps the `UUID`, path, and type, so every field that references the file stays
+  linked.
 
 Changing `name` or `directory` directly through `query('Uploads')` does not move the object, so use
 `moveUpload`.
-
-`replaceUpload(uuid, body)` swaps a file's bytes and keeps its `UUID`, path, and type, so every
-field that references it stays linked. Bytes that do not match the type are a `422`.
 
 ## Serving
 
@@ -192,7 +182,7 @@ field that references it stays linked. Bytes that do not match the type are a `4
 - an `ETag` from the file's hash, so a fresh `If-None-Match` answers
   [`304`](../api/response.md#caching),
 - `Cache-Control` from `uploads.cache`, `private` for a private file,
-- `Range` support for video and audio.
+- `Range` support for video and audio, honoring `If-Range`.
 
 Every answer is `nosniff`. A file whose type a browser would run as a document is downloaded as an
 attachment. An SVG renders under a sandboxing content security policy.
@@ -231,11 +221,10 @@ export default defineConfig({
 });
 ```
 
-- `storage` - the backend, by the name a boot file [registered](#storage) it under. The layer ships
-  `fs`; [`@ohnejs/uploads-s3`](#storing-files-in-s3) adds `s3`.
-- `url` - where the backend keeps the files, in whatever form it understands. For `fs` it is a
-  directory, resolved against the working directory. For `s3` it is a bucket and prefix, as
-  [Storing files in S3](#storing-files-in-s3) shows. The `UPLOADS_URL` env var overrides it.
+- `storage` - the [backend](./storage.md), by name. The layer ships `fs`, and
+  [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) adds `s3`.
+- `url` - where the backend keeps the files: a directory for `fs`, a bucket and prefix for
+  [`s3`](./storage.md#storing-files-in-s3). `UPLOADS_URL` overrides it.
 - `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
 - `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
   wildcards, and category names such as `document`, in the
@@ -250,87 +239,8 @@ export default defineConfig({
   variants every image read carries. `url` has no default, and without it every image URL points at
   the original.
 
-`storage` and `url` are each layer's [own](../project/config.md#own-vs-inherited-keys): a dependency
-cannot point your uploads at its storage.
-
-## Storage
+## Where files live
 
 A file is stored under its path, `photos/2024/sunset.jpg`, and a folder is a prefix. The `fs`
-backend keeps that layout as real files and directories under `uploads.url`.
-
-To store files elsewhere, register a backend from a [boot file](../project/boot.md) and select it
-by name:
-
-```ts
-// boot/storage.ts
-import { useStorages } from 'ohnejs/uploads';
-
-import { createGCSStorage } from '../storage/gcs.ts';
-
-useStorages().register('gcs', (url) => createGCSStorage(url));
-```
-
-```ts
-// ohne.config.ts
-uploads: { storage: 'gcs', url: 'gs://my-bucket/uploads' },
-```
-
-A backend is a `StorageAdapter`:
-
-- `write` stores a file.
-- `read` returns a file, with an optional byte range.
-- `stat` describes a file.
-- `move` and `delete` take a prefix as well as a file, so a folder is one operation.
-- `url` is optional, for a backend that serves its objects itself. A record's `url` then comes from
-  the backend, unless `publicURL` is set.
-- `setPrivate` is optional: it locks or unlocks a file or a prefix as a row turns
-  [private](./private-files.md) or public. A `move` keeps what it set.
-- `check` is optional: it confirms at boot that the backend can be reached.
-- `list` is optional: it yields the path of every stored file, which `pruneUploads` needs.
-
-The backend never sees the database. The layer's helpers record each move, delete, and
-`setPrivate` inside the [transaction](../database/engine.md#transactions) that changes the rows,
-and run it after the commit:
-
-- A failed one is retried later and at every boot, so a crash never leaves a row pointing nowhere.
-- A retry can repeat an effect that already ran, so a missing path must be a no-op.
-
-The `fs` backend writes a file to a temp file beside its target and renames it into place. It
-removes empty parent directories after a delete, and moves a folder in one rename.
-
-A file can end up in storage with no row behind it, after a database restored from an older
-backup or a file copied in by hand. `pruneUploads` lists those files, and deletes them when you
-pass `delete: true`:
-
-```ts
-import { pruneUploads } from 'ohnejs/uploads';
-
-const stray = await pruneUploads();
-await pruneUploads({ delete: true });
-```
-
-A file that is still uploading is never among them, and neither is one your app's
-[read hooks](../project/hooks.md) hide. Each call returns the paths it found.
-
-## Storing files in S3
-
-For S3 and S3-compatible services, install
-[`@ohnejs/uploads-s3`](https://github.com/ohnejs/uploads-s3).
-
-```sh
-pnpm add @ohnejs/uploads-s3
-```
-
-```ts
-// ohne.config.ts
-import { defineConfig } from 'ohnejs';
-
-export default defineConfig({
-  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/uploads-s3'],
-  uploads: { storage: 's3', url: 's3://my-bucket/uploads?region=eu-central-1' },
-});
-```
-
-Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The
-[package README](https://github.com/ohnejs/uploads-s3#readme) covers bucket setup, private files,
-and services such as R2 and MinIO.
+backend keeps that layout under `uploads.url`, `.uploads` by default. [Storage](./storage.md) covers
+S3 and a backend of your own.

@@ -43,6 +43,9 @@ Without a secret, the URL carries `unsigned` where the signature would go:
 
 That is for your own machine, never for a service others can reach.
 
+The reference implementation, [`@ohnejs/images`](https://github.com/ohnejs/images), runs on Node
+and sharp; any service that follows [the protocol](./image-service.md) works.
+
 ## Named variants
 
 Most pages need the same few sizes everywhere. Name them once under `uploads.images.variants`.
@@ -67,9 +70,8 @@ export default defineConfig({
 ```
 
 - A name is a camelCase identifier.
-- The layer ships `thumbnail` as `{ width: 320, height: 320, fit: 'inside', format: 'webp' }`. It
-  fits an image inside a 320 pixel box for the dashboard grid without cropping, so the result is
-  square only when the original image is square.
+- The layer ships `thumbnail` as `{ width: 320, height: 320, fit: 'inside', format: 'webp' }`, for
+  the dashboard grid.
 - Names from every layer are combined. Defining a name again replaces the whole preset, so
   `thumbnail: { width: 200 }` does not keep the shipped height.
 - A name that is not an identifier, or a preset with no transforms, fails at boot.
@@ -85,9 +87,8 @@ upload.variants.card; // -> 'https://img.example.com/.../w_640,h_360,f_webp/phot
 ```
 
 Without a service, or for a file that is not an image, `variants` is absent. A
-[private image's](./private-files.md) variants expire with its `url`. Signing stays in server
-code, and the dashboard's [details popup](./uploads.md#the-dashboard) lists the variants under
-Variants.
+[private image's](./private-files.md) variants expire with its `url`. The dashboard's
+[details popup](./uploads.md#the-dashboard) lists them under Variants.
 
 In server code, pass the name instead of a transforms object:
 
@@ -98,11 +99,9 @@ imageURL(upload, 'thumbnail'); // -> 'https://img.example.com/.../w_320,h_320,fi
 imageURL(upload); // -> '/uploads/photos/sunset.jpg'
 ```
 
-After [`ohne prepare`](../project/cli.md#ohne-prepare) or `ohne dev`, names autocomplete in
-`imageURL` and `imageSrcSet`, and a typo fails to type-check. `ImageVariantName` is the union of
-every configured name, including the ones in your own `ohne.config.ts`. Before codegen runs, any
-string is accepted. At runtime an unknown name throws, so you see the mistake in server code and
-not as a broken image.
+After [`ohne prepare`](../project/cli.md#ohne-prepare) or `ohne dev`, `ImageVariantName` is the
+union of every configured name, so a typo in `imageURL` or `imageSrcSet` fails to type-check. At
+runtime an unknown name throws.
 
 ## Cropping
 
@@ -144,9 +143,8 @@ imageSrcSet(upload, [
 ```
 
 [`format: 'auto'`](./image-service.md#what-a-service-does) lets the service pick the format from the
-browser's `Accept` header. It is only useful behind a CDN that normalizes `Accept`. Without one,
-every browser's `Accept` string is a separate cache entry. `imageSrcSet` writes explicit formats
-for a `<picture>` instead.
+browser's `Accept` header. Use it only behind a CDN that normalizes `Accept`; without one, every
+browser's `Accept` string is a separate cache entry.
 
 ## Rotating the secret
 
@@ -157,14 +155,6 @@ accepts a URL signed by any of them. To rotate:
 2. On ohne, put it first in the list.
 3. Once every page has re-rendered, remove the old one from the service.
 
-## The reference service
-
-ohne ships the protocol. The reference implementation,
-[`@ohnejs/images`](https://github.com/ohnejs/images), runs on Node and sharp. It lives in its own
-package, because sharp is a native dependency and ohne has none. Any implementation that follows
-[the image service protocol](./image-service.md) works, including one behind a CDN or on an edge
-runtime.
-
 ## Allowing only your variants
 
 A service can refuse everything except your variants. `imageVariantTokens` returns the canonical
@@ -174,20 +164,9 @@ token string of every name:
 import { imageVariantTokens } from 'ohnejs/uploads';
 
 imageVariantTokens();
-// -> { thumbnail: 'w_320,h_320,fit_inside,f_webp', card: 'w_640,h_360,f_webp', cardWide: 'w_1280,h_720,f_webp' }
+// -> { thumbnail: 'w_320,h_320,fit_inside,f_webp', card: 'w_640,h_360,f_webp' }
 ```
 
-The [reference service](#the-reference-service) reads them from `IMAGES_VARIANTS`,
-semicolon-separated:
-
-```sh
-IMAGES_VARIANTS='w_320,h_320,fit_inside,f_webp;w_640,h_360,f_webp;w_1280,h_720,f_webp'
-```
-
-- A URL with a valid signature gets a `403` when its tokens are not in the list.
-- The match ignores `fp`, `p`, and `e`, which carry where a crop keeps its subject and a
-  [private file's](./private-files.md) expiry rather than a size.
-
-With the list set, a leaked secret or a careless template cannot ask the service for a size you did
-not choose. The focal point is not restricted, so the list limits the sizes a service renders, not
-the number of entries in its cache.
+Give them to the service, and a signed URL outside the list is a `403`. The
+[reference service](https://github.com/ohnejs/images#allowing-only-your-variants) takes them as
+`--variants`.

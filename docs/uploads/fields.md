@@ -77,9 +77,7 @@ Over the [collections API](../api/collections.md), a media field
 [populates](../api/url-queries.md#populating-relations) only for a caller who
 [may read `Uploads`](./uploads.md#the-collection). Anyone else, including a visitor who is not
 signed in, gets `null` for `image` and `file` and an empty list for `images` and `files`. To serve
-media fields to everyone, make that read public. A public read also hands out a private file's
-expiring links, unless its [`access`](./private-files.md#who-can-open-the-bytes) scope hides
-private rows.
+media fields to everyone, make that read public.
 
 For a page of your own, [`imageURL`](./image-variants.md#named-variants) builds a variant URL and
 [`imageSrcSet`](./image-variants.md#responsive-images) builds a `srcset`. Without a service, both
