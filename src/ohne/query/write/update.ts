@@ -85,6 +85,7 @@ declare module 'ohnejs' {
      * Force-scope the write - a tenant filter, a soft-delete guard - by returning a narrowed condition.
      * Return a replacement `ConditionNode`, or return nothing to leave the caller's condition as is.
      * The `ctx` carries the `collection` and whether this is an `update` or a `delete`.
+     * An `unscoped()` chain skips it, as the framework's own bookkeeping does.
      */
     'record:condition': (
       condition: ConditionNode,
@@ -142,6 +143,7 @@ async function afterUpdate(
  * A missing row materializes, its unwritten companion columns filled through the default path.
  * Uniqueness prechecks exclude the matched rows, so a kept value never collides with its own record.
  * The returned records are all matched rows, untouched empty inputs included, in their final state.
+ * `unscoped` skips `record:condition` and reads the rows back past `query:filter`, for framework bookkeeping.
  */
 export async function runUpdate(
   collection: string,
@@ -149,15 +151,16 @@ export async function runUpdate(
   condition: ConditionNode,
   locale: string | null,
   joinedTx?: Transaction,
+  unscoped = false,
 ): Promise<UpdateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const scoped = await scopeCondition(collection, condition, 'update');
+  const scoped = unscoped ? condition : await scopeCondition(collection, condition, 'update');
   const outcome = await runWrite<UpdateOutcome>(
     dialect,
     joinedTx,
     (o) => !o.ok,
-    (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale),
+    (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale, unscoped),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
@@ -190,6 +193,7 @@ async function attemptUpdate(
   input: Record<string, unknown>,
   condition: ConditionNode,
   locale: string | null,
+  unscoped: boolean,
 ): Promise<UpdateOutcome> {
   const processed = await runRecord(meta, input, { operation: 'update', tx });
   if (!processed.ok) return { ok: false, errors: processed.errors };
@@ -211,9 +215,9 @@ async function attemptUpdate(
 
   const gates = whenGates(meta.fields, processed.input, scope);
   if (isEmpty(gates) && !hasNestedGates(scope)) {
-    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale);
+    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale, unscoped);
   }
-  return attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale);
+  return attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale, unscoped);
 }
 
 /**
@@ -228,6 +232,7 @@ async function attemptPlainUpdate(
   matched: readonly string[],
   code: string,
   locale: string | null,
+  unscoped: boolean,
 ): Promise<UpdateOutcome> {
   if (matched.length > 1 && scope.uniqueProbes.length > 0) {
     return { ok: false, errors: fannedErrors(scope.uniqueProbes) };
@@ -282,7 +287,7 @@ async function attemptPlainUpdate(
     ok: true,
     records: await afterUpdate(
       meta.collection,
-      await readMatched(meta.collection, matched, locale),
+      await readMatched(meta.collection, matched, locale, false, unscoped),
       tx,
       code,
     ),
@@ -315,8 +320,9 @@ async function attemptGatedUpdate(
   matched: readonly string[],
   code: string,
   locale: string | null,
+  unscoped: boolean,
 ): Promise<UpdateOutcome> {
-  const records = await readMatched(meta.collection, matched, locale, true);
+  const records = await readMatched(meta.collection, matched, locale, true, unscoped);
   const overlays = new Map(
     records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
   );
@@ -427,7 +433,7 @@ async function attemptGatedUpdate(
     ok: true,
     records: await afterUpdate(
       meta.collection,
-      await readMatched(meta.collection, matched, locale),
+      await readMatched(meta.collection, matched, locale, false, unscoped),
       tx,
       code,
     ),
@@ -639,12 +645,14 @@ async function childUUIDsUnder(
  * Re-reads the matched records in their final state, chunked so a large update stays under the param cap.
  * `keepHidden` reads `readable: false` fields too: the gate substrate needs the full stored shape.
  * The records an outcome returns take the default one.
+ * `unscoped` reads past the `query:filter` hook, so a scope never hides a row the write just touched.
  */
 async function readMatched(
   collection: string,
   matched: readonly string[],
   locale: string | null,
   keepHidden = false,
+  unscoped = false,
 ): Promise<QueryRecord[]> {
   const records: QueryRecord[] = [];
   for (const batch of chunk(matched, 2000)) {
@@ -659,7 +667,7 @@ async function readMatched(
         populate: [],
         locale,
         wire: null,
-        unscoped: false,
+        unscoped,
       },
       keepHidden,
     );

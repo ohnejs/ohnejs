@@ -709,6 +709,31 @@ describe('runUpdate hooks', () => {
     strictEqual(await views(a.UUID as string), 555);
     strictEqual(await views(b.UUID as string), 10);
   });
+
+  it('skips `record:condition` and the read-back scope on an unscoped chain', async () => {
+    const a = await seedPost({ summary: 'unscoped-group', views: 1 });
+    const b = await seedPost({ summary: 'unscoped-group', views: 1 });
+    hook('record:condition', () => uuidIs('none'));
+    hook('query:filter', (ir) => (ir.collection === 'UPost' ? { ...ir, limit: 0 } : ir));
+    const scoped = await runUpdate('UPost', { views: 2 }, uuidIs(a.UUID as string), null);
+    ok(scoped.ok);
+    strictEqual(scoped.records.length, 0);
+
+    const updated = await queryUntyped('UPost')
+      .unscoped()
+      .where({ summary: 'unscoped-group' })
+      .updateOrThrow({ views: 3 });
+    strictEqual(updated.length, 2);
+    const deleted = await queryUntyped('UPost').unscoped().where({ UUID: b.UUID }).delete();
+    strictEqual(deleted.deleted, 1);
+    const created = await queryUntyped('UPost')
+      .unscoped()
+      .createOrThrow({ title: 'born hidden', summary: 'unscoped-group', views: 4 });
+    strictEqual(created.views, 4);
+    useHooks().clear();
+    strictEqual(await views(a.UUID as string), 3);
+    strictEqual(await queryUntyped('UPost').where({ UUID: b.UUID }).exists(), false);
+  });
 });
 
 describe('runUpdate hidden fields', () => {

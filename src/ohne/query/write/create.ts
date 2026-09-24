@@ -84,6 +84,7 @@ declare module 'ohnejs' {
  * Runs the whole in-transaction order: validate, precheck uniqueness, prove references, insert, re-read.
  * Opens an `immediate` write transaction unless `joinedTx` supplies one, in which case the caller holds it.
  * `locale` is the chain's explicit choice or `null`; translatable values land on the effective locale.
+ * `unscoped` reads the record back past the `query:filter` hook, for framework bookkeeping.
  * A validation or precheck failure returns `{ ok: false }` and writes nothing.
  * A constraint race is classified; a busy database surfaces as a retryable `busyError`, an HTTP `503`.
  */
@@ -92,6 +93,7 @@ export async function runCreate(
   input: Record<string, unknown>,
   locale: string | null,
   joinedTx?: Transaction,
+  unscoped = false,
 ): Promise<CreateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
@@ -99,7 +101,7 @@ export async function runCreate(
     dialect,
     joinedTx,
     (o) => !o.ok,
-    (tx) => attemptCreate(tx, meta, dialect, input, locale),
+    (tx) => attemptCreate(tx, meta, dialect, input, locale, unscoped),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
@@ -129,6 +131,7 @@ async function attemptCreate(
   dialect: Dialect,
   input: Record<string, unknown>,
   locale: string | null,
+  unscoped: boolean,
 ): Promise<CreateOutcome> {
   const processed = await runRecord(meta, input, { operation: 'create', tx });
   if (!processed.ok) return { ok: false, errors: processed.errors };
@@ -182,7 +185,7 @@ async function attemptCreate(
     populate: [],
     locale,
     wire: null,
-    unscoped: false,
+    unscoped,
   });
   const record = rows[0];
   if (isUndefined(record)) {
@@ -190,7 +193,7 @@ async function attemptCreate(
       title: `Read-back of a created \`${meta.collection}\` record found nothing`,
       body: [
         'The row was inserted, but reading it back returned no record.',
-        'The read path is likely on a different connection than the write transaction.',
+        'A `query:filter` or `query:records` hook hid it, or the read ran on another connection.',
       ],
     });
   }

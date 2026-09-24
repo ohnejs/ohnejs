@@ -454,12 +454,16 @@ export interface UntypedQueryBuilder {
   use(tx: Transaction): this;
 
   /**
-   * Makes the read skip the `query:filter` hook, so an app scope hides no row from it.
-   * `query:records` still runs, and a write ignores it: `record:condition` still scopes the write.
+   * Makes the chain skip the app's scoping hooks, so a scope hides no row from it.
+   * A read skips `query:filter` and a write skips `record:condition`.
+   * A create reads its record back past both.
+   * `query:records` still runs.
+   * For framework bookkeeping only: the wire layer never reaches it.
    *
    * @example
    * ```ts
    * await queryUntyped('Users').unscoped().exists()
+   * await queryUntyped('Sessions').unscoped().where({ UUID }).delete()
    * ```
    */
   unscoped(): this;

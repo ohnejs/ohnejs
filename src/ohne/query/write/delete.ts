@@ -119,15 +119,17 @@ async function beforeDelete(ctx: RecordDeleteContext): Promise<void> {
  * A `restrict` reference still pointing at a matched row throws a `referenceViolation`, an HTTP `409`.
  * A busy database surfaces as a retryable `busyError`.
  * Delete has no validation phase, so the result is only the count.
+ * `unscoped` skips `record:condition`, for framework bookkeeping.
  */
 export async function runDelete(
   collection: string,
   condition: ConditionNode,
   joinedTx?: Transaction,
+  unscoped = false,
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const scoped = await scopeCondition(collection, condition, 'delete');
+  const scoped = unscoped ? condition : await scopeCondition(collection, condition, 'delete');
   const outcome = await runWrite<DeleteResult>(
     dialect,
     joinedTx,
@@ -416,16 +418,18 @@ async function matchedUUIDs(
  * A record with nothing stored at the locale is matched but uncounted: nothing changed.
  * A busy database surfaces as a retryable `busyError`.
  * No `restrict` reference into the collection can fire, so the terminal declares no foreign-key arm.
+ * `unscoped` skips `record:condition`, for framework bookkeeping.
  */
 export async function runDeleteTranslation(
   collection: string,
   condition: ConditionNode,
   locale: string,
   joinedTx?: Transaction,
+  unscoped = false,
 ): Promise<DeleteOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
-  const scoped = await scopeCondition(collection, condition, 'delete');
+  const scoped = unscoped ? condition : await scopeCondition(collection, condition, 'delete');
   const outcome = await runWrite<DeleteResult>(
     dialect,
     joinedTx,

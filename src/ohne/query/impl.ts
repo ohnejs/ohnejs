@@ -47,7 +47,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private offsetValue: number | null = null;
   private localeValue: string | null = null;
   private wireState: WireReach | null = null;
-  private unscopedRead = false;
+  private unscopedChain = false;
   private joinedTx?: Transaction;
   private readonly meta: CollectionQueryMeta;
 
@@ -163,12 +163,24 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   create(input: Record<string, unknown>): Promise<CreateOutcome> {
     if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
-    return runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
+    return runCreate(
+      this.meta.collection,
+      input,
+      this.localeValue,
+      this.joinedTx,
+      this.unscopedChain,
+    );
   }
 
   async createOrThrow(input: Record<string, unknown>): Promise<QueryRecord> {
     if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
-    const outcome = await runCreate(this.meta.collection, input, this.localeValue, this.joinedTx);
+    const outcome = await runCreate(
+      this.meta.collection,
+      input,
+      this.localeValue,
+      this.joinedTx,
+      this.unscopedChain,
+    );
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.record;
   }
@@ -180,6 +192,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.requireCondition('update'),
       this.localeValue,
       this.joinedTx,
+      this.unscopedChain,
     );
   }
 
@@ -190,6 +203,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.requireCondition('update'),
       this.localeValue,
       this.joinedTx,
+      this.unscopedChain,
     );
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.records;
@@ -206,7 +220,12 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
         ],
       });
     }
-    return runDelete(this.meta.collection, this.requireCondition('delete'), this.joinedTx);
+    return runDelete(
+      this.meta.collection,
+      this.requireCondition('delete'),
+      this.joinedTx,
+      this.unscopedChain,
+    );
   }
 
   deleteTranslation(): Promise<DeleteOutcome> {
@@ -223,6 +242,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.requireCondition('deleteTranslation'),
       this.localeValue,
       this.joinedTx,
+      this.unscopedChain,
     );
   }
 
@@ -232,7 +252,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   unscoped(): this {
-    this.unscopedRead = true;
+    this.unscopedChain = true;
     return this;
   }
 
@@ -268,7 +288,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       populate: this.populateNodes,
       locale: this.localeValue,
       wire: this.wireState,
-      unscoped: this.unscopedRead,
+      unscoped: this.unscopedChain,
     });
   }
 }
