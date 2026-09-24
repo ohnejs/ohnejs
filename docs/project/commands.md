@@ -88,7 +88,7 @@ the port:
 - The database is connected, so `query` works as it does in a route. The schema is not synced, so
   run [`ohne sync`](./cli.md#ohne-sync) first on a new database.
 - `server:ready` never fires. Once `run` ends, even by throwing, every `onShutdown` callback runs,
-  then the database closes.
+  then the database closes. Ctrl-C or a `SIGTERM` ends the process at once, and no callback runs.
 
 ## Failing
 

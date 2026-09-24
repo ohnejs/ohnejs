@@ -99,7 +99,8 @@ announce the address to discovery, as the snippet at the top of this page does.
 - The callback receives the bound `host` and `port`. Read `port` to learn the real port when
   [`api.port`](./config.md#the-api-server) is `0`.
 - To clean up, register `onShutdown` instead. It runs when the process
-  [shuts down](../production/deployment.md#graceful-shutdown).
+  [shuts down](../production/deployment.md#graceful-shutdown), and after every
+  [command](./commands.md#what-run-can-use), where `server:ready` never fires.
 
 ### `request:complete`
 
