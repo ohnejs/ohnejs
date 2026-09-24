@@ -20,6 +20,8 @@ import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../../src/ohne/messages/use-messages.ts';
@@ -140,6 +142,31 @@ describe('POST /auth/install', () => {
     });
     strictEqual(response.status, 403);
     strictEqual(await required(), false);
+    await reset();
+  });
+
+  it('stays closed when a query:filter hides every user', async () => {
+    strictEqual(
+      (await call(ROUTES.post, { email: 'first@example.com', password: 'correct horse' })).status,
+      200,
+    );
+    const none = {
+      kind: 'compare' as const,
+      path: ['email'],
+      op: 'isNull' as const,
+      negated: false,
+    };
+    hook('query:filter', (ir) => (ir.collection === 'Users' ? { ...ir, condition: none } : ir));
+    try {
+      strictEqual(await required(), false);
+      const response = await call(ROUTES.post, {
+        email: 'intruder@example.com',
+        password: 'correct horse',
+      });
+      strictEqual(response.status, 403);
+    } finally {
+      useHooks().clear();
+    }
     await reset();
   });
 });
