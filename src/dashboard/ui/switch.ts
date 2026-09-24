@@ -122,9 +122,8 @@ css`
     cursor: not-allowed;
   }
 
-  .ohne-switch-disabled .ohne-switch-button,
-  .ohne-switch-disabled .ohne-switch-control[data-checked='true'] + .ohne-switch-button {
-    background-color: hsl(var(--ohne-muted));
+  .ohne-switch-disabled .ohne-switch-button {
+    opacity: 0.5;
     pointer-events: none;
   }
 
