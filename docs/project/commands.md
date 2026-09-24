@@ -39,13 +39,19 @@ commands/
 `args` declares the command's flags, and `run` receives their values, typed:
 
 ```ts
-args: {
-  count: { type: 'number', default: 10, description: 'How many posts to add.' },
-  dryRun: { type: 'boolean', description: 'Print the posts instead.' },
-},
-async run({ values }) {
-  console.log(values.count, values.dryRun);
-},
+// commands/seed.ts
+import { defineCommand } from 'ohnejs/utils/cli';
+
+export default defineCommand({
+  meta: { name: 'seed', description: 'Add sample posts.' },
+  args: {
+    count: { type: 'number', default: 10, description: 'How many posts to add.' },
+    dryRun: { type: 'boolean', description: 'Print the posts instead.' },
+  },
+  async run({ values }) {
+    console.log(values.count, values.dryRun);
+  },
+});
 ```
 
 - A camelCase key is a kebab-case flag, so `dryRun` is `--dry-run`.
@@ -58,6 +64,12 @@ async run({ values }) {
 A command can group others under `subCommands`, each defined the same way:
 
 ```ts
+// commands/feed.ts
+import { defineCommand } from 'ohnejs/utils/cli';
+
+import exportFeed from './feed/export.ts';
+import importFeed from './feed/import.ts';
+
 export default defineCommand({
   meta: { name: 'feed', description: 'Move posts in and out.' },
   subCommands: { import: importFeed, export: exportFeed },

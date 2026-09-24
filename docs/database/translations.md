@@ -5,10 +5,15 @@ content uses, and scope a query with `.locale()` to pick the locale you [read](.
 [write](./writing.md).
 
 ```ts
-fields: {
-  title: field('text', { translatable: true }),
-  slug: field('text'),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text', { translatable: true }),
+    slug: field('text'),
+  },
+});
 ```
 
 ```ts
@@ -24,19 +29,24 @@ way around.
 Any top-level collection field takes `translatable: true`:
 
 ```ts
-fields: {
-  title: field('text', { translatable: true }),
-  summary: field('text', { translatable: true, nullable: true }),
-  hero: field('record', { collection: 'Images', translatable: true }),
-  tags: field('records', { collection: 'Tags', translatable: true }),
-  sections: field('repeater', {
-    translatable: true,
-    fields: {
-      heading: field('text'),
-      body: field('text'),
-    },
-  }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text', { translatable: true }),
+    summary: field('text', { translatable: true, nullable: true }),
+    hero: field('record', { collection: 'Images', translatable: true }),
+    tags: field('records', { collection: 'Tags', translatable: true }),
+    sections: field('repeater', {
+      translatable: true,
+      fields: {
+        heading: field('text'),
+        body: field('text'),
+      },
+    }),
+  },
+});
 ```
 
 - A scalar or a [`record`](./field-types.md#record) reference keeps one value per locale.
@@ -209,9 +219,14 @@ locale: a value taken in German is taken in English too. When a value only has t
 its own locale, add `uniquePerLocale`:
 
 ```ts
-fields: {
-  slug: field('text', { translatable: true, unique: true, uniquePerLocale: true }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    slug: field('text', { translatable: true, unique: true, uniquePerLocale: true }),
+  },
+});
 ```
 
 Now `hello` can be the English slug of one post and the German slug of another, but never two

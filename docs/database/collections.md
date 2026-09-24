@@ -54,10 +54,15 @@ types. Each stores one value per row.
 A field is required unless you pass `nullable: true`, which lets it hold `null`:
 
 ```ts
-fields: {
-  title: field('text'),
-  summary: field('text', { nullable: true }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text'),
+    summary: field('text', { nullable: true }),
+  },
+});
 ```
 
 - `text` rejects the empty string by default. Pass `allowEmpty: true` to allow it. A value of only
@@ -76,10 +81,15 @@ value, and on `text` they limit the length in characters. The length is counted 
 `String#length`, so an emoji counts as 2:
 
 ```ts
-fields: {
-  title: field('text', { min: 3, max: 120 }),
-  rating: field('integer', { min: 1, max: 5 }),
-}
+// collections/Reviews.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text', { min: 3, max: 120 }),
+    rating: field('integer', { min: 1, max: 5 }),
+  },
+});
 ```
 
 ## Uniques and indexes
@@ -87,10 +97,15 @@ fields: {
 Field options cover the single-column cases:
 
 ```ts
-fields: {
-  email: field('text', { unique: true }),
-  author: field('text', { index: true }),
-}
+// collections/Comments.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    email: field('text', { unique: true }),
+    author: field('text', { index: true }),
+  },
+});
 ```
 
 A unique index also works for plain lookups, so if you set both `unique` and `index`, only the
@@ -123,9 +138,14 @@ existing values contain duplicates.
 type narrows to exactly that union, and a write with a value outside the list is rejected:
 
 ```ts
-fields: {
-  status: field('select', { choices: ['draft', 'published', 'archived'] }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    status: field('select', { choices: ['draft', 'published', 'archived'] }),
+  },
+});
 ```
 
 A choice may pair its stored value with a label the dashboard shows. Pass a
@@ -144,10 +164,15 @@ status: field('select', {
 a JSON list:
 
 ```ts
-fields: {
-  channels: field('multiSelect', { choices: ['web', 'email', 'push'] }),
-  keywords: field('multiSelect'),
-}
+// collections/Campaigns.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    channels: field('multiSelect', { choices: ['web', 'email', 'push'] }),
+    keywords: field('multiSelect'),
+  },
+});
 ```
 
 - With `choices`, every entry must come from the list. Without it, any strings are allowed, like
@@ -172,11 +197,16 @@ The date and time types store each value in the form that matches what it is:
   [time zone setting](../dashboard/account.md#the-settings), unless the field sets a fixed zone.
 
 ```ts
-fields: {
-  publishedOn: field('date'),
-  opensAt: field('time', { min: '08:00', max: '18:00' }),
-  expiresAt: field('dateTime', { nullable: true }),
-}
+// collections/Events.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    publishedOn: field('date'),
+    opensAt: field('time', { min: '08:00', max: '18:00' }),
+    expiresAt: field('dateTime', { nullable: true }),
+  },
+});
 ```
 
 Each takes `min` and `max` in its own value form, and `dateTime` also accepts ISO 8601 strings
@@ -192,10 +222,15 @@ compare and sort in calendar and clock order.
   belongs to one place, no matter who is looking.
 
 ```ts
-fields: {
-  lastSeenAt: field('dateTime', { relativeTime: true }),
-  departsAt: field('dateTime', { timezone: 'Asia/Tokyo' }),
-}
+// collections/Flights.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    lastSeenAt: field('dateTime', { relativeTime: true }),
+    departsAt: field('dateTime', { timezone: 'Asia/Tokyo' }),
+  },
+});
 ```
 
 ## Write-only and locked fields
@@ -216,9 +251,14 @@ and it is how the framework's own `Users.password` works. Without the flag, ever
 the password hash, including over the collections API:
 
 ```ts
-fields: {
-  password: field('password', { readable: false }),
-}
+// collections/Users.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    password: field('password', { readable: false }),
+  },
+});
 ```
 
 ```ts
@@ -241,9 +281,14 @@ A relation points at another collection instead of storing a value.
 [`record`](./field-types.md#record) holds a reference to one row of another collection:
 
 ```ts
-fields: {
-  author: field('record', { collection: 'Users' }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    author: field('record', { collection: 'Users' }),
+  },
+});
 ```
 
 The column stores the target's `UUID`. It is always nullable, because the target can be deleted
@@ -268,9 +313,14 @@ at most one row may reference each target.
 table:
 
 ```ts
-fields: {
-  tags: field('records', { collection: 'Tags' }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    tags: field('records', { collection: 'Tags' }),
+  },
+});
 ```
 
 - `onDelete` is `cascade` (the default) or `restrict`. `cascade` removes the link when its target
@@ -320,27 +370,37 @@ A composite field stores a nested shape in its own table, not a reference to ano
 [`object`](./field-types.md#object) holds one nested group per row, or none:
 
 ```ts
-fields: {
-  seo: field('object', {
-    fields: {
-      title: field('text'),
-      description: field('text', { nullable: true }),
-    },
-  }),
-}
+// collections/Pages.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    seo: field('object', {
+      fields: {
+        title: field('text'),
+        description: field('text', { nullable: true }),
+      },
+    }),
+  },
+});
 ```
 
 [`repeater`](./field-types.md#repeater) holds an ordered list of such groups - zero, one, or many:
 
 ```ts
-fields: {
-  sections: field('repeater', {
-    fields: {
-      heading: field('text'),
-      body: field('text'),
-    },
-  }),
-}
+// collections/Pages.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    sections: field('repeater', {
+      fields: {
+        heading: field('text'),
+        body: field('text'),
+      },
+    }),
+  },
+});
 ```
 
 The subfields are ordinary `field(...)` instances, so a composite may nest further composites and
@@ -422,13 +482,18 @@ plain string or a [message key](../i18n/messages.md) that is translated into the
 - `placeholder` shows a hint in an empty input, on fields that have one.
 
 ```ts
-fields: {
-  slug: field('text', {
-    label: 'app.slug.label',
-    description: 'Lowercase words joined by hyphens.',
-    placeholder: 'my-first-post',
-  }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    slug: field('text', {
+      label: 'app.slug.label',
+      description: 'Lowercase words joined by hyphens.',
+      placeholder: 'my-first-post',
+    }),
+  },
+});
 ```
 
 A long description can start collapsed behind a "Show description" toggle. Pass an object with
@@ -436,15 +501,20 @@ A long description can start collapsed behind a "Show description" toggle. Pass 
 `expanded: true` opens it from the start.
 
 ```ts
-fields: {
-  slug: field('text', {
-    description: {
-      text: 'app.slug.help',
-      showLabel: 'Show examples',
-      hideLabel: 'Hide examples',
-    },
-  }),
-}
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    slug: field('text', {
+      description: {
+        text: 'app.slug.help',
+        showLabel: 'Show examples',
+        hideLabel: 'Hide examples',
+      },
+    }),
+  },
+});
 ```
 
 Two options change only the editor, never what is stored:

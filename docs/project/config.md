@@ -31,7 +31,12 @@ ohne ships its own content as a layer too. That is why the scaffold lists `ohnej
 users, sign-in, and the dashboard. A service on your base layer lists both:
 
 ```ts
-layers: ['ohnejs/base', '@acme/service-base'],
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', '@acme/service-base'],
+});
 ```
 
 Later entries override earlier ones, and your project overrides them all. Defaults to `[]`.
@@ -43,9 +48,15 @@ The [layers guide](./layers.md) shows how to add a layer and build your own.
 only one ohne writes to. It is a single directory for the whole stack, at your project's root:
 
 ```ts
-dirs: {
-  api: 'routes',
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dirs: {
+    api: 'routes',
+  },
+});
 ```
 
 - `codegen: '.ohne'` - where [generated `.ts` files](./cli.md#ohne-prepare) land.
@@ -75,11 +86,17 @@ dirs: {
 layers are combined, so what you list here applies to anything in the stack, including your own:
 
 ```ts
-disable: {
-  routes: ['GET /admin/**'],
-  messages: ['dashboard.**'],
-  collections: ['Drafts'],
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  disable: {
+    routes: ['GET /admin/**'],
+    messages: ['dashboard.**'],
+    collections: ['Drafts'],
+  },
+});
 ```
 
 - `routes` - globs over route ids. A glob with a method prefix, like `'GET /admin/**'`, matches only
@@ -102,10 +119,16 @@ a layer can drop components too, and you can always add more.
 values move to the default locale.
 
 ```ts
-collections: {
-  locales: ['en', 'de-AT', 'fr'],
-  defaultLocale: 'en',
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  collections: {
+    locales: ['en', 'de-AT', 'fr'],
+    defaultLocale: 'en',
+  },
+});
 ```
 
 - They default to `['en']` and `'en'`.
@@ -121,9 +144,15 @@ Content locales are separate from the languages of your message catalogs.
 have no catalog entry:
 
 ```ts
-messages: {
-  defaultLanguage: 'de',
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  messages: {
+    defaultLanguage: 'de',
+  },
+});
 ```
 
 ## The API server
@@ -131,10 +160,16 @@ messages: {
 `api` configures the HTTP server that `ohne serve api` runs:
 
 ```ts
-api: {
-  port: 3000,
-  basePath: '/api',
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  api: {
+    port: 3000,
+    basePath: '/api',
+  },
+});
 ```
 
 Durations take milliseconds or a string like `'30s'`. Sizes take bytes or a string like `'1mb'`.
@@ -172,10 +207,16 @@ For production, [deployment](../production/deployment.md) covers when to set the
 `dashboard` configures the dashboard's server, run by `ohne serve dashboard`:
 
 ```ts
-dashboard: {
-  apiURL: 'https://api.example.com',
-  origin: 'https://admin.example.com',
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    apiURL: 'https://api.example.com',
+    origin: 'https://admin.example.com',
+  },
+});
 ```
 
 | Key      | Default | What it does                                                                                                                                                                        |
@@ -194,10 +235,16 @@ a wrong `origin` makes the browser block every dashboard request.
 ## The database
 
 ```ts
-database: {
-  url: '.data/app.db',
-  helpers: { rateLimit: ':memory:' },
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  database: {
+    url: '.data/app.db',
+    helpers: { rateLimit: ':memory:' },
+  },
+});
 ```
 
 - `dialect: 'sqlite'` - ohne ships SQLite. Layers can add
@@ -218,9 +265,15 @@ The [database guide](../database/engine.md) covers connections, transactions, an
 Queries you build in your own code are trusted and never checked:
 
 ```ts
-query: {
-  guards: { maxInLength: 500, maxPerPage: 100 },
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  query: {
+    guards: { maxInLength: 500, maxPerPage: 100 },
+  },
+});
 ```
 
 A limit you set replaces its default. The others keep theirs.
@@ -231,9 +284,15 @@ A limit you set replaces its default. The others keep theirs.
 `printer` controls terminal output:
 
 ```ts
-printer: {
-  silent: true,
-},
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  printer: {
+    silent: true,
+  },
+});
 ```
 
 - `silent: false` - `true` drops every print call.

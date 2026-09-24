@@ -143,9 +143,14 @@ an open set, so a block that a layer adds later joins it silently. Naming a bloc
 defines fails at codegen.
 
 ```ts
-fields: {
-  content: field('blocks', { allow: ['Hero', 'Quote'] }),
-}
+// collections/Pages.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    content: field('blocks', { allow: ['Hero', 'Quote'] }),
+  },
+});
 ```
 
 - `allowEmpty: false` requires at least one block when the field is given.

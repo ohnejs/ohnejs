@@ -254,13 +254,19 @@ Passwords are hashed with scrypt. `auth.password` sets how expensive the hashing
 settings make a password harder to crack but make every sign-in slower.
 
 ```ts
-auth: {
-  password: {
-    cost: 32768, // the main dial; higher is safer but slower
-    blockSize: 8,
-    parallelization: 1,
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  auth: {
+    password: {
+      cost: 32768, // the main dial; higher is safer but slower
+      blockSize: 8,
+      parallelization: 1,
+    },
   },
-},
+});
 ```
 
 You rarely need to change more than one setting. Leave `blockSize` and `parallelization` alone, and
