@@ -76,6 +76,7 @@ export interface DevOptions {
  * The dashboard child reads its modules from disk per request, so a file change never respawns it.
  * A config change does: the child resolved the layer stack at boot, and a listed layer may have changed.
  * A change in a dashboard directory tells its browsers to reload over the dev live-reload stream.
+ * That reload follows any API respawn the same batch caused, so the reloaded page finds the API ready.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
@@ -122,6 +123,7 @@ export async function dev(
   let cycling = false;
   let rerun = false;
   let closed = false;
+  let browserReload = false;
 
   if (wantDashboard) await startDashboard();
 
@@ -185,6 +187,8 @@ export async function dev(
   /**
    * Reloads a changed `.env`, regenerates, then restarts, reloads, or respawns only what the batch affects.
    * A `.env` or codegen failure is reported and parks the supervisor, leaving the children as they are.
+   * The API respawns first, so a browser reload or a dashboard restart never meets a restarting API.
+   * A browser reload with no API child to serve it waits for the change that brings one back.
    */
   async function runCycle(batch: Set<string>): Promise<void> {
     const configChanged = [...batch].some((path) => config.affectedBy(path));
@@ -198,19 +202,26 @@ export async function dev(
       return;
     }
     if (closed) return;
-    if ((configChanged || envChanged) && wantDashboard) await restartDashboard();
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
-    if (reloadable.length < batch.size) dashboard?.reload();
+    if (reloadable.length < batch.size) browserReload = true;
     const reloads =
       envChanged ||
       reloadable.some(isSource) ||
       reloadable.some((path) => messages.affectedBy(path));
-    if (!reloads) return;
-    printer.info('__Reloading API...__');
-    try {
-      await respawn();
-    } catch {}
-    park();
+    if (reloads) {
+      printer.info('__Reloading API...__');
+      try {
+        await respawn();
+      } catch {}
+    }
+    if ((configChanged || envChanged) && wantDashboard) {
+      browserReload = false;
+      await restartDashboard();
+    } else if (browserReload && !isNull(api)) {
+      browserReload = false;
+      dashboard?.reload();
+    }
+    if (reloads) park();
   }
 
   /**

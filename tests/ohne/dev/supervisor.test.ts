@@ -463,6 +463,38 @@ describe('dev', () => {
     client.close();
   });
 
+  it(
+    'reloads the browser only once the API the same batch respawns is ready',
+    TIMEOUT,
+    async () => {
+      const dashPort = await freePort();
+      const app = writeProject('dash-api-reload', 0);
+      writeFileSync(
+        join(app, 'ohne.config.ts'),
+        `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+      );
+      writeRoute(app, 'health.ts');
+      mkdirSync(join(app, 'dashboard', 'pages'), { recursive: true });
+      writeFileSync(join(app, 'dashboard', 'pages', 'index.ts'), 'export default () => null\n');
+
+      const server = await dev(app, { entry: BIN });
+      servers.push(server);
+      await waitFor(async () => (await get(dashPort, '/')) === 200);
+      const apiPort = Number(
+        new URL((await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)![1]).port,
+      );
+      await waitFor(async () => (await get(apiPort, '/health')) === 200);
+
+      const client = sseReload(dashPort, '/m/dashboard/reload');
+      await client.connected;
+      writeFileSync(join(app, 'dashboard', 'pages', 'about.ts'), 'export default () => null\n');
+      writeRoute(app, 'users.get.ts');
+      await client.reloaded;
+      client.close();
+      strictEqual(await get(apiPort, '/users'), 200);
+    },
+  );
+
   it('does not reload the browser on an API-only change', TIMEOUT, async () => {
     const dashPort = await freePort();
     const app = writeProject('api-only-reload', 0);
