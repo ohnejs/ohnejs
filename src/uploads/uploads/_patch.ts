@@ -14,7 +14,6 @@ import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
 import { ensureFolders, folderLocked } from './_folders.ts';
-import { privateUploads } from './_private.ts';
 import { assertReached, assertUploadReach, reachedSubtree } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { moveDescendants, setDescendantsPrivate } from './_subtree.ts';
@@ -75,7 +74,7 @@ export async function updateRow(
   input: UpdateUploadInput,
   locale?: string,
 ): Promise<QueryRecord> {
-  const locks = isBoolean(input.private) && privateUploads();
+  const locks = isBoolean(input.private);
   const row = await readUpload(uuid, tx);
   if (locks && input.private === false && (await folderLocked(tx, row.directory))) {
     throw uploadsError('private', 'insidePrivateFolder', { folder: row.directory });

@@ -102,15 +102,16 @@ describe('updateUpload', () => {
     strictEqual(storage.visibility.has('meta/f.txt'), false);
   });
 
-  it('ignores private while no secret makes the layer keep private files', async () => {
+  it('locks without a secret, on the bare route and without an expiry', async () => {
     const upload = await putUpload({ directory: 'meta', name: 'g.txt', body: stream(bytes('g')) });
     useEnv().unset('UPLOADS_SECRET');
     try {
       const updated = await updateUpload(upload.UUID, { private: true, description: 'Note' });
-      strictEqual(updated.private, false);
+      strictEqual(updated.private, true);
       strictEqual(updated.description, 'Note');
-      strictEqual(storage.visibility.has('meta/g.txt'), false);
-      strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+      strictEqual(updated.url, '/uploads/meta/g.txt');
+      strictEqual(updated.expires, undefined);
+      strictEqual(storage.visibility.get('meta/g.txt'), true);
     } finally {
       useEnv().set('UPLOADS_SECRET', 'secret');
     }

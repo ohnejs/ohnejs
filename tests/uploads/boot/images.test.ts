@@ -25,7 +25,7 @@ async function readyOutput(): Promise<string> {
 describe('the images boot file', () => {
   afterEach(() => {
     useLayers().remove('/images-boot-test');
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().unset('UPLOADS_SECRET');
   });
 
   it('warns when a service is configured without a secret', async () => {
@@ -33,7 +33,7 @@ describe('the images boot file', () => {
       path: '/images-boot-test',
       input: { uploads: { images: { url: 'https://img.example.com' } } },
     });
-    match(await readyOutput(), /IMAGES_SECRET/);
+    match(await readyOutput(), /UPLOADS_SECRET/);
   });
 
   it('stays silent with a secret or without a service', async () => {
@@ -42,7 +42,7 @@ describe('the images boot file', () => {
       path: '/images-boot-test',
       input: { uploads: { images: { url: 'https://img.example.com' } } },
     });
-    useEnv().set('IMAGES_SECRET', 'secret');
+    useEnv().set('UPLOADS_SECRET', 'secret');
     strictEqual(await readyOutput(), '');
   });
 

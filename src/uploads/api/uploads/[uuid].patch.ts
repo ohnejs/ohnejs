@@ -14,7 +14,6 @@ import type { UploadRecord } from '../../uploads/types.ts';
 import type { UpdateUploadInput } from '../../uploads/update-upload.ts';
 
 import { patchUpload } from '../../uploads/_patch.ts';
-import { privateUploads } from '../../uploads/_private.ts';
 import { assertUploadReach } from '../../uploads/_reach.ts';
 import { uploadReach } from '../../uploads/_reader.ts';
 
@@ -24,7 +23,6 @@ import { uploadReach } from '../../uploads/_reader.ts';
  * Changes a row from `{ name?, directory?, description?, focalX?, focalY?, private? }` and answers the row.
  * `name` and `directory` move the row and its object; the rest change its metadata.
  * `private` locks or unlocks it, a folder with everything inside; a move into a private folder locks too.
- * Without `UPLOADS_SECRET` there are no private files, so `private` is ignored.
  * `?locale=` writes `description` at that content locale.
  * Needs `collection.Uploads.update` and the `Uploads` read guard: no user `401`, no capability `403`.
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any `400`.
@@ -62,8 +60,7 @@ function readTarget(input: Record<string, unknown>): MoveUploadTarget | undefine
  * The metadata changes a body asks for, or `undefined` when it names none.
  */
 function readChanges(input: Record<string, unknown>): UpdateUploadInput | undefined {
-  const { description, focalX, focalY } = input;
-  const locked = privateUploads() ? input.private : undefined;
+  const { description, focalX, focalY, private: locked } = input;
   if ([description, focalX, focalY, locked].every(isUndefined)) return undefined;
   const validDescription = isUndefined(description) || isNull(description) || isString(description);
   const validX = isUndefined(focalX) || isNull(focalX) || isNumber(focalX);

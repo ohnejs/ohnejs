@@ -26,7 +26,6 @@ export interface SetUploadsPrivateOptions {
  * Each row changes as `updateUpload` changes its `private`; a folder takes everything inside it along.
  * Folders go before what they hold, so a folder made public frees the rows named inside it.
  * Making a row public inside a private folder is a `422` for the whole call, and nothing changes.
- * Without an `UPLOADS_SECRET` the layer has no private files, so nothing changes.
  * An unknown `UUID`, or one `reach` hides, is a `404`.
  * With `reach`, a write that would hide a named row or one inside a named folder is a `422`.
  * The journal drains once after the commit.

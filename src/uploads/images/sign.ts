@@ -1,22 +1,32 @@
 import { useEnv } from 'ohnejs';
+import { isEmpty } from 'ohnejs/utils';
 import { hmac, secureCompare } from 'ohnejs/utils/crypto';
 
 /**
- * The signature segment `imageURL` writes when no `IMAGES_SECRET` is set.
+ * The signature segment `imageURL` writes when no `UPLOADS_SECRET` is set.
  * A service started unsigned renders it; a signing service answers `403`.
  */
 export const UNSIGNED_SIGNATURE = 'unsigned';
 
 /**
- * The secrets `IMAGES_SECRET` lists, comma-separated, trimmed, empty entries dropped.
- * The first one signs; a service accepts any, which is how a rotation happens without breaking pages.
+ * The secrets `UPLOADS_SECRET` lists, comma-separated, trimmed, empty entries dropped.
+ * They sign image variant URLs and the links of private files alike.
+ * The first one signs; any verifies, which is how a rotation happens without breaking pages.
  * `[]` when the env var is unset.
  */
-export function imageSecrets(): string[] {
-  return (useEnv().get('IMAGES_SECRET') ?? '')
+export function uploadSecrets(): string[] {
+  return (useEnv().get('UPLOADS_SECRET') ?? '')
     .split(',')
     .map((secret) => secret.trim())
     .filter(Boolean);
+}
+
+/**
+ * Whether `UPLOADS_SECRET` names a secret, so variant URLs and private-file links can be signed.
+ * Without one a public variant reads `unsigned`, and a private file has no links and no variants.
+ */
+export function hasUploadSecret(): boolean {
+  return !isEmpty(uploadSecrets());
 }
 
 /**

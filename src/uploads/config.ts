@@ -116,18 +116,10 @@ declare module 'ohnejs' {
     UPLOADS_URL: string | undefined;
 
     /**
-     * The secret that signs image variant URLs, shared with the image service.
-     * Several secrets may be listed, comma-separated; the first signs, the service accepts any.
-     *
-     * @default
-     * undefined
-     */
-    IMAGES_SECRET: string | undefined;
-
-    /**
-     * The secret that signs a private file's expiring links.
+     * The secret that signs image variant URLs and a private file's expiring links.
+     * The image service verifies with the same value.
      * Several secrets may be listed, comma-separated; the first signs, any verifies.
-     * Unset, the layer keeps no private files: every file is served to anyone and no link can be made.
+     * Unset, variant URLs read `unsigned` and a private file has no links and no variants.
      *
      * @default
      * undefined
@@ -216,7 +208,6 @@ export const UPLOADS_STRATEGIES: LayerStrategies = {
 };
 
 useEnv().define('UPLOADS_URL', { default: undefined });
-useEnv().define('IMAGES_SECRET', { default: undefined });
 useEnv().define('UPLOADS_SECRET', { default: undefined });
 
 /**

@@ -1,10 +1,12 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import '../../../src/uploads/config.ts';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import {
-  imageSecrets,
+  hasUploadSecret,
   signImageVariant,
+  uploadSecrets,
   verifyImageVariant,
 } from '../../../src/uploads/images/sign.ts';
 
@@ -33,12 +35,16 @@ describe('verifyImageVariant', () => {
   });
 });
 
-describe('imageSecrets', () => {
+describe('uploadSecrets', () => {
   it('splits the env var and drops empty entries', () => {
-    useEnv().set('IMAGES_SECRET', ' new , old,, ');
-    deepStrictEqual(imageSecrets(), ['new', 'old']);
-    useEnv().set('IMAGES_SECRET', undefined);
-    deepStrictEqual(imageSecrets(), []);
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().set('UPLOADS_SECRET', ' new , old,, ');
+    deepStrictEqual(uploadSecrets(), ['new', 'old']);
+    strictEqual(hasUploadSecret(), true);
+    useEnv().set('UPLOADS_SECRET', ' , ');
+    deepStrictEqual(uploadSecrets(), []);
+    strictEqual(hasUploadSecret(), false);
+    useEnv().unset('UPLOADS_SECRET');
+    deepStrictEqual(uploadSecrets(), []);
+    strictEqual(hasUploadSecret(), false);
   });
 });

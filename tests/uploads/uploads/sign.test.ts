@@ -1,14 +1,9 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import '../../../src/uploads/config.ts';
-import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { signImageVariant } from '../../../src/uploads/images/sign.ts';
-import {
-  signUploadLink,
-  uploadSecrets,
-  verifyUploadLink,
-} from '../../../src/uploads/uploads/sign.ts';
+import { signUploadLink, verifyUploadLink } from '../../../src/uploads/uploads/sign.ts';
 
 const PATH = 'photos/sunset.jpg';
 const EXPIRES = 1_700_000_000_000;
@@ -42,16 +37,5 @@ describe('verifyUploadLink', () => {
     strictEqual(verifyUploadLink(signature, 'photos/dawn.jpg', EXPIRES, ['old']), false);
     strictEqual(verifyUploadLink('', PATH, EXPIRES, ['old']), false);
     strictEqual(verifyUploadLink(signature, PATH, EXPIRES, []), false);
-  });
-});
-
-describe('uploadSecrets', () => {
-  it('splits the env var and drops empty entries', () => {
-    useEnv().set('UPLOADS_SECRET', ' new , old,, ');
-    deepStrictEqual(uploadSecrets(), ['new', 'old']);
-    useEnv().set('UPLOADS_SECRET', undefined);
-    deepStrictEqual(uploadSecrets(), []);
-    useEnv().unset('UPLOADS_SECRET');
-    deepStrictEqual(uploadSecrets(), []);
   });
 });

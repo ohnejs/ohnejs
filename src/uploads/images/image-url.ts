@@ -1,5 +1,4 @@
 import {
-  isEmpty,
   isNullish,
   isString,
   isUndefined,
@@ -16,7 +15,7 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
 import { uploadPath } from '../uploads/path.ts';
 import { uploadURL } from '../uploads/url.ts';
-import { imageSecrets, signImageVariant, UNSIGNED_SIGNATURE } from './sign.ts';
+import { signImageVariant, UNSIGNED_SIGNATURE, uploadSecrets } from './sign.ts';
 import { stringifyImageTransforms } from './transforms.ts';
 import { resolveImageVariant } from './variants.ts';
 
@@ -77,14 +76,6 @@ export function hasImageService(): boolean {
 }
 
 /**
- * Whether variant URLs can be signed: `IMAGES_SECRET` names a secret.
- * Without one a public variant reads `unsigned`, and a private image gets no variants at all.
- */
-export function hasImageSecret(): boolean {
-  return !isEmpty(imageSecrets());
-}
-
-/**
  * The signed image service URL of a variant, or the original's URL when there is nothing to render.
  *
  * `variant` is a configured name, ad hoc transforms for trusted server code, or nothing for the original.
@@ -92,9 +83,9 @@ export function hasImageSecret(): boolean {
  * The original is answered when no service is configured or when the transforms ask for nothing.
  * It is also answered for a type the service does not render.
  * A focal point stored on the upload fills the position when a `cover` fit names none.
- * Without an `IMAGES_SECRET` the signature reads `unsigned`, which only an unsigned service renders.
+ * Without an `UPLOADS_SECRET` the signature reads `unsigned`, which only an unsigned service renders.
  * A private image's URLs carry an `e_<expires>` token last and are always signed.
- * Without an `IMAGES_SECRET` or an `expires` they point at the original instead.
+ * Without an `UPLOADS_SECRET` or an `expires` they point at the original instead.
  *
  * @example
  * ```ts
@@ -119,7 +110,7 @@ export function imageURL(
   if (!isOptimizableImage(type)) return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
   if (tokens === '') return uploadURL(upload);
-  const [secret] = imageSecrets();
+  const [secret] = uploadSecrets();
   const signed = tokensToSign(upload, tokens, secret);
   if (isUndefined(signed)) return uploadURL(upload);
   const path = uploadPath(upload);

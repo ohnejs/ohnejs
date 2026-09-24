@@ -21,10 +21,11 @@ import {
 } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../../config.ts';
+import { uploadSecrets } from '../../images/sign.ts';
 import { useStorage } from '../../storage/use-storages.ts';
 import { readerReaches } from '../../uploads/_reader.ts';
 import { splitUploadPath, uploadPath } from '../../uploads/path.ts';
-import { uploadSecrets, verifyUploadLink } from '../../uploads/sign.ts';
+import { verifyUploadLink } from '../../uploads/sign.ts';
 
 const SVG = 'image/svg+xml';
 

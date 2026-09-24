@@ -102,7 +102,6 @@ describe('decorateUpload', () => {
       path: '/decorate-public',
       input: { uploads: { images: { url: SERVICE }, publicURL: 'https://cdn.example.com' } },
     });
-    useEnv().set('IMAGES_SECRET', 'secret');
     try {
       const record = locked('c.png');
       decorateUpload(record);
@@ -112,21 +111,19 @@ describe('decorateUpload', () => {
       const open = locked('d.png', { private: false });
       decorateUpload(open);
       strictEqual(open.url, 'https://cdn.example.com/locked/d.png');
-      match((open.variants as Record<string, string>).thumbnail, /^https:\/\/img\.example\.com\//);
+      match(
+        (open.variants as Record<string, string>).thumbnail,
+        /^https:\/\/img\.example\.com\/unsigned\//,
+      );
     } finally {
-      useEnv().unset('IMAGES_SECRET');
       useLayers().remove('/decorate-public');
     }
   });
 
-  it('gives a private file variants only when the image service can sign them', () => {
+  it('gives a private file signed variants that expire with its link', () => {
     useLayers().add({ path: '/decorate-images', input: { uploads: { images: { url: SERVICE } } } });
     useEnv().set('UPLOADS_SECRET', 'secret');
     try {
-      const unsigned = locked('e.png');
-      decorateUpload(unsigned);
-      strictEqual(unsigned.variants, undefined);
-      useEnv().set('IMAGES_SECRET', 'secret');
       const signed = locked('f.png');
       decorateUpload(signed);
       const { thumbnail } = signed.variants as Record<string, string>;
@@ -137,7 +134,6 @@ describe('decorateUpload', () => {
         ),
       );
     } finally {
-      useEnv().unset('IMAGES_SECRET');
       useEnv().unset('UPLOADS_SECRET');
       useLayers().remove('/decorate-images');
     }
@@ -166,7 +162,6 @@ describe('decorateUpload', () => {
       input: { uploads: { images: { url: SERVICE }, publicURL: 'https://cdn.example.com' } },
     });
     useEnv().set('UPLOADS_SECRET', 'secret');
-    useEnv().set('IMAGES_SECRET', 'secret');
     try {
       const record: Record<string, unknown> = {
         directory: 'zzc',
@@ -185,7 +180,6 @@ describe('decorateUpload', () => {
         new RegExp(`/w_320,h_320,fit_inside,f_webp,e_${expires}/zzc/pic\\.png$`),
       );
     } finally {
-      useEnv().unset('IMAGES_SECRET');
       useEnv().unset('UPLOADS_SECRET');
       useLayers().remove('/decorate-unknown');
     }

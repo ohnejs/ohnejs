@@ -87,7 +87,6 @@ import { mediaFileName } from './media-file-name.ts';
 import {
   confirmDeleteUploads,
   privateFolders,
-  privateUploads,
   refreshMedia,
   resolveUploadURL,
   temporaryLink,
@@ -421,7 +420,7 @@ export async function loadUpload(
  * The file details popup; the media page deep-links it by `?details=<uuid>`.
  *
  * A displayable image or a playable video previews on the left; the tabs sit beside it.
- * Details leads with the Private switch, kept for a layer with private files, then the upload time and author.
+ * Details leads with the Private switch, then the upload time and author.
  * The switch locks on a private file inside a private folder.
  * The type, size, and dimensions follow.
  * It ends with the URL and a copy button.
@@ -458,7 +457,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   });
   const priv = ref(seed.private);
   const inherited = ref(false);
-  if (privateUploads() && canUpdate) {
+  if (canUpdate && record.private === true) {
     void privateFolders([record.directory]).then((folders) => {
       inherited.value = folders.has(record.directory);
     });
@@ -783,7 +782,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const detailsPanel = (): Child => [
-    privateUploads() ? privateRow() : null,
+    privateRow(),
     wrappingRow(
       () => t('uploads.dashboard.uploadedOn'),
       () => formatDateTime(current.value.uploadedAt),

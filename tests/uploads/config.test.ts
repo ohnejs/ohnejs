@@ -37,7 +37,6 @@ describe('useUploadsConfig', () => {
 describe('the uploads env vars', () => {
   it('declare no CLI flag, since the CLI parses its flags before any layer loads', () => {
     strictEqual(useEnv().flag('UPLOADS_URL'), undefined);
-    strictEqual(useEnv().flag('IMAGES_SECRET'), undefined);
     strictEqual(useEnv().flag('UPLOADS_SECRET'), undefined);
   });
 });

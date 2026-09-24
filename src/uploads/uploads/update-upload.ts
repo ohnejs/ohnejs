@@ -45,7 +45,6 @@ export interface UpdateUploadOptions {
 /**
  * Updates a row's metadata: the alt text, the focal point, and whether it is private.
  * A folder's `private` applies to everything inside it, and storage locks or unlocks the objects to match.
- * Without an `UPLOADS_SECRET` the layer has no private files, so `private` is ignored.
  * Making a row public inside a private folder is a `422`.
  * An out-of-range value is the pipeline's `422`; an unknown `UUID` a `404`.
  *

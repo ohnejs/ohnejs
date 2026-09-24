@@ -107,12 +107,14 @@ describe('setUploadsPrivate', () => {
     strictEqual(storage.visibility.has('shy/a.txt'), false);
   });
 
-  it('changes nothing while no secret makes the layer keep private files', async () => {
+  it('locks without a secret, on the bare route', async () => {
     const plain = await put('nosecret', 'plain.txt');
     useEnv().unset('UPLOADS_SECRET');
     try {
       const [record] = await setUploadsPrivate([plain], true);
-      strictEqual(record?.private, false);
+      strictEqual(record?.private, true);
+      strictEqual(record?.url, '/uploads/nosecret/plain.txt');
+      strictEqual(storage.visibility.get('nosecret/plain.txt'), true);
     } finally {
       useEnv().set('UPLOADS_SECRET', 'secret');
     }

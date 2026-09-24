@@ -104,16 +104,17 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual((await send(uuid, { private: 'yes' })).status, 400);
   });
 
-  it('ignores private while no secret makes the layer keep private files', async () => {
+  it('locks a file without a secret, on the bare route and without an expiry', async () => {
     const uuid = await seed('p.txt');
     useEnv().unset('UPLOADS_SECRET');
     try {
-      strictEqual((await send(uuid, { private: true })).status, 400);
       const response = await send(uuid, { private: true, description: 'Note' });
       strictEqual(response.status, 200);
       const record = (await response.json()) as Record<string, unknown>;
-      strictEqual(record.private, false);
+      strictEqual(record.private, true);
       strictEqual(record.description, 'Note');
+      strictEqual(record.url, '/uploads/patch/p.txt');
+      strictEqual(record.expires, undefined);
     } finally {
       useEnv().set('UPLOADS_SECRET', 'secret');
     }

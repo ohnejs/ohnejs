@@ -98,11 +98,15 @@ describe('POST /uploads/private', () => {
     deepStrictEqual(await privacy([uuid]), [false]);
   });
 
-  it('400s while no secret makes the layer keep private files', async () => {
+  it('locks without a secret, answering the bare route', async () => {
     const uuid = await seed('pv', 'nosecret.txt');
     useEnv().unset('UPLOADS_SECRET');
     try {
-      strictEqual((await send({ uuids: [uuid], private: true })).status, 400);
+      const response = await send({ uuids: [uuid], private: true });
+      strictEqual(response.status, 200);
+      const [record] = (await response.json()) as Record<string, unknown>[];
+      strictEqual(record?.private, true);
+      strictEqual(record?.url, '/uploads/pv/nosecret.txt');
     } finally {
       useEnv().set('UPLOADS_SECRET', 'secret');
     }

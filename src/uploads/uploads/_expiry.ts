@@ -1,7 +1,7 @@
 import { alignExpiry, isEmpty, parseDuration } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
-import { uploadSecrets } from './sign.ts';
+import { uploadSecrets } from '../images/sign.ts';
 
 /**
  * When the links a read mints now for a private file stop working, in epoch milliseconds.

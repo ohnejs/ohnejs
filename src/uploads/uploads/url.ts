@@ -3,9 +3,10 @@ import { isUndefined, normalizeBasePath, parseDuration, stringifySearchParams } 
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
+import { uploadSecrets } from '../images/sign.ts';
 import { useStorage } from '../storage/use-storages.ts';
 import { type UploadLocation, uploadPath } from './path.ts';
-import { signUploadLink, uploadSecrets } from './sign.ts';
+import { signUploadLink } from './sign.ts';
 
 const TRAILING_SLASHES = /\/+$/;
 

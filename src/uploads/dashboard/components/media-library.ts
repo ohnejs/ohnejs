@@ -48,7 +48,6 @@ import {
   mediaMemory,
   parseMediaQuery,
   privateFolders,
-  privateUploads,
   resolveUploadURL,
   serializeMediaQuery,
   setUploadsPrivate,
@@ -316,8 +315,9 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
       view.uploads.value = page.records;
       renewAt(page.records);
       view.privateFolders.value = new Set();
-      if (mode === 'none' && canUpdate && privateUploads()) {
-        void privateFolders(page.records.map((record) => record.directory)).then((folders) => {
+      if (mode === 'none' && canUpdate) {
+        const locked = page.records.filter((record) => record.private === true);
+        void privateFolders(locked.map((record) => record.directory)).then((folders) => {
           if (mine === generation) view.privateFolders.value = folders;
         });
       }
@@ -403,7 +403,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
             actions.onMove?.([record]),
           )
         : null,
-      canUpdate && privateUploads() && !pinned(record, view.privateFolders.value)
+      canUpdate && !pinned(record, view.privateFolders.value)
         ? menuItem(
             record.private ? 'lock-open' : 'lock',
             t(record.private ? 'uploads.dashboard.makePublic' : 'uploads.dashboard.makePrivate'),

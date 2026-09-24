@@ -1,22 +1,9 @@
-import { useEnv } from 'ohnejs';
-
 import { signImageVariant, verifyImageVariant } from '../images/sign.ts';
 
 /**
- * The secrets `UPLOADS_SECRET` lists, comma-separated, trimmed, empty entries dropped.
- * The first one signs; any verifies, which is how a rotation happens without breaking links.
- * `[]` when the env var is unset.
- */
-export function uploadSecrets(): string[] {
-  return (useEnv().get('UPLOADS_SECRET') ?? '')
-    .split(',')
-    .map((secret) => secret.trim())
-    .filter(Boolean);
-}
-
-/**
  * Signs a private file's link: base64url HMAC-SHA256 over `e_{expires}/{path}` under `secret`.
- * It is `signImageVariant` over the expiry token alone, so an image service can mint one for its source fetch.
+ * It is `signImageVariant` over the expiry token alone.
+ * An image service therefore mints one for its source fetch with the secret it already holds.
  * `expires` is in epoch milliseconds.
  *
  * @example

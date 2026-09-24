@@ -1,11 +1,6 @@
 import { isNumber, isString, isUndefined } from 'ohnejs/utils';
 
-import {
-  hasImageSecret,
-  hasImageService,
-  imageVariantURLs,
-  isOptimizableImage,
-} from '../images/image-url.ts';
+import { hasImageService, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
 import { privateExpiry } from './_expiry.ts';
 import { uploadPath } from './path.ts';
 import { uploadURL } from './url.ts';
@@ -15,7 +10,6 @@ import { uploadURL } from './url.ts';
  * Adds `variants` too, one signed URL per configured variant, when the image service can render them.
  * A private file gets the API route as `url`, signed and with `expires` while an `UPLOADS_SECRET` is set.
  * Without the secret it is the bare route, which only a signed-in reader can open, and `variants` is absent.
- * Its `variants` need an `IMAGES_SECRET` as well, since an unsigned service could not guard the original.
  * A file whose `select` left out `private` is decorated as private, since it may be one.
  * A folder gets `path` alone: it has no bytes to serve.
  * A record whose `select` dropped `directory` or `name` is left untouched.
@@ -39,7 +33,7 @@ export function decorateUpload(record: Record<string, unknown>): void {
   record.url = uploadURL({ directory, name, private: locked, expires });
   const { type, focalX, focalY } = record;
   if (!isString(type) || !isOptimizableImage(type) || !hasImageService()) return;
-  if (locked && (isUndefined(expires) || !hasImageSecret())) return;
+  if (locked && isUndefined(expires)) return;
   record.variants = imageVariantURLs({
     directory,
     name,

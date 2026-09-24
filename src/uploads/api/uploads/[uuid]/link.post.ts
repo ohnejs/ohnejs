@@ -4,8 +4,8 @@ import { isNumber, isPlainObject, isString, isUndefined, parseDuration } from 'o
 import type { UploadRow } from '../../../uploads/_row.ts';
 
 import { useUploadsConfig } from '../../../config.ts';
+import { hasUploadSecret } from '../../../images/sign.ts';
 import { uploadsError } from '../../../uploads/_errors.ts';
-import { privateUploads } from '../../../uploads/_private.ts';
 import { reached } from '../../../uploads/_reach.ts';
 import { uploadReach } from '../../../uploads/_reader.ts';
 import { temporaryUploadURL, uploadURL } from '../../../uploads/url.ts';
@@ -25,7 +25,7 @@ import { temporaryUploadURL, uploadURL } from '../../../uploads/url.ts';
  */
 export default defineHandler(
   async ({ params }): Promise<{ url: string; expires: number | null }> => {
-    if (!privateUploads()) throw notFound();
+    if (!hasUploadSecret()) throw notFound();
     const reach = await uploadReach();
     const body = await readJSONBody<unknown>();
     const maxAge = readMaxAge(isPlainObject(body) ? body.maxAge : undefined);

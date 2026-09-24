@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import {
-  hasImageSecret,
   imageSrcSet,
   imageURL,
   imageVariantURLs,
@@ -30,12 +29,12 @@ describe('imageURL', () => {
       path: '/images-test',
       input: { uploads: { images: { url: SERVICE, variants } } },
     });
-    useEnv().set('IMAGES_SECRET', 'secret');
+    useEnv().set('UPLOADS_SECRET', 'secret');
   });
 
   afterEach(() => {
     useLayers().remove('/images-test');
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().unset('UPLOADS_SECRET');
   });
 
   it('signs a variant under the service origin', () => {
@@ -94,12 +93,12 @@ describe('imageURL', () => {
   });
 
   it('writes unsigned without a secret and answers the original without a service', () => {
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().unset('UPLOADS_SECRET');
     strictEqual(
       imageURL(sunset, { width: 800 }),
       'https://img.example.com/unsigned/w_800/photos/sunset.jpg',
     );
-    useEnv().set('IMAGES_SECRET', 'secret');
+    useEnv().set('UPLOADS_SECRET', 'secret');
     useLayers().remove('/images-test');
     strictEqual(imageURL(sunset, 'thumbnail'), '/uploads/photos/sunset.jpg');
   });
@@ -148,7 +147,7 @@ describe('imageURL', () => {
     };
     decorateUpload(document);
     strictEqual(document.variants, undefined);
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().unset('UPLOADS_SECRET');
     const plain: Record<string, unknown> = { ...sunset, private: false };
     decorateUpload(plain);
     match(
@@ -173,26 +172,19 @@ describe('imageURL', () => {
   });
 
   it('never writes unsigned for a private image', () => {
-    useEnv().unset('IMAGES_SECRET');
+    useEnv().unset('UPLOADS_SECRET');
     strictEqual(imageURL(locked, { width: 800 }), '/uploads/photos/sunset.jpg');
-    useEnv().set('UPLOADS_SECRET', 'secret');
-    try {
-      const signature = signUploadLink('photos/sunset.jpg', 1_700_000_000_000, 'secret');
-      strictEqual(
-        imageURL(locked, { width: 800 }),
-        `/uploads/photos/sunset.jpg?e=1700000000000&s=${signature}`,
-      );
-    } finally {
-      useEnv().unset('UPLOADS_SECRET');
-    }
   });
 
-  it('points a private image without an expiry at the original', () => {
+  it('points a private image without an expiry at the bare original, else at its signed link', () => {
     strictEqual(
       imageURL({ ...sunset, private: true }, { width: 800 }),
       '/uploads/photos/sunset.jpg',
     );
-    strictEqual(imageURL(locked), '/uploads/photos/sunset.jpg');
+    strictEqual(
+      imageURL(locked),
+      `/uploads/photos/sunset.jpg?e=1700000000000&s=${signUploadLink('photos/sunset.jpg', 1_700_000_000_000, 'secret')}`,
+    );
   });
 
   it('carries a private source through srcset and the variant map', () => {
@@ -201,17 +193,6 @@ describe('imageURL', () => {
       /\/w_400,f_webp,e_1700000000000\/photos\/sunset\.jpg 400w$/,
     );
     strictEqual(imageVariantURLs(locked).card, imageURL(locked, 'card'));
-  });
-});
-
-describe('hasImageSecret', () => {
-  it('knows whether IMAGES_SECRET names a secret', () => {
-    useEnv().set('IMAGES_SECRET', 'secret');
-    strictEqual(hasImageSecret(), true);
-    useEnv().set('IMAGES_SECRET', ' , ');
-    strictEqual(hasImageSecret(), false);
-    useEnv().unset('IMAGES_SECRET');
-    strictEqual(hasImageSecret(), false);
   });
 });
 

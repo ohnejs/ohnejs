@@ -1,20 +1,16 @@
 import { hook, queryMetadata, queryUntyped, useDatabase, useDialect, usePrinter } from 'ohnejs';
-import { isEmpty, isUndefined } from 'ohnejs/utils';
+import { isUndefined } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
+import { hasUploadSecret } from '../images/sign.ts';
 import { useStorage } from '../storage/use-storages.ts';
-import { uploadSecrets } from '../uploads/sign.ts';
 
 // Before the socket opens, so no read ever meets a row that predates the column.
 hook('schema:synced', fillPrivate);
 
 hook('server:ready', async () => {
-  if (!isEmpty(uploadSecrets())) return;
-  if (!(await anyPrivate())) return;
-  usePrinter().warn(
-    '`UPLOADS_SECRET` is unset, so a private file opens only for a signed-in reader: ' +
-      'no links, no variants, and the dashboard hides the private controls',
-  );
+  if (hasUploadSecret() || !(await anyPrivate())) return;
+  usePrinter().warn('`UPLOADS_SECRET` is unset, so private files have no links and no variants');
 });
 
 hook('server:ready', async () => {

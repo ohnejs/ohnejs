@@ -24,18 +24,8 @@ import {
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
-import { readWireError, type WireError } from './_wire-error.ts';
-
-declare module 'ohnejs/dashboard' {
-  interface DashboardMeta {
-    /**
-     * Whether the layer keeps private files, set by the uploads layer on every discovery read.
-     */
-    privateUploads?: boolean;
-  }
-}
-
 import { useUploadsT } from './_messages.ts';
+import { readWireError, type WireError } from './_wire-error.ts';
 import { versionedURL } from './media-details-state.ts';
 import {
   DEFAULT_ORDER,
@@ -127,14 +117,6 @@ export function uploadsCollection(): DashboardCollection | undefined {
   return untracked(dashboardMeta)?.collections.find(
     (collection) => collection.name === UPLOADS_COLLECTION,
   );
-}
-
-/**
- * Whether the layer keeps private files, which needs an `UPLOADS_SECRET` on the server.
- * Every private control stays hidden while it is `false`, and every file is served publicly.
- */
-export function privateUploads(): boolean {
-  return untracked(dashboardMeta)?.privateUploads === true;
 }
 
 /**
