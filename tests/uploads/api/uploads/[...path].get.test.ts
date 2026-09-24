@@ -133,6 +133,17 @@ describe('GET /uploads/[...path]', () => {
     strictEqual(tail.headers.get('content-range'), 'bytes 13-15/16');
   });
 
+  it('serves the whole file when If-Range names another ETag', async () => {
+    const stale = await get('serve/note.txt', { range: 'bytes=2-5', 'if-range': '"old"' });
+    strictEqual(stale.status, 200);
+    strictEqual(stale.headers.get('content-range'), null);
+    strictEqual((await stale.text()).length, 16);
+
+    const fresh = await get('serve/note.txt', { range: 'bytes=2-5', 'if-range': `"${note.hash}"` });
+    strictEqual(fresh.status, 206);
+    strictEqual(await fresh.text(), '2345');
+  });
+
   it('answers a range past the end with 416 and no body', async () => {
     const response = await get('serve/note.txt', { range: 'bytes=100-' });
     strictEqual(response.status, 416);

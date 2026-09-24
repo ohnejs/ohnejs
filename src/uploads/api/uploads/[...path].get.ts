@@ -58,7 +58,7 @@ const ATTACHMENT_TYPES = new Set([
  * Anything else is the `404` an unknown path answers, decided before any header tells the file apart.
  * The row's `hash` is the `ETag`, so a fresh `If-None-Match` answers `304`.
  * `Cache-Control` comes from `uploads.cache`; a private file's is marked `private` and never `public`.
- * `Range` answers `206`, or `416` past the end.
+ * `Range` answers `206`, or `416` past the end; an `If-Range` naming another `ETag` answers the whole file.
  * Every type is `nosniff`, a script-capable one downloads as an attachment, and an SVG carries a sandbox CSP.
  * A folder or an unknown path is a `404`; `HEAD` comes from the router.
  */
@@ -95,7 +95,9 @@ export default defineHandler(async ({ params }) => {
   if (type === SVG) headers.set('content-security-policy', SVG_POLICY);
   if (isFresh()) return sendNotModified();
 
-  const header = useRequest().headers.get('range');
+  const { headers: incoming } = useRequest();
+  const ifRange = incoming.get('if-range');
+  const header = isNull(ifRange) || ifRange === `"${hash}"` ? incoming.get('range') : null;
   const requested = isNull(header) ? undefined : parseRange(header, size);
   if (requested?.type === 'unsatisfiable') {
     setResponseStatus(416);
