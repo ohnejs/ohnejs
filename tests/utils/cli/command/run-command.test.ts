@@ -76,6 +76,24 @@ describe('runCommand', () => {
     deepStrictEqual(err, ['Unknown command `biuld`. Did you mean `build`?\n']);
   });
 
+  it('reports a flag in place of the command and exits 1', async () => {
+    const build = defineCommand({ meta: { name: 'build' }, run() {} });
+    const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
+    const { out, err, options } = capture();
+    strictEqual(await runCommand(cli, ['--cwd', 'x', 'build'], options), 1);
+    deepStrictEqual(out, []);
+    deepStrictEqual(err, ['Missing command before `--cwd`\n']);
+  });
+
+  it('prints the group help for flags with no command after them', async () => {
+    const build = defineCommand({ meta: { name: 'build' }, run() {} });
+    const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
+    const { out, err, options } = capture();
+    strictEqual(await runCommand(cli, ['--cwd', 'x'], options), 0);
+    strictEqual(out[0]!.includes('\n  app <command> [options]\n'), true);
+    deepStrictEqual(err, []);
+  });
+
   it('reports an arg error and exits 1', async () => {
     const cli = defineCommand({
       meta: { name: 'app' },
@@ -85,6 +103,26 @@ describe('runCommand', () => {
     const { err, options } = capture();
     strictEqual(await runCommand(cli, [], options), 1);
     strictEqual(err[0], 'Missing required flag `--name`\n');
+  });
+
+  it('names the whole command path in the usage line and the hint', async () => {
+    const seed = defineCommand({
+      meta: { name: 'seed' },
+      args: { count: { type: 'number', required: true } },
+      run() {},
+    });
+    const cli = defineCommand({
+      meta: { name: 'app' },
+      subCommands: { db: defineCommand({ meta: { name: 'db' }, subCommands: { seed } }) },
+    });
+
+    const failed = capture();
+    strictEqual(await runCommand(cli, ['db', 'seed'], failed.options), 1);
+    strictEqual(failed.err.at(-1), '\nRun `app db seed --help` for usage.\n');
+
+    const help = capture();
+    await runCommand(cli, ['db', 'seed', '--help'], help.options);
+    strictEqual(help.out[0]!.includes('\n  app db seed [options]\n'), true);
   });
 
   it('awaits an async run handler', async () => {

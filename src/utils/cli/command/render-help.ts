@@ -15,6 +15,7 @@ interface Row {
 /**
  * Renders the help text for a command as a string, ending with a newline.
  * Includes the title, description, a usage line, the subcommand list, and the option list.
+ * The usage line opens with `path`, the words that invoke the command.
  * Long flags are shown in kebab-case; `--help` (and `--version` when set) are appended automatically.
  * A `globals` schema, when passed, is rendered under a `GLOBAL OPTIONS` section after the options.
  * The `colors` styler set tints the output; pass the plain set to emit no codes.
@@ -25,7 +26,12 @@ interface Row {
  * // -> 'app\n\nUSAGE\n  app [options]\n\nOPTIONS\n  --help, -h  Show help\n'
  * ```
  */
-export function renderHelp(command: Command, colors: ANSIColors, globals?: ArgsSchema): string {
+export function renderHelp(
+  command: Command,
+  colors: ANSIColors,
+  globals?: ArgsSchema,
+  path = command.meta.name,
+): string {
   const { meta, args, subCommands } = command;
   const title = meta.version
     ? `${colors.bold(meta.name)} ${colors.dim(meta.version)}`
@@ -34,11 +40,7 @@ export function renderHelp(command: Command, colors: ANSIColors, globals?: ArgsS
 
   if (meta.description) lines.push('', meta.description);
 
-  lines.push(
-    '',
-    colors.bold('USAGE'),
-    `  ${meta.name} ${subCommands ? '<command> ' : ''}[options]`,
-  );
+  lines.push('', colors.bold('USAGE'), `  ${path} ${subCommands ? '<command> ' : ''}[options]`);
 
   if (subCommands) {
     const rows = Object.entries(subCommands).map(

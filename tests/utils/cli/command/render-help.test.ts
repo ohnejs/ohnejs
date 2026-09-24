@@ -75,6 +75,11 @@ describe('renderHelp', () => {
     );
   });
 
+  it('opens the usage line with the given path', () => {
+    const help = renderHelp({ meta: { name: 'build' } }, plain, undefined, 'app build');
+    strictEqual(help.includes('\n  app build [options]\n'), true);
+  });
+
   it('omits a hidden option from the option list', () => {
     const build = {
       meta: { name: 'build' },

@@ -63,35 +63,37 @@ export async function runCommand(
   argv: string[],
   options: RunOptions = {},
 ): Promise<number> {
-  return dispatch(command, argv, options, true);
+  return dispatch(command, argv, options, [command.meta.name]);
 }
 
 /**
  * Recursive body of `runCommand`.
- * `top` is `true` only for the entry command, so the root help alone lists `GLOBAL OPTIONS`.
+ * `path` holds the words that invoke `command`, so its usage line and hint are runnable.
+ * Only the entry command, whose `path` is its name alone, lists `GLOBAL OPTIONS` in its help.
  * `options.globals` is recognized (never reported as unknown) at every level.
  */
 async function dispatch(
   command: Command,
   argv: string[],
   options: RunOptions,
-  top: boolean,
+  path: string[],
 ): Promise<number> {
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const colors = pickANSIColors(options.color ?? isColorStream(stdout));
-  const globals = top ? options.globals : undefined;
+  const globals = path.length === 1 ? options.globals : undefined;
+  const usage = path.join(' ');
   const sub = command.subCommands;
   const first = argv[0];
   const isCommandToken = !isUndefined(first) && !first.startsWith('-');
 
   if (sub && isCommandToken && hasKey(sub, first)) {
-    return dispatch(sub[first]!, argv.slice(1), options, false);
+    return dispatch(sub[first]!, argv.slice(1), options, [...path, first]);
   }
 
   const peek = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
   if (peek.flags.help || peek.flags.h) {
-    stdout.write(renderHelp(command, colors, globals));
+    stdout.write(renderHelp(command, colors, globals, usage));
     return 0;
   }
   if (command.meta.version && (peek.flags.version || peek.flags.v)) {
@@ -105,8 +107,14 @@ async function dispatch(
     return 1;
   }
 
+  const flagsFirst = sub && !command.run && first?.startsWith('-');
+  if (flagsFirst && resolveArgs({}, argv, options.globals).positionals.length > 0) {
+    stderr.write(`Missing command before \`${first}\`\n`);
+    return 1;
+  }
+
   if (!command.run) {
-    stdout.write(renderHelp(command, colors, globals));
+    stdout.write(renderHelp(command, colors, globals, usage));
     return 0;
   }
 
@@ -114,7 +122,7 @@ async function dispatch(
   const resolved = resolveArgs(schema, argv, options.globals);
   if (!resolved.ok) {
     for (const error of resolved.errors) stderr.write(`${error.message}\n`);
-    stderr.write(`\nRun \`${command.meta.name} --help\` for usage.\n`);
+    stderr.write(`\nRun \`${usage} --help\` for usage.\n`);
     return 1;
   }
 
