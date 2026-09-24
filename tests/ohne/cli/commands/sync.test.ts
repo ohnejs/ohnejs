@@ -41,6 +41,7 @@ describe('ohne sync', () => {
     const result = spawnSync(process.execPath, [MAIN, 'sync', '--cwd', dir, ...flags], {
       encoding: 'utf8',
       env,
+      timeout: 30_000,
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
   }
@@ -186,6 +187,21 @@ describe('ohne sync', () => {
       .all('table', 'Notes');
     after.close();
     deepStrictEqual(tables, []);
+  });
+
+  it('runs the shutdown hooks a boot file registers, so an open timer cannot hold the process', () => {
+    const dir = makeApp('timer');
+    mkdirSync(join(dir, 'boot'));
+    writeFileSync(
+      join(dir, 'boot', 'timer.ts'),
+      "import { onShutdown } from 'ohnejs';\n" +
+        'const timer = setInterval(() => {}, 1000);\n' +
+        'onShutdown(() => clearInterval(timer));\n',
+    );
+
+    const result = sync(dir);
+    strictEqual(result.status, 0);
+    match(result.output, /Database synced/);
   });
 
   it('refuses to run outside an ohne project', () => {

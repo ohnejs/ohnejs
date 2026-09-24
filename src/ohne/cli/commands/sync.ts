@@ -17,6 +17,7 @@ import { syncProjectDatabase } from '../../database/sync-project.ts';
 import { closeDatabases } from '../../database/use-database.ts';
 import { useEnv } from '../../env/use-env.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
+import { useShutdown } from '../../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
 import { loadProjectEnv } from '../../project/load-project-env.ts';
@@ -60,19 +61,20 @@ export const syncCommand = defineCommand({
     await loadProjectEnv(cwd);
     const { ms } = await measure(async () => {
       await loadLayers(cwd);
-      await bootLayers();
-      if (!useEnv().get('SKIP_CODEGEN')) await generateDatabase(cwd);
-      const dir = await codegenDir(cwd);
-      if (!isNull(dir)) {
-        const file = joinPath(dir, 'node', 'database.ts');
-        if (await exists(file)) await import(pathToFileURL(file).href);
-      }
       try {
+        await bootLayers();
+        if (!useEnv().get('SKIP_CODEGEN')) await generateDatabase(cwd);
+        const dir = await codegenDir(cwd);
+        if (!isNull(dir)) {
+          const file = joinPath(dir, 'node', 'database.ts');
+          if (await exists(file)) await import(pathToFileURL(file).href);
+        }
         await syncProjectDatabase({
           ...(values.force ? { force: true } : {}),
           ...(values.dryRun ? { dryRun: true } : {}),
         });
       } finally {
+        await useShutdown().run();
         await closeDatabases();
       }
     });
