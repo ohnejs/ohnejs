@@ -25,7 +25,7 @@ declare module 'ohnejs' {
       /**
        * Where the backend keeps the files, in whatever form the backend understands.
        *
-       * - For `fs` it is a directory, resolved against the working directory.
+       * - For `fs` it is a directory, resolved against the app root.
        * - For `s3` it is `s3://<bucket>/<prefix>`, with options in the query.
        *
        * The `UPLOADS_URL` env var takes precedence whenever it is set.

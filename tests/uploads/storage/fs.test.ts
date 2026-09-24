@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { StorageAdapter } from '../../../src/uploads/storage/adapter.ts';
 
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { createFSStorage } from '../../../src/uploads/storage/fs.ts';
 
 const encoder = new TextEncoder();
@@ -351,5 +352,21 @@ describe('createFSStorage', () => {
     await relativeStorage.write('a.txt', streamOf('relative'), { type: 'text/plain' });
 
     strictEqual(readFileSync(join(dir, 'a.txt'), 'utf8'), 'relative');
+  });
+
+  it('resolves a relative root against the app root of a loaded stack, not the working directory', async () => {
+    const cwd = process.cwd();
+    const app = join(dir, 'app');
+    useLayers().add({ path: app, input: {} });
+    process.chdir(dir);
+    try {
+      await createFSStorage('files').write('a.txt', streamOf('app'), { type: 'text/plain' });
+    } finally {
+      process.chdir(cwd);
+      useLayers().remove(app);
+    }
+
+    strictEqual(readFileSync(join(app, 'files', 'a.txt'), 'utf8'), 'app');
+    strictEqual(existsSync(join(dir, 'files')), false);
   });
 });

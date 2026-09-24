@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import { cp, open, rename, rmdir } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { appRoot } from 'ohnejs';
 import { basename, dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
 import { ensureDir, exists, listDir, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
@@ -15,7 +16,7 @@ const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR'
 
 /**
  * Builds the `fs` storage backend, which keeps every object as a file under `root`.
- * `root` is the configured `uploads.url`, resolved against the working directory.
+ * `root` is the configured `uploads.url`, resolved against the app root.
  * A key maps onto its path beneath `root`, so a folder prefix is a real directory.
  * A write lands in a sibling temp file and renames into place, so a reader never sees a partial object.
  * A delete also removes the temp files a crashed write left beside the object.
@@ -28,7 +29,7 @@ const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR'
  * ```
  */
 export function createFSStorage(root: string): StorageAdapter {
-  const base = resolvePath(root);
+  const base = resolvePath(root, appRoot());
 
   return {
     async write(path, body) {
