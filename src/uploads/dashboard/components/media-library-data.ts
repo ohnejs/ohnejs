@@ -309,7 +309,10 @@ export async function setUploadsPrivate(
  */
 export async function temporaryLink(uuid: string, maxAge: string): Promise<string | undefined> {
   try {
-    const response = await api(`GET /uploads/${uuid}/link?${stringifySearchParams({ maxAge })}`);
+    const response = await api(`POST /uploads/${uuid}/link`, {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxAge }),
+    });
     if (!response.ok) return undefined;
     const { url } = (await response.json()) as { url: string };
     return new URL(url, dashboardConfig().apiURL).href;

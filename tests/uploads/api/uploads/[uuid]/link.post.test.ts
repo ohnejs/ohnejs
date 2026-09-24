@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
 import { useRoles } from '../../../../../src/ohne/roles/use-roles.ts';
-import linkGet from '../../../../../src/uploads/api/uploads/[uuid]/link.get.ts';
+import linkPost from '../../../../../src/uploads/api/uploads/[uuid]/link.post.ts';
 import { createFolder } from '../../../../../src/uploads/uploads/create-folder.ts';
 import { putUpload } from '../../../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../../../src/uploads/uploads/update-upload.ts';
@@ -21,7 +21,7 @@ import {
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
-const link = route('GET', '/uploads/[uuid]/link', linkGet);
+const link = route('POST', '/uploads/[uuid]/link', linkPost);
 
 useRoles().register('uploads-reader', {
   name: 'uploads-reader',
@@ -35,12 +35,15 @@ const hidden = await putUpload({ directory: 'link', name: 'hidden.txt', body: st
 await updateUpload(hidden.UUID, { private: true });
 const folder = await createFolder({ directory: 'link', name: 'folder' });
 
-function send(uuid: string, qs = '', bearer = reader): Promise<Response> {
-  return call(link, `/uploads/${uuid}/link${qs}`, { uuid }, { bearer });
+function send(uuid: string, json: unknown = {}, bearer = reader): Promise<Response> {
+  return call(link, `/uploads/${uuid}/link`, { uuid }, { bearer, json });
 }
 
-async function answer(uuid: string, qs = ''): Promise<{ url: string; expires: number | null }> {
-  const response = await send(uuid, qs);
+async function answer(
+  uuid: string,
+  json: unknown = {},
+): Promise<{ url: string; expires: number | null }> {
+  const response = await send(uuid, json);
   strictEqual(response.status, 200);
   return (await response.json()) as { url: string; expires: number | null };
 }
@@ -55,7 +58,7 @@ function expiresAbout(expires: number | null, before: number, maxAge: string): n
   return expires;
 }
 
-describe('GET /uploads/[uuid]/link', () => {
+describe('POST /uploads/[uuid]/link', () => {
   beforeEach(() => useEnv().set('UPLOADS_SECRET', 'secret'));
   afterEach(() => useEnv().unset('UPLOADS_SECRET'));
 
@@ -72,19 +75,19 @@ describe('GET /uploads/[uuid]/link', () => {
 
   it('takes maxAge as a parseDuration value', async () => {
     const before = Date.now();
-    expiresAbout((await answer(hidden.UUID, '?maxAge=7d')).expires, before, '7d');
-    expiresAbout((await answer(hidden.UUID, '?maxAge=90s')).expires, before, '90s');
-    expiresAbout((await answer(hidden.UUID, '?maxAge=5000')).expires, before, '5s');
+    expiresAbout((await answer(hidden.UUID, { maxAge: '7d' })).expires, before, '7d');
+    expiresAbout((await answer(hidden.UUID, { maxAge: '90s' })).expires, before, '90s');
+    expiresAbout((await answer(hidden.UUID, { maxAge: 5000 })).expires, before, '5s');
   });
 
   it('400s a maxAge parseDuration rejects, or of another shape', async () => {
-    for (const qs of ['?maxAge=soon', '?maxAge=-1h', '?maxAge=[1,2]', '?maxAge']) {
-      strictEqual((await send(hidden.UUID, qs)).status, 400, qs);
+    for (const maxAge of ['soon', '-1h', [1, 2], null, true]) {
+      strictEqual((await send(hidden.UUID, { maxAge })).status, 400, JSON.stringify(maxAge));
     }
   });
 
   it('answers a public file its plain url with no expiry', async () => {
-    deepStrictEqual(await answer(open.UUID, '?maxAge=7d'), {
+    deepStrictEqual(await answer(open.UUID, { maxAge: '7d' }), {
       url: '/uploads/link/open.txt',
       expires: null,
     });
@@ -109,11 +112,21 @@ describe('GET /uploads/[uuid]/link', () => {
 
   it('401s without a user and 403s without the capability', async () => {
     const uuid = hidden.UUID;
-    strictEqual((await call(link, `/uploads/${uuid}/link`, { uuid })).status, 401);
-    strictEqual((await send(uuid, '', nobody)).status, 403);
+    strictEqual((await call(link, `/uploads/${uuid}/link`, { uuid }, { json: {} })).status, 401);
+    strictEqual((await send(uuid, {}, nobody)).status, 403);
   });
 
-  it('404s every file while no secret makes the layer keep private files', async () => {
+  it("reads through the scope's where alone, so a select without private still signs", async () => {
+    await withReadAccess(
+      () => ({ select: ['UUID', 'kind', 'directory', 'name'] }),
+      async () => {
+        const answered = await answer(hidden.UUID, { maxAge: '1h' });
+        match(answered.url, /^\/uploads\/link\/hidden\.txt\?e=\d+&s=[A-Za-z0-9_-]{43}$/);
+      },
+    );
+  });
+
+  it('404s every file while no secret can sign a link', async () => {
     useEnv().unset('UPLOADS_SECRET');
     try {
       strictEqual((await send(hidden.UUID)).status, 404);
