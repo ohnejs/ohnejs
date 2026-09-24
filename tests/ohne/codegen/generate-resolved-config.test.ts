@@ -29,7 +29,10 @@ describe('generateResolvedConfig', () => {
     const app = makeApp('app');
 
     const layers = useLayers();
-    layers.add({ path: app, defaults: { dirs: { codegen: '.ohne' }, printer: { silent: false } } });
+    layers.add({
+      path: app,
+      defaults: { collections: { defaultLocale: 'en' }, messages: { defaultLanguage: 'en' } },
+    });
     try {
       const path = await generateResolvedConfig(app);
       strictEqual(path?.endsWith('/.ohne/node/resolved-config.ts'), true);
@@ -41,16 +44,29 @@ describe('generateResolvedConfig', () => {
           "declare module 'ohnejs' {\n" +
           '  interface ConfigExtensions {\n' +
           '    defaults: {\n' +
-          '      dirs: {\n' +
-          '        codegen: true;\n' +
+          '      collections: {\n' +
+          '        defaultLocale: true;\n' +
           '      };\n' +
-          '      printer: {\n' +
-          '        silent: true;\n' +
+          '      messages: {\n' +
+          '        defaultLanguage: true;\n' +
           '      };\n' +
           '    };\n' +
           '  }\n' +
           '}\n',
       );
+    } finally {
+      layers.remove(app);
+    }
+  });
+
+  it('leaves out a key marked own, since no default reaches it', async () => {
+    const app = makeApp('own');
+
+    const layers = useLayers();
+    layers.add({ path: app, defaults: { dirs: { codegen: '.ohne' }, printer: { silent: false } } });
+    try {
+      const path = await generateResolvedConfig(app);
+      strictEqual(readFileSync(path!, 'utf8').includes('interface ConfigExtensions {}'), true);
     } finally {
       layers.remove(app);
     }
