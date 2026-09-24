@@ -27,6 +27,11 @@ describe('xmlText', () => {
     strictEqual(xmlText('<R><Owner id="1"/></R>', 'Owner'), '');
   });
 
+  it('keeps a > or /> inside a quoted attribute value in the start tag', () => {
+    strictEqual(xmlText('<R><Key a="x>y">v</Key></R>', 'Key'), 'v');
+    strictEqual(xmlText('<R><Key a=\'x/>y\' b="2">v</Key></R>', 'Key'), 'v');
+  });
+
   it('returns the first of several', () => {
     strictEqual(xmlText('<R><Key>a</Key><Key>b</Key></R>', 'Key'), 'a');
   });
