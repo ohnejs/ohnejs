@@ -34,7 +34,7 @@ export interface MovePopupOptions {
   tree: TargetDirectory;
 
   /**
-   * Called with the number of records moved once the batch has settled.
+   * Called with the number of records moved once the move has landed or been refused.
    */
   onMoved?(count: number): void;
 
@@ -61,7 +61,7 @@ export async function loadTargetTree(records: readonly UploadRecord[]): Promise<
  * The move popup: the folder tree, every folder a button, with New subfolder inline on each.
  * The selection itself and everything inside it is disabled; with no folder left, the popup says so.
  * Picking a folder closes the popup, then checks the destination for taken names.
- * Every taken name is skipped after one confirmation; the rest move with bounded concurrency.
+ * Every taken name is skipped after one confirmation; the rest move in one request, all or nothing.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function movePopup(options: MovePopupOptions): Popup {
@@ -96,7 +96,8 @@ export function movePopup(options: MovePopupOptions): Popup {
       });
       if (action !== 'move') return;
     }
-    options.onMoved?.(await moveUploads(movable, directory));
+    const moved = await moveUploads(movable, directory);
+    options.onMoved?.(moved);
   };
 
   const select = (target: TargetDirectory): void => {
