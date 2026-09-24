@@ -126,6 +126,8 @@ temporaryUploadURL(upload, '7d');
 
 ## Storage and the image service
 
+A private file is hidden at the API route alone. A [backend](./storage.md#a-backend-of-your-own)
+without `setPrivate` keeps its object readable at `publicURL`, and ohne warns at boot.
 [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) tags a private object so the bucket can
 refuse it. Its [README](https://github.com/ohnejs/uploads-s3#private-files) has the policy. An
 [image service](https://github.com/ohnejs/images#private-files) fetches a private original only
