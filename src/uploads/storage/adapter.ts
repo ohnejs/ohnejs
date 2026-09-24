@@ -96,6 +96,12 @@ export interface StorageAdapter {
    * A configured `uploads.publicURL` takes precedence over it.
    */
   url?(path: string): string;
+
+  /**
+   * Confirms the backend can be reached, throwing an error block that names the cause when it cannot.
+   * Every boot runs it before replaying the journal, so a broken backend stops boot with one error.
+   */
+  check?(): Promise<void>;
 }
 
 /**

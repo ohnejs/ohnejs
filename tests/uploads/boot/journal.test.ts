@@ -93,4 +93,57 @@ describe('the schema:synced hook', () => {
     deepStrictEqual(written, []);
     strictEqual(await drainJournal(), true);
   });
+
+  it('checks the storage before the first effect it replays', async () => {
+    const order: string[] = [];
+    useStorages().register('checked', () => ({
+      ...storage,
+      check: async () => void order.push('check'),
+      delete: async (path) => {
+        order.push('delete');
+        await storage.delete(path);
+      },
+    }));
+    useLayers().add({ path: '/journal-checked', input: { uploads: { storage: 'checked' } } });
+    await db.transaction(
+      (tx) => journalStorage(tx, { op: 'delete', from: 'photos/checked.jpg' }),
+      'immediate',
+    );
+    try {
+      await synced();
+    } finally {
+      useLayers().remove('/journal-checked');
+    }
+    deepStrictEqual(order, ['check', 'delete']);
+  });
+
+  it('throws a failed check once, replaying and sweeping nothing', async () => {
+    useStorages().register('unreachable', () => ({
+      ...storage,
+      check: () => Promise.reject(ohneError({ title: 'Storage `unreachable` did not answer' })),
+    }));
+    useLayers().add({
+      path: '/journal-unreachable',
+      input: { uploads: { storage: 'unreachable' } },
+    });
+    const stale = `${TEMP_PREFIX}/${uuidAt(Date.now() - 2 * DAY)}`;
+    storage.objects.set(stale, bytes('staged'));
+    await queryUntyped('UploadsJournal').createOrThrow({ op: 'stage', from: stale });
+    await db.transaction(
+      (tx) => journalStorage(tx, { op: 'delete', from: 'photos/pending.jpg' }),
+      'immediate',
+    );
+    written.length = 0;
+    try {
+      await rejects(synced(), /Storage `unreachable` did not answer/);
+    } finally {
+      useLayers().remove('/journal-unreachable');
+    }
+    deepStrictEqual(written, []);
+    deepStrictEqual((await queryUntyped('UploadsJournal').pluck('op')).sort(), ['delete', 'stage']);
+    ok(storage.objects.has(stale));
+    strictEqual(await drainJournal(), true);
+    await queryUntyped('UploadsJournal').where({ from: stale }).delete();
+    storage.objects.delete(stale);
+  });
 });

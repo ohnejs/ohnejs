@@ -254,6 +254,7 @@ A backend is a `StorageAdapter`:
   the backend, unless `publicURL` is set.
 - `setPrivate` is optional: it locks or unlocks a file or a prefix as a row turns
   [private](./private-files.md) or public. A `move` keeps what it set.
+- `check` is optional: it confirms at boot that the backend can be reached.
 
 The backend never sees the database. The layer's helpers record each move, delete, and
 `setPrivate` inside the [transaction](../database/engine.md#transactions) that changes the rows,
