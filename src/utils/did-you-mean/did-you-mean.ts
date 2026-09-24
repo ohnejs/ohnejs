@@ -1,6 +1,7 @@
 /**
  * Returns the candidate from `candidates` closest to `input` by Damerau-Levenshtein distance.
  * Returns `undefined` if no candidate is within `maxDistance`.
+ * By default a hint changes at most half of `input`, so a one-letter input only matches itself.
  *
  * Tuned for "did you mean?" hints on short identifiers like command names, flags, or field names.
  * If `input` exactly matches a candidate, it is returned at distance 0.
@@ -14,6 +15,7 @@
  * didYouMean('Filesy', ['Files', 'Users', 'Posts']) // -> 'Files'
  * didYouMean('Fiels',  ['Files', 'Tags'])           // -> 'Files'
  * didYouMean('zzzz',   ['Files', 'Users'])          // -> undefined
+ * didYouMean('x',      ['db', 'port'])              // -> undefined
  *
  * didYouMean('Posts', ['Roasts'], 2) // -> 'Roasts'
  * didYouMean('Posts', ['Roasts'], 1) // -> undefined
@@ -22,7 +24,7 @@
 export function didYouMean(
   input: string,
   candidates: Iterable<string>,
-  maxDistance = 2,
+  maxDistance = Math.min(2, Math.floor(input.length / 2)),
 ): string | undefined {
   let best: string | undefined;
   let bestDistance = maxDistance + 1;

@@ -35,6 +35,7 @@ describe('didYouMean', () => {
   it('respects a custom max distance', () => {
     strictEqual(didYouMean('Posts', ['Roasts'], 2), 'Roasts');
     strictEqual(didYouMean('Posts', ['Roasts'], 1), undefined);
+    strictEqual(didYouMean('in', ['init'], 2), 'init');
   });
 
   it('breaks ties by candidate iteration order', () => {
@@ -45,7 +46,11 @@ describe('didYouMean', () => {
     strictEqual(didYouMean('Filesy', new Set(['Files', 'Users'])), 'Files');
   });
 
-  it('handles empty input', () => {
-    strictEqual(didYouMean('', ['a', 'bb', 'ccc']), 'a');
+  it('defaults to half the input length, at most 2', () => {
+    strictEqual(didYouMean('x', ['db', 'pm']), undefined);
+    strictEqual(didYouMean('dev', ['db']), undefined);
+    strictEqual(didYouMean('dv', ['db']), 'db');
+    strictEqual(didYouMean('', ['a', 'bb', 'ccc']), undefined);
+    strictEqual(didYouMean('Postgres', ['Postfix']), undefined);
   });
 });

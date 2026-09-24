@@ -135,6 +135,14 @@ describe('resolveArgs', () => {
     });
   });
 
+  it('reports a one-letter flag without a suggestion', () => {
+    deepStrictEqual(resolveArgs({}, ['-x'], { db: { type: 'string' } }), {
+      ok: false,
+      errors: [{ kind: 'unknown', name: 'x', message: 'Unknown flag `-x`' }],
+      positionals: [],
+    });
+  });
+
   it('reports a missing required flag', () => {
     const schema = { name: { type: 'string', required: true } } as const;
     deepStrictEqual(resolveArgs(schema, []), {
