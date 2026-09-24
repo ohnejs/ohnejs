@@ -10,6 +10,7 @@ import type { MoveUploadTarget } from './move-upload.ts';
 import type { UploadRecord } from './types.ts';
 import type { UpdateUploadInput } from './update-upload.ts';
 
+import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
 import { ensureFolders, folderLocked } from './_folders.ts';
@@ -23,6 +24,7 @@ import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';
  * Moves the row `uuid` on `tx`, as `moveUpload` describes.
  * `lock` decides whether a move into a private folder locks.
  * Resolves the moved row and the `UUID`s of the folder rows the move created.
+ * A write that reaches no row is a `404`, so the object never moves without its row.
  */
 export async function moveRow(
   tx: Transaction,
@@ -53,6 +55,7 @@ export async function moveRow(
     .use(tx)
     .where({ UUID: uuid })
     .updateOrThrow(locks ? { ...target, private: true } : target);
+  if (isUndefined(moved)) throw notFound();
   if (row.kind === 'folder') {
     await moveDescendants(tx, from, path);
     if (locks) await setDescendantsPrivate(tx, path, true);
@@ -64,6 +67,7 @@ export async function moveRow(
 
 /**
  * Updates the metadata of the row `uuid` on `tx`, as `updateUpload` describes, at `locale` when given.
+ * A write that reaches no row is a `404`, so the object is never locked or unlocked without its row.
  */
 export async function updateRow(
   tx: Transaction,
@@ -81,6 +85,7 @@ export async function updateRow(
   const [updated] = await (isUndefined(locale) ? builder : builder.locale(locale)).updateOrThrow({
     ...changes,
   });
+  if (isUndefined(updated)) throw notFound();
   if (!locks || input.private === (row.private === true)) return updated;
   const path = uploadPath(row);
   if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private === true);
@@ -90,19 +95,23 @@ export async function updateRow(
 
 /**
  * Deletes `row` on `tx`, as `deleteUpload` describes: a folder takes its whole subtree along.
+ * A delete that reaches no row is a `404`, so the object never goes without its row.
+ * The subtree follows the folder past any app scope, since its objects go with the folder's prefix.
  */
 export async function deleteRow(tx: Transaction, row: UploadRow): Promise<void> {
   const path = uploadPath(row);
+  const { deleted } = await queryUntyped('Uploads').use(tx).where({ UUID: row.UUID }).delete();
+  if (deleted === 0) throw notFound();
   if (row.kind === 'folder') {
     await queryUntyped('Uploads')
       .use(tx)
+      .unscoped()
       .whereAny((g) => [
         g.where({ directory: path }),
         g.where({ directory: { startsWith: `${path}/` } }),
       ])
       .delete();
   }
-  await queryUntyped('Uploads').use(tx).where({ UUID: row.UUID }).delete();
   await journalStorage(tx, { op: 'delete', from: path });
 }
 

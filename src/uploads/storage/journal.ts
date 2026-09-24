@@ -30,9 +30,12 @@ const draining = createMutex();
 
 const JOURNAL_LOCK = 'uploads:journal';
 
+const SETTLE_STALE_AFTER = 10 * 60 * 1000;
+
 /**
  * Records a storage effect on `tx`, so it commits or rolls back with the row change it belongs to.
  * The entry takes the `sequence` after the last pending one; an `'immediate'` `tx` keeps it unique.
+ * The journal is bookkeeping, so every read and write of it skips the app's scoping hooks.
  * `drainJournal` runs it after the commit.
  *
  * @example
@@ -47,11 +50,13 @@ const JOURNAL_LOCK = 'uploads:journal';
 export async function journalStorage(tx: Transaction, entry: JournalEntry): Promise<void> {
   const [last] = (await queryUntyped('UploadsJournal')
     .use(tx)
+    .unscoped()
     .orderBy('sequence', 'desc')
     .limit(1)
     .pluck('sequence')) as (number | null)[];
   await queryUntyped('UploadsJournal')
     .use(tx)
+    .unscoped()
     .createOrThrow({
       sequence: (last ?? 0) + 1,
       op: entry.op,
@@ -66,8 +71,9 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
  * An effect that fails is warned about and left for the next drain.
  * So is every later entry on its path, or above or below it, since that entry may build on it.
  * So is a journal that cannot be read or a storage that cannot be built; nothing here throws.
- * Drains serialize across every instance under a cluster lock, so no two replay the same entry at once.
+ * Each entry settles under a cluster lock, so no two instances replay the same entry at once.
  * Otherwise a slow replay of an older entry could land after a newer one on the same path.
+ * The lock goes stale after ten minutes, so an effect that runs longer may be replayed by another instance.
  * Resolves `true` when every entry settled, and `false` when any was held or nothing could be drained.
  *
  * @example
@@ -78,7 +84,7 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
 export function drainJournal(): Promise<boolean> {
   return draining(async () => {
     try {
-      return await withLock(JOURNAL_LOCK, drain);
+      return await drain();
     } catch (error) {
       usePrinter().warn(`Storage journal not drained: ${errorMessage(error)}`);
       return false;
@@ -92,6 +98,7 @@ export function drainJournal(): Promise<boolean> {
 async function drain(): Promise<boolean> {
   const storage = useStorage();
   const entries = (await queryUntyped('UploadsJournal')
+    .unscoped()
     .orderBy('sequence')
     .findMany()) as StoredEntry[];
   const held: string[] = [];
@@ -105,23 +112,37 @@ async function drain(): Promise<boolean> {
 }
 
 /**
- * Runs one entry's effect and deletes the entry, resolving `true`, or warns and resolves `false`.
+ * Runs one entry's effect under the cluster lock and deletes the entry, resolving `true`.
+ * An entry another instance settled meanwhile is skipped as done.
+ * A failed effect is warned about and resolves `false`.
  * A backend without `setPrivate` has no visibility to set, so a lock or unlock succeeds at once.
  */
-async function settle(
-  storage: StorageAdapter,
-  { UUID, op, from, to }: StoredEntry,
-): Promise<boolean> {
-  try {
-    if (op === 'move') await storage.move(from, to as string);
-    else if (op === 'delete') await storage.delete(from);
-    else await storage.setPrivate?.(from, op === 'lock');
-    await queryUntyped('UploadsJournal').where({ UUID }).delete();
-    return true;
-  } catch (error) {
-    usePrinter().warn(`Storage \`${op}\` of \`${from}\` failed: ${errorMessage(error)}`);
-    return false;
-  }
+function settle(storage: StorageAdapter, entry: StoredEntry): Promise<boolean> {
+  return withLock(
+    JOURNAL_LOCK,
+    async () => {
+      const { UUID, op, from, to } = entry;
+      if (!(await pending(UUID))) return true;
+      try {
+        if (op === 'move') await storage.move(from, to as string);
+        else if (op === 'delete') await storage.delete(from);
+        else await storage.setPrivate?.(from, op === 'lock');
+      } catch (error) {
+        usePrinter().warn(`Storage \`${op}\` of \`${from}\` failed: ${errorMessage(error)}`);
+        return false;
+      }
+      await queryUntyped('UploadsJournal').unscoped().where({ UUID }).delete();
+      return true;
+    },
+    { staleAfter: SETTLE_STALE_AFTER },
+  );
+}
+
+/**
+ * Whether the entry `UUID` is still in the journal.
+ */
+function pending(UUID: string): Promise<boolean> {
+  return queryUntyped('UploadsJournal').unscoped().where({ UUID }).exists();
 }
 
 /**

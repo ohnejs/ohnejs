@@ -12,6 +12,7 @@ import { ancestorDirectories, splitUploadPath } from './path.ts';
  * A row already there is left alone; a concurrent create losing the unique race is fine too.
  * A file row at one of those paths is a `422`, since nothing can live inside a file.
  * Walking shallowest first, a missing folder is born as private as the nearest one above it.
+ * The rows are read past any app scope, since a hidden private folder still locks what lands in it.
  * Resolves whether the deepest folder is private, so what lands inside it can inherit; the root never is.
  * Resolves too the `UUID`s of the folder rows this call created.
  */
@@ -26,6 +27,7 @@ export async function ensureFolders(
     const location = splitUploadPath(path);
     const row = await queryUntyped('Uploads')
       .use(tx)
+      .unscoped()
       .where({ ...location })
       .findFirst();
     if (!isUndefined(row)) {
@@ -43,13 +45,14 @@ export async function ensureFolders(
 }
 
 /**
- * Whether the folder at `directory` is private, read on `tx`.
+ * Whether the folder at `directory` is private, read on `tx` past any app scope.
  * The root never is.
  */
 export async function folderLocked(tx: Transaction, directory: string): Promise<boolean> {
   if (directory === '') return false;
   const folder = await queryUntyped('Uploads')
     .use(tx)
+    .unscoped()
     .where({ ...splitUploadPath(directory), kind: 'folder' })
     .findFirst();
   return folder?.private === true;

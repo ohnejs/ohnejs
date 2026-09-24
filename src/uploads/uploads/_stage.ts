@@ -62,6 +62,7 @@ const SVG = 'image/svg+xml';
  * An SVG is buffered whole, sanitized, and re-measured; input without an `<svg>` root is refused as `notSVG`.
  * The bytes then flow through a sha256 counter into `storage.write` under the `.tmp/` prefix.
  * The temp object is journaled as a `stage` entry first, so `sweepStaged` finds it if its row never commits.
+ * The journal is bookkeeping, so its reads and writes skip the app's scoping hooks.
  * `size` is the request's declared length, a hint for a backend that needs it up front.
  */
 export async function stageUpload(
@@ -92,7 +93,7 @@ export async function stageUpload(
     }),
   );
   const temp = `${TEMP_PREFIX}/${uuidv7()}`;
-  await queryUntyped('UploadsJournal').createOrThrow({
+  await queryUntyped('UploadsJournal').unscoped().createOrThrow({
     sequence: null,
     op: 'stage',
     from: temp,
@@ -147,7 +148,7 @@ export async function discardStaged(temp: string): Promise<void> {
   } catch {
     return;
   }
-  await queryUntyped('UploadsJournal').where({ op: 'stage', from: temp }).delete();
+  await queryUntyped('UploadsJournal').unscoped().where({ op: 'stage', from: temp }).delete();
 }
 
 /**
@@ -163,6 +164,7 @@ export async function discardStaged(temp: string): Promise<void> {
  */
 export async function sweepStaged(before: number): Promise<void> {
   const temps = (await queryUntyped('UploadsJournal')
+    .unscoped()
     .where({ op: 'stage' })
     .pluck('from')) as string[];
   const stale = temps.filter((temp) => uuidv7Time(temp.slice(TEMP_PREFIX.length + 1)) < before);
@@ -181,6 +183,7 @@ export async function sweepStaged(before: number): Promise<void> {
 async function release(tx: Transaction, temp: string): Promise<boolean> {
   const { deleted } = await queryUntyped('UploadsJournal')
     .use(tx)
+    .unscoped()
     .where({ op: 'stage', from: temp })
     .delete();
   return deleted > 0;

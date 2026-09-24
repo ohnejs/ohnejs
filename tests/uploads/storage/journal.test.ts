@@ -2,6 +2,9 @@ import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { withLock } from '../../../src/ohne/database/with-lock.ts';
+import { useEnv } from '../../../src/ohne/env/use-env.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
@@ -16,6 +19,7 @@ import { bytes, db, storage, text } from '../_fixture.ts';
 import { createMemoryStorage } from '../_storage.ts';
 
 const written: string[] = [];
+useEnv().set('NO_COLOR', true);
 usePrinter().configure({
   stream: {
     write: (chunk: string | Uint8Array) => {
@@ -23,7 +27,6 @@ usePrinter().configure({
       return true;
     },
   },
-  color: false,
 });
 
 /**
@@ -142,17 +145,62 @@ describe('drainJournal', () => {
     ok(storage.objects.has('drain/five.txt'));
   });
 
-  it('serializes overlapping drains', async () => {
-    storage.objects.set('.tmp/three', bytes('3'));
-    storage.objects.set('.tmp/four', bytes('4'));
-    await journal(
-      { op: 'move', from: '.tmp/three', to: 'drain/three.txt' },
-      { op: 'move', from: '.tmp/four', to: 'drain/four.txt' },
+  it('serializes overlapping drains, one effect at a time', async () => {
+    const gated = createMemoryStorage();
+    let inFlight = 0;
+    let peak = 0;
+    useStorages().register('gated', () => ({
+      ...gated,
+      async move(from, to) {
+        peak = Math.max(peak, ++inFlight);
+        await sleep(10);
+        inFlight--;
+        await gated.move(from, to);
+      },
+    }));
+    useLayers().add({ path: '/journal-gated', input: { uploads: { storage: 'gated' } } });
+    try {
+      gated.objects.set('.tmp/three', bytes('3'));
+      gated.objects.set('.tmp/four', bytes('4'));
+      await journal(
+        { op: 'move', from: '.tmp/three', to: 'drain/three.txt' },
+        { op: 'move', from: '.tmp/four', to: 'drain/four.txt' },
+      );
+      await Promise.all([drainJournal(), drainJournal()]);
+      deepStrictEqual(await pending(), []);
+      ok(gated.objects.has('drain/three.txt'));
+      ok(gated.objects.has('drain/four.txt'));
+      strictEqual(peak, 1);
+    } finally {
+      useLayers().remove('/journal-gated');
+    }
+  });
+
+  it('skips an entry another instance settled meanwhile', async () => {
+    storage.objects.set('.tmp/settled', bytes('s'));
+    await journal({ op: 'move', from: '.tmp/settled', to: 'drain/settled.txt' });
+    await queryUntyped('UploadsJournal').where({ from: '.tmp/settled' }).delete();
+    strictEqual(await drainJournal(), true);
+    ok(storage.objects.has('.tmp/settled'));
+    storage.objects.delete('.tmp/settled');
+  });
+
+  it('runs past an app scope on the journal', async () => {
+    storage.objects.set('.tmp/scoped', bytes('s'));
+    hook('record:condition', (condition, { collection }) =>
+      collection === 'UploadsJournal'
+        ? { kind: 'compare', path: ['UUID'], op: 'equalsTo', value: 'none', negated: false }
+        : condition,
     );
-    await Promise.all([drainJournal(), drainJournal()]);
+    hook('query:filter', (ir) => (ir.collection === 'UploadsJournal' ? { ...ir, limit: 0 } : ir));
+    try {
+      await journal({ op: 'move', from: '.tmp/scoped', to: 'drain/scoped.txt' });
+      strictEqual(await drainJournal(), true);
+    } finally {
+      useHooks().clear();
+    }
     deepStrictEqual(await pending(), []);
-    ok(storage.objects.has('drain/three.txt'));
-    ok(storage.objects.has('drain/four.txt'));
+    ok(storage.objects.has('drain/scoped.txt'));
   });
 
   it('locks a prefix with everything under it, and unlocks one object', async () => {
