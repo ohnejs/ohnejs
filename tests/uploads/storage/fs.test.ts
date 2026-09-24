@@ -292,7 +292,7 @@ describe('createFSStorage', () => {
 
   it('removes the temp files a crashed write left beside a key it deletes', async () => {
     await storage.write('photos/a.jpg', streamOf('a'), { type: 'image/jpeg' });
-    const temp = join(dir, 'photos/a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp');
+    const temp = join(dir, 'photos/.a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp');
     writeFileSync(temp, 'partial');
     writeFileSync(join(dir, 'photos/a.jpg.keep'), 'k');
 
@@ -302,13 +302,37 @@ describe('createFSStorage', () => {
   });
 
   it('keeps a folder named like a temp file beside a key it deletes', async () => {
-    const folder = 'photos/a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp';
+    const folder = 'photos/.a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp';
     await storage.write('photos/a.jpg', streamOf('a'), { type: 'image/jpeg' });
     await storage.write(`${folder}/b.jpg`, streamOf('b'), { type: 'image/jpeg' });
 
     await storage.delete('photos/a.jpg');
 
     strictEqual(readFileSync(join(dir, folder, 'b.jpg'), 'utf8'), 'b');
+  });
+
+  it('keeps and lists an object whose key is another key plus a temp suffix', async () => {
+    const twin = 'photos/a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp';
+    await storage.write('photos/a.jpg', streamOf('a'), { type: 'image/jpeg' });
+    await storage.write(twin, streamOf('t'), { type: 'application/octet-stream' });
+
+    await storage.delete('photos/a.jpg');
+
+    strictEqual(readFileSync(join(dir, twin), 'utf8'), 't');
+    deepStrictEqual(await Array.fromAsync(storage.list!('photos')), [twin]);
+  });
+
+  it('keeps the temp of a write in progress to a longer name beside a key it deletes', async () => {
+    await storage.write('docs/report', streamOf('r'), { type: 'text/plain' });
+    const { body, pulled, release } = stalledStream('pdf');
+    const writing = storage.write('docs/report.pdf', body, { type: 'application/pdf' });
+    await pulled;
+
+    await storage.delete('docs/report');
+    release();
+    await writing;
+
+    strictEqual(readFileSync(join(dir, 'docs/report.pdf'), 'utf8'), 'pdf');
   });
 
   it('treats a delete of a missing path as a no-op', async () => {

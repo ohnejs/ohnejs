@@ -18,7 +18,7 @@ import type { StorageAdapter } from './adapter.ts';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 
-const WRITE_TEMP = /\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.tmp$/;
+const WRITE_TEMP = /^\.(.+)\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.tmp$/;
 
 const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR']);
 
@@ -27,6 +27,7 @@ const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR'
  * `root` is the configured `uploads.url`, resolved against the app root.
  * A key maps onto its path beneath `root`, so a folder prefix is a real directory.
  * A write lands in a sibling temp file and renames into place, so a reader never sees a partial object.
+ * The temp's name starts with a dot, which no upload name does, so it is never taken for a stored object.
  * A delete also removes the temp files a crashed write left beside the object.
  * It removes the parent directories it leaves empty too, so the tree never accumulates them.
  * A listing walks the tree and passes over those temp files.
@@ -42,8 +43,9 @@ export function createFSStorage(root: string): StorageAdapter {
   return {
     async write(path, body) {
       const target = locate(base, path);
-      const temp = `${target}.${uuidv7()}.tmp`;
-      const handle = await inDir(dirname(target), () => open(temp, 'wx'));
+      const dir = dirname(target);
+      const temp = joinPath(dir, `.${basename(target)}.${uuidv7()}.tmp`);
+      const handle = await inDir(dir, () => open(temp, 'wx'));
       try {
         await pipeline(Readable.fromWeb(body), handle.createWriteStream());
         await rename(temp, target);
@@ -150,7 +152,7 @@ async function relocate(source: string, target: string): Promise<void> {
  */
 async function removeWriteTemps(target: string): Promise<void> {
   const dir = dirname(target);
-  const prefix = `${basename(target)}.`;
+  const name = basename(target);
   const entries = await readdir(dir, { withFileTypes: true }).catch(
     (error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return [];
@@ -158,7 +160,7 @@ async function removeWriteTemps(target: string): Promise<void> {
     },
   );
   for (const entry of entries) {
-    if (entry.isFile() && entry.name.startsWith(prefix) && WRITE_TEMP.test(entry.name)) {
+    if (entry.isFile() && WRITE_TEMP.exec(entry.name)?.[1] === name) {
       await removeFile(joinPath(dir, entry.name));
     }
   }
