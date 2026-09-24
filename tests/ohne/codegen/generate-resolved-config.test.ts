@@ -72,6 +72,42 @@ describe('generateResolvedConfig', () => {
     }
   });
 
+  it('stops at a replace path and at the entries of an assign path', async () => {
+    const app = makeApp('whole');
+
+    const layers = useLayers();
+    layers.setStrategy('kit.style', 'replace');
+    layers.setStrategy('kit.tags', 'assign');
+    layers.add({
+      path: app,
+      defaults: { kit: { style: { color: 'red' }, tags: { a: { x: 1 } }, size: 2 } } as never,
+    });
+    try {
+      const path = await generateResolvedConfig(app);
+      strictEqual(
+        readFileSync(path!, 'utf8'),
+        `${BANNER}\n` +
+          "import type {} from 'ohnejs';\n" +
+          '\n' +
+          "declare module 'ohnejs' {\n" +
+          '  interface ConfigExtensions {\n' +
+          '    defaults: {\n' +
+          '      kit: {\n' +
+          '        style: true;\n' +
+          '        tags: {\n' +
+          '          a: true;\n' +
+          '        };\n' +
+          '        size: true;\n' +
+          '      };\n' +
+          '    };\n' +
+          '  }\n' +
+          '}\n',
+      );
+    } finally {
+      layers.clear();
+    }
+  });
+
   it('emits an empty interface when no layer ships defaults', async () => {
     const app = makeApp('empty');
 
