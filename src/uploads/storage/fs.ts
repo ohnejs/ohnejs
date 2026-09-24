@@ -11,6 +11,8 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
 
 const WRITE_TEMP = /\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.tmp$/;
 
+const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR']);
+
 /**
  * Builds the `fs` storage backend, which keeps every object as a file under `root`.
  * `root` is the configured `uploads.url`, resolved against the working directory.
@@ -118,13 +120,17 @@ async function fileSize(target: string): Promise<number | null> {
 }
 
 /**
- * Renames `source` to `target`, copying and removing instead when the two sit on different filesystems.
+ * Renames `source` to `target`, replacing whatever a stray or an interrupted copy left there.
+ * Across filesystems it copies and removes instead.
  */
 async function relocate(source: string, target: string): Promise<void> {
   try {
     await rename(source, target);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+    const code = (error as NodeJS.ErrnoException).code ?? '';
+    if (!REPLACEABLE.has(code)) throw error;
+    await removeDir(target);
+    if (code !== 'EXDEV') return rename(source, target);
     await cp(source, target, { recursive: true });
     await removeDir(source);
   }

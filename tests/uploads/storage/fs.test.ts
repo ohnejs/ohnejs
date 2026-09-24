@@ -237,6 +237,21 @@ describe('createFSStorage', () => {
     strictEqual(await storage.stat('photos/2024/a.jpg'), null);
   });
 
+  it('replaces what a stray or an interrupted copy left at the target of a prefix move', async () => {
+    await storage.write('photos/2024/a.jpg', streamOf('a'), { type: 'image/jpeg' });
+    await storage.write('archive/2024/stray.txt', streamOf('s'), { type: 'text/plain' });
+    await storage.write('docs/notes.txt', streamOf('n'), { type: 'text/plain' });
+    await storage.write('archive/notes', streamOf('file'), { type: 'text/plain' });
+
+    await storage.move('photos/2024', 'archive/2024');
+    await storage.move('docs', 'archive/notes');
+
+    deepStrictEqual(readdirSync(join(dir, 'archive/2024')), ['a.jpg']);
+    strictEqual(readFileSync(join(dir, 'archive/notes/notes.txt'), 'utf8'), 'n');
+    strictEqual(existsSync(join(dir, 'photos/2024')), false);
+    strictEqual(existsSync(join(dir, 'docs')), false);
+  });
+
   it('treats a move of a missing source as a no-op', async () => {
     await storage.move('ghost.txt', 'deep/ghost.txt');
 
