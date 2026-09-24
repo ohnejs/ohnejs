@@ -22,6 +22,15 @@ describe('applyANSIMarkup', () => {
     strictEqual(applyANSIMarkup('table__name', false, color), 'table__name');
   });
 
+  it('leaves markers inside a quoted path', () => {
+    const raw = "unlink '/x/__init__.py' and '/y/x**2**.txt'";
+    strictEqual(applyANSIMarkup(raw, false, color), raw);
+  });
+
+  it('leaves a marker pair with a space just inside literal', () => {
+    strictEqual(applyANSIMarkup('3 ** 2 + 4 ** 2', false, color), '3 ** 2 + 4 ** 2');
+  });
+
   it('styles nothing inside a backtick span', () => {
     strictEqual(applyANSIMarkup('`__init__.py`', false, color), '\x1b[96m__init__.py\x1b[39m');
   });

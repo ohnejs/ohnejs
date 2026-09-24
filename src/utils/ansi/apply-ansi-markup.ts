@@ -5,8 +5,8 @@ import { isUndefined } from '../is/is-undefined.ts';
 const MARKUP_PATTERN = new RegExp(
   [
     /`([^`\n]+)`/.source,
-    /\*\*([^*\n]+)\*\*/.source,
-    /(?<![A-Za-z0-9])__([^_\n]+)__(?![A-Za-z0-9])/.source,
+    /(?<!\S)\*\*(?!\s)([^*\n]+)(?<!\s)\*\*(?!\S)/.source,
+    /(?<!\S)__(?!\s)([^_\n]+)(?<!\s)__(?!\S)/.source,
   ].join('|'),
   'g',
 );
@@ -14,6 +14,7 @@ const MARKUP_PATTERN = new RegExp(
 /**
  * Applies inline markup to text: `__x__` dims, `**x**` bolds, and a backtick span highlights.
  * A backtick span holds no other markup.
+ * A `__` or `**` pair opens at a word start and closes at a word end, both at whitespace or a line edge.
  * Highlight renders cyan, or bold when `emphasize` is set.
  * Set `emphasize` when the surrounding text is already tinted, so the highlight still stands out.
  *
