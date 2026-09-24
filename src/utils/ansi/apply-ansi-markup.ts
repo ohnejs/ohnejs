@@ -1,11 +1,19 @@
 import type { ANSIColors } from './pick-ansi-colors.ts';
 
-const DIM_PATTERN = /(?<![A-Za-z0-9])__([^_\n]+)__(?![A-Za-z0-9])/g;
-const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
-const HIGHLIGHT_PATTERN = /`([^`\n]+)`/g;
+import { isUndefined } from '../is/is-undefined.ts';
+
+const MARKUP_PATTERN = new RegExp(
+  [
+    /`([^`\n]+)`/.source,
+    /\*\*([^*\n]+)\*\*/.source,
+    /(?<![A-Za-z0-9])__([^_\n]+)__(?![A-Za-z0-9])/.source,
+  ].join('|'),
+  'g',
+);
 
 /**
  * Applies inline markup to text: `__x__` dims, `**x**` bolds, and a backtick span highlights.
+ * A backtick span holds no other markup.
  * Highlight renders cyan, or bold when `emphasize` is set.
  * Set `emphasize` when the surrounding text is already tinted, so the highlight still stands out.
  *
@@ -18,8 +26,9 @@ const HIGHLIGHT_PATTERN = /`([^`\n]+)`/g;
  */
 export function applyANSIMarkup(text: string, emphasize: boolean, colors: ANSIColors): string {
   const highlight = emphasize ? colors.bold : colors.cyan;
-  return text
-    .replace(DIM_PATTERN, (_, inner: string) => colors.dim(inner))
-    .replace(BOLD_PATTERN, (_, inner: string) => colors.bold(inner))
-    .replace(HIGHLIGHT_PATTERN, (_, inner: string) => highlight(inner));
+  return text.replace(MARKUP_PATTERN, (_, code?: string, bold?: string, dim?: string) => {
+    if (!isUndefined(code)) return highlight(code);
+    if (!isUndefined(bold)) return colors.bold(applyANSIMarkup(bold, emphasize, colors));
+    return colors.dim(applyANSIMarkup(dim!, emphasize, colors));
+  });
 }
