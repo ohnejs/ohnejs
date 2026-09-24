@@ -45,8 +45,8 @@ describe('toSentenceCase', () => {
     strictEqual(toSentenceCase('HTML_parser'), 'HTML parser');
   });
 
-  it('separates letters and digits as distinct words', () => {
-    strictEqual(toSentenceCase('v2Release'), 'V 2 release');
+  it('keeps digits in their word', () => {
+    strictEqual(toSentenceCase('v2Release'), 'V2 release');
   });
 
   it('returns an empty string for empty input', () => {

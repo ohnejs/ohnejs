@@ -22,9 +22,9 @@ describe('splitWords', () => {
     deepStrictEqual(splitWords('parseURL'), ['parse', 'url']);
   });
 
-  it('separates digits from letters', () => {
-    deepStrictEqual(splitWords('user2FA'), ['user', '2', 'fa']);
-    deepStrictEqual(splitWords('item123List'), ['item', '123', 'list']);
+  it('keeps digits in their word', () => {
+    deepStrictEqual(splitWords('user2FA'), ['user2', 'fa']);
+    deepStrictEqual(splitWords('item123List'), ['item123', 'list']);
   });
 
   it('returns an empty array for empty or separator-only input', () => {

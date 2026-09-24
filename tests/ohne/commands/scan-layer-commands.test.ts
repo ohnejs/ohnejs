@@ -26,9 +26,11 @@ describe('scanLayerCommands', () => {
 
   it('names each command by its kebab-cased file name', async () => {
     const dir = join(root, 'named');
-    const file = writeCommand(dir, 'seedDatabase.ts');
+    const sync = writeCommand(dir, 's3-sync.ts');
+    const seed = writeCommand(dir, 'seedDatabase.ts');
     deepStrictEqual(await scanLayerCommands({ name: 'app', dir }, 'commands'), [
-      { name: 'seed-database', file },
+      { name: 's3-sync', file: sync },
+      { name: 'seed-database', file: seed },
     ]);
   });
 

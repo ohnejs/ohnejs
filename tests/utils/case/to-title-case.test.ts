@@ -42,8 +42,8 @@ describe('toTitleCase', () => {
     strictEqual(toTitleCase('HTML_parser'), 'HTML Parser');
   });
 
-  it('separates letters and digits as distinct words', () => {
-    strictEqual(toTitleCase('v2Release'), 'V 2 Release');
+  it('keeps digits in their word', () => {
+    strictEqual(toTitleCase('v2Release'), 'V2 Release');
   });
 
   it('returns an empty string for empty input', () => {

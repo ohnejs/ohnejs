@@ -25,6 +25,10 @@ describe('isSentenceCase', () => {
     strictEqual(isSentenceCase('HTML'), true);
   });
 
+  it('accepts an opening word that starts with a digit', () => {
+    strictEqual(isSentenceCase('2fa setup'), true);
+  });
+
   it('rejects title case (subsequent word capitalized but not an acronym)', () => {
     strictEqual(isSentenceCase('First Name'), false);
   });

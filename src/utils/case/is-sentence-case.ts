@@ -1,8 +1,8 @@
-const SENTENCE_CASE = /^(?:[A-Z][A-Za-z0-9]*|[0-9]+)(?: (?:[a-z0-9]+|[A-Z][A-Z0-9]*))*$/;
+const SENTENCE_CASE = /^[A-Z0-9][A-Za-z0-9]*(?: (?:[a-z0-9]+|[A-Z][A-Z0-9]*))*$/;
 
 /**
  * Returns `true` when `input` is canonical `Sentence case`.
- * The first word starts uppercase or is digit-only.
+ * The first word starts uppercase or with a digit.
  * Subsequent words are lowercase or all-uppercase acronyms.
  * Single-space joined.
  *

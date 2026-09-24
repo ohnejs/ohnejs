@@ -25,8 +25,8 @@ describe('toSnakeCase', () => {
     strictEqual(toSnakeCase('parseURL'), 'parse_url');
   });
 
-  it('splits letter/digit boundaries', () => {
-    strictEqual(toSnakeCase('user2FA'), 'user_2_fa');
+  it('keeps digits in their word', () => {
+    strictEqual(toSnakeCase('user2FA'), 'user2_fa');
   });
 
   it('handles single-character input', () => {

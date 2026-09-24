@@ -9,7 +9,7 @@ import { splitWords } from './split-words.ts';
  * toSnakeCase('BlogPosts')     // -> 'blog_posts'
  * toSnakeCase('featuredImage') // -> 'featured_image'
  * toSnakeCase('HTMLParser')    // -> 'html_parser'
- * toSnakeCase('user2FA')       // -> 'user_2_fa'
+ * toSnakeCase('user2FA')       // -> 'user2_fa'
  * toSnakeCase('')              // -> ''
  * ```
  */

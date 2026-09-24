@@ -11,7 +11,7 @@ import { splitTokens } from './split-tokens.ts';
  * splitWords('BlogPosts')      // -> ['blog', 'posts']
  * splitWords('blog-posts')     // -> ['blog', 'posts']
  * splitWords('BlogHTMLParser') // -> ['blog', 'html', 'parser']
- * splitWords('user2FA')        // -> ['user', '2', 'fa']
+ * splitWords('user2FA')        // -> ['user2', 'fa']
  * splitWords('')               // -> []
  * ```
  */

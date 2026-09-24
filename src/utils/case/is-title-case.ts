@@ -1,8 +1,8 @@
-const TITLE_CASE = /^(?:[A-Z][A-Za-z0-9]*|[0-9]+)(?: (?:[A-Z][A-Za-z0-9]*|[0-9]+))*$/;
+const TITLE_CASE = /^[A-Z0-9][A-Za-z0-9]*(?: [A-Z0-9][A-Za-z0-9]*)*$/;
 
 /**
  * Returns `true` when `input` is canonical `Title Case`.
- * Every space-separated word starts uppercase or is digit-only.
+ * Every space-separated word starts uppercase or with a digit.
  * Single-space joined, no leading or trailing whitespace.
  *
  * Acronyms (`HTML`, `API`) qualify since they start uppercase.

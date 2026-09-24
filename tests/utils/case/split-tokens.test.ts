@@ -22,13 +22,13 @@ describe('splitTokens', () => {
     deepStrictEqual(splitTokens('parseURL'), ['parse', 'URL']);
   });
 
-  it('separates digits from letters', () => {
-    deepStrictEqual(splitTokens('user2FA'), ['user', '2', 'FA']);
-    deepStrictEqual(splitTokens('item123List'), ['item', '123', 'List']);
+  it('keeps digits in their word', () => {
+    deepStrictEqual(splitTokens('user2FA'), ['user2', 'FA']);
+    deepStrictEqual(splitTokens('item123List'), ['item123', 'List']);
   });
 
   it('collapses runs of non-alphanumeric separators', () => {
-    deepStrictEqual(splitTokens('  blog -- posts __ v2  '), ['blog', 'posts', 'v', '2']);
+    deepStrictEqual(splitTokens('  blog -- posts __ v2  '), ['blog', 'posts', 'v2']);
   });
 
   it('returns an empty array for empty or separator-only input', () => {

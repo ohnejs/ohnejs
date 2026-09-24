@@ -21,8 +21,9 @@ describe('isTitleCase', () => {
     strictEqual(isTitleCase('HTML'), true);
   });
 
-  it('accepts digit-only words', () => {
+  it('accepts words that start with a digit', () => {
     strictEqual(isTitleCase('V 2 Release'), true);
+    strictEqual(isTitleCase('1st Place'), true);
   });
 
   it('rejects sentence case', () => {

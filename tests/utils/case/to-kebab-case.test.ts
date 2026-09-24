@@ -25,8 +25,9 @@ describe('toKebabCase', () => {
     strictEqual(toKebabCase('parseURL'), 'parse-url');
   });
 
-  it('splits letter/digit boundaries', () => {
-    strictEqual(toKebabCase('user2FA'), 'user-2-fa');
+  it('keeps digits in their word', () => {
+    strictEqual(toKebabCase('user2FA'), 'user2-fa');
+    strictEqual(toKebabCase('s3-sync'), 's3-sync');
   });
 
   it('handles single-character input', () => {
