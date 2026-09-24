@@ -115,6 +115,7 @@ export interface ListDirOptions {
  * `path` is resolved against `process.cwd()` if relative.
  * Returns `null` if the root directory does not exist.
  * Returns `[]` for an existing but empty directory.
+ * A subdirectory removed while the walk runs is skipped.
  *
  * All paths in the result are normalized to `/` separators.
  *
@@ -144,13 +145,8 @@ export async function listDir(
   const root = resolvePath(path);
   const allowedExts = isUndefined(ext) ? null : normalizeExtensions(ext);
 
-  let rootDir: Dir;
-  try {
-    rootDir = await opendir(root);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
-  }
+  const rootDir = await openDir(root);
+  if (isNull(rootDir)) return null;
 
   const results: DirEntry[] = [];
   await walk(rootDir, root, 0);
@@ -186,10 +182,22 @@ export async function listDir(
       }
 
       if (type === 'directory' && currentDepth < depth) {
-        const subdir = await opendir(entryPath);
-        await walk(subdir, entryPath, currentDepth + 1);
+        const subdir = await openDir(entryPath);
+        if (!isNull(subdir)) await walk(subdir, entryPath, currentDepth + 1);
       }
     }
+  }
+}
+
+/**
+ * Opens the directory at `path`, or resolves `null` when nothing is there.
+ */
+async function openDir(path: string): Promise<Dir | null> {
+  try {
+    return await opendir(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
   }
 }
 

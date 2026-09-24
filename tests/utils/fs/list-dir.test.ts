@@ -1,8 +1,10 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 
 import { listDir } from '../../../src/utils/fs/index.ts';
 
@@ -132,5 +134,31 @@ describe('listDir', () => {
     const empty = join(dir, 'empty');
     mkdirSync(empty);
     deepStrictEqual(await listDir(empty), []);
+  });
+});
+
+describe('listDir under a concurrent removal', () => {
+  it('skips a subdirectory removed between reading its entry and opening it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ohne-list-dir-race-'));
+    mkdirSync(join(dir, 'gone'));
+    writeFileSync(join(dir, 'gone', 'lost.ts'), '');
+    writeFileSync(join(dir, 'kept.ts'), '');
+    const original = fsPromises.opendir;
+    const mocked = mock.method(fsPromises, 'opendir', (path: string, ...rest: unknown[]) => {
+      if (path.endsWith('/gone')) rmSync(path, { recursive: true, force: true });
+      return (original as (...args: unknown[]) => unknown).call(fsPromises, path, ...rest);
+    });
+    syncBuiltinESMExports();
+    try {
+      const entries = await listDir(dir);
+      deepStrictEqual(
+        entries?.map((entry) => entry.relativePath),
+        ['kept.ts'],
+      );
+    } finally {
+      mocked.mock.restore();
+      syncBuiltinESMExports();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
