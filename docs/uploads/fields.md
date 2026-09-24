@@ -66,8 +66,11 @@ and with `expires` for a [private file](./private-files.md):
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();
 
-post.cover.url; // -> '/uploads/photos/sunset.jpg'
-post.cover.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
+post.cover.url;
+// -> '/uploads/photos/sunset.jpg'
+
+post.cover.variants.thumbnail;
+// -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
 ```
 
 A private file's `url` and `variants` stop working at `expires`, so render them per request rather

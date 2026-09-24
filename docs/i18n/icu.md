@@ -31,11 +31,7 @@ formatMessage('Hello, {name}.', { name: 'Sylvanas' }, 'en');
 A message can carry many placeholders, in any order.
 
 ```ts
-formatMessage(
-  '{verb} the {kind}.',
-  { verb: 'Open', kind: 'door' },
-  'en',
-);
+formatMessage('{verb} the {kind}.', { verb: 'Open', kind: 'door' }, 'en');
 // -> 'Open the door.'
 ```
 
@@ -62,8 +58,7 @@ The case keywords are `zero`, `one`, `two`, `few`, `many`, and `other`. Each lan
 The same message in Russian uses three forms:
 
 ```ts
-const msg =
-  '{n, plural, one {# файл} few {# файла} many {# файлов} other {# файла}}';
+const msg = '{n, plural, one {# файл} few {# файла} many {# файлов} other {# файла}}';
 
 formatMessage(msg, { n: 1 }, 'ru'); // -> '1 файл'
 formatMessage(msg, { n: 3 }, 'ru'); // -> '3 файла'
@@ -76,11 +71,7 @@ Sometimes you want a specific number to render differently. `=N` matches before 
 run.
 
 ```ts
-const msg = `{n, plural,
-  =0 {No messages.}
-  one {# new message.}
-  other {# new messages.}
-}`;
+const msg = `{n, plural, =0 {No messages.} one {# new message.} other {# new messages.}}`;
 
 formatMessage(msg, { n: 0 }, 'en'); // -> 'No messages.'
 formatMessage(msg, { n: 1 }, 'en'); // -> '1 new message.'
@@ -114,11 +105,8 @@ const msg = `{role, select,
   other {You can edit your own posts.}
 }`;
 
-formatMessage(msg, { role: 'admin' }, 'en');
-// -> 'You can edit anything.'
-
-formatMessage(msg, { role: 'member' }, 'en');
-// -> 'You can edit your own posts.'
+formatMessage(msg, { role: 'admin' }, 'en');  // -> 'You can edit anything.'
+formatMessage(msg, { role: 'member' }, 'en'); // -> 'You can edit your own posts.'
 ```
 
 `other` is required, same as `plural`.
@@ -161,26 +149,9 @@ formatMessage('{n, number, percent}', { n: 0.42 }, 'en'); // -> '42%'
 For currencies, units, compact notation, and digit control, use a skeleton with the `::` prefix.
 
 ```ts
-formatMessage(
-  '{amount, number, ::currency/EUR}',
-  { amount: 19.5 },
-  'de',
-);
-// -> '19,50 €'
-
-formatMessage(
-  '{n, number, ::compact-short}',
-  { n: 12500 },
-  'en',
-);
-// -> '13K'
-
-formatMessage(
-  'Pi is about {n, number, ::.000}',
-  { n: Math.PI },
-  'en',
-);
-// -> 'Pi is about 3.142'
+formatMessage('{amount, number, ::currency/EUR}', { amount: 19.5 }, 'de'); // -> '19,50 €'
+formatMessage('{n, number, ::compact-short}', { n: 12500 }, 'en');          // -> '13K'
+formatMessage('Pi is about {n, number, ::.000}', { n: Math.PI }, 'en');     // -> 'Pi is about 3.142'
 ```
 
 The gap in `19,50 €` is a no-break space, exactly as `Intl` produces it.
@@ -223,19 +194,12 @@ Plural and select bodies are themselves messages. Nest freely.
 
 ```ts
 const msg = `{count, plural,
-  one {You have # {kind, select,
-    photo {photo} video {video} other {file}
-  }}
-  other {You have # {kind, select,
-    photo {photos} video {videos} other {files}
-  }}
+  one {You have # {kind, select, photo {photo} video {video} other {file}}}
+  other {You have # {kind, select, photo {photos} video {videos} other {files}}}
 }`;
 
-formatMessage(msg, { count: 1, kind: 'photo' }, 'en');
-// -> 'You have 1 photo'
-
-formatMessage(msg, { count: 7, kind: 'video' }, 'en');
-// -> 'You have 7 videos'
+formatMessage(msg, { count: 1, kind: 'photo' }, 'en'); // -> 'You have 1 photo'
+formatMessage(msg, { count: 7, kind: 'video' }, 'en'); // -> 'You have 7 videos'
 ```
 
 ## Escaping
@@ -244,14 +208,9 @@ formatMessage(msg, { count: 7, kind: 'video' }, 'en');
 quotes. Two apostrophes (`''`) render one.
 
 ```ts
-formatMessage("Use '{name}' to interpolate.", undefined, 'en');
-// -> 'Use {name} to interpolate.'
-
-formatMessage("It''s fine.", undefined, 'en');
-// -> "It's fine."
-
-formatMessage("It's {n, number} o'clock.", { n: 5 }, 'en');
-// -> "It's 5 o'clock."
+formatMessage("Use '{name}' to interpolate.", undefined, 'en'); // -> 'Use {name} to interpolate.'
+formatMessage("It''s fine.", undefined, 'en');                  // -> "It's fine."
+formatMessage("It's {n, number} o'clock.", { n: 5 }, 'en');     // -> "It's 5 o'clock."
 ```
 
 An apostrophe only opens an escape when the next character would otherwise be special. Normal

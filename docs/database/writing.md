@@ -71,10 +71,10 @@ required otherwise, so the type tells you what a record needs before you run it.
 
 ```ts
 await query('Posts').create({
-  title: 'Hello', // required: a non-nullable text field with no default
-  summary: null, // optional: nullable, so null is a value
-  author: 'a1b2...', // a `record` relation, given the target's UUID
-  tags: ['t1', 't2'], // a `records` relation, a list of UUIDs
+  title: 'Hello',                   // required: a non-nullable text field with no default
+  summary: null,                    // optional: nullable, so null is a value
+  author: 'a1b2...',                // a `record` relation, given the target's UUID
+  tags: ['t1', 't2'],               // a `records` relation, a list of UUIDs
   sections: [{ heading: 'Intro' }], // a `repeater`, a list of item shapes
 });
 ```
@@ -151,7 +151,7 @@ with an `invalidReference` error at that field's path.
 
 ```ts
 const result = await query('Posts').create({ title: 'Hello', author: 'missing' });
-result.ok; // false
+result.ok;            // false
 result.errors.author; // the reference does not exist
 ```
 
@@ -210,7 +210,7 @@ defaults, so always send the complete item.
 await query('Posts').where('UUID', id).update({
   sections: [
     { UUID: 'sec-1', heading: 'Kept, and edited' }, // survives, rewritten
-    { heading: 'A brand new section' }, // inserted fresh
+    { heading: 'A brand new section' },             // inserted fresh
   ],
 }); // any section you did not list is deleted
 ```

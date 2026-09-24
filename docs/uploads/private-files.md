@@ -38,9 +38,14 @@ A folder locks everything inside it:
 A private file's [decorations](./uploads.md#the-collection) change:
 
 ```ts
-upload.url; // -> '/uploads/press/launch.jpg?e=1700000000000&s=...'
-upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp,e_1700000000000/press/launch.jpg'
-upload.expires; // -> 1700000000000
+upload.url;
+// -> '/uploads/press/launch.jpg?e=1700000000000&s=...'
+
+upload.variants.thumbnail;
+// -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp,e_1700000000000/press/launch.jpg'
+
+upload.expires;
+// -> 1700000000000
 ```
 
 - `url` is always the API route, never `publicURL` or the backend's own. `e` is the expiry in

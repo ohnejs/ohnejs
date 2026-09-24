@@ -82,8 +82,11 @@ when a service is configured:
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();
 
-upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
-upload.variants.card; // -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg'
+upload.variants.thumbnail;
+// -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
+
+upload.variants.card;
+// -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg'
 ```
 
 Without a service, or for a file that is not an image, `variants` is absent. A
@@ -95,8 +98,11 @@ In server code, pass the name instead of a transforms object:
 ```ts
 import { imageURL } from 'ohnejs/uploads';
 
-imageURL(upload, 'thumbnail'); // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
-imageURL(upload); // -> '/uploads/photos/sunset.jpg'
+imageURL(upload, 'thumbnail');
+// -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/sunset.jpg'
+
+imageURL(upload);
+// -> '/uploads/photos/sunset.jpg'
 ```
 
 After [`ohne prepare`](../project/cli.md#ohne-prepare) or `ohne dev`, `ImageVariantName` is the

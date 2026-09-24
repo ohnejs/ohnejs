@@ -60,9 +60,14 @@ A folder is decorated with `path` only:
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();
 
-upload.path; // -> 'photos/2024/sunset.jpg'
-upload.url; // -> '/uploads/photos/2024/sunset.jpg'
-upload.variants.thumbnail; // -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/2024/sunset.jpg'
+upload.path;
+// -> 'photos/2024/sunset.jpg'
+
+upload.url;
+// -> '/uploads/photos/2024/sunset.jpg'
+
+upload.variants.thumbnail;
+// -> 'https://img.example.com/.../w_320,h_320,fit_inside,f_webp/photos/2024/sunset.jpg'
 ```
 
 Only `read` is exposed over the [collections API](../api/collections.md#exposure), and it is
