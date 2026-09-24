@@ -8,9 +8,11 @@ import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { drainJournal } from '../../../src/uploads/storage/journal.ts';
+import { deleteUpload } from '../../../src/uploads/uploads/delete-upload.ts';
 import { moveUpload } from '../../../src/uploads/uploads/move-upload.ts';
 import { pruneUploads } from '../../../src/uploads/uploads/prune-uploads.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
+import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream } from '../_fixture.ts';
 
 function put(directory: string, name: string): Promise<UploadRecord> {
@@ -95,7 +97,7 @@ describe('pruneUploads', () => {
     strictEqual(storage.objects.has('rec/live.txt'), true);
   });
 
-  it('skips a path a pending journal entry still touches', async () => {
+  it('skips a path a pending move still touches', async () => {
     storage.objects.set('held/old.txt', bytes('old'));
     await queryUntyped('UploadsJournal').createOrThrow({
       sequence: 1,
@@ -109,6 +111,47 @@ describe('pruneUploads', () => {
     strictEqual(await drainJournal(), true);
     deepStrictEqual(within('held', await pruneUploads()), ['held/new.txt']);
     await pruneUploads({ delete: true });
+  });
+
+  it('keeps listing a stray whose delete is still pending, journaled once', async (t) => {
+    storage.objects.set('stuck/stray.txt', bytes('stray'));
+    const { delete: remove } = storage;
+    const failing = t.mock.method(storage, 'delete', async (path: string) => {
+      if (path === 'stuck/stray.txt') throw new Error('read-only');
+      await remove(path);
+    });
+
+    deepStrictEqual(within('stuck', await pruneUploads({ delete: true })), ['stuck/stray.txt']);
+    deepStrictEqual(within('stuck', await pruneUploads({ delete: true })), ['stuck/stray.txt']);
+    deepStrictEqual(within('stuck', await pruneUploads()), ['stuck/stray.txt']);
+    strictEqual(await queryUntyped('UploadsJournal').where({ from: 'stuck/stray.txt' }).count(), 1);
+    failing.mock.restore();
+    strictEqual(await drainJournal(), true);
+    strictEqual(storage.objects.has('stuck/stray.txt'), false);
+  });
+
+  it('lists a deleted file whose delete waits behind a failing lock', async () => {
+    const { UUID } = await put('locked', 'gone.txt');
+    const { setPrivate } = storage;
+    storage.setPrivate = async () => {
+      throw new Error('acl');
+    };
+    try {
+      await updateUpload(UUID, { private: true });
+      await deleteUpload(UUID);
+
+      deepStrictEqual(within('locked', await pruneUploads({ delete: true })), ['locked/gone.txt']);
+      strictEqual(
+        await queryUntyped('UploadsJournal')
+          .where({ op: 'delete', from: 'locked/gone.txt' })
+          .count(),
+        1,
+      );
+    } finally {
+      storage.setPrivate = setPrivate;
+    }
+    strictEqual(await drainJournal(), true);
+    strictEqual(storage.objects.has('locked/gone.txt'), false);
   });
 
   it('holds a stored key whose pending entry differs only in case', async () => {
