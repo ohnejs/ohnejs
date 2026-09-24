@@ -56,8 +56,9 @@ UPLOADS_SECRET=a-long-random-value
 - It may list several secrets, comma-separated. The first signs and any verifies, so it
   [rotates](./image-variants.md#rotating-the-secret) like `IMAGES_SECRET`.
 - Without it the layer keeps no private files at all. Every file is served to anyone, a stored
-  `private` is ignored, `PATCH` drops it, the link route answers `404`, and the dashboard hides
-  the switch, the badges, and the bulk actions. ohne warns at boot while a private row exists.
+  `private` is ignored, `PATCH` drops it, `POST /uploads/private` answers `400`, the link route
+  answers `404`, and the dashboard hides the switch, the badges, and the bulk actions. ohne warns
+  at boot while a private row exists.
 - The column stays, so nothing is lost: set the secret and the same rows are private again.
 
 ## How long a link lives

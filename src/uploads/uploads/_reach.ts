@@ -1,7 +1,7 @@
 import type { QueryScope, Transaction, UntypedQueryBuilder } from 'ohnejs';
 
 import { applyScope, notFound, queryUntyped } from 'ohnejs';
-import { chunk, isUndefined } from 'ohnejs/utils';
+import { chunk, isUndefined, uniqueArray } from 'ohnejs/utils';
 
 import { uploadsError } from './_errors.ts';
 
@@ -23,6 +23,23 @@ export async function assertUploadReach(
 }
 
 /**
+ * Refuses the rows `uuids` with a `404` unless `reach` admits every one, as `assertUploadReach` does.
+ * `uuids` must hold no duplicates.
+ */
+export async function assertUploadsReach(
+  uuids: readonly string[],
+  reach: UploadReach,
+  tx?: Transaction,
+): Promise<void> {
+  for (const batch of chunk(uuids, 900)) {
+    const count = await reached(reach, tx)
+      .where({ UUID: { in: batch } })
+      .count();
+    if (count < batch.length) throw notFound();
+  }
+}
+
+/**
  * The `UUID`s under the folder at `path` that `reach` admits, none when it has no `where`.
  */
 export async function reachedSubtree(
@@ -40,6 +57,7 @@ export async function reachedSubtree(
 
 /**
  * Refuses the write on `tx` with a `422` unless `reach` still admits every row in `uuids`.
+ * `uuids` may repeat a row, as a named row inside a named folder's subtree does.
  */
 export async function assertReached(
   tx: Transaction,
@@ -47,7 +65,7 @@ export async function assertReached(
   uuids: readonly string[],
 ): Promise<void> {
   if (isUndefined(reach?.where)) return;
-  for (const batch of chunk(uuids, 900)) {
+  for (const batch of chunk(uniqueArray(uuids), 900)) {
     const count = await reached(reach, tx)
       .where({ UUID: { in: batch } })
       .count();

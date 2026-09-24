@@ -1,9 +1,14 @@
 import type { RouteOptions } from 'ohnejs';
 
 import { badRequest, useRequest } from 'ohnejs';
-import { coerceToNumber, isNull, isRealNumber } from 'ohnejs/utils';
+import { coerceToNumber, isArray, isNull, isRealNumber, isString, uniqueArray } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
+
+/**
+ * The most `UUID`s one bulk request may name.
+ */
+export const BULK_LIMIT = 1000;
 
 /**
  * The options every route that streams a file body declares.
@@ -25,4 +30,15 @@ export function uploadBody(): { body: ReadableStream<Uint8Array>; size: number |
   const header = request.headers.get('content-length');
   const declared = coerceToNumber(header);
   return { body: request.body, size: isRealNumber(declared) ? declared : undefined };
+}
+
+/**
+ * The `uuids` a bulk request body names, duplicates dropped.
+ * Anything but a non-empty array of strings, or more than `BULK_LIMIT` of them, is a `400`.
+ */
+export function bulkUUIDs(body: Record<string, unknown>): string[] {
+  const { uuids } = body;
+  const valid = isArray(uuids) && uuids.length > 0 && uuids.length <= BULK_LIMIT;
+  if (!valid || !uuids.every(isString)) throw badRequest();
+  return uniqueArray(uuids);
 }

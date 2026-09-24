@@ -1,12 +1,12 @@
-import { queryUntyped, useDatabase } from 'ohnejs';
+import { useDatabase } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
 import type { UploadReach } from './_reach.ts';
 
-import { drainJournal, journalStorage } from '../storage/journal.ts';
+import { drainJournal } from '../storage/journal.ts';
+import { deleteRow } from './_patch.ts';
 import { assertUploadReach } from './_reach.ts';
 import { readUpload } from './_row.ts';
-import { uploadPath } from './path.ts';
 
 /**
  * Options for `deleteUpload`.
@@ -34,19 +34,7 @@ export interface DeleteUploadOptions {
 export async function deleteUpload(uuid: string, options: DeleteUploadOptions = {}): Promise<void> {
   await useDatabase().transaction(async (tx) => {
     if (!isUndefined(options.reach)) await assertUploadReach(uuid, options.reach, tx);
-    const row = await readUpload(uuid, tx);
-    const path = uploadPath(row);
-    if (row.kind === 'folder') {
-      await queryUntyped('Uploads')
-        .use(tx)
-        .whereAny((g) => [
-          g.where({ directory: path }),
-          g.where({ directory: { startsWith: `${path}/` } }),
-        ])
-        .delete();
-    }
-    await queryUntyped('Uploads').use(tx).where({ UUID: uuid }).delete();
-    await journalStorage(tx, { op: 'delete', from: path });
+    await deleteRow(tx, await readUpload(uuid, tx));
   }, 'immediate');
   await drainJournal();
 }

@@ -5,6 +5,7 @@ import { extname, isBoolean, isUndefined, omit } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
 import type { UploadReach } from './_reach.ts';
+import type { UploadRow } from './_row.ts';
 import type { MoveUploadTarget } from './move-upload.ts';
 import type { UploadRecord } from './types.ts';
 import type { UpdateUploadInput } from './update-upload.ts';
@@ -85,6 +86,24 @@ export async function updateRow(
   if (row.kind === 'folder') await setDescendantsPrivate(tx, path, input.private === true);
   await journalStorage(tx, { op: input.private ? 'lock' : 'unlock', from: path });
   return updated;
+}
+
+/**
+ * Deletes `row` on `tx`, as `deleteUpload` describes: a folder takes its whole subtree along.
+ */
+export async function deleteRow(tx: Transaction, row: UploadRow): Promise<void> {
+  const path = uploadPath(row);
+  if (row.kind === 'folder') {
+    await queryUntyped('Uploads')
+      .use(tx)
+      .whereAny((g) => [
+        g.where({ directory: path }),
+        g.where({ directory: { startsWith: `${path}/` } }),
+      ])
+      .delete();
+  }
+  await queryUntyped('Uploads').use(tx).where({ UUID: row.UUID }).delete();
+  await journalStorage(tx, { op: 'delete', from: path });
 }
 
 /**

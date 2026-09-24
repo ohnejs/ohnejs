@@ -3,6 +3,7 @@ import { parseTableState, serializeTableState } from 'app/components/collection-
 import { activeContentLocale } from 'app/components/content-language-switcher.ts';
 import {
   api,
+  type APIRouteID,
   type DashboardCollection,
   dashboardConfig,
   dashboardMeta,
@@ -13,6 +14,7 @@ import {
 import {
   type ConditionObject,
   hasCapability,
+  isEmpty,
   isUndefined,
   parseSearchParams,
   stringifySearchParams,
@@ -22,7 +24,7 @@ import {
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
-import { readWireError } from './_wire-error.ts';
+import { readWireError, type WireError } from './_wire-error.ts';
 
 declare module 'ohnejs/dashboard' {
   interface DashboardMeta {
@@ -33,7 +35,6 @@ declare module 'ohnejs/dashboard' {
   }
 }
 
-import { runBatched } from './_batch.ts';
 import { useUploadsT } from './_messages.ts';
 import { versionedURL } from './media-details-state.ts';
 import {
@@ -247,10 +248,11 @@ export function refreshMedia(): void {
 }
 
 /**
- * Moves records into `directory`, one `PATCH` each with bounded concurrency, deepest path first.
- * Rows already there and folders that would move into themselves stay put.
+ * Moves records into `directory` in one request, all or nothing.
+ * Rows already there, and folders that would move into themselves, stay out of the request.
+ * The server takes a row inside a moving folder along with it.
  * Refreshes the libraries and toasts the moved count.
- * A taken name toasts the conflict; a refusal toasts its reason.
+ * A taken name toasts the conflict, any other refusal its reason, and nothing moves.
  * Resolves the number of rows moved.
  */
 export async function moveUploads(
@@ -258,67 +260,47 @@ export async function moveUploads(
   directory: string,
 ): Promise<number> {
   const t = useUploadsT();
-  const results = await runBatched(movePlan(records, directory), BATCH_LIMIT, (record) =>
-    api(`PATCH /uploads/${record.UUID}`, {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ directory }),
-    }),
-  );
-  const moved = results.filter((result) => landed(result)).length;
-  const failures = await Promise.all(
-    results.filter(unprocessable).map(({ value }) => readWireError(value)),
-  );
-  const refusals = failures.map(({ errors }) => errors['']);
-  const reason = refusals.find((message) => !isUndefined(message));
-  const conflicts = refusals.filter(isUndefined).length;
-  if (moved > 0) refreshMedia();
-  if (conflicts > 0) toast(t('uploads.dashboard.itemsConflict'), { type: 'error' });
-  if (!isUndefined(reason)) toast(reason, { type: 'error' });
-  if (moved > 0 || failures.length === 0) {
-    toast(t('uploads.dashboard.moved', { count: moved }), {
-      type: moved > 0 ? 'success' : 'default',
-    });
+  const plan = movePlan(records, directory);
+  if (plan.length > 0) {
+    const refusal = await sendBulk('POST /uploads/move', { uuids: uuidsOf(plan), directory });
+    if (!isUndefined(refusal)) {
+      const conflict = !isEmpty(refusal.errors) && isUndefined(refusal.errors['']);
+      toast(conflict ? t('uploads.dashboard.itemsConflict') : refusal.message, { type: 'error' });
+      return 0;
+    }
   }
-  return moved;
+  toast(t('uploads.dashboard.moved', { count: plan.length }), {
+    type: plan.length > 0 ? 'success' : 'default',
+  });
+  return plan.length;
 }
 
 /**
- * Makes records private or public, one `PATCH` each with bounded concurrency.
+ * Makes records private or public in one request, all or nothing.
  * The server takes a folder's contents along, so the rows go as given.
- * Refreshes the libraries and toasts the changed count, with the first refusal's reason beneath it.
- * When nothing changes, the toast names the refused change instead, with the same reason.
+ * Refreshes the libraries and toasts the changed count.
+ * A refusal toasts the refused change with its reason, and nothing changes.
  * Resolves the number of rows changed.
  */
 export async function setUploadsPrivate(
   records: readonly UploadRecord[],
   value: boolean,
 ): Promise<number> {
+  if (records.length === 0) return 0;
   const t = useUploadsT();
-  const results = await runBatched(records, BATCH_LIMIT, (record) =>
-    api(`PATCH /uploads/${record.UUID}`, {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ private: value }),
-    }),
-  );
-  const changed = results.filter((result) => landed(result)).length;
-  if (changed > 0) refreshMedia();
-  if (records.length > 0) {
-    const key = value ? 'uploads.dashboard.madePrivate' : 'uploads.dashboard.madePublic';
-    const failure = results.find(unprocessable);
-    const reason = isUndefined(failure) ? undefined : (await readWireError(failure.value)).message;
-    if (changed === 0 && !isUndefined(reason)) {
-      const refused = value
-        ? 'uploads.dashboard.notMadePrivate'
-        : 'uploads.dashboard.notMadePublic';
-      toast(t(refused, { count: records.length }), { type: 'error', description: reason });
-    } else {
-      toast(t(key, { count: changed }), {
-        type: changed > 0 ? 'success' : 'error',
-        description: reason,
-      });
-    }
+  const count = records.length;
+  const refusal = await sendBulk('POST /uploads/private', {
+    uuids: uuidsOf(records),
+    private: value,
+  });
+  if (!isUndefined(refusal)) {
+    const refused = value ? 'uploads.dashboard.notMadePrivate' : 'uploads.dashboard.notMadePublic';
+    toast(t(refused, { count }), { type: 'error', description: refusal.message });
+    return 0;
   }
-  return changed;
+  const key = value ? 'uploads.dashboard.madePrivate' : 'uploads.dashboard.madePublic';
+  toast(t(key, { count }), { type: 'success' });
+  return count;
 }
 
 /**
@@ -337,10 +319,11 @@ export async function temporaryLink(uuid: string, maxAge: string): Promise<strin
 }
 
 /**
- * Confirms and deletes records, one `DELETE` each with bounded concurrency.
- * A row inside a selected folder is pruned first: the folder's delete takes its subtree along.
+ * Confirms and deletes records in one request, all or nothing.
+ * A row inside a selected folder is left out: the folder takes its subtree along.
  * The dialog names a single row, counts several, and notes the subtree when a folder is among them.
  * Refreshes the libraries and toasts the deleted count.
+ * A refusal toasts its reason, and nothing is deleted.
  * A second call while one runs is ignored.
  */
 export async function confirmDeleteUploads(records: readonly UploadRecord[]): Promise<void> {
@@ -363,29 +346,39 @@ export async function confirmDeleteUploads(records: readonly UploadRecord[]): Pr
   });
   if (action !== 'delete') return;
   deleting = true;
-  const results = await runBatched(targets, BATCH_LIMIT, (record) =>
-    api(`DELETE /uploads/${record.UUID}`),
-  );
+  const refusal = await sendBulk('POST /uploads/delete', { uuids: uuidsOf(targets) });
   deleting = false;
-  const deleted = results.filter((result) => landed(result)).length;
-  if (deleted > 0) refreshMedia();
-  toast(t('uploads.dashboard.deleted', { count: deleted }), {
-    type: deleted > 0 ? 'success' : 'error',
-  });
+  if (isUndefined(refusal)) {
+    toast(t('uploads.dashboard.deleted', { count: targets.length }), { type: 'success' });
+  } else {
+    toast(refusal.message, { type: 'error' });
+  }
 }
 
 /**
- * Whether a settled request answered with a success status.
+ * Sends one bulk request and refreshes the libraries when it lands.
+ * Resolves `undefined` on success, else the refusal: the answer's error, or that the API is unreachable.
  */
-function landed(result: PromiseSettledResult<Response>): boolean {
-  return result.status === 'fulfilled' && result.value.ok;
+async function sendBulk(
+  route: APIRouteID,
+  body: Record<string, unknown>,
+): Promise<WireError | undefined> {
+  try {
+    const response = await api(route, {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) return readWireError(response);
+  } catch {
+    return { errors: {}, message: useUploadsT()('dashboard.unreachable') };
+  }
+  refreshMedia();
+  return undefined;
 }
 
 /**
- * Whether a batched request was answered with a `422`.
+ * The `UUID`s of `records`, in order.
  */
-function unprocessable(
-  result: PromiseSettledResult<Response>,
-): result is PromiseFulfilledResult<Response> {
-  return result.status === 'fulfilled' && result.value.status === 422;
+function uuidsOf(records: readonly UploadRecord[]): string[] {
+  return records.map((record) => record.UUID);
 }

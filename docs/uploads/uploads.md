@@ -97,6 +97,9 @@ POST   /uploads/folders                             { "directory": "photos", "na
 PATCH  /uploads/[uuid]                              { "name"?, "directory"?, "description"?, "focalX"?, "focalY"?, "private"? }
 POST   /uploads/[uuid]/replace                      the body replaces the file's bytes
 DELETE /uploads/[uuid]                              a folder takes everything inside it
+POST   /uploads/move                                { "uuids": [...], "directory": "archive" }
+POST   /uploads/private                             { "uuids": [...], "private": true }
+POST   /uploads/delete                              { "uuids": [...] }
 GET    /uploads/[uuid]/link?maxAge=7d               a temporary link to a private file
 GET    /uploads/[...path]                           the bytes
 ```
@@ -128,24 +131,52 @@ The upload and replace routes accept bodies up to `uploads.maxFileSize` and run 
 timeout. An upload may take up to [`api.requestTimeout`](../project/config.md#the-api-server).
 Unless you set it, that is Node's default of 5 minutes.
 
+## Changing many rows at once
+
+The bulk routes move, lock, or delete every row in `uuids` in one request. It is all or nothing:
+if one row fails, nothing changes, and the answer is the error that row would get on its own.
+
+```sh
+curl -X POST 'http://localhost:9001/uploads/move' --cookie "session=..." \
+  -H 'content-type: application/json' \
+  --data '{ "uuids": ["0b7c...", "4f1e..."], "directory": "archive" }'
+```
+
+- `uuids` holds up to 1000 entries. Duplicates are dropped.
+- An unknown `UUID`, or one you cannot see, is a `404`.
+- A row inside a folder you also named goes along with that folder.
+- A move skips rows already in `directory`. A folder moved into itself is a `422`.
+- Move and privacy answer the records in the order you gave. Delete answers `204`.
+
 ## In server code
 
 The same operations are functions in `ohnejs/uploads`, for a route or a boot file of your own:
 
 ```ts
-import { createFolder, deleteUpload, moveUpload, putUpload, updateUpload } from 'ohnejs/uploads';
+import {
+  createFolder,
+  deleteUpload,
+  deleteUploads,
+  moveUpload,
+  moveUploads,
+  putUpload,
+  updateUpload,
+} from 'ohnejs/uploads';
 
 const upload = await putUpload({ directory: 'imports', name: 'report.pdf', body });
 await updateUpload(upload.UUID, { description: 'Quarterly report' }, { locale: 'de' });
 await moveUpload(upload.UUID, { directory: 'archive/2026' });
-await createFolder({ directory: 'archive', name: '2027' });
+const folder = await createFolder({ directory: 'archive', name: '2027' });
+await moveUploads([upload.UUID], folder.path);
 await deleteUpload(upload.UUID);
+await deleteUploads([folder.UUID]);
 ```
 
 - `body` is a web `ReadableStream`, which is what [`useRequest().body`](../api/request.md#the-body)
   gives you.
 - Every helper throws the same errors the routes answer with.
-- Every helper except `deleteUpload` returns the decorated record, an `UploadRecord`.
+- Every helper except the deletes returns the decorated record, an `UploadRecord`, or a list of them.
+- `moveUploads`, `setUploadsPrivate`, and `deleteUploads` are all or nothing, like the bulk routes.
 
 Changing `name` or `directory` directly through `query('Uploads')` does not move the object, so use
 `moveUpload`.

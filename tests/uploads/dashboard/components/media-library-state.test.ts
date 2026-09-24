@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { UploadRecord } from '../../../../src/uploads/uploads/types.ts';
@@ -15,6 +15,7 @@ import {
   mediaGroupField,
   mediaPath,
   movePlan,
+  PER_PAGE,
   pinned,
   pruneDescendants,
   rangeBetween,
@@ -23,6 +24,7 @@ import {
   searchWhere,
   splitFileName,
 } from '../../../../src/uploads/dashboard/components/media-library-state.ts';
+import { BULK_LIMIT } from '../../../../src/uploads/uploads/_body.ts';
 
 function upload(path: string, kind: 'file' | 'folder' = 'file'): UploadRecord {
   const slash = path.lastIndexOf('/');
@@ -57,6 +59,12 @@ const notes = upload('notes.txt');
 const archive = upload('archive', 'folder');
 
 const uuids = (records: readonly UploadRecord[]): string[] => records.map((record) => record.UUID);
+
+describe('PER_PAGE', () => {
+  it('fits a selected page into one bulk request', () => {
+    ok(PER_PAGE <= BULK_LIMIT);
+  });
+});
 
 describe('media view selection', () => {
   it('appends plain picks in order and sets the origin', () => {
