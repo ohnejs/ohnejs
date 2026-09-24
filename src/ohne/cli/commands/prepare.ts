@@ -1,22 +1,12 @@
 import { defineCommand } from '../../../utils/cli/index.ts';
 import {
   formatDuration,
-  isString,
   measure,
   naturalCompare,
   relativePath,
   resolvePath,
 } from '../../../utils/index.ts';
-import { generateBrowserTSConfig } from '../../codegen/generate-browser-tsconfig.ts';
-import { generateDatabase } from '../../codegen/generate-database.ts';
-import { generateLayerCodegen } from '../../codegen/generate-layer-codegen.ts';
-import { generateLayerName } from '../../codegen/generate-layer-name.ts';
-import { generateMessages } from '../../codegen/generate-messages.ts';
-import { generateMiddleware } from '../../codegen/generate-middleware.ts';
-import { generateResolvedConfig } from '../../codegen/generate-resolved-config.ts';
-import { generateRoles } from '../../codegen/generate-roles.ts';
-import { generateRoutes } from '../../codegen/generate-routes.ts';
-import { pruneCodegen } from '../../codegen/prune-codegen.ts';
+import { generateProject } from '../../codegen/generate-project.ts';
 import { loadLayers } from '../../layers/load-layers.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
 import { isOhneProject } from '../../project/is-ohne-project.ts';
@@ -55,23 +45,7 @@ export const prepareCommand = defineCommand({
     await loadProjectEnv(cwd);
     const { result: written, ms } = await measure(async () => {
       await loadLayers(cwd);
-      const files = (
-        await Promise.all([
-          generateLayerName(cwd),
-          generateResolvedConfig(cwd),
-          generateBrowserTSConfig(cwd),
-          generateRoutes(cwd),
-          generateMiddleware(cwd),
-          generateMessages(cwd),
-          generateDatabase(cwd),
-          generateRoles(cwd),
-          generateLayerCodegen(cwd),
-        ])
-      )
-        .flat()
-        .filter(isString);
-      await pruneCodegen(cwd, files);
-      return files;
+      return generateProject(cwd);
     });
 
     print.successBlock({
