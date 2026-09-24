@@ -69,6 +69,13 @@ describe('withDefaults', () => {
         {},
       );
     });
+
+    it('drops a nested own key when input omits its whole group', () => {
+      deepStrictEqual(
+        withDefaults({}, { a: { b: { x: 1 }, y: 2 } }, { strategies: { 'a.b.x': 'own' } }),
+        { a: { b: {}, y: 2 } },
+      );
+    });
   });
 
   describe("strategy 'concat'", () => {
@@ -254,7 +261,7 @@ describe('withDefaults', () => {
   describe('boundary cases', () => {
     it('returns defaults when input is undefined', () => {
       const defaults = { a: 1 };
-      strictEqual(withDefaults(undefined, defaults), defaults);
+      deepStrictEqual(withDefaults(undefined, defaults), defaults);
     });
 
     it('returns input when defaults is undefined', () => {

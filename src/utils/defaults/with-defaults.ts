@@ -126,6 +126,7 @@ function apply(
     }
   }
 
+  if (isUndefined(input) && isPlainObject(defaults)) return apply({}, defaults, path, strategies);
   if (isUndefined(input)) return defaults;
   if (isUndefined(defaults)) return input;
 
