@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { cp, open, rename, rmdir } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
+import { basename, dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
 import { ensureDir, exists, listDir, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
 import type { StorageAdapter } from './adapter.ts';
@@ -16,7 +16,8 @@ const WRITE_TEMP = /\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.t
  * `root` is the configured `uploads.url`, resolved against the working directory.
  * A key maps onto its path beneath `root`, so a folder prefix is a real directory.
  * A write lands in a sibling temp file and renames into place, so a reader never sees a partial object.
- * A delete also removes the parent directories it leaves empty, so the tree never accumulates them.
+ * A delete also removes the temp files a crashed write left beside the object.
+ * It removes the parent directories it leaves empty too, so the tree never accumulates them.
  * A listing walks the tree and passes over those temp files.
  *
  * @example
@@ -76,6 +77,7 @@ export function createFSStorage(root: string): StorageAdapter {
     async delete(path) {
       const target = locate(base, path);
       await removeDir(target);
+      await removeWriteTemps(target);
       await pruneEmpty(dirname(target), base);
     },
   };
@@ -125,6 +127,17 @@ async function relocate(source: string, target: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
     await cp(source, target, { recursive: true });
     await removeDir(source);
+  }
+}
+
+/**
+ * Removes every temp file a write of `target` left beside it, so a crash mid-write leaks nothing.
+ */
+async function removeWriteTemps(target: string): Promise<void> {
+  const entries = (await listDir(dirname(target), { depth: 0, hidden: true })) ?? [];
+  const prefix = `${basename(target)}.`;
+  for (const entry of entries) {
+    if (entry.name.startsWith(prefix) && WRITE_TEMP.test(entry.name)) await removeFile(entry.path);
   }
 }
 

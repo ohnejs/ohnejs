@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -272,6 +272,17 @@ describe('createFSStorage', () => {
     strictEqual(existsSync(join(dir, 'photos')), false);
     strictEqual(await storage.stat('photos/2024/a.jpg'), null);
     strictEqual(await storage.stat('photos/b.jpg'), null);
+  });
+
+  it('removes the temp files a crashed write left beside a key it deletes', async () => {
+    await storage.write('photos/a.jpg', streamOf('a'), { type: 'image/jpeg' });
+    const temp = join(dir, 'photos/a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp');
+    writeFileSync(temp, 'partial');
+    writeFileSync(join(dir, 'photos/a.jpg.keep'), 'k');
+
+    await storage.delete('photos/a.jpg');
+
+    deepStrictEqual(readdirSync(join(dir, 'photos')), ['a.jpg.keep']);
   });
 
   it('treats a delete of a missing path as a no-op', async () => {
