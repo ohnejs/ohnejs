@@ -159,6 +159,17 @@ export interface Config {
     migrations?: string;
 
     /**
+     * Directory each layer's CLI commands are read from.
+     * Each top-level `.ts` file default-exports one `defineCommand` result; the file names the command.
+     * A `_`-prefixed file is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'commands'
+     */
+    commands?: string;
+
+    /**
      * Directory each layer's dashboard pages and components are read from and served from.
      * Dashboard pages live under `pages/` within it (`pages/authors/[id].ts` -> the `/authors/[id]` page).
      * Resolved against each layer's root.
@@ -795,6 +806,7 @@ export const DIR_DEFAULTS = {
   blocks: 'blocks',
   roles: 'roles',
   migrations: 'migrations',
+  commands: 'commands',
   dashboard: 'dashboard',
 } satisfies NonNullable<Config['dirs']>;
 
