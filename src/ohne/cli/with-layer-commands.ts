@@ -54,9 +54,10 @@ export async function withLayerCommands(root: Command, argv: string[]): Promise<
   const token = isUndefined(head) || head.startsWith('-') ? undefined : head;
   if (!isUndefined(token) && hasKey(builtins, token)) return root;
 
-  const { flags } = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
+  const { flags, positionals } = parseArgv(argv, { booleans: ['help', 'h', 'version', 'v'] });
   const help = flags.help || flags.h;
-  if (isUndefined(token) && (flags.version || flags.v) && !help) return root;
+  const misplaced = positionals.length > 0;
+  if (isUndefined(token) && !help && (flags.version || flags.v || misplaced)) return root;
 
   const cwd = last(toArray(flags.cwd ?? []));
   const project = resolvePath(isString(cwd) ? cwd : '.');

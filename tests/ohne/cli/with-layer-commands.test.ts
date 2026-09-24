@@ -107,15 +107,17 @@ describe('withLayerCommands', () => {
     await rejects(withLayerCommands(ohne, ['--help', '--cwd', app]), /The Lich King stirs/);
   });
 
-  it('returns `root` itself for a bare `--version`, loading the stack once `--help` joins it', async () => {
+  it('returns `root` itself for a leading flag, loading the stack once `--help` joins it', async () => {
     const app = project('version', LICH_KING);
 
     strictEqual(await withLayerCommands(ohne, ['--version', '--cwd', app]), ohne);
     strictEqual(await withLayerCommands(ohne, ['-v', '--cwd', app]), ohne);
+    strictEqual(await withLayerCommands(ohne, ['--cwd', app, 'seed']), ohne);
     await rejects(
       withLayerCommands(ohne, ['--version', '--help', '--cwd', app]),
       /The Lich King stirs/,
     );
+    await rejects(withLayerCommands(ohne, ['--cwd', app]), /The Lich King stirs/);
   });
 
   it('returns `root` itself outside an ohne project', async () => {
