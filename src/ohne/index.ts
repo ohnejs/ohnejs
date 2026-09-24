@@ -106,6 +106,7 @@ export * from './http/use-search-params.ts';
 export * from './http/use-signed-cookies.ts';
 export * from './http/use-t.ts';
 export * from './http/wait-until.ts';
+export * from './layers/app-root.ts';
 export * from './layers/config.ts';
 export * from './layers/define-config.ts';
 export * from './layers/define-layer.ts';

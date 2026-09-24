@@ -1,11 +1,11 @@
 import type { Dialect } from './dialect.ts';
 
-import { isAbsolutePath, isUndefined, joinPath, last } from '../../utils/index.ts';
+import { isAbsolutePath, isUndefined, joinPath } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { appRoot } from '../layers/app-root.ts';
 import { DEFAULT_DATABASE_URL, DEFAULT_DIALECT } from '../layers/config.ts';
 import { useConfig } from '../layers/use-config.ts';
-import { useLayers } from '../layers/use-layers.ts';
 import { clearDatabases, registerDatabase, registerDialect } from './use-database.ts';
 import { useDialects } from './use-dialects.ts';
 
@@ -43,16 +43,14 @@ export async function connect(): Promise<Dialect> {
 }
 
 /**
- * Resolves a plain relative path against the app root, the closest layer of the stack.
+ * Resolves a plain relative path against the app root.
  * `:memory:`, `file:` URLs, driver URLs carrying a scheme, and absolute paths pass through untouched.
- * Without a loaded stack the path stays as given, resolving against the process working directory.
  */
 function rootRelative(url: string): string {
   if (url === ':memory:' || url.startsWith('file:') || url.includes('://') || isAbsolutePath(url)) {
     return url;
   }
-  const root = last(useLayers().layers())?.path;
-  return isUndefined(root) ? url : joinPath(root, url);
+  return joinPath(appRoot(), url);
 }
 
 /**
