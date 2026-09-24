@@ -21,6 +21,7 @@ database that is gone when the process ends. That is useful when you do not need
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
+  layers: ['ohnejs/base'],
   database: { url: '.data/app.db' },
 });
 ```
@@ -44,7 +45,10 @@ own name:
 
 ```ts
 // ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
 export default defineConfig({
+  layers: ['ohnejs/base'],
   database: {
     helpers: { rateLimit: '.data/rate-limit.db' },
   },

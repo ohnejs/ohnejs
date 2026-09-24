@@ -149,6 +149,7 @@ pattern for every method:
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
+  layers: ['ohnejs/base'],
   disable: {
     routes: ['/internal/**', 'GET /admin/**'],
   },

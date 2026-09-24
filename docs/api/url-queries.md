@@ -8,6 +8,7 @@ The [collections API](./collections.md) ships endpoints built on exactly this pi
 page when you build your own.
 
 ```ts
+// api/posts.get.ts
 import {
   applyQuery,
   defineHandler,
@@ -129,6 +130,17 @@ Mixing `limit` or `offset` with `page` or `perPage` is a `400`.
 them from the parsed query and call [`paginate`](../database/reading.md#pagination) yourself:
 
 ```ts
+// api/posts.get.ts
+import {
+  applyQuery,
+  defineHandler,
+  parseQueryParams,
+  queryMetadata,
+  queryUntyped,
+  resolveGuards,
+  useSearchParams,
+} from 'ohnejs';
+
 export default defineHandler(async () => {
   const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), resolveGuards());
   const builder = applyQuery(queryUntyped('Posts'), parsed);
@@ -247,6 +259,7 @@ A query that is too long for a URL can be sent as a JSON body in the same gramma
 reads it, and you pass the parsed object to the same `parseQueryParams`:
 
 ```ts
+// api/posts/query.post.ts
 import {
   applyQuery,
   defineHandler,
@@ -317,6 +330,17 @@ To change a ceiling:
 - For one endpoint, pass it to `resolveGuards`:
 
 ```ts
+// api/posts.get.ts
+import {
+  applyQuery,
+  defineHandler,
+  parseQueryParams,
+  queryMetadata,
+  queryUntyped,
+  resolveGuards,
+  useSearchParams,
+} from 'ohnejs';
+
 export default defineHandler(async () => {
   const guards = resolveGuards({ maxPopulateDepth: 3 });
   const parsed = parseQueryParams(useSearchParams(), queryMetadata('Posts'), guards);

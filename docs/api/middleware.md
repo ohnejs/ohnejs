@@ -88,6 +88,9 @@ The option also takes a function. It receives every named middleware in the app 
 ones to run:
 
 ```ts
+// api/reports.get.ts
+import { defineHandler } from 'ohnejs';
+
 export default defineHandler(() => report(), {
   middleware: (available) => available.filter((name) => name !== 'rate-limit'),
 });

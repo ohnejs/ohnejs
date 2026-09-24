@@ -99,6 +99,9 @@ unique index is created.
 Constraints over several columns live on the collection, one entry per constraint:
 
 ```ts
+// collections/Members.ts
+import { defineCollection, field } from 'ohnejs';
+
 export default defineCollection({
   fields: {
     email: field('text'),
@@ -285,16 +288,24 @@ keeping its own order:
 
 ```ts
 // collections/Posts.ts
-fields: {
-  tags: field('records', { collection: 'Tags' }),
-}
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    tags: field('records', { collection: 'Tags' }),
+  },
+});
 ```
 
 ```ts
 // collections/Tags.ts
-fields: {
-  posts: field('records', { collection: 'Posts', inverse: 'tags' }),
-}
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    posts: field('records', { collection: 'Posts', inverse: 'tags' }),
+  },
+});
 ```
 
 Reading `posts` on a tag uses the same links as `tags` on a post, in the opposite direction. The
@@ -363,6 +374,8 @@ A singleton is a collection that holds exactly one record, like site settings. M
 
 ```ts
 // collections/Settings.ts
+import { defineCollection, field } from 'ohnejs';
+
 export default defineCollection({
   singleton: true,
   api: { read: 'public', update: true },
@@ -445,6 +458,9 @@ Two options change only the editor, never what is stored:
 The collection-level `dashboard` key sets how the dashboard presents the collection itself:
 
 ```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
 export default defineCollection({
   dashboard: {
     icon: 'note',

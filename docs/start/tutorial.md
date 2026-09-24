@@ -225,7 +225,8 @@ One last file. Browser code type-checks against DOM types, not Node's, so the ro
 excludes `dashboard/`. Give the dashboard its own
 [`dashboard/tsconfig.json`](../dashboard/pages.md#type-checking):
 
-```json
+```jsonc
+// dashboard/tsconfig.json
 {
   "extends": "../.ohne/browser/tsconfig.json"
 }
@@ -237,6 +238,152 @@ To check it with your Node code, set the `typecheck` script in `package.json` to
 
 Pick **Posts** in the sidebar, or open `http://localhost:9000/posts`, and your posts are on screen.
 From here, every dashboard save reloads the browser, and nothing restarts.
+
+## The finished app
+
+The whole app, every file in one place:
+
+`collections/Posts.ts`
+
+```ts files
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text'),
+    body: field('text'),
+  },
+});
+```
+
+`api/posts.get.ts`
+
+```ts files
+import { defineHandler, query } from 'ohnejs';
+
+export default defineHandler(() => query('Posts').findMany());
+```
+
+`api/posts.post.ts`
+
+```ts files
+import { defineHandler, query, readJSONBody, setResponseStatus } from 'ohnejs';
+
+export default defineHandler(async () => {
+  const input = await readJSONBody<{ title: string; body: string }>();
+  const result = await query('Posts').create(input);
+
+  if (!result.ok) {
+    setResponseStatus(422);
+    return { errors: result.errors };
+  }
+
+  setResponseStatus(201);
+  return result.record;
+});
+```
+
+`dashboard/pages/posts.ts`
+
+```ts files
+import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
+
+import { shell } from 'app/components/shell.ts';
+
+interface Post {
+  UUID: string;
+  title: string;
+  body: string;
+}
+
+export default defineDashboardPage(() =>
+  shell(() => {
+    const posts = ref<Post[]>([]);
+
+    void api('GET /posts')
+      .then((response) => response.json())
+      .then((list: Post[]) => (posts.value = list));
+
+    return h(
+      'div',
+      null,
+      h('h1', null, 'Posts'),
+      each(
+        () => posts.value,
+        (post) => post.UUID,
+        (post) =>
+          h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
+      ),
+    );
+  }),
+);
+```
+
+`dashboard/tsconfig.json`
+
+```json files
+{
+  "extends": "../.ohne/browser/tsconfig.json"
+}
+```
+
+`ohne.config.ts`
+
+```ts files
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    menu: [
+      {
+        items: [
+          { to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' },
+          { to: '/posts', label: 'Posts', icon: 'article' },
+        ],
+      },
+    ],
+  },
+});
+```
+
+`package.json`
+
+```json files
+{
+  "name": "blog",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "ohne dev",
+    "serve:api": "ohne serve api",
+    "serve:dashboard": "ohne serve dashboard",
+    "prepare": "ohne prepare",
+    "typecheck": "tsc && tsc -p dashboard/tsconfig.json"
+  },
+  "dependencies": {
+    "ohnejs": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}
+```
+
+`tsconfig.json`
+
+```json files
+{
+  "extends": "ohnejs/tsconfig.node.json",
+  "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
+  "exclude": ["dashboard"]
+}
+```
 
 To go deeper into the dashboard:
 

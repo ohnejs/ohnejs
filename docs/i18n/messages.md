@@ -11,9 +11,23 @@ Catalogs translate what the app says, not what records store. Records translate 
 French error messages but no French record values, and a new
 [content locale](../project/config.md#content-locales) adds no UI language.
 
-A catalog is a file under `messages/`, named after its language. `messages/en.json`:
+A catalog is a file under `messages/`, named after its language, and a handler translates with
+`useT`:
 
-```json
+`api/inbox.get.ts`
+
+```ts files
+import { defineHandler, useT } from 'ohnejs';
+
+export default defineHandler(() => {
+  const t = useT();
+  return { status: t('inbox.unread', { count: 3 }) };
+});
+```
+
+`messages/en.json`
+
+```json files
 {
   "inbox": {
     "empty": "No new notifications",
@@ -22,9 +36,9 @@ A catalog is a file under `messages/`, named after its language. `messages/en.js
 }
 ```
 
-And `messages/de.json`:
+`messages/de.json`
 
-```json
+```json files
 {
   "inbox": {
     "empty": "Keine neuen Benachrichtigungen",
@@ -33,16 +47,51 @@ And `messages/de.json`:
 }
 ```
 
-A handler translates with `useT`:
+`ohne.config.ts`
 
-```ts
-// api/inbox.get.ts
-import { defineHandler, useT } from 'ohnejs';
+```ts files
+import { defineConfig } from 'ohnejs';
 
-export default defineHandler(() => {
-  const t = useT();
-  return { status: t('inbox.unread', { count: 3 }) };
+export default defineConfig({
+  layers: ['ohnejs/base'],
 });
+```
+
+`package.json`
+
+```json files
+{
+  "name": "my-app",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "ohne dev",
+    "serve:api": "ohne serve api",
+    "serve:dashboard": "ohne serve dashboard",
+    "prepare": "ohne prepare",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "ohnejs": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}
+```
+
+`tsconfig.json`
+
+```json files
+{
+  "extends": "ohnejs/tsconfig.node.json",
+  "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
+  "exclude": ["dashboard"]
+}
 ```
 
 A request with `Accept-Language: de` gets "Du hast 3 ungelesene Nachrichten", and one without gets
@@ -144,7 +193,7 @@ Catalogs merge across [layers](../project/layers.md#what-overrides-what), per ke
 closer layer overrides exactly the keys it redefines and leaves the rest in place. Your app is the
 closest layer, so it overrides all others. `ohnejs/base` is at the bottom and ships the framework's
 strings in English, German, and Bosnian. To replace one shipped string, you only need a tiny
-catalog:
+`messages/en.json`:
 
 ```json
 {

@@ -71,6 +71,7 @@ A `.env` next to `ohne.config.ts` holds the variables you would rather not type 
 such as secrets. Every command reads it before anything else runs:
 
 ```sh
+# .env
 DATABASE=.data/dev.db
 COOKIE_SECRET=a-long-random-value
 ```

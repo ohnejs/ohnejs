@@ -232,9 +232,11 @@ await destroySession();                // ends the session and clears the cookie
 The auth settings live under `auth` in [`ohne.config.ts`](../project/config.md):
 
 ```ts
+// ohne.config.ts
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
+  layers: ['ohnejs/base'],
   auth: {
     sessionMaxAge: '30d',         // a remembered session's lifetime, and the ceiling
     transientSessionMaxAge: '1d', // the lifetime without remember me

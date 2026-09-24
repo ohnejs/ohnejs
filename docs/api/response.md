@@ -185,5 +185,8 @@ error line and stops waiting for the promise, so it no longer delays shutdown. A
 overrides the limit through its [options](./routes.md#per-route-options):
 
 ```ts
+// api/track.post.ts
+import { defineHandler } from 'ohnejs';
+
 export default defineHandler(() => track(), { waitUntilTimeout: '5s' });
 ```

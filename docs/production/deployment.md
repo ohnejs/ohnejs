@@ -94,9 +94,11 @@ ohne trusts only the socket connection itself. Behind a load balancer,
 plain `http`.
 
 ```ts
+// ohne.config.ts
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
+  layers: ['ohnejs/base'],
   api: {
     trustProxy: ['10.0.0.0/8'],
     allowedHosts: ['api.example.com', '*.example.com'],
@@ -161,7 +163,11 @@ your platform's kill timeout, or the platform `SIGKILL`s the process during the 
 gives 30 seconds by default, and PM2's `kill_timeout` gives only 1.6:
 
 ```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
 export default defineConfig({
+  layers: ['ohnejs/base'],
   api: {
     preStopDelay: '5s',
     shutdownTimeout: '20s',

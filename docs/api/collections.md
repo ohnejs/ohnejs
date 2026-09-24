@@ -131,13 +131,19 @@ An exposed operation is guarded by default: the request needs a signed-in user w
 any operation it does not name stays closed:
 
 ```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
 export default defineCollection({
   api: {
     read: 'public',
     create: true,
     update: { middleware: ['audit'] },
   },
-  fields: { ... },
+  fields: {
+    title: field('text'),
+    views: field('integer'),
+  },
 });
 ```
 

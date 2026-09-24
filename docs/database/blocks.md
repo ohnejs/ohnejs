@@ -8,20 +8,9 @@ different one.
 Use them when content is built from different sections in an order the editor chooses: a page body,
 a landing page, an article with embeds between paragraphs.
 
-```ts
-// blocks/Hero.ts
-import { defineBlock, field } from 'ohnejs';
+`collections/Pages.ts`
 
-export default defineBlock({
-  fields: {
-    title: field('text'),
-    subtitle: field('text', { nullable: true }),
-  },
-});
-```
-
-```ts
-// collections/Pages.ts
+```ts files
 import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
@@ -32,17 +21,22 @@ export default defineCollection({
 });
 ```
 
-A read returns `content` as a list of items, each naming its type.
+`blocks/Hero.ts`
 
-## Defining a block
+```ts files
+import { defineBlock, field } from 'ohnejs';
 
-A block lives in one file under `blocks/`, which is each layer's `dirs.blocks` directory, set in
-[config](../project/config.md#directories). The file names the block: `blocks/Quote.ts` defines
-`Quote`. Its fields are ordinary [`field(...)` instances](./collections.md) - columns, relations,
-composites, to any depth.
+export default defineBlock({
+  fields: {
+    title: field('text'),
+    subtitle: field('text', { nullable: true }),
+  },
+});
+```
 
-```ts
-// blocks/Quote.ts
+`blocks/Quote.ts`
+
+```ts files
 import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
@@ -52,6 +46,62 @@ export default defineBlock({
   },
 });
 ```
+
+`ohne.config.ts`
+
+```ts files
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+});
+```
+
+`package.json`
+
+```json files
+{
+  "name": "my-app",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "ohne dev",
+    "serve:api": "ohne serve api",
+    "serve:dashboard": "ohne serve dashboard",
+    "prepare": "ohne prepare",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "ohnejs": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}
+```
+
+`tsconfig.json`
+
+```json files
+{
+  "extends": "ohnejs/tsconfig.node.json",
+  "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
+  "exclude": ["dashboard"]
+}
+```
+
+A read returns `content` as a list of items, each naming its type.
+
+## Defining a block
+
+A block lives in one file under `blocks/`, which is each layer's `dirs.blocks` directory, set in
+[config](../project/config.md#directories). The file names the block: `blocks/Quote.ts` defines
+`Quote`. Its fields are ordinary [`field(...)` instances](./collections.md) - columns, relations,
+composites, to any depth.
 
 A block can have no fields. A divider, for example, has a type but no data.
 

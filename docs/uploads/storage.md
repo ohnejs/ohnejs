@@ -42,7 +42,12 @@ useStorages().register('gcs', (url) => createGCSStorage(url));
 
 ```ts
 // ohne.config.ts
-uploads: { storage: 'gcs', url: 'gs://my-bucket/uploads' },
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  uploads: { storage: 'gcs', url: 'gs://my-bucket/uploads' },
+});
 ```
 
 A backend implements `StorageAdapter`; its JSDoc names each method. The rules it cannot show:

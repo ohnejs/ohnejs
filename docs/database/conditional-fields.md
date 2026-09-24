@@ -99,11 +99,15 @@ field's condition in it. Otherwise a chain can store a value that its own condit
 
 ```ts
 // collections/Products.ts
-fields: {
-  kind: field('text'),
-  discount: field('integer', { nullable: true, when: { kind: 'sale' } }),
-  banner: field('text', { nullable: true, when: { discount: { atLeast: 10 } } }),
-}
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    kind: field('text'),
+    discount: field('integer', { nullable: true, when: { kind: 'sale' } }),
+    banner: field('text', { nullable: true, when: { discount: { atLeast: 10 } } }),
+  },
+});
 ```
 
 ```ts
@@ -132,15 +136,19 @@ default, exactly like a subfield you left out. It is not kept.
 
 ```ts
 // collections/Posts.ts
-fields: {
-  kind: field('text'),
-  revisions: field('repeater', {
-    fields: {
-      note: field('text', { nullable: true, when: { '../kind': 'published' } }),
-      label: field('text', { nullable: true }),
-    },
-  }),
-}
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    kind: field('text'),
+    revisions: field('repeater', {
+      fields: {
+        note: field('text', { nullable: true, when: { '../kind': 'published' } }),
+        label: field('text', { nullable: true }),
+      },
+    }),
+  },
+});
 ```
 
 ```ts

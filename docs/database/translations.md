@@ -58,12 +58,16 @@ The locale set and its default live in `ohne.config.ts`, as
 [content locales](../project/config.md#content-locales):
 
 ```ts
-export default {
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
   collections: {
     locales: ['en', 'de', 'bs'],
     defaultLocale: 'en',
   },
-};
+});
 ```
 
 After codegen, `.locale()` accepts exactly this set, so `.locale('fr')` on the config above is a

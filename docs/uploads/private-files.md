@@ -68,7 +68,13 @@ upload.expires;
 `uploads.privateMaxAge` sets the window, as a `parseDuration` value:
 
 ```ts
-uploads: { privateMaxAge: '1h' },
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  uploads: { privateMaxAge: '1h' },
+});
 ```
 
 - A read mints links that expire at the end of the window after the one holding now, so a link
@@ -90,12 +96,20 @@ To keep some files behind a role, grant it a
 [your own `collections/Uploads.ts`](./uploads.md#the-collection):
 
 ```ts
-api: {
-  read: {
-    access: async () =>
-      userCan(await requireUser(), 'media.private') || { where: { private: false } },
+// collections/Uploads.ts
+import { defineCollection } from 'ohnejs';
+import { requireUser, userCan } from 'ohnejs/auth';
+import { uploadsDefinition } from 'ohnejs/uploads';
+
+export default defineCollection({
+  ...uploadsDefinition,
+  api: {
+    read: {
+      access: async () =>
+        userCan(await requireUser(), 'media.private') || { where: { private: false } },
+    },
   },
-},
+});
 ```
 
 - A caller outside the scope does not see the row, cannot open its bytes, and gets `null` where a

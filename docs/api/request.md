@@ -202,6 +202,9 @@ instead of throwing. Use it in code that runs with or without a request.
 with an auth session or a resolved user. Augment its type from your app with `declare module`:
 
 ```ts
+// context.ts
+import type { Session } from 'ohnejs/auth';
+
 declare module 'ohnejs' {
   interface EventContext {
     auth: Session;

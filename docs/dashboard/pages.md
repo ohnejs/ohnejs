@@ -98,6 +98,7 @@ give it a row, declare [`dashboard.menu`](../project/config.md#the-dashboard):
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
+  layers: ['ohnejs/base'],
   dashboard: {
     menu: [
       {
@@ -201,7 +202,8 @@ Dashboard code is browser code: it has DOM types and no `node:` imports. So it t
 own program. The [scaffold's root `tsconfig.json`](../start/installation.md#the-project-files)
 excludes `dashboard/`, so the directory needs its own:
 
-```json
+```jsonc
+// dashboard/tsconfig.json
 {
   "extends": "../.ohne/browser/tsconfig.json"
 }
