@@ -22,6 +22,7 @@ describe('freezeIR deep-freezes the populate tree', () => {
     ],
     locale: null,
     wire: null,
+    unscoped: false,
   });
 
   it('freezes the list, every node, each subselect, and each children list', () => {
@@ -65,6 +66,7 @@ describe('freezeIR deep-freezes the condition tree and order entries', () => {
     populate: [],
     locale: null,
     wire: null,
+    unscoped: false,
   });
   const folded = ir.condition as Extract<ConditionNode, { kind: 'and' }>;
 
@@ -104,6 +106,7 @@ describe('freezeIR deep-freezes the condition tree and order entries', () => {
       populate: [],
       locale: null,
       wire: null,
+      unscoped: false,
     });
     strictEqual(lone.condition?.kind, 'compare');
     notStrictEqual(lone.condition, compare);

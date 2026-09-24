@@ -364,6 +364,7 @@ describe('a wire read composes under its reach', () => {
       populate: [],
       locale: null,
       wire: { condition: null, reach },
+      unscoped: false,
     });
     ok(Object.isFrozen(ir.wire));
     ok(Object.isFrozen(ir.wire?.reach.get('WrAuthors')));

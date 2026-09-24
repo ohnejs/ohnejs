@@ -182,6 +182,7 @@ async function attemptCreate(
     populate: [],
     locale,
     wire: null,
+    unscoped: false,
   });
   const record = rows[0];
   if (isUndefined(record)) {

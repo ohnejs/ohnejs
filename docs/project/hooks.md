@@ -437,6 +437,9 @@ hook('query:filter', (ir) => {
 
 - It fires once per SQL statement: `findMany`, `findFirst`, `count`, `exists`, and `pluck`'s column
   path. A `paginate` fires it twice, once for its count and once for its rows.
+- A `queryUntyped` read chained with `.unscoped()` skips it. Use that where a hidden row would pass
+  for a missing one, like checking that no user exists yet. [`query:records`](#queryrecords) still
+  runs on the rows it returns, and `.unscoped()` has no effect on writes.
 - The `QueryIR` is frozen, so mutating it throws. Spread it, add your clause to `condition`, wrapped
   in an `and` when a condition already exists, and return the rebuilt IR.
 - It does not reach populated targets. Use [`populate:targets`](#populatetargets) to scope populated

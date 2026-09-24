@@ -452,4 +452,15 @@ export interface UntypedQueryBuilder {
    * ```
    */
   use(tx: Transaction): this;
+
+  /**
+   * Makes the read skip the `query:filter` hook, so an app scope hides no row from it.
+   * `query:records` still runs, and a write ignores it: `record:condition` still scopes the write.
+   *
+   * @example
+   * ```ts
+   * await queryUntyped('Users').unscoped().exists()
+   * ```
+   */
+  unscoped(): this;
 }

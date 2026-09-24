@@ -47,6 +47,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private offsetValue: number | null = null;
   private localeValue: string | null = null;
   private wireState: WireReach | null = null;
+  private unscopedRead = false;
   private joinedTx?: Transaction;
   private readonly meta: CollectionQueryMeta;
 
@@ -230,6 +231,11 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return this;
   }
 
+  unscoped(): this {
+    this.unscopedRead = true;
+    return this;
+  }
+
   /**
    * Folds the accumulated conditions into one node, refusing a write that would touch every record.
    * The typed `ReadyQuery` state already gates this, so the throw catches only an untyped caller.
@@ -262,6 +268,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       populate: this.populateNodes,
       locale: this.localeValue,
       wire: this.wireState,
+      unscoped: this.unscopedRead,
     });
   }
 }

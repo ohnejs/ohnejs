@@ -121,6 +121,11 @@ export interface QueryIR {
    * A wire read's untrusted condition and reach, or `null` on a trusted read.
    */
   wire: WireReach | null;
+
+  /**
+   * Whether the read skips the `query:filter` hook.
+   */
+  unscoped: boolean;
 }
 
 /**
@@ -140,6 +145,7 @@ export function freezeIR(state: {
   populate: readonly PopulateNode[];
   locale: string | null;
   wire: WireReach | null;
+  unscoped: boolean;
 }): QueryIR {
   const condition = isEmpty(state.conditions)
     ? null
@@ -166,6 +172,7 @@ export function freezeIR(state: {
             : freezeConditionNode(state.wire.condition),
           reach: freezeReach(state.wire.reach),
         }),
+    unscoped: state.unscoped,
   });
 }
 

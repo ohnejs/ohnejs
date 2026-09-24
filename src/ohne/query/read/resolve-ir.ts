@@ -8,6 +8,7 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the frozen `QueryIR` before a read terminal compiles it, so one scope reaches every read.
+     * A read marked `unscoped` skips it.
      * Fires once per statement: `findMany`, `findFirst`, `count`, `exists`, `pluck`, and a write's read-back.
      * A `paginate` fires it twice, once for its count and once for its row read, each a separate statement.
      * AND-inject a scoping condition here: a tenant key, a soft-delete `deletedAt IS NULL`, or an ACL clause.
@@ -23,8 +24,10 @@ declare module 'ohnejs' {
 /**
  * Runs the `query:filter` hook over a frozen `QueryIR`, or returns it untouched when none is registered.
  * Every read terminal calls this at its head, so a registered scope reaches every read the same way.
+ * An `unscoped` read returns untouched.
  */
 export async function resolveIR(ir: QueryIR): Promise<QueryIR> {
+  if (ir.unscoped) return ir;
   const callbacks = useHooks().get('query:filter');
   if (isUndefined(callbacks) || callbacks.length === 0) return ir;
   return applyHook('query:filter', ir);

@@ -80,4 +80,17 @@ describe('query:filter', () => {
     deepStrictEqual(titles, ['Alpha', 'Gamma']);
     strictEqual(await queryUntyped('RPosts').count(), 2);
   });
+
+  it('passes over an unscoped read, which sees every row', async () => {
+    let called = 0;
+    hook('query:filter', (ir) => {
+      called++;
+      return { ...ir, limit: 0 };
+    });
+
+    strictEqual(await queryUntyped('RPosts').unscoped().count(), 3);
+    strictEqual((await queryUntyped('RPosts').unscoped().findMany()).length, 3);
+    strictEqual(called, 0);
+    strictEqual((await queryUntyped('RPosts').findMany()).length, 0);
+  });
 });
