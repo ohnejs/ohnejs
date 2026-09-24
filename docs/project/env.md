@@ -32,6 +32,10 @@ If a value is invalid, ohne refuses to boot and names the variable: `PORT=abc` f
 | `API_URL`          | -             | Base URL the dashboard's browser client calls, over `dashboard.apiURL`.                                             |
 | `DASHBOARD_URL`    | -             | Dashboard origin the API's [CORS](../api/middleware.md#cors) allows, over `dashboard.origin`.                       |
 
+A layer defines its own, such as the uploads layer's
+[`UPLOADS_URL`](../uploads/uploads.md#configuration) and
+[`UPLOADS_SECRET`](../uploads/private-files.md).
+
 Boolean variables accept `1`, `true`, `0`, and `false`, case-insensitive. A few work differently:
 
 - `NO_COLOR` - any non-empty value disables color, following the no-color.org standard.
