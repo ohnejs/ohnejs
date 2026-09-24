@@ -15,7 +15,7 @@ imageURL(upload, { width: 800, format: 'webp' });
 ## Connecting a service
 
 Set `uploads.images.url` in [the uploads config](./uploads.md#configuration) to the service origin,
-and `IMAGES_SECRET` in the environment to the secret you share with it:
+and `UPLOADS_SECRET` in the environment to a secret you share with it:
 
 ```ts
 // ohne.config.ts
@@ -30,8 +30,10 @@ export default defineConfig({
 ```
 
 ```sh
-IMAGES_SECRET=a-long-random-value
+UPLOADS_SECRET=a-long-random-value
 ```
+
+Give the service the same value as its `IMAGES_SECRET`.
 
 Without a URL, `imageURL` returns the original file's URL, so a page renders the same either way.
 
@@ -89,8 +91,9 @@ upload.variants.card;
 // -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg'
 ```
 
-Without a service, or for a file that is not an image, `variants` is absent. A
-[private image's](./private-files.md) variants expire with its `url`. The dashboard's
+Without a service, for a file that is not an image, or for a
+[private image](./private-files.md#the-secret) while `UPLOADS_SECRET` is unset, `variants` is
+absent. A private image's variants expire with its `url`. The dashboard's
 [details popup](./uploads.md#the-dashboard) lists them under Variants.
 
 In server code, pass the name instead of a transforms object:
@@ -154,12 +157,13 @@ browser's `Accept` string is a separate cache entry.
 
 ## Rotating the secret
 
-`IMAGES_SECRET` may list several secrets, comma-separated. ohne signs with the first, and a service
-accepts a URL signed by any of them. To rotate:
+`UPLOADS_SECRET` may [list several secrets](./private-files.md#the-secret), and a service accepts a
+URL signed by any of them. To rotate:
 
-1. Add the new secret on the service.
+1. Add the new secret on the service, after the old one. The service signs its fetch of a private
+   original with its first secret, which ohne must already know.
 2. On ohne, put it first in the list.
-3. Once every page has re-rendered, remove the old one from the service.
+3. Once every page has re-rendered, remove the old one from the service, then from ohne.
 
 ## Allowing only your variants
 

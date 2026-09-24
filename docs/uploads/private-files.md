@@ -1,15 +1,9 @@
 # Private files
 
-A private file opens only through a link that expires, or for a signed-in reader who may read
-`Uploads`.
+A private file opens only for a signed-in reader who may read `Uploads`, or through a temporary
+link.
 
-Set `UPLOADS_SECRET` first. It signs every link:
-
-```sh
-UPLOADS_SECRET=a-long-random-value
-```
-
-Then mark a file or folder private in the dashboard, or in server code:
+Mark a file or folder private in the dashboard, or in server code:
 
 ```ts
 import { updateUpload } from 'ohnejs/uploads';
@@ -17,7 +11,11 @@ import { updateUpload } from 'ohnejs/uploads';
 await updateUpload(upload.UUID, { private: true });
 ```
 
-Every read of it now carries a signed link that expires.
+Set `UPLOADS_SECRET` and every read of it also carries a temporary link:
+
+```sh
+UPLOADS_SECRET=a-long-random-value
+```
 
 ## Marking files private
 
@@ -50,18 +48,20 @@ upload.expires;
 
 - `url` is always the API route, never `publicURL` or the backend's own. `e` is the expiry in
   epoch milliseconds and `s` its signature.
-- `variants` carry the same expiry as their last [transform](./image-service.md#transforms), and
-  need `IMAGES_SECRET` too, since an unsigned service could not guard the original.
+- `variants` carry the same expiry as their last [transform](./image-service.md#transforms).
 - `expires` says when both stop working.
 - A read whose `select` leaves out `private` decorates every file as private, so select it too.
 
 ## The secret
 
-- `UPLOADS_SECRET` may list several secrets, comma-separated. The first signs and any verifies, so
-  it [rotates](./image-variants.md#rotating-the-secret) like `IMAGES_SECRET`.
-- Without it no file can be made private, and a private file opens only for a signed-in reader,
-  with no links and no variants. The dashboard hides the private controls.
-- The rows keep their flag, so setting the secret later makes the same files linkable again.
+`UPLOADS_SECRET` signs temporary links and
+[image variants](./image-variants.md#connecting-a-service):
+
+- It may list several secrets, comma-separated. The first signs and any verifies, which is how you
+  rotate it.
+- Without it, a private file's `url` is the bare API route and `variants` is absent.
+  `POST /uploads/[uuid]/link` answers `404`, and ohne warns at boot while a private row exists.
+- Only `Copy temporary link` in the dashboard needs it.
 
 ## How long a link lives
 
@@ -144,5 +144,5 @@ A private file is hidden at the API route alone. A [backend](./storage.md#a-back
 without `setPrivate` keeps its object readable at `publicURL`, and ohne warns at boot.
 [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) tags a private object so the bucket can
 refuse it. Its [README](https://github.com/ohnejs/uploads-s3#private-files) has the policy. An
-[image service](https://github.com/ohnejs/images#private-files) fetches a private original only
-with one of your `UPLOADS_SECRET` values, so give it `--source-secret`.
+[image service](https://github.com/ohnejs/images#private-files) fetches a private original through
+a link it signs with the same secret, so give it your `UPLOADS_SECRET` as its `IMAGES_SECRET`.

@@ -127,14 +127,12 @@ dashboard's origin may read API responses, cookies included.
 Each secret is a long random value. Set the ones your app uses:
 
 - `COOKIE_SECRET` signs [cookies](../api/request.md#signed-cookies). Without it, signing throws.
-- `IMAGES_SECRET` signs [image variant URLs](../uploads/image-variants.md#connecting-a-service).
-  Without it, an image service that checks signatures refuses every variant.
-- `UPLOADS_SECRET` signs the links of [private files](../uploads/private-files.md). Without it, a
-  private file opens only for a signed-in reader.
+- `UPLOADS_SECRET` signs [image variant URLs](../uploads/image-variants.md#connecting-a-service) and
+  the links of [private files](../uploads/private-files.md#the-secret). Without it, a private file
+  opens only for a signed-in reader and variant URLs are unsigned.
 
 ```sh
 COOKIE_SECRET=zug-zug-work-work-jobs-done
-IMAGES_SECRET=you-are-not-prepared
 UPLOADS_SECRET=frostmourne-hungers
 ```
 

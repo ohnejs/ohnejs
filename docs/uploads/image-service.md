@@ -69,7 +69,7 @@ one variant it names. A [private file's](./private-files.md) URL carries its exp
 the signed transforms, so nobody can extend it without the secret.
 
 The fetch of a private original ([step 5](#what-a-service-does)) signs `e_<expires>/<path>` the
-same way, under an `UPLOADS_SECRET` value:
+same way, under the same secret:
 
 | secret    | expires         | path                | signature                                     |
 | --------- | --------------- | ------------------- | --------------------------------------------- |
@@ -91,11 +91,10 @@ same way, under an `UPLOADS_SECRET` value:
 4. Refuse an expired URL: when `e` is present and not after the current time, answer `403`.
 5. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
    normally the app's [`/uploads` origin](./uploads.md#serving).
-   - With a source secret, one of the app's `UPLOADS_SECRET` values, sign the fetch for a URL that
-     carries `e` with `?e=<expires>&s=<signature>`: `expires` a minute ahead in epoch milliseconds,
-     and `signature` the HMAC over `e_<expires>/<path>` under that secret. A
-     [private file's](./private-files.md) original answers `404` to anything else. An unsigned
-     service must not hold one, since anyone could then make it fetch any private original.
+   - Sign the fetch with your secret for a URL that carries `e`, as `?e=<expires>&s=<signature>`:
+     `expires` a minute ahead in epoch milliseconds, and `signature` the HMAC over
+     `e_<expires>/<path>`. A [private file's](./private-files.md) original answers `404` to
+     anything else. An unsigned service has no secret and fetches bare.
    - Fetch bare for a URL without `e`, and cache the two fetches apart, so a URL that never expires
      cannot open a private original.
    - Answer `404` when the origin does, and `502` when it is unreachable, both with

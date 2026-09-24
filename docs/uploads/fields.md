@@ -61,7 +61,7 @@ that belongs to no upload fails like any other
 
 [Populate](../database/reading.md#populating-relations) the field to get the upload's record,
 decorated with `url`, with `variants` when an [image service](./image-variants.md) is configured,
-and with `expires` for a [private file](./private-files.md):
+and, with `UPLOADS_SECRET` set, with `expires` for a [private file](./private-files.md):
 
 ```ts
 const post = await query('Posts').populate('cover').where('UUID', id).findFirst();

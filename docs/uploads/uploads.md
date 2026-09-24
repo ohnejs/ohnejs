@@ -41,9 +41,8 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
   and every segment is a slug.
 - `description` - a file's alt text, one per
   [content locale](../database/translations.md#marking-fields).
-- `private` - whether only a [signed link or a signed-in reader](./private-files.md) opens the
-  bytes. Without `UPLOADS_SECRET` it can no longer change, and the file opens only for a signed-in
-  reader.
+- `private` - whether only a [signed-in reader with access, or a temporary link](./private-files.md)
+  opens the bytes.
 - `type`, `size`, `hash`, `width`, `height`, `focalX`, `focalY`, `author`, and `uploadedAt`
   describe the file.
 
