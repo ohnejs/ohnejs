@@ -50,7 +50,7 @@ export async function pruneUploads(options: PruneUploadsOptions = {}): Promise<s
   if (isUndefined(storage.list)) {
     throw ohneError({
       title: `The \`${useUploadsConfig().storage}\` storage cannot list its objects`,
-      body: ['`pruneUploads` finds stray files by listing them, so the backend needs `list`.'],
+      body: ['Stray files are found by listing the stored objects, so the backend needs `list`.'],
     });
   }
   await drainJournal();
