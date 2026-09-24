@@ -39,6 +39,18 @@ async function failure(run: () => Promise<unknown>): Promise<Record<string, unkn
 }
 
 describe('putUpload', () => {
+  it('422s a directory path that is a file, creating nothing', async () => {
+    await putUpload({ directory: 'flat', name: 'readme', body: stream(bytes('r')) });
+    const errors = await failure(() =>
+      putUpload({ directory: 'flat/readme', name: 'x.txt', body: stream(bytes('x')) }),
+    );
+    deepStrictEqual(errors, {
+      directory: { key: 'uploads.errors.notAFolder', params: { path: 'flat/readme' } },
+    });
+    strictEqual(await queryUntyped('Uploads').where({ directory: 'flat/readme' }).exists(), false);
+    deepStrictEqual(temps(), []);
+  });
+
   it('lands the row and the object at the canonical path, hashed and sized', async () => {
     const source = bytes('hello, uploads');
     const upload = await putUpload({

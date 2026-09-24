@@ -104,6 +104,7 @@
     "minHeight": "Slika mora biti visoka najmanje `{min}` piksela",
     "minWidth": "Slika mora biti široka najmanje `{min}` piksela",
     "notAFile": "Ovo je folder, a ne datoteka",
+    "notAFolder": "Putanja `{path}` je datoteka, a ne folder",
     "notAnImage": "Datoteka nije slika",
     "notSVG": "Datoteka nije SVG slika",
     "outOfReach": "Više ne biste vidjeli rezultat",

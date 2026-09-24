@@ -104,6 +104,7 @@
     "minHeight": "The image must be at least `{min}` pixels tall",
     "minWidth": "The image must be at least `{min}` pixels wide",
     "notAFile": "This is a folder, not a file",
+    "notAFolder": "The path `{path}` is a file, not a folder",
     "notAnImage": "The file is not an image",
     "notSVG": "The file is not an SVG image",
     "outOfReach": "You would no longer see the result",

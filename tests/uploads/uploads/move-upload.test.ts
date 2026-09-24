@@ -184,6 +184,21 @@ describe('moveUpload', () => {
     strictEqual(storage.visibility.get('keep/stay.txt'), true);
   });
 
+  it('422s a move into a path a file holds, moving nothing', async () => {
+    const file = await put('into', 'notes', 'n');
+    const other = await put('into', 'b.txt', 'b');
+    await rejects(moveUpload(other, { directory: 'into/notes' }), (error: unknown) => {
+      if (!isValidationError(error)) return false;
+      deepStrictEqual(error.errors, {
+        directory: { key: 'uploads.errors.notAFolder', params: { path: 'into/notes' } },
+      });
+      return true;
+    });
+    deepStrictEqual(await paths('into'), ['into/b.txt', 'into/notes']);
+    strictEqual(text(storage.objects.get('into/b.txt')), 'b');
+    await moveUpload(file, { name: 'notes-2' });
+  });
+
   it('404s an unknown UUID', async () => {
     await rejects(
       moveUpload('missing', { name: 'x.txt' }),
