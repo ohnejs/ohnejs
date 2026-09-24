@@ -142,6 +142,25 @@ describe('ohne', () => {
     match(result.output, /^hook$/m);
   });
 
+  it('prints an unawaited rejection once, exits 1, and still runs the shutdown hooks', () => {
+    const dir = makeApp('stray');
+    writeCommand(
+      dir,
+      'portal',
+      "import { onShutdown } from 'ohnejs';",
+      'onShutdown(async () => {\n' +
+        '  await new Promise((resolve) => setTimeout(resolve, 10));\n' +
+        "  console.log('hook');\n" +
+        '});\n' +
+        "void Promise.reject(new Error('The Dark Portal opened'));",
+    );
+
+    const result = ohne(root, 'portal', '--cwd', dir);
+    strictEqual(result.status, 1);
+    strictEqual(result.output.match(/The Dark Portal opened/g)?.length, 1);
+    match(result.output, /^hook$/m);
+  });
+
   it('keeps the `process.exitCode` a command sets', () => {
     const dir = makeApp('exit');
     writeCommand(dir, 'retreat', '', 'process.exitCode = 3;');

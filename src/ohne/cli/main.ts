@@ -7,6 +7,11 @@ import { withLayerCommands } from './with-layer-commands.ts';
 
 const argv = process.argv.slice(2);
 
+process.on('unhandledRejection', (error) => {
+  reportError(error);
+  process.exitCode = 1;
+});
+
 try {
   applyEnvFlags(argv);
   // Read before a layer loads: a flag defined later would be listed but never applied.
