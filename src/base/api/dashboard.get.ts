@@ -582,8 +582,8 @@ declare module 'ohnejs' {
     /**
      * Extends the discovery payload after everything else resolved, before `GET /dashboard` answers.
      * Fires once per read, inside the request context, so the viewer and their language are in scope.
-     * A layer adds a key by augmenting `DashboardMeta` here and in `ohnejs/dashboard` for the browser.
      * Mutate the object in place; whatever it holds afterwards is the answer.
+     * A layer types its key by augmenting `DashboardMeta` in `ohnejs/dashboard`, where the browser reads it.
      */
     'dashboard:meta': (meta: DashboardMeta, context: { user: User }) => void | Promise<void>;
   }
