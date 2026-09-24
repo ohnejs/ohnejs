@@ -301,6 +301,16 @@ describe('createFSStorage', () => {
     deepStrictEqual(readdirSync(join(dir, 'photos')), ['a.jpg.keep']);
   });
 
+  it('keeps a folder named like a temp file beside a key it deletes', async () => {
+    const folder = 'photos/a.jpg.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp';
+    await storage.write('photos/a.jpg', streamOf('a'), { type: 'image/jpeg' });
+    await storage.write(`${folder}/b.jpg`, streamOf('b'), { type: 'image/jpeg' });
+
+    await storage.delete('photos/a.jpg');
+
+    strictEqual(readFileSync(join(dir, folder, 'b.jpg'), 'utf8'), 'b');
+  });
+
   it('treats a delete of a missing path as a no-op', async () => {
     await storage.delete('nothing/here.txt');
 

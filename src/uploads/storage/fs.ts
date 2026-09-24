@@ -1,9 +1,17 @@
 import { createReadStream } from 'node:fs';
-import { cp, open, rename, rmdir } from 'node:fs/promises';
+import { cp, open, readdir, rename, rmdir } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { appRoot } from 'ohnejs';
-import { basename, dirname, isNull, resolvePath, safeResolve, uuidv7 } from 'ohnejs/utils';
+import {
+  basename,
+  dirname,
+  isNull,
+  joinPath,
+  resolvePath,
+  safeResolve,
+  uuidv7,
+} from 'ohnejs/utils';
 import { ensureDir, exists, listDir, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
 import type { StorageAdapter } from './adapter.ts';
@@ -141,10 +149,18 @@ async function relocate(source: string, target: string): Promise<void> {
  * Removes every temp file a write of `target` left beside it, so a crash mid-write leaks nothing.
  */
 async function removeWriteTemps(target: string): Promise<void> {
-  const entries = (await listDir(dirname(target), { depth: 0, hidden: true })) ?? [];
+  const dir = dirname(target);
   const prefix = `${basename(target)}.`;
+  const entries = await readdir(dir, { withFileTypes: true }).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    },
+  );
   for (const entry of entries) {
-    if (entry.name.startsWith(prefix) && WRITE_TEMP.test(entry.name)) await removeFile(entry.path);
+    if (entry.isFile() && entry.name.startsWith(prefix) && WRITE_TEMP.test(entry.name)) {
+      await removeFile(joinPath(dir, entry.name));
+    }
   }
 }
 
