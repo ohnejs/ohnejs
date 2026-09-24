@@ -1,12 +1,13 @@
-import { doesNotMatch, match, strictEqual } from 'node:assert';
+import { match, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import '../../../src/uploads/boot/private.ts';
-import '../_fixture.ts';
+import { storage } from '../_fixture.ts';
 
 /**
  * Runs the ready hook and returns what the printer wrote.
@@ -54,27 +55,22 @@ describe('the private boot file', () => {
     strictEqual(await readyOutput(), '');
   });
 
-  it('lists public rows directly inside a private folder once a secret is set', async () => {
-    const create = (row: Record<string, unknown>) => queryUntyped('Uploads').createOrThrow(row);
-    await create({ kind: 'folder', directory: '', name: 'locked', private: true });
-    await create({ kind: 'file', directory: 'locked', name: 'sealed.txt', private: true });
-    await create({ kind: 'file', directory: 'locked', name: 'leak.txt', private: false });
-    await create({ kind: 'folder', directory: 'locked', name: 'open', private: false });
-    await create({ kind: 'file', directory: 'locked/open', name: 'deep.txt', private: false });
-    doesNotMatch(await readyOutput(), /Public uploads/);
+  it('warns when publicURL serves a storage that cannot hide a private row', async () => {
     useEnv().set('UPLOADS_SECRET', 'secret');
-    const output = await readyOutput();
-    match(output, /Public uploads inside a private folder/);
-    match(output, /locked\/leak\.txt/);
-    match(output, /locked\/open\b/);
-    doesNotMatch(output, /sealed|deep/);
-  });
-
-  it('stays silent with a secret while every row inside a private folder is private', async () => {
-    await queryUntyped('Uploads')
-      .where({ directory: { in: ['locked', 'locked/open'] } })
-      .updateOrThrow({ private: true });
-    useEnv().set('UPLOADS_SECRET', 'secret');
-    strictEqual(await readyOutput(), '');
+    useLayers().add({
+      path: '/private-public-url',
+      input: { uploads: { publicURL: 'https://cdn.example.com' } },
+    });
+    const { setPrivate } = storage;
+    try {
+      strictEqual(await readyOutput(), '');
+      delete (storage as { setPrivate?: unknown }).setPrivate;
+      const output = await readyOutput();
+      match(output, /Private uploads are readable at/);
+      match(output, /https:\/\/cdn\.example\.com/);
+    } finally {
+      storage.setPrivate = setPrivate;
+      useLayers().remove('/private-public-url');
+    }
   });
 });

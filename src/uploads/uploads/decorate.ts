@@ -7,15 +7,14 @@ import {
   isOptimizableImage,
 } from '../images/image-url.ts';
 import { privateExpiry } from './_expiry.ts';
-import { privateUploads } from './_private.ts';
 import { uploadPath } from './path.ts';
 import { uploadURL } from './url.ts';
 
 /**
  * Adds `path` and `url` to an `Uploads` record in place.
  * Adds `variants` too, one signed URL per configured variant, when the image service can render them.
- * Without an `UPLOADS_SECRET` the layer has no private files, so every record is decorated as public.
- * A private file otherwise gets the signed API route as `url`, and `expires`.
+ * A private file gets the API route as `url`, signed and with `expires` while an `UPLOADS_SECRET` is set.
+ * Without the secret it is the bare route, which only a signed-in reader can open, and `variants` is absent.
  * Its `variants` need an `IMAGES_SECRET` as well, since an unsigned service could not guard the original.
  * A file whose `select` left out `private` is decorated as private, since it may be one.
  * A folder gets `path` alone: it has no bytes to serve.
@@ -34,7 +33,7 @@ export function decorateUpload(record: Record<string, unknown>): void {
   if (!isString(directory) || !isString(name)) return;
   record.path = uploadPath({ directory, name });
   if (record.kind === 'folder') return;
-  const locked = privateUploads() && (record.private === true || isUndefined(record.private));
+  const locked = record.private === true || isUndefined(record.private);
   const expires = locked ? privateExpiry() : undefined;
   if (!isUndefined(expires)) record.expires = expires;
   record.url = uploadURL({ directory, name, private: locked, expires });

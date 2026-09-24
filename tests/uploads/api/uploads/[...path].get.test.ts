@@ -210,12 +210,13 @@ describe('GET /uploads/[...path] on a private file', () => {
     });
   });
 
-  it('serves the row to anyone while no secret makes the layer keep private files', async () => {
+  it('stays closed to anyone while no secret can sign a link, open to a reader', async () => {
     await withoutSecret(async () => {
-      const response = await getHidden();
+      strictEqual((await getHidden()).status, 404);
+      const response = await getHidden('', { bearer: reader });
       strictEqual(response.status, 200);
       strictEqual(await response.text(), 'hush');
-      strictEqual(response.headers.get('cache-control'), 'no-cache');
+      strictEqual(response.headers.get('cache-control'), 'private, no-cache');
     });
   });
 

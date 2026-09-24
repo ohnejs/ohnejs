@@ -184,7 +184,7 @@ describe('putUpload', () => {
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
   });
 
-  it('lands every file public while no secret makes the layer keep private files', async () => {
+  it('inherits a private folder while no secret can sign a link', async () => {
     await queryUntyped('Uploads').createOrThrow({
       kind: 'folder',
       directory: '',
@@ -198,9 +198,10 @@ describe('putUpload', () => {
         name: 'plain.txt',
         body: stream(bytes('p')),
       });
-      strictEqual(upload.private, false);
+      strictEqual(upload.private, true);
       strictEqual(upload.url, '/uploads/open-vault/plain.txt');
-      strictEqual(storage.visibility.has('open-vault/plain.txt'), false);
+      strictEqual(upload.expires, undefined);
+      strictEqual(storage.visibility.get('open-vault/plain.txt'), true);
     } finally {
       useEnv().set('UPLOADS_SECRET', 'secret');
     }

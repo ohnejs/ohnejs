@@ -1,9 +1,8 @@
 import { hook, queryMetadata, queryUntyped, useDatabase, useDialect, usePrinter } from 'ohnejs';
-import { chunk, isEmpty } from 'ohnejs/utils';
+import { isEmpty, isUndefined } from 'ohnejs/utils';
 
-import type { UploadRow } from '../uploads/_row.ts';
-
-import { uploadPath } from '../uploads/path.ts';
+import { useUploadsConfig } from '../config.ts';
+import { useStorage } from '../storage/use-storages.ts';
 import { uploadSecrets } from '../uploads/sign.ts';
 
 // Before the socket opens, so no read ever meets a row that predates the column.
@@ -11,26 +10,23 @@ hook('schema:synced', fillPrivate);
 
 hook('server:ready', async () => {
   if (!isEmpty(uploadSecrets())) return;
-  if (!(await queryUntyped('Uploads').where({ private: true }).exists())) return;
+  if (!(await anyPrivate())) return;
   usePrinter().warn(
-    '`UPLOADS_SECRET` is unset, so the layer keeps no private files: ' +
-      'every row marked private is served to anyone',
+    '`UPLOADS_SECRET` is unset, so a private file opens only for a signed-in reader: ' +
+      'no links, no variants, and the dashboard hides the private controls',
   );
 });
 
-// Rows left public before a private folder locked its contents stay public, so no embedded link breaks.
 hook('server:ready', async () => {
-  if (isEmpty(uploadSecrets())) return;
-  const paths = await publicInsidePrivate();
-  if (paths.length === 0) return;
+  const { publicURL, storage } = useUploadsConfig();
+  if (isUndefined(publicURL) || !isUndefined(useStorage().setPrivate)) return;
+  if (!(await anyPrivate())) return;
   usePrinter().warnBlock({
-    title: 'Public uploads inside a private folder',
+    title: 'Private uploads are readable at `publicURL`',
     body: [
-      'These rows stay public although their folder is private:',
+      `The \`${storage}\` storage cannot hide an object, so anyone who knows a private file's path opens it at \`${publicURL}\`.`,
       '',
-      ...paths.map((path) => `- \`${path}\``),
-      '',
-      'Make each one private in the dashboard or with `updateUpload`.',
+      'Use a storage with `setPrivate`, such as `@ohnejs/uploads-s3` with tagging, or drop `uploads.publicURL`.',
     ].join('\n'),
   });
 });
@@ -50,21 +46,8 @@ async function fillPrivate(): Promise<void> {
 }
 
 /**
- * The paths of public rows directly inside a private folder, sorted.
- * Each public row under a private folder has one on its path, so a public subfolder is listed once.
+ * Whether any row is private, read past every app scope.
  */
-async function publicInsidePrivate(): Promise<string[]> {
-  const folders = (await queryUntyped('Uploads')
-    .where({ kind: 'folder', private: true })
-    .select('directory', 'name')
-    .findMany()) as UploadRow[];
-  const paths: string[] = [];
-  for (const batch of chunk(folders.map(uploadPath), 900)) {
-    const rows = (await queryUntyped('Uploads')
-      .where({ private: false, directory: { in: batch } })
-      .select('directory', 'name')
-      .findMany()) as UploadRow[];
-    paths.push(...rows.map(uploadPath));
-  }
-  return paths.sort();
+function anyPrivate(): Promise<boolean> {
+  return queryUntyped('Uploads').unscoped().where({ private: true }).exists();
 }

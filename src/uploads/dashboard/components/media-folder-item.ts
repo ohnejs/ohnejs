@@ -4,7 +4,7 @@ import { ref, untracked } from 'ohnejs/utils';
 import type { UploadRecord } from '../../uploads/types.ts';
 
 import { lockPill } from './media-image-item.ts';
-import { moveUploads, privateUploads } from './media-library-data.ts';
+import { moveUploads } from './media-library-data.ts';
 import { mediaPath, type MediaView } from './media-library-state.ts';
 
 /**
@@ -160,7 +160,7 @@ export function mediaFolderItem(
       },
       glyph,
       when(
-        () => privateUploads() && record().private === true,
+        () => record().private === true,
         () => lockPill('o-media-folder-lock'),
       ),
     ),

@@ -97,7 +97,7 @@ describe('decorateUpload', () => {
     }
   });
 
-  it('decorates a private file as public without UPLOADS_SECRET', () => {
+  it('keeps a private file on the bare API route without UPLOADS_SECRET', () => {
     useLayers().add({
       path: '/decorate-public',
       input: { uploads: { images: { url: SERVICE }, publicURL: 'https://cdn.example.com' } },
@@ -106,12 +106,9 @@ describe('decorateUpload', () => {
     try {
       const record = locked('c.png');
       decorateUpload(record);
-      strictEqual(record.url, 'https://cdn.example.com/locked/c.png');
+      strictEqual(record.url, '/uploads/locked/c.png');
       strictEqual(record.expires, undefined);
-      match(
-        (record.variants as Record<string, string>).thumbnail,
-        /^https:\/\/img\.example\.com\//,
-      );
+      strictEqual(record.variants, undefined);
       const open = locked('d.png', { private: false });
       decorateUpload(open);
       strictEqual(open.url, 'https://cdn.example.com/locked/d.png');

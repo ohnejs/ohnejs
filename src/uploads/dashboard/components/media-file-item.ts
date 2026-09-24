@@ -11,7 +11,6 @@ import {
   type MediaFileTileOptions,
   type MediaItemDisabled,
 } from './media-image-item.ts';
-import { privateUploads } from './media-library-data.ts';
 
 const NOT_DISABLED: MediaItemDisabled = { value: false };
 
@@ -200,7 +199,7 @@ export function mediaFileItem(
         'span',
         { class: 'o-media-file-meta' },
         when(
-          () => privateUploads() && record().private === true,
+          () => record().private === true,
           () => lockPill('o-media-file-lock'),
         ),
         h('span', { class: 'o-media-file-size' }, () => formatBytes(record().size ?? 0)),
