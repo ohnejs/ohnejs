@@ -179,6 +179,43 @@ describe('resolveArgs', () => {
     });
   });
 
+  it('names a camelCase key by its kebab-case flag', () => {
+    const schema = {
+      dryRun: { type: 'boolean' },
+      maxItems: { type: 'number', required: true },
+    } as const;
+    deepStrictEqual(resolveArgs(schema, ['--dry-rn', '--dry-run=maybe']), {
+      ok: false,
+      errors: [
+        {
+          kind: 'unknown',
+          name: 'dry-rn',
+          message: 'Unknown flag `--dry-rn`. Did you mean `--dry-run`?',
+          suggestion: 'dry-run',
+        },
+        {
+          kind: 'invalid',
+          name: 'dryRun',
+          message: 'Flag `--dry-run` expects a boolean, got `maybe`',
+        },
+        { kind: 'missing', name: 'maxItems', message: 'Missing required flag `--max-items`' },
+      ],
+      positionals: [],
+    });
+  });
+
+  it('reports an unknown short flag with one dash', () => {
+    const result = resolveArgs({ port: { type: 'number' } }, ['-x']);
+    strictEqual(result.ok, false);
+    if (!result.ok) strictEqual(result.errors[0]!.message, 'Unknown flag `-x`');
+  });
+
+  it('reports an unknown one-letter long flag with two dashes', () => {
+    const result = resolveArgs({ port: { type: 'number' } }, ['--x']);
+    strictEqual(result.ok, false);
+    if (!result.ok) strictEqual(result.errors[0]!.message, 'Unknown flag `--x`');
+  });
+
   describe('recognize', () => {
     it('accepts a recognized flag without reporting it unknown, and omits it from values', () => {
       const schema = { cwd: { type: 'string' } } as const;

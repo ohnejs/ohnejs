@@ -1,8 +1,8 @@
 import type { ArgSchema, ArgsSchema, ResolvedArgs } from './define-args.ts';
 
+import { first } from '../../array/first.ts';
 import { last } from '../../array/last.ts';
 import { toArray } from '../../array/to-array.ts';
-import { toCamelCase } from '../../case/to-camel-case.ts';
 import { toKebabCase } from '../../case/to-kebab-case.ts';
 import { coerceToBoolean } from '../../coerce/coerce-to-boolean.ts';
 import { coerceToInteger } from '../../coerce/coerce-to-integer.ts';
@@ -100,36 +100,38 @@ export function resolveArgs<const S extends ArgsSchema>(
   register(schema);
   if (recognize) register(recognize);
 
-  const known = recognize ? [...names, ...Object.keys(recognize)] : names;
   const parsed = parseArgv(argv, { booleans });
   const errors: ArgError[] = [];
   const values: Record<string, string | number | boolean> = {};
 
   for (const flag of Object.keys(parsed.flags)) {
     if (aliasToName.has(flag) || canonByForm.has(toKebabCase(flag))) continue;
-    const suggestion = didYouMean(toCamelCase(flag), known);
+    const suggestion = didYouMean(toKebabCase(flag), canonByForm.keys());
+    const long = flag.length > 1 || argv.some((arg) => first(arg.split('=')) === `--${flag}`);
+    const typed = long ? `--${flag}` : `-${flag}`;
     errors.push({
       kind: 'unknown',
       name: flag,
-      message: `Unknown flag \`--${flag}\`${suggestion ? `. Did you mean \`--${suggestion}\`?` : ''}`,
+      message: `Unknown flag \`${typed}\`${suggestion ? `. Did you mean \`--${suggestion}\`?` : ''}`,
       ...(suggestion ? { suggestion } : {}),
     });
   }
 
   for (const name of names) {
     const def = schema[name]!;
+    const flag = toKebabCase(name);
     const raw = pickRaw(parsed.flags, name, def.alias);
 
     if (isUndefined(raw)) {
       if (def.type === 'boolean') values[name] = def.default ?? false;
       else if (!isUndefined(def.default)) values[name] = def.default;
       else if (def.required) {
-        errors.push({ kind: 'missing', name, message: `Missing required flag \`--${name}\`` });
+        errors.push({ kind: 'missing', name, message: `Missing required flag \`--${flag}\`` });
       }
       continue;
     }
 
-    const result = coerceValue(def, raw, name);
+    const result = coerceValue(def, raw, flag);
     if ('error' in result) errors.push({ kind: 'invalid', name, message: result.error });
     else values[name] = result.value;
   }
@@ -166,24 +168,24 @@ function pickRaw(
 function coerceValue(
   def: ArgSchema,
   raw: string | boolean,
-  name: string,
+  flag: string,
 ): { value: string | number | boolean } | { error: string } {
   switch (def.type) {
     case 'string':
       if (isString(raw)) return { value: raw };
-      return { error: `Flag \`--${name}\` expects a value` };
+      return { error: `Flag \`--${flag}\` expects a value` };
 
     case 'number': {
-      if (!isString(raw)) return { error: `Flag \`--${name}\` expects a number` };
+      if (!isString(raw)) return { error: `Flag \`--${flag}\` expects a number` };
       const parsed = def.integer ? coerceToInteger(raw) : coerceToNumber(raw);
       if (isNumber(parsed)) return { value: parsed };
-      return { error: `Flag \`--${name}\` expects a number, got \`${raw}\`` };
+      return { error: `Flag \`--${flag}\` expects a number, got \`${raw}\`` };
     }
 
     case 'boolean': {
       const parsed = coerceToBoolean(raw);
       if (isBoolean(parsed)) return { value: parsed };
-      return { error: `Flag \`--${name}\` expects a boolean, got \`${raw}\`` };
+      return { error: `Flag \`--${flag}\` expects a boolean, got \`${raw}\`` };
     }
 
     case 'enum': {
@@ -191,7 +193,7 @@ function coerceValue(
       const list = def.options.map((option) => `\`${option}\``).join(', ');
       const hint = isString(raw) ? didYouMean(raw, def.options) : undefined;
       const suffix = hint ? `. Did you mean \`${hint}\`?` : '';
-      return { error: `Flag \`--${name}\` must be one of ${list}${suffix}` };
+      return { error: `Flag \`--${flag}\` must be one of ${list}${suffix}` };
     }
   }
 }
