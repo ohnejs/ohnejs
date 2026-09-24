@@ -20,9 +20,16 @@ describe('stripUserinfo', () => {
     strictEqual(stripUserinfo('s3://key:secret@/x'), 's3:///x');
   });
 
-  it('keeps an @ in the path or query', () => {
-    strictEqual(stripUserinfo('https://host/a@b'), 'https://host/a@b');
-    strictEqual(stripUserinfo('https://host?to=a@b'), 'https://host?to=a@b');
+  it('strips userinfo without a scheme or without slashes', () => {
+    strictEqual(stripUserinfo('key:secret@host:9000'), 'host:9000');
+    strictEqual(stripUserinfo('//key:secret@host'), '//host');
+    strictEqual(stripUserinfo('s3:key:secret@photos'), 'photos');
+  });
+
+  it('cuts up to the last @, so a password holding / or ? goes too', () => {
+    strictEqual(stripUserinfo('s3://key:se/cr?et@photos/a'), 's3://photos/a');
+    strictEqual(stripUserinfo('s3://b?endpoint=http://u:p@h'), 's3://h');
+    strictEqual(stripUserinfo('https://host/a@b'), 'https://b');
   });
 
   it('leaves a URL without userinfo alone', () => {
