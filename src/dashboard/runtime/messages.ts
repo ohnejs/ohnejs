@@ -1,6 +1,9 @@
+import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
 import { api } from './api.ts';
+
+const RETRY_DELAY = 3000;
 
 /**
  * One resolved message: its ICU template and the language that template is written in.
@@ -31,7 +34,8 @@ const cells = new Map<string, Ref<MessageCatalog | undefined>>();
  *
  * The result is `undefined` until the fetch resolves; callers fall back to the raw key meanwhile.
  * A `(language, group)` pair is fetched at most once: the cell is created before the request starts.
- * A failed or missing fetch resolves to an empty catalog, so a broken request degrades to raw keys.
+ * A missing catalog resolves to an empty one, so its keys render raw.
+ * A fetch the API failed to answer does too, but is retried after a delay until an answer arrives.
  *
  * @example
  * ```ts
@@ -51,25 +55,34 @@ export function messageCatalog(language: string, group: string): MessageCatalog 
 }
 
 /**
- * Stores the group's fetched catalog in `cell`, an empty one when the fetch fails.
+ * Stores the group's fetched catalog in `cell`.
+ * A fetch the API failed to answer leaves an empty catalog and tries again after `RETRY_DELAY`.
  */
 async function fill(
   cell: Ref<MessageCatalog | undefined>,
   language: string,
   group: string,
 ): Promise<void> {
-  cell.value = await fetchCatalog(language, group);
+  const catalog = await fetchCatalog(language, group);
+  if (!isNull(catalog)) {
+    cell.value = catalog;
+    return;
+  }
+  cell.value ??= {};
+  setTimeout(() => void fill(cell, language, group), RETRY_DELAY);
 }
 
 /**
- * Fetches a group's catalog for a language, answering `{}` on any failure.
+ * Fetches a group's catalog for a language.
+ * Answers `{}` for a refused request, like a `404`, and `null` when the API erred or never answered.
  */
-async function fetchCatalog(language: string, group: string): Promise<MessageCatalog> {
+async function fetchCatalog(language: string, group: string): Promise<MessageCatalog | null> {
   try {
     const path = `/messages/${encodeURIComponent(group)}/${encodeURIComponent(language)}`;
     const response = await api(path);
-    return response.ok ? ((await response.json()) as MessageCatalog) : {};
+    if (response.ok) return (await response.json()) as MessageCatalog;
+    return response.status >= 500 ? null : {};
   } catch {
-    return {};
+    return null;
   }
 }
