@@ -765,10 +765,10 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     );
 
   const privateRow = (): HTMLElement => {
-    const message = h('div');
+    const message = h('div', { class: 'ohne-prose' });
     effect(() => {
       const hint = locked()
-        ? t('uploads.errors.insidePrivateFolder', { folder: current.value.directory })
+        ? t('uploads.dashboard.privateFolderHint', { folder: current.value.directory })
         : t('uploads.dashboard.privateHint');
       renderProse(message, refused.value === '' ? hint : refused.value);
     });

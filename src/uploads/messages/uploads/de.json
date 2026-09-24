@@ -71,6 +71,7 @@
     "pending": "Ausstehend",
     "pixels": "Pixel",
     "private": "Privat",
+    "privateFolderHint": "Alles im privaten Ordner `{folder}` ist privat.",
     "privateHint": "Nur ein temporärer Link oder ein angemeldeter Leser mit Zugriff kann die Datei öffnen.",
     "rename": "Umbenennen",
     "renameFailed": "Beim Umbenennen ist ein Fehler aufgetreten",

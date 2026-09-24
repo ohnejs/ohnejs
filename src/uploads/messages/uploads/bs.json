@@ -71,6 +71,7 @@
     "pending": "Na čekanju",
     "pixels": "piksela",
     "private": "Privatno",
+    "privateFolderHint": "Sve u privatnom folderu `{folder}` je privatno.",
     "privateHint": "Datoteku može otvoriti samo privremeni link ili prijavljeni čitalac s pristupom.",
     "rename": "Preimenuj",
     "renameFailed": "Došlo je do greške pri preimenovanju",

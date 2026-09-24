@@ -71,6 +71,7 @@
     "pending": "Pending",
     "pixels": "pixels",
     "private": "Private",
+    "privateFolderHint": "Everything inside the private folder `{folder}` is private.",
     "privateHint": "Only a temporary link or a signed-in reader with access can open the file.",
     "rename": "Rename",
     "renameFailed": "An error occurred while renaming",
