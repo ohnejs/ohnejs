@@ -21,6 +21,7 @@ project extend another.
 
 - [Configuration](./project/config.md) - `ohne.config.ts` and the core settings it holds.
 - [The CLI](./project/cli.md) - `npm create ohne` and every `ohne` command.
+- [Commands](./project/commands.md) - add your own `ohne` commands for work outside a request.
 - [Environment variables](./project/env.md) - the built-ins and how to define your own.
 - [Boot files](./project/boot.md) - code that runs before the server opens.
 - [Hooks](./project/hooks.md) - run code at fixed points in the framework, or change what it

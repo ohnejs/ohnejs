@@ -99,13 +99,13 @@ renames `api/` to `routes/` moves only its own routes.
 
 The pieces merge by identity, and the closer layer wins:
 
-| Piece                                                    | Identity                                  |
-| -------------------------------------------------------- | ----------------------------------------- |
-| [Routes](../api/routes.md#routes-across-layers)          | Method plus pattern, such as `GET /posts` |
-| Dashboard pages                                          | The page's pattern                        |
-| [Dashboard boot files](../dashboard/pages.md#boot-files) | The path under the dashboard directory    |
-| [Messages](../i18n/messages.md#layers)                   | One key in one language                   |
-| Collections, blocks, field types, middleware, roles      | The name                                  |
+| Piece                                                         | Identity                                  |
+| ------------------------------------------------------------- | ----------------------------------------- |
+| [Routes](../api/routes.md#routes-across-layers)               | Method plus pattern, such as `GET /posts` |
+| Dashboard pages                                               | The page's pattern                        |
+| [Dashboard boot files](../dashboard/pages.md#boot-files)      | The path under the dashboard directory    |
+| [Messages](../i18n/messages.md#layers)                        | One key in one language                   |
+| Collections, blocks, field types, middleware, roles, commands | The name                                  |
 
 - The closer definition replaces the further one entirely, including
   [roles](../auth/roles.md#roles-across-layers), and a closer dashboard boot file runs instead of

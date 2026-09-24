@@ -1,8 +1,8 @@
 # Storage
 
 A file is stored under its path, `photos/2024/sunset.jpg`, and a folder is a prefix. The `fs`
-backend keeps that layout under `uploads.url`, `.uploads` by default, resolved against the working
-directory. The `UPLOADS_URL` env var overrides `url`.
+backend keeps that layout under `uploads.url`, `.uploads` by default, resolved against your app's
+root. The `UPLOADS_URL` env var overrides `url`.
 
 ## Storing files in S3
 
@@ -58,25 +58,21 @@ A backend implements `StorageAdapter`; its JSDoc names each method. The rules it
 - `setPrivate` locks an object a backend serves itself, as a row turns
   [private](./private-files.md). Without it, a private object stays readable at `publicURL`, and
   ohne warns at boot.
+- `list` lets `ohne uploads prune` find [stray files](#stray-files). Without it, the command
+  refuses.
 
 ## Stray files
 
 A file can end up in storage with no row behind it, after a database restored from an older backup
-or a file copied in by hand. `pruneUploads` lists those files. Call it from a
-[boot file](../project/boot.md):
+or a file copied in by hand. The `ohne uploads prune` [command](../project/commands.md) lists those
+files:
 
-```ts
-// boot/prune-uploads.ts
-import { hook } from 'ohnejs';
-import { pruneUploads } from 'ohnejs/uploads';
-
-hook('server:ready', async () => {
-  console.log(await pruneUploads());
-});
+```sh
+npx ohne uploads prune
 ```
 
-Each boot prints the stray paths. Once the list holds only files you can lose,
-`pruneUploads({ delete: true })` deletes them. A file that is still uploading is never among them.
+Once the list holds only files you can lose, `--delete` deletes them. A file that is still uploading
+is never among them.
 
 `storage` and `url` are each layer's [own](../project/config.md#own-vs-inherited-keys): a dependency
 cannot point your uploads at its storage.

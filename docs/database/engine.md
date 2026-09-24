@@ -141,61 +141,28 @@ await useDatabase().transaction(async (tx) => {
 
 ## Outside the app
 
-A cron job or a one-time maintenance task runs outside the server, so nothing opens the connection
-for it. Open it yourself:
+A cron job or a one-time maintenance task runs outside the server. Write it as a
+[command](../project/commands.md), and ohne connects the database for it:
 
 ```ts
-// scripts/prune-hits.ts
-import {
-  bootLayers,
-  closeDatabases,
-  connect,
-  loadLayers,
-  loadProjectEnv,
-  useDatabase,
-  withLock,
-} from 'ohnejs';
+// commands/prune-hits.ts
+import { useDatabase, withLock } from 'ohnejs';
+import { defineCommand } from 'ohnejs/utils/cli';
 
-await loadProjectEnv(process.cwd());
-await loadLayers();
-await bootLayers();
-await connect();
-
-try {
-  await withLock('hits:prune', () => useDatabase().run('DELETE FROM hits WHERE count = ?', [0]));
-} finally {
-  await closeDatabases();
-}
+export default defineCommand({
+  meta: { name: 'prune-hits', description: 'Delete the hits nobody counted.' },
+  async run() {
+    await withLock('hits:prune', () => useDatabase().run('DELETE FROM hits WHERE count = ?', [0]));
+  },
+});
 ```
 
-- `loadProjectEnv` reads the project [`.env`](../project/env.md#the-env-file), so you can set
-  `DATABASE` there.
-- `loadLayers` resolves your config and every layer it stacks.
-- `bootLayers` runs your [boot files](../project/boot.md), so a [custom dialect](#other-dialects) is
-  registered before `connect`.
-- `connect` opens the main database and every helper.
-- `closeDatabases` closes them, whether the work succeeds or throws.
-
-Your collections are not registered in such a script, so `query` throws `Unknown collection`. Use
-[raw SQL](#raw-sql) there. The [cluster lock](./locks.md) needs no sync first: it creates its
-table the first time it is used.
-
-Run the script from the project root, with ohne's `register` hook so Node can load ohne's
-TypeScript from `node_modules`:
+A cron job starts with an almost empty environment, and only the project's
+[`.env`](../project/env.md#the-env-file) fills it. Pass any `DATABASE` your app gets elsewhere, or
+the lock protects a database your app never reads:
 
 ```sh
-node --import ohnejs/register scripts/prune-hits.ts
-```
-
-From a cron job:
-
-- Change into the project first. The hook and `process.cwd()` both resolve from where you launch.
-- Pass the same `DATABASE` your app uses, since a cron job starts with an almost empty environment.
-  Without it the script opens `database.url` or `.data/ohne.db`, and the lock protects a database
-  your app never reads.
-
-```sh
-cd /srv/app && DATABASE=/srv/data/app.db node --import ohnejs/register scripts/prune-hits.ts
+cd /srv/app && DATABASE=/srv/data/app.db npx ohne prune-hits
 ```
 
 ## Reserved tables

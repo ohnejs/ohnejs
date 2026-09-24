@@ -7,6 +7,8 @@ Installing ohne installs one binary, `ohne`:
 - [`ohne serve`](#ohne-serve) runs one backend in production.
 - [`ohne sync`](#ohne-sync) updates the database schema.
 
+Your app and its layers can add [commands](./commands.md) of their own.
+
 [`npm create ohne`](#npm-create-ohne) creates a project. Inside a project, `npx` runs that project's
 own copy of the binary:
 

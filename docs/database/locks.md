@@ -20,8 +20,8 @@ whatever the function returned.
 `withLock` needs the connected main database. Inside a running app, such as in a handler or a hook,
 the database is always connected. [Boot files](../project/boot.md) run before the
 [connection](./engine.md) opens, so a boot file calls `withLock` from a hook such as
-[`server:ready`](../project/hooks.md#serverready), never at its top level. A standalone script, such
-as a cron job, [opens the connection itself](./engine.md#outside-the-app).
+[`server:ready`](../project/hooks.md#serverready), never at its top level. A cron job written as a
+[command](../project/commands.md) finds the database connected, like a handler.
 
 ## Timing
 

@@ -13,6 +13,7 @@ my-app/
 ├── blocks/               reusable content shapes
 ├── boot/                 code that runs once at startup
 ├── collections/          your data model
+├── commands/             your own ohne commands
 ├── dashboard/
 │   ├── boot/             code that runs once when the dashboard loads
 │   ├── components/       UI code your pages share
@@ -74,6 +75,8 @@ the whole directory as public. Server code lives outside it, and the two talk ov
   opens. This is where you register [hooks](../project/hooks.md).
 - `roles/` - [roles](../auth/roles.md#defining-roles), one per file. `roles/editor.ts` is the
   `editor` role, a named set of permissions you give to users.
+- `commands/` - [commands](../project/commands.md), one per file. `commands/seed.ts` adds
+  `ohne seed`, for work outside a request.
 - `messages/` - [message catalogs](../i18n/messages.md#catalogs), the strings your app translates.
   One JSON file per language: `messages/en.json`, `messages/de.json`.
 

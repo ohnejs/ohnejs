@@ -62,6 +62,7 @@ dirs: {
 - `blocks: 'blocks'` - [block definitions](../database/blocks.md#defining-a-block).
 - `roles: 'roles'` - [role definitions](../auth/roles.md#defining-roles).
 - `migrations: 'migrations'` - [database migrations](../database/migrations.md#a-migration-file).
+- `commands: 'commands'` - [CLI commands](./commands.md#names).
 - `dashboard: 'dashboard'` - [dashboard pages](../dashboard/pages.md#from-file-to-route) and
   components.
 
