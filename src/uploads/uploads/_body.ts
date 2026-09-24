@@ -21,15 +21,17 @@ export const UPLOAD_ROUTE_OPTIONS: RouteOptions = {
 };
 
 /**
- * The request's raw body stream and its declared length, when `Content-Length` carries a finite one.
- * A request without a body is a `400`.
+ * The request's raw body stream and its declared length, when `Content-Length` carries one.
+ * A request without a body is a `400`: no `Transfer-Encoding` and no `Content-Length` above zero.
+ * The headers decide, since the adapter hands every `POST` a stream, empty or not.
  */
 export function uploadBody(): { body: ReadableStream<Uint8Array>; size: number | undefined } {
   const request = useRequest();
-  if (isNull(request.body)) throw badRequest();
-  const header = request.headers.get('content-length');
-  const declared = coerceToNumber(header);
-  return { body: request.body, size: isRealNumber(declared) ? declared : undefined };
+  const declared = coerceToNumber(request.headers.get('content-length'));
+  const sized = isRealNumber(declared) && declared > 0;
+  const chunked = !isNull(request.headers.get('transfer-encoding'));
+  if (isNull(request.body) || !(sized || chunked)) throw badRequest();
+  return { body: request.body, size: sized ? declared : undefined };
 }
 
 /**

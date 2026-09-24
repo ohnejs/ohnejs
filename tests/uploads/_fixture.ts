@@ -201,6 +201,8 @@ export async function call(
   const headers = new Headers(init.headers);
   if (init.bearer !== undefined) headers.set('authorization', `Bearer ${init.bearer}`);
   if ('json' in init) headers.set('content-type', 'application/json');
+  const streamed = !('json' in init) && init.body !== undefined;
+  if (streamed && !headers.has('content-length')) headers.set('transfer-encoding', 'chunked');
   const body = 'json' in init ? JSON.stringify(init.json) : init.body;
   const request = new Request(`http://x.test${path}`, {
     method: r.method ?? 'GET',

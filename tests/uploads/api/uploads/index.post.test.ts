@@ -89,6 +89,21 @@ describe('POST /uploads', () => {
     strictEqual(noBody.status, 400);
   });
 
+  it('400s a body whose headers announce no bytes', async () => {
+    const response = await call(
+      upload,
+      '/uploads?name=empty.txt',
+      {},
+      {
+        bearer: admin,
+        body: stream(bytes('')),
+        headers: { 'content-length': '0' },
+      },
+    );
+    strictEqual(response.status, 400);
+    strictEqual(await queryUntyped('Uploads').where({ name: 'empty.txt' }).exists(), false);
+  });
+
   it('422s content that contradicts the extension, naming the key', async () => {
     const response = await call(
       upload,
