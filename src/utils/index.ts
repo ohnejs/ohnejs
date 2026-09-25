@@ -203,6 +203,7 @@ export * from './route/strip-base-path.ts';
 export * from './search-params/parse-search-params.ts';
 export * from './search-params/stringify-search-params.ts';
 export * from './search/search-by-keywords.ts';
+export * from './shell/shell-path.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify-file-name.ts';
 export * from './slug/slugify.ts';

@@ -1,4 +1,5 @@
 export * from './append-file.ts';
+export * from './empty-dir.ts';
 export * from './ensure-dir.ts';
 export * from './exists.ts';
 export * from './find-up.ts';
