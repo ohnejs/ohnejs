@@ -3,6 +3,7 @@ import {
   blockQueryMetadata,
   type Capability,
   type CollectionAPI,
+  createRouter,
   type DashboardMenuEntry,
   type DashboardMenuLink,
   defineHandler,
@@ -17,13 +18,16 @@ import {
   parseLayoutItem,
   queryMetadata,
   type RecordLabel,
+  type Router,
   useBlocks,
   useCollections,
   useConfig,
   useMessages,
   useRoles,
+  useRoutes,
 } from 'ohnejs';
 import {
+  type HTTPMethod,
   isEmpty,
   isJSONValue,
   isNull,
@@ -537,6 +541,12 @@ export interface DashboardMeta {
   capabilities: Capability[];
 
   /**
+   * The ids of the routes the app serves, after `disable.routes` dropped any.
+   * A client matches with `hasRoute`, which counts an any-method route for every method.
+   */
+  routes: string[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];
@@ -601,12 +611,25 @@ const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
   blocks: new Set(['allow']),
 };
 
+const ANY_RECORD = '/00000000-0000-0000-0000-000000000000';
+
+const OPERATION_ROUTES: Readonly<
+  Record<keyof DashboardOperations, readonly [method: HTTPMethod, suffix: string]>
+> = {
+  read: ['POST', '/query'],
+  create: ['POST', ''],
+  update: ['PATCH', ANY_RECORD],
+  delete: ['DELETE', ANY_RECORD],
+};
+
 /**
  * `GET /dashboard`
  *
  * Describes the collections API for the signed-in user: the dashboard's one discovery read.
  * A collection appears when it is exposed and the user may run at least one of its operations.
  * Operations carry their verdicts, so the dashboard disables what the capability guard would refuse.
+ * An operation whose route the app does not serve is closed, like one the collection does not expose.
+ * `routes` lists the served route ids, so a layer's screen can hide a control whose route is dropped.
  * Fields carry the metadata a sheet needs: type, kind, flags, labels resolved in the request's language.
  * `languages` lists the catalog languages the dashboard language setting offers, the default first.
  * `accountFields` describes the `Users` fields the account page edits, as `auth:account-layout` places them.
@@ -615,16 +638,20 @@ const STRUCTURAL_OPTIONS: Readonly<Record<string, ReadonlySet<string>>> = {
  */
 export default defineHandler(async (): Promise<DashboardMeta> => {
   const user = await requireUser();
+  const router = createRouter(Object.values(useRoutes().all()));
   const collections: DashboardCollection[] = [];
   for (const meta of Object.values(useCollections().all())) {
-    const operations = describeOperations(meta.collection.api, meta.name, user);
+    const segment = toKebabCase(meta.name);
+    const operations = describeOperations(meta.collection.api, meta.name, user, (operation) =>
+      served(router, segment, operation),
+    );
     if (isNull(operations)) continue;
     const query = queryMetadata(meta.name);
     const fields = describeFields(query.fields, meta.collection.fields);
     const dashboard = meta.collection.dashboard;
     const collection: DashboardCollection = {
       name: meta.name,
-      segment: toKebabCase(meta.name),
+      segment,
       label: toSentenceCase(meta.name),
       translatable: query.translatable === true,
       singleton: query.singleton === true,
@@ -654,6 +681,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     ]),
     roles: describeRoles(),
     capabilities: userCapabilities(user),
+    routes: useRoutes().keys(),
     locales,
     defaultLocale,
     languages: catalogLanguages(),
@@ -742,17 +770,19 @@ function declaredLabelOf(name: string, label: Message | undefined): string {
 
 /**
  * Resolves a collection's operations for `user`, or `null` when none is usable.
+ * `routed` answers whether the app serves an operation's route.
  */
 function describeOperations(
   api: boolean | CollectionAPI | undefined,
   collection: string,
   user: User,
+  routed: (operation: keyof DashboardOperations) => boolean,
 ): DashboardOperations | null {
   const operations = {
-    read: describeOperation(api, 'read', collection, user),
-    create: describeOperation(api, 'create', collection, user),
-    update: describeOperation(api, 'update', collection, user),
-    delete: describeOperation(api, 'delete', collection, user),
+    read: describeOperation(api, 'read', collection, user, routed),
+    create: describeOperation(api, 'create', collection, user, routed),
+    update: describeOperation(api, 'update', collection, user, routed),
+    delete: describeOperation(api, 'delete', collection, user, routed),
   };
   const usable = Object.values(operations).some((operation) => operation?.allowed);
   return usable ? operations : null;
@@ -760,21 +790,32 @@ function describeOperations(
 
 /**
  * Resolves one operation's verdict: `public` admits anyone, otherwise the capability decides.
+ * An operation the collection does not expose, or whose route the app does not serve, is `null`.
  */
 function describeOperation(
   api: boolean | CollectionAPI | undefined,
   operation: keyof DashboardOperations,
   collection: string,
   user: User,
+  routed: (operation: keyof DashboardOperations) => boolean,
 ): DashboardOperation | null {
   const endpoint = endpointOf(api, operation);
-  if (isUndefined(endpoint)) return null;
+  if (isUndefined(endpoint) || !routed(operation)) return null;
   const open = endpoint.public === true;
   return {
     allowed: open || userCan(user, `collection.${collection}.${operation}` as Capability),
     public: open,
     scoped: !isUndefined(endpoint.access),
   };
+}
+
+/**
+ * Whether the app serves an operation's collections-API route for the collection at `segment`.
+ * It asks a router built like dispatch's, so the app's own route for that one collection counts too.
+ */
+function served(router: Router, segment: string, operation: keyof DashboardOperations): boolean {
+  const [method, suffix] = OPERATION_ROUTES[operation];
+  return router.match(method, `/collections/${segment}${suffix}`).type === 'matched';
 }
 
 /**

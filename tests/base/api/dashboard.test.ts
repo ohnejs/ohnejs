@@ -33,7 +33,10 @@ import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
-import { keyBy } from '../../../src/utils/index.ts';
+import { collectRoutes } from '../../../src/ohne/routes/collect-routes.ts';
+import { routeID } from '../../../src/ohne/routes/route.ts';
+import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
+import { joinPath, keyBy } from '../../../src/utils/index.ts';
 
 declare module 'ohnejs' {
   interface KnownMessages {
@@ -305,6 +308,23 @@ async function userWith(email: string, roles: string[]): Promise<string> {
 const user = await userWith('user@example.com', ['dash-user']);
 const admin = await userWith('admin@example.com', ['admin']);
 
+const stack = [
+  { name: 'ohnejs/base', dir: joinPath(import.meta.dirname, '../../../src/base') },
+  { name: 'ohnejs/uploads', dir: joinPath(import.meta.dirname, '../../../src/uploads') },
+];
+
+async function serve(disable: string[] = []): Promise<void> {
+  useRoutes().clear();
+  for (const served of await collectRoutes(stack, { disable })) {
+    useRoutes().register(routeID(served.method, served.pattern), {
+      ...served,
+      handler: () => null,
+    });
+  }
+}
+
+await serve();
+
 const route: Route = {
   method: 'GET',
   pattern: '/dashboard',
@@ -433,6 +453,73 @@ describe('operations', () => {
   it('names the URL segment in kebab-case', async () => {
     const { body } = await call(user);
     strictEqual(collection(body, 'DashNotes').segment, 'dash-notes');
+  });
+});
+
+describe('routes', () => {
+  it('lists the served route ids, a dropped one absent', async () => {
+    await serve(['POST /uploads/fetch']);
+    try {
+      const { routes } = (await call(admin)).body;
+      strictEqual(routes.includes('POST /uploads/fetch'), false);
+      strictEqual(routes.includes('GET /dashboard'), true);
+    } finally {
+      await serve();
+    }
+  });
+
+  it('closes an operation whose route is dropped', async () => {
+    await serve(['POST /collections/[collection]']);
+    try {
+      const { operations } = collection((await call(admin)).body, 'Users');
+      strictEqual(operations.create, null);
+      deepStrictEqual(
+        [operations.read?.allowed, operations.update?.allowed, operations.delete?.allowed],
+        [true, true, true],
+      );
+    } finally {
+      await serve();
+    }
+  });
+
+  it('drops a collection whose every operation lost its route, from the menu too', async () => {
+    await serve([
+      'POST /collections/[collection]/query',
+      'POST /collections/[collection]',
+      'PATCH /collections/[collection]/[uuid]',
+      'DELETE /collections/[collection]/[uuid]',
+    ]);
+    try {
+      const { body } = await call(admin);
+      deepStrictEqual(names(body), []);
+      deepStrictEqual(menuPaths(body), [
+        { label: 'Content', items: ['/reports'] },
+        { label: '2 tools', items: ['/tools'] },
+      ]);
+    } finally {
+      await serve();
+    }
+  });
+
+  it("keeps an operation the app's own route serves for the collection", async () => {
+    await serve(['POST /collections/[collection]']);
+    useRoutes().register('POST /collections/dash-notes', {
+      method: 'POST',
+      pattern: '/collections/dash-notes',
+      file: 'dash-notes.post.ts',
+      layer: 'stormwind',
+      handler: () => null,
+    });
+    try {
+      deepStrictEqual(collection((await call(user)).body, 'DashNotes').operations.create, {
+        allowed: true,
+        public: false,
+        scoped: false,
+      });
+      strictEqual(collection((await call(admin)).body, 'Users').operations.create, null);
+    } finally {
+      await serve();
+    }
   });
 });
 
