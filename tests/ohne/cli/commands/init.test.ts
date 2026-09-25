@@ -1,5 +1,14 @@
 import { deepStrictEqual, match, strictEqual } from 'node:assert';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -100,6 +109,71 @@ describe('ohne init', () => {
     }
     match(output.join(''), /\bcd 'my app'$/m);
     match(output.join(''), /\bcd \.\/-dash$/m);
+  });
+
+  it(
+    'reads a leading `~` as the home directory',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const cwd = process.cwd();
+      const home = process.env.HOME;
+      const dir = freshDir('home');
+
+      process.chdir(freshDir('cwd'));
+      process.env.HOME = dir;
+      try {
+        await runCommand(ohne, ['init', '~/x', '--yes']);
+        deepStrictEqual(readdirSync(process.cwd()), []);
+      } finally {
+        process.env.HOME = home;
+        process.chdir(cwd);
+      }
+      strictEqual(existsSync(join(dir, 'x', 'ohne.config.ts')), true);
+    },
+  );
+
+  it('derives a valid package name from the directory name', async () => {
+    const parent = freshDir('app');
+    const nameOf = (dir: string): string =>
+      JSON.parse(readFileSync(join(parent, dir, 'package.json'), 'utf8')).name;
+
+    await runCommand(ohne, ['init', join(parent, 'My App'), '--yes']);
+    await runCommand(ohne, ['init', join(parent, 'my_app.v2'), '--yes']);
+    strictEqual(nameOf('My App'), 'my-app');
+    strictEqual(nameOf('my_app.v2'), 'my_app.v2');
+  });
+
+  it('refuses what it cannot scaffold before touching anything, and exits 1', async () => {
+    const cwd = process.cwd();
+    const cases: [string[], RegExp][] = [
+      [['my', 'app'], /Unexpected argument app\n[^]*'my app'/],
+      [['my\napp'], /Arguments cannot hold control characters/],
+      [['--name', 'Foo Bar'], /Invalid package name Foo Bar/],
+      [[], /Invalid package name 日本\n[^]*--name/],
+    ];
+    for (const [argv, title] of cases) {
+      const dir = join(freshDir('refuse'), '日本');
+      const output: string[] = [];
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'keep.txt'), 'mine');
+      process.chdir(dir);
+      usePrinter().configure({
+        silent: false,
+        color: false,
+        stream: { write: (s) => output.push(s) },
+      });
+      try {
+        await runCommand(ohne, ['init', ...argv, '--yes', '--force']);
+      } finally {
+        usePrinter().configure({ silent: true, stream: process.stderr });
+        process.chdir(cwd);
+      }
+      strictEqual(process.exitCode, 1, argv.join(' '));
+      match(output.join(''), title);
+      strictEqual(output.join('').includes('my\napp'), false);
+      deepStrictEqual(readdirSync(dir), ['keep.txt'], argv.join(' '));
+      process.exitCode = 0;
+    }
   });
 
   it('empties the current directory in place with `--force`', async () => {
