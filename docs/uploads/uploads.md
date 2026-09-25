@@ -25,8 +25,9 @@ shows Media.
 
 ## The dashboard
 
-The layer ships the Media page at `/media`, with folders, drag and drop uploads, a details popup
-for alt text and the focal point, and a picker that the [media fields](./fields.md) open.
+The layer ships the Media page at `/media`, with folders, drag and drop uploads,
+[uploads from a URL](./from-a-url.md), a details popup for alt text and the focal point, and
+a picker that the [media fields](./fields.md) open.
 
 The sidebar row replaces the `Uploads` collection's own row, so a viewer who is allowed to read
 `Uploads` sees Media instead of the table. To place it yourself, list `'Uploads'` in
@@ -36,9 +37,10 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
 
 `Uploads` holds one row per file and per folder:
 
-- `directory` - the parent path, with no leading slash and `''` at the root.
+- `directory` - the parent path, with no leading slash and `''` at the root. A write that would
+  make any path longer than 768 characters is a `422`.
 - `name` - the file or folder name. The `directory` and `name` pair is unique, as on a filesystem,
-  and every segment is a slug.
+  and every segment is a slug of at most 255 characters.
 - `description` - a file's alt text, one per
   [content locale](../database/translations.md#marking-fields).
 - `private` - whether only a [signed-in reader with access, or a temporary link](./private-files.md)
@@ -97,6 +99,7 @@ The request body is the file. One file per request, metadata in the query:
 
 ```
 POST   /uploads?directory=photos&name=Sunset.JPG   the body is the file, answers 201 with the record
+POST   /uploads/fetch                               { "url": "https://...", "directory": "photos" }
 POST   /uploads/folders                             { "directory": "photos", "name": "2024" }
 PATCH  /uploads/[uuid]                              rename, move, or edit a file
 POST   /uploads/[uuid]/replace                      the body replaces the file's bytes
@@ -121,6 +124,8 @@ When a file comes in:
 - The file's type comes from its extension and is verified against its first bytes, so a PNG named
   `.jpg` is a `422`.
 - An SVG is sanitized before it is stored.
+
+`POST /uploads/fetch` stores a file [from a URL](./from-a-url.md) the same way.
 
 The bulk routes take up to 1000 `uuids` and are all or nothing: if one row fails, nothing changes,
 and the answer is the error that row would get on its own.
@@ -213,6 +218,7 @@ export default defineConfig({
     storage: 'fs',
     url: '.uploads',
     maxFileSize: '128mb',
+    maxSVGSize: '2mb',
     types: '*',
     cache: { noCache: true },
     privateMaxAge: '1h',
@@ -221,6 +227,7 @@ export default defineConfig({
         thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
       },
     },
+    fetch: { allow: [], timeout: '2m' },
   },
 });
 ```
@@ -230,6 +237,8 @@ export default defineConfig({
 - `url` - where the backend keeps the files: a directory for `fs`, a bucket and prefix for
   [`s3`](./storage.md#storing-files-in-s3). `UPLOADS_URL` overrides it.
 - `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
+- `maxSVGSize` - the largest SVG that can be uploaded, as a `parseBytes` value. The server answers
+  nothing else while it sanitizes one, so a higher cap lets a single upload stall it for longer.
 - `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
   wildcards, and category names such as `document`, in the
   [media fields grammar](./fields.md#types).
@@ -242,6 +251,7 @@ export default defineConfig({
 - `images` - the [image service](./image-variants.md) that renders resized variants, and the named
   variants every image read carries. `url` has no default, and without it every image URL points at
   the original.
+- `fetch` - the `allow` list and the `timeout` of [uploads from a URL](./from-a-url.md).
 
 ## Where files live
 

@@ -151,10 +151,16 @@ the database. These `api` settings control it:
 
 - `preStopDelay` - keep serving this long after the signal before refusing connections. This gives
   the load balancer time to deregister the instance. Default: refuse at once.
-- `shutdownTimeout` - how long to wait for in-flight work to drain. When it expires, the remaining
-  connections are destroyed so the process can still exit. Default: wait with no time limit.
-- `deadline` - a global limit for all shutdown steps together, including the pre-stop delay, the
-  drain, and the database close. Default: wait with no time limit.
+- `shutdownTimeout` - how long in-flight work may take to finish. When it expires, every request
+  still in flight is cancelled, even one that already answered and only runs `waitUntil` work: its
+  connection closes and [`useRequest().signal`](../api/request.md#the-request) aborts. Shutdown
+  then waits for it to clean up. Default: wait with no time limit.
+- `deadline` - a global limit for all shutdown steps together: the pre-stop delay, the drain, that
+  cleanup, and the database close. Default: wait with no time limit.
+
+Work that ignores its signal holds shutdown until `deadline`. A handler past its
+[`handlerTimeout`](../project/config.md#the-api-server) is answered with `503` but keeps running, so
+shutdown waits for it like any other request.
 
 The process exits `0` on a clean drain, and `1` when the deadline passes first. Keep the total below
 your platform's kill timeout, or the platform `SIGKILL`s the process during the drain. Kubernetes

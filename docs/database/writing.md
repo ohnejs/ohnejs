@@ -43,6 +43,9 @@ and throws a `ValidationError` whose `errors` carries the same map:
 const post = await query('Posts').createOrThrow({ title: 'Hello' });
 ```
 
+Left uncaught in a [command](../project/commands.md#failing), it prints each failing field with its
+reason.
+
 When you catch it, use `isValidationError`, imported from `ohnejs`, to separate it from any other
 failure:
 

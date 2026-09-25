@@ -92,7 +92,9 @@ the port:
 
 ## Failing
 
-A thrown error prints, and `ohne` exits with `1`. To fail without printing, set the exit code:
+A thrown error prints, and `ohne` exits with `1`. A write that fails validation prints each field
+with its reason, and points at the line of yours that made the write. To fail without printing,
+set the exit code:
 
 ```ts
 if (drafts.length > 0) {

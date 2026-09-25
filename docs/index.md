@@ -102,6 +102,7 @@ An optional layer for files: storage with a backend you can replace, an `Uploads
 and serve routes, media fields, and the dashboard's Media page.
 
 - [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
+- [Uploading from a URL](./uploads/from-a-url.md) - fetch a file from a link into Media.
 - [Storage](./uploads/storage.md) - the filesystem, S3, or a backend of your own.
 - [Media fields](./uploads/fields.md) - reference uploads from your collections.
 - [Image variants](./uploads/image-variants.md) - signed URLs an image service renders on demand.

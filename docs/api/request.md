@@ -174,6 +174,17 @@ useRequest().method                    // -> 'POST'
 useRequest().headers.get('user-agent') // -> the header value
 ```
 
+When the client disconnects before you respond, for example by closing the tab, the request's
+`signal` aborts. Pass it to a slow call that accepts a signal, such as `fetch`. The call then stops
+early, since nobody is left to receive its result:
+
+```ts
+const report = await fetch('https://reports.example.com/daily', { signal: useRequest().signal });
+```
+
+The signal also aborts when a [graceful shutdown](../production/deployment.md#graceful-shutdown)
+stops waiting for the request. Shutdown then waits for your `catch` and `finally`, so clean up there.
+
 ## The event
 
 `useEvent()` returns the request's `Event`, the one object every composable reads from:

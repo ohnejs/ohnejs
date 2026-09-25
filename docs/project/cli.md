@@ -82,12 +82,14 @@ dependencies are skipped. On a change:
 Each server is a child process, the same one `serve` runs in production. The API restarts as a fresh
 process, so no old module is left after a reload.
 
-A codegen error or a crashed API prints its error and waits. The next successful reload brings it
-back.
+A codegen error, or a server that crashes or fails to start, prints its error and waits. The API
+starts again on your next change to API source, a message catalog, `ohne.config.ts`, or `.env`. The
+dashboard starts again on any change.
 
 Each server binds its configured port, `9000` for the dashboard and `9001` for the API by default.
 When a port is already in use, `dev` warns and takes the next free one. `PORT` moves both: the
-dashboard takes it, and the API takes the next free port.
+dashboard takes it, and the API takes the next free port. Ports are picked once, when `dev` starts.
+A restart keeps them.
 
 ## ohne prepare
 

@@ -100,7 +100,8 @@ export default defineConfig({
 ```
 
 - `routes` - globs over route ids. A glob with a method prefix, like `'GET /admin/**'`, matches only
-  that method. Without one it matches every method.
+  that method. Without one it matches every method. When you drop a collection's create, update, or
+  delete route, or an uploads route, the dashboard hides the controls that call it.
 - `messages` - globs over the dot-separated key, so `dashboard.**` drops the whole group. A dropped
   key vanishes from the [catalog endpoint](../i18n/messages.md#the-catalog-endpoint),
   [`useT`](../i18n/messages.md#translating-with-uset), and the generated
@@ -183,8 +184,8 @@ Durations take milliseconds or a string like `'30s'`. Sizes take bytes or a stri
 | `handlerTimeout`   | `'30s'` | How long middleware and the handler may run before the server answers with `503`.                                     |
 | `maxBodySize`      | `'1mb'` | Largest request body. A larger body is refused with `413`.                                                            |
 | `preStopDelay`     | `false` | Keeps serving after a shutdown signal, so a load balancer can deregister.                                             |
-| `shutdownTimeout`  | `false` | How long running requests may take to finish on shutdown.                                                             |
-| `deadline`         | `false` | Deadline for every shutdown hook combined.                                                                            |
+| `shutdownTimeout`  | `false` | How long running requests may take to finish on shutdown, before they are cancelled.                                  |
+| `deadline`         | `false` | Deadline for every shutdown hook combined, the cleanup of cancelled requests included.                                |
 | `waitUntilTimeout` | `false` | How long a [`waitUntil`](../api/response.md#after-the-response) promise may run after the response.                   |
 | `headersTimeout`   | `false` | Wait for the complete request headers. Node's default is 60 seconds.                                                  |
 | `requestTimeout`   | `false` | The whole request, headers and body. Node's default is 5 minutes.                                                     |

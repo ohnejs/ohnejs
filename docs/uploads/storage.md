@@ -58,6 +58,8 @@ A backend implements `StorageAdapter`; its JSDoc names each method. The rules it
 - `setPrivate` locks an object a backend serves itself, as a row turns
   [private](./private-files.md). Without it, a private object stays readable at `publicURL`, and
   ohne warns at boot.
+- A backend that serves its files itself stores the `disposition` that `write` receives, as
+  `@ohnejs/uploads-s3` does. Without it, an uploaded HTML file runs as a page on that origin.
 - `list` lets `ohne uploads prune` find [stray files](#stray-files). Without it, the command
   refuses.
 
@@ -73,6 +75,10 @@ npx ohne uploads prune
 
 Once the list holds only files you can lose, `--delete` deletes them. A file that is still uploading
 is never among them.
+
+An upload cut off by a crash, a `SIGKILL`, or a passed
+[`deadline`](../production/deployment.md#graceful-shutdown) leaves a partial file under `.tmp/`, and
+the first boot once a day has passed deletes it.
 
 `storage` and `url` are each layer's [own](../project/config.md#own-vs-inherited-keys): a dependency
 cannot point your uploads at its storage.
