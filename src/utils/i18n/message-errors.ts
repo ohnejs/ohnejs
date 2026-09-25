@@ -1,9 +1,10 @@
+import { codeSpan } from '../ansi/code-span.ts';
 import { clamp } from '../number/clamp.ts';
 
 /**
  * Thrown by `parseMessage` when the template violates ICU MessageFormat grammar.
  * Carries the character offset, a 1-indexed line/column, and a snippet with a caret.
- * The snippet is appended to `message` so an uncaught throw prints a useful diagnostic.
+ * The snippet is appended to `message`, its source line fenced so the printer echoes it exactly.
  *
  * @example
  * ```ts
@@ -38,13 +39,13 @@ export class MessageSyntaxError extends Error {
   readonly snippet: string;
 
   constructor(message: string, template: string, position: number) {
-    const { line, column, snippet } = locate(template, position);
-    super(`${message} (${line}:${column})\n${snippet}`);
+    const { line, column, source, caret } = locate(template, position);
+    super(`${message} (${line}:${column})\n${codeSpan(source)}\n${caret}`);
     this.name = 'MessageSyntaxError';
     this.position = position;
     this.line = line;
     this.column = column;
-    this.snippet = snippet;
+    this.snippet = `${source}\n${caret}`;
   }
 }
 
@@ -71,12 +72,12 @@ export class MessageFormatError extends Error {
 }
 
 /**
- * Resolves an offset, clamped into the template, to its 1-indexed line and column and a caret snippet.
+ * Resolves an offset, clamped into the template, to its 1-indexed line and column, source line, and caret.
  */
 function locate(
   template: string,
   position: number,
-): { line: number; column: number; snippet: string } {
+): { line: number; column: number; source: string; caret: string } {
   const clamped = clamp(position, 0, template.length);
   let line = 1;
   let lineStart = 0;
@@ -94,5 +95,5 @@ function locate(
   const source = template.slice(lineStart, lineEnd);
   const caret = ' '.repeat(column - 1) + '^';
 
-  return { line, column, snippet: `${source}\n${caret}` };
+  return { line, column, source, caret };
 }

@@ -64,6 +64,16 @@ describe('MessageSyntaxError', () => {
     strictEqual(err.message.includes('^'), true);
   });
 
+  it('fences the source line in the message, keeping the snippet raw', () => {
+    const err = new MessageSyntaxError('unexpected }', 'Hi `{name}` }', 12);
+    strictEqual(err.message.split('\n')[1], '``Hi `{name}` }``');
+    strictEqual(err.snippet, 'Hi `{name}` }\n            ^');
+  });
+
+  it('leaves an empty source line empty in the message', () => {
+    strictEqual(new MessageSyntaxError('boom', 'a\n', 2).message, 'boom (2:1)\n\n^');
+  });
+
   it('handles \\r\\n by treating \\n as the line break (column counts include \\r)', () => {
     const template = 'a\r\nb';
     const err = new MessageSyntaxError('boom', template, 3);

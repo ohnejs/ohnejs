@@ -35,7 +35,7 @@ export interface BlockOptions {
    * ```ts
    * printer.errorBlock({
    *   title: 'Validation failed',
-   *   body: errors.map((e) => `${e.path}: ${e.message}`),
+   *   body: errors.map((e) => `${codeSpan(e.path)}: ${e.message}`),
    * })
    * ```
    */

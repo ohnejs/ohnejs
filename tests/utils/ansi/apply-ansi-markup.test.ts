@@ -31,6 +31,21 @@ describe('applyANSIMarkup', () => {
     strictEqual(applyANSIMarkup('3 ** 2 + 4 ** 2', false, color), '3 ** 2 + 4 ** 2');
   });
 
+  it('closes a span only at a backtick run of its own length', () => {
+    strictEqual(applyANSIMarkup('``a`b``', false, color), '\x1b[96ma`b\x1b[39m');
+    strictEqual(applyANSIMarkup('``a`', false, color), '``a`');
+  });
+
+  it('closes a span across a carriage return or a line separator', () => {
+    strictEqual(applyANSIMarkup('`a\rb`', false, color), '\x1b[96ma\rb\x1b[39m');
+    strictEqual(applyANSIMarkup('`a b`', false, color), '\x1b[96ma b\x1b[39m');
+  });
+
+  it('drops one padding space on each side of a span, never from a blank one', () => {
+    strictEqual(applyANSIMarkup('`` `x ``', false, color), '\x1b[96m`x\x1b[39m');
+    strictEqual(applyANSIMarkup('`  `', false, color), '\x1b[96m  \x1b[39m');
+  });
+
   it('styles nothing inside a backtick span', () => {
     strictEqual(applyANSIMarkup('`__init__.py`', false, color), '\x1b[96m__init__.py\x1b[39m');
   });
