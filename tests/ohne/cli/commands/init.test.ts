@@ -1,5 +1,5 @@
 import { deepStrictEqual, match, strictEqual } from 'node:assert';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -79,6 +79,44 @@ describe('ohne init', () => {
     usePrinter().configure({ silent: true, stream: process.stderr });
     match(output.join(''), /\bnpm install/);
     match(output.join(''), /\bnpm run dev/);
+  });
+
+  it('quotes the directory in the `cd` step', async () => {
+    const cwd = process.cwd();
+    const output: string[] = [];
+
+    process.chdir(freshDir('cwd'));
+    usePrinter().configure({
+      silent: false,
+      color: false,
+      stream: { write: (s) => output.push(s) },
+    });
+    try {
+      await runCommand(ohne, ['init', 'my app', '--yes']);
+      await runCommand(ohne, ['init', '--yes', '--', '-dash']);
+    } finally {
+      usePrinter().configure({ silent: true, stream: process.stderr });
+      process.chdir(cwd);
+    }
+    match(output.join(''), /\bcd 'my app'$/m);
+    match(output.join(''), /\bcd \.\/-dash$/m);
+  });
+
+  it('empties the current directory in place with `--force`', async () => {
+    const cwd = process.cwd();
+    const dir = freshDir('here');
+    writeFileSync(join(dir, 'stale.txt'), 'x');
+    const inode = statSync(dir).ino;
+
+    process.chdir(dir);
+    try {
+      await runCommand(ohne, ['init', '.', '--yes', '--force']);
+      strictEqual(statSync(process.cwd()).ino, inode);
+    } finally {
+      process.chdir(cwd);
+    }
+    strictEqual(existsSync(join(dir, 'stale.txt')), false);
+    strictEqual(existsSync(join(dir, 'ohne.config.ts')), true);
   });
 
   it('points the ohne dependency at a local path with --ohne-path', async () => {

@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 
 import { codeSpan, isColorStream, pickANSIColors } from '../../../utils/ansi/index.ts';
 import { createPrompt, defineCommand, isCancel } from '../../../utils/cli/index.ts';
-import { listDir, removeDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
+import { emptyDir, listDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
 import {
   basename,
   first,
@@ -13,6 +13,7 @@ import {
   joinPath,
   relativePath,
   resolvePath,
+  shellPath,
 } from '../../../utils/index.ts';
 import { colorOverride } from '../../env/color-override.ts';
 import { version } from '../../meta/version.ts';
@@ -78,7 +79,7 @@ export const initCommand = defineCommand({
     },
     git: { type: 'boolean', description: 'Initialize a git repository.' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip prompts and take the defaults.' },
-    force: { type: 'boolean', alias: 'f', description: 'Delete a non-empty directory.' },
+    force: { type: 'boolean', alias: 'f', description: 'Empty a non-empty directory first.' },
     ohnePath: { type: 'string', hidden: true },
   },
   async run({ values, positionals }) {
@@ -132,7 +133,7 @@ export const initCommand = defineCommand({
         if (isCancel(purge)) return cancel();
         if (!purge) return keep();
       }
-      await removeDir(target);
+      await emptyDir(target);
     }
 
     let name = values.name ?? dirName;
@@ -183,7 +184,7 @@ export const initCommand = defineCommand({
 
     const dest = relativePath(process.cwd(), target);
     const steps = [
-      ...(dest ? [`cd ${dest}`] : []),
+      ...(dest ? [`cd ${shellPath(dest)}`] : []),
       ...(installed ? [] : [`${pm} install`]),
       runScript(pm, 'dev'),
     ];
@@ -191,8 +192,7 @@ export const initCommand = defineCommand({
     const body = steps.map((step) => codeSpan(step)).join('\n');
     print.success(`Created ${codeSpan(name)}`);
     if (interactive) prompt.note(body, 'Next steps', true);
-    else
-      print.successBlock({ title: 'Next steps:', body, path: relativePath(process.cwd(), target) });
+    else print.successBlock({ title: 'Next steps:', body, path: dest });
   },
 });
 
