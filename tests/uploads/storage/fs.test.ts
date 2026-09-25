@@ -11,6 +11,7 @@ import type { StorageAdapter } from '../../../src/uploads/storage/adapter.ts';
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { createFSStorage } from '../../../src/uploads/storage/fs.ts';
+import { truncateWithHash } from '../../../src/utils/crypto/index.ts';
 
 const encoder = new TextEncoder();
 
@@ -333,6 +334,30 @@ describe('createFSStorage', () => {
     await writing;
 
     strictEqual(readFileSync(join(dir, 'docs/report.pdf'), 'utf8'), 'pdf');
+  });
+
+  it('writes, lists and deletes an object whose name fills 255 bytes', async () => {
+    const key = `docs/${'a'.repeat(251)}.txt`;
+    await storage.write(key, streamOf('long'), { type: 'text/plain' });
+
+    strictEqual(readFileSync(join(dir, key), 'utf8'), 'long');
+    deepStrictEqual(await Array.fromAsync(storage.list!('docs')), [key]);
+    await storage.delete(key);
+    strictEqual(existsSync(join(dir, 'docs')), false);
+  });
+
+  it('removes the crash temp of a long name, keeping a sibling that shares its head', async () => {
+    const one = `${'b'.repeat(240)}-one.txt`;
+    const two = `${'b'.repeat(240)}-two.txt`;
+    const temp = (name: string) =>
+      `.${truncateWithHash(name, 213)}.01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b.tmp`;
+    await storage.write(`e/${one}`, streamOf('1'), { type: 'text/plain' });
+    writeFileSync(join(dir, 'e', temp(one)), 'crash');
+    writeFileSync(join(dir, 'e', temp(two)), 'crash');
+
+    await storage.delete(`e/${one}`);
+
+    deepStrictEqual(readdirSync(join(dir, 'e')), [temp(two)]);
   });
 
   it('treats a delete of a missing path as a no-op', async () => {

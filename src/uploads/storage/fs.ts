@@ -12,6 +12,7 @@ import {
   safeResolve,
   uuidv7,
 } from 'ohnejs/utils';
+import { truncateWithHash } from 'ohnejs/utils/crypto';
 import { ensureDir, exists, listDir, removeDir, removeFile, stat } from 'ohnejs/utils/fs';
 
 import type { StorageAdapter } from './adapter.ts';
@@ -44,7 +45,7 @@ export function createFSStorage(root: string): StorageAdapter {
     async write(path, body) {
       const target = locate(base, path);
       const dir = dirname(target);
-      const temp = joinPath(dir, `.${basename(target)}.${uuidv7()}.tmp`);
+      const temp = joinPath(dir, `.${tempStem(target)}.${uuidv7()}.tmp`);
       const handle = await inDir(dir, () => open(temp, 'wx'));
       try {
         await pipeline(Readable.fromWeb(body), handle.createWriteStream());
@@ -152,7 +153,7 @@ async function relocate(source: string, target: string): Promise<void> {
  */
 async function removeWriteTemps(target: string): Promise<void> {
   const dir = dirname(target);
-  const name = basename(target);
+  const stem = tempStem(target);
   const entries = await readdir(dir, { withFileTypes: true }).catch(
     (error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return [];
@@ -160,7 +161,7 @@ async function removeWriteTemps(target: string): Promise<void> {
     },
   );
   for (const entry of entries) {
-    if (entry.isFile() && WRITE_TEMP.exec(entry.name)?.[1] === name) {
+    if (entry.isFile() && WRITE_TEMP.exec(entry.name)?.[1] === stem) {
       await removeFile(joinPath(dir, entry.name));
     }
   }
@@ -180,4 +181,12 @@ async function pruneEmpty(dir: string, root: string): Promise<void> {
       throw error;
     }
   }
+}
+
+/**
+ * The name of `target` as its write temps carry it.
+ * A slug past 213 characters is cut with a hash of the whole, so the temp still fits a 255-byte file name.
+ */
+function tempStem(target: string): string {
+  return truncateWithHash(basename(target), 213);
 }
