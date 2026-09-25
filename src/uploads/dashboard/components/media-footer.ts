@@ -86,6 +86,11 @@ export interface MediaFooterOptions {
   onUpload?(files: File[], directory: string): void;
 
   /**
+   * Called with the URL entered through the upload-from-URL button, for the view's directory.
+   */
+  onUploadURL?(url: string, directory: string): void;
+
+  /**
    * Called when the Apply button applies a multiple-mode selection.
    */
   onApply?(): void;
@@ -129,8 +134,8 @@ css`
  * The cluster holds the selection actions while something is selected, then search, filter, and sorting.
  * The selection actions are delete, clear, move, make private, and make public.
  * Make private shows while a public item is selected, make public while a private one is.
- * On the page it ends with New folder and Upload; in a multiple picker with Apply.
- * New folder and Upload stay hidden in a folder whose own row the scope hides.
+ * On the page it ends with New folder, upload from URL, and Upload; in a multiple picker with Apply.
+ * The create buttons stay hidden in a folder whose own row the scope hides.
  * Left and right arrows page while no overlay sits above the footer's own surface.
  * Cmd/Ctrl+K opens the search popup, whose keyword filters file names across the folder's subtree.
  */
@@ -138,7 +143,7 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
   const t = useUploadsT();
   const view = options.view;
   const mode = options.selectionMode ?? 'none';
-  const { canUpdate, canDelete } = uploadsPermissions();
+  const { canMove, canSetPrivate, canDelete } = uploadsPermissions();
   const collection = uploadsCollection();
   const selectionCount = (): number => view.selection.value.length;
   const hasSelection = (): boolean => mode === 'none' && selectionCount() > 0;
@@ -287,6 +292,11 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
               onUpload: (files) =>
                 options.onUpload?.(
                   files,
+                  untracked(() => view.directory.value),
+                ),
+              onUploadURL: (url) =>
+                options.onUploadURL?.(
+                  url,
                   untracked(() => view.directory.value),
                 ),
             }),
@@ -445,13 +455,13 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       { class: 'ohne-row ohne-ml-auto' },
       when(() => hasSelection() && canDelete, deleteButton),
       when(hasSelection, clearButton),
-      when(() => hasSelection() && canUpdate && !isUndefined(options.onMove), moveButton),
+      when(() => hasSelection() && canMove && !isUndefined(options.onMove), moveButton),
       when(
-        () => hasSelection() && canUpdate && selects(false),
+        () => hasSelection() && canSetPrivate && selects(false),
         () => privacyButton(true),
       ),
       when(
-        () => hasSelection() && canUpdate && selects(true),
+        () => hasSelection() && canSetPrivate && selects(true),
         () => privacyButton(false),
       ),
       searchButton,

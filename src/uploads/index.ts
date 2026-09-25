@@ -11,6 +11,7 @@ export * from './uploads/create-folder.ts';
 export * from './uploads/decorate.ts';
 export * from './uploads/delete-upload.ts';
 export * from './uploads/delete-uploads.ts';
+export * from './uploads/fetch-upload.ts';
 export * from './uploads/move-upload.ts';
 export * from './uploads/move-uploads.ts';
 export * from './uploads/path.ts';

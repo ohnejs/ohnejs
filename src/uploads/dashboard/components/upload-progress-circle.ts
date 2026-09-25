@@ -1,5 +1,13 @@
 import { css, h, when } from 'ohnejs/dashboard';
-import { batchedEffect, first, isFunction, isUndefined, onCleanup, ref } from 'ohnejs/utils';
+import {
+  batchedEffect,
+  first,
+  isFunction,
+  isNull,
+  isUndefined,
+  onCleanup,
+  ref,
+} from 'ohnejs/utils';
 
 /**
  * Options for `uploadProgressCircle`.
@@ -34,6 +42,8 @@ type SVGAttributes = Record<string, string | number | (() => string | number)>;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+const INDETERMINATE_ARC = 25;
+
 css`
   .o-upload-progress-circle {
     position: absolute;
@@ -52,6 +62,10 @@ css`
     transform: rotate(-90deg);
   }
 
+  .o-upload-progress-circle-indeterminate .o-upload-progress-circle-svg {
+    animation: o-upload-progress-circle-spin 1s linear infinite;
+  }
+
   .o-upload-progress-circle-bar {
     stroke-linecap: round;
     transition-property: stroke-dashoffset;
@@ -63,26 +77,43 @@ css`
     color: currentColor;
     font-weight: 600;
   }
+
+  @keyframes o-upload-progress-circle-spin {
+    from {
+      transform: rotate(-90deg);
+    }
+
+    to {
+      transform: rotate(270deg);
+    }
+  }
 `;
 
 /**
  * A ring that fills clockwise from the top as `progress` climbs from `0` to `100`, the percentage inside.
+ * While `progress` is `null` the amount is unknown, so a quarter arc spins and no percentage shows.
  * It covers its positioned parent and sizes the ring to the smaller side, so it fits any square or circle.
  */
 export function uploadProgressCircle(
-  progress: () => number,
+  progress: () => number | null,
   options: UploadProgressCircleOptions = {},
 ): HTMLElement {
   const strokeWidth = options.strokeWidth ?? 3;
   const size = ref(0);
+  const indeterminate = (): boolean => isNull(progress());
   const center = (): number => size.value / 2;
   const radius = (): number => center() - strokeWidth / 2;
   const circumference = (): number => 2 * Math.PI * radius();
-  const offset = (): number => circumference() - (progress() / 100) * circumference();
+  const offset = (): number =>
+    circumference() - ((progress() ?? INDETERMINATE_ARC) / 100) * circumference();
 
   const root = h(
     'div',
-    { class: 'o-upload-progress-circle' },
+    {
+      class: () =>
+        'o-upload-progress-circle' +
+        (indeterminate() ? ' o-upload-progress-circle-indeterminate' : ''),
+    },
     when(
       () => size.value > 0,
       () =>
@@ -116,10 +147,14 @@ export function uploadProgressCircle(
           }),
         ),
     ),
-    h(
-      'div',
-      { class: 'o-upload-progress-circle-text', style: () => `font-size: ${size.value / 4}px` },
-      () => `${Math.round(progress())}%`,
+    when(
+      () => !indeterminate(),
+      () =>
+        h(
+          'div',
+          { class: 'o-upload-progress-circle-text', style: () => `font-size: ${size.value / 4}px` },
+          () => `${Math.round(progress() ?? 0)}%`,
+        ),
     ),
   );
 

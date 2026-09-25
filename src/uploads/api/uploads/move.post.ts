@@ -19,7 +19,7 @@ import { moveUploads } from '../../uploads/move-uploads.ts';
  * `uuids` must be a non-empty array of strings, at most `BULK_LIMIT` (`1000`), or the request is a `400`.
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any other `400`.
  * A `directory` that is not a string is a `400`.
- * A folder moved into itself, or a target already taken, is a `422`, and nothing moves.
+ * A folder moved into itself, a target already taken, or a path past 768 bytes is a `422`, and nothing moves.
  * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
  */
 export default defineHandler(async (): Promise<UploadRecord[]> => {

@@ -5,18 +5,23 @@ import { createHash } from 'node:crypto';
 import { ohneError, queryUntyped, useDatabase } from 'ohnejs';
 import {
   decodeText,
+  formatBytes,
   imageSize,
   isUndefined,
+  limitStream,
   mediaCategory,
   mediaTypesCompatible,
+  parseBytes,
   sanitizeSVG,
   sniffMediaType,
   uuidv7,
   uuidv7Time,
 } from 'ohnejs/utils';
 
+import { useUploadsConfig } from '../config.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';
+import { dispositionFor } from './_disposition.ts';
 import { uploadsError } from './_errors.ts';
 import { TEMP_PREFIX } from './path.ts';
 
@@ -60,10 +65,12 @@ const SVG = 'image/svg+xml';
  * The first 64 KiB are peeked: bytes whose sniffed type contradicts `type` are refused as `contentMismatch`.
  * An image's dimensions are read from that head.
  * An SVG is buffered whole, sanitized, and re-measured; input without an `<svg>` root is refused as `notSVG`.
+ * Reading stops the moment an SVG passes `uploads.maxSVGSize`: `fileTooLarge`, whatever `maxFileSize` allows.
  * The bytes then flow through a sha256 counter into `storage.write` under the `.tmp/` prefix.
  * The temp object is journaled as a `stage` entry first, so `sweepStaged` finds it if its row never commits.
  * The journal is bookkeeping, so its reads and writes skip the app's scoping hooks.
  * `size` is the request's declared length, a hint for a backend that needs it up front.
+ * The disposition the API route serves `type` with goes along, for a backend that serves the object itself.
  */
 export async function stageUpload(
   body: ReadableStream<Uint8Array>,
@@ -100,7 +107,11 @@ export async function stageUpload(
     to: null,
   });
   try {
-    await useStorage().write(temp, metered, { type, size: declared });
+    await useStorage().write(temp, metered, {
+      type,
+      size: declared,
+      disposition: dispositionFor(type),
+    });
   } catch (error) {
     await discardStaged(temp);
     throw error;
@@ -225,10 +236,14 @@ async function peek(
 }
 
 /**
- * Buffers an SVG body whole and returns its sanitized markup as bytes.
+ * Buffers an SVG body whole, up to `uploads.maxSVGSize`, and returns its sanitized markup as bytes.
  */
 async function sanitizedSVG(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const bytes = await new Response(stream).bytes();
+  const max = parseBytes(useUploadsConfig().maxSVGSize);
+  const capped = limitStream(stream, max, () =>
+    uploadsError('name', 'fileTooLarge', { max: formatBytes(max) }),
+  );
+  const bytes = await new Response(capped).bytes();
   let text: string;
   try {
     text = decodeText(bytes);

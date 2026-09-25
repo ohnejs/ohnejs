@@ -32,6 +32,7 @@ export interface MoveUploadTarget {
  * A rename that stays in its folder leaves `private` as it is.
  * The journal drains after the commit, so the object moves once the row points at its new path.
  * A file whose extension would change is a `422`; so is a folder moved into itself.
+ * So is a path past 768 bytes, a folder's deepest row included, at `directory`.
  * A target already taken is the pipeline's `422`; an unknown `UUID` a `404`.
  *
  * @example

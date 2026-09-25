@@ -1,4 +1,4 @@
-import { clamp, errorMessage, isUndefined, ref, uuidv7 } from 'ohnejs/utils';
+import { clamp, errorMessage, ref, urlFileName, uuidv7 } from 'ohnejs/utils';
 
 /**
  * Where one queued upload stands.
@@ -17,6 +17,7 @@ export interface UploadTask {
 
   /**
    * The file name; once completed, the name the server stored the file under.
+   * A URL upload starts with the name its path ends in, else its host.
    */
   name: string;
 
@@ -26,9 +27,15 @@ export interface UploadTask {
   directory: string;
 
   /**
-   * The file's size in bytes.
+   * The file's size in bytes, `null` while unknown.
+   * A URL upload learns it from the stored record.
    */
-  size: number;
+  size: number | null;
+
+  /**
+   * The host a URL upload fetches from, shown in place of the URL, whose query may carry a token.
+   */
+  host?: string;
 
   /**
    * Where the upload stands.
@@ -57,30 +64,39 @@ export interface UploadTask {
 }
 
 /**
- * A file bound for a folder.
+ * A file, or the URL of one, bound for a folder.
+ * A file travels as the request body; a URL is fetched by the server.
  */
-export interface UploadItem {
-  /**
-   * The file to send.
-   */
-  file: File;
-
+export type UploadItem = {
   /**
    * The target folder path, `''` at the root.
    */
   directory: string;
-}
+} & (
+  | {
+      /**
+       * The file to send.
+       */
+      file: File;
+    }
+  | {
+      /**
+       * The `http:` or `https:` URL the server fetches the file from.
+       */
+      url: string;
+    }
+);
 
 /**
  * How one send ended.
  * Success carries what the server stored, since it may have renamed the file.
  */
 export type UploadOutcome =
-  | { ok: true; UUID: string; name: string; directory: string }
+  | { ok: true; UUID: string; name: string; directory: string; size: number | null }
   | { ok: false; error: string };
 
 /**
- * What a sender receives beside the task and its file.
+ * What a sender receives beside the task and its item.
  */
 export interface UploadSendHooks {
   /**
@@ -95,12 +111,12 @@ export interface UploadSendHooks {
 }
 
 /**
- * Sends one file and answers how it went.
+ * Sends one item and answers how it went.
  * A rejection while the signal is aborted marks the task aborted; any other rejection marks it failed.
  */
 export type UploadSender = (
   task: UploadTask,
-  file: File,
+  item: UploadItem,
   hooks: UploadSendHooks,
 ) => Promise<UploadOutcome>;
 
@@ -168,7 +184,7 @@ export interface UploadQueue {
 
 interface Entry {
   task: UploadTask;
-  file: File;
+  item: UploadItem;
   controller: AbortController;
   settle(): void;
 }
@@ -185,9 +201,14 @@ const DEFAULT_SPEED_WINDOW = 3000;
 // A shorter span holds too few samples to mean anything, so the measurement waits.
 const MIN_SPEED_SPAN = 500;
 
+// The fetch route's per-user limit: one more fetch in flight is answered with a `429`.
+const MAX_FETCHES = 2;
+
 /**
  * Creates an upload queue around `send`.
  * Tasks start in the order they were queued, at most `concurrency` at once; a settled task frees its slot.
+ * URL tasks run at most as many at once as the fetch route allows one user; files pass a URL left waiting.
+ * The cap is per queue while the route counts per user, so fetches from another tab can still cause a `429`.
  * Progress arrives from the sender in bytes, so the speed is measured from the deltas over a rolling window.
  * A failure settles only its own task; the rest of the batch runs on.
  *
@@ -210,6 +231,7 @@ export function createUploadQueue(
   const waiting: Entry[] = [];
   const samples: Sample[] = [];
   let running = 0;
+  let fetching = 0;
 
   const snapshot = (id: string): UploadTask | undefined =>
     tasks.value.find((task) => task.id === id);
@@ -241,7 +263,7 @@ export function createUploadQueue(
     let loaded = 0;
     patch(id, { status: 'uploading' });
     try {
-      const outcome = await send(entry.task, entry.file, {
+      const outcome = await send(entry.task, entry.item, {
         signal,
         onProgress: (sent, total) => {
           measure(sent - loaded);
@@ -251,8 +273,8 @@ export function createUploadQueue(
       });
       if (signal.aborted) return;
       if (outcome.ok) {
-        const { UUID, name, directory } = outcome;
-        finish(entry, { status: 'completed', progress: 1, UUID, name, directory });
+        const { UUID, name, directory, size } = outcome;
+        finish(entry, { status: 'completed', progress: 1, UUID, name, directory, size });
       } else {
         finish(entry, { status: 'failed', progress: 1, error: outcome.error });
       }
@@ -264,11 +286,15 @@ export function createUploadQueue(
 
   const pump = (): void => {
     while (running < concurrency) {
-      const entry = waiting.shift();
-      if (isUndefined(entry)) return;
+      const index = waiting.findIndex(({ item }) => !('url' in item) || fetching < MAX_FETCHES);
+      if (index === -1) return;
+      const [entry] = waiting.splice(index, 1);
+      const fetches = 'url' in entry.item ? 1 : 0;
       running += 1;
+      fetching += fetches;
       void run(entry).finally(() => {
         running -= 1;
+        fetching -= fetches;
         entry.settle();
         pump();
       });
@@ -294,17 +320,16 @@ export function createUploadQueue(
         if (outstanding === 0) resolve(tasks.value.filter((task) => ids.has(task.id)));
       };
       const batch: UploadTask[] = [];
-      for (const { file, directory } of items) {
+      for (const item of items) {
         const task: UploadTask = {
           id: uuidv7(),
-          name: file.name,
-          directory,
-          size: file.size,
+          ...origin(item),
+          directory: item.directory,
           status: 'pending',
           progress: 0,
           abort: () => abort(entry),
         };
-        const entry: Entry = { task, file, controller: new AbortController(), settle };
+        const entry: Entry = { task, item, controller: new AbortController(), settle };
         ids.add(task.id);
         batch.push(task);
         waiting.push(entry);
@@ -322,4 +347,14 @@ export function createUploadQueue(
       tasks.value = tasks.value.filter((task) => task.id !== id);
     },
   };
+}
+
+/**
+ * The name, size, and host a new task starts with.
+ * A URL's name is provisional: the server names the file from the response, and the task takes that on.
+ */
+function origin(item: UploadItem): Pick<UploadTask, 'name' | 'size' | 'host'> {
+  if ('file' in item) return { name: item.file.name, size: item.file.size };
+  const host = URL.parse(item.url)?.host ?? '';
+  return { name: urlFileName(item.url) || host, size: null, host };
 }

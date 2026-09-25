@@ -1,4 +1,4 @@
-import { attachTooltip, button, css, h, icon, when } from 'ohnejs/dashboard';
+import { attachTooltip, button, type Child, css, h, icon, when } from 'ohnejs/dashboard';
 import { onCleanup, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -6,6 +6,7 @@ import type { TargetDirectory } from './_target-tree.ts';
 
 import { useUploadsT } from './_messages.ts';
 import { createFolderPopup } from './create-folder-popup.ts';
+import { uploadsPermissions } from './media-library-data.ts';
 
 /**
  * Options for `mediaTargetDirectory`.
@@ -67,6 +68,7 @@ css`
  * One node of the move target tree, its children nested beneath it.
  * The wide outline button picks the folder and stays disabled where the selection may not land.
  * The New subfolder button beside it appears on hover and opens the create-folder popup for this folder.
+ * It shows only while the viewer's permissions grant creating folders.
  */
 export function mediaTargetDirectory(
   directory: TargetDirectory,
@@ -74,7 +76,6 @@ export function mediaTargetDirectory(
 ): HTMLElement {
   const t = useUploadsT();
   const level = options.level ?? 0;
-  const createOpen = ref(false);
 
   const target = button(directory.name, {
     variant: 'outline',
@@ -90,20 +91,15 @@ export function mediaTargetDirectory(
     ),
   );
 
-  const subfolder = button(icon('folder-plus'), {
-    variant: 'outline',
-    class: 'o-media-target-directory-subdirectory-button',
-    onClick: (event) => {
-      event.stopPropagation();
-      createOpen.value = true;
-    },
-  });
-  onCleanup(attachTooltip(subfolder, () => t('uploads.dashboard.subfolder')));
-
   return h(
     'div',
     { class: `o-media-target-directory o-media-target-directory-${level}` },
-    h('div', { class: 'o-media-target-directory-buttons' }, target, subfolder),
+    h(
+      'div',
+      { class: 'o-media-target-directory-buttons' },
+      target,
+      uploadsPermissions().canCreateFolder ? newSubfolder(directory, options) : null,
+    ),
     directory.children.length > 0
       ? h(
           'div',
@@ -113,20 +109,41 @@ export function mediaTargetDirectory(
           ),
         )
       : null,
-    when(
-      () => createOpen.value,
-      () => {
-        createFolderPopup({
-          directory: directory.path,
-          title: () => t('uploads.dashboard.subfolder'),
-          onCreated: options.onCreated,
-          onClose: (close) =>
-            void close().then(() => {
-              createOpen.value = false;
-            }),
-        });
-        return null;
-      },
-    ),
   );
+}
+
+/**
+ * The New subfolder icon button, and the region its create-folder popup renders in while open.
+ */
+function newSubfolder(directory: TargetDirectory, options: MediaTargetDirectoryOptions): Child {
+  const t = useUploadsT();
+  const open = ref(false);
+
+  const el = button(icon('folder-plus'), {
+    variant: 'outline',
+    class: 'o-media-target-directory-subdirectory-button',
+    onClick: (event) => {
+      event.stopPropagation();
+      open.value = true;
+    },
+  });
+  onCleanup(attachTooltip(el, () => t('uploads.dashboard.subfolder')));
+
+  const host = when(
+    () => open.value,
+    () => {
+      createFolderPopup({
+        directory: directory.path,
+        title: () => t('uploads.dashboard.subfolder'),
+        onCreated: options.onCreated,
+        onClose: (close) =>
+          void close().then(() => {
+            open.value = false;
+          }),
+      });
+      return null;
+    },
+  );
+
+  return [el, host];
 }

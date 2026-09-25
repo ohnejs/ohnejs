@@ -87,10 +87,13 @@
     "selected": "{count, plural, one {# Element ausgewählt} other {# Elemente ausgewählt}}",
     "subfolder": "Neuer Unterordner",
     "upload": "Hochladen",
+    "uploadFromURL": "Von URL hochladen",
     "uploadHistory": "Upload-Verlauf",
     "uploadedBy": "Hochgeladen von",
     "uploadedOn": "Hochgeladen am",
     "uploading": "Wird hochgeladen",
+    "url": "URL",
+    "urlPlaceholder": "z. B. https://example.com/photo.jpg",
     "variants": "Varianten"
   },
   "errors": {
@@ -109,7 +112,11 @@
     "notAnImage": "Die Datei ist kein Bild",
     "notSVG": "Die Datei ist kein SVG-Bild",
     "outOfReach": "Du würdest das Ergebnis nicht mehr sehen",
-    "typeNotAllowed": "Der Dateityp `{type}` ist nicht erlaubt"
+    "pathTooLong": "Ein Pfad darf höchstens `{max}` Zeichen lang sein",
+    "typeNotAllowed": "Der Dateityp `{type}` ist nicht erlaubt",
+    "urlInvalid": "Die URL muss http oder https sein, ohne Zugangsdaten",
+    "urlStatus": "Die URL antwortete mit Status `{status}`",
+    "urlUnreachable": "Die Datei konnte nicht von der URL abgerufen werden"
   },
   "fields": {
     "kind": {

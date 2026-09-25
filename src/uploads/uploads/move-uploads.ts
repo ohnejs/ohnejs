@@ -26,7 +26,7 @@ export interface MoveUploadsOptions {
  * Each row moves as `moveUpload` moves it; a row already in `directory` stays where it is.
  * A row inside a folder that moves goes along with that folder.
  * Any refusal rolls every row back and throws the error that row alone would raise.
- * So a folder moved into itself, or a target already taken, is a `422` for the whole call.
+ * So a folder moved into itself, a taken target, or a path past 768 bytes is a `422` for the whole call.
  * An unknown `UUID`, or one `reach` hides, is a `404`.
  * With `reach`, a write that would hide a named row, a moved one, or a created folder is a `422`.
  * The journal drains once after the commit.

@@ -11,7 +11,7 @@ import {
   navigate,
   when,
 } from 'ohnejs/dashboard';
-import { effect, formatBytes, onCleanup, ref, untracked } from 'ohnejs/utils';
+import { effect, formatBytes, isNull, onCleanup, ref, untracked } from 'ohnejs/utils';
 
 import type { UploadStatus, UploadTask } from './upload-queue-state.ts';
 
@@ -159,6 +159,7 @@ css`
  * It renders only while the upload history holds a task, so a quiet dashboard shows no bell.
  * The trigger carries a bubble with the pending and uploading count and turns primary while open.
  * The dropdown lists every task with a status circle, the split file name, a detail line, and its action.
+ * The detail line holds the size; a URL upload shows its host until the size is known, never the URL.
  * A completed row opens the file's details in the media library; the header shows the measured speed.
  */
 export function uploadBell(): Child {
@@ -225,7 +226,7 @@ function bell(): HTMLElement {
         case 'pending':
           return icon('clock');
         case 'uploading':
-          return uploadProgressCircle(() => task().progress * 100);
+          return uploadProgressCircle(() => (isNull(task().size) ? null : task().progress * 100));
       }
     };
 
@@ -235,7 +236,7 @@ function bell(): HTMLElement {
         return current.error?.replaceAll('`', '') ?? t('uploads.dashboard.failed');
       }
       if (current.status === 'aborted') return t('uploads.dashboard.aborted');
-      return formatBytes(current.size);
+      return isNull(current.size) ? (current.host ?? '') : formatBytes(current.size);
     };
 
     return h(

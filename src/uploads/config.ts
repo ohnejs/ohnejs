@@ -1,7 +1,8 @@
 import type { CacheControlOptions, LayerStrategies } from 'ohnejs/utils';
 
-import { useConfig, useEnv } from 'ohnejs';
-import { withDefaults } from 'ohnejs/utils';
+import { ohneError, useConfig, useEnv } from 'ohnejs';
+import { parseBytes, parseDuration, withDefaults } from 'ohnejs/utils';
+import { createCIDRMatcher } from 'ohnejs/utils/net';
 
 import type { ImageTransforms } from './images/transforms.ts';
 
@@ -42,6 +43,16 @@ declare module 'ohnejs' {
        * '128mb'
        */
       maxFileSize?: number | string;
+
+      /**
+       * The largest SVG an upload may carry, as a `parseBytes` value.
+       * An SVG is sanitized whole in memory, and the API answers no other request while that runs.
+       * Hostile markup takes about 120 ms per MiB, so a larger cap lets one upload stall the API for longer.
+       *
+       * @default
+       * '2mb'
+       */
+      maxSVGSize?: number | string;
 
       /**
        * The media types that may be uploaded, or `'*'` for any.
@@ -103,7 +114,42 @@ declare module 'ohnejs' {
          */
         variants?: Record<string, ImageTransforms>;
       };
+
+      /**
+       * How `POST /uploads/fetch` and `fetchUpload` fetch a file from a URL someone else chose.
+       * It reaches only public addresses on ports 80 and 443, so a URL cannot probe the server's network.
+       */
+      fetch?: {
+        /**
+         * Addresses and CIDR blocks fetched although they are not public, on any port.
+         * The way to fetch from an intranet, as `['10.20.0.0/16']` does.
+         * `'0.0.0.0/0'` switches the guard off for IPv4, and `'::/0'` switches it off entirely.
+         * Either one lets any editor who may fetch read the server's own network and cloud metadata.
+         * A closer layer's list replaces an inherited one.
+         *
+         * @default
+         * []
+         */
+        allow?: string[];
+
+        /**
+         * The deadline for one fetch, across its redirects and the whole body, as a `parseDuration` value.
+         * Whatever it is, the source must start answering within 30 seconds and never go quiet for longer.
+         *
+         * @default
+         * '2m'
+         */
+        timeout?: number | string;
+      };
     };
+  }
+
+  interface KnownCapabilities {
+    /**
+     * Fetching a file from a URL into `Uploads`, alongside `collection.Uploads.create`.
+     * The request leaves from the server's own address, which partners may trust, so a role grants it apart.
+     */
+    'uploads.fetch': true;
   }
 
   interface Env {
@@ -148,6 +194,11 @@ export interface ResolvedUploadsConfig {
   maxFileSize: number | string;
 
   /**
+   * The largest SVG an upload may carry, as a `parseBytes` value.
+   */
+  maxSVGSize: number | string;
+
+  /**
    * The media types that may be uploaded, or `'*'` for any.
    */
   types: '*' | string[];
@@ -181,6 +232,21 @@ export interface ResolvedUploadsConfig {
      */
     variants: Record<string, ImageTransforms>;
   };
+
+  /**
+   * How a file is fetched from a URL.
+   */
+  fetch: {
+    /**
+     * Addresses and CIDR blocks fetched although they are not public.
+     */
+    allow: string[];
+
+    /**
+     * The deadline for one fetch, as a `parseDuration` value.
+     */
+    timeout: number | string;
+  };
 }
 
 /**
@@ -190,10 +256,12 @@ export const UPLOADS_DEFAULTS = {
   storage: 'fs',
   url: '.uploads',
   maxFileSize: '128mb',
+  maxSVGSize: '2mb',
   types: '*',
   cache: { noCache: true },
   privateMaxAge: '1h',
   images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
+  fetch: { allow: [], timeout: '2m' },
 } satisfies ResolvedUploadsConfig;
 
 /**
@@ -217,5 +285,62 @@ useEnv().define('UPLOADS_SECRET', { default: undefined });
 export function useUploadsConfig(): ResolvedUploadsConfig {
   return withDefaults(useConfig().uploads ?? {}, UPLOADS_DEFAULTS, {
     strategies: UPLOADS_STRATEGIES,
+  });
+}
+
+/**
+ * Checks every uploads setting the layer parses, throwing an error block that names the first bad one.
+ * Each is parsed per request, so one bad value would otherwise fail every upload or fetch with a `500`.
+ * A boot file runs it, so the API server and every command stop before any request.
+ */
+export function validateUploadsConfig(): void {
+  const config = useUploadsConfig();
+  for (const entry of config.fetch.allow) {
+    if (!parses(() => createCIDRMatcher([entry]))) {
+      throw ohneError({
+        title: `Invalid \`uploads.fetch.allow\` entry \`${entry}\``,
+        body: [
+          'An entry is an IP address or a CIDR block, such as `10.20.0.0/16` or `fd00::/8`.',
+          'Fix or remove it under `uploads.fetch.allow`.',
+        ],
+      });
+    }
+  }
+  const sizes = { maxFileSize: config.maxFileSize, maxSVGSize: config.maxSVGSize };
+  for (const [key, value] of Object.entries(sizes)) {
+    if (!parses(() => parseBytes(value))) {
+      throw invalidValue(key, value, 'It is a byte size, such as `2mb`, or a number of bytes.');
+    }
+  }
+  const durations = { privateMaxAge: config.privateMaxAge, 'fetch.timeout': config.fetch.timeout };
+  for (const [key, value] of Object.entries(durations)) {
+    if (!parses(() => parseDuration(value) > 0)) {
+      throw invalidValue(
+        key,
+        value,
+        'It is a duration above zero, such as `2m`, or a number of milliseconds.',
+      );
+    }
+  }
+}
+
+/**
+ * Whether `parse` runs without throwing and returns anything but `false`.
+ */
+function parses(parse: () => unknown): boolean {
+  try {
+    return parse() !== false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The error block for an `uploads.<key>` setting whose `value` does not parse, with the `form` it takes.
+ */
+function invalidValue(key: string, value: number | string, form: string): Error {
+  return ohneError({
+    title: `Invalid \`uploads.${key}\` value \`${value}\``,
+    body: [form, `Fix it under \`uploads.${key}\`.`],
   });
 }

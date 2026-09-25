@@ -13,7 +13,7 @@ import { createFolder } from '../../uploads/create-folder.ts';
  * Creates a folder from `{ directory?, name }` and answers `201` with its record.
  * Needs `collection.Uploads.create`: no user `401`, no capability `403`.
  * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
- * A body without a `name` is a `400`; a name already taken a `422`.
+ * A body without a `name` is a `400`; a name already taken or a path past 768 bytes a `422`.
  */
 export default defineHandler(async (): Promise<UploadRecord> => {
   const user = await requireCapability('collection.Uploads.create');

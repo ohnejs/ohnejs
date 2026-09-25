@@ -86,6 +86,11 @@ export interface MediaActions extends MediaItemActions {
    * Called with the files picked through the Upload button, for `directory`.
    */
   onUpload?(files: File[], directory: string): void;
+
+  /**
+   * Called with the URL entered through the upload-from-URL button, for `directory`.
+   */
+  onUploadURL?(url: string, directory: string): void;
 }
 
 /**
@@ -265,7 +270,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
   const view = options.view;
   const mode = options.selectionMode ?? 'none';
   const permissions = uploadsPermissions();
-  const { canUpdate, canDelete } = permissions;
+  const { canEdit, canMove, canSetPrivate, canDelete } = permissions;
   const actions = options.actions ?? registered;
   const showPathTooltips =
     options.showPathTooltips ?? ((): boolean => !isUndefined(view.query.value.where));
@@ -315,7 +320,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
       view.uploads.value = page.records;
       renewAt(page.records);
       view.privateFolders.value = new Set();
-      if (mode === 'none' && canUpdate) {
+      if (mode === 'none' && canSetPrivate) {
         const locked = page.records.filter((record) => record.private === true);
         void privateFolders(locked.map((record) => record.directory)).then((folders) => {
           if (mine === generation) view.privateFolders.value = folders;
@@ -395,15 +400,15 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
             href: resolveUploadURL(record),
             target: '_blank',
           }),
-      canUpdate && actions.onRename
+      canEdit && actions.onRename
         ? menuItem('pencil', t('uploads.dashboard.rename'), () => actions.onRename?.(record))
         : null,
-      canUpdate && actions.onMove
+      canMove && actions.onMove
         ? menuItem('file-arrow-right', t('uploads.dashboard.move'), () =>
             actions.onMove?.([record]),
           )
         : null,
-      canUpdate && !pinned(record, view.privateFolders.value)
+      canSetPrivate && !pinned(record, view.privateFolders.value)
         ? menuItem(
             record.private ? 'lock-open' : 'lock',
             t(record.private ? 'uploads.dashboard.makePublic' : 'uploads.dashboard.makePrivate'),
@@ -423,7 +428,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
 
   const hotkeys = useHotkeys(options.hotkeys);
   hotkeys.listen('selectAll', (event) => {
-    if (mode === 'single' || !(canUpdate || canDelete)) return;
+    if (mode === 'single' || !(canMove || canSetPrivate || canDelete)) return;
     const candidates = view.uploads.value.filter(selectable);
     if (candidates.length === 0) return;
     event.preventDefault();
@@ -616,6 +621,7 @@ function mediaPage(directory: string, actions: MediaActions): Child {
       onMove: merged.onMove,
       onCreateFolder: merged.onCreateFolder,
       onUpload: merged.onUpload,
+      onUploadURL: merged.onUploadURL,
     }),
   );
 

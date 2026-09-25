@@ -87,10 +87,13 @@
     "selected": "{count, plural, one {# item selected} other {# items selected}}",
     "subfolder": "New subfolder",
     "upload": "Upload",
+    "uploadFromURL": "Upload from URL",
     "uploadHistory": "Upload history",
     "uploadedBy": "Uploaded by",
     "uploadedOn": "Uploaded on",
     "uploading": "Uploading",
+    "url": "URL",
+    "urlPlaceholder": "e.g. https://example.com/photo.jpg",
     "variants": "Variants"
   },
   "errors": {
@@ -109,7 +112,11 @@
     "notAnImage": "The file is not an image",
     "notSVG": "The file is not an SVG image",
     "outOfReach": "You would no longer see the result",
-    "typeNotAllowed": "File type `{type}` is not allowed"
+    "pathTooLong": "A path may be at most `{max}` characters long",
+    "typeNotAllowed": "File type `{type}` is not allowed",
+    "urlInvalid": "The URL must be http or https, without credentials",
+    "urlStatus": "The URL answered with status `{status}`",
+    "urlUnreachable": "The file could not be fetched from the URL"
   },
   "fields": {
     "kind": {

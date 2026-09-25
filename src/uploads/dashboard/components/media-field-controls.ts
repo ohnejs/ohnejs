@@ -117,7 +117,7 @@ css`
 /**
  * The form control of an `image` or `file` field.
  *
- * Empty, it offers a Select button opening the picker and, with create permission, an Upload button.
+ * Empty, it offers a Select button opening the picker and, with upload permission, an Upload button.
  * A linked image shows its tile, the name with the path in a tooltip, the alt text, and Replace and Clear.
  * A linked file shows its name chip beside Replace and Clear.
  * The alt text row and the tile open the details popup; the tile's link opens the media page in a new tab.
@@ -130,7 +130,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
     const t = useUploadsT();
     if (isUndefined(uploadsCollection())) return noPermissionControl(context, t);
     const off = context.disabled === true;
-    const { canCreate, canUpdate } = uploadsPermissions();
+    const { canUpload, canEdit } = uploadsPermissions();
     const constraints = constraintsOf(context.field.options);
     const disabled = ineligibility(constraints, image);
     const tileView = createMediaView();
@@ -190,7 +190,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
           },
         ),
       ),
-      canCreate && !off
+      canUpload && !off
         ? iconButton(
             'upload',
             () => t('uploads.dashboard.upload'),
@@ -226,7 +226,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
         { class: 'ohne-truncate', title: linked?.description ?? undefined },
         text,
       );
-      if (!canUpdate || isNullish(linked)) {
+      if (!canEdit || isNullish(linked)) {
         return h('div', { class: 'o-media-field-description ohne-truncate' }, inner);
       }
       return h(

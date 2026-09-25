@@ -19,4 +19,5 @@ registerShellSlot('header', () => uploadBell());
 registerShellSlot('global', () => dropUploader());
 registerMediaActions({
   onUpload: (files, directory) => void uploadFiles(files.map((file) => ({ file, directory }))),
+  onUploadURL: (url, directory) => void uploadFiles([{ url, directory }]),
 });

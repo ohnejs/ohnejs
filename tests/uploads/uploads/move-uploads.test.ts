@@ -126,4 +126,23 @@ describe('moveUploads', () => {
       false,
     );
   });
+
+  it('422s a folder move whose deepest descendant would pass 768 bytes, moving nothing', async () => {
+    const segment = 'icecrown'.repeat(32).slice(0, 255);
+    const deep = await put(`northrend/${segment}/${segment}`, 'frostmourne.txt');
+    const small = await put('dragonblight', 'wyrmrest.txt');
+    const folder = await queryUntyped('Uploads')
+      .where({ directory: '', name: 'northrend' })
+      .findFirst();
+    await rejects(moveUploads([small, folder?.UUID as string], segment), (error: unknown) => {
+      if (!isValidationError(error)) return false;
+      deepStrictEqual(error.errors, {
+        directory: { key: 'uploads.errors.pathTooLong', params: { max: 768 } },
+      });
+      return true;
+    });
+    strictEqual(await pathOf(deep), `northrend/${segment}/${segment}/frostmourne.txt`);
+    strictEqual(await pathOf(small), 'dragonblight/wyrmrest.txt');
+    strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
 });

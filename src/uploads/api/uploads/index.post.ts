@@ -15,7 +15,7 @@ import { putUpload } from '../../uploads/put-upload.ts';
  * `name` is required and `directory` defaults to the root; both are raw search params, read as text.
  * Needs `collection.Uploads.create`: no user `401`, no capability `403`.
  * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
- * A missing `name` or body is a `400`; a refused type or mismatching content a `422`.
+ * A missing `name` or body is a `400`; a refused type, mismatching content, or a path past 768 bytes a `422`.
  */
 export default defineHandler(async (): Promise<UploadRecord> => {
   const user = await requireCapability('collection.Uploads.create');

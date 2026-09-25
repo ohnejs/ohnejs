@@ -13,7 +13,6 @@ import {
 } from 'ohnejs/dashboard';
 import {
   type ConditionObject,
-  hasCapability,
   isEmpty,
   isUndefined,
   parseSearchParams,
@@ -25,6 +24,7 @@ import {
 import type { UploadRecord } from '../../uploads/types.ts';
 
 import { useUploadsT } from './_messages.ts';
+import { permissionsOf, type UploadsPermissions } from './_permissions.ts';
 import { readWireError, type WireError } from './_wire-error.ts';
 import { versionedURL } from './media-details-state.ts';
 import {
@@ -71,28 +71,6 @@ export interface UploadsPage {
 }
 
 /**
- * What the signed-in viewer may do with uploads, read off the capabilities the discovery read lists.
- * The write routes sit under `/uploads` behind `collection.Uploads.*`, outside the collections API.
- * So the collection's operations cannot say; the viewer's capabilities do.
- */
-export interface UploadsPermissions {
-  /**
-   * Whether the viewer may upload files and create folders.
-   */
-  canCreate: boolean;
-
-  /**
-   * Whether the viewer may rename, move, and edit uploads.
-   */
-  canUpdate: boolean;
-
-  /**
-   * Whether the viewer may delete uploads.
-   */
-  canDelete: boolean;
-}
-
-/**
  * The name of the collection the media library reads.
  */
 export const UPLOADS_COLLECTION = 'Uploads';
@@ -120,14 +98,17 @@ export function uploadsCollection(): DashboardCollection | undefined {
 }
 
 /**
- * The viewer's upload permissions; every one `false` while the discovery read is pending.
+ * The viewer's upload permissions, off the capabilities and served routes the discovery read lists.
+ * Every one is `false` while the discovery read is pending.
  * Read untracked, so a constructor may call it.
  */
 export function uploadsPermissions(): UploadsPermissions {
-  const held = untracked(dashboardMeta)?.capabilities ?? [];
-  const can = (operation: string): boolean =>
-    hasCapability(held, `collection.${UPLOADS_COLLECTION}.${operation}`);
-  return { canCreate: can('create'), canUpdate: can('update'), canDelete: can('delete') };
+  const meta = untracked(dashboardMeta);
+  return permissionsOf(
+    meta?.capabilities ?? [],
+    meta?.routes ?? [],
+    uploadsCollection()?.operations.read?.allowed === true,
+  );
 }
 
 /**

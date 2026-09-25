@@ -87,10 +87,13 @@
     "selected": "{count, plural, one {# stavka odabrana} few {# stavke odabrane} other {# stavki odabrano}}",
     "subfolder": "Novi podfolder",
     "upload": "Postavi",
+    "uploadFromURL": "Postavi s URL-a",
     "uploadHistory": "Historija postavljanja",
     "uploadedBy": "Postavio",
     "uploadedOn": "Postavljeno",
     "uploading": "Postavljanje",
+    "url": "URL",
+    "urlPlaceholder": "npr. https://example.com/photo.jpg",
     "variants": "Varijante"
   },
   "errors": {
@@ -109,7 +112,11 @@
     "notAnImage": "Datoteka nije slika",
     "notSVG": "Datoteka nije SVG slika",
     "outOfReach": "Više ne biste vidjeli rezultat",
-    "typeNotAllowed": "Tip datoteke `{type}` nije dozvoljen"
+    "pathTooLong": "Putanja može imati najviše `{max}` znakova",
+    "typeNotAllowed": "Tip datoteke `{type}` nije dozvoljen",
+    "urlInvalid": "URL mora biti http ili https, bez pristupnih podataka",
+    "urlStatus": "URL je odgovorio statusom `{status}`",
+    "urlUnreachable": "Datoteku nije moguće preuzeti s URL-a"
   },
   "fields": {
     "kind": {

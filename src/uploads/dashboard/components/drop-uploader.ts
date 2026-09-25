@@ -13,6 +13,7 @@ import { isNull, isUndefined, joinPath, onCleanup, parseDuration, ref } from 'oh
 import type { UploadItem } from './upload-queue-state.ts';
 
 import { useUploadsT } from './_messages.ts';
+import { uploadsPermissions } from './media-library-data.ts';
 import { directoryFromParam, mediaPath, pageFolderHidden } from './media-library-state.ts';
 import { uploadFiles } from './upload-queue.ts';
 
@@ -76,6 +77,7 @@ css`
 /**
  * The window-wide drop target.
  * Dragging files over the window fades in a full-screen panel above every other surface.
+ * It opens only for a viewer whose permissions grant upload.
  * A drop uploads into the folder the media library shows, or the root elsewhere.
  * Like the footer's Upload, it never opens over a folder whose own row the read scope hides.
  * A stray drop never navigates the window.
@@ -145,7 +147,7 @@ export function dropUploader(): HTMLElement {
 
   const onDragEnter = (event: DragEvent): void => {
     event.preventDefault();
-    if (internal || pageFolderHidden.value) return;
+    if (internal || pageFolderHidden.value || !uploadsPermissions().canUpload) return;
     if (event.dataTransfer?.types.includes('Files')) show();
   };
 

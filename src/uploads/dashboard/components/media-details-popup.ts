@@ -439,7 +439,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const t = useUploadsT();
   const language = useDashboardLanguage();
   const collection = uploadsCollection();
-  const { canUpdate, canDelete } = uploadsPermissions();
+  const { canEdit, canReplace, canLink, canDelete } = uploadsPermissions();
   const preview = previewKindOf(record);
   const image = preview === 'image';
   const current = ref(record);
@@ -457,7 +457,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   });
   const priv = ref(seed.private);
   const inherited = ref(false);
-  if (canUpdate && record.private === true) {
+  if (canEdit && record.private === true) {
     void privateFolders([record.directory]).then((folders) => {
       inherited.value = folders.has(record.directory);
     });
@@ -475,7 +475,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
           {
             mode: 'edit',
             path: '',
-            readOnly: !canUpdate,
+            readOnly: !canEdit,
             readOnlyRows: true,
             language: () => activeContentLocale() ?? language.value,
             onInput: () => {
@@ -530,7 +530,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   const errored = (): boolean => (form.value?.errored() ?? false) || unplaced.value !== '';
 
   const save = async (): Promise<void> => {
-    if (busy.value || !canUpdate) return;
+    if (busy.value || !canEdit) return;
     const reading = form.value?.read();
     if (!isUndefined(reading?.errors)) {
       form.value?.focusError();
@@ -639,7 +639,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
 
   const imageFrame = (): HTMLElement => {
     const props: Props = { alt: () => current.value.description ?? '', src, draggable: 'false' };
-    if (canUpdate) {
+    if (canEdit) {
       const place = (event: PointerEvent): void => {
         focal.value = focalPointAt(event.offsetX, event.offsetY, img.clientWidth, img.clientHeight);
       };
@@ -665,7 +665,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         icon('focus-2'),
       ),
     );
-    return h('span', { class: 'o-media-details-image-frame' }, img, canUpdate ? marker : null);
+    return h('span', { class: 'o-media-details-image-frame' }, img, canEdit ? marker : null);
   };
 
   const previewEl =
@@ -677,7 +677,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
               'o-media-details-preview' +
               (isSmallPreview(current.value) ? ' o-media-details-preview-centered' : ''),
           },
-          canUpdate
+          canEdit
             ? h(
                 'div',
                 { class: 'o-media-details-preview-image o-media-details-focal-surface' },
@@ -775,7 +775,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     return field([
       fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.private'))),
       switchInput(privateModel, undefined, {
-        disabled: () => !canUpdate || busy.value || locked(),
+        disabled: () => !canEdit || busy.value || locked(),
       }),
       fieldMessage(message, { error: () => refused.value !== '' }),
     ]);
@@ -835,7 +835,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         max: 100,
         suffix: '%',
         autoWidth: true,
-        disabled: () => !canUpdate,
+        disabled: () => !canEdit,
         onCommit: () => setFocal(percentX.value / 100, percentY.value / 100),
       });
     const blank = (): HTMLElement =>
@@ -852,11 +852,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
           () => [blank(), times(), blank()],
         ),
         when(
-          () => canUpdate && hasFocal(),
+          () => canEdit && hasFocal(),
           () => clear,
         ),
       ),
-      canUpdate ? fieldMessage(() => t('uploads.dashboard.focalPointHint')) : null,
+      canEdit ? fieldMessage(() => t('uploads.dashboard.focalPointHint')) : null,
     ]);
   };
 
@@ -1092,7 +1092,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     onClick: () => void close(),
   });
 
-  const hotkeys = canUpdate
+  const hotkeys = canEdit
     ? useHotkeys({
         allowInOverlays: true,
         allowWhileTyping: ['undo', 'redo'],
@@ -1105,9 +1105,9 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     { class: 'ohne-row' },
     isUndefined(hotkeys) ? null : historyButtons(edits, restore, hotkeys),
     canDelete ? deleteButton : null,
-    canUpdate ? [replaceButton, fileInput] : null,
+    canReplace ? [replaceButton, fileInput] : null,
     when(
-      () => current.value.private && !isUndefined(current.value.expires),
+      () => canLink && current.value.private && !isUndefined(current.value.expires),
       () => [linkButton(), linkMenu()],
     ),
     when(

@@ -1,15 +1,31 @@
+import type { AddressInfo } from 'node:net';
+
 import { deepStrictEqual, match, ok, rejects, strictEqual } from 'node:assert';
 import { createHash } from 'node:crypto';
-import { describe, it } from 'node:test';
+import { once } from 'node:events';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { request } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
+import { createRouter } from '../../../src/ohne/http/router.ts';
+import { createServer } from '../../../src/ohne/http/server.ts';
+import { shutdownServer } from '../../../src/ohne/http/shutdown-server.ts';
+import { useRequest } from '../../../src/ohne/http/use-request.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
+import { createFSStorage } from '../../../src/uploads/storage/fs.ts';
+import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
-import { bytes, JPEG_HEAD, png, storage, stream, text } from '../_fixture.ts';
+import { sleep } from '../../../src/utils/index.ts';
+import { bytes, JPEG_HEAD, png, route, storage, stream, text } from '../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
+
+const SEGMENT = 'stormwind'.repeat(29).slice(0, 255);
 
 function sha256(source: Uint8Array): string {
   return createHash('sha256').update(source).digest('hex');
@@ -244,5 +260,83 @@ describe('putUpload', () => {
     strictEqual(upload.private, false);
     strictEqual(storage.visibility.has('open/plain.txt'), false);
     deepStrictEqual(await privacy('open'), { 'open/plain.txt': false });
+  });
+
+  it('422s a path past 768 bytes at directory, staging nothing', async () => {
+    const directory = ['ironforge', SEGMENT, SEGMENT, SEGMENT].join('/');
+    const errors = await failure(() =>
+      putUpload({ directory, name: 'x.txt', body: stream(bytes('Magni')) }),
+    );
+    deepStrictEqual(errors, {
+      directory: { key: 'uploads.errors.pathTooLong', params: { max: 768 } },
+    });
+    strictEqual(await queryUntyped('Uploads').where({ name: 'ironforge' }).exists(), false);
+    deepStrictEqual(temps(), []);
+    strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('lands a path of exactly 768 bytes, and 422s the suffix that would pass it', async () => {
+    const directory = `${SEGMENT}/${SEGMENT}/k`;
+    const name = `${'k'.repeat(250)}.txt`;
+    const upload = await putUpload({ directory, name, body: stream(bytes('Varian')) });
+    strictEqual(upload.path.length, 768);
+    const errors = await failure(() =>
+      putUpload({ directory, name, body: stream(bytes('Anduin')) }),
+    );
+    deepStrictEqual(errors, {
+      directory: { key: 'uploads.errors.pathTooLong', params: { max: 768 } },
+    });
+    strictEqual(await queryUntyped('Uploads').where({ directory }).count(), 1);
+    deepStrictEqual(temps(), []);
+  });
+});
+
+describe('putUpload during a shutdown', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ohne-shutdown-'));
+  const tmp = join(root, '.tmp');
+
+  /**
+   * The files under the fs backend's `.tmp/`.
+   */
+  const partials = (): string[] => (existsSync(tmp) ? readdirSync(tmp) : []);
+
+  /**
+   * How many `stage` entries the journal holds.
+   */
+  const stages = (): Promise<number> =>
+    queryUntyped('UploadsJournal').where({ op: 'stage' }).count();
+
+  before(() => {
+    useStorages().register('fs', createFSStorage);
+    useLayers().add({
+      path: '/uploads-shutdown',
+      input: { uploads: { storage: 'fs', url: root } },
+    });
+  });
+
+  after(() => {
+    useLayers().remove('/uploads-shutdown');
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('a shutdown mid-upload leaves no stage row or temp', async () => {
+    const upload = route('POST', '/upload', () =>
+      putUpload({ directory: 'barrens', name: 'crossroads.txt', body: useRequest().body! }),
+    );
+    const { server, gate } = createServer(createRouter([upload]));
+    server.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const client = request({ port, method: 'POST', path: '/upload' });
+    client.on('error', () => {});
+    client.write('For the Horde! '.repeat(5000));
+    const midway = async () => (await stages()) === 1 && partials().length === 1;
+    for (let i = 0; i < 200 && !(await midway()); i++) await sleep(5);
+    ok(await midway());
+
+    await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
+    strictEqual(await stages(), 0);
+    deepStrictEqual(partials(), []);
   });
 });

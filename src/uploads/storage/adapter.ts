@@ -28,6 +28,16 @@ export interface StorageWriteMeta {
    * A backend that needs the length up front spools or uploads in parts when it is absent.
    */
   size?: number;
+
+  /**
+   * How a browser opens the bytes when the backend or `uploads.publicURL` serves them.
+   * `attachment` marks a type a browser would run as a document, so it never executes on that origin.
+   * A backend that stores headers with its objects keeps it; the API route decides for itself.
+   *
+   * @default
+   * 'inline'
+   */
+  disposition?: 'attachment' | 'inline';
 }
 
 /**

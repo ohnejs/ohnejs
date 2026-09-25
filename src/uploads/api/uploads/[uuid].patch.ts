@@ -28,6 +28,7 @@ import { uploadReach } from '../../uploads/_reader.ts';
  * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any `400`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`.
  * A changed extension, a folder moved into itself, a taken target, or an out-of-range value is a `422`.
+ * So is a path past 768 bytes, a folder's deepest row included.
  * So is a row made public inside a private folder, or moved into one with `private: false`.
  * A write that would hide a row from the caller's read `access` scope is a `422`, and nothing changes.
  */

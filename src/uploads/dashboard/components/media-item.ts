@@ -2,6 +2,7 @@ import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohnejs/dash
 import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
+import type { UploadsPermissions } from './_permissions.ts';
 
 import { dragImage, startMoving, stopMoving } from './_drag-image.ts';
 import { useUploadsT } from './_messages.ts';
@@ -9,7 +10,7 @@ import { mediaFileItem } from './media-file-item.ts';
 import { mediaFileName } from './media-file-name.ts';
 import { mediaFolderItem } from './media-folder-item.ts';
 import { detailsHref, type MediaItemDisabled, mediaImageItem } from './media-image-item.ts';
-import { confirmDeleteUploads, type UploadsPermissions } from './media-library-data.ts';
+import { confirmDeleteUploads } from './media-library-data.ts';
 import {
   isDisplayableImage,
   mediaPath,
@@ -180,7 +181,7 @@ css`
 /**
  * One grid tile: the kind's square, the hover checkbox and delete button over it, and the name row under it.
  * A folder tile links into the folder; an image or file tile links to the record's details.
- * With update permission the tile drags.
+ * With move permission the tile drags.
  * The drag selects it, shows the moving ghost, and arms the drop targets.
  * The checkbox toggles the selection, ranging from the last pick while the range modifier is held.
  * Once something is selected, a Shift-click on the tile's link ranges too, instead of following it.
@@ -189,13 +190,15 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
   const t = useUploadsT();
   const view = options.view;
   const mode = options.selectionMode ?? 'none';
-  const { canUpdate, canDelete } = options.permissions;
+  const { canEdit, canMove, canSetPrivate, canDelete } = options.permissions;
   const kind = untracked(record).kind;
   const disabled = (): MediaItemDisabled => options.disabled?.(record()) ?? NOT_DISABLED;
   const selected = (): boolean => view.isSelected(record().UUID);
   const selectable =
-    mode !== 'single' && (mode !== 'multiple' || kind === 'file') && (canUpdate || canDelete);
-  const draggable = canUpdate && mode === 'none';
+    mode !== 'single' &&
+    (mode !== 'multiple' || kind === 'file') &&
+    (canMove || canSetPrivate || canDelete);
+  const draggable = canMove && mode === 'none';
 
   const selectedModel: Ref<boolean> = {
     get value() {
@@ -326,7 +329,7 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
       'div',
       { class: 'o-media-item-name' },
       name,
-      mode === 'none' && canUpdate ? renameButton() : null,
+      mode === 'none' && canEdit ? renameButton() : null,
     ),
   );
 

@@ -5,6 +5,7 @@ import {
   storedFileName,
   storedFolderName,
 } from '../../../../src/uploads/dashboard/components/_names.ts';
+import { canonicalName } from '../../../../src/uploads/uploads/path.ts';
 
 describe('storedFolderName', () => {
   it('slugs the name the way the server stores it', () => {
@@ -38,5 +39,31 @@ describe('storedFileName', () => {
     strictEqual(storedFileName('', 'jpg'), '');
     strictEqual(storedFileName('...', 'jpg'), '');
     strictEqual(storedFileName('!!!', ''), '');
+  });
+});
+
+describe('stored names past 255 bytes', () => {
+  const stem = 'frostmourne-'.repeat(25);
+
+  it('cuts the stem and keeps the extension, as the server stores it', () => {
+    strictEqual(storedFileName('a'.repeat(300), 'png'), `${'a'.repeat(251)}.png`);
+    strictEqual(storedFolderName('b'.repeat(300)), 'b'.repeat(255));
+    strictEqual(storedFileName(stem, 'png'), `${stem.slice(0, 251).replace(/-+$/, '')}.png`);
+  });
+
+  it('previews exactly what `canonicalName` stores', () => {
+    const typed = [
+      'Arthas Menethil',
+      stem,
+      `${stem}.JPG`,
+      `${'Thrall '.repeat(40)}.webp`,
+      'lich.king.'.repeat(30),
+      `${'a'.repeat(254)}.b!`,
+      `Ünïcode ${'Sylvanas '.repeat(35)}.tar.gz`,
+    ];
+    for (const name of typed) strictEqual(storedFolderName(name), canonicalName(name), name);
+    for (const name of typed) {
+      strictEqual(storedFileName(name, 'png'), canonicalName(`${name}.png`), name);
+    }
   });
 });

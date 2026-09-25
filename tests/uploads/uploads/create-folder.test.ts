@@ -69,4 +69,17 @@ describe('createFolder', () => {
       return isValidationError(error) && error.errors.name === 'validation.notUnique';
     });
   });
+
+  it('422s a folder whose path would pass 768 bytes, creating nothing', async () => {
+    const segment = 'gilneas'.repeat(37).slice(0, 255);
+    const directory = ['gilneas', segment, segment].join('/');
+    await rejects(createFolder({ directory, name: segment }), (error: unknown) => {
+      if (!isValidationError(error)) return false;
+      deepStrictEqual(error.errors, {
+        directory: { key: 'uploads.errors.pathTooLong', params: { max: 768 } },
+      });
+      return true;
+    });
+    strictEqual(await queryUntyped('Uploads').where({ name: 'gilneas' }).exists(), false);
+  });
 });

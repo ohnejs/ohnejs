@@ -1,8 +1,17 @@
-import { attachTooltip, button, type ButtonOptions, h, icon, when } from 'ohnejs/dashboard';
-import { onCleanup } from 'ohnejs/utils';
+import {
+  attachTooltip,
+  button,
+  type ButtonOptions,
+  type Child,
+  h,
+  icon,
+  when,
+} from 'ohnejs/dashboard';
+import { onCleanup, ref } from 'ohnejs/utils';
 
 import { useUploadsT } from './_messages.ts';
 import { uploadsPermissions } from './media-library-data.ts';
+import { urlUploadPopup } from './url-upload-popup.ts';
 
 /**
  * Options for `mediaActions`.
@@ -19,6 +28,11 @@ export interface MediaActionsOptions {
   onUpload?(files: File[]): void;
 
   /**
+   * Called with the URL a viewer entered in the upload-from-URL popup; the caller queues the upload.
+   */
+  onUploadURL?(url: string): void;
+
+  /**
    * Whether the footer is too narrow for a labeled Upload button.
    * While it returns `true`, Upload renders as an icon button with a tooltip.
    */
@@ -26,15 +40,46 @@ export interface MediaActionsOptions {
 }
 
 /**
- * The create cluster of the footer: a New folder icon button and a primary Upload button.
+ * The create cluster of the footer: a New folder icon button, an upload-from-URL icon button, and Upload.
  * Upload opens a hidden multiple file input and hands the picked files to `onUpload`.
+ * The URL button opens a popup that hands the entered URL to `onUploadURL`.
+ * Each button shows only while the viewer's permissions grant its action.
  * While `compact` reports a narrow footer, Upload shrinks to an icon button with a tooltip.
- * Renders nothing for a viewer without create permission.
+ * Renders nothing for a viewer granted none of them.
  */
 export function mediaActions(options: MediaActionsOptions = {}): HTMLElement | null {
-  if (!uploadsPermissions().canCreate) return null;
-  const t = useUploadsT();
+  const { canUpload, canFetch, canCreateFolder } = uploadsPermissions();
+  if (!canUpload && !canFetch && !canCreateFolder) return null;
+  return h(
+    'div',
+    { class: 'ohne-row' },
+    canCreateFolder ? newFolder(options) : null,
+    canFetch ? uploadFromURL(options) : null,
+    canUpload ? upload(options) : null,
+  );
+}
 
+/**
+ * The New folder icon button.
+ */
+function newFolder(options: MediaActionsOptions): HTMLElement {
+  const t = useUploadsT();
+  const el = button(icon('folder-plus'), {
+    variant: 'outline',
+    onClick: (event) => {
+      event.stopPropagation();
+      options.onCreateFolder?.();
+    },
+  });
+  onCleanup(attachTooltip(el, () => t('uploads.dashboard.newFolder')));
+  return el;
+}
+
+/**
+ * The Upload button, and the hidden file input it opens.
+ */
+function upload(options: MediaActionsOptions): Child {
+  const t = useUploadsT();
   const input = h('input', {
     hidden: true,
     multiple: true,
@@ -46,15 +91,6 @@ export function mediaActions(options: MediaActionsOptions = {}): HTMLElement | n
     },
   }) as HTMLInputElement;
 
-  const newFolder = button(icon('folder-plus'), {
-    variant: 'outline',
-    onClick: (event) => {
-      event.stopPropagation();
-      options.onCreateFolder?.();
-    },
-  });
-  onCleanup(attachTooltip(newFolder, () => t('uploads.dashboard.newFolder')));
-
   const uploadOptions: ButtonOptions = {
     variant: 'primary',
     onClick: (event) => {
@@ -62,16 +98,49 @@ export function mediaActions(options: MediaActionsOptions = {}): HTMLElement | n
       input.click();
     },
   };
-  const upload = when(
+  const el = when(
     () => options.compact?.() ?? false,
     () => {
-      const el = button(icon('upload'), uploadOptions);
-      onCleanup(attachTooltip(el, () => t('uploads.dashboard.upload')));
-      return el;
+      const compact = button(icon('upload'), uploadOptions);
+      onCleanup(attachTooltip(compact, () => t('uploads.dashboard.upload')));
+      return compact;
     },
     () =>
       button([h('span', null, () => t('uploads.dashboard.upload')), icon('upload')], uploadOptions),
   );
 
-  return h('div', { class: 'ohne-row' }, input, newFolder, upload);
+  return [input, el];
+}
+
+/**
+ * The upload-from-URL icon button, and the region its popup renders in while open.
+ */
+function uploadFromURL(options: MediaActionsOptions): Child {
+  const t = useUploadsT();
+  const open = ref(false);
+
+  const el = button(icon('link'), {
+    variant: 'outline',
+    onClick: (event) => {
+      event.stopPropagation();
+      open.value = true;
+    },
+  });
+  onCleanup(attachTooltip(el, () => t('uploads.dashboard.uploadFromURL')));
+
+  const host = when(
+    () => open.value,
+    () => {
+      urlUploadPopup({
+        onSubmit: (url) => options.onUploadURL?.(url),
+        onClose: (close) =>
+          void close().then(() => {
+            open.value = false;
+          }),
+      });
+      return null;
+    },
+  );
+
+  return [el, host];
 }

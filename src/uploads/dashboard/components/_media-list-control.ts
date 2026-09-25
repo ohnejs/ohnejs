@@ -195,7 +195,7 @@ css`
  *
  * An orderable chips field over `Uploads`: image chips show their tile, file chips their name.
  * The dropdown searches file names across every folder, newest first, within the constraints it can express.
- * A leading library button opens the picker in multiple mode; create permission adds an Upload button.
+ * A leading library button opens the picker in multiple mode; upload permission adds an Upload button.
  * A double-click on a chip opens the file's details; a modified one opens the media page in a new tab.
  * A file deleted from the details popup leaves the list.
  * Server messages keyed by index mark their chips destructive.
@@ -205,7 +205,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
     const t = useUploadsT();
     if (isUndefined(uploadsCollection())) return noPermissionControl(context, t);
     const off = context.disabled === true;
-    const { canCreate } = uploadsPermissions();
+    const { canUpload } = uploadsPermissions();
     const constraints = constraintsOf(context.field.options);
     const disabled = ineligibility(constraints, image);
     const max = context.field.options?.max;
@@ -393,7 +393,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
         () => off,
       ),
       chips,
-      canCreate && !off
+      canUpload && !off
         ? iconButton(
             'upload',
             () => t('uploads.dashboard.upload'),

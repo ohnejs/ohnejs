@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DashboardMenuGroup } from '../../../src/base/api/dashboard.get.ts';
+import type { DashboardMenuGroup, DashboardMeta } from '../../../src/base/api/dashboard.get.ts';
 import type { User } from '../../../src/base/auth/types.ts';
 
 import '../_fixture.ts';
@@ -133,5 +133,13 @@ describe('the dashboard:menu hook', () => {
     deepStrictEqual(await menuFor(admin, { label: '', items: [library] }), [
       { label: '', items: [library] },
     ]);
+  });
+});
+
+describe('the dashboard:meta hook', () => {
+  it('leaves whether a route is served to the framework', async () => {
+    const meta = {} as DashboardMeta;
+    await applyHook('dashboard:meta', meta, { user: admin });
+    strictEqual('uploadFromURL' in meta, false);
   });
 });

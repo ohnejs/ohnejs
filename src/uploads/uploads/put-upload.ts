@@ -13,6 +13,7 @@ import { useUploadsConfig } from '../config.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { isNotUnique, uploadsError } from './_errors.ts';
 import { ensureFolders } from './_folders.ts';
+import { assertPathFits } from './_path-limit.ts';
 import { assertReached } from './_reach.ts';
 import { decorated } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
@@ -67,6 +68,7 @@ const NAME_ATTEMPTS = 5;
  * A file inside a private folder is born private; the journal locks its staged object before the move.
  * The journal drains after the commit, so the object lands at its path once the row exists.
  * A type outside `uploads.types` is a `422`; so is content that contradicts the extension.
+ * So is a path past 768 bytes, the suffix of a taken name included, as a `422` at `directory`.
  * A failure after staging removes the temp object.
  *
  * @example
@@ -83,6 +85,7 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
   if (!mediaTypeMatches(type, useUploadsConfig().types)) {
     throw uploadsError('name', 'typeNotAllowed', { type });
   }
+  assertPathFits(uploadPath({ directory, name }));
 
   const staged = await stageUpload(input.body, { type, size: input.size });
   let record: QueryRecord;
@@ -107,6 +110,7 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
 
 /**
  * Creates the file row under a name free among its siblings, retrying the next suffix on a lost race.
+ * A suffix that would carry the path past 768 bytes is a `422` at `directory`.
  */
 async function createFile(
   tx: Transaction,
@@ -119,6 +123,7 @@ async function createFile(
     .pluck('name')) as string[];
   let name = uniqueUploadName(file.name, siblings);
   for (let attempt = 1; ; attempt++) {
+    assertPathFits(uploadPath({ directory: file.directory, name }));
     const outcome = await queryUntyped('Uploads')
       .use(tx)
       .create({ ...file, kind: 'file', name, size, hash, width, height });
