@@ -1,5 +1,6 @@
 import type { Env } from './env.ts';
 
+import { codeSpan } from '../../utils/ansi/index.ts';
 import { createEnvRegistry, type EnvRegistry, nodeEnv } from '../../utils/env/index.ts';
 import {
   coerceToBoolean,
@@ -25,7 +26,7 @@ const registry: EnvRegistry<Env> = createEnvRegistry<Env>();
 export function boolEnv(raw: string, name: string): boolean {
   const value = coerceToBoolean(raw);
   if (isBoolean(value)) return value;
-  throw new Error(`\`${name}\` must be \`1\`/\`true\` or \`0\`/\`false\`, got \`${raw}\`.`);
+  throw new Error(`\`${name}\` must be \`1\`/\`true\` or \`0\`/\`false\`, got ${codeSpan(raw)}.`);
 }
 
 registry.define('NODE_ENV', { default: 'development', parse: nodeEnv, flag: 'value' });
@@ -35,7 +36,7 @@ registry.define('PORT', {
     const port = coerceToInteger(raw);
     if (!isPort(port))
       throw new Error(
-        `\`PORT\` must be an integer between \`0\` and \`${MAX_PORT}\`, got \`${raw}\`.`,
+        `\`PORT\` must be an integer between \`0\` and \`${MAX_PORT}\`, got ${codeSpan(raw)}.`,
       );
     return port;
   },

@@ -1,6 +1,7 @@
 import type { ArgsSchema, FlagValue } from '../../utils/cli/index.ts';
 import type { Env } from './env.ts';
 
+import { codeSpan } from '../../utils/ansi/index.ts';
 import { parseArgv } from '../../utils/cli/index.ts';
 import {
   coerceToBoolean,
@@ -90,7 +91,9 @@ export function applyEnvFlags(argv: string[]): void {
     if (kind === 'boolean') {
       const bool = coerceToBoolean(value);
       if (!isBoolean(bool)) {
-        throw new Error(`\`--${kebab}\` must be \`true\` or \`false\`, got \`${value}\`.`);
+        throw new Error(
+          `\`--${kebab}\` must be \`true\` or \`false\`, got ${codeSpan(`${value}`)}.`,
+        );
       }
       env.set(name, bool as Env[typeof name]);
     } else {

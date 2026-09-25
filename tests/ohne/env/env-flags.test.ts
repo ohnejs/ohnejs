@@ -56,6 +56,7 @@ describe('env flags', () => {
 
     it('throws when a boolean flag is given a non-booleanish value', () => {
       throws(() => applyEnvFlags(['sync', '--force-sync=maybe']), /must be `true` or `false`/);
+      throws(() => applyEnvFlags(['sync', '--force-sync=a`b']), /, got ``a`b``\.$/);
     });
 
     it('sets both `DATABASE` and `DB`, so the both-set conflict stays detectable', () => {

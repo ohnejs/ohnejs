@@ -142,6 +142,9 @@ describe('useEnv', () => {
 
       process.env['PORT'] = '99999';
       throws(() => useEnv().get('PORT'), /`PORT` must be an integer/);
+
+      process.env['PORT'] = '8`0';
+      throws(() => useEnv().get('PORT'), /, got ``8`0``\.$/);
     });
   });
 

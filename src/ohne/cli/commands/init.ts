@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { isColorStream, pickANSIColors } from '../../../utils/ansi/index.ts';
+import { codeSpan, isColorStream, pickANSIColors } from '../../../utils/ansi/index.ts';
 import { createPrompt, defineCommand, isCancel } from '../../../utils/cli/index.ts';
 import { listDir, removeDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
 import {
@@ -120,13 +120,13 @@ export const initCommand = defineCommand({
           return;
         }
         const clear = await prompt.confirm({
-          message: `The directory \`${dirName}\` is not empty. Delete its contents?`,
+          message: `The directory ${codeSpan(dirName)} is not empty. Delete its contents?`,
           initialValue: false,
         });
         if (isCancel(clear)) return cancel();
         if (!clear) return keep();
         const purge = await prompt.confirm({
-          message: `This permanently deletes everything in \`${target}\`. Continue?`,
+          message: `This permanently deletes everything in ${codeSpan(target)}. Continue?`,
           initialValue: false,
         });
         if (isCancel(purge)) return cancel();
@@ -188,8 +188,8 @@ export const initCommand = defineCommand({
       runScript(pm, 'dev'),
     ];
 
-    const body = steps.map((step) => `\`${step}\``).join('\n');
-    print.success(`Created \`${name}\``);
+    const body = steps.map((step) => codeSpan(step)).join('\n');
+    print.success(`Created ${codeSpan(name)}`);
     if (interactive) prompt.note(body, 'Next steps', true);
     else
       print.successBlock({ title: 'Next steps:', body, path: relativePath(process.cwd(), target) });
