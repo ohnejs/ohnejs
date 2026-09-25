@@ -2,6 +2,7 @@ import type { Transaction } from 'ohnejs';
 
 import { queryUntyped, usePrinter, withLock } from 'ohnejs';
 import { createMutex, errorMessage, isNull, isPathInside } from 'ohnejs/utils';
+import { codeSpan } from 'ohnejs/utils/ansi';
 
 import type { StorageAdapter } from './adapter.ts';
 
@@ -128,7 +129,7 @@ function settle(storage: StorageAdapter, entry: StoredEntry): Promise<boolean> {
         else if (op === 'delete') await storage.delete(from);
         else await storage.setPrivate?.(from, op === 'lock');
       } catch (error) {
-        usePrinter().warn(`Storage \`${op}\` of \`${from}\` failed: ${errorMessage(error)}`);
+        usePrinter().warn(`Storage \`${op}\` of ${codeSpan(from)} failed: ${errorMessage(error)}`);
         return false;
       }
       await queryUntyped('UploadsJournal').unscoped().where({ UUID }).delete();

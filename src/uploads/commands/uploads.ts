@@ -1,5 +1,6 @@
 import { usePrinter } from 'ohnejs';
 import { formatDuration, isNull, measure, pluralize } from 'ohnejs/utils';
+import { codeSpan } from 'ohnejs/utils/ansi';
 import { defineCommand } from 'ohnejs/utils/cli';
 
 import { useStorage } from '../storage/use-storages.ts';
@@ -67,5 +68,5 @@ function strays(paths: readonly string[]): string {
  * Lists `paths` one per body row.
  */
 function rows(paths: readonly string[]): string {
-  return paths.map((path) => `- \`${path}\``).join('\n');
+  return paths.map((path) => `- ${codeSpan(path)}`).join('\n');
 }

@@ -78,6 +78,12 @@ describe('ohne uploads prune', () => {
     strictEqual(storage.objects.has('alliance/kept.txt'), true);
   });
 
+  it('lists a stray whose name holds backticks exactly', async () => {
+    storage.objects.set('goblin/a`b`c.txt', bytes('stray'));
+
+    deepStrictEqual(rows(await run(true), 'goblin'), ['goblin/a`b`c.txt']);
+  });
+
   it('reports a delete that failed apart from the deleted ones, and fails the run', async (t) => {
     const errorBlock = t.mock.method(usePrinter(), 'errorBlock');
     await strays('scourge');
