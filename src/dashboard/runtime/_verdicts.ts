@@ -112,21 +112,36 @@ export function capabilityVerdicts(
 
 /**
  * Folds the row form's wire answer into `RowVerdicts`.
+ * An operation `collection` does not allow admits no row, since its route may be dropped.
  */
-export function foldVerdicts(answer: RowVerdictsAnswer): RowVerdicts {
+export function foldVerdicts(
+  answer: RowVerdictsAnswer,
+  collection: DashboardCollection,
+): RowVerdicts {
+  const { update, delete: remove } = collection.operations;
+  const updates = update?.allowed === true;
+  const deletes = remove?.allowed === true;
   return {
-    update: new Set(answer.update.UUIDs),
-    delete: new Set(answer.delete.UUIDs),
-    deleteTranslation: new Set(answer.deleteTranslation?.UUIDs),
-    select: answer.update.select,
+    update: new Set(updates ? answer.update.UUIDs : []),
+    delete: new Set(deletes ? answer.delete.UUIDs : []),
+    deleteTranslation: new Set(deletes ? answer.deleteTranslation?.UUIDs : []),
+    select: updates ? answer.update.select : undefined,
   };
 }
 
 /**
  * Folds the query form's wire answer into `VerdictCounts`.
+ * An operation `collection` does not allow counts no row, as in `foldVerdicts`.
  */
-export function foldCounts(answer: VerdictTotalsAnswer): VerdictCounts {
-  return { update: answer.update.total, delete: answer.delete.total };
+export function foldCounts(
+  answer: VerdictTotalsAnswer,
+  collection: DashboardCollection,
+): VerdictCounts {
+  const { update, delete: remove } = collection.operations;
+  return {
+    update: update?.allowed === true ? answer.update.total : 0,
+    delete: remove?.allowed === true ? answer.delete.total : 0,
+  };
 }
 
 /**

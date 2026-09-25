@@ -32,7 +32,9 @@ export async function loadVerdicts(
 ): Promise<RowVerdicts> {
   if (UUIDs.length === 0 || !asksVerdicts(collection)) return capabilityVerdicts(collection, UUIDs);
   const answer = await ask<RowVerdictsAnswer>(collection.segment, { UUIDs, locale });
-  return isUndefined(answer) ? capabilityVerdicts(collection, UUIDs) : foldVerdicts(answer);
+  return isUndefined(answer)
+    ? capabilityVerdicts(collection, UUIDs)
+    : foldVerdicts(answer, collection);
 }
 
 /**
@@ -54,7 +56,7 @@ export async function countVerdicts(
 ): Promise<VerdictCounts | undefined> {
   if (!asksVerdicts(collection)) return undefined;
   const answer = await ask<VerdictTotalsAnswer>(collection.segment, { where, locale });
-  return isUndefined(answer) ? undefined : foldCounts(answer);
+  return isUndefined(answer) ? undefined : foldCounts(answer, collection);
 }
 
 /**

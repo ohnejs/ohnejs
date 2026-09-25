@@ -34,6 +34,8 @@ function collection(
   };
 }
 
+const both = collection({ update: open, delete: open }, true);
+
 describe('asksVerdicts', () => {
   it('asks nothing while neither update nor delete is scoped', () => {
     strictEqual(asksVerdicts(collection({ update: open, delete: open })), false);
@@ -85,11 +87,14 @@ describe('capabilityVerdicts', () => {
 describe('foldVerdicts', () => {
   it('folds each named list into a set and carries the select', () => {
     deepStrictEqual(
-      foldVerdicts({
-        update: { UUIDs: ['a'], select: ['title'] },
-        delete: { UUIDs: ['a', 'b'] },
-        deleteTranslation: { UUIDs: ['b'] },
-      }),
+      foldVerdicts(
+        {
+          update: { UUIDs: ['a'], select: ['title'] },
+          delete: { UUIDs: ['a', 'b'] },
+          deleteTranslation: { UUIDs: ['b'] },
+        },
+        both,
+      ),
       {
         update: new Set(['a']),
         delete: new Set(['a', 'b']),
@@ -100,7 +105,7 @@ describe('foldVerdicts', () => {
   });
 
   it('reads an absent translation delete as no row and an absent select as no limit', () => {
-    deepStrictEqual(foldVerdicts({ update: { UUIDs: ['a'] }, delete: { UUIDs: [] } }), {
+    deepStrictEqual(foldVerdicts({ update: { UUIDs: ['a'] }, delete: { UUIDs: [] } }, both), {
       update: new Set(['a']),
       delete: new Set(),
       deleteTranslation: new Set(),
@@ -109,14 +114,47 @@ describe('foldVerdicts', () => {
   });
 });
 
+describe('the folds mask an operation the collection no longer serves', () => {
+  const answer = {
+    update: { UUIDs: ['a'], select: ['title'] },
+    delete: { UUIDs: ['a', 'b'] },
+    deleteTranslation: { UUIDs: ['b'] },
+  };
+
+  it('admits no row to an update or delete whose route is dropped', () => {
+    deepStrictEqual(foldVerdicts(answer, collection({ update: null, delete: scoped }, true)), {
+      update: new Set(),
+      delete: new Set(['a', 'b']),
+      deleteTranslation: new Set(['b']),
+      select: undefined,
+    });
+    deepStrictEqual(foldVerdicts(answer, collection({ update: scoped, delete: null }, true)), {
+      update: new Set(['a']),
+      delete: new Set(),
+      deleteTranslation: new Set(),
+      select: ['title'],
+    });
+  });
+
+  it('counts no row for a dropped operation', () => {
+    deepStrictEqual(
+      foldCounts({ update: { total: 3 }, delete: { total: 2 } }, collection({ delete: scoped })),
+      { update: 0, delete: 2 },
+    );
+  });
+});
+
 describe('foldCounts', () => {
   it('reads the update and delete totals', () => {
     deepStrictEqual(
-      foldCounts({
-        update: { total: 3, select: ['title'] },
-        delete: { total: 1 },
-        deleteTranslation: { total: 2 },
-      }),
+      foldCounts(
+        {
+          update: { total: 3, select: ['title'] },
+          delete: { total: 1 },
+          deleteTranslation: { total: 2 },
+        },
+        both,
+      ),
       { update: 3, delete: 1 },
     );
   });

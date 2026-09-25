@@ -491,6 +491,12 @@ export interface DashboardMeta {
   capabilities: string[];
 
   /**
+   * The ids of the routes the app serves, after `disable.routes` dropped any.
+   * A client matches with `hasRoute`, which counts an any-method route for every method.
+   */
+  routes: string[];
+
+  /**
    * The content locales the app declares.
    */
   locales: string[];
