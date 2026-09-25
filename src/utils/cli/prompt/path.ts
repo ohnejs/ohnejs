@@ -1,6 +1,7 @@
 import type { Dirent } from 'node:fs';
 
 import { readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 
 import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import type { PromptDefinition, PromptState } from './_prompt.ts';
@@ -13,6 +14,7 @@ import { isUndefined } from '../../is/is-undefined.ts';
 import { createKeymap } from '../../keys/create-keymap.ts';
 import { strokeFromReadlineKey } from '../../keys/stroke-from-readline-key.ts';
 import { basename } from '../../path/basename.ts';
+import { expandTilde } from '../../path/expand-tilde.ts';
 import { extname } from '../../path/extname.ts';
 import { joinPath } from '../../path/join-path.ts';
 import { normalizePath } from '../../path/normalize-path.ts';
@@ -152,10 +154,12 @@ interface Match {
  * - Printable keys insert and the usual line edits apply, with word jumps stopping at each `/`.
  * - `enter` submits the typed value once `only`, `mustExist`, and `validate` accept it.
  *
+ * A leading `~` stands for the home directory, in the completions and the result.
  * The result is normalized to `/` separators, so a value works on every platform.
  */
 export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   const root = options.root ?? process.cwd();
+  const home = homedir();
   const max = options.maxItems ?? 8;
   const exts = isUndefined(options.ext) ? null : normalizeExts(options.ext);
   const editor = createLineEditor(options.initialValue ?? '', { wordSeparators: WORD_SEPARATORS });
@@ -191,7 +195,7 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
   function complete(value: string): Match[] {
     const fragment = endsWithSep(value) ? '' : basename(value);
     const prefix = value.slice(0, value.length - fragment.length);
-    const dir = prefix === '' ? resolvePath('.', root) : resolvePath(prefix, root);
+    const dir = resolvePath(expandTilde(prefix, home), root);
     const showHidden = options.hidden || fragment.startsWith('.');
 
     const scored: Match[] = [];
@@ -244,13 +248,15 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
     const prefix = endsWithSep(value)
       ? value
       : value.slice(0, value.length - basename(value).length);
-    editor.set(prefix + entry.name + (entry.type === 'directory' ? '/' : ''));
+    // A leading `~` would read as the home directory, so an entry named `~` keeps its `./`.
+    const name = prefix === '' && entry.name === '~' ? './~' : entry.name;
+    editor.set(prefix + name + (entry.type === 'directory' ? '/' : ''));
     refresh();
   };
 
   const submit = (): void => {
     const trimmed = editor.value.trim();
-    const typed = trimmed === '' ? '.' : trimmed;
+    const typed = trimmed === '' ? '.' : expandTilde(trimmed, home);
     const target = resolvePath(typed, root);
     const found = inspect(target);
 

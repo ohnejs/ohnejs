@@ -158,6 +158,34 @@ describe('createPrompt().path', () => {
     strictEqual(result, 'a/b');
   });
 
+  it(
+    'reads a leading `~` as the home directory',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const home = process.env.HOME;
+      process.env.HOME = root;
+      try {
+        const { result } = await runPath([...'~/sr', '\t', '\r'], { root: tmpdir() });
+        strictEqual(result, joinPath(root, 'src'));
+      } finally {
+        process.env.HOME = home;
+      }
+    },
+  );
+
+  it('completes a directory literally named `~` as itself, never the home directory', async () => {
+    const home = process.env.HOME;
+    const local = joinPath(root, 'tilde');
+    mkdirSync(joinPath(local, '~', 'inner'), { recursive: true });
+    process.env.HOME = joinPath(root, 'src');
+    try {
+      const { result } = await runPath([...'~', '\t', '\r'], { root: local, only: 'directory' });
+      strictEqual(result, joinPath(local, '~'));
+    } finally {
+      process.env.HOME = home;
+    }
+  });
+
   it('cancels on Ctrl-C', async () => {
     const { result } = await runPath([...'src', '\x03']);
     strictEqual(isCancel(result), true);
