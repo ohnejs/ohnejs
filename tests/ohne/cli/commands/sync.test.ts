@@ -189,6 +189,34 @@ describe('ohne sync', () => {
     deepStrictEqual(tables, []);
   });
 
+  it('boots like `serve api`, so a `schema:synced` hook sees the routes, roles, and messages', () => {
+    const dir = makeApp('registries');
+    writeNotes(dir);
+    for (const sub of ['api', 'boot', 'messages', 'roles']) mkdirSync(join(dir, sub));
+    writeFileSync(
+      join(dir, 'api', 'hello.get.ts'),
+      "import { defineHandler } from 'ohnejs';\nexport default defineHandler(() => 'hi');\n",
+    );
+    writeFileSync(
+      join(dir, 'roles', 'editor.ts'),
+      "import { defineRole } from 'ohnejs';\n" +
+        "export default defineRole({ capabilities: ['collection.Notes.*'] });\n",
+    );
+    writeFileSync(join(dir, 'messages', 'en.json'), '{ "notes": { "hi": "Hi" } }');
+    writeFileSync(
+      join(dir, 'boot', 'probe.ts'),
+      "import { hook, useMessages, useRoles, useRoutes } from 'ohnejs';\n" +
+        "hook('schema:synced', () => {\n" +
+        '  const seen = [useRoutes().keys(), useRoles().keys(), useMessages().keys()];\n' +
+        "  console.log('seen', JSON.stringify(seen));\n" +
+        '});\n',
+    );
+
+    const result = sync(dir);
+    strictEqual(result.status, 0);
+    match(result.output, /seen \[\["GET \/hello"\],\["editor"\],\["en"\]\]/);
+  });
+
   it('runs the shutdown hooks a boot file registers, so an open timer cannot hold the process', () => {
     const dir = makeApp('timer');
     mkdirSync(join(dir, 'boot'));
