@@ -1,10 +1,12 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { MessageMeta } from './messages.ts';
 
+import { codeSpan } from '../../utils/ansi/index.ts';
 import { listDir, readJSON } from '../../utils/fs/index.ts';
 import {
   canonicalizeLanguage,
   dirname,
+  errorMessage,
   hasKey,
   isNull,
   isPlainObject,
@@ -27,6 +29,7 @@ import { ohneError } from '../error/ohne-error.ts';
  * Returns `[]` when the layer has no messages directory.
  * Throws when two files in the layer define the same key for the same language.
  * Throws too when one file lands on the same flattened key twice, nested and as a literal dotted key.
+ * A file that cannot be read or parsed throws an `ohneError` naming it.
  *
  * @example
  * ```ts
@@ -59,13 +62,22 @@ export async function scanLayerMessages(
     const language = canonicalizeLanguage(entry.stem);
     if (isNull(language)) {
       throw ohneError({
-        title: `Invalid message language \`${entry.stem}\``,
+        title: `Invalid message language ${codeSpan(entry.stem)}`,
         body: `A message file is named after a BCP-47 language tag, like \`en.json\` or \`de-AT.json\`.`,
         path: entry.path,
       });
     }
 
-    const data = await readJSON(entry.path);
+    let data: unknown;
+    try {
+      data = await readJSON(entry.path);
+    } catch (error) {
+      throw ohneError({
+        title: 'Could not load message file',
+        body: codeSpan(errorMessage(error)),
+        path: entry.path,
+      });
+    }
     if (!isPlainObject(data)) {
       throw ohneError({
         title: 'Invalid message file',
@@ -80,7 +92,7 @@ export async function scanLayerMessages(
     const flat: Record<string, unknown> = {};
     flattenMessages(data, '', flat, (key) => {
       throw ohneError({
-        title: `Duplicate message \`${prefix === '' ? key : `${prefix}.${key}`}\` for \`${language}\``,
+        title: `Duplicate message ${codeSpan(prefix === '' ? key : `${prefix}.${key}`)} for \`${language}\``,
         body: [
           'The file defines the same flattened key twice, nested and as a literal dotted key.',
           'Keep one definition.',
@@ -93,7 +105,7 @@ export async function scanLayerMessages(
       const key = prefix === '' ? rawKey : `${prefix}.${rawKey}`;
       if (!isString(value)) {
         throw ohneError({
-          title: `Message \`${key}\` is not a string`,
+          title: `Message ${codeSpan(key)} is not a string`,
           body: 'Every message value must be an ICU template string.',
           path: entry.path,
         });
@@ -103,7 +115,7 @@ export async function scanLayerMessages(
       const clash = seen.get(id);
       if (!isUndefined(clash)) {
         throw ohneError({
-          title: `Duplicate message \`${key}\` for \`${language}\``,
+          title: `Duplicate message ${codeSpan(key)} for \`${language}\``,
           body: [
             `Two files in layer \`${layer.name}\` define the same key for the same language.`,
             '',

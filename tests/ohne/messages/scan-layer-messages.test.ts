@@ -1,10 +1,10 @@
-import { deepStrictEqual, rejects } from 'node:assert';
+import { deepStrictEqual, match, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { type OhneLayer, scanLayerMessages } from '../../../src/ohne/index.ts';
+import { type OhneError, type OhneLayer, scanLayerMessages } from '../../../src/ohne/index.ts';
 
 describe('scanLayerMessages', () => {
   let root: string;
@@ -118,6 +118,21 @@ describe('scanLayerMessages', () => {
   it('throws when a message value is not a string', async () => {
     const l = layer('nonstring', { 'en.json': { count: 5 } });
     await rejects(scanLayerMessages(l, 'messages'), /Message `count` is not a string/);
+  });
+
+  it('fences a key that holds backticks, so the title shows it exactly', async () => {
+    const l = layer('tick', { 'en.json': { 'a`b': 5 } });
+    await rejects(scanLayerMessages(l, 'messages'), /Message ``a`b`` is not a string/);
+  });
+
+  it('throws naming the file when it is not valid JSON, its parser message fenced', async () => {
+    const l = layer('syntax', { 'en.json': '{ "greeting": `Hello` }' });
+    await rejects(scanLayerMessages(l, 'messages'), (error: OhneError) => {
+      strictEqual(error.message, 'Could not load message file');
+      strictEqual(error.path, join(l.dir, 'messages', 'en.json'));
+      match(`${error.body}`, /^``Unexpected token '`', .* is not valid JSON``$/);
+      return true;
+    });
   });
 
   it('throws when a file does not hold a JSON object', async () => {

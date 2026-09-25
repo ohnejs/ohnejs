@@ -1,5 +1,6 @@
 import type { MessageMeta } from '../messages/messages.ts';
 
+import { codeSpan } from '../../utils/ansi/index.ts';
 import {
   type CodeBuilder,
   createCodeBuilder,
@@ -181,9 +182,9 @@ function unifyKeyTypes(messages: readonly MessageMeta[]): Map<string, string> {
     }
     if (first.type !== type) {
       throw ohneError({
-        title: `Message \`${message.key}\` has different parameters across languages`,
+        title: `Message ${codeSpan(message.key)} has different parameters across languages`,
         body: [
-          `Every language must declare the same parameters for \`${message.key}\`.`,
+          `Every language must declare the same parameters for ${codeSpan(message.key)}.`,
           `\`${first.language}\` expects \`${first.type}\`; \`${message.language}\` expects \`${type}\`.`,
           '',
           `- \`${relativePath(process.cwd(), first.file)}\``,
@@ -204,7 +205,7 @@ function paramsOf(message: MessageMeta): Record<string, MessageParamType> {
     return messageParamTypes(message.template);
   } catch (error) {
     throw ohneError({
-      title: `Invalid message \`${message.key}\` for \`${message.language}\``,
+      title: `Invalid message ${codeSpan(message.key)} for \`${message.language}\``,
       body: errorMessage(error),
       path: message.file,
     });
