@@ -364,7 +364,10 @@ export interface Config {
     preStopDelay?: number | string | false;
 
     /**
-     * How long to wait for in-flight requests and their background work to drain.
+     * How long in-flight requests and their background work may take to drain.
+     * When it expires, every request still in flight is cancelled, even one already answered.
+     * Its connection closes and its `signal` aborts, so its handler or `waitUntil` work can stop.
+     * Shutdown then waits for their cleanup, which only `deadline` bounds, so set `deadline` too.
      * Keep it below the deploy target's kill window (or raise that window), or it `SIGKILL`s mid-drain.
      * The window is the target's, so no default fits all: PM2 `kill_timeout` `1600ms`, k8s grace `30s`.
      * `false` waits indefinitely.
@@ -383,6 +386,7 @@ export interface Config {
 
     /**
      * Global deadline for every `onShutdown` hook combined, the server's own drain included.
+     * It is the only hard stop, so it also bounds the cleanup of the requests `shutdownTimeout` cancelled.
      * When it passes, the process exits with code `1`.
      * `false` waits for the hooks indefinitely.
      *
@@ -494,6 +498,7 @@ export interface Config {
     /**
      * How long middleware and the handler may run before the request is answered with `503`.
      * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+     * The handler keeps running after the `503`, and shutdown waits for it.
      * `false` lets the handler run without a deadline.
      * A route overrides it for itself through `defineHandler`.
      *

@@ -1,5 +1,6 @@
 import type { MessageAST } from '../../utils/index.ts';
 import type { Message } from '../messages/known-messages.ts';
+import type { FieldErrors } from '../query/write/errors.ts';
 
 import {
   canonicalizeLanguage,
@@ -76,6 +77,23 @@ export function resolveMessage(message: Message): string {
   return isString(message)
     ? translate(message)
     : translate(message.key, message.params as MessageParams);
+}
+
+/**
+ * Resolves every field message of a write's `errors` map through `resolveMessage`, keeping each path.
+ *
+ * The map has no prototype, so a `__proto__`, `constructor` or `prototype` path keeps its message.
+ *
+ * @example
+ * ```ts
+ * resolveFieldErrors({ name: 'validation.required' })
+ * // -> { name: 'This field is required' }
+ * ```
+ */
+export function resolveFieldErrors(errors: FieldErrors): Record<string, string> {
+  const resolved: Record<string, string> = Object.create(null);
+  for (const path of Object.keys(errors)) resolved[path] = resolveMessage(errors[path]);
+  return resolved;
 }
 
 /**

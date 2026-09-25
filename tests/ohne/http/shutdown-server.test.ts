@@ -6,7 +6,14 @@ import { before, describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
 
-import { createRouter, createServer, shutdownServer, usePrinter } from '../../../src/ohne/index.ts';
+import {
+  createRouter,
+  createServer,
+  shutdownServer,
+  usePrinter,
+  useRequest,
+  waitUntil,
+} from '../../../src/ohne/index.ts';
 import { sleep } from '../../../src/utils/index.ts';
 
 function makeRoute(pattern: string, handler: AnyHandler): Route {
@@ -15,6 +22,15 @@ function makeRoute(pattern: string, handler: AnyHandler): Route {
 
 async function waitFor(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 200 && !condition(); i++) await sleep(5);
+}
+
+/**
+ * Resolves once `signal` aborts.
+ */
+function aborted(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) =>
+    signal.addEventListener('abort', () => resolve(), { once: true }),
+  );
 }
 
 before(() => {
@@ -48,7 +64,10 @@ describe('shutdownServer', () => {
   });
 
   it('force-closes connections when the drain times out', async () => {
-    const route = makeRoute('/hang', () => new Promise<string>(() => {}));
+    const route = makeRoute('/hang', async () => {
+      await aborted(useRequest().signal);
+      throw new Error('cancelled');
+    });
 
     const { server, gate } = createServer(createRouter([route]));
     server.listen(0);
@@ -59,6 +78,99 @@ describe('shutdownServer', () => {
     await waitFor(() => gate.pending === 1);
 
     await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
+    ok((await inflight) instanceof Error);
+  });
+
+  it("waits for a cancelled request's cleanup before resolving", async () => {
+    let cleaned = false;
+    const route = makeRoute('/siege', async () => {
+      await aborted(useRequest().signal);
+      await sleep(100);
+      cleaned = true;
+      throw new Error('cancelled');
+    });
+
+    const { server, gate } = createServer(createRouter([route]));
+    server.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const inflight = fetch(`http://localhost:${port}/siege`).catch((error) => error);
+    await waitFor(() => gate.pending === 1);
+
+    await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
+    strictEqual(cleaned, true);
+    strictEqual(gate.pending, 0);
+    ok((await inflight) instanceof Error);
+  });
+
+  it('cancels `waitUntil` work still running after its response finished', async () => {
+    let reason: unknown;
+    const route = makeRoute('/ritual', () => {
+      const { signal } = useRequest();
+      waitUntil(aborted(signal).then(() => (reason = signal.reason)));
+      return 'Medivh';
+    });
+
+    const { server, gate } = createServer(createRouter([route]));
+    server.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const res = await fetch(`http://localhost:${port}/ritual`);
+    strictEqual(await res.text(), 'Medivh');
+    strictEqual(gate.pending, 1);
+
+    const winner = await Promise.race([
+      shutdownServer(server, gate, { shutdownTimeout: '50ms' }).then(() => 'shutdown'),
+      sleep(500).then(() => 'timer'),
+    ]);
+    strictEqual(winner, 'shutdown');
+    strictEqual(gate.pending, 0);
+    strictEqual((reason as DOMException).name, 'AbortError');
+    strictEqual((reason as DOMException).message, 'The server is shutting down');
+  });
+
+  it("waits for a timed-out handler's cleanup before resolving", async () => {
+    let cleaned = false;
+    const route = makeRoute('/culling', async () => {
+      await aborted(useRequest().signal);
+      await sleep(100);
+      cleaned = true;
+      return 'Stratholme';
+    });
+
+    const { server, gate } = createServer(createRouter([route]), { handlerTimeout: '20ms' });
+    server.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const res = await fetch(`http://localhost:${port}/culling`);
+    strictEqual(res.status, 503);
+    await res.body?.cancel();
+
+    await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
+    strictEqual(cleaned, true);
+    strictEqual(gate.pending, 0);
+  });
+
+  it('a handler that ignores its signal holds shutdown past shutdownTimeout', async () => {
+    const route = makeRoute('/hang', () => new Promise<string>(() => {}));
+
+    const { server, gate } = createServer(createRouter([route]));
+    server.listen(0);
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const inflight = fetch(`http://localhost:${port}/hang`).catch((error) => error);
+    await waitFor(() => gate.pending === 1);
+
+    const winner = await Promise.race([
+      shutdownServer(server, gate, { shutdownTimeout: '50ms' }).then(() => 'shutdown'),
+      sleep(300).then(() => 'timer'),
+    ]);
+    strictEqual(winner, 'timer');
+    strictEqual(gate.pending, 1);
     ok((await inflight) instanceof Error);
   });
 

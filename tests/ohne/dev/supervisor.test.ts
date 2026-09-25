@@ -1,7 +1,16 @@
 import { ok, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { request } from 'node:http';
-import { createServer, type AddressInfo } from 'node:net';
+import { createServer, type AddressInfo, type Server as NetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
@@ -92,9 +101,39 @@ function sseReload(
   return { connected, reloaded, close: () => req.destroy() };
 }
 
+/**
+ * An `ohne dev` process a test runs, with everything it and its children printed.
+ */
+interface DevCLI {
+  output: () => string;
+  stop: () => Promise<void>;
+}
+
+/**
+ * Spawns `ohne dev` for `app` with its output piped, so a test reads the children's blocks as well.
+ */
+function spawnDev(app: string): DevCLI {
+  const child = spawn(process.execPath, [BIN, 'dev', '--cwd', app], {
+    env: { ...process.env, NO_COLOR: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let text = '';
+  child.stdout.on('data', (chunk) => (text += chunk));
+  child.stderr.on('data', (chunk) => (text += chunk));
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  return {
+    output: () => text,
+    stop: async () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      await exited;
+    },
+  };
+}
+
 describe('dev', () => {
   let root: string;
   let servers: DevServer[];
+  let clis: DevCLI[];
 
   function writeProject(name: string, port: number, silent = true): string {
     const app = join(root, name);
@@ -113,6 +152,57 @@ describe('dev', () => {
     writeFileSync(join(app, 'api', file), "export default () => 'ok'\n");
   }
 
+  /**
+   * Runs `ohne dev` as its own process, so the output holds what each child prints too.
+   * The app config records the dashboard child's PID, for a test to stop it from outside.
+   */
+  async function startDev(
+    name: string,
+  ): Promise<{ app: string; cli: DevCLI; dashPort: number; apiPort: number }> {
+    const dashPort = await freePort();
+    const app = writeProject(name, 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      "import { writeFileSync } from 'node:fs'\n" +
+        `if (process.argv.includes('dashboard')) writeFileSync(${JSON.stringify(pidFile())}, String(process.pid))\n` +
+        `export default { api: { port: 0 }, dashboard: { port: ${dashPort} } }\n`,
+    );
+    writeRoute(app, 'health.ts');
+
+    const cli = spawnDev(app);
+    clis.push(cli);
+    await waitFor(async () => /API ready[\s\S]*Waiting for changes/.test(cli.output()));
+    strictEqual(await get(dashPort, '/'), 200);
+    const apiPort = Number(cli.output().match(/API ready at http:\/\/localhost:(\d+)/)?.[1]);
+    return { app, cli, dashPort, apiPort };
+  }
+
+  /**
+   * Where the dashboard child of the running test writes its PID.
+   */
+  function pidFile(): string {
+    return join(root, 'dashboard.pid');
+  }
+
+  /**
+   * The PID of the running dashboard child.
+   */
+  function dashboardPID(): number {
+    return Number(readFileSync(pidFile(), 'utf8'));
+  }
+
+  /**
+   * Stops the ready dashboard child, then binds its port, so the next start cannot take it.
+   */
+  async function holdDashboard(cli: DevCLI, port: number): Promise<NetServer> {
+    const mark = cli.output().length;
+    process.kill(dashboardPID(), 'SIGTERM');
+    await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
+    const holder = createServer();
+    await new Promise<void>((resolve) => holder.listen(port, resolve));
+    return holder;
+  }
+
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-supervisor-'));
     useEnv().set('NO_COLOR', true);
@@ -125,10 +215,12 @@ describe('dev', () => {
 
   beforeEach(() => {
     servers = [];
+    clis = [];
   });
 
   afterEach(async () => {
     for (const server of servers) await server.close();
+    for (const cli of clis) await cli.stop();
     useShutdown().unwatch();
     useShutdown().clear();
     useLayers().clear();
@@ -318,28 +410,52 @@ describe('dev', () => {
     strictEqual(bound, false);
   });
 
-  it('prints one supervisor-owned line when the dashboard child fails boot', TIMEOUT, async () => {
-    const dashPort = await freePort();
-    const app = writeProject('dashboard-boot-fail', 0);
-    writeFileSync(
-      join(app, 'ohne.config.ts'),
-      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, ` +
-        `messages: { defaultLanguage: 'not a tag!' }, printer: { silent: true } }\n`,
-    );
-    writeRoute(app, 'health.ts');
+  it('parks quietly when a ready dashboard dies, and a change revives it', TIMEOUT, async () => {
+    const { app, cli, dashPort } = await startDev('dashboard-killed');
 
-    const out: string[] = [];
-    useEnv().set('SILENT', false);
-    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
+    const mark = cli.output().length;
+    process.kill(dashboardPID(), 'SIGTERM');
+    await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
+    ok(!cli.output().includes('Dashboard server exited.'));
+
+    writeRoute(app, 'stormwind.get.ts');
+    await waitFor(async () => cli.output().slice(mark).includes('Dashboard ready'));
+    strictEqual(await get(dashPort, '/'), 200);
+  });
+
+  it('prints only the child block when the dashboard cannot bind', TIMEOUT, async () => {
+    const { app, cli, dashPort, apiPort } = await startDev('dashboard-busy');
+    const holder = await holdDashboard(cli, dashPort);
     try {
-      const server = await dev(app, { entry: BIN });
-      servers.push(server);
-      const text = out.join('');
-      ok(text.includes('Dashboard failed to start.'));
-      ok(!text.includes('exited before ready'));
+      const mark = cli.output().length;
+      writeRoute(app, 'orgrimmar.get.ts');
+      await waitFor(async () =>
+        /Another process is listening[\s\S]*Waiting for changes/.test(cli.output().slice(mark)),
+      );
+      const text = cli.output().slice(mark);
+      ok(text.includes(`Port ${dashPort} is already in use`));
+      ok(!cli.output().includes('Dashboard failed to start.'));
+      ok(!cli.output().includes('did not signal ready'));
+      strictEqual(await get(apiPort, '/orgrimmar'), 200);
+
+      writeRoute(app, 'undercity.get.ts');
+      await waitFor(async () => (await get(apiPort, '/undercity')) === 200, 5000);
     } finally {
-      usePrinter().configure({ stream: process.stderr });
+      holder.close();
     }
+  });
+
+  it('retries a dashboard that could not bind on any later change', TIMEOUT, async () => {
+    const { app, cli, dashPort } = await startDev('dashboard-retry');
+    const holder = await holdDashboard(cli, dashPort);
+    writeRoute(app, 'ironforge.get.ts');
+    await waitFor(async () => cli.output().includes('Another process is listening'));
+    await new Promise<void>((resolve) => holder.close(() => resolve()));
+
+    const mark = cli.output().length;
+    writeRoute(app, 'darnassus.get.ts');
+    await waitFor(async () => cli.output().slice(mark).includes('Dashboard ready'));
+    strictEqual(await get(dashPort, '/'), 200);
   });
 
   it(

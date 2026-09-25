@@ -9,6 +9,10 @@ describe('busyError', () => {
     strictEqual(busyError(cause).cause, cause);
   });
 
+  it('is named `BusyError`', () => {
+    strictEqual(busyError().name, 'BusyError');
+  });
+
   it('is recognized by its guard, and a plain error is not', () => {
     strictEqual(isBusyError(busyError()), true);
     strictEqual(isBusyError(new Error('nope')), false);

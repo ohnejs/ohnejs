@@ -18,6 +18,10 @@ describe('validationError', () => {
     match(validationError({ title: 'x', summary: 'y' }).message, /title, summary/);
   });
 
+  it('is named `ValidationError`', () => {
+    strictEqual(validationError({}).name, 'ValidationError');
+  });
+
   it('is recognized by its guard, and a plain error is not', () => {
     strictEqual(isValidationError(validationError({ a: 'b' })), true);
     strictEqual(isValidationError(new Error('nope')), false);
@@ -29,6 +33,10 @@ describe('referenceViolation', () => {
   it('carries the driver failure as its cause', () => {
     const cause = new Error('FOREIGN KEY constraint failed');
     strictEqual(referenceViolation(cause).cause, cause);
+  });
+
+  it('is named `ReferenceViolation`', () => {
+    strictEqual(referenceViolation().name, 'ReferenceViolation');
   });
 
   it('is recognized by its guard, and neither a plain nor a validation error is', () => {

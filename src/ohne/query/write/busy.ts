@@ -21,6 +21,7 @@ export interface BusyError extends Error {}
  */
 export function busyError(cause?: unknown): BusyError {
   const error = new Error('Database is busy, retry the write', { cause }) as BusyError;
+  error.name = 'BusyError';
   Object.defineProperty(error, BUSY_ERROR, { value: true });
   return error;
 }

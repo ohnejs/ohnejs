@@ -1,4 +1,4 @@
-import type { IncomingHttpHeaders } from 'node:http';
+import type { IncomingHttpHeaders, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
@@ -19,9 +19,10 @@ import {
   useHooks,
   useMiddleware,
   usePrinter,
+  useRequest,
   waitUntil,
 } from '../../../src/ohne/index.ts';
-import { sleep } from '../../../src/utils/index.ts';
+import { isUndefined, sleep } from '../../../src/utils/index.ts';
 
 function makeRoute(method: HTTPMethod, pattern: string, handler: AnyHandler): Route {
   return { method, pattern, file: `${pattern}.ts`, layer: 'test', handler };
@@ -33,7 +34,7 @@ async function waitFor(condition: () => boolean): Promise<void> {
 
 async function withServer(
   routes: Route[],
-  run: (base: string, gate: Gate) => Promise<void>,
+  run: (base: string, gate: Gate, server: Server) => Promise<void>,
   options: CreateServerOptions = {},
 ): Promise<void> {
   const { server, gate } = createServer(createRouter(routes), options);
@@ -41,7 +42,7 @@ async function withServer(
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
   try {
-    await run(`http://localhost:${port}`, gate);
+    await run(`http://localhost:${port}`, gate, server);
   } finally {
     server.close();
     server.closeAllConnections();
@@ -449,5 +450,129 @@ describe('base path', () => {
       },
       { basePath: 'api/' },
     );
+  });
+});
+
+describe('request signal', () => {
+  it('aborts `useRequest().signal` when the client goes away mid-request', async () => {
+    let entered!: (chunk: string) => void;
+    const reading = new Promise<string>((resolve) => (entered = resolve));
+    let reason: unknown;
+    const route = makeRoute('POST', '/upload', async () => {
+      const { body, signal } = useRequest();
+      const { value } = await body!.getReader().read();
+      entered(new TextDecoder().decode(value));
+      await once(signal, 'abort');
+      reason = signal.reason;
+      return null;
+    });
+
+    await withServer([route], async (base) => {
+      const req = request(`${base}/upload`, { method: 'POST' }).on('error', () => {});
+      req.write('Thrall');
+      strictEqual(await reading, 'Thrall');
+      req.destroy();
+      await waitFor(() => !isUndefined(reason));
+      strictEqual((reason as DOMException).name, 'AbortError');
+    });
+  });
+
+  it('finds `useRequest().signal` aborted when first read after the client went away', async () => {
+    let entered!: () => void;
+    const reading = new Promise<void>((resolve) => (entered = resolve));
+    let gone!: () => void;
+    const left = new Promise<void>((resolve) => (gone = resolve));
+    let aborted: boolean | undefined;
+    const route = makeRoute('POST', '/late-read', async () => {
+      const { body } = useRequest();
+      await body!.getReader().read();
+      entered();
+      await left;
+      aborted = useRequest().signal.aborted;
+      return null;
+    });
+
+    await withServer([route], async (base, _gate, server) => {
+      server.on('request', (_req, res: ServerResponse) => res.once('close', () => gone()));
+      const req = request(`${base}/late-read`, { method: 'POST' }).on('error', () => {});
+      req.write('Varian');
+      await reading;
+      req.destroy();
+      await waitFor(() => !isUndefined(aborted));
+      strictEqual(aborted, true);
+    });
+  });
+
+  it('leaves `useRequest().signal` unaborted once the response finished', async () => {
+    let signal: AbortSignal | undefined;
+    const route = makeRoute('GET', '/done', () => {
+      signal = useRequest().signal;
+      return 'ok';
+    });
+
+    await withServer([route], async (base, _gate, server) => {
+      let closed = false;
+      server.on('request', (_req, res: ServerResponse) => res.once('close', () => (closed = true)));
+      const res = await fetch(`${base}/done`);
+      strictEqual(await res.text(), 'ok');
+      await waitFor(() => closed);
+      strictEqual(closed, true);
+      strictEqual(signal?.aborted, false);
+    });
+  });
+
+  it('drops the answer to a client that already left, printing nothing', async () => {
+    const printed: string[] = [];
+    usePrinter().configure({ stream: { write: (chunk) => void printed.push(chunk) } });
+    let entered!: () => void;
+    const waiting = new Promise<void>((resolve) => (entered = resolve));
+    const route = makeRoute('GET', '/late', async () => {
+      const { signal } = useRequest();
+      entered();
+      await once(signal, 'abort');
+      return { hero: 'Jaina' };
+    });
+
+    try {
+      await withServer([route], async (base, gate) => {
+        const req = request(`${base}/late`).on('error', () => {});
+        req.end();
+        await waiting;
+        req.destroy();
+        await waitFor(() => gate.pending === 0);
+        strictEqual(gate.pending, 0);
+      });
+    } finally {
+      usePrinter().configure({ stream: { write() {} } });
+    }
+    deepStrictEqual(printed, []);
+  });
+
+  it('prints nothing for work the request signal aborted after the client left', async () => {
+    const printed: string[] = [];
+    usePrinter().configure({ stream: { write: (chunk) => void printed.push(chunk) } });
+    let entered!: () => void;
+    const waiting = new Promise<void>((resolve) => (entered = resolve));
+    const route = makeRoute('GET', '/report', async () => {
+      const { signal } = useRequest();
+      entered();
+      await once(signal, 'abort');
+      signal.throwIfAborted();
+      return null;
+    });
+
+    try {
+      await withServer([route], async (base, gate) => {
+        const req = request(`${base}/report`).on('error', () => {});
+        req.end();
+        await waiting;
+        req.destroy();
+        await waitFor(() => gate.pending === 0);
+        strictEqual(gate.pending, 0);
+      });
+    } finally {
+      usePrinter().configure({ stream: { write() {} } });
+    }
+    deepStrictEqual(printed, []);
   });
 });

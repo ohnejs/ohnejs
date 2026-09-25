@@ -1,6 +1,3 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-
 import { isPort, MAX_PORT } from '../../utils/index.ts';
 import { bootProject } from '../boot/boot-project.ts';
 import { syncProjectDatabase } from '../database/sync-project.ts';
@@ -19,6 +16,7 @@ import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
 import { useRoutes } from '../routes/use-routes.ts';
+import { listen } from './_listen.ts';
 
 declare module 'ohnejs' {
   interface Hooks {
@@ -94,8 +92,6 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
     await applyHook('server:ready', { host: host ?? 'localhost', port: address.port });
   } catch (error) {
     await useShutdown().run({ deadline: offToUndefined(config.deadline) });
-    // An open IPC channel keeps the loop alive, so the drained process would never exit.
-    process.disconnect?.();
     throw error;
   }
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
@@ -103,18 +99,4 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   usePrinter().success(`API ready at \`http://${host ?? 'localhost'}:${address.port}\``);
   process.send?.('ready');
   return http;
-}
-
-/**
- * Starts listening and resolves with the bound address, rejecting when the port cannot be taken.
- */
-function listen(server: Server, port: number, host?: string): Promise<AddressInfo> {
-  return new Promise((resolve, reject) => {
-    const onError = (error: Error): void => reject(error);
-    server.once('error', onError);
-    server.listen(port, host, () => {
-      server.removeListener('error', onError);
-      resolve(server.address() as AddressInfo);
-    });
-  });
 }

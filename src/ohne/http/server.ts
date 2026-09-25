@@ -56,7 +56,7 @@ export interface HTTPServer {
 
   /**
    * The drain gate, one ticket per in-flight request.
-   * A request holds its ticket until the response is written and its `waitUntil` work settles.
+   * A request holds its ticket until the response is written and its handler and `waitUntil` work settle.
    */
   gate: Gate;
 }
@@ -142,6 +142,7 @@ export interface CreateServerOptions {
   /**
    * How long middleware and the handler may run before the request is answered with `503`.
    * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+   * The handler keeps running after the `503` and holds its drain ticket until it ends.
    * Omitted lets the handler run without a deadline.
    *
    * @example
@@ -219,6 +220,9 @@ export interface CreateServerOptions {
  * The ticket is released once the response is written and its background work drains.
  * A request that arrives while the gate is closing is refused with `503` and a `Connection: close`.
  * A path that matches no route is a `404`; one that matches but not for the method is a `405` with `Allow`.
+ * Each request's `signal` aborts when its client goes away before the response finished.
+ * It also aborts when `shutdownServer` stops waiting for the request, its `waitUntil` work included.
+ * `gate.cancel` aborts it too, even after the response; `shutdownServer` calls it once its drain times out.
  * The transport limits in `options` are applied to the Node server; an omitted field keeps Node's default.
  *
  * The returned server is not listening; the caller starts it and wires shutdown.
@@ -274,7 +278,7 @@ interface RequestLimits {
 }
 
 /**
- * Answers one request, holding its gate ticket until the response is sent and its `waitUntil` work drains.
+ * Answers one request, holding its gate ticket until the response is sent and its background work drains.
  */
 async function handle(
   router: Router,
@@ -286,7 +290,8 @@ async function handle(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
-  const release = gate.enter();
+  const controller = new AbortController();
+  const release = gate.enter((reason) => controller.abort(reason));
   if (isNull(release)) {
     res.statusCode = 503;
     res.setHeader('Connection', 'close');
@@ -321,7 +326,8 @@ async function handle(
 
     const overrides = match.type === 'matched' ? routeLimits(match.route.handler) : undefined;
     const maxBodySize = limit(overrides?.maxBodySize, limits.maxBodySize);
-    const request = toRequest(req, { url, maxBodySize });
+    abortOnDisconnect(res, controller);
+    const request = toRequest(req, { url, maxBodySize, signal: controller.signal });
 
     if (match.type === 'matched' || match.type === 'options') {
       const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
@@ -357,6 +363,15 @@ async function handle(
     }
     release();
   }
+}
+
+/**
+ * Aborts `controller` once `res` closes before its response finished: the client went away.
+ */
+function abortOnDisconnect(res: ServerResponse, controller: AbortController): void {
+  res.once('close', () => {
+    if (!res.writableFinished) controller.abort();
+  });
 }
 
 /**

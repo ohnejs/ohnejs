@@ -162,6 +162,34 @@ describe('dispatch', () => {
     });
   });
 
+  it('keeps draining a handler that overran handlerTimeout until it ends', async () => {
+    let ended = false;
+    const route = makeRoute('/', async () => {
+      await sleep(50);
+      ended = true;
+      return 'Arthas';
+    });
+    const { response, drain } = await dispatch(route, req(), url(), {}, { handlerTimeout: 5 });
+    strictEqual(response.status, 503);
+    strictEqual(ended, false);
+
+    await drain();
+    strictEqual(ended, true);
+  });
+
+  it('isolates a timed-out handler whose run rejects late', async () => {
+    hook('error:response', () => {
+      throw new Error('Frostmourne shattered');
+    });
+    const route = makeRoute('/', async () => {
+      await sleep(20);
+      throw new Error('Arthas fell');
+    });
+    const { response, drain } = await dispatch(route, req(), url(), {}, { handlerTimeout: 5 });
+    strictEqual(response.status, 503);
+    await drain();
+  });
+
   it('returns normally when the handler finishes within handlerTimeout', async () => {
     const route = makeRoute('/', () => ({ ok: true }));
     const { response } = await dispatch(route, req(), url(), {}, { handlerTimeout: 1000 });

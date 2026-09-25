@@ -40,6 +40,7 @@ export function validationError(errors: FieldErrors): ValidationError {
   const error = new Error(
     `Validation failed: ${Object.keys(errors).join(', ')}`,
   ) as ValidationError;
+  error.name = 'ValidationError';
   Object.defineProperty(error, VALIDATION_ERROR, { value: true });
   error.errors = errors;
   return error;
@@ -76,6 +77,7 @@ export function isValidationError(value: unknown): value is ValidationError {
  */
 export function referenceViolation(cause?: unknown): Error {
   const error = new Error('A referenced record blocks this delete', { cause });
+  error.name = 'ReferenceViolation';
   Object.defineProperty(error, REFERENCE_VIOLATION, { value: true });
   return error;
 }

@@ -20,7 +20,7 @@ import { isReferenceViolation, isValidationError } from '../query/write/errors.t
 import { conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
-import { resolveMessage, translate } from './translate.ts';
+import { resolveFieldErrors, translate } from './translate.ts';
 import { runWithEvent } from './use-event.ts';
 
 declare module 'ohnejs' {
@@ -84,6 +84,7 @@ export interface Dispatched {
 
   /**
    * Awaits every `waitUntil` promise, isolating and logging rejections.
+   * A handler still running past its `handlerTimeout` is awaited the same way.
    * The transport calls it after the response is sent, then releases the drain ticket.
    * Newly registered work is drained too, so a `waitUntil` that calls `waitUntil` still settles.
    */
@@ -104,6 +105,7 @@ export interface DispatchOptions {
 
   /**
    * Milliseconds to let middleware and the handler run before giving up with a `503`.
+   * The run keeps going past the `503`, and `drain` waits for it.
    * Distinct from the socket-level `requestTimeout`: this bounds the work, not the connection.
    * Omitted lets the handler run without a deadline.
    */
@@ -138,7 +140,7 @@ export interface DispatchOptions {
  * A returned or thrown `HTTPError` maps to its status.
  * A write that fails validation, hits a busy database, or is blocked by a reference maps to its own status.
  * Any other throw becomes a `500` with the real error logged, never sent.
- * When `handlerTimeout` is set and the run overruns it, the response is a `503` and the work is abandoned.
+ * A run that overruns `handlerTimeout` answers `503` and keeps going, and `drain` waits for it.
  * A thrown error runs the `error:response` hook first.
  * `response:send` then filters the final response of every outcome, the timeout `503` included.
  * The returned `drain` defers background work past the response.
@@ -201,11 +203,7 @@ export async function dispatch(
       return toResponse(await resolveResult(result, event), event.response);
     } catch (error) {
       if (isValidationError(error)) {
-        // A field path may be `__proto__`/`constructor`/`prototype`, which `mapValues` drops; keep them all.
-        const errors: Record<string, string> = Object.create(null);
-        for (const path of Object.keys(error.errors))
-          errors[path] = resolveMessage(error.errors[path]);
-        const http = unprocessable(undefined, { errors });
+        const http = unprocessable(undefined, { errors: resolveFieldErrors(error.errors) });
         return resolveErrorResponse(toResponse(http, event.response), http, event);
       }
       if (isBusyError(error)) {
@@ -221,7 +219,8 @@ export async function dispatch(
       if (error instanceof HTTPError) {
         return resolveErrorResponse(toResponse(error, event.response), error, event);
       }
-      logUnhandled(route, error);
+      // A request aborted by its client leaving or by shutdown is no fault of the server.
+      if (!request.signal.aborted) logUnhandled(route, error);
       const response = toResponse(
         new HTTPError(500, translate('api.http.internalServerError')),
         event.response,
@@ -232,12 +231,17 @@ export async function dispatch(
 
   const response = isUndefined(options.handlerTimeout)
     ? await run
-    : await withTimeout(run, options.handlerTimeout, () =>
-        toResponse(new HTTPError(503, translate('api.http.serviceUnavailable')), {
+    : await withTimeout(run, options.handlerTimeout, () => {
+        background.push(
+          run.catch((error: unknown) => {
+            usePrinter().error(`Request failed: ${errorMessage(error)}`);
+          }),
+        );
+        return toResponse(new HTTPError(503, translate('api.http.serviceUnavailable')), {
           status: 503,
           headers: new Headers(),
-        }),
-      );
+        });
+      });
 
   return {
     response: await resolveResponse(response, event),

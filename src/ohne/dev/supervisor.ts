@@ -73,8 +73,9 @@ export interface DevOptions {
  * A child that never signals ready is killed after a minute and parks the supervisor the same way.
  *
  * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
- * The dashboard child reads its modules from disk per request, so a file change never respawns it.
+ * The dashboard child reads its modules from disk per request, so a file change never respawns a running one.
  * A config change does: the child resolved the layer stack at boot, and a listed layer may have changed.
+ * A dashboard that fails to start or exits prints its own error, and any next change starts it again.
  * A change in a dashboard directory tells its browsers to reload over the dev live-reload stream.
  * That reload follows any API respawn the same batch caused, so the reloaded page finds the API ready.
  *
@@ -188,6 +189,7 @@ export async function dev(
    * Reloads a changed `.env`, regenerates, then restarts, reloads, or respawns only what the batch affects.
    * A `.env` or codegen failure is reported and parks the supervisor, leaving the children as they are.
    * The API respawns first, so a browser reload or a dashboard restart never meets a restarting API.
+   * A missing dashboard starts again on any change.
    * A browser reload with no API child to serve it waits for the change that brings one back.
    */
   async function runCycle(batch: Set<string>): Promise<void> {
@@ -208,20 +210,21 @@ export async function dev(
       envChanged ||
       reloadable.some(isSource) ||
       reloadable.some((path) => messages.affectedBy(path));
+    const startsDashboard = wantDashboard && (configChanged || envChanged || isNull(dashboard));
     if (reloads) {
       printer.info('__Reloading API...__');
       try {
         await respawn();
       } catch {}
     }
-    if ((configChanged || envChanged) && wantDashboard) {
+    if (startsDashboard) {
       browserReload = false;
       await restartDashboard();
     } else if (browserReload && !isNull(api)) {
       browserReload = false;
       dashboard?.reload();
     }
-    if (reloads) park();
+    if (reloads || startsDashboard) park();
   }
 
   /**
@@ -280,7 +283,8 @@ export async function dev(
   }
 
   /**
-   * Spawns the dashboard child pointed at the API; a failed boot only warns and leaves no dashboard.
+   * Spawns the dashboard child pointed at the API; a failed boot leaves no dashboard.
+   * The child prints its own failure, and the next change starts it again.
    */
   async function startDashboard(): Promise<void> {
     const config = useConfig();
@@ -300,7 +304,6 @@ export async function dev(
       await dashboard.ready;
     } catch {
       dashboard = null;
-      printer.warn('Dashboard failed to start.');
     }
   }
 
@@ -324,11 +327,11 @@ export async function dev(
   }
 
   /**
-   * Drops an exited dashboard child with a warning; only a config or `.env` change starts it again.
+   * Drops an exited dashboard child and parks until a change starts it again.
    */
   function onDashboardExit(): void {
     dashboard = null;
-    printer.warn('Dashboard server exited.');
+    park();
   }
 
   /**

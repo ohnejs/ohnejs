@@ -23,7 +23,10 @@ export interface ShutdownServerOptions {
   preStopDelay?: number | string;
 
   /**
-   * How long to wait for in-flight requests and their background work to drain, a `parseDuration` value.
+   * How long in-flight requests and their background work may take to drain, a `parseDuration` value.
+   * When it expires, every request still in flight is cancelled, even one already answered.
+   * Its connection closes and its `signal` aborts, so its handler or `waitUntil` work can stop.
+   * Shutdown then waits for their cleanup, so work that ignores its signal holds shutdown open.
    * Keep it below the orchestrator's kill window, or it `SIGKILL`s mid-drain.
    * Omitted means wait indefinitely.
    *
@@ -43,7 +46,9 @@ export interface ShutdownServerOptions {
  * After an optional pre-stop delay, it stops accepting new connections.
  * It then waits for in-flight requests and their `waitUntil` work to drain, bounded by `shutdownTimeout`.
  * Idle keep-alive sockets are closed so the server can settle.
- * If the wait times out, every remaining connection is destroyed so the process can still exit.
+ * If the wait times out, every request still in flight is cancelled, even one already answered.
+ * Its connection closes and its `signal` aborts.
+ * It then waits for their cleanup, which only the coordinator's `deadline` bounds.
  *
  * Register it with `onShutdown` so the coordinator runs it on a signal.
  *
@@ -65,5 +70,8 @@ export async function shutdownServer(
   const { drained } = await gate.close({ timeout: options.shutdownTimeout });
 
   server.closeIdleConnections();
-  if (!drained) server.closeAllConnections();
+  if (drained) return;
+  server.closeAllConnections();
+  gate.cancel(new DOMException('The server is shutting down', 'AbortError'));
+  await gate.settled();
 }

@@ -1,6 +1,6 @@
 import { rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer, type AddressInfo } from 'node:net';
+import { createServer, type AddressInfo, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
@@ -15,6 +15,17 @@ import { useEnv } from '../../../src/ohne/env/use-env.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const TIMEOUT = { timeout: 20_000 };
+
+/**
+ * Binds a server on a free port and keeps it, so a child cannot take that port.
+ */
+function hold(): Promise<Server> {
+  return new Promise((resolve, reject) => {
+    const holder = createServer();
+    holder.once('error', reject);
+    holder.listen(0, () => resolve(holder));
+  });
+}
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -94,6 +105,45 @@ describe('spawnServeChild', () => {
     await rejects(child.ready, /did not signal ready within `500ms`/);
     await child.stop();
   });
+
+  it('rejects ready at once when the dashboard port is taken', TIMEOUT, async () => {
+    const app = writeProject('dashboard-busy');
+    const holder = await hold();
+    try {
+      const child = spawnServeChild(app, 'dashboard', {
+        port: (holder.address() as AddressInfo).port,
+        entry: BIN,
+        readyTimeout: 5000,
+        env: { DASHBOARD_RELOAD: '1' },
+      });
+      children.push(child);
+      await rejects(child.ready, /exited before ready/);
+    } finally {
+      holder.close();
+    }
+  });
+
+  it(
+    'rejects ready at once on a taken port while a boot file listens over IPC',
+    TIMEOUT,
+    async () => {
+      const app = writeProject('api-busy');
+      mkdirSync(join(app, 'boot'), { recursive: true });
+      writeFileSync(join(app, 'boot', 'listen.ts'), "process.on('message', () => {})\n");
+      const holder = await hold();
+      try {
+        const child = spawnServeChild(app, 'api', {
+          port: (holder.address() as AddressInfo).port,
+          entry: BIN,
+          readyTimeout: 5000,
+        });
+        children.push(child);
+        await rejects(child.ready, /exited before ready/);
+      } finally {
+        holder.close();
+      }
+    },
+  );
 
   it('calls onExit when a ready child exits on its own', TIMEOUT, async () => {
     const app = writeProject('self-exit');

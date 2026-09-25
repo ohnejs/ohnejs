@@ -1,8 +1,3 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-
-import { fileURLToPath } from 'node:url';
-
 import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { etag } from '../../utils/etag/etag.ts';
@@ -10,7 +5,6 @@ import { exists } from '../../utils/fs/index.ts';
 import {
   cacheControl,
   canonicalizeLanguage,
-  dirname,
   isNull,
   isPathInside,
   isPort,
@@ -48,8 +42,10 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
+import { SRC_ROOT } from '../meta/src-root.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
+import { listen } from './_listen.ts';
 
 /**
  * URL prefix under which the framework's browser modules are served.
@@ -107,11 +103,6 @@ const CANVAS = `
       :root { color-scheme: light; background: hsl(210 22.2% 96.5%) }
       .dark { color-scheme: dark; background: hsl(234 16.7% 11.8%) }
     `;
-
-/**
- * The framework `src` directory, the root the client modules are served from.
- */
-const SRC_ROOT = resolvePath('../..', dirname(fileURLToPath(import.meta.url)));
 
 /**
  * The framework subtrees the browser graph may load: the dashboard kernel and the utils it imports.
@@ -350,18 +341,4 @@ function shellDocument(
   </body>
 </html>
 `;
-}
-
-/**
- * Starts listening and resolves with the bound address, rejecting when the port cannot be taken.
- */
-function listen(server: Server, port: number, host?: string): Promise<AddressInfo> {
-  return new Promise((resolve, reject) => {
-    const onError = (error: Error): void => reject(error);
-    server.once('error', onError);
-    server.listen(port, host, () => {
-      server.removeListener('error', onError);
-      resolve(server.address() as AddressInfo);
-    });
-  });
 }

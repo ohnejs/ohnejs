@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { ok, strictEqual } from 'node:assert';
+import { ok, rejects, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
@@ -131,6 +131,22 @@ describe('toRequest', () => {
           duplex: 'half',
         } as RequestInit);
         strictEqual(res.status, 413);
+      },
+    );
+  });
+
+  it('follows `signal`, leaving the body readable once it aborts', async () => {
+    await withServer(
+      async (req, res) => {
+        const controller = new AbortController();
+        const request = toRequest(req, { signal: controller.signal });
+        controller.abort();
+        const body = await request.text();
+        await sendResponse(res, new Response(`${request.signal.aborted} ${body}`));
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'POST', body: 'Sylvanas' });
+        strictEqual(await res.text(), 'true Sylvanas');
       },
     );
   });
@@ -316,6 +332,27 @@ describe('sendResponse', () => {
     );
     ok(cancelled);
     ok(pulls <= 1);
+  });
+
+  it('drops the answer to a client that already went away, cancelling its body', async () => {
+    let cancelled = false;
+    const dropped = Promise.withResolvers<void>();
+    await withServer(
+      async (_req, res) => {
+        res.destroy();
+        const stream = new ReadableStream<Uint8Array>({
+          cancel() {
+            cancelled = true;
+          },
+        });
+        await sendResponse(res, new Response(stream)).then(dropped.resolve, dropped.reject);
+      },
+      async (base) => {
+        await rejects(fetch(base));
+        await dropped.promise;
+      },
+    );
+    ok(cancelled);
   });
 
   it('pipes a streamed response body', async () => {

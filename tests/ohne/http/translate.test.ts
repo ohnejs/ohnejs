@@ -1,10 +1,16 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { defaultLanguage, translate } from '../../../src/ohne/http/translate.ts';
+import type { FieldErrors } from '../../../src/ohne/index.ts';
+
+import {
+  defaultLanguage,
+  resolveFieldErrors,
+  translate,
+} from '../../../src/ohne/http/translate.ts';
 import {
   type Event,
   loadLayers,
@@ -12,6 +18,12 @@ import {
   useLayers,
   useMessages,
 } from '../../../src/ohne/index.ts';
+
+declare module 'ohnejs' {
+  interface KnownMessages {
+    'translateTest.maxLevel': { max: number };
+  }
+}
 
 function makeEvent(acceptLanguage?: string, locale?: string): Event {
   const headers = new Headers();
@@ -94,6 +106,36 @@ describe('translate', () => {
   it('returns the key when it is absent from every language', async () => {
     await setup({ en: { 'api.http.notFound': 'Not Found' } });
     strictEqual(translate('does.not.exist'), 'does.not.exist');
+  });
+});
+
+describe('resolveFieldErrors', () => {
+  afterEach(() => {
+    useMessages().clear();
+  });
+
+  it('resolves key and `{ key, params }` messages into a null-prototype map', () => {
+    useMessages().register('en', {
+      'translateTest.required': 'Required',
+      'translateTest.maxLevel': 'At most `{max}`',
+    });
+    const resolved = resolveFieldErrors({
+      name: 'translateTest.required',
+      level: { key: 'translateTest.maxLevel', params: { max: 60 } },
+    });
+
+    strictEqual(Object.getPrototypeOf(resolved), null);
+    deepStrictEqual({ ...resolved }, { name: 'Required', level: 'At most `60`' });
+  });
+
+  it('keeps a `__proto__` path', () => {
+    const errors: FieldErrors = Object.create(null);
+    errors['__proto__'] = 'Hearthstone is on cooldown';
+
+    const resolved = resolveFieldErrors(errors);
+
+    strictEqual(Object.hasOwn(resolved, '__proto__'), true);
+    strictEqual(resolved['__proto__'], 'Hearthstone is on cooldown');
   });
 });
 

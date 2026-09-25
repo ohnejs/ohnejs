@@ -3,7 +3,7 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { first, isArray, isNull, isUndefined } from '../../utils/index.ts';
+import { first, isArray, isNull, isUndefined, limitStream } from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
@@ -44,6 +44,14 @@ export interface ToRequestOptions {
    * Omitted leaves the body size unbounded.
    */
   maxBodySize?: number;
+
+  /**
+   * The signal the request's own `signal` follows.
+   * The transport passes one that aborts when the client goes away before its response finished.
+   * It also aborts it when a graceful shutdown stops waiting for the request.
+   * Omitted, the request's `signal` never aborts.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -75,6 +83,8 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  * When `maxBodySize` is set, the streamed body is metered, so an overrun aborts mid-flight with `413`.
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
  * The `Content-Length` pre-check lives in `dispatch`, so a policy middleware's headers reach the `413`.
+ *
+ * The request's `signal` follows `options.signal`, and aborting it leaves the body readable.
  */
 export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
   const url = options.url ?? toURL(req);
@@ -91,9 +101,11 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
   const { maxBodySize } = options;
   const bodyless = method === 'GET' || method === 'HEAD';
   let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-  if (!isNull(body) && !isUndefined(maxBodySize)) body = meterBody(body, maxBodySize);
+  if (!isNull(body) && !isUndefined(maxBodySize)) {
+    body = limitStream(body, maxBodySize, payloadTooLarge);
+  }
 
-  return new Request(url, { method, headers, body, duplex: 'half' });
+  return new Request(url, { method, headers, body, duplex: 'half', signal: options.signal });
 }
 
 /**
@@ -159,22 +171,6 @@ function firstToken(value: string | string[] | undefined): string | undefined {
 }
 
 /**
- * Passes the body through, throwing `payloadTooLarge` once more than `max` bytes have streamed.
- */
-function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStream<Uint8Array> {
-  let seen = 0;
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        seen += chunk.byteLength;
-        if (seen > max) throw payloadTooLarge();
-        controller.enqueue(chunk);
-      },
-    }),
-  );
-}
-
-/**
  * Writes a Web `Response` back onto a Node `ServerResponse`.
  *
  * Status and headers are copied over, then the body is piped from `Readable.fromWeb`.
@@ -183,12 +179,13 @@ function meterBody(body: ReadableStream<Uint8Array>, max: number): ReadableStrea
  * The pipe carries backpressure and destroys both ends on error.
  * A bodyless response (e.g. `204`) just ends the socket.
  * So does the answer to a `HEAD`, whose body is cancelled unread, since Node would pull and discard it whole.
+ * An answer to a client that already went away is dropped the same way, its body cancelled unread.
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
   res.setHeaders(await resolveHeaders(response, res.req.method));
 
-  if (isNull(response.body) || res.req.method === 'HEAD') {
+  if (isNull(response.body) || res.req.method === 'HEAD' || res.destroyed) {
     await response.body?.cancel().catch(() => {});
     res.end();
     return;

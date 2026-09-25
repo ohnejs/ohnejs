@@ -21,4 +21,6 @@ try {
 } catch (error) {
   reportError(error);
   process.exitCode = 1;
+  // A `'message'` listener keeps the IPC channel open, so a failed child would never exit.
+  if (process.connected) process.disconnect?.();
 }
