@@ -70,6 +70,13 @@ describe('MessageSyntaxError', () => {
     strictEqual(err.snippet, 'Hi `{name}` }\n            ^');
   });
 
+  it('spells out a control character and keeps the caret under the offender', () => {
+    const err = new MessageSyntaxError('boom', 'a\x1b }', 3);
+    strictEqual(err.column, 4);
+    strictEqual(err.snippet, 'a\\x1B }\n      ^');
+    strictEqual(err.message, 'boom (1:4)\n`a\\x1B }`\n      ^');
+  });
+
   it('leaves an empty source line empty in the message', () => {
     strictEqual(new MessageSyntaxError('boom', 'a\n', 2).message, 'boom (2:1)\n\n^');
   });

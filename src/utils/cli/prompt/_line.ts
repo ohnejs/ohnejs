@@ -240,7 +240,7 @@ export function clipEnd(value: string, width: number | undefined): string {
 
 /**
  * Reports whether `str` is a single insertable run with no control characters.
- * Filters out escape sequences and the `DEL` byte so only graphic input reaches the line.
+ * Filters out escape sequences, `DEL` and C1 controls so only graphic input reaches the line.
  *
  * @example
  * ```ts
@@ -250,12 +250,7 @@ export function clipEnd(value: string, width: number | undefined): string {
  * ```
  */
 export function isPrintable(str: string | undefined): boolean {
-  if (isUndefined(str) || str.length === 0) return false;
-  for (const char of str) {
-    const code = char.codePointAt(0)!;
-    if (code < 0x20 || code === 0x7f) return false;
-  }
-  return true;
+  return !isUndefined(str) && str.length > 0 && !/\p{Cc}/u.test(str);
 }
 
 /**

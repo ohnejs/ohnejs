@@ -1,6 +1,7 @@
 import type { ANSIColors } from '../ansi/pick-ansi-colors.ts';
 
 import { applyANSIMarkup } from '../ansi/apply-ansi-markup.ts';
+import { escapeControls } from '../ansi/escape-controls.ts';
 import { isColorStream } from '../ansi/is-color-stream.ts';
 import { pickANSIColors } from '../ansi/pick-ansi-colors.ts';
 import { isString } from '../is/is-string.ts';
@@ -98,6 +99,8 @@ export interface PrinterConfig {
  * Terminal-UX writer.
  *
  * Build instances via `createPrinter`.
+ * Control characters in any text print as escapes, like `\x1B`, so the terminal never acts on them.
+ * A line break stays only in a message, which hangs its next line under the text, and in a block body.
  *
  * Each severity has two methods:
  * - The bare name (`success`, `info`, ...) renders one line: `●` + message.
@@ -170,6 +173,7 @@ const GLYPH_HEAD = '●';
 const GLYPH_RAIL = '│';
 const GLYPH_CORNER = '└';
 const GLYPH_CORNER_DASH = '─';
+const HANG = '   ';
 
 /**
  * Builds an isolated `Printer`.
@@ -271,12 +275,13 @@ export function createPrinter(config: PrinterConfig = {}): Printer {
 }
 
 /**
- * Renders the level glyph and message as one line, tinting an error message red.
+ * Renders the level glyph and message, hanging each later line under the text and tinting an error red.
  */
 function renderLine(level: PrintLevel, message: string, colors: ANSIColors): string {
   const tint = levelTint(level, colors);
   const isError = level === 'error';
-  const styled = applyANSIMarkup(message.trim(), isError, colors);
+  const text = message.trim().split('\n').map(escapeControls).join(`\n${HANG}`);
+  const styled = applyANSIMarkup(text, isError, colors);
   const final = isError ? colors.red(styled) : styled;
   return `${tint(GLYPH_HEAD)}  ${final}\n`;
 }
@@ -295,8 +300,8 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
   const rail = tint(GLYPH_RAIL);
   const corner = tint(GLYPH_CORNER);
 
-  const title = options.title.trim();
-  const path = options.path?.trim() ?? '';
+  const title = escapeControls(options.title.trim());
+  const path = escapeControls(options.path?.trim() ?? '');
   const paragraphs = normalizeBody(options.body);
 
   const styledTitle = applyANSIMarkup(title, emphasize, colors);
@@ -309,7 +314,7 @@ function renderBlock(level: PrintLevel, options: BlockOptions, colors: ANSIColor
     for (let i = 0; i < paragraphs.length; i++) {
       if (i > 0) lines.push(rail);
       for (const line of paragraphs[i]!) {
-        lines.push(`${rail}  ${applyANSIMarkup(line, false, colors)}`);
+        lines.push(`${rail}  ${applyANSIMarkup(escapeControls(line), false, colors)}`);
       }
     }
   }

@@ -257,6 +257,36 @@ describe('createPrinter', () => {
     });
   });
 
+  describe('control characters', () => {
+    it('spells them out in a line', () => {
+      const { printer, out } = capture();
+      printer.warn('a\x1b[2Jb\rc\x9b');
+      strictEqual(out(), '●  a\\x1B[2Jb\\rc\\x9B\n');
+    });
+
+    it('hangs each later line of a message under the text, so none starts at the glyph', () => {
+      const { printer, out } = capture({ debug: true });
+      printer.warn('unlink x\n●  Deleted 0 stray files');
+      printer.debug('stack\n    at x\x07');
+      strictEqual(out(), '●  unlink x\n   ●  Deleted 0 stray files\n●  stack\n       at x\\x07\n');
+    });
+
+    it('spells them out in the title, every body row, and the path', () => {
+      const { printer, out } = capture();
+      printer.errorBlock({ title: 'T\x1b[1A', body: 'x\r● ok\ny\b', path: 'a\x1b]8;;u\x07b' });
+      strictEqual(
+        out(),
+        ['●  T\\x1B[1A', '│', '│  x\\r● ok', '│  y\\b', '│', '└─ a\\x1B]8;;u\\x07b', ''].join('\n'),
+      );
+    });
+
+    it('still styles markup around the escapes', () => {
+      const { printer, out } = capture({ color: true });
+      printer.info('got `a\x1bb`');
+      strictEqual(out(), `${E}[96m●${E}[39m  got ${E}[96ma\\x1Bb${E}[39m\n`);
+    });
+  });
+
   describe('color toggle', () => {
     it('strips all ANSI when color is false', () => {
       const { printer, out } = capture({ color: false });

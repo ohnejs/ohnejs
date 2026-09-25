@@ -168,6 +168,7 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
 
   /**
    * Lists `dir` as completion entries, cached per directory and empty when it cannot be read.
+   * A name holding a control character is left out, since no one could type it.
    */
   function read(dir: string): PathEntry[] {
     const hit = cache.get(dir);
@@ -176,7 +177,7 @@ export function pathDefinition(options: PathOptions): PromptDefinition<string> {
     try {
       entries = readdirSync(dir, { withFileTypes: true })
         .map((dirent) => entryOf(dirent, dir))
-        .filter((entry): entry is PathEntry => !isUndefined(entry));
+        .filter((entry): entry is PathEntry => !isUndefined(entry) && isPrintable(entry.name));
     } catch {
       entries = [];
     }

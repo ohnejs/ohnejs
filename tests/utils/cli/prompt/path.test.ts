@@ -19,6 +19,9 @@ before(() => {
   writeFileSync(joinPath(root, 'src', 'util.js'), '');
   writeFileSync(joinPath(root, 'readme.md'), '');
   writeFileSync(joinPath(root, '.hidden'), '');
+  writeFileSync(joinPath(root, 'docs', 'ok.md'), '');
+  writeFileSync(joinPath(root, 'docs', 'a\x1b[2Jb.md'), '');
+  writeFileSync(joinPath(root, 'docs', 'c\u009bd.md'), '');
 });
 
 after(() => {
@@ -60,6 +63,13 @@ describe('createPrompt().path', () => {
   it('moves the highlight with the arrows and fills it with Tab', async () => {
     const { result } = await runPath(['\x1b[B', '\t', '\r']);
     strictEqual(result, joinPath(root, 'src'));
+  });
+
+  it('never offers a name holding a control character', async () => {
+    const frame = (await runPath([...'docs/', '\x03'])).out.join('');
+    strictEqual(frame.includes('ok.md'), true);
+    strictEqual(frame.includes('a\x1b[2Jb'), false);
+    strictEqual(frame.includes('c\u009bd'), false);
   });
 
   it('restricts file completions to the given extensions', async () => {

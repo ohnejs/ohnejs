@@ -1,4 +1,5 @@
 import { codeSpan } from '../ansi/code-span.ts';
+import { escapeControls } from '../ansi/escape-controls.ts';
 import { clamp } from '../number/clamp.ts';
 
 /**
@@ -73,6 +74,7 @@ export class MessageFormatError extends Error {
 
 /**
  * Resolves an offset, clamped into the template, to its 1-indexed line and column, source line, and caret.
+ * The source line spells out its control characters, and the caret counts their escapes.
  */
 function locate(
   template: string,
@@ -92,8 +94,8 @@ function locate(
   const column = clamped - lineStart + 1;
   const nl = template.indexOf('\n', lineStart);
   const lineEnd = nl === -1 ? template.length : nl;
-  const source = template.slice(lineStart, lineEnd);
-  const caret = ' '.repeat(column - 1) + '^';
+  const source = escapeControls(template.slice(lineStart, lineEnd));
+  const caret = ' '.repeat(escapeControls(template.slice(lineStart, clamped)).length) + '^';
 
   return { line, column, source, caret };
 }

@@ -25,11 +25,24 @@ describe('codeSpan', () => {
       '',
       ' ',
       'a b.txt',
-      'Hi }\r',
     ]) {
       strictEqual(
         applyANSIMarkup(`- ${codeSpan(value)} __in 3ms__`, false, plain),
         `- ${value} in 3ms`,
+      );
+    }
+  });
+
+  it('spells out control characters, so the span stays one line the terminal only shows', () => {
+    for (const [value, shown] of [
+      ['Hi }\r', 'Hi }\\r'],
+      ['a\nb', 'a\\nb'],
+      ['\x1b[2J`x`', '\\x1B[2J`x`'],
+      ['c1-\u009b2K', 'c1-\\x9B2K'],
+    ] as const) {
+      strictEqual(
+        applyANSIMarkup(`- ${codeSpan(value)} __in 3ms__`, false, plain),
+        `- ${shown} in 3ms`,
       );
     }
   });
