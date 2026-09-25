@@ -27,9 +27,8 @@ Whatever a boot file registers is in place for everything that follows. If a boo
 startup stops before anything serves.
 
 They run under [`ohne serve api`](./cli.md#ohne-serve), [`ohne dev`](./cli.md#ohne-dev) (again on
-every reload), [`ohne sync`](./cli.md#ohne-sync), which needs any dialect a boot file registers,
-and before every [command](./commands.md#what-run-can-use) of your own. The dashboard server does
-not run them.
+every reload), [`ohne sync`](./cli.md#ohne-sync), and before every
+[command](./commands.md#what-run-can-use) of your own. The dashboard server does not run them.
 
 ## Ordering
 

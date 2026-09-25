@@ -47,7 +47,8 @@ npm create ohne my-app -- --yes --git
 ```
 
 - `--yes` (`-y`) skips the prompts and the install, taking the defaults.
-- `--name` sets the package name instead of the directory name.
+- `--name` sets the package name. Without it, the name comes from the directory, made into a valid
+  npm package name when it is not one: `My App` becomes `my-app`.
 - `--pm` sets the package manager, `npm` or `pnpm`. Without it, the default is npm when npm runs
   the scaffold, and pnpm otherwise.
 - `--git` initializes a git repository.
