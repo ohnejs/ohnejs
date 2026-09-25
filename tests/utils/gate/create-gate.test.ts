@@ -129,6 +129,46 @@ describe('createGate', () => {
     }
   });
 
+  it('settled resolves at once when nothing is in flight', async () => {
+    const gate = createGate();
+    await gate.settled();
+    strictEqual(gate.state, 'open');
+  });
+
+  it('settled waits past a timed-out close until the late release', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const gate = createGate();
+      const late = gate.enter()!;
+
+      const closing = gate.close({ timeout: 1000 });
+      let settled = false;
+      const idle = gate.settled().then(() => (settled = true));
+      mock.timers.tick(1000);
+      deepStrictEqual(await closing, { drained: false, pending: 1 });
+      strictEqual(settled, false);
+
+      late();
+      await idle;
+      strictEqual(settled, true);
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  it('settled resolves with a clean drain', async () => {
+    const gate = createGate();
+    const release = gate.enter()!;
+
+    const closing = gate.close();
+    const idle = gate.settled();
+    release();
+
+    deepStrictEqual(await closing, { drained: true, pending: 0 });
+    await idle;
+    strictEqual(gate.pending, 0);
+  });
+
   it('close is idempotent, later calls share the first promise', async () => {
     const gate = createGate();
     const release = gate.enter()!;
@@ -139,5 +179,42 @@ describe('createGate', () => {
 
     release();
     deepStrictEqual(await first, { drained: true, pending: 0 });
+  });
+
+  it('cancel asks every unit in flight to stop, with the reason', () => {
+    const gate = createGate();
+    const heard: [string, unknown][] = [];
+    gate.enter((reason) => heard.push(['Thrall', reason]));
+    gate.enter((reason) => heard.push(['Jaina', reason]));
+    gate.enter();
+    const reason = new Error('shutting down');
+    gate.cancel(reason);
+    deepStrictEqual(heard, [
+      ['Thrall', reason],
+      ['Jaina', reason],
+    ]);
+    strictEqual(gate.pending, 3);
+  });
+
+  it('cancel skips a unit that already released', () => {
+    const gate = createGate();
+    let cancelled = 0;
+    const release = gate.enter(() => cancelled++)!;
+    release();
+    gate.cancel();
+    strictEqual(cancelled, 0);
+  });
+
+  it('keeps two units apart when they pass the same onCancel', () => {
+    const gate = createGate();
+    let cancelled = 0;
+    const onCancel = (): void => void cancelled++;
+    const release = gate.enter(onCancel)!;
+    gate.enter(onCancel);
+    release();
+    release();
+    strictEqual(gate.pending, 1);
+    gate.cancel();
+    strictEqual(cancelled, 1);
   });
 });

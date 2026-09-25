@@ -1,3 +1,4 @@
+import { percentDecode } from '../uri/percent-decode.ts';
 import { coerceToken, type SearchParamValue } from './coerce-token.ts';
 
 export type { SearchParamValue } from './coerce-token.ts';
@@ -42,11 +43,7 @@ function assign(
  * URI-decodes a string, returning it unchanged when a percent-sequence is malformed.
  */
 function decode(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
+  return percentDecode(raw) ?? raw;
 }
 
 /**

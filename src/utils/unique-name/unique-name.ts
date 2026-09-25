@@ -1,5 +1,7 @@
 import { isSet } from '../is/is-set.ts';
 
+const SUFFIXED = /^(.+)-(\d{1,15})$/;
+
 /**
  * Returns `base` if it is not in `taken`; otherwise appends `-2`, `-3`, ... until a free name is found.
  * Does not mutate `taken`.
@@ -7,6 +9,7 @@ import { isSet } from '../is/is-set.ts';
  *
  * If `base` already ends with `-N`, the suffix is peeled and incremented.
  * This avoids `foo-2-2`-style chains across calls.
+ * A suffix past 15 digits is too long to count on exactly, so it stays and `-2` follows it.
  *
  * Pass a `Set` for O(1) membership checks, or any read-only array for ergonomics.
  *
@@ -29,7 +32,7 @@ export function uniqueName(base: string, taken: ReadonlySet<string> | readonly s
 
   let root = base;
   let suffix = 2;
-  const match = /^(.+)-(\d+)$/.exec(base);
+  const match = SUFFIXED.exec(base);
   if (match) {
     root = match[1]!;
     suffix = parseInt(match[2]!, 10) + 1;

@@ -60,6 +60,21 @@ describe('uniqueName', () => {
     it('does not peel non-numeric trailing segments', () => {
       strictEqual(uniqueName('foo-bar', new Set(['foo-bar'])), 'foo-bar-2');
     });
+
+    it('counts on from a suffix of 15 digits', () => {
+      const thrall = 'thrall-999999999999999';
+      strictEqual(uniqueName(thrall, [thrall]), 'thrall-1000000000000000');
+    });
+
+    it('keeps a longer suffix and appends to it, never printing an exponent', () => {
+      const jaina = 'jaina-1234567890123456789012';
+      strictEqual(uniqueName(jaina, [jaina]), `${jaina}-2`);
+    });
+
+    it('keeps a suffix past 2^53 and appends to it, never looping forever', () => {
+      const arthas = 'arthas-9007199254740992';
+      strictEqual(uniqueName(arthas, [arthas, `${arthas}-2`]), `${arthas}-3`);
+    });
   });
 
   it('throws on empty base', () => {

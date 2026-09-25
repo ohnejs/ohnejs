@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
@@ -32,6 +32,22 @@ describe('createCIDRMatcher', () => {
     const trusted = createCIDRMatcher([]);
     strictEqual(trusted('127.0.0.1'), false);
     strictEqual(trusted('::1'), false);
+  });
+
+  it('throws on a prefix that is not plain decimal digits, never reading it as /0', () => {
+    for (const cidr of [
+      '10.0.0.0/',
+      '10.0.0.0/ ',
+      '10.0.0.0/ 8',
+      '10.0.0.0/0x8',
+      '10.0.0.0/+8',
+      'fd00::/8.0',
+    ]) {
+      throws(
+        () => createCIDRMatcher([cidr]),
+        (error: Error) => error.message === `Invalid CIDR prefix in \`${cidr}\``,
+      );
+    }
   });
 
   it('rejects a malformed address', () => {

@@ -31,6 +31,7 @@ export interface GateCloseOptions {
 
 /**
  * A drain primitive: admit work while open, refuse while closing, wait for in-flight work to finish.
+ * Work a drain cannot wait out can be cancelled.
  *
  * It carries no domain knowledge - HTTP holds a ticket per request, a job queue holds one per job.
  */
@@ -39,8 +40,22 @@ export interface Gate {
    * Admits one unit of work while open, returning a release fn to call when it finishes.
    * Returns `null` the moment the gate is closing or closed, so the caller refuses the new unit.
    * The release fn is idempotent: a second call is a no-op.
+   * `onCancel` is how `cancel` asks this unit to stop while it is in flight.
    */
-  enter(): (() => void) | null;
+  enter(onCancel?: (reason: unknown) => void): (() => void) | null;
+
+  /**
+   * Asks every unit still in flight to stop, calling the `onCancel` each passed to `enter` with `reason`.
+   * A cancelled unit stays in flight until it releases, so await `settled` for it.
+   *
+   * @example
+   * ```ts
+   * const { drained } = await gate.close({ timeout: '10s' })
+   * if (!drained) gate.cancel(new Error('shutting down')) // -> each unit's onCancel runs
+   * await gate.settled()                                  // -> resolves once they release
+   * ```
+   */
+  cancel(reason?: unknown): void;
 
   /**
    * Flips the gate to `closing` and waits for in-flight work to drain.
@@ -51,7 +66,19 @@ export interface Gate {
   close(options?: GateCloseOptions): Promise<GateDrain>;
 
   /**
-   * `'open'` while admitting, `'closing'` once `close` is awaiting the drain, `'closed'` once settled.
+   * Resolves once no unit is in flight, at once when none is.
+   * It outlives a timed-out `close`, still waiting for the units the timeout left in flight.
+   *
+   * @example
+   * ```ts
+   * const { drained } = await gate.close({ timeout: '10s' })
+   * if (!drained) await gate.settled() // -> resolves once the stragglers release
+   * ```
+   */
+  settled(): Promise<void>;
+
+  /**
+   * `'open'` while admitting, `'closing'` once `close` is awaiting the drain, `'closed'` once it resolved.
    */
   readonly state: 'open' | 'closing' | 'closed';
 
@@ -77,54 +104,62 @@ export interface Gate {
  */
 export function createGate(): Gate {
   let state: 'open' | 'closing' | 'closed' = 'open';
-  let pending = 0;
+  const units = new Set<{ onCancel?: (reason: unknown) => void }>();
   let closePromise: Promise<GateDrain> | undefined;
   let onDrained: (() => void) | undefined;
+  let idle: PromiseWithResolvers<void> | undefined;
 
   const settle = () => {
-    if (state === 'closing' && pending === 0) {
+    if (units.size > 0) return;
+    idle?.resolve();
+    idle = undefined;
+    if (state === 'closing') {
       state = 'closed';
       onDrained?.();
     }
   };
 
   return {
-    enter() {
+    enter(onCancel) {
       if (state !== 'open') return null;
-      pending++;
-      let released = false;
+      const unit = { onCancel };
+      units.add(unit);
       return () => {
-        if (released) return;
-        released = true;
-        pending--;
-        settle();
+        if (units.delete(unit)) settle();
       };
+    },
+    cancel(reason) {
+      for (const unit of units) unit.onCancel?.(reason);
     },
     close(options) {
       if (closePromise) return closePromise;
       state = 'closing';
-      if (pending === 0) {
+      if (units.size === 0) {
         state = 'closed';
         return (closePromise = Promise.resolve({ drained: true, pending: 0 }));
       }
       return (closePromise = new Promise((resolve) => {
-        const cancel = isUndefined(options?.timeout)
+        const clearTimer = isUndefined(options?.timeout)
           ? undefined
           : longTimeout(() => {
               state = 'closed';
-              resolve({ drained: false, pending });
+              resolve({ drained: false, pending: units.size });
             }, parseDuration(options.timeout));
         onDrained = () => {
-          cancel?.();
+          clearTimer?.();
           resolve({ drained: true, pending: 0 });
         };
       }));
+    },
+    settled() {
+      if (units.size === 0) return Promise.resolve();
+      return (idle ??= Promise.withResolvers<void>()).promise;
     },
     get state() {
       return state;
     },
     get pending() {
-      return pending;
+      return units.size;
     },
   };
 }

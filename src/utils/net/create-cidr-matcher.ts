@@ -2,6 +2,8 @@ import { BlockList, isIP, isIPv6 } from 'node:net';
 
 import { unmapIP } from './unmap-ip.ts';
 
+const PREFIX = /^\d{1,3}$/;
+
 /**
  * Builds a predicate that tests whether an IP falls in any of the given CIDR ranges.
  *
@@ -10,6 +12,7 @@ import { unmapIP } from './unmap-ip.ts';
  * An IPv4-mapped IPv6 address (`'::ffff:127.0.0.1'`) is normalized to its IPv4 form before testing.
  * That lets it match an IPv4 range.
  * An empty list matches nothing; a malformed address tests as `false`.
+ * An entry whose prefix is not plain decimal digits throws, since `Number('')` would read it as `/0`.
  *
  * @example
  * ```ts
@@ -31,7 +34,9 @@ export function createCIDRMatcher(cidrs: string[]): (ip: string) => boolean {
       list.addAddress(cidr, isIPv6(cidr) ? 'ipv6' : 'ipv4');
     } else {
       const address = cidr.slice(0, slash);
-      list.addSubnet(address, Number(cidr.slice(slash + 1)), isIPv6(address) ? 'ipv6' : 'ipv4');
+      const prefix = cidr.slice(slash + 1);
+      if (!PREFIX.test(prefix)) throw new Error(`Invalid CIDR prefix in \`${cidr}\``);
+      list.addSubnet(address, Number(prefix), isIPv6(address) ? 'ipv6' : 'ipv4');
     }
   }
 

@@ -39,6 +39,13 @@ describe('parseMediaType', () => {
     });
   });
 
+  it('unwraps a quoted value that whitespace around the `=` sets apart', () => {
+    deepStrictEqual(parseMediaType('text/plain; charset= "utf-8"; format =\t"flowed"'), {
+      type: 'text/plain',
+      parameters: { charset: 'utf-8', format: 'flowed' },
+    });
+  });
+
   it('reads multiple parameters', () => {
     deepStrictEqual(parseMediaType('text/plain; charset=utf-8; format=flowed'), {
       type: 'text/plain',

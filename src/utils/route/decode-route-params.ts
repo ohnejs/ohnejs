@@ -1,5 +1,7 @@
 import type { RouteParams } from './compile-route.ts';
 
+import { percentDecode } from '../uri/percent-decode.ts';
+
 /**
  * URI-decodes each captured route param, leaving a malformed percent-sequence as its raw value.
  * `compileRoute` returns raw matched substrings, so a consumer decodes them through this.
@@ -15,18 +17,7 @@ export function decodeRouteParams(params: RouteParams): RouteParams {
   const out: RouteParams = {};
   for (const key in params) {
     const value = params[key];
-    out[key] = value.includes('%') ? safeDecode(value) : value;
+    out[key] = value.includes('%') ? (percentDecode(value) ?? value) : value;
   }
   return out;
-}
-
-/**
- * URI-decodes a string, returning it unchanged when a percent-sequence is malformed.
- */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }

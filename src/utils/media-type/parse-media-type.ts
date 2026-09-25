@@ -21,6 +21,7 @@ function readParameters(input: string, out: Record<string, string>): void {
     if (input[i] !== '=') continue;
     i++;
     if (name === '') continue;
+    while (input[i] === ' ' || input[i] === '\t') i++;
 
     let value: string;
     if (input[i] === '"') {
@@ -65,6 +66,7 @@ export interface MediaType {
  * The essence and parameter names are lowercased; parameter values are kept as written.
  *
  * Quoted-string values are unwrapped, honoring backslash escapes, so a `;` inside quotes is preserved.
+ * Whitespace around `=` is tolerated: RFC 9110 allows none, but RFC 6266 does.
  * The first occurrence of a parameter name wins; later duplicates are ignored.
  * Untrusted input never throws, and a `__proto__` parameter lands as an own property.
  *

@@ -1,3 +1,5 @@
+import { percentDecode } from '../uri/percent-decode.ts';
+
 /**
  * Defines `key` as an own enumerable property, so a `__proto__` key cannot reach the prototype.
  */
@@ -6,19 +8,8 @@ function assign(out: Record<string, string>, key: string, value: string): void {
 }
 
 /**
- * Percent-decodes `raw`, or returns it unchanged when its escapes are malformed.
- */
-function decode(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
-/**
  * Parses a `Cookie` request header into a map of name to value.
- * Names are trimmed; values are `decodeURIComponent`-decoded with a raw fallback.
+ * Names are trimmed; values are percent-decoded as UTF-8, kept raw when that fails.
  * A single pair of surrounding double quotes is stripped.
  *
  * The first occurrence of a name wins; later duplicates are ignored.
@@ -46,7 +37,7 @@ export function parseCookies(header: string): Record<string, string> {
     let value = pair.slice(eq + 1).trim();
     if (value.length >= 2 && value.startsWith('"') && value.endsWith('"'))
       value = value.slice(1, -1);
-    assign(out, name, decode(value));
+    assign(out, name, percentDecode(value) ?? value);
   }
   return out;
 }
