@@ -220,7 +220,7 @@ export { timeRange } from './ui/time-range.ts';
 export type { TimeRangeOptions } from './ui/time-range.ts';
 export { time } from './ui/time.ts';
 export type { TimeLabels, TimeOptions } from './ui/time.ts';
-export { queueToast, toast, toaster } from './ui/toaster.ts';
+export { dismissToast, queueToast, toast, toaster } from './ui/toaster.ts';
 export type { ToastAction, ToastOptions } from './ui/toaster.ts';
 export { attachTooltip } from './ui/tooltip.ts';
 export type { TooltipOptions } from './ui/tooltip.ts';

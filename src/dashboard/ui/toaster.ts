@@ -93,6 +93,7 @@ export interface ToastOptions {
   /**
    * The toast id.
    * Calling `toast` again with the id of a showing toast updates it in place.
+   * A toast already on its way out comes back, so the update always shows.
    * Omitted generates one.
    */
   id?: string | number;
@@ -129,6 +130,7 @@ const REMOVE_DELAY = 200;
 const SWIPE_THRESHOLD = 20;
 
 const toasts = ref<ToastRecord[]>([]);
+const dismissers = new Map<string | number, () => void>();
 const heights = ref<{ toastId: string | number; height: number }[]>([]);
 const queue = ref<{ message: string; options?: ToastOptions }[]>([]);
 
@@ -726,6 +728,24 @@ export function toast(message: string, options: ToastOptions = {}): string | num
 }
 
 /**
+ * Dismisses the toast `id` as its close button does, without calling its `onDismiss`.
+ * An id no toast carries is ignored.
+ *
+ * @example
+ * ```ts
+ * const id = toast('Upload failed', { type: 'error' })
+ * dismissToast(id)
+ * ```
+ */
+export function dismissToast(id: string | number): void {
+  const dismiss = dismissers.get(id);
+  if (!isUndefined(dismiss)) dismiss();
+  else if (toasts.value.some((entry) => entry.id === id)) {
+    toasts.value = toasts.value.filter((entry) => entry.id !== id);
+  }
+}
+
+/**
  * Queues a toast notification for the `toaster` to drain.
  * Use it when the toaster is not mounted yet, or when a toast must survive an imminent navigation.
  * The queue flushes on mount and on every route change; `showAfterRouteChange` holds until the latter.
@@ -786,14 +806,19 @@ function createToaster(): HTMLElement {
       return at * GAP + before || 0;
     };
 
+    let removal: ReturnType<typeof setTimeout> | undefined;
+
     const deleteToast = (): void => {
+      if (untracked(() => removed.value)) return;
       removed.value = true;
       offsetBeforeRemove = untracked(offset);
       heights.value = heights.value.filter((entry) => entry.toastId !== id);
-      setTimeout(() => {
+      removal = setTimeout(() => {
         toasts.value = toasts.value.filter((entry) => entry.id !== id);
       }, REMOVE_DELAY);
     };
+    dismissers.set(id, deleteToast);
+    onCleanup(() => dismissers.delete(id));
 
     let remaining = record.duration;
     let startedAt = 0;
@@ -801,9 +826,9 @@ function createToaster(): HTMLElement {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     effect(() => {
-      if (record.duration === Infinity) return;
-      const paused = expanded.value || interacting.value;
       clearTimeout(timer);
+      if (removed.value || remaining === Infinity) return;
+      const paused = expanded.value || interacting.value;
       if (paused) {
         if (pausedAt < startedAt) remaining -= Date.now() - startedAt;
         pausedAt = Date.now();
@@ -816,6 +841,23 @@ function createToaster(): HTMLElement {
       }
     });
     onCleanup(() => clearTimeout(timer));
+
+    effect(() => {
+      void item();
+      untracked(() => {
+        if (!removed.value) return;
+        clearTimeout(removal);
+        remaining = item().duration;
+        startedAt = 0;
+        pausedAt = 0;
+        swiping.value = false;
+        swipeOut.value = false;
+        swipeAmount.value = '0px';
+        // Back at the front, where its height re-enters the stack.
+        toasts.value = [item(), ...toasts.value.filter((entry) => entry.id !== id)];
+        removed.value = false;
+      });
+    });
 
     const li = h(
       'li',
@@ -949,7 +991,7 @@ function createToaster(): HTMLElement {
 
     effect(() => {
       void item();
-      if (!mounted.value || untracked(() => removed.value)) return;
+      if (!mounted.value || removed.value) return;
       untracked(() => {
         const inline = li.style.height;
         li.style.height = 'auto';
