@@ -658,5 +658,44 @@ describe('SQLiteDialect', () => {
       ok(await dialect.acquireLock(db, 'sync'));
       await db.close();
     });
+
+    it("renewLock moves the holder's acquiredAt to now and leaves a rival's row alone", async (t) => {
+      const db = await open();
+      const handle = await dialect.acquireLock(db, 'sync');
+      ok(handle);
+      const renewed = [nullObj({ acquiredAt: 5_000 })];
+      t.mock.timers.enable({ apis: ['Date'], now: 5_000 });
+      await dialect.renewLock(db, handle);
+      deepStrictEqual(await db.query('SELECT "acquiredAt" FROM "ohne_locks"'), renewed);
+      t.mock.timers.tick(1_000);
+      await dialect.renewLock(db, { key: 'sync', nonce: 'wrong' });
+      deepStrictEqual(await db.query('SELECT "acquiredAt" FROM "ohne_locks"'), renewed);
+      await db.close();
+    });
+
+    it('releaseAbandonedLock frees an absent or abandoned key and keeps a live one', async () => {
+      const db = await open();
+      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
+      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 50), true);
+      ok(await dialect.acquireLock(db, 'sync'));
+      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 10_000), false);
+      strictEqual(await dialect.acquireLock(db, 'sync'), null);
+      await db.run('UPDATE "ohne_locks" SET "acquiredAt" = ?', [Date.now() - 10_000]);
+      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 50), true);
+      deepStrictEqual(await db.query('SELECT * FROM "ohne_locks"'), []);
+      await db.close();
+    });
+
+    it('ensures the lock table once per adapter', async (t) => {
+      const db = await open();
+      const exec = t.mock.method(db, 'exec');
+      const handle = await dialect.acquireLock(db, 'sync');
+      ok(handle);
+      strictEqual(await dialect.acquireLock(db, 'sync'), null);
+      await dialect.releaseLock(db, handle);
+      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
+      strictEqual(exec.mock.callCount(), 1);
+      await db.close();
+    });
   });
 });

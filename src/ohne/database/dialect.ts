@@ -80,7 +80,7 @@ export interface LockTiming {
   pollInterval: number;
 
   /**
-   * Milliseconds after which a held lock counts as abandoned and may be taken over.
+   * Milliseconds without a renewal after which a held lock counts as abandoned and may be taken over.
    */
   staleAfter: number;
 }
@@ -99,6 +99,8 @@ export interface SchemaTransactionOptions {
   commit?: boolean;
 }
 
+const lockTables = new WeakSet<DatabaseAdapter>();
+
 /**
  * A database dialect: the single place a driver and its SQL live.
  *
@@ -107,8 +109,8 @@ export interface SchemaTransactionOptions {
  * Abstract members are the completeness contract: a dialect that cannot satisfy one cannot compile.
  *
  * Register an instance under a name with `useDialects`; `database.dialect` selects it.
- * The base `acquireLock`/`releaseLock` implement a portable cluster lock over an `ohne_locks` table.
- * A dialect with a native lock, like Postgres advisory locks, overrides them.
+ * The base lock methods implement a portable cluster lock over an `ohne_locks` table, renewed while held.
+ * A dialect with a native lock, like Postgres advisory locks, overrides each of them.
  */
 export abstract class Dialect {
   /**
@@ -352,11 +354,26 @@ export abstract class Dialect {
   }
 
   /**
+   * Marks the lock `handle` holds as alive, moving its `acquiredAt` to now, so no waiter takes it over.
+   * A lock another holder took over is left alone, since the nonce no longer matches.
+   *
+   * @example
+   * ```ts
+   * await dialect.renewLock(db, handle)
+   * ```
+   */
+  async renewLock(db: DatabaseAdapter, handle: LockHandle): Promise<void> {
+    await db.run(
+      `UPDATE ${this.quote(OHNE_LOCKS)} SET ${this.quote('acquiredAt')} = ? ` +
+        `WHERE ${this.quote('key')} = ? AND ${this.quote('nonce')} = ?`,
+      [Date.now(), handle.key, handle.nonce],
+    );
+  }
+
+  /**
    * Waits while another holder keeps `key`, resolving when a new acquisition attempt is worthwhile.
-   * The base implementation polls the `ohne_locks` row and steals it once older than `staleAfter`.
-   * The steal deletes by key, nonce, and timestamp, so two stealers cannot both remove one row.
-   * A rotated nonce or timestamp is a new holder and the poll continues against it.
-   * A dialect with a natively blocking lock overrides this together with `acquireLock` and `releaseLock`.
+   * The base implementation polls, freeing an abandoned lock through `releaseAbandonedLock`.
+   * A dialect with a natively blocking lock overrides this together with every other lock method.
    *
    * @example
    * ```ts
@@ -365,36 +382,57 @@ export abstract class Dialect {
    */
   async waitForLock(db: DatabaseAdapter, key: string, timing: LockTiming): Promise<void> {
     await this.ensureLockTable(db);
-    while (true) {
-      const row = await db.queryOne<{ nonce: string; acquiredAt: number }>(
-        `SELECT ${this.quote('nonce')}, ${this.quote('acquiredAt')} ` +
-          `FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ?`,
-        [key],
-      );
-      if (isUndefined(row)) return;
-      if (Date.now() - row.acquiredAt > timing.staleAfter) {
-        await db.run(
-          `DELETE FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ? ` +
-            `AND ${this.quote('nonce')} = ? AND ${this.quote('acquiredAt')} = ?`,
-          [key, row.nonce, row.acquiredAt],
-        );
-        return;
-      }
+    while (!(await this.releaseAbandonedLock(db, key, timing.staleAfter))) {
       await sleep(timing.pollInterval);
     }
   }
 
   /**
+   * Deletes the lock `key` once it went `staleAfter` without a renewal, resolving whether `key` is free.
+   * A key nobody holds is free, and one a live holder renewed is not.
+   * The delete matches key, nonce, and timestamp, so a renewal or a rival's takeover in between wins.
+   * Expects the lock table, which `acquireLock` and `waitForLock` ensure.
+   *
+   * @example
+   * ```ts
+   * await dialect.releaseAbandonedLock(db, 'sync', 60_000)
+   * // -> true once the key is free
+   * ```
+   */
+  async releaseAbandonedLock(
+    db: DatabaseAdapter,
+    key: string,
+    staleAfter: number,
+  ): Promise<boolean> {
+    const row = await db.queryOne<{ nonce: string; acquiredAt: number }>(
+      `SELECT ${this.quote('nonce')}, ${this.quote('acquiredAt')} ` +
+        `FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ?`,
+      [key],
+    );
+    if (isUndefined(row)) return true;
+    if (Date.now() - row.acquiredAt <= staleAfter) return false;
+    const { changes } = await db.run(
+      `DELETE FROM ${this.quote(OHNE_LOCKS)} WHERE ${this.quote('key')} = ? ` +
+        `AND ${this.quote('nonce')} = ? AND ${this.quote('acquiredAt')} = ?`,
+      [key, row.nonce, row.acquiredAt],
+    );
+    return changes === 1;
+  }
+
+  /**
    * Ensures the `ohne_locks` table exists, tolerating a concurrent create.
    * Both the race and the wait ensure it, since a busy-classified lost race can poll first.
+   * It runs once per adapter, since DDL on every bid would flush a driver's statement cache.
    */
   protected async ensureLockTable(db: DatabaseAdapter): Promise<void> {
+    if (lockTables.has(db)) return;
     await db.exec(
       `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_LOCKS)} (` +
         `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
         `${this.quote('nonce')} ${this.columnType('text')} NOT NULL, ` +
         `${this.quote('acquiredAt')} ${this.columnType('integer')} NOT NULL)`,
     );
+    lockTables.add(db);
   }
 
   /**

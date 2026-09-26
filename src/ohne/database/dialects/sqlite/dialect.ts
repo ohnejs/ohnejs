@@ -47,7 +47,7 @@ const SQLITE_LOCKED = 6;
  *
  * Its directory is the only place in ohne that imports a database driver.
  * Everything else speaks `DatabaseAdapter` and `Dialect`.
- * The base `acquireLock`/`releaseLock` carry over unchanged.
+ * The base lock methods carry over unchanged.
  * They run their portable SQL through this dialect's `quote` and `columnType`.
  */
 export class SQLiteDialect extends Dialect {
