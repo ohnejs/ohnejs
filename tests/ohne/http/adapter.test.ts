@@ -1,9 +1,10 @@
 import type { AddressInfo } from 'node:net';
 
-import { ok, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { describe, it } from 'node:test';
+import { setImmediate } from 'node:timers/promises';
 
 import {
   clientIP,
@@ -147,6 +148,23 @@ describe('toRequest', () => {
       async (base) => {
         const res = await fetch(base, { method: 'POST', body: 'Sylvanas' });
         strictEqual(await res.text(), 'true Sylvanas');
+      },
+    );
+  });
+
+  it('runs `onFirstRead` once, when the metered body is first read', async () => {
+    await withServer(
+      async (req, res) => {
+        let reads = 0;
+        const request = toRequest(req, { maxBodySize: 64, onFirstRead: () => reads++ });
+        await setImmediate();
+        const before = reads;
+        const text = await request.text();
+        await sendResponse(res, Response.json({ before, after: reads, text }));
+      },
+      async (base) => {
+        const res = await fetch(base, { method: 'POST', body: 'Varian' });
+        deepStrictEqual(await res.json(), { before: 0, after: 1, text: 'Varian' });
       },
     );
   });

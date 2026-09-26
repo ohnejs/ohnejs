@@ -3,7 +3,14 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { first, isArray, isNull, isUndefined, limitStream } from '../../utils/index.ts';
+import {
+  first,
+  isArray,
+  isNull,
+  isUndefined,
+  limitStream,
+  onFirstRead,
+} from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
@@ -52,6 +59,12 @@ export interface ToRequestOptions {
    * Omitted, the request's `signal` never aborts.
    */
   signal?: AbortSignal;
+
+  /**
+   * Runs once, when the body is first read, never for a body nobody reads.
+   * The transport passes one that sends `100 Continue` to a client waiting for it before sending the body.
+   */
+  onFirstRead?: () => void;
 }
 
 /**
@@ -84,6 +97,8 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
  * The `Content-Length` pre-check lives in `dispatch`, so a policy middleware's headers reach the `413`.
  *
+ * An `onFirstRead` runs once, when the body is first read, so the transport sends `100 Continue` only then.
+ *
  * The request's `signal` follows `options.signal`, and aborting it leaves the body readable.
  */
 export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
@@ -103,6 +118,9 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
   let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
   if (!isNull(body) && !isUndefined(maxBodySize)) {
     body = limitStream(body, maxBodySize, payloadTooLarge);
+  }
+  if (!isNull(body) && !isUndefined(options.onFirstRead)) {
+    body = onFirstRead(body, options.onFirstRead);
   }
 
   return new Request(url, { method, headers, body, duplex: 'half', signal: options.signal });

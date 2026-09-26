@@ -1,4 +1,4 @@
-import type { IncomingHttpHeaders, Server, ServerResponse } from 'node:http';
+import type { IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
@@ -10,11 +10,14 @@ import type { AnyHandler, CreateServerOptions, Route } from '../../../src/ohne/i
 import type { Gate, HTTPMethod } from '../../../src/utils/index.ts';
 
 import {
+  conflict,
   cors,
   createRouter,
   createServer,
   defineHandler,
   hook,
+  readRawBody,
+  readTextBody,
   useEvent,
   useHooks,
   useMiddleware,
@@ -90,6 +93,33 @@ function optionsRequest(
     );
     req.on('error', reject);
     req.end();
+  });
+}
+
+/**
+ * Posts `body` with `Expect: 100-continue`, sending it only once the server answers `100 Continue`.
+ */
+function sendExpecting(
+  base: string,
+  path: string,
+  body: Uint8Array,
+): Promise<{ status: number; continued: boolean; connection?: string; text: string }> {
+  const { port } = new URL(base);
+  const headers = { expect: '100-continue', 'content-length': String(body.byteLength) };
+  return new Promise((resolve, reject) => {
+    let continued = false;
+    const req = request({ port, path, method: 'POST', headers }, async (res) => {
+      res.setEncoding('utf8');
+      const text = (await Array.fromAsync(res)).join('');
+      resolve({ status: res.statusCode ?? 0, continued, connection: res.headers.connection, text });
+      req.destroy();
+    });
+    req.on('continue', () => {
+      continued = true;
+      req.end(body);
+    });
+    req.on('error', reject);
+    req.flushHeaders();
   });
 }
 
@@ -450,6 +480,86 @@ describe('base path', () => {
       },
       { basePath: 'api/' },
     );
+  });
+});
+
+describe('Expect: 100-continue', () => {
+  it('sends 100 Continue once the handler reads the body, keeping the connection', async () => {
+    const route = makeRoute('POST', '/scroll', async () => ({
+      length: (await readRawBody())?.byteLength,
+    }));
+    await withServer([route], async (base) => {
+      const answer = await sendExpecting(base, '/scroll', new Uint8Array(65536));
+      strictEqual(answer.status, 200);
+      strictEqual(answer.continued, true);
+      strictEqual(answer.connection, 'keep-alive');
+      deepStrictEqual(JSON.parse(answer.text), { length: 65536 });
+    });
+  });
+
+  it('answers before 100 Continue when the handler refuses unread, closing the connection', async () => {
+    const route = makeRoute('POST', '/scroll', () => {
+      throw conflict();
+    });
+    await withServer([route], async (base) => {
+      const answer = await sendExpecting(base, '/scroll', new Uint8Array(65536));
+      strictEqual(answer.status, 409);
+      strictEqual(answer.continued, false);
+      strictEqual(answer.connection, 'close');
+    });
+  });
+
+  it('refuses an over-cap Content-Length with 413 before 100 Continue', async () => {
+    const route = makeRoute(
+      'POST',
+      '/scroll',
+      defineHandler(async () => readRawBody(), { maxBodySize: 10 }),
+    );
+    await withServer([route], async (base) => {
+      const answer = await sendExpecting(base, '/scroll', new Uint8Array(100));
+      strictEqual(answer.status, 413);
+      strictEqual(answer.continued, false);
+    });
+  });
+
+  it('reads a body first pulled after the head went out, with no 100 Continue', async () => {
+    const route = makeRoute('POST', '/scroll', () => {
+      const request = useRequest();
+      const echo = async function* (): AsyncGenerator<Uint8Array> {
+        yield new TextEncoder().encode('Khadgar ');
+        yield await request.bytes();
+      };
+      return new Response(ReadableStream.from(echo()));
+    });
+    await withServer([route], async (base) => {
+      const { port } = new URL(base);
+      const headers = { expect: '100-continue', 'content-length': '6' };
+      const req = request({ port, path: '/scroll', method: 'POST', headers });
+      let continued = false;
+      req.on('continue', () => (continued = true));
+      req.flushHeaders();
+      const [res] = (await once(req, 'response')) as [IncomingMessage];
+      req.end('Medivh');
+      res.setEncoding('utf8');
+      strictEqual((await Array.fromAsync(res)).join(''), 'Khadgar Medivh');
+      strictEqual(continued, false);
+    });
+  });
+
+  it('sends no 1xx to a request without Expect', async () => {
+    const route = makeRoute('POST', '/scroll', async () => readTextBody());
+    await withServer([route], async (base) => {
+      const { port } = new URL(base);
+      let informed = 0;
+      const req = request({ port, path: '/scroll', method: 'POST' });
+      req.on('information', () => informed++);
+      req.end('Medivh');
+      const [res] = (await once(req, 'response')) as [IncomingMessage];
+      res.setEncoding('utf8');
+      strictEqual((await Array.fromAsync(res)).join(''), 'Medivh');
+      strictEqual(res.statusCode, 200);
+      strictEqual(informed, 0);
+    });
   });
 });
 

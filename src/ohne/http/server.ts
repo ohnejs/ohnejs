@@ -223,6 +223,8 @@ export interface CreateServerOptions {
  * Each request's `signal` aborts when its client goes away before the response finished.
  * It also aborts when `shutdownServer` stops waiting for the request, its `waitUntil` work included.
  * `gate.cancel` aborts it too, even after the response; `shutdownServer` calls it once its drain times out.
+ * A client that sends `Expect: 100-continue` gets `100 Continue` only when the body is first read.
+ * An answer before that read costs it no upload, and the connection closes after it.
  * The transport limits in `options` are applied to the Node server; an omitted field keeps Node's default.
  *
  * The returned server is not listening; the caller starts it and wires shutdown.
@@ -254,10 +256,11 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
   if (!isUndefined(options.maxHeaderSize)) {
     httpOptions.maxHeaderSize = parseBytes(options.maxHeaderSize);
   }
-  const server = createNodeServer(
-    httpOptions,
-    (req, res) => void handle(router, gate, limits, trustProxy, allowedHosts, basePath, req, res),
-  );
+  const serve = (req: IncomingMessage, res: ServerResponse, onFirstRead?: () => void): void =>
+    void handle(router, gate, limits, trustProxy, allowedHosts, basePath, req, res, onFirstRead);
+  const server = createNodeServer(httpOptions, serve);
+  // Without this listener, Node sends 100 Continue before routing, so a body the route refuses is sent anyway.
+  server.on('checkContinue', (req, res) => serve(req, res, () => sendContinue(res)));
 
   if (!isUndefined(options.headersTimeout))
     server.headersTimeout = parseDuration(options.headersTimeout);
@@ -289,6 +292,7 @@ async function handle(
   basePath: string,
   req: IncomingMessage,
   res: ServerResponse,
+  onFirstRead?: () => void,
 ): Promise<void> {
   const controller = new AbortController();
   const release = gate.enter((reason) => controller.abort(reason));
@@ -327,7 +331,7 @@ async function handle(
     const overrides = match.type === 'matched' ? routeLimits(match.route.handler) : undefined;
     const maxBodySize = limit(overrides?.maxBodySize, limits.maxBodySize);
     abortOnDisconnect(res, controller);
-    const request = toRequest(req, { url, maxBodySize, signal: controller.signal });
+    const request = toRequest(req, { url, maxBodySize, signal: controller.signal, onFirstRead });
 
     if (match.type === 'matched' || match.type === 'options') {
       const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
@@ -372,6 +376,13 @@ function abortOnDisconnect(res: ServerResponse, controller: AbortController): vo
   res.once('close', () => {
     if (!res.writableFinished) controller.abort();
   });
+}
+
+/**
+ * Sends `100 Continue`, unless a final response already told the client to keep its body.
+ */
+function sendContinue(res: ServerResponse): void {
+  if (!res.headersSent) res.writeContinue();
 }
 
 /**
