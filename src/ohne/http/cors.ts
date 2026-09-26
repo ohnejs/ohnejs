@@ -3,6 +3,7 @@ import type { Middleware } from '../middleware/middleware.ts';
 import { isNull, isUndefined, toArray, vary } from '../../utils/index.ts';
 
 const DEFAULT_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'];
+const DEFAULT_MAX_AGE = 7200;
 
 /**
  * Origin policy and headers for a `cors` middleware.
@@ -45,8 +46,12 @@ export interface CORSOptions {
   exposeHeaders?: readonly string[];
 
   /**
-   * Seconds the browser may cache the preflight result, as `Access-Control-Max-Age`.
-   * Omitted, the header is not sent and the browser uses its own short default.
+   * Seconds the browser may cache a preflight result, as `Access-Control-Max-Age`.
+   * A cached preflight spares the next request to the same URL its `OPTIONS` round trip.
+   * Browsers cap it, Chrome at two hours, and `0` turns the cache off.
+   *
+   * @default
+   * 7200
    */
   maxAge?: number;
 }
@@ -88,7 +93,7 @@ export function cors(options: CORSOptions): Middleware {
   const methods = (options.methods ?? DEFAULT_METHODS).join(', ');
   const allowHeaders = options.allowHeaders?.join(', ');
   const exposeHeaders = options.exposeHeaders?.join(', ');
-  const { credentials, maxAge } = options;
+  const { credentials, maxAge = DEFAULT_MAX_AGE } = options;
 
   return (event) => {
     const { request, response } = event;
@@ -108,7 +113,7 @@ export function cors(options: CORSOptions): Middleware {
       const headers = allowHeaders ?? request.headers.get('access-control-request-headers');
       if (!isNull(headers) && headers !== '')
         response.headers.set('access-control-allow-headers', headers);
-      if (!isUndefined(maxAge)) response.headers.set('access-control-max-age', String(maxAge));
+      response.headers.set('access-control-max-age', String(maxAge));
       response.status = 204;
       return null;
     }

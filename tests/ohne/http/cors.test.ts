@@ -122,6 +122,22 @@ describe('cors', () => {
     strictEqual(e.response.headers.get('access-control-max-age'), '600');
   });
 
+  it('caches a preflight for two hours by default, and not at all with maxAge 0', () => {
+    const preflight = (): Event =>
+      event('OPTIONS', { origin: 'https://a.com', 'access-control-request-method': 'PATCH' });
+    const cached = preflight();
+    cors({ origin: 'https://a.com' })(cached);
+    strictEqual(cached.response.headers.get('access-control-max-age'), '7200');
+
+    const uncached = preflight();
+    cors({ origin: 'https://a.com', maxAge: 0 })(uncached);
+    strictEqual(uncached.response.headers.get('access-control-max-age'), '0');
+
+    const get = event('GET', { origin: 'https://a.com' });
+    cors({ origin: 'https://a.com' })(get);
+    strictEqual(get.response.headers.get('access-control-max-age'), null);
+  });
+
   it('treats an OPTIONS without Access-Control-Request-Method as a normal request', () => {
     const e = event('OPTIONS', { origin: 'https://a.com' });
     const result = cors({ origin: 'https://a.com' })(e);
