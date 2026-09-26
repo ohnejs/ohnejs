@@ -1,10 +1,12 @@
 import type { CacheControlOptions, LayerStrategies } from 'ohnejs/utils';
 
 import { ohneError, useConfig, useEnv } from 'ohnejs';
-import { parseBytes, parseDuration, withDefaults } from 'ohnejs/utils';
+import { formatBytes, parseBytes, parseDuration, withDefaults } from 'ohnejs/utils';
 import { createCIDRMatcher } from 'ohnejs/utils/net';
 
 import type { ImageTransforms } from './images/transforms.ts';
+
+import { PEEK_SIZE } from './uploads/_peek.ts';
 
 declare module 'ohnejs' {
   interface Config {
@@ -55,6 +57,19 @@ declare module 'ohnejs' {
       maxSVGSize?: number | string;
 
       /**
+       * The size of every chunk of a resumable upload but the last, as a `parseBytes` value.
+       * It is `64kb` or more, since the first chunk must hold the bytes a file's type is checked by.
+       * Keep it under the body limit of any proxy in front of the API.
+       * A file that fits one chunk goes up in one request.
+       * An open session keeps the size it was given.
+       * Lowering it ends an open session with a full chunk left, which the new cap refuses with `413`.
+       *
+       * @default
+       * '8mb'
+       */
+      chunkSize?: number | string;
+
+      /**
        * The media types that may be uploaded, or `'*'` for any.
        * A file's type comes from its extension and is verified against its bytes.
        *
@@ -93,6 +108,15 @@ declare module 'ohnejs' {
        * ```
        */
       privateMaxAge?: number | string;
+
+      /**
+       * How long a resumable upload has from its first request to completion, as a `parseDuration` value.
+       * A storage that expires unfinished writes on its own must outlive it.
+       *
+       * @default
+       * '1d'
+       */
+      sessionMaxAge?: number | string;
 
       /**
        * The image optimization service that answers signed variant URLs, and the variants it renders.
@@ -199,6 +223,11 @@ export interface ResolvedUploadsConfig {
   maxSVGSize: number | string;
 
   /**
+   * The size of every chunk of a resumable upload but the last, as a `parseBytes` value.
+   */
+  chunkSize: number | string;
+
+  /**
    * The media types that may be uploaded, or `'*'` for any.
    */
   types: '*' | string[];
@@ -217,6 +246,11 @@ export interface ResolvedUploadsConfig {
    * How long a private file's links stay valid, as a `parseDuration` value.
    */
   privateMaxAge: number | string;
+
+  /**
+   * How long a resumable upload has from its first request to completion, as a `parseDuration` value.
+   */
+  sessionMaxAge: number | string;
 
   /**
    * The image optimization service and the named variants it renders.
@@ -257,9 +291,11 @@ export const UPLOADS_DEFAULTS = {
   url: '.uploads',
   maxFileSize: '128mb',
   maxSVGSize: '2mb',
+  chunkSize: '8mb',
   types: '*',
   cache: { noCache: true },
   privateMaxAge: '1h',
+  sessionMaxAge: '1d',
   images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
   fetch: { allow: [], timeout: '2m' },
 } satisfies ResolvedUploadsConfig;
@@ -306,13 +342,25 @@ export function validateUploadsConfig(): void {
       });
     }
   }
-  const sizes = { maxFileSize: config.maxFileSize, maxSVGSize: config.maxSVGSize };
-  for (const [key, value] of Object.entries(sizes)) {
-    if (!parses(() => parseBytes(value))) {
-      throw invalidValue(key, value, 'It is a byte size, such as `2mb`, or a number of bytes.');
+  const { maxFileSize, maxSVGSize, chunkSize, privateMaxAge, sessionMaxAge } = config;
+  for (const [key, value] of Object.entries({ maxFileSize, maxSVGSize })) {
+    if (!parses(() => parseBytes(value) > 0)) {
+      throw invalidValue(
+        key,
+        value,
+        'It is a byte size above zero, such as `2mb`, or a number of bytes.',
+      );
     }
   }
-  const durations = { privateMaxAge: config.privateMaxAge, 'fetch.timeout': config.fetch.timeout };
+  if (!parses(() => parseBytes(chunkSize) >= PEEK_SIZE)) {
+    const min = formatBytes(PEEK_SIZE);
+    throw invalidValue(
+      'chunkSize',
+      chunkSize,
+      `It is a byte size of \`${min}\` or more, such as \`8mb\`, or a number of bytes.`,
+    );
+  }
+  const durations = { privateMaxAge, sessionMaxAge, 'fetch.timeout': config.fetch.timeout };
   for (const [key, value] of Object.entries(durations)) {
     if (!parses(() => parseDuration(value) > 0)) {
       throw invalidValue(

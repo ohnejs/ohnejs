@@ -5,7 +5,6 @@ import {
   extname,
   formatBytes,
   isUndefined,
-  mediaTypeMatches,
   mimeTypeFor,
   parseBytes,
   parseContentDisposition,
@@ -21,6 +20,7 @@ import type { UploadRecord } from './types.ts';
 
 import { useUploadsConfig } from '../config.ts';
 import { uploadsError } from './_errors.ts';
+import { assertTypeAllowed } from './_type.ts';
 import { canonicalName } from './path.ts';
 import { putUpload } from './put-upload.ts';
 
@@ -93,9 +93,7 @@ const SVG = 'image/svg+xml';
 export async function fetchUpload(input: FetchUploadInput): Promise<UploadRecord> {
   const config = useUploadsConfig();
   const type = knownType(input.name ?? '');
-  if (!isUndefined(type) && !mediaTypeMatches(type, config.types)) {
-    throw uploadsError('name', 'typeNotAllowed', { type });
-  }
+  if (!isUndefined(type)) assertTypeAllowed(type);
 
   const maxFileSize = parseBytes(config.maxFileSize);
   const maxBytes =

@@ -8,10 +8,12 @@ import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { drainJournal } from '../../../src/uploads/storage/journal.ts';
+import { createUploadSession } from '../../../src/uploads/uploads/create-upload-session.ts';
 import { deleteUpload } from '../../../src/uploads/uploads/delete-upload.ts';
 import { moveUpload } from '../../../src/uploads/uploads/move-upload.ts';
 import { pruneUploads } from '../../../src/uploads/uploads/prune-uploads.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
+import { sweepUploadSessions } from '../../../src/uploads/uploads/sweep-upload-sessions.ts';
 import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
 import { bytes, storage, stream } from '../_fixture.ts';
 
@@ -21,6 +23,26 @@ function put(directory: string, name: string): Promise<UploadRecord> {
 
 function within(prefix: string, paths: readonly string[]): string[] {
   return paths.filter((path) => path.startsWith(`${prefix}/`));
+}
+
+/**
+ * Opens an upload session for `name` under `sweep` that expired long ago, resolving its `UUID`.
+ * Opening one sweeps the sessions already expired, so a test opens its live sessions first.
+ */
+async function expiredSession(name: string): Promise<string> {
+  const { UUID } = await createUploadSession({ directory: 'sweep', name, size: 6 });
+  await queryUntyped('UploadsSessions')
+    .unscoped()
+    .where({ UUID })
+    .updateOrThrow({ expiresAt: 1_000 });
+  return UUID;
+}
+
+/**
+ * The `UUID` of every upload session row.
+ */
+function sessionUUIDs(): Promise<unknown[]> {
+  return queryUntyped('UploadsSessions').unscoped().pluck('UUID');
 }
 
 describe('pruneUploads', () => {
@@ -184,6 +206,15 @@ describe('pruneUploads', () => {
     );
     strictEqual(await drainJournal(), true);
     for (const key of keys) storage.objects.delete(key);
+  });
+
+  it('leaves the expired upload sessions to `sweepUploadSessions`', async () => {
+    const expired = await expiredSession('thrall.txt');
+
+    await pruneUploads();
+
+    deepStrictEqual(await sessionUUIDs(), [expired]);
+    strictEqual(await sweepUploadSessions(2_000), 1);
   });
 
   it('refuses a storage that cannot list its objects', async () => {

@@ -3,9 +3,14 @@ import { after, before, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
+import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import uploads from '../../../src/uploads/commands/uploads.ts';
 import { drainJournal } from '../../../src/uploads/storage/journal.ts';
+import { sessionTemp } from '../../../src/uploads/uploads/_session.ts';
+import { abortUploadSession } from '../../../src/uploads/uploads/abort-upload-session.ts';
+import { createUploadSession } from '../../../src/uploads/uploads/create-upload-session.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
+import { sweepUploadSessions } from '../../../src/uploads/uploads/sweep-upload-sessions.ts';
 import { bytes, storage, stream } from '../_fixture.ts';
 
 const HINT = /Run it again with --delete to delete them\./;
@@ -24,6 +29,22 @@ describe('ohne uploads prune', () => {
     return [...output.matchAll(/^│ {2}- (\S+)$/gm)]
       .map(([, path]) => path ?? '')
       .filter((path) => path.startsWith(`${prefix}/`));
+  }
+
+  /**
+   * Opens an upload session for each of `names`, then expires them all, resolving their `UUID`s.
+   * They open first, since opening a session sweeps the ones already expired.
+   */
+  async function expire(...names: string[]): Promise<string[]> {
+    const opened: string[] = [];
+    for (const name of names) {
+      opened.push((await createUploadSession({ directory: 'undercity', name, size: 6 })).UUID);
+    }
+    await queryUntyped('UploadsSessions')
+      .unscoped()
+      .where({ UUID: { in: opened } })
+      .updateOrThrow({ expiresAt: 1_000 });
+    return opened;
   }
 
   async function strays(prefix: string): Promise<void> {
@@ -100,5 +121,57 @@ describe('ohne uploads prune', () => {
     process.exitCode = 0;
     await drainJournal();
     strictEqual(storage.objects.has('scourge/deep/lost.txt'), false);
+  });
+
+  it('prints one dim line naming the expired upload sessions it swept', async () => {
+    await expire('sylvanas.txt', 'varimathras.txt');
+
+    const output = await run(false);
+    match(output, /^●  Swept 2 expired upload sessions\n●  No stray files in \S+\n$/);
+    strictEqual(await queryUntyped('UploadsSessions').unscoped().count(), 0);
+
+    await expire('nathanos.txt');
+    match(await run(false), /^●  Swept 1 expired upload session$/m);
+  });
+
+  it('sweeps once, so a session it could not discard is warned about once', async () => {
+    await expire('putress.txt');
+    storage.failNext('abort');
+
+    const output = await run(false);
+    strictEqual(output.match(/not discarded/g)?.length, 1);
+    doesNotMatch(output, /Swept/);
+    strictEqual(await sweepUploadSessions(2_000), 1);
+  });
+
+  it('sweeps the expired upload sessions before it lists the stored files', async (t) => {
+    const order: string[] = [];
+    const parts = storage.parts!;
+    const { abort } = parts;
+    t.mock.method(parts, 'abort', async (path: string, handle: string) => {
+      order.push(`abort ${path}`);
+      await abort(path, handle);
+    });
+    const { list } = storage;
+    storage.list = (prefix) => {
+      order.push('list');
+      return list!(prefix);
+    };
+    try {
+      const live = await createUploadSession({
+        directory: 'undercity',
+        name: 'jaina.txt',
+        size: 6,
+      });
+      const [expired] = await expire('arthas.txt');
+
+      await run(false);
+
+      deepStrictEqual(order, [`abort ${sessionTemp(expired!)}`, 'list']);
+      deepStrictEqual(await queryUntyped('UploadsSessions').unscoped().pluck('UUID'), [live.UUID]);
+      await abortUploadSession(live.UUID);
+    } finally {
+      storage.list = list;
+    }
   });
 });

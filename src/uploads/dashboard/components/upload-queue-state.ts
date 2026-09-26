@@ -1,4 +1,4 @@
-import { clamp, errorMessage, ref, urlFileName, uuidv7 } from 'ohnejs/utils';
+import { clamp, errorMessage, isUndefined, ref, urlFileName, uuidv7 } from 'ohnejs/utils';
 
 /**
  * Where one queued upload stands.
@@ -58,6 +58,17 @@ export interface UploadTask {
   UUID?: string;
 
   /**
+   * The `UUID` of the resumable session holding the bytes sent so far.
+   * A retry continues it.
+   */
+  session?: string;
+
+  /**
+   * Whether the upload waits to send again after a network failure.
+   */
+  stalled?: boolean;
+
+  /**
    * Aborts the upload while it is pending or uploading; a settled task ignores the call.
    */
   abort(): void;
@@ -78,6 +89,11 @@ export type UploadItem = {
        * The file to send.
        */
       file: File;
+
+      /**
+       * The `UUID` of the resumable session the file continues.
+       */
+      session?: string;
     }
   | {
       /**
@@ -108,6 +124,16 @@ export interface UploadSendHooks {
    * Reports the bytes sent so far and the bytes to send in total.
    */
   onProgress(loaded: number, total: number): void;
+
+  /**
+   * Reports the resumable session the bytes go into, `undefined` once it is gone.
+   */
+  onSession(session: string | undefined): void;
+
+  /**
+   * Reports whether the sender waits to send again after a network failure.
+   */
+  onStall(stalled: boolean): void;
 }
 
 /**
@@ -150,6 +176,7 @@ export interface UploadQueueOptions {
 
   /**
    * Called with the final snapshot of every task that completes, fails, or is aborted.
+   * A task that `hide` or `clear` stops is not reported.
    */
   onSettle?(task: UploadTask): void;
 }
@@ -166,6 +193,7 @@ export interface UploadQueue {
 
   /**
    * The bytes per second measured over the recent window, `null` before the first measurement.
+   * A stall drops the measurement, and the next bytes measure afresh.
    * The last measurement stays once the queue drains.
    * Reactive.
    */
@@ -177,9 +205,24 @@ export interface UploadQueue {
   enqueue(items: readonly UploadItem[]): Promise<readonly UploadTask[]>;
 
   /**
-   * Drops a task from the list; an upload still pending or running continues unseen.
+   * Drops a task from the list.
+   * A pending task leaves the queue and never runs; a running one continues unseen.
    */
   hide(id: string): void;
+
+  /**
+   * Queues a failed task again with its item and its session, behind the tasks already waiting.
+   * Resolves with its final snapshot once it settles.
+   * A task that has not failed, or that was hidden, is left alone, and the call resolves `undefined` at once.
+   */
+  retry(id: string): Promise<UploadTask | undefined>;
+
+  /**
+   * Stops every pending and running task, hidden or not, and empties the list and the speed measurement.
+   * No stopped task reaches `onSettle`, so its session stays for its owner to resume after signing in again.
+   * A failed task goes too, so it can no longer be retried.
+   */
+  clear(): void;
 }
 
 interface Entry {
@@ -211,6 +254,7 @@ const MAX_FETCHES = 2;
  * The cap is per queue while the route counts per user, so fetches from another tab can still cause a `429`.
  * Progress arrives from the sender in bytes, so the speed is measured from the deltas over a rolling window.
  * A failure settles only its own task; the rest of the batch runs on.
+ * A failed task keeps its item until it is hidden, so `retry` can send it again.
  *
  * @example
  * ```ts
@@ -228,9 +272,10 @@ export function createUploadQueue(
   const speedWindow = options.speedWindow ?? DEFAULT_SPEED_WINDOW;
   const tasks = ref<readonly UploadTask[]>([]);
   const speed = ref<number | null>(null);
+  const entries = new Map<string, Entry>();
   const waiting: Entry[] = [];
+  const running = new Set<Entry>();
   const samples: Sample[] = [];
-  let running = 0;
   let fetching = 0;
 
   const snapshot = (id: string): UploadTask | undefined =>
@@ -243,7 +288,13 @@ export function createUploadQueue(
   const finish = (entry: Entry, changes: Partial<UploadTask>): void => {
     const final = { ...(snapshot(entry.task.id) ?? entry.task), ...changes };
     patch(entry.task.id, changes);
+    if (final.status !== 'failed') entries.delete(entry.task.id);
     options.onSettle?.(final);
+  };
+
+  const forgetSpeed = (): void => {
+    samples.length = 0;
+    speed.value = null;
   };
 
   const measure = (bytes: number): void => {
@@ -260,15 +311,21 @@ export function createUploadQueue(
   const run = async (entry: Entry): Promise<void> => {
     const { id } = entry.task;
     const { signal } = entry.controller;
-    let loaded = 0;
+    // A continued session first reports the offset it resumes from, which is no speed.
+    let loaded = isUndefined(entry.task.session) ? 0 : undefined;
     patch(id, { status: 'uploading' });
     try {
       const outcome = await send(entry.task, entry.item, {
         signal,
         onProgress: (sent, total) => {
-          measure(sent - loaded);
+          measure(sent - (loaded ?? sent));
           loaded = sent;
           patch(id, { progress: total > 0 ? clamp(sent / total, 0, 1) : 0 });
+        },
+        onSession: (session) => patch(id, { session }),
+        onStall: (stalled) => {
+          if (stalled) forgetSpeed();
+          patch(id, { stalled });
         },
       });
       if (signal.aborted) return;
@@ -285,15 +342,15 @@ export function createUploadQueue(
   };
 
   const pump = (): void => {
-    while (running < concurrency) {
+    while (running.size < concurrency) {
       const index = waiting.findIndex(({ item }) => !('url' in item) || fetching < MAX_FETCHES);
       if (index === -1) return;
       const [entry] = waiting.splice(index, 1);
       const fetches = 'url' in entry.item ? 1 : 0;
-      running += 1;
+      running.add(entry);
       fetching += fetches;
       void run(entry).finally(() => {
-        running -= 1;
+        running.delete(entry);
         fetching -= fetches;
         entry.settle();
         pump();
@@ -301,14 +358,20 @@ export function createUploadQueue(
     }
   };
 
-  const abort = (entry: Entry): void => {
-    const status = snapshot(entry.task.id)?.status;
-    if (status !== 'pending' && status !== 'uploading') return;
+  const unqueue = (entry: Entry): boolean => {
     const index = waiting.indexOf(entry);
     if (index !== -1) waiting.splice(index, 1);
+    return index !== -1;
+  };
+
+  const abort = (id: string): void => {
+    const entry = entries.get(id);
+    const status = snapshot(id)?.status;
+    if (isUndefined(entry) || (status !== 'pending' && status !== 'uploading')) return;
+    const queued = unqueue(entry);
     finish(entry, { status: 'aborted', progress: 0 });
     entry.controller.abort();
-    if (index !== -1) entry.settle();
+    if (queued) entry.settle();
   };
 
   const enqueue = (items: readonly UploadItem[]): Promise<readonly UploadTask[]> =>
@@ -321,21 +384,50 @@ export function createUploadQueue(
       };
       const batch: UploadTask[] = [];
       for (const item of items) {
+        const id = uuidv7();
         const task: UploadTask = {
-          id: uuidv7(),
+          id,
           ...origin(item),
           directory: item.directory,
           status: 'pending',
           progress: 0,
-          abort: () => abort(entry),
+          abort: () => abort(id),
         };
         const entry: Entry = { task, item, controller: new AbortController(), settle };
-        ids.add(task.id);
+        ids.add(id);
         batch.push(task);
+        entries.set(id, entry);
         waiting.push(entry);
       }
       tasks.value = [...batch, ...tasks.value];
       if (items.length === 0) resolve([]);
+      pump();
+    });
+
+  const retry = (id: string): Promise<UploadTask | undefined> =>
+    new Promise((resolve) => {
+      const failed = entries.get(id);
+      const current = snapshot(id);
+      if (isUndefined(failed) || current?.status !== 'failed') {
+        resolve(undefined);
+        return;
+      }
+      const task: UploadTask = {
+        ...current,
+        status: 'pending',
+        progress: 0,
+        error: undefined,
+        stalled: false,
+      };
+      const entry: Entry = {
+        task,
+        item: failed.item,
+        controller: new AbortController(),
+        settle: () => resolve(snapshot(id)),
+      };
+      patch(id, task);
+      entries.set(id, entry);
+      waiting.push(entry);
       pump();
     });
 
@@ -344,17 +436,28 @@ export function createUploadQueue(
     speed: () => speed.value,
     enqueue,
     hide: (id) => {
+      const entry = entries.get(id);
+      entries.delete(id);
       tasks.value = tasks.value.filter((task) => task.id !== id);
+      if (!isUndefined(entry) && unqueue(entry)) entry.settle();
+    },
+    retry,
+    clear: () => {
+      for (const entry of running) entry.controller.abort();
+      entries.clear();
+      tasks.value = [];
+      forgetSpeed();
+      for (const entry of waiting.splice(0)) entry.settle();
     },
   };
 }
 
 /**
- * The name, size, and host a new task starts with.
+ * The name, size, host, and session a new task starts with.
  * A URL's name is provisional: the server names the file from the response, and the task takes that on.
  */
-function origin(item: UploadItem): Pick<UploadTask, 'name' | 'size' | 'host'> {
-  if ('file' in item) return { name: item.file.name, size: item.file.size };
+function origin(item: UploadItem): Pick<UploadTask, 'name' | 'size' | 'host' | 'session'> {
+  if ('file' in item) return { name: item.file.name, size: item.file.size, session: item.session };
   const host = URL.parse(item.url)?.host ?? '';
   return { name: urlFileName(item.url) || host, size: null, host };
 }

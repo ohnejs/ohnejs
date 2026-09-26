@@ -9,9 +9,12 @@ import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { drainJournal, journalStorage } from '../../../src/uploads/storage/journal.ts';
 import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
+import { sessionTemp } from '../../../src/uploads/uploads/_session.ts';
+import { abortUploadSession } from '../../../src/uploads/uploads/abort-upload-session.ts';
+import { createUploadSession } from '../../../src/uploads/uploads/create-upload-session.ts';
 import { TEMP_PREFIX } from '../../../src/uploads/uploads/path.ts';
 import { uuidv7 } from '../../../src/utils/uuid/uuidv7.ts';
-import { bytes, db, storage, text } from '../_fixture.ts';
+import { bytes, db, holdSession, promptly, storage, text } from '../_fixture.ts';
 
 const written: string[] = [];
 usePrinter().configure({
@@ -145,5 +148,59 @@ describe('the schema:synced hook', () => {
     strictEqual(await drainJournal(), true);
     await queryUntyped('UploadsJournal').where({ from: stale }).delete();
     storage.objects.delete(stale);
+  });
+
+  it('sweeps the expired upload sessions after the stale staged objects', async () => {
+    const order: string[] = [];
+    const parts = storage.parts!;
+    useStorages().register('sweeping', () => ({
+      ...storage,
+      delete: async (path) => {
+        order.push(`delete ${path}`);
+        await storage.delete(path);
+      },
+      parts: {
+        ...parts,
+        abort: async (path, handle) => {
+          order.push(`abort ${path}`);
+          await parts.abort(path, handle);
+        },
+      },
+    }));
+    useLayers().add({ path: '/journal-sweeping', input: { uploads: { storage: 'sweeping' } } });
+    const stale = `${TEMP_PREFIX}/${uuidAt(Date.now() - 2 * DAY)}`;
+    storage.objects.set(stale, bytes('staged'));
+    await queryUntyped('UploadsJournal').createOrThrow({ op: 'stage', from: stale });
+    const expired = await createUploadSession({ name: 'frostmourne.txt', size: 6 });
+    const live = await createUploadSession({ name: 'ashbringer.txt', size: 6 });
+    await queryUntyped('UploadsSessions')
+      .unscoped()
+      .where({ UUID: expired.UUID })
+      .updateOrThrow({ expiresAt: 1_000 });
+    try {
+      await synced();
+    } finally {
+      useLayers().remove('/journal-sweeping');
+    }
+    const temp = sessionTemp(expired.UUID);
+    deepStrictEqual(order, [`delete ${stale}`, `abort ${temp}`, `delete ${temp}`]);
+    deepStrictEqual(await queryUntyped('UploadsSessions').unscoped().pluck('UUID'), [live.UUID]);
+    await abortUploadSession(live.UUID);
+  });
+
+  it('boots past an expired session whose lock a live holder keeps', async () => {
+    const held = await createUploadSession({ name: 'gorehowl.txt', size: 6 });
+    await queryUntyped('UploadsSessions')
+      .unscoped()
+      .where({ UUID: held.UUID })
+      .updateOrThrow({ expiresAt: 1_000 });
+    const release = await holdSession(held.UUID);
+    try {
+      strictEqual(await promptly(synced().then(() => 'booted')), 'booted');
+      ok(await queryUntyped('UploadsSessions').unscoped().where({ UUID: held.UUID }).exists());
+    } finally {
+      await release();
+    }
+    await abortUploadSession(held.UUID);
   });
 });

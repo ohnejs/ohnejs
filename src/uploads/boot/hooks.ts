@@ -2,16 +2,46 @@ import type { User } from 'ohnejs/auth';
 
 import { hook } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
-import { isEmpty } from 'ohnejs/utils';
+import { hasRoute, isEmpty, isUndefined, parseBytes } from 'ohnejs/utils';
 
 import type { DashboardMenuGroup, DashboardMenuItem } from '../../base/api/dashboard.get.ts';
 
 import { translate } from '../../ohne/http/translate.ts';
+import { useUploadsConfig } from '../config.ts';
+import { useStorage } from '../storage/use-storages.ts';
 import { decorateUploads } from '../uploads/decorate.ts';
 
+declare module '../../base/api/dashboard.get.ts' {
+  interface DashboardMeta {
+    /**
+     * The upload limits of the uploads layer, in bytes, set on every discovery read.
+     */
+    uploads?: {
+      /**
+       * The largest file one upload may carry.
+       */
+      maxFileSize: number;
+
+      /**
+       * The size of every chunk of a resumable upload but the last.
+       * Absent when the storage cannot assemble parts.
+       * Also absent when the app drops a route that opens, fills or completes a session.
+       * The dashboard then sends every file whole through `POST /uploads`.
+       */
+      chunkSize?: number;
+    };
+  }
+}
+
 const UPLOADS_ROW = '/collections/uploads';
-const JOURNAL_ROW = '/collections/uploads-journal';
+const BOOKKEEPING_ROWS = new Set(['/collections/uploads-journal', '/collections/uploads-sessions']);
 const MEDIA_ROW = '/media';
+
+const SESSION_ROUTES = [
+  'POST /uploads/sessions',
+  'PATCH /uploads/sessions/[uuid]',
+  'POST /uploads/sessions/[uuid]/complete',
+];
 
 hook('query:records', (records, { collection }) => {
   if (collection === 'Uploads') decorateUploads(records);
@@ -23,8 +53,14 @@ hook('populate:targets', (targets, { collection }) => {
 
 hook('dashboard:menu', (menu, { user }) => mediaMenu(menu, user));
 
+hook('dashboard:meta', (meta) => {
+  const { maxFileSize, chunkSize } = useUploadsConfig();
+  meta.uploads = { maxFileSize: parseBytes(maxFileSize) };
+  if (resumable(meta.routes)) meta.uploads.chunkSize = parseBytes(chunkSize);
+});
+
 /**
- * The sidebar as the uploads layer shows it: the media page instead of the `Uploads` table, no journal.
+ * The sidebar as the uploads layer shows it: the media page instead of the `Uploads` table, no bookkeeping.
  * The `Uploads` row is rewritten where it stands, so a configured group keeps its place.
  * A viewer who may read `Uploads` but has no row for it gets the media row appended.
  * An app that declares its own `/media` link gets no appended row beside it.
@@ -41,10 +77,11 @@ function mediaMenu(menu: readonly DashboardMenuGroup[], user: User): DashboardMe
 }
 
 /**
- * The rows one resolved row becomes: the journal row is dropped, the `Uploads` row becomes the media row.
+ * The rows one resolved row becomes.
+ * The journal and sessions rows are dropped, and the `Uploads` row becomes the media row.
  */
 function replaceRow(item: DashboardMenuItem): DashboardMenuItem[] {
-  if (item.to === JOURNAL_ROW) return [];
+  if (BOOKKEEPING_ROWS.has(item.to)) return [];
   return [item.to === UPLOADS_ROW ? mediaRow() : item];
 }
 
@@ -53,4 +90,14 @@ function replaceRow(item: DashboardMenuItem): DashboardMenuItem[] {
  */
 function mediaRow(): DashboardMenuItem {
   return { to: MEDIA_ROW, label: translate('uploads.menu.media'), icon: 'library-photo' };
+}
+
+/**
+ * Whether the dashboard may send a file in chunks while the app serves `routes`.
+ * It takes a storage with `parts` and the routes that open, fill and complete a session.
+ * An app that drops one of them through `disable.routes` keeps every upload whole.
+ * Dropping only `DELETE /uploads/sessions/[uuid]` keeps chunks: an abort then leaves its session to expire.
+ */
+function resumable(routes: readonly string[]): boolean {
+  return !isUndefined(useStorage().parts) && SESSION_ROUTES.every((id) => hasRoute(routes, id));
 }

@@ -28,9 +28,11 @@ const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR'
  * `root` is the configured `uploads.url`, resolved against the app root.
  * A key maps onto its path beneath `root`, so a folder prefix is a real directory.
  * A write lands in a sibling temp file and renames into place, so a reader never sees a partial object.
+ * A part-wise write fills the same kind of temp in place and renames it at `complete`.
+ * Its parts take any size and any count.
  * The temp's name starts with a dot, which no upload name does, so it is never taken for a stored object.
  * A delete also removes the temp files a crashed write left beside the object.
- * It removes the parent directories it leaves empty too, so the tree never accumulates them.
+ * A delete or an abort removes the parent directories it leaves empty, so the tree never accumulates them.
  * A listing walks the tree and passes over those temp files.
  *
  * @example
@@ -44,11 +46,10 @@ export function createFSStorage(root: string): StorageAdapter {
   return {
     async write(path, body) {
       const target = locate(base, path);
-      const dir = dirname(target);
-      const temp = joinPath(dir, `.${tempStem(target)}.${uuidv7()}.tmp`);
-      const handle = await inDir(dir, () => open(temp, 'wx'));
+      const temp = writeTemp(target, uuidv7());
+      const file = await inDir(dirname(target), () => open(temp, 'wx'));
       try {
-        await pipeline(Readable.fromWeb(body), handle.createWriteStream());
+        await pipeline(Readable.fromWeb(body), file.createWriteStream());
         await rename(temp, target);
       } catch (error) {
         await removeFile(temp).catch(() => {});
@@ -93,6 +94,41 @@ export function createFSStorage(root: string): StorageAdapter {
       await removeDir(target);
       await removeWriteTemps(target);
       await pruneEmpty(dirname(target), base);
+    },
+
+    parts: {
+      minSize: 1,
+      maxCount: Infinity,
+
+      async begin(path) {
+        const target = locate(base, path);
+        const handle = uuidv7();
+        const file = await inDir(dirname(target), () => open(writeTemp(target, handle), 'wx'));
+        await file.close();
+        return handle;
+      },
+
+      async write(path, handle, { offset, bytes }) {
+        const file = await open(writeTemp(locate(base, path), handle), 'r+');
+        await pipeline([bytes], file.createWriteStream({ start: offset }));
+        return '';
+      },
+
+      async complete(path, handle) {
+        const target = locate(base, path);
+        try {
+          await rename(writeTemp(target, handle), target);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          if (isNull(await fileSize(target))) throw error;
+        }
+      },
+
+      async abort(path, handle) {
+        const target = locate(base, path);
+        await removeFile(writeTemp(target, handle));
+        await pruneEmpty(dirname(target), base);
+      },
     },
   };
 }
@@ -181,6 +217,13 @@ async function pruneEmpty(dir: string, root: string): Promise<void> {
       throw error;
     }
   }
+}
+
+/**
+ * The temp file beside `target` that the write named by `handle` fills before it renames into place.
+ */
+function writeTemp(target: string, handle: string): string {
+  return joinPath(dirname(target), `.${tempStem(target)}.${handle}.tmp`);
 }
 
 /**

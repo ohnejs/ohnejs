@@ -28,7 +28,7 @@ export interface PruneUploadsOptions {
  *
  * The journal drains first, so every object sits where its row says.
  * Storage is listed before the rows are read, so a file uploaded meanwhile is never taken for an orphan.
- * Staged uploads under `.tmp/` are left to `sweepStaged`.
+ * Staged uploads and session objects under `.tmp/` are left to `sweepStaged` and `sweepUploadSessions`.
  * A path a pending `move` touches is left to the next drain.
  * A path under a pending `delete` is still listed, so a delete that keeps failing is never hidden.
  * A folder above a named file is never an orphan, since deleting it would take that file along.

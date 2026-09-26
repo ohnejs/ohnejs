@@ -12,6 +12,7 @@ import {
 
 interface InFlight {
   name: string;
+  task: UploadTask;
   item: UploadItem;
   hooks: UploadSendHooks;
   resolve(outcome: UploadOutcome): void;
@@ -38,6 +39,7 @@ function stub(): Stub {
         };
         const entry: InFlight = {
           name: task.name,
+          task,
           item,
           hooks,
           resolve: (outcome) => {
@@ -235,6 +237,20 @@ describe('createUploadQueue', () => {
     deepStrictEqual(names(await batch), ['b.png']);
   });
 
+  it('hiding a pending task takes it out of the queue, so it never runs', async () => {
+    const transport = stub();
+    const queue = createUploadQueue(transport.send, { concurrency: 1 });
+    const batch = queue.enqueue(
+      ['thrall', 'jaina'].map((n) => ({ file: file(`${n}.png`), directory: '' })),
+    );
+
+    queue.hide(queue.tasks()[1].id);
+    transport.inFlight[0].resolve(completed('thrall.png'));
+    await settle();
+    deepStrictEqual(transport.started, ['thrall.png']);
+    deepStrictEqual(names(await batch), ['thrall.png']);
+  });
+
   it('measures the speed from progress deltas over a rolling window', async () => {
     const transport = stub();
     let clock = 0;
@@ -261,6 +277,80 @@ describe('createUploadQueue', () => {
     hooks.onProgress(8000, 8000);
     strictEqual(queue.speed(), 500);
     strictEqual(queue.tasks()[0].progress, 1);
+  });
+
+  it('drops the speed while a task is stalled, and measures afresh once bytes flow again', () => {
+    const transport = stub();
+    let clock = 0;
+    const queue = createUploadQueue(transport.send, { now: () => clock, speedWindow: 3000 });
+    void queue.enqueue([{ file: file('a.bin', 8000), directory: '' }]);
+    const { hooks } = transport.inFlight[0];
+
+    hooks.onProgress(1000, 8000);
+    clock = 1000;
+    hooks.onProgress(3000, 8000);
+    strictEqual(queue.speed(), 2000);
+
+    hooks.onStall(true);
+    strictEqual(queue.speed(), null);
+
+    clock = 2000;
+    hooks.onStall(false);
+    hooks.onProgress(4000, 8000);
+    strictEqual(queue.speed(), null);
+
+    clock = 2500;
+    hooks.onProgress(5000, 8000);
+    strictEqual(queue.speed(), 2000);
+  });
+
+  it('clears the list and the speed, stopping every pending and running task unreported', async () => {
+    const transport = stub();
+    let clock = 0;
+    const settled: string[] = [];
+    const queue = createUploadQueue(transport.send, {
+      concurrency: 1,
+      now: () => clock,
+      onSettle: (task) => settled.push(`${task.name}:${task.status}`),
+    });
+    const failing = queue.enqueue([{ file: file('garrosh.png'), directory: '' }]);
+    transport.inFlight[0].resolve({ ok: false, error: 'nope' });
+    const [failed] = await failing;
+    const batch = queue.enqueue(
+      ['saurfang', 'nazgrel'].map((n) => ({ file: file(`${n}.png`), directory: '' })),
+    );
+    const { hooks } = transport.inFlight[0];
+    hooks.onProgress(0, 1024);
+    clock = 1000;
+    hooks.onProgress(512, 1024);
+    strictEqual(queue.speed(), 512);
+
+    queue.clear();
+    deepStrictEqual(queue.tasks(), []);
+    strictEqual(queue.speed(), null);
+    strictEqual(hooks.signal.aborted, true);
+    deepStrictEqual(await batch, []);
+    deepStrictEqual(settled, ['garrosh.png:failed']);
+    deepStrictEqual(transport.started, ['garrosh.png', 'saurfang.png']);
+    strictEqual(await queue.retry(failed.id), undefined);
+  });
+
+  it('clearing stops a hidden task too', async () => {
+    const transport = stub();
+    const queue = createUploadQueue(transport.send, { concurrency: 1 });
+    const batch = queue.enqueue(
+      ['thrall', 'jaina', 'arthas'].map((n) => ({ file: file(`${n}.png`), directory: '' })),
+    );
+    const { signal } = transport.inFlight[0].hooks;
+    const [thrall, jaina] = queue.tasks();
+
+    queue.hide(thrall.id);
+    queue.hide(jaina.id);
+    queue.clear();
+    strictEqual(signal.aborted, true);
+    await settle();
+    deepStrictEqual(transport.started, ['thrall.png']);
+    deepStrictEqual(await batch, []);
   });
 
   it('resolves an empty batch at once', async () => {
@@ -390,5 +480,116 @@ describe('createUploadQueue', () => {
       [task.status, task.error, task.size],
       ['failed', 'The URL could not be reached', null],
     );
+  });
+
+  it('retries a failed task with the same file and the session it kept', async () => {
+    const transport = stub();
+    const settled: string[] = [];
+    const queue = createUploadQueue(transport.send, {
+      onSettle: (task) => settled.push(task.status),
+    });
+    const doomhammer = file('doomhammer.bin', 8000);
+    const batch = queue.enqueue([{ file: doomhammer, directory: 'orgrimmar' }]);
+    const { hooks } = transport.inFlight[0];
+    hooks.onSession('session-1');
+    hooks.onProgress(4000, 8000);
+    transport.inFlight[0].reject(new TypeError('Network request failed'));
+    const [failed] = await batch;
+    deepStrictEqual([failed.status, failed.session], ['failed', 'session-1']);
+
+    const retried = queue.retry(failed.id);
+    const [again] = transport.inFlight;
+    strictEqual(again.item.directory, 'orgrimmar');
+    strictEqual('file' in again.item && again.item.file, doomhammer);
+    deepStrictEqual([again.task.id, again.task.session], [failed.id, 'session-1']);
+    deepStrictEqual(
+      [queue.tasks()[0].status, queue.tasks()[0].progress, queue.tasks()[0].error],
+      ['uploading', 0, undefined],
+    );
+
+    again.resolve(completed('doomhammer.bin', 'orgrimmar'));
+    strictEqual((await retried)?.status, 'completed');
+    deepStrictEqual(settled, ['failed', 'completed']);
+    strictEqual(await queue.retry(failed.id), undefined);
+  });
+
+  it('retries nothing but a failed task', async () => {
+    const transport = stub();
+    const queue = createUploadQueue(transport.send);
+    const batch = queue.enqueue([{ file: file('jaina.png'), directory: '' }]);
+    const [task] = queue.tasks();
+
+    strictEqual(await queue.retry(task.id), undefined);
+    strictEqual(transport.started.length, 1);
+
+    transport.inFlight[0].resolve({ ok: false, error: 'nope' });
+    await batch;
+    queue.hide(task.id);
+    strictEqual(await queue.retry(task.id), undefined);
+    strictEqual(transport.started.length, 1);
+  });
+
+  it('starts a file task with the session its item continues', () => {
+    const transport = stub();
+    const queue = createUploadQueue(transport.send);
+    void queue.enqueue([{ file: file('arthas.png'), directory: '', session: 'session-9' }]);
+
+    strictEqual(queue.tasks()[0].session, 'session-9');
+    strictEqual(transport.inFlight[0].task.session, 'session-9');
+  });
+
+  it('marks a task stalled while its sender waits to send again', () => {
+    const transport = stub();
+    const queue = createUploadQueue(transport.send);
+    void queue.enqueue([{ file: file('sylvanas.png'), directory: '' }]);
+    const { hooks } = transport.inFlight[0];
+
+    hooks.onStall(true);
+    strictEqual(queue.tasks()[0].stalled, true);
+    hooks.onStall(false);
+    strictEqual(queue.tasks()[0].stalled, false);
+  });
+
+  it('settles an aborted task with its session, pending or running', async () => {
+    const transport = stub();
+    const settled: [string, string | undefined][] = [];
+    const queue = createUploadQueue(transport.send, {
+      concurrency: 1,
+      onSettle: (task) => settled.push([task.name, task.session]),
+    });
+    const batch = queue.enqueue([
+      { file: file('illidan.png'), directory: '' },
+      { file: file('tyrande.png'), directory: '', session: 'session-2' },
+    ]);
+    transport.inFlight[0].hooks.onSession('session-1');
+
+    queue.tasks()[1].abort();
+    queue.tasks()[0].abort();
+    await batch;
+    deepStrictEqual(settled, [
+      ['tyrande.png', 'session-2'],
+      ['illidan.png', 'session-1'],
+    ]);
+    deepStrictEqual(transport.started, ['illidan.png']);
+  });
+
+  it("counts a fresh run's first progress, but not the offset a continued session resumes from", () => {
+    const transport = stub();
+    let clock = 0;
+    const queue = createUploadQueue(transport.send, { now: () => clock, speedWindow: 3000 });
+    void queue.enqueue([
+      { file: file('a.bin', 8000), directory: '' },
+      { file: file('b.bin', 8000), directory: '' },
+      { file: file('c.bin', 8000), directory: '', session: 'session-3' },
+    ]);
+    const [first, whole, resumed] = transport.inFlight;
+
+    first.hooks.onProgress(0, 8000);
+    clock = 500;
+    resumed.hooks.onProgress(5000, 8000);
+    strictEqual(queue.tasks()[2].progress, 0.625);
+    clock = 1000;
+    whole.hooks.onProgress(8000, 8000);
+    strictEqual(queue.speed(), 8000);
   });
 });

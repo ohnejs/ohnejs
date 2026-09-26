@@ -5,7 +5,12 @@ import { defineCommand } from 'ohnejs/utils/cli';
 
 import { useStorage } from '../storage/use-storages.ts';
 import { pruneUploads } from '../uploads/prune-uploads.ts';
+import { sweepUploadSessions } from '../uploads/sweep-upload-sessions.ts';
 
+/**
+ * The `ohne uploads prune` command: it sweeps the expired upload sessions, then lists or deletes stray files.
+ * A dim line counts the sessions it swept, when it swept any.
+ */
 const prune = defineCommand({
   meta: {
     name: 'prune',
@@ -16,6 +21,8 @@ const prune = defineCommand({
   },
   async run({ values }) {
     const print = usePrinter();
+    const swept = await sweepUploadSessions();
+    if (swept > 0) print.info(`__Swept ${swept} expired upload ${pluralize(swept, 'session')}__`);
     const { result: paths, ms } = await measure(() => pruneUploads({ delete: values.delete }));
     const took = `__in ${formatDuration(ms)}__`;
     if (paths.length === 0) {

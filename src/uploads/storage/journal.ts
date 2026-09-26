@@ -31,8 +31,6 @@ const draining = createMutex();
 
 const JOURNAL_LOCK = 'uploads:journal';
 
-const SETTLE_STALE_AFTER = 10 * 60 * 1000;
-
 /**
  * Records a storage effect on `tx`, so it commits or rolls back with the row change it belongs to.
  * The entry takes the `sequence` after the last pending one; an `'immediate'` `tx` keeps it unique.
@@ -74,7 +72,6 @@ export async function journalStorage(tx: Transaction, entry: JournalEntry): Prom
  * So is a journal that cannot be read or a storage that cannot be built; nothing here throws.
  * Each entry settles under a cluster lock, so no two instances replay the same entry at once.
  * Otherwise a slow replay of an older entry could land after a newer one on the same path.
- * The lock goes stale after ten minutes, so an effect that runs longer may be replayed by another instance.
  * Resolves `true` when every entry settled, and `false` when any was held or nothing could be drained.
  *
  * @example
@@ -119,24 +116,20 @@ async function drain(): Promise<boolean> {
  * A backend without `setPrivate` has no visibility to set, so a lock or unlock succeeds at once.
  */
 function settle(storage: StorageAdapter, entry: StoredEntry): Promise<boolean> {
-  return withLock(
-    JOURNAL_LOCK,
-    async () => {
-      const { UUID, op, from, to } = entry;
-      if (!(await pending(UUID))) return true;
-      try {
-        if (op === 'move') await storage.move(from, to as string);
-        else if (op === 'delete') await storage.delete(from);
-        else await storage.setPrivate?.(from, op === 'lock');
-      } catch (error) {
-        usePrinter().warn(`Storage \`${op}\` of ${codeSpan(from)} failed: ${errorMessage(error)}`);
-        return false;
-      }
-      await queryUntyped('UploadsJournal').unscoped().where({ UUID }).delete();
-      return true;
-    },
-    { staleAfter: SETTLE_STALE_AFTER },
-  );
+  return withLock(JOURNAL_LOCK, async () => {
+    const { UUID, op, from, to } = entry;
+    if (!(await pending(UUID))) return true;
+    try {
+      if (op === 'move') await storage.move(from, to as string);
+      else if (op === 'delete') await storage.delete(from);
+      else await storage.setPrivate?.(from, op === 'lock');
+    } catch (error) {
+      usePrinter().warn(`Storage \`${op}\` of ${codeSpan(from)} failed: ${errorMessage(error)}`);
+      return false;
+    }
+    await queryUntyped('UploadsJournal').unscoped().where({ UUID }).delete();
+    return true;
+  });
 }
 
 /**

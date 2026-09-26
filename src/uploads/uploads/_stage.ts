@@ -1,4 +1,5 @@
 import type { Transaction } from 'ohnejs';
+import type { ImageSize } from 'ohnejs/utils';
 
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
@@ -23,6 +24,7 @@ import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';
 import { dispositionFor } from './_disposition.ts';
 import { uploadsError } from './_errors.ts';
+import { PEEK_SIZE } from './_peek.ts';
 import { TEMP_PREFIX } from './path.ts';
 
 /**
@@ -55,7 +57,10 @@ export interface StagedUpload {
   height: number | null;
 }
 
-const PEEK_SIZE = 64 * 1024;
+/**
+ * The pixel size staging records, `null` in both unless the bytes are a sized image.
+ */
+type Dimensions = Pick<StagedUpload, 'width' | 'height'>;
 
 const SVG = 'image/svg+xml';
 
@@ -77,14 +82,16 @@ export async function stageUpload(
   { type, size }: { type: string; size?: number },
 ): Promise<StagedUpload> {
   const { head, stream } = await peek(body, PEEK_SIZE);
-  const sniffed = sniffMediaType(head);
-  if (!isUndefined(sniffed) && !mediaTypesCompatible(type, sniffed)) {
+  let raster: Dimensions;
+  try {
+    raster = checkHead(head, type);
+  } catch (error) {
     await stream.cancel();
-    throw uploadsError('name', 'contentMismatch', { type, detected: sniffed });
+    throw error;
   }
 
   const svg = type === SVG ? await sanitizedSVG(stream) : undefined;
-  const measured = mediaCategory(type) === 'image' ? imageSize(svg ?? head) : undefined;
+  const { width, height } = isUndefined(svg) ? raster : dimensions(imageSize(svg));
   const source = isUndefined(svg) ? stream : bytesStream(svg);
   const declared = isUndefined(svg) ? size : svg.byteLength;
 
@@ -117,13 +124,28 @@ export async function stageUpload(
     throw error;
   }
 
-  return {
-    temp,
-    size: counted,
-    hash: hash.digest('hex'),
-    width: measured?.width ?? null,
-    height: measured?.height ?? null,
-  };
+  return { temp, size: counted, hash: hash.digest('hex'), width, height };
+}
+
+/**
+ * Checks the leading bytes of a file against its declared `type`, measuring a raster image by them.
+ * Bytes whose sniffed type contradicts `type` are a `422` `contentMismatch` at `name`.
+ * An SVG stays unmeasured, since its size is read from the sanitized markup.
+ *
+ * @example
+ * ```ts
+ * checkHead(await readFile('sunset.png'), 'image/png') // -> { width: 640, height: 480 }
+ * checkHead(await readFile('notes.txt'), 'text/plain') // -> { width: null, height: null }
+ * ```
+ */
+export function checkHead(head: Uint8Array, type: string): Dimensions {
+  const sniffed = sniffMediaType(head);
+  if (!isUndefined(sniffed) && !mediaTypesCompatible(type, sniffed)) {
+    throw uploadsError('name', 'contentMismatch', { type, detected: sniffed });
+  }
+  return type !== SVG && mediaCategory(type) === 'image'
+    ? dimensions(imageSize(head))
+    : { width: null, height: null };
 }
 
 /**
@@ -257,12 +279,25 @@ async function sanitizedSVG(stream: ReadableStream<Uint8Array>): Promise<Uint8Ar
 
 /**
  * A one-chunk stream over bytes already in memory.
+ *
+ * @example
+ * ```ts
+ * const body = bytesStream(new TextEncoder().encode('For the Horde'))
+ * await new Response(body).text() // -> 'For the Horde'
+ * ```
  */
-function bytesStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
+export function bytesStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(bytes);
       controller.close();
     },
   });
+}
+
+/**
+ * The `width` and `height` of `size`, both `null` when there is no size.
+ */
+function dimensions(size: ImageSize | undefined): Dimensions {
+  return { width: size?.width ?? null, height: size?.height ?? null };
 }

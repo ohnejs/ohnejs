@@ -28,6 +28,7 @@
     "fileType": "Tip datoteke",
     "fileURL": "URL datoteke",
     "files": "Datoteke",
+    "finishing": "Završavanje",
     "focalPoint": "Fokusna tačka",
     "focalPointHint": "Kliknite ili povucite po slici da postavite fokusnu tačku.",
     "folder": "Folder",
@@ -41,6 +42,7 @@
     "hide": "Sakrij",
     "image": "Slika",
     "imageNotFound": "Slika nije pronađena",
+    "interrupted": "Nedovršeno",
     "itemsConflict": "Neke stavke već postoje na odredištu",
     "linkCopied": "Privremeni link kopiran",
     "linkFailed": "Link nije moguće napraviti",
@@ -66,13 +68,16 @@
     "noUploads": "Nema pronađenih datoteka",
     "notAllowedHere": "Ovdje nije dozvoljeno",
     "notRendered": "Nije renderovano",
+    "notTheSameFile": "Odabrana datoteka nije nedovršena datoteka `{name}`",
     "nothingSelected": "Ništa nije odabrano",
     "openInNewTab": "Otvori u novoj kartici",
     "pending": "Na čekanju",
+    "pickToResume": "Ponovo odaberite `{name}` da nastavite",
     "pixels": "piksela",
     "private": "Privatno",
     "privateFolderHint": "Sve u privatnom folderu `{folder}` je privatno.",
     "privateHint": "Datoteku može otvoriti samo privremeni link ili prijavljeni čitalac s pristupom.",
+    "reconnecting": "Ponovno povezivanje",
     "rename": "Preimenuj",
     "renameFailed": "Došlo je do greške pri preimenovanju",
     "renameFile": "Preimenuj datoteku",
@@ -80,6 +85,8 @@
     "renamed": "`{from}` preimenovano u `{to}`",
     "replace": "Zamijeni",
     "replaceFile": "Zamijeni datoteku",
+    "resume": "Nastavi",
+    "retry": "Pokušaj ponovo",
     "rootFolder": "Korijenski folder",
     "searchByName": "Pretraži po nazivu",
     "selectFile": "Odaberi datoteku",
@@ -110,9 +117,11 @@
     "notAFile": "Ovo je folder, a ne datoteka",
     "notAFolder": "Putanja `{path}` je datoteka, a ne folder",
     "notAnImage": "Datoteka nije slika",
+    "notResumable": "Pohrana `{storage}` ne može nastaviti otpremanje",
     "notSVG": "Datoteka nije SVG slika",
     "outOfReach": "Više ne biste vidjeli rezultat",
     "pathTooLong": "Putanja može imati najviše `{max}` znakova",
+    "sessionExpired": "Sesija otpremanja je istekla",
     "typeNotAllowed": "Tip datoteke `{type}` nije dozvoljen",
     "urlInvalid": "URL mora biti http ili https, bez pristupnih podataka",
     "urlStatus": "URL je odgovorio statusom `{status}`",
@@ -196,5 +205,63 @@
   },
   "menu": {
     "media": "Mediji"
+  },
+  "sessions": {
+    "author": {
+      "label": "Postavio",
+      "description": "Korisnik koji je započeo otpremanje i jedini ga može nastaviti."
+    },
+    "directory": {
+      "label": "Folder",
+      "description": "Putanja foldera u koji datoteka stiže, prazna u korijenu."
+    },
+    "name": {
+      "label": "Naziv",
+      "description": "Naziv datoteke, kao slug; završetak dodaje sufiks ako je naziv zauzet."
+    },
+    "type": {
+      "label": "Tip",
+      "description": "Tip medija, izveden iz ekstenzije datoteke."
+    },
+    "size": {
+      "label": "Veličina",
+      "description": "Veličina cijele datoteke u bajtima."
+    },
+    "chunkSize": {
+      "label": "Veličina dijela",
+      "description": "Veličina svakog dijela osim posljednjeg u bajtima, utvrđena pri početku sesije."
+    },
+    "offset": {
+      "label": "Pomak",
+      "description": "Bajtovi potvrđeni u pohrani; sljedeći dio počinje ovdje."
+    },
+    "hashState": {
+      "label": "Stanje hasha",
+      "description": "SHA-256 stanje nad potvrđenim bajtovima, preneseno s dijela na dio."
+    },
+    "token": {
+      "label": "Token",
+      "description": "Oznaka pohrane za dosad zapisane dijelove; prazna kada se sastave."
+    },
+    "receipts": {
+      "label": "Potvrde",
+      "description": "Potvrda pohrane za svaki pohranjeni dio, redoslijedom dijelova."
+    },
+    "width": {
+      "label": "Širina",
+      "description": "Širina slike u pikselima, izmjerena na prvom dijelu."
+    },
+    "height": {
+      "label": "Visina",
+      "description": "Visina slike u pikselima, izmjerena na prvom dijelu."
+    },
+    "upload": {
+      "label": "Datoteka",
+      "description": "Datoteka nastala završetkom sesije; prazno do tada."
+    },
+    "expiresAt": {
+      "label": "Ističe",
+      "description": "Kada sesija završava; nedovršeno otpremanje se tada odbacuje."
+    }
   }
 }

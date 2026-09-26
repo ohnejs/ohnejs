@@ -42,6 +42,11 @@ describe('useUploadsConfig', () => {
     strictEqual(useUploadsConfig().maxSVGSize, '2mb');
   });
 
+  it('sends a resumable upload in eight-megabyte chunks within a day by default', () => {
+    const { chunkSize, sessionMaxAge } = useUploadsConfig();
+    deepStrictEqual({ chunkSize, sessionMaxAge }, { chunkSize: '8mb', sessionMaxAge: '1d' });
+  });
+
   it('defaults fetch to no extra addresses and a two-minute deadline', () => {
     deepStrictEqual(useUploadsConfig().fetch, { allow: [], timeout: '2m' });
   });
@@ -79,7 +84,9 @@ describe('validateUploadsConfig', () => {
     const input = {
       maxFileSize: 1024,
       maxSVGSize: '4mb',
+      chunkSize: '5mb',
       privateMaxAge: '30m',
+      sessionMaxAge: '2d',
       fetch: { allow: ['10.20.0.0/16', '192.0.2.7', 'fd00::/8'], timeout: 5000 },
     };
     strictEqual(refusal(input), undefined);
@@ -99,21 +106,41 @@ describe('validateUploadsConfig', () => {
 
   for (const [key, input, value] of [
     ['maxFileSize', { maxFileSize: 'lots' }, 'lots'],
+    ['maxFileSize', { maxFileSize: 0 }, 0],
     ['maxSVGSize', { maxSVGSize: 'huge' }, 'huge'],
   ] as const) {
-    it(`refuses a \`${key}\` that is no byte size`, () => {
+    it(`refuses a \`${key}\` of \`${value}\``, () => {
       deepStrictEqual(refusal(input), {
         title: `Invalid \`uploads.${key}\` value \`${value}\``,
         body: [
-          'It is a byte size, such as `2mb`, or a number of bytes.',
+          'It is a byte size above zero, such as `2mb`, or a number of bytes.',
           `Fix it under \`uploads.${key}\`.`,
         ],
       });
     });
   }
 
+  for (const value of ['hefty', '0mb', '63kb', 65535]) {
+    it(`refuses a \`chunkSize\` of \`${value}\``, () => {
+      deepStrictEqual(refusal({ chunkSize: value }), {
+        title: `Invalid \`uploads.chunkSize\` value \`${value}\``,
+        body: [
+          'It is a byte size of `64kb` or more, such as `8mb`, or a number of bytes.',
+          'Fix it under `uploads.chunkSize`.',
+        ],
+      });
+    });
+  }
+
+  it('accepts a `chunkSize` of exactly `64kb`', () => {
+    strictEqual(refusal({ chunkSize: '64kb' }), undefined);
+    strictEqual(refusal({ chunkSize: 65536 }), undefined);
+  });
+
   for (const [key, input, value] of [
     ['privateMaxAge', { privateMaxAge: 'soon' }, 'soon'],
+    ['sessionMaxAge', { sessionMaxAge: 'eventually' }, 'eventually'],
+    ['sessionMaxAge', { sessionMaxAge: 0 }, 0],
     ['fetch.timeout', { fetch: { timeout: 'forever' } }, 'forever'],
     ['fetch.timeout', { fetch: { timeout: '0s' } }, '0s'],
   ] as const) {

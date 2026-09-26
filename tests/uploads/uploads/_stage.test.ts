@@ -1,17 +1,19 @@
-import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual, throws } from 'node:assert';
 import { describe, it, mock } from 'node:test';
 
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { journalStorage } from '../../../src/uploads/storage/journal.ts';
+import { PEEK_SIZE } from '../../../src/uploads/uploads/_peek.ts';
 import {
+  checkHead,
   claimStaged,
   discardStaged,
   stageUpload,
   sweepStaged,
 } from '../../../src/uploads/uploads/_stage.ts';
-import { bytes, db, storage, stream, text } from '../_fixture.ts';
+import { bytes, db, JPEG_HEAD, png, storage, stream, text } from '../_fixture.ts';
 
 const stage = () => stageUpload(stream(bytes('hello')), { type: 'text/plain' });
 
@@ -108,6 +110,32 @@ describe('staging', () => {
     );
   });
 
+  it('cancels the body of a head that contradicts its type, staging nothing', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(JPEG_HEAD);
+      },
+      pull(controller) {
+        controller.enqueue(new Uint8Array(PEEK_SIZE));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+
+    await rejects(stageUpload(body, { type: 'image/png' }), isValidationError);
+
+    ok(cancelled);
+    deepStrictEqual(await staged(), []);
+  });
+
+  it('measures a raster image by its head', async () => {
+    const { temp, width, height } = await stageUpload(stream(png(2, 3)), { type: 'image/png' });
+    deepStrictEqual({ width, height }, { width: 2, height: 3 });
+    await discardStaged(temp);
+  });
+
   it('stops reading an SVG the moment it passes uploads.maxSVGSize, staging nothing', async () => {
     const { body, pulled, cancelled } = endlessSVG();
     let caught: unknown;
@@ -143,5 +171,41 @@ describe('staging', () => {
     } finally {
       useLayers().remove('/uploads-stage');
     }
+  });
+});
+
+describe('checkHead', () => {
+  it('measures a raster image', () => {
+    deepStrictEqual(checkHead(png(640, 480), 'image/png'), { width: 640, height: 480 });
+  });
+
+  it('leaves an SVG unmeasured, since only its sanitized markup counts', () => {
+    const svg = bytes('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12"/>');
+    deepStrictEqual(checkHead(svg, 'image/svg+xml'), { width: null, height: null });
+  });
+
+  it('leaves bytes that are no image unmeasured', () => {
+    deepStrictEqual(checkHead(bytes("Lok'tar ogar"), 'text/plain'), { width: null, height: null });
+  });
+
+  it('admits an image head it cannot sniff, unmeasured', () => {
+    deepStrictEqual(checkHead(bytes('Thrall'), 'image/png'), { width: null, height: null });
+  });
+
+  it('refuses a head whose sniffed type contradicts the declared one', () => {
+    let caught: unknown;
+    throws(
+      () => checkHead(JPEG_HEAD, 'image/png'),
+      (error: unknown) => {
+        caught = error;
+        return isValidationError(error);
+      },
+    );
+    deepStrictEqual((caught as { errors: unknown }).errors, {
+      name: {
+        key: 'uploads.errors.contentMismatch',
+        params: { type: 'image/png', detected: 'image/jpeg' },
+      },
+    });
   });
 });

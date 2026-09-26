@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
-import type { StorageAdapter } from '../../../src/uploads/storage/adapter.ts';
+import type { StorageAdapter, StoragePart } from '../../../src/uploads/storage/adapter.ts';
 
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
@@ -427,5 +427,117 @@ describe('createFSStorage', () => {
 
     strictEqual(readFileSync(join(app, 'files', 'a.txt'), 'utf8'), 'app');
     strictEqual(existsSync(join(dir, 'files')), false);
+  });
+
+  describe('parts', () => {
+    const path = 'videos/intro.mp4';
+    const meta = { type: 'video/mp4', size: 10 };
+
+    /**
+     * Part `number` of the object at `path`, on a grid of 5-byte parts.
+     */
+    function part(number: number, value: string): StoragePart {
+      return { number, offset: (number - 1) * 5, bytes: encoder.encode(value) };
+    }
+
+    it('assembles the parts written in order into an object that appears only at complete', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      const receipts = [
+        await storage.parts!.write(path, handle, part(1, 'hello')),
+        await storage.parts!.write(path, handle, part(2, 'world')),
+      ];
+
+      deepStrictEqual(readdirSync(join(dir, 'videos')), [`.intro.mp4.${handle}.tmp`]);
+      strictEqual(await storage.stat(path), null);
+      await storage.parts!.complete(path, handle, receipts);
+
+      deepStrictEqual(await storage.stat(path), { size: 10 });
+      strictEqual(readFileSync(join(dir, path), 'utf8'), 'helloworld');
+      deepStrictEqual(readdirSync(join(dir, 'videos')), ['intro.mp4']);
+    });
+
+    it('replaces a part written again', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.write(path, handle, part(1, 'hello'));
+      await storage.parts!.write(path, handle, part(1, 'HELLO'));
+      await storage.parts!.write(path, handle, part(2, 'world'));
+
+      await storage.parts!.complete(path, handle, ['', '']);
+
+      strictEqual(readFileSync(join(dir, path), 'utf8'), 'HELLOworld');
+    });
+
+    it('resolves a complete replayed after the object landed', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.write(path, handle, part(1, 'hello'));
+      await storage.parts!.write(path, handle, part(2, 'world'));
+      await storage.parts!.complete(path, handle, ['', '']);
+
+      await storage.parts!.complete(path, handle, ['', '']);
+
+      strictEqual(readFileSync(join(dir, path), 'utf8'), 'helloworld');
+    });
+
+    it('refuses to complete a write that is gone when nothing landed at its path', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.abort(path, handle);
+
+      await rejects(storage.parts!.complete(path, handle, []), { code: 'ENOENT' });
+      strictEqual(await storage.stat(path), null);
+    });
+
+    it('removes the temp and the directory it empties on abort, and aborts again as a no-op', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.write(path, handle, part(1, 'hello'));
+
+      await storage.parts!.abort(path, handle);
+      await storage.parts!.abort(path, handle);
+
+      strictEqual(existsSync(join(dir, 'videos')), false);
+      await rejects(storage.parts!.write(path, handle, part(2, 'world')), { code: 'ENOENT' });
+    });
+
+    it('keeps an unfinished write out of every listing', async () => {
+      await storage.write('videos/outro.mp4', streamOf('outro'), { type: 'video/mp4' });
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.write(path, handle, part(1, 'hello'));
+
+      deepStrictEqual(await Array.fromAsync(storage.list!()), ['videos/outro.mp4']);
+      deepStrictEqual(await Array.fromAsync(storage.list!('videos')), ['videos/outro.mp4']);
+    });
+
+    it('removes an abandoned write with a delete of its path', async () => {
+      const handle = await storage.parts!.begin(path, meta);
+      await storage.parts!.write(path, handle, part(1, 'hello'));
+
+      await storage.delete(path);
+
+      strictEqual(existsSync(join(dir, 'videos')), false);
+    });
+
+    it('recreates a directory pruned between its creation and the temp opening at begin', async () => {
+      const opening = pruneBefore('open', join(dir, 'videos'));
+      let handle = '';
+      try {
+        handle = await storage.parts!.begin(path, meta);
+      } finally {
+        opening.restore();
+      }
+
+      strictEqual(opening.calls(), 2);
+      deepStrictEqual(readdirSync(join(dir, 'videos')), [`.intro.mp4.${handle}.tmp`]);
+    });
+
+    it('refuses a part-wise write to a path that escapes the root', async () => {
+      const escape = '../escape.mp4';
+      const handle = '01991a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b';
+      await rejects(storage.parts!.begin(escape, meta), /escapes the uploads root/);
+      await rejects(
+        storage.parts!.write(escape, handle, part(1, 'hello')),
+        /escapes the uploads root/,
+      );
+      await rejects(storage.parts!.complete(escape, handle, []), /escapes the uploads root/);
+      await rejects(storage.parts!.abort(escape, handle), /escapes the uploads root/);
+    });
   });
 });

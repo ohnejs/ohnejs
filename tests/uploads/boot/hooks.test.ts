@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { DashboardMenuGroup, DashboardMeta } from '../../../src/base/api/dashboard.get.ts';
 import type { User } from '../../../src/base/auth/types.ts';
 
-import '../_fixture.ts';
 import '../../../src/uploads/boot/hooks.ts';
 import { toUser } from '../../../src/base/auth/to-user.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
@@ -14,11 +13,13 @@ import { useDatabase, useDialect } from '../../../src/ohne/database/use-database
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { scanLayerMessages } from '../../../src/ohne/messages/scan-layer-messages.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
-import { joinPath } from '../../../src/utils/index.ts';
+import { joinPath, parseBytes } from '../../../src/utils/index.ts';
+import { storage } from '../_fixture.ts';
 
 const layer = { name: 'uploads', dir: joinPath(import.meta.dirname, '../../../src/uploads') };
 const catalog: Record<string, string> = {};
@@ -45,6 +46,7 @@ const viewer = toUser({ UUID: 'u-viewer', email: 'viewer@example.com', roles: ['
 const usersRow = { to: '/collections/users', label: 'Users' };
 const uploadsRow = { to: '/collections/uploads', label: 'Uploads', icon: 'library-photo' as const };
 const journalRow = { to: '/collections/uploads-journal', label: 'Uploads journal' };
+const sessionsRow = { to: '/collections/uploads-sessions', label: 'Uploads sessions' };
 const mediaRow = { to: '/media', label: 'Media', icon: 'library-photo' };
 
 const folder = await queryUntyped('Uploads').createOrThrow({
@@ -60,8 +62,23 @@ const sunset = await queryUntyped('Uploads').createOrThrow({
   size: 6,
 });
 
+const SESSION_ROUTES = [
+  'POST /uploads/sessions',
+  'PATCH /uploads/sessions/[uuid]',
+  'POST /uploads/sessions/[uuid]/complete',
+];
+
 function menuFor(user: User, ...groups: DashboardMenuGroup[]): Promise<DashboardMenuGroup[]> {
   return applyHook('dashboard:menu', groups, { user, collections: [] });
+}
+
+/**
+ * The discovery payload the `dashboard:meta` hook leaves for an app serving `routes`.
+ */
+async function metaFor(routes: string[]): Promise<DashboardMeta> {
+  const meta = { routes } as DashboardMeta;
+  await applyHook('dashboard:meta', meta, { user: admin });
+  return meta;
 }
 
 describe('the read hooks', () => {
@@ -110,11 +127,11 @@ describe('the dashboard:menu hook', () => {
     deepStrictEqual(menu, [{ label: '', items: [usersRow] }]);
   });
 
-  it('drops the journal row, and the group it leaves empty', async () => {
+  it('drops the journal and sessions rows, and the group they leave empty', async () => {
     const menu = await menuFor(
       admin,
-      { label: 'System', items: [journalRow] },
-      { label: '', items: [usersRow, uploadsRow] },
+      { label: 'System', items: [journalRow, sessionsRow] },
+      { label: '', items: [usersRow, sessionsRow, uploadsRow] },
     );
     deepStrictEqual(menu, [{ label: '', items: [usersRow, mediaRow] }]);
   });
@@ -138,8 +155,45 @@ describe('the dashboard:menu hook', () => {
 
 describe('the dashboard:meta hook', () => {
   it('leaves whether a route is served to the framework', async () => {
-    const meta = {} as DashboardMeta;
-    await applyHook('dashboard:meta', meta, { user: admin });
-    strictEqual('uploadFromURL' in meta, false);
+    strictEqual('uploadFromURL' in (await metaFor(SESSION_ROUTES)), false);
+  });
+
+  it('sends the upload limits in bytes, with a chunk size while the routes that open, fill and complete a session are served', async () => {
+    useLayers().add({
+      path: '/boot-hooks-limits',
+      input: { uploads: { maxFileSize: '10gb', chunkSize: '16mb' } },
+    });
+    try {
+      deepStrictEqual((await metaFor(['POST /uploads', ...SESSION_ROUTES])).uploads, {
+        maxFileSize: parseBytes('10gb'),
+        chunkSize: parseBytes('16mb'),
+      });
+    } finally {
+      useLayers().remove('/boot-hooks-limits');
+    }
+  });
+
+  it('counts one of the routes that open, fill and complete a session when it answers every method', async () => {
+    const routes = ['/uploads/sessions', ...SESSION_ROUTES.slice(1)];
+    strictEqual((await metaFor(routes)).uploads?.chunkSize, parseBytes('8mb'));
+  });
+
+  it('sends no chunk size while the app drops one of the routes that open, fill and complete a session', async () => {
+    for (const dropped of SESSION_ROUTES) {
+      const meta = await metaFor(SESSION_ROUTES.filter((id) => id !== dropped));
+      deepStrictEqual(meta.uploads, { maxFileSize: parseBytes('128mb') });
+    }
+  });
+
+  it('sends no chunk size on a storage without parts', async () => {
+    const { parts } = storage;
+    delete storage.parts;
+    try {
+      deepStrictEqual((await metaFor(SESSION_ROUTES)).uploads, {
+        maxFileSize: parseBytes('128mb'),
+      });
+    } finally {
+      storage.parts = parts;
+    }
   });
 });

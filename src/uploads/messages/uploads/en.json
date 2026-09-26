@@ -28,6 +28,7 @@
     "fileType": "File type",
     "fileURL": "File URL",
     "files": "Files",
+    "finishing": "Finishing",
     "focalPoint": "Focal point",
     "focalPointHint": "Click or drag on the image to set the focal point.",
     "folder": "Folder",
@@ -41,6 +42,7 @@
     "hide": "Hide",
     "image": "Image",
     "imageNotFound": "Image not found",
+    "interrupted": "Interrupted",
     "itemsConflict": "Some items already exist at the destination",
     "linkCopied": "Temporary link copied",
     "linkFailed": "The link could not be made",
@@ -66,13 +68,16 @@
     "noUploads": "No uploads found",
     "notAllowedHere": "Not allowed here",
     "notRendered": "Not rendered",
+    "notTheSameFile": "The picked file is not the interrupted `{name}`",
     "nothingSelected": "Nothing selected",
     "openInNewTab": "Open in new tab",
     "pending": "Pending",
+    "pickToResume": "Pick `{name}` again to resume",
     "pixels": "pixels",
     "private": "Private",
     "privateFolderHint": "Everything inside the private folder `{folder}` is private.",
     "privateHint": "Only a temporary link or a signed-in reader with access can open the file.",
+    "reconnecting": "Reconnecting",
     "rename": "Rename",
     "renameFailed": "An error occurred while renaming",
     "renameFile": "Rename file",
@@ -80,6 +85,8 @@
     "renamed": "Renamed `{from}` to `{to}`",
     "replace": "Replace",
     "replaceFile": "Replace file",
+    "resume": "Resume",
+    "retry": "Retry",
     "rootFolder": "Root folder",
     "searchByName": "Search by name",
     "selectFile": "Select file",
@@ -110,9 +117,11 @@
     "notAFile": "This is a folder, not a file",
     "notAFolder": "The path `{path}` is a file, not a folder",
     "notAnImage": "The file is not an image",
+    "notResumable": "The `{storage}` storage cannot resume uploads",
     "notSVG": "The file is not an SVG image",
     "outOfReach": "You would no longer see the result",
     "pathTooLong": "A path may be at most `{max}` characters long",
+    "sessionExpired": "The upload session has expired",
     "typeNotAllowed": "File type `{type}` is not allowed",
     "urlInvalid": "The URL must be http or https, without credentials",
     "urlStatus": "The URL answered with status `{status}`",
@@ -196,5 +205,63 @@
   },
   "menu": {
     "media": "Media"
+  },
+  "sessions": {
+    "author": {
+      "label": "Uploaded by",
+      "description": "The user who started the upload, the only one who can continue it."
+    },
+    "directory": {
+      "label": "Folder",
+      "description": "The path of the folder the file lands in, empty at the root."
+    },
+    "name": {
+      "label": "Name",
+      "description": "The file name, slugified; completion adds a suffix when the name is taken."
+    },
+    "type": {
+      "label": "Type",
+      "description": "The media type, derived from the file extension."
+    },
+    "size": {
+      "label": "Size",
+      "description": "The size of the whole file in bytes."
+    },
+    "chunkSize": {
+      "label": "Chunk size",
+      "description": "The size of every chunk but the last in bytes, fixed when the session starts."
+    },
+    "offset": {
+      "label": "Offset",
+      "description": "The bytes confirmed in storage; the next chunk starts here."
+    },
+    "hashState": {
+      "label": "Hash state",
+      "description": "The SHA-256 state over the confirmed bytes, carried from one chunk to the next."
+    },
+    "token": {
+      "label": "Token",
+      "description": "The storage's handle for the parts written so far; empty once they are assembled."
+    },
+    "receipts": {
+      "label": "Receipts",
+      "description": "The storage's receipt for each stored part, in part order."
+    },
+    "width": {
+      "label": "Width",
+      "description": "The width of the image in pixels, measured from the first chunk."
+    },
+    "height": {
+      "label": "Height",
+      "description": "The height of the image in pixels, measured from the first chunk."
+    },
+    "upload": {
+      "label": "Upload",
+      "description": "The file the session landed as; empty until it completes."
+    },
+    "expiresAt": {
+      "label": "Expires at",
+      "description": "When the session ends; an unfinished upload is then discarded."
+    }
   }
 }

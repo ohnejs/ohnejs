@@ -115,3 +115,87 @@ export interface UploadRecord extends UploadDecorations {
    */
   _updatedAt: number;
 }
+
+/**
+ * A resumable upload as every session route answers it: where the file lands and how far it got.
+ */
+export interface UploadSession {
+  /**
+   * The session's `UUID`, which every later request names.
+   */
+  UUID: string;
+
+  /**
+   * The parent path the file lands in, canonicalized; `''` is the root.
+   */
+  directory: string;
+
+  /**
+   * The file name, canonicalized.
+   * Completion adds a `-2` suffix when the name is taken by then.
+   */
+  name: string;
+
+  /**
+   * The file's media type, derived from the extension of `name`.
+   */
+  type: string;
+
+  /**
+   * The size of the whole file in bytes.
+   */
+  size: number;
+
+  /**
+   * The size of every chunk but the last in bytes, fixed for the session's life.
+   */
+  chunkSize: number;
+
+  /**
+   * The bytes confirmed in storage, where the next chunk starts.
+   * Completion needs it at `size`.
+   */
+  offset: number;
+
+  /**
+   * When the session ends, in epoch milliseconds, never extended.
+   * An unfinished session past it is discarded with every byte it received.
+   */
+  expiresAt: number;
+
+  /**
+   * The `UUID` of the `Uploads` row the file landed as, `null` until completion.
+   */
+  upload: string | null;
+}
+
+/**
+ * What `createUploadSession` takes: where the file goes and how large it is.
+ */
+export interface CreateUploadSessionInput {
+  /**
+   * The parent path, canonicalized before use.
+   *
+   * @default
+   * ''
+   */
+  directory?: string;
+
+  /**
+   * The file name, canonicalized before use.
+   * Its extension names the media type, and a name already taken gets a `-2` suffix at completion.
+   */
+  name: string;
+
+  /**
+   * The size of the whole file in bytes, a positive integer.
+   * It fixes the number of chunks the session expects.
+   */
+  size: number;
+
+  /**
+   * The `UUID` of the uploading user, `null` when there is none.
+   * A later call that names an `author` reaches the session only when it is this one.
+   */
+  author?: string | null;
+}

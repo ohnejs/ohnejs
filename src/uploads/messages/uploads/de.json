@@ -28,6 +28,7 @@
     "fileType": "Dateityp",
     "fileURL": "Datei-URL",
     "files": "Dateien",
+    "finishing": "Wird abgeschlossen",
     "focalPoint": "Fokuspunkt",
     "focalPointHint": "Klicke auf das Bild oder ziehe darüber, um den Fokuspunkt zu setzen.",
     "folder": "Ordner",
@@ -41,6 +42,7 @@
     "hide": "Ausblenden",
     "image": "Bild",
     "imageNotFound": "Bild nicht gefunden",
+    "interrupted": "Unterbrochen",
     "itemsConflict": "Einige Elemente existieren am Ziel bereits",
     "linkCopied": "Temporärer Link kopiert",
     "linkFailed": "Der Link konnte nicht erstellt werden",
@@ -66,13 +68,16 @@
     "noUploads": "Keine Uploads gefunden",
     "notAllowedHere": "Hier nicht erlaubt",
     "notRendered": "Nicht gerendert",
+    "notTheSameFile": "Die gewählte Datei ist nicht die unterbrochene Datei `{name}`",
     "nothingSelected": "Nichts ausgewählt",
     "openInNewTab": "In neuem Tab öffnen",
     "pending": "Ausstehend",
+    "pickToResume": "Wähle `{name}` erneut aus, um fortzufahren",
     "pixels": "Pixel",
     "private": "Privat",
     "privateFolderHint": "Alles im privaten Ordner `{folder}` ist privat.",
     "privateHint": "Nur ein temporärer Link oder ein angemeldeter Leser mit Zugriff kann die Datei öffnen.",
+    "reconnecting": "Verbindung wird wiederhergestellt",
     "rename": "Umbenennen",
     "renameFailed": "Beim Umbenennen ist ein Fehler aufgetreten",
     "renameFile": "Datei umbenennen",
@@ -80,6 +85,8 @@
     "renamed": "`{from}` in `{to}` umbenannt",
     "replace": "Ersetzen",
     "replaceFile": "Datei ersetzen",
+    "resume": "Fortsetzen",
+    "retry": "Erneut versuchen",
     "rootFolder": "Stammordner",
     "searchByName": "Nach Namen suchen",
     "selectFile": "Datei auswählen",
@@ -110,9 +117,11 @@
     "notAFile": "Dies ist ein Ordner, keine Datei",
     "notAFolder": "Der Pfad `{path}` ist eine Datei, kein Ordner",
     "notAnImage": "Die Datei ist kein Bild",
+    "notResumable": "Der Speicher `{storage}` kann Uploads nicht fortsetzen",
     "notSVG": "Die Datei ist kein SVG-Bild",
     "outOfReach": "Du würdest das Ergebnis nicht mehr sehen",
     "pathTooLong": "Ein Pfad darf höchstens `{max}` Zeichen lang sein",
+    "sessionExpired": "Die Upload-Sitzung ist abgelaufen",
     "typeNotAllowed": "Der Dateityp `{type}` ist nicht erlaubt",
     "urlInvalid": "Die URL muss http oder https sein, ohne Zugangsdaten",
     "urlStatus": "Die URL antwortete mit Status `{status}`",
@@ -196,5 +205,63 @@
   },
   "menu": {
     "media": "Medien"
+  },
+  "sessions": {
+    "author": {
+      "label": "Hochgeladen von",
+      "description": "Der Benutzer, der den Upload gestartet hat und ihn als Einziger fortsetzen kann."
+    },
+    "directory": {
+      "label": "Ordner",
+      "description": "Der Pfad des Ordners, in dem die Datei landet, im Stammverzeichnis leer."
+    },
+    "name": {
+      "label": "Name",
+      "description": "Der Dateiname als Slug; der Abschluss hängt ein Suffix an, wenn der Name vergeben ist."
+    },
+    "type": {
+      "label": "Typ",
+      "description": "Der Medientyp, abgeleitet aus der Dateiendung."
+    },
+    "size": {
+      "label": "Größe",
+      "description": "Die Größe der ganzen Datei in Bytes."
+    },
+    "chunkSize": {
+      "label": "Chunk-Größe",
+      "description": "Die Größe jedes Chunks außer dem letzten in Bytes, beim Start der Sitzung festgelegt."
+    },
+    "offset": {
+      "label": "Offset",
+      "description": "Die im Speicher bestätigten Bytes; hier beginnt der nächste Chunk."
+    },
+    "hashState": {
+      "label": "Hash-Zustand",
+      "description": "Der SHA-256-Zustand über die bestätigten Bytes, von Chunk zu Chunk weitergereicht."
+    },
+    "token": {
+      "label": "Token",
+      "description": "Das Handle des Speichers für die bisher geschriebenen Teile; leer, sobald sie zusammengesetzt sind."
+    },
+    "receipts": {
+      "label": "Belege",
+      "description": "Der Beleg des Speichers für jeden gespeicherten Teil, in der Reihenfolge der Teile."
+    },
+    "width": {
+      "label": "Breite",
+      "description": "Die Breite des Bildes in Pixeln, am ersten Chunk gemessen."
+    },
+    "height": {
+      "label": "Höhe",
+      "description": "Die Höhe des Bildes in Pixeln, am ersten Chunk gemessen."
+    },
+    "upload": {
+      "label": "Upload",
+      "description": "Die Datei, die beim Abschluss der Sitzung entstanden ist; bis dahin leer."
+    },
+    "expiresAt": {
+      "label": "Läuft ab am",
+      "description": "Wann die Sitzung endet; ein unfertiger Upload wird dann verworfen."
+    }
   }
 }

@@ -2,6 +2,7 @@ import type {
   CollectionAPI,
   CollectionEndpoint,
 } from '../../src/ohne/collections/define-collection.ts';
+import type { DispatchOptions } from '../../src/ohne/http/dispatch.ts';
 import type { AnyHandler, Route } from '../../src/ohne/routes/route.ts';
 import type { HTTPMethod } from '../../src/utils/index.ts';
 import type { MemoryStorage } from './_storage.ts';
@@ -29,7 +30,10 @@ import { queryUntyped } from '../../src/ohne/query/query.ts';
 import { useRoles } from '../../src/ohne/roles/use-roles.ts';
 import UploadsCollection from '../../src/uploads/collections/Uploads.ts';
 import UploadsJournalCollection from '../../src/uploads/collections/UploadsJournal.ts';
+import UploadsSessionsCollection from '../../src/uploads/collections/UploadsSessions.ts';
 import { useStorages } from '../../src/uploads/storage/use-storages.ts';
+import { withSessionLock } from '../../src/uploads/uploads/_session.ts';
+import { sleep } from '../../src/utils/sleep/sleep.ts';
 import { createMemoryStorage } from './_storage.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
@@ -63,6 +67,10 @@ useCollections().register('Uploads', { name: 'Uploads', collection: UploadsColle
 useCollections().register('UploadsJournal', {
   name: 'UploadsJournal',
   collection: UploadsJournalCollection,
+});
+useCollections().register('UploadsSessions', {
+  name: 'UploadsSessions',
+  collection: UploadsSessionsCollection,
 });
 useRoles().register('uploads-admin', {
   name: 'uploads-admin',
@@ -167,6 +175,31 @@ export const JPEG_HEAD = new Uint8Array([
 ]);
 
 /**
+ * Holds the lock of the session `uuid`, as a request busy with it would, until the returned `release` runs.
+ * `release` resolves once the lock is free again.
+ */
+export async function holdSession(uuid: string): Promise<() => Promise<void>> {
+  const gate = Promise.withResolvers<void>();
+  const entered = Promise.withResolvers<void>();
+  const held = withSessionLock(uuid, async () => {
+    entered.resolve();
+    await gate.promise;
+  });
+  await entered.promise;
+  return () => {
+    gate.resolve();
+    return held;
+  };
+}
+
+/**
+ * Resolves what `pending` resolves, or `'waited'` once a second passes first.
+ */
+export function promptly<T>(pending: Promise<T>): Promise<T | 'waited'> {
+  return Promise.race([pending, sleep(1000).then(() => 'waited' as const)]);
+}
+
+/**
  * Wraps a handler module's default export as the route the router would build for it.
  */
 export function route(method: HTTPMethod, pattern: string, handler: unknown): Route {
@@ -191,12 +224,14 @@ export interface CallInit {
 
 /**
  * Dispatches one request through a route in-process, as the server would.
+ * `options` reach `dispatch` as the server passes a route's resolved options, such as its `maxBodySize`.
  */
 export async function call(
   r: Route,
   path: string,
   params: Record<string, string>,
   init: CallInit = {},
+  options?: DispatchOptions,
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.bearer !== undefined) headers.set('authorization', `Bearer ${init.bearer}`);
@@ -210,7 +245,7 @@ export async function call(
     body,
     duplex: 'half',
   } as RequestInit);
-  const { response } = await dispatch(r, request, new URL(request.url), params);
+  const { response } = await dispatch(r, request, new URL(request.url), params, options);
   return response;
 }
 

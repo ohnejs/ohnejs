@@ -8,19 +8,41 @@ import {
   each,
   h,
   icon,
+  type IconName,
   navigate,
   when,
 } from 'ohnejs/dashboard';
-import { effect, formatBytes, isNull, onCleanup, ref, untracked } from 'ohnejs/utils';
+import { effect, formatBytes, isNull, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
 
+import type { RememberedUpload } from './_remembered-uploads.ts';
 import type { UploadStatus, UploadTask } from './upload-queue-state.ts';
 
 import { useUploadsT } from './_messages.ts';
 import { mediaPath, splitFileName } from './media-library-state.ts';
 import { uploadProgressCircle } from './upload-progress-circle.ts';
-import { hideUploadTask, uploadSpeed, uploadTasks } from './upload-queue.ts';
+import {
+  discardInterruptedUpload,
+  hideUploadTask,
+  interruptedUploads,
+  resumeUpload,
+  retryUploadTask,
+  uploadSpeed,
+  uploadTasks,
+} from './upload-queue.ts';
+
+/**
+ * What a row's round button does; its message key under `uploads.dashboard` names it.
+ */
+type RowAction = 'abort' | 'retry' | 'resume' | 'hide';
 
 const ACTIVE: readonly UploadStatus[] = ['pending', 'uploading'];
+
+const ACTION_ICONS: Readonly<Record<RowAction, IconName>> = {
+  abort: 'circle-off',
+  retry: 'refresh',
+  resume: 'player-play',
+  hide: 'x',
+};
 
 css`
   .ohne-dropdown.o-upload-bell-dropdown {
@@ -91,7 +113,8 @@ css`
     color: hsl(var(--ohne-destructive-foreground));
   }
 
-  .o-upload-notification-status-pending {
+  .o-upload-notification-status-pending,
+  .o-upload-notification-status-interrupted {
     border-color: hsl(var(--ohne-accent) / 0.24);
   }
 
@@ -138,7 +161,7 @@ css`
     transition-property: background-color, color;
   }
 
-  .o-upload-notification-action-button-hide {
+  .o-upload-notification-action-hide {
     display: none;
   }
 
@@ -147,23 +170,41 @@ css`
     display: flex;
   }
 
+  .o-upload-notification-action-button ~ .o-upload-notification-action-button {
+    margin-left: 0.25rem;
+  }
+
   .o-upload-notification-action-button:hover,
   .o-upload-notification-action-button:focus {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
+
+  .o-upload-notification-action-button.o-upload-notification-action-retry:hover,
+  .o-upload-notification-action-button.o-upload-notification-action-retry:focus,
+  .o-upload-notification-action-button.o-upload-notification-action-resume:hover,
+  .o-upload-notification-action-button.o-upload-notification-action-resume:focus {
+    background-color: hsl(var(--ohne-primary));
+    color: hsl(var(--ohne-primary-foreground));
+  }
+
+  .o-upload-notification-input {
+    display: none;
+  }
 `;
 
 /**
  * The header's upload bell.
- * It renders only while the upload history holds a task, so a quiet dashboard shows no bell.
+ * It renders only while the history holds a task or an interrupted upload, so a quiet dashboard shows none.
  * The trigger carries a bubble with the pending and uploading count and turns primary while open.
  * The dropdown lists every task with a status circle, the split file name, a detail line, and its action.
- * The detail line holds the size; a URL upload shows its host until the size is known, never the URL.
- * A completed row opens the file's details in the media library; the header shows the measured speed.
+ * The detail line holds the size, and the bytes sent while uploading; a URL upload shows its host instead.
+ * A completed row opens the file's details in the media library; a failed row offers a retry.
+ * Below the tasks, each upload an earlier page left open offers to resume once its file is picked again.
+ * The header shows the measured speed.
  */
 export function uploadBell(): Child {
-  return when(() => uploadTasks().length > 0, bell);
+  return when(() => uploadTasks().length > 0 || interruptedUploads().length > 0, bell);
 }
 
 /**
@@ -198,10 +239,36 @@ function bell(): HTMLElement {
     trigger.classList.toggle('ohne-button-outline', !open.value);
   });
 
+  let resuming: RememberedUpload | undefined;
+  const resumeInput = h('input', {
+    type: 'file',
+    class: 'o-upload-notification-input',
+    onChange: () => {
+      const file = resumeInput.files?.[0];
+      if (!isUndefined(file) && !isUndefined(resuming)) resumeUpload(resuming, file);
+      resumeInput.value = '';
+    },
+  }) as HTMLInputElement;
+
+  const closeIfLast = (): void => {
+    if (uploadTasks().length + interruptedUploads().length === 1) close();
+  };
+
   const hide = (id: string): void => {
-    if (uploadTasks().length === 1) close();
+    closeIfLast();
     hideUploadTask(id);
     panel?.update();
+  };
+
+  const discard = (session: string): void => {
+    closeIfLast();
+    discardInterruptedUpload(session);
+    panel?.update();
+  };
+
+  const resume = (entry: RememberedUpload): void => {
+    resuming = entry;
+    resumeInput.click();
   };
 
   const view = (task: UploadTask): void => {
@@ -236,7 +303,11 @@ function bell(): HTMLElement {
         return current.error?.replaceAll('`', '') ?? t('uploads.dashboard.failed');
       }
       if (current.status === 'aborted') return t('uploads.dashboard.aborted');
-      return isNull(current.size) ? (current.host ?? '') : formatBytes(current.size);
+      if (isNull(current.size)) return current.host ?? '';
+      if (current.status !== 'uploading') return formatBytes(current.size);
+      if (current.stalled) return t('uploads.dashboard.reconnecting');
+      if (current.progress === 1) return t('uploads.dashboard.finishing');
+      return `${formatBytes(current.size * current.progress)} / ${formatBytes(current.size)}`;
     };
 
     return h(
@@ -263,50 +334,52 @@ function bell(): HTMLElement {
       h(
         'div',
         { class: 'o-upload-notification-content' },
-        h(
-          'span',
-          { class: 'o-upload-notification-filename' },
-          h('span', { class: 'ohne-truncate' }, () => splitFileName(task().name).stem),
-          when(
-            () => splitFileName(task().name).extension !== '',
-            () => h('span', null, () => `.${splitFileName(task().name).extension}`),
-          ),
-        ),
+        fileName(() => task().name),
         h('span', { class: 'o-upload-notification-detail' }, detail),
       ),
       when(
         () => status.value === 'uploading',
-        () =>
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'o-upload-notification-action-button ohne-raw',
-              title: () => t('uploads.dashboard.abort'),
-              onClick: () => task().abort(),
-            },
-            icon('circle-off'),
+        () => actionButton('abort', () => task().abort()),
+        () => [
+          when(
+            () => status.value === 'failed',
+            () => actionButton('retry', () => void retryUploadTask(task().id)),
           ),
-        () =>
-          h(
-            'button',
-            {
-              type: 'button',
-              class:
-                'o-upload-notification-action-button o-upload-notification-action-button-hide ohne-raw',
-              title: () => t('uploads.dashboard.hide'),
-              onClick: () => hide(task().id),
-            },
-            icon('x'),
-          ),
+          actionButton('hide', () => hide(task().id)),
+        ],
       ),
     );
   };
+
+  const interruptedRow = (entry: () => RememberedUpload): HTMLElement =>
+    h(
+      'div',
+      { class: 'o-upload-notification' },
+      h(
+        'span',
+        {
+          class: 'o-upload-notification-status o-upload-notification-status-interrupted',
+          title: () => t('uploads.dashboard.interrupted'),
+        },
+        icon('circle-dashed'),
+      ),
+      h(
+        'div',
+        { class: 'o-upload-notification-content' },
+        fileName(() => entry().name),
+        h('span', { class: 'o-upload-notification-detail' }, () =>
+          t('uploads.dashboard.pickToResume', { name: entry().name }).replaceAll('`', ''),
+        ),
+      ),
+      actionButton('resume', () => resume(entry())),
+      actionButton('hide', () => discard(entry().session)),
+    );
 
   return h(
     'div',
     { class: 'ohne-flex' },
     trigger,
+    resumeInput,
     when(
       () => open.value,
       () => {
@@ -326,6 +399,7 @@ function bell(): HTMLElement {
               ),
             ),
             each(uploadTasks, (task) => task.id, row),
+            each(interruptedUploads, (entry) => entry.session, interruptedRow),
           ],
           { reference: trigger, class: 'o-upload-bell-dropdown', onClose: close },
         );
@@ -334,6 +408,38 @@ function bell(): HTMLElement {
         });
         return panel.root;
       },
+    ),
+  );
+}
+
+/**
+ * A row's round action button, titled in the viewer's language.
+ */
+function actionButton(action: RowAction, onClick: () => void): HTMLElement {
+  const t = useUploadsT();
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: `o-upload-notification-action-button o-upload-notification-action-${action} ohne-raw`,
+      title: () => t(`uploads.dashboard.${action}`),
+      onClick,
+    },
+    icon(ACTION_ICONS[action]),
+  );
+}
+
+/**
+ * A row's file name, its stem truncated so the extension always shows.
+ */
+function fileName(name: () => string): HTMLElement {
+  return h(
+    'span',
+    { class: 'o-upload-notification-filename' },
+    h('span', { class: 'ohne-truncate' }, () => splitFileName(name()).stem),
+    when(
+      () => splitFileName(name()).extension !== '',
+      () => h('span', null, () => `.${splitFileName(name()).extension}`),
     ),
   );
 }

@@ -1,23 +1,12 @@
-import type { Transaction } from 'ohnejs';
-
-import { queryUntyped, useDatabase } from 'ohnejs';
-import { extname, mediaTypeMatches, mimeTypeFor, parseMediaType } from 'ohnejs/utils';
-
-import type { QueryRecord } from '../../ohne/query/read/find.ts';
 import type { UploadReach } from './_reach.ts';
-import type { StagedUpload } from './_stage.ts';
 import type { UploadRecord } from './types.ts';
 
-import { validationError } from '../../ohne/query/write/errors.ts';
-import { useUploadsConfig } from '../config.ts';
-import { drainJournal, journalStorage } from '../storage/journal.ts';
-import { isNotUnique, uploadsError } from './_errors.ts';
-import { ensureFolders } from './_folders.ts';
+import { drainJournal } from '../storage/journal.ts';
+import { landUpload } from './_land.ts';
 import { assertPathFits } from './_path-limit.ts';
-import { assertReached } from './_reach.ts';
-import { decorated } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
-import { canonicalDirectory, canonicalName, uniqueUploadName, uploadPath } from './path.ts';
+import { assertTypeAllowed, uploadType } from './_type.ts';
+import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';
 
 /**
  * What `putUpload` takes: where the file goes and the bytes it holds.
@@ -55,10 +44,6 @@ export interface PutUploadInput {
   reach?: UploadReach;
 }
 
-const OCTET_STREAM = 'application/octet-stream';
-
-const NAME_ATTEMPTS = 5;
-
 /**
  * Stores a new file: its bytes in storage and its row in `Uploads`, at one canonical path.
  *
@@ -81,57 +66,22 @@ export async function putUpload(input: PutUploadInput): Promise<UploadRecord> {
   const directory = canonicalDirectory(input.directory);
   const name = canonicalName(input.name);
   const author = input.author ?? null;
-  const type = parseMediaType(mimeTypeFor(extname(name)) ?? OCTET_STREAM).type;
-  if (!mediaTypeMatches(type, useUploadsConfig().types)) {
-    throw uploadsError('name', 'typeNotAllowed', { type });
-  }
+  const type = uploadType(name);
+  assertTypeAllowed(type);
   assertPathFits(uploadPath({ directory, name }));
 
   const staged = await stageUpload(input.body, { type, size: input.size });
-  let record: QueryRecord;
+  let record: UploadRecord;
   try {
-    record = await useDatabase().transaction(async (tx) => {
-      await claimStaged(tx, staged.temp);
-      const { locked, created } = await ensureFolders(tx, directory, author);
-      const row = await createFile(tx, { directory, name, type, author, private: locked }, staged);
-      await assertReached(tx, input.reach, [row.UUID as string, ...created]);
-      const path = uploadPath(row);
-      if (locked) await journalStorage(tx, { op: 'lock', from: staged.temp });
-      await journalStorage(tx, { op: 'move', from: staged.temp, to: path });
-      return row;
-    }, 'immediate');
+    record = await landUpload(
+      staged,
+      { directory, name, type, author, reach: input.reach },
+      { claim: (tx) => claimStaged(tx, staged.temp) },
+    );
   } catch (error) {
     await discardStaged(staged.temp);
     throw error;
   }
   await drainJournal();
-  return decorated(record);
-}
-
-/**
- * Creates the file row under a name free among its siblings, retrying the next suffix on a lost race.
- * A suffix that would carry the path past 768 bytes is a `422` at `directory`.
- */
-async function createFile(
-  tx: Transaction,
-  file: { directory: string; name: string; type: string; author: string | null; private: boolean },
-  { size, hash, width, height }: StagedUpload,
-): Promise<QueryRecord & { directory: string; name: string }> {
-  const siblings = (await queryUntyped('Uploads')
-    .use(tx)
-    .where({ directory: file.directory })
-    .pluck('name')) as string[];
-  let name = uniqueUploadName(file.name, siblings);
-  for (let attempt = 1; ; attempt++) {
-    assertPathFits(uploadPath({ directory: file.directory, name }));
-    const outcome = await queryUntyped('Uploads')
-      .use(tx)
-      .create({ ...file, kind: 'file', name, size, hash, width, height });
-    if (outcome.ok) return outcome.record as QueryRecord & { directory: string; name: string };
-    if (attempt === NAME_ATTEMPTS || !isNotUnique(outcome.errors)) {
-      throw validationError(outcome.errors);
-    }
-    siblings.push(name);
-    name = uniqueUploadName(file.name, siblings);
-  }
+  return record;
 }
