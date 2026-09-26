@@ -5,9 +5,14 @@ import { parseBytes } from '../../../src/utils/index.ts';
 
 describe('parseBytes', () => {
   describe('numbers', () => {
-    it('passes finite non-negative numbers through unchanged', () => {
+    it('passes whole non-negative numbers through unchanged', () => {
       strictEqual(parseBytes(0), 0);
       strictEqual(parseBytes(2048), 2048);
+    });
+
+    it('rounds a fractional number to whole bytes', () => {
+      strictEqual(parseBytes(5242880.5), 5242881);
+      strictEqual(parseBytes(0.4), 0);
     });
 
     it('throws on negative, NaN, and Infinity', () => {

@@ -33,7 +33,7 @@ const SIZE = /^\s*(\d+(?:\.\d+)?)\s*([a-z]*)\s*$/i;
 /**
  * Parses a human-readable byte size into a whole number of bytes.
  *
- * Accepts a number (returned as-is, treated as bytes) or a string of `<value><unit>`.
+ * Accepts a number of bytes or a string of `<value><unit>`.
  * Compact (`'10mb'`), decimal (`'1.5gb'`), and bare-number (`'2048'`) forms all work.
  * Units are case-insensitive and binary: `kb` is 1024 bytes, `mb` is 1024 kb, and so on.
  *
@@ -50,6 +50,7 @@ const SIZE = /^\s*(\d+(?:\.\d+)?)\s*([a-z]*)\s*$/i;
  * parseBytes('10mb')  // -> 10485760
  * parseBytes('1.5gb') // -> 1610612736
  * parseBytes(2048)    // -> 2048
+ * parseBytes(2047.6)  // -> 2048
  * ```
  */
 export function parseBytes(input: number | string): number {
@@ -68,5 +69,5 @@ export function parseBytes(input: number | string): number {
   if (!isRealNumber(input) || input < 0) {
     throw new Error(`Invalid byte size: ${input}`);
   }
-  return input;
+  return Math.round(input);
 }
