@@ -14,6 +14,7 @@
     "internalServerError": "Interna greška servera",
     "methodNotAllowed": "Metoda nije dozvoljena",
     "notFound": "Nije pronađeno",
+    "notImplemented": "Nije implementirano",
     "serviceUnavailable": "Usluga nedostupna",
     "tooManyRequests": "Previše zahtjeva",
     "unauthorized": "Niste autorizovani",

@@ -14,6 +14,7 @@
     "internalServerError": "Internal Server Error",
     "methodNotAllowed": "Method Not Allowed",
     "notFound": "Not Found",
+    "notImplemented": "Not Implemented",
     "serviceUnavailable": "Service Unavailable",
     "tooManyRequests": "Too Many Requests",
     "unauthorized": "Unauthorized",
