@@ -6,6 +6,7 @@ import {
   forbidden,
   HTTPError,
   notFound,
+  notImplemented,
   tooManyRequests,
   unauthorized,
   unprocessable,
@@ -36,6 +37,13 @@ describe('HTTPError constructors', () => {
     strictEqual(unprocessable().status, 422);
     strictEqual(unprocessable().message, 'api.http.unprocessableContent');
     strictEqual(tooManyRequests().status, 429);
+  });
+
+  it('`notImplemented` maps to `501`, the message defaulting to the catalog key', () => {
+    const error = notImplemented(undefined, { storage: 'ledger' });
+    strictEqual(error.status, 501);
+    strictEqual(error.message, 'api.http.notImplemented');
+    deepStrictEqual(error.data, { storage: 'ledger' });
   });
 
   it('take a custom message and data', () => {

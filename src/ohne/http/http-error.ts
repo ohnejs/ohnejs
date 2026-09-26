@@ -158,3 +158,19 @@ export function tooManyRequests(
 ): HTTPError {
   return new HTTPError(429, message, data);
 }
+
+/**
+ * Builds a `501 Not Implemented` error.
+ * The status when the server lacks a capability a request needs.
+ *
+ * @example
+ * ```ts
+ * throw notImplemented()
+ * ```
+ */
+export function notImplemented(
+  message = translate('api.http.notImplemented'),
+  data?: unknown,
+): HTTPError {
+  return new HTTPError(501, message, data);
+}
