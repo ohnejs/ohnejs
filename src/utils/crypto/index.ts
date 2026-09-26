@@ -5,6 +5,7 @@ export * from './hmac.ts';
 export * from './password-needs-rehash.ts';
 export * from './random-token.ts';
 export * from './secure-compare.ts';
+export * from './sha256.ts';
 export * from './sign-value.ts';
 export * from './truncate-with-hash.ts';
 export * from './unsign-value.ts';

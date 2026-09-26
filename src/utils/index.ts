@@ -216,6 +216,7 @@ export * from './slug/slugify.ts';
 export * from './sort/natural-compare.ts';
 export * from './sse/format-sse.ts';
 export * from './stream/limit-stream.ts';
+export * from './stream/on-first-read.ts';
 export * from './stream/rechunk-stream.ts';
 export * from './template/parse-template.ts';
 export * from './template/render-template.ts';
