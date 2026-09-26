@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
@@ -334,40 +335,61 @@ function errcodeOf(error: unknown): number | undefined {
 
 /**
  * Wraps a `node:sqlite` connection in the async `DatabaseAdapter` surface.
- * The driver is synchronous, so each method resolves at once.
  * Transactions run `BEGIN`/`COMMIT`/`ROLLBACK` explicitly, since `DatabaseSync` has no transaction helper.
  * A per-connection FIFO mutex serializes them, since a second `BEGIN` while one is open is a plain error.
  * The write pipeline awaits async validators inside the bracket, so overlapping writes are real without it.
  * `immediate` reserves the write lock at `BEGIN`, so contention waits there under `busy_timeout`.
+ *
+ * Any statement the connection runs while a transaction is open commits or rolls back with it.
+ * So while one is open, only its own async flow runs statements at once, through `tx` or the adapter alike.
+ * That flow covers work the transaction started without awaiting, until the transaction settles.
+ * A statement from any other flow queues behind it in the mutex, in order with waiting transactions.
+ * A transaction that awaits a statement from another flow on this connection therefore never settles.
+ * With no transaction open, a statement runs synchronously and resolves at once.
  */
 function createAdapter(db: DatabaseSync): DatabaseAdapter {
   const statements = createStatementCache((sql) => db.prepare(sql));
   const serialize = createMutex();
+  const flow = new AsyncLocalStorage<object>();
+  let open: object | undefined;
+
+  /**
+   * Runs `statement` at once, or queued behind the open transaction when it comes from another flow.
+   */
+  const inTurn = async <T>(statement: () => T): Promise<T> =>
+    isUndefined(open) || flow.getStore() === open
+      ? statement()
+      : serialize(async () => statement());
+
   const adapter: DatabaseAdapter = {
-    async exec(sql) {
-      db.exec(sql);
-      statements.clear();
+    exec(sql) {
+      return inTurn(() => {
+        db.exec(sql);
+        statements.clear();
+      });
     },
-    async run(sql, params = []) {
-      const { changes } = statements.get(sql).run(...params);
-      return { changes: Number(changes) };
+    run(sql, params = []) {
+      return inTurn(() => ({ changes: Number(statements.get(sql).run(...params).changes) }));
     },
-    async query(sql, params = []) {
-      return statements.get(sql).all(...params) as never;
+    query(sql, params = []) {
+      return inTurn(() => statements.get(sql).all(...params) as never);
     },
-    async queryOne(sql, params = []) {
-      return statements.get(sql).get(...params) as never;
+    queryOne(sql, params = []) {
+      return inTurn(() => statements.get(sql).get(...params) as never);
     },
     transaction(fn, mode = 'deferred') {
       return serialize(async () => {
         db.exec(mode === 'immediate' ? 'BEGIN IMMEDIATE' : 'BEGIN');
+        open = {};
         try {
-          const result = await fn(adapter);
+          const result = await flow.run(open, fn, adapter);
           db.exec('COMMIT');
           return result;
         } catch (error) {
           db.exec('ROLLBACK');
           throw error;
+        } finally {
+          open = undefined;
         }
       });
     },

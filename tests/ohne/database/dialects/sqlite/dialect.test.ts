@@ -112,6 +112,167 @@ describe('SQLiteDialect', () => {
       deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
       await db.close();
     });
+
+    const INSERT = 'INSERT INTO t (name) VALUES (?)';
+
+    async function openHeroes(): Promise<DatabaseAdapter> {
+      const db = await open();
+      await db.exec('CREATE TABLE t (name TEXT)');
+      return db;
+    }
+
+    async function heroes(db: DatabaseAdapter): Promise<string[]> {
+      const rows = await db.query<{ name: string }>('SELECT name FROM t ORDER BY rowid');
+      return rows.map((row) => row.name);
+    }
+
+    async function holdOpen(
+      db: DatabaseAdapter,
+      name: string,
+    ): Promise<(outcome: 'commit' | 'rollback') => Promise<void>> {
+      const gate = Promise.withResolvers<'commit' | 'rollback'>();
+      const entered = Promise.withResolvers<void>();
+      const held = db.transaction(async (tx) => {
+        await tx.run(INSERT, [name]);
+        entered.resolve();
+        if ((await gate.promise) === 'rollback') throw new Error('rolled back');
+      });
+      await entered.promise;
+      return (outcome) => {
+        gate.resolve(outcome);
+        return outcome === 'rollback' ? rejects(held, /rolled back/) : held;
+      };
+    }
+
+    it('keeps a write from another flow out of an open transaction that rolls back', async () => {
+      const db = await openHeroes();
+      const settle = await holdOpen(db, 'arthas');
+      const write = db.run(INSERT, ['jaina']);
+      await settle('rollback');
+      await write;
+      deepStrictEqual(await heroes(db), ['jaina']);
+      await db.close();
+    });
+
+    it('hides the rows of an open transaction from a read in another flow', async () => {
+      const db = await openHeroes();
+      const settle = await holdOpen(db, 'arthas');
+      const read = heroes(db);
+      await settle('rollback');
+      deepStrictEqual(await read, []);
+      await db.close();
+    });
+
+    it("keeps a lock taken from another flow through an open transaction's rollback", async () => {
+      const db = await openHeroes();
+      const settle = await holdOpen(db, 'arthas');
+      const acquired = dialect.acquireLock(db, 'uploads:session:jaina');
+      await settle('rollback');
+      ok(await acquired);
+      strictEqual(await dialect.acquireLock(db, 'uploads:session:jaina'), null);
+      await db.close();
+    });
+
+    it("keeps a lock released from another flow free through an open transaction's rollback", async () => {
+      const db = await openHeroes();
+      const handle = await dialect.acquireLock(db, 'uploads:session:jaina');
+      ok(handle);
+      const settle = await holdOpen(db, 'arthas');
+      const released = dialect.releaseLock(db, handle);
+      await settle('rollback');
+      await released;
+      ok(await dialect.acquireLock(db, 'uploads:session:jaina'));
+      await db.close();
+    });
+
+    it('queues statements from other flows in order with transactions, behind the open one', async () => {
+      const db = await openHeroes();
+      const gate = Promise.withResolvers<void>();
+      const entered = Promise.withResolvers<void>();
+      const first = db.transaction(async (tx) => {
+        await tx.run(INSERT, ['arthas']);
+        entered.resolve();
+        await gate.promise;
+        await tx.run(INSERT, ['illidan']);
+      });
+      await entered.promise;
+      const queued = [
+        db.run(INSERT, ['jaina']),
+        db.transaction((tx) => tx.run(INSERT, ['thrall'])),
+        ...['sylvanas', 'uther', 'tyrande'].map((name) => db.run(INSERT, [name])),
+      ];
+      gate.resolve();
+      await Promise.all([first, ...queued]);
+      deepStrictEqual(await heroes(db), [
+        'arthas',
+        'illidan',
+        'jaina',
+        'thrall',
+        'sylvanas',
+        'uther',
+        'tyrande',
+      ]);
+      await db.close();
+    });
+
+    it('keeps the queue moving past a waiting statement that fails', async () => {
+      const db = await openHeroes();
+      const settle = await holdOpen(db, 'arthas');
+      const failed = rejects(
+        db.run('INSERT INTO missing (name) VALUES (?)', ['jaina']),
+        /no such table/,
+      );
+      const write = db.run(INSERT, ['thrall']);
+      await settle('commit');
+      await failed;
+      await write;
+      deepStrictEqual(await heroes(db), ['arthas', 'thrall']);
+      await db.close();
+    });
+
+    it('runs its own flow at once, through the adapter and in work it started', async () => {
+      const db = await openHeroes();
+      await rejects(
+        db.transaction(async () => {
+          const started = sleep(1).then(() => db.run(INSERT, ['arthas']));
+          await db.run(INSERT, ['jaina']);
+          await started;
+          throw new Error('rolled back');
+        }),
+        /rolled back/,
+      );
+      deepStrictEqual(await heroes(db), []);
+      await db.close();
+    });
+
+    it('runs work a settled transaction left behind outside the next one', async () => {
+      const db = await openHeroes();
+      const later = Promise.withResolvers<void>();
+      let leftover!: Promise<unknown>;
+      await db.transaction(async (tx) => {
+        leftover = later.promise.then(() => db.run(INSERT, ['thrall']));
+        await tx.run(INSERT, ['jaina']);
+      });
+      const settle = await holdOpen(db, 'arthas');
+      later.resolve();
+      await sleep(1);
+      await settle('rollback');
+      await leftover;
+      deepStrictEqual(await heroes(db), ['jaina', 'thrall']);
+      await db.close();
+    });
+
+    it('runs a transaction started inside another, unawaited, once the outer commits', async () => {
+      const db = await openHeroes();
+      let inner!: Promise<unknown>;
+      await db.transaction(async (tx) => {
+        inner = db.transaction((nested) => nested.run(INSERT, ['jaina']));
+        await tx.run(INSERT, ['arthas']);
+      });
+      await inner;
+      deepStrictEqual(await heroes(db), ['arthas', 'jaina']);
+      await db.close();
+    });
   });
 
   describe('quote', () => {
