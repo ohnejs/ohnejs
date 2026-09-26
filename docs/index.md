@@ -104,6 +104,8 @@ and serve routes, media fields, and the dashboard's Media page.
 - [Uploads](./uploads/uploads.md) - install the layer, configure storage, upload and serve files.
 - [Uploading from a URL](./uploads/from-a-url.md) - fetch a file from a link into Media.
 - [Storage](./uploads/storage.md) - the filesystem, S3, or a backend of your own.
+- [Resumable uploads](./uploads/resumable.md) - send a large file in chunks, and continue after a
+  lost connection.
 - [Media fields](./uploads/fields.md) - reference uploads from your collections.
 - [Image variants](./uploads/image-variants.md) - signed URLs an image service renders on demand.
 - [Private files](./uploads/private-files.md) - files that open only through an expiring link or

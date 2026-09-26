@@ -112,6 +112,10 @@ export default defineConfig({
 - `allowedHosts` limits which hosts the server answers to: a request whose `Host` matches none of
   the patterns is refused with `400` before routing. When empty, the server answers to any host.
 
+If the proxy limits request bodies, keep
+[`uploads.chunkSize`](../uploads/resumable.md#sizes-and-limits) under that limit, so every chunk of
+a large upload gets through.
+
 ## CORS
 
 The `ohnejs/base` layer mounts a global [`cors` middleware](../api/middleware.md#cors): only the

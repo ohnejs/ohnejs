@@ -23,31 +23,38 @@ the database is always connected. [Boot files](../project/boot.md) run before th
 [`server:ready`](../project/hooks.md#serverready), never at its top level. A cron job written as a
 [command](../project/commands.md) finds the database connected, like a handler.
 
-## Timing
+## Skipping a held lock
 
-A third argument adjusts the timing of a call:
+To skip work that another instance is already doing, pass `wait: false`:
 
 ```ts
-await withLock('reports:rebuild', () => rebuildReports(), {
-  pollInterval: 500,
-  staleAfter: 5 * 60_000,
-});
+import { withLock } from 'ohnejs';
+
+const pruned = await withLock('cache:prune', () => pruneCache(), { wait: false });
 ```
 
-- `pollInterval` is how often a waiting instance re-checks a held lock, in milliseconds.
-  Defaults to `250`.
-- `staleAfter` is the time after which a held lock counts as abandoned and is taken over. A lock is
-  abandoned when its holder crashed without releasing it. Defaults to one minute.
+While another caller holds the lock, `withLock` resolves `undefined` at once, and the function
+does not run.
 
-`staleAfter` must be longer than the longest time the guarded work can take. If the work can take
-five minutes, a one-minute `staleAfter` lets another instance take over the lock while the work is
-still running.
+## Crashes
 
-Waiting has no limit. There is no timeout and no try-once option: a caller waits until the lock is
-released or goes stale.
+The lock is renewed while the function runs, so the work can take as long as it needs. If the
+process holding it crashes, the renewals stop, and the next caller takes the lock over within 20
+seconds.
+
+## Timing
+
+`pollInterval` is how often a waiting caller re-checks a held lock, in milliseconds. It defaults to
+`250`:
+
+```ts
+await withLock('reports:rebuild', () => rebuildReports(), { pollInterval: 500 });
+```
+
+Waiting has no limit: a caller waits until the lock is released or its holder has crashed.
 
 ## Rules
 
-- `withLock` is not reentrant. A nested call on the same key waits until it takes over the outer
-  lock after `staleAfter`.
+- `withLock` is not reentrant. A call on a key the calling function holds throws, even from work it
+  started without awaiting.
 - The key `sync` is reserved for the [schema sync](./sync.md). Passing it throws immediately.

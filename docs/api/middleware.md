@@ -170,10 +170,11 @@ Adding `cors()` replaces the open default. Its options:
   a wildcard.
 - `methods` - preflight allow-list. Defaults to `GET`, `HEAD`, `PUT`, `PATCH`, `POST`, `DELETE`.
 - `allowHeaders` - request headers to allow. When omitted, the preflight allows the headers the
-  browser asked for.
+  browser asked for. A list must include the ones the dashboard sends: `content-type`, and
+  `upload-offset` for [resumable uploads](../uploads/resumable.md).
 - `exposeHeaders` - response headers that scripts may read, in addition to the safelisted ones.
-- `maxAge` - seconds the browser may cache the preflight. When omitted, the browser uses its own
-  default.
+- `maxAge` - seconds the browser may cache a preflight, so later requests to the same URL skip it.
+  Defaults to `7200`, two hours. `0` turns the cache off.
 
 It answers a preflight [`OPTIONS`](./routes.md#matching) itself, with `204` and the allow headers,
 so you need no `.options` route.

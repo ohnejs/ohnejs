@@ -78,6 +78,11 @@ as you like, in any shape.
 Raise the limit in [config](../project/config.md#the-api-server), or
 [per route](./routes.md#per-route-options).
 
+A client that sends `Expect: 100-continue`, as curl does for a large body, holds the body back
+until your handler first reads it, or until its own wait runs out, a second for curl. Refuse before
+the first read, with a `401` or a `409`, and a client still waiting never sends the body. A proxy
+that buffers request bodies, as nginx does by default, takes the whole body first.
+
 ## Cookies
 
 `useCookies()` parses the `Cookie` header into a map of name to value:

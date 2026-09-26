@@ -93,6 +93,9 @@ export default defineCollection({
 });
 ```
 
+Beside `Uploads`, the layer keeps its bookkeeping in `UploadsJournal` and `UploadsSessions`. It
+needs all of them, so [disabling](../project/config.md#disabling) one stops the boot.
+
 ## Uploading over HTTP
 
 The request body is the file. One file per request, metadata in the query:
@@ -141,7 +144,8 @@ type, so a name with another extension is a `422`. `?locale=` selects the alt te
 
 The upload and replace routes accept bodies up to `uploads.maxFileSize` and run with no handler
 timeout. An upload may take up to [`api.requestTimeout`](../project/config.md#the-api-server).
-Unless you set it, that is Node's default of 5 minutes.
+Unless you set it, that is Node's default of 5 minutes. A file that needs longer can go up in
+[resumable chunks](./resumable.md), each with a timeout of its own.
 
 ## In server code
 
@@ -219,9 +223,11 @@ export default defineConfig({
     url: '.uploads',
     maxFileSize: '128mb',
     maxSVGSize: '2mb',
+    chunkSize: '8mb',
     types: '*',
     cache: { noCache: true },
     privateMaxAge: '1h',
+    sessionMaxAge: '1d',
     images: {
       variants: {
         thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
@@ -239,6 +245,8 @@ export default defineConfig({
 - `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
 - `maxSVGSize` - the largest SVG that can be uploaded, as a `parseBytes` value. The server answers
   nothing else while it sanitizes one, so a higher cap lets a single upload stall it for longer.
+- `chunkSize` - the size of every chunk of a [resumable upload](./resumable.md) but the last, as a
+  `parseBytes` value of `64kb` or more.
 - `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
   wildcards, and category names such as `document`, in the
   [media fields grammar](./fields.md#types).
@@ -248,6 +256,8 @@ export default defineConfig({
   the storage. Without it, records point where [serving](#serving) describes.
 - `privateMaxAge` - how long a [private file's](./private-files.md) links stay valid, as a
   `parseDuration` value.
+- `sessionMaxAge` - how long a [resumable upload](./resumable.md) has from its first request to
+  completion, as a `parseDuration` value.
 - `images` - the [image service](./image-variants.md) that renders resized variants, and the named
   variants every image read carries. `url` has no default, and without it every image URL points at
   the original.

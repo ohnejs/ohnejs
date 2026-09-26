@@ -37,6 +37,7 @@ payloadTooLarge()      413 Content Too Large
 unsupportedMediaType() 415 Unsupported Media Type
 unprocessable()        422 Unprocessable Content
 tooManyRequests()      429 Too Many Requests
+notImplemented()       501 Not Implemented
 ```
 
 Each takes an optional message and optional data. If you omit the message, the status's standard

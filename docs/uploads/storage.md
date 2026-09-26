@@ -62,6 +62,8 @@ A backend implements `StorageAdapter`; its JSDoc names each method. The rules it
   `@ohnejs/uploads-s3` does. Without it, an uploaded HTML file runs as a page on that origin.
 - `list` lets `ohne uploads prune` find [stray files](#stray-files). Without it, the command
   refuses.
+- `parts` lets a file go up in [resumable chunks](./resumable.md). Without it, opening a session
+  answers `501`, and the dashboard sends every file whole.
 
 ## Stray files
 
@@ -74,7 +76,8 @@ npx ohne uploads prune
 ```
 
 Once the list holds only files you can lose, `--delete` deletes them. A file that is still uploading
-is never among them.
+is never among them. Nor is an unfinished [resumable upload](./resumable.md): once its session
+expires, the next boot or this command sweeps its chunks away.
 
 An upload cut off by a crash, a `SIGKILL`, or a passed
 [`deadline`](../production/deployment.md#graceful-shutdown) leaves a partial file under `.tmp/`, and

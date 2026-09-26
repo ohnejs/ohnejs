@@ -283,3 +283,6 @@ or `Sessions` collection, no `/auth` routes, and no `ohnejs/auth` helpers. Nothi
 
 `dummyVerify` from `ohnejs/auth` is worth reusing even then. On your login's "no such user" path, it
 takes as long as a real password check, so timing cannot reveal which emails have an account.
+
+An app that stacks `ohnejs/base` cannot drop its sign-in:
+[disabling](../project/config.md#disabling) `Users` or `Sessions` stops the boot.
