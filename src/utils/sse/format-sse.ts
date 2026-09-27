@@ -24,7 +24,7 @@ const LINE_BREAK = /[\r\n]/;
  *
  * Each line of `data` becomes its own `data:` line, so a multi-line payload survives intact.
  * The optional `event` and `id` are emitted as their own lines first.
- * Either one holding a line break throws, since it would end its line and let the rest forge fields.
+ * Either one holding a line break throws.
  * The frame ends with the blank line that terminates an event.
  *
  * @example
