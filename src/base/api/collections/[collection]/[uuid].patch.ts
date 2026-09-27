@@ -5,6 +5,7 @@ import { notFound } from '../../../../ohne/http/http-error.ts';
 import {
   accessScope,
   admitCollection,
+  linkReach,
   readWriteBody,
   scopedRecord,
   scopeTranslations,
@@ -33,7 +34,9 @@ export default defineHandler(async ({ params }) => {
   if (!isUndefined(failure)) throw failure;
   checkWriteInput(raw, meta.fields, 'update');
   const input = isUndefined(scope.select) ? raw : pick(raw, scope.select);
-  const builder = queryUntyped(admitted.collection).where({ UUID: params.uuid });
+  const builder = queryUntyped(admitted.collection)
+    .linkReach(linkReach)
+    .where({ UUID: params.uuid });
   if (!isUndefined(scope.where)) builder.where(scope.where);
   const records = await (isNull(locale) ? builder : builder.locale(locale)).updateOrThrow(input);
   if (records.length === 0) throw notFound();

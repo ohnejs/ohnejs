@@ -21,6 +21,7 @@ import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dia
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
@@ -50,7 +51,20 @@ useFields().register('language', { name: 'language', fieldType: languageField })
 useFields().register('locale', { name: 'locale', fieldType: localeField });
 useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
 useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
-useCollections().register('Users', { name: 'Users', collection: UsersCollection });
+useCollections().register('MeSecrets', {
+  name: 'MeSecrets',
+  collection: { fields: { label: field('text') } },
+});
+useCollections().register('Users', {
+  name: 'Users',
+  collection: {
+    ...UsersCollection,
+    fields: {
+      ...UsersCollection.fields,
+      secret: field('record', { collection: 'MeSecrets' }),
+    },
+  },
+});
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
 const dialect = new SQLiteDialect();
@@ -246,5 +260,22 @@ describe('PATCH /auth/me', () => {
 
   it('answers 401 without a session', async () => {
     strictEqual((await call(ROUTES.patch, { json: { timezone: 'UTC' } })).status, 401);
+  });
+
+  it('refuses a link to a record the user cannot read exactly as a missing one', async () => {
+    const cookie = await signIn('linker@example.com');
+    const hidden = (await queryUntyped('MeSecrets').createOrThrow({ label: 'x' })).UUID;
+    hook('auth:account-layout', () => [{ card: ['secret'] }]);
+    try {
+      const missing = '01900000-0000-7000-8000-000000000000';
+      deepStrictEqual(await errorsOf(await patch(cookie, { secret: hidden })), {
+        secret: 'validation.invalidReference',
+      });
+      deepStrictEqual(await errorsOf(await patch(cookie, { secret: missing })), {
+        secret: 'validation.invalidReference',
+      });
+    } finally {
+      useHooks().delete('auth:account-layout');
+    }
   });
 });

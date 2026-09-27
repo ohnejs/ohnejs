@@ -14,22 +14,20 @@ import type {
 import type { Defined, SearchParamValue } from 'ohnejs/utils';
 
 import {
+  admittedUUIDs,
   applyQuery,
   endpointOf,
   parseLocaleParam,
-  parseQueryParams,
   queryMetadata,
   queryUntyped,
   readRecordBody,
   resolveAccess,
-  resolveGuards,
   useCollections,
   useEvent,
   useMiddleware,
   useSearchParams,
 } from 'ohnejs';
 import {
-  chunk,
   isArray,
   isEmpty,
   isNull,
@@ -151,6 +149,21 @@ export function readReach(collection: string): Promise<QueryScope | false> {
     memo.set(collection, reach);
   }
   return reach;
+}
+
+/**
+ * The caller's reach for linking into a collection: its read reach.
+ * Into `Users` it also reaches the caller's own account, so a record can name its author.
+ * The shipped create and update endpoints hand this to `linkReach`, so a link never reveals a hidden record.
+ */
+export async function linkReach(collection: string): Promise<QueryScope | false> {
+  const reach = await readReach(collection);
+  if (collection !== 'Users') return reach;
+  const user = await useUser();
+  if (isNull(user)) return reach;
+  const me = { UUID: user.UUID };
+  if (reach === false) return { where: me };
+  return isUndefined(reach.where) ? reach : { where: { or: [reach.where, me] } };
 }
 
 /**
@@ -310,32 +323,6 @@ export async function visibleLocales(
     visible.set(locale, await admittedUUIDs(collection, meta, where, uuids, locale));
   }
   return visible;
-}
-
-/**
- * The `UUID`s among `uuids` the scope `where` admits at one locale; `null` reads the default locale.
- * The locale probes once per chunk, selecting `UUID` alone under `{ where }`.
- * The scope's `select` would drop the key and its `limit` would cap the probe, so neither rides.
- */
-export async function admittedUUIDs(
-  collection: string,
-  meta: CollectionQueryMeta,
-  where: Defined<QueryScope['where']>,
-  uuids: readonly string[],
-  locale: string | null,
-): Promise<Set<string>> {
-  const admitted = new Set<string>();
-  const parsed = parseQueryParams(
-    isNull(locale) ? { select: 'UUID' } : { select: 'UUID', locale },
-    meta,
-    resolveGuards(),
-  );
-  for (const batch of chunk(uuids, 900)) {
-    const builder = queryUntyped(collection).where({ UUID: { in: batch } });
-    const rows = await applyQuery(builder, parsed, { where }).findMany();
-    for (const row of rows) admitted.add(row.UUID as string);
-  }
-  return admitted;
 }
 
 /**

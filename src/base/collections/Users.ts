@@ -2,6 +2,7 @@ import { defineCollection, field } from 'ohnejs';
 import { isEmail } from 'ohnejs/utils';
 
 import { normalizeEmail } from '../auth/_email.ts';
+import { manageUsers } from '../auth/manage-users.ts';
 
 /**
  * The `Users` collection: an account identified by a unique email, with a scrypt password hash.
@@ -15,10 +16,17 @@ import { normalizeEmail } from '../auth/_email.ts';
  * Each is nullable, so an existing table gains them without a migration.
  * `toUser` reads a `null` name or setting as its default.
  * The `dashboard.layout` groups the editor into the same cards the account page shows.
- * The API exposure is guarded, so user management needs the `collection.Users.*` capabilities.
+ * The API is guarded by the `collection.Users.*` capabilities, and `manageUsers` scopes every write.
+ * You can grant a role only when your own capabilities cover every capability it lists.
+ * You can edit or delete a user only when you could grant every role they hold.
  */
 const users = defineCollection({
-  api: true,
+  api: {
+    read: {},
+    create: { access: manageUsers },
+    update: { access: manageUsers },
+    delete: { access: manageUsers },
+  },
   dashboard: {
     icon: 'users',
     layout: [
@@ -102,6 +110,8 @@ const users = defineCollection({
 /**
  * The `Users` definition, for an app's own `collections/Users.ts` to spread and extend.
  * An override replaces the file whole, so spread this to keep the fields auth depends on.
+ * Spreading it keeps the `manageUsers` grant rule.
+ * An override that sets its own `api` drops the rule unless each write passes `access: manageUsers`.
  * The auth routes and helpers read `email`, `password`, and `roles`.
  * The account page edits the name and settings fields as `auth:account-layout` arranges them.
  * A dropped name or settings field falls back to its default, so the dashboard degrades quietly.

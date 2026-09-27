@@ -5,6 +5,11 @@ import { readSessionToken } from './_cookie.ts';
 import { hashSessionToken } from './_token.ts';
 
 /**
+ * Write transactions that re-store an unchanged password at a new cost, so they end no session.
+ */
+export const passwordRehashes = new WeakSet<Transaction>();
+
+/**
  * Ends every session of `user` except the one the current request rides on.
  * Outside a request, or on a request without a session token, it ends them all.
  * Pass `tx` to delete inside an open write transaction.

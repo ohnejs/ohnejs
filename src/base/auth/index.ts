@@ -4,6 +4,7 @@ export * from './capabilities.ts';
 export * from './create-session.ts';
 export * from './destroy-session.ts';
 export * from './dummy-verify.ts';
+export * from './manage-users.ts';
 export * from './query-scoped.ts';
 export * from './require-user.ts';
 export * from './to-user.ts';

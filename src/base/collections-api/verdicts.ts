@@ -2,6 +2,7 @@ import type { CollectionQueryMeta, ConditionInput, QueryScope } from 'ohnejs';
 import type { SearchParamValue } from 'ohnejs/utils';
 
 import {
+  admittedUUIDs,
   applyQuery,
   parseLocaleParam,
   parseWireQuery,
@@ -15,7 +16,7 @@ import { isArray, isString, isUndefined, pick, uniqueArray } from 'ohnejs/utils'
 import { checkQueryLocale, effectiveLocale } from '../../ohne/query/locale.ts';
 import { invalidValueError, limitError, unknownParamError } from '../../ohne/query/wire/errors.ts';
 import { localeSensitive } from '../../ohne/query/wire/withheld-metadata.ts';
-import { admittedUUIDs, readReach, writeReach } from './gate.ts';
+import { readReach, writeReach } from './gate.ts';
 
 /**
  * A row-form verdict: the asked rows the operation may touch.
@@ -204,8 +205,10 @@ async function queryForm(
       }
       let total = 0;
       for (let offset = 0; ; offset += WALK_SIZE) {
-        const builder = queryUntyped(collection).limit(WALK_SIZE).offset(offset);
-        const uuids = (await applyQuery(builder, parsed, walked).pluck('UUID')) as string[];
+        const uuids = (await applyQuery(queryUntyped(collection), parsed, walked)
+          .limit(WALK_SIZE)
+          .offset(offset)
+          .pluck('UUID')) as string[];
         total += (await admittedUUIDs(collection, meta, where, uuids, at)).size;
         if (uuids.length < WALK_SIZE) return { total };
       }

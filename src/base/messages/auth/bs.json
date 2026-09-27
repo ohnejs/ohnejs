@@ -4,9 +4,11 @@
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",
   "invalidTimezone": "Nevažeća vremenska zona `{timezone}`",
+  "roleNotGrantable": "Ne možete dodijeliti ulogu `{role}`",
   "unknownRole": "Nepoznata uloga `{role}`",
   "unknownLanguage": "Nepoznat jezik `{language}`",
   "unknownLocale": "Nepoznat lokalitet `{locale}`",
+  "untrustedOrigin": "Kolačići sesije se ne prihvataju sa `{origin}`",
   "timezone": {
     "auto": "Automatski (postavke uređaja)"
   },

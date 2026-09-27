@@ -22,6 +22,24 @@ export function userCapabilities(user: User): Capability[] {
 }
 
 /**
+ * The registered roles the user cannot grant: those listing a capability the user's own do not cover.
+ * Coverage follows `capabilityCovers`, pattern against pattern: `collection.*` covers `collection.Posts.*`.
+ * `*` covers every role, so an admin gets `[]`; a role listing no capability is always grantable.
+ *
+ * @example
+ * ```ts
+ * const user = await requireUser()
+ * ungrantableRoles(user) // -> ['admin']
+ * ```
+ */
+export function ungrantableRoles(user: User): string[] {
+  const held = userCapabilities(user);
+  return Object.values(useRoles().all())
+    .filter(({ role }) => !role.capabilities.every((capability) => hasCapability(held, capability)))
+    .map(({ name }) => name);
+}
+
+/**
  * Whether the user holds `capability`, under the `capabilityCovers` wildcard rules.
  *
  * @example

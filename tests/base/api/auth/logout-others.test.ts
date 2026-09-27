@@ -14,6 +14,7 @@ import localeField from '../../../../src/base/fields/locale.ts';
 import passwordField from '../../../../src/base/fields/password.ts';
 import rolesField from '../../../../src/base/fields/roles.ts';
 import timezoneField from '../../../../src/base/fields/timezone.ts';
+import corsGlobal from '../../../../src/base/middleware/global/cors.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -24,6 +25,7 @@ import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
+import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 
@@ -43,6 +45,7 @@ useFields().register('timezone', { name: 'timezone', fieldType: timezoneField })
 useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
+useMiddleware().registerGlobal('cors', corsGlobal);
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -62,8 +65,17 @@ const ROUTES = {
   others: route('POST', '/auth/logout/others', othersHandler as AnyHandler),
 };
 
-async function call(r: Route, cookie?: string, json?: unknown): Promise<Response> {
+async function call(
+  r: Route,
+  cookie?: string,
+  json?: unknown,
+  sameSite?: string,
+): Promise<Response> {
   const headers = new Headers();
+  if (sameSite !== undefined) {
+    headers.set('Origin', sameSite);
+    headers.set('Sec-Fetch-Site', 'same-site');
+  }
   if (json !== undefined) headers.set('Content-Type', 'application/json');
   if (cookie !== undefined) headers.set('Cookie', cookie);
   const request = new Request(`http://localhost${r.pattern}`, {
@@ -107,6 +119,22 @@ describe('POST /auth/logout/others', () => {
     strictEqual(await status(ROUTES.me, phone), 200);
     strictEqual(await status(ROUTES.me, laptop), 401);
     strictEqual(await status(ROUTES.me, bystander), 200);
+  });
+
+  it('refuses a request forged from a same-site page, and ends them from the dashboard', async () => {
+    await queryUntyped('Users').createOrThrow({
+      email: 'forged@example.com',
+      password: 'correct horse',
+    });
+    const phone = await login('forged@example.com');
+    const laptop = await login('forged@example.com');
+
+    const forged = await call(ROUTES.others, phone, undefined, 'http://localhost:3000');
+    strictEqual(forged.status, 403);
+    strictEqual(await status(ROUTES.me, laptop), 200);
+
+    strictEqual((await call(ROUTES.others, phone, undefined, 'http://localhost:9000')).status, 200);
+    strictEqual(await status(ROUTES.me, laptop), 401);
   });
 
   it('answers 401 without a session', async () => {

@@ -159,6 +159,7 @@
     "rememberMe": "Zapamti me",
     "showPassword": "Prikaži lozinku",
     "submit": "Prijava",
+    "throttled": "Previše pokušaja prijave. {seconds, plural, =0 {Pokušajte ponovo kasnije.} one {Pokušajte ponovo za `#` sekundu.} few {Pokušajte ponovo za `#` sekunde.} other {Pokušajte ponovo za `#` sekundi.}}",
     "title": "Prijava",
     "unreachable": "Server nije dostupan"
   },

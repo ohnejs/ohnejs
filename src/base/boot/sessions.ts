@@ -1,13 +1,13 @@
 import { hook, type Transaction } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
-import { endOtherSessions } from '../auth/_sessions.ts';
+import { endOtherSessions, passwordRehashes } from '../auth/_sessions.ts';
 
 // `record:after-update` cannot see the input, so `record:before-change` marks a password write on its `tx`.
 const passwordWrites = new WeakSet<Transaction>();
 
 hook('record:before-change', (input, { collection, operation, tx }) => {
-  if (collection !== 'Users' || operation !== 'update') return;
+  if (collection !== 'Users' || operation !== 'update' || passwordRehashes.has(tx)) return;
   if (isUndefined(input.password)) passwordWrites.delete(tx);
   else passwordWrites.add(tx);
 });

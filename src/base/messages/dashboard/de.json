@@ -159,6 +159,7 @@
     "rememberMe": "Angemeldet bleiben",
     "showPassword": "Passwort anzeigen",
     "submit": "Anmelden",
+    "throttled": "Zu viele Anmeldeversuche. {seconds, plural, =0 {Versuche es später erneut.} one {Versuche es in `#` Sekunde erneut.} other {Versuche es in `#` Sekunden erneut.}}",
     "title": "Anmeldung",
     "unreachable": "Der Server ist nicht erreichbar"
   },

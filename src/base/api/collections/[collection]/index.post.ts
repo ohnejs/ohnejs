@@ -10,6 +10,7 @@ import { isNull, isUndefined } from 'ohnejs/utils';
 import {
   accessScope,
   admitCollection,
+  linkReach,
   readWriteBody,
   scopedRecord,
   writeLocale,
@@ -34,7 +35,7 @@ export default defineHandler(async ({ params }) => {
   const locale = writeLocale(meta);
   if (!isUndefined(failure)) throw failure;
   checkWriteInput(input, meta.fields, 'create');
-  const builder = queryUntyped(admitted.collection);
+  const builder = queryUntyped(admitted.collection).linkReach(linkReach);
   const record = await (isNull(locale) ? builder : builder.locale(locale)).createOrThrow(input);
   setResponseStatus(201);
   return scopedRecord(record, scope);

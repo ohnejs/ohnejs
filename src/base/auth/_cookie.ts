@@ -1,15 +1,20 @@
 import { deleteCookie, setCookie, useAuthorization, useCookies } from 'ohnejs';
 import { isNull, isUndefined } from 'ohnejs/utils';
 
+import { assertCookieOrigin } from './_origin.ts';
 import { useAuthConfig } from './config.ts';
 
 /**
  * Reads the request's session token: the session cookie, or a `Bearer` token when the cookie is absent.
  * Returns `null` when neither carries one, so a browser cookie and an API client's header both work.
+ * A cookie on an unsafe request from an origin the CORS policy has not credentialed is refused with `403`.
  */
 export function readSessionToken(): string | null {
   const cookie = useCookies()[useAuthConfig().cookieName];
-  if (!isUndefined(cookie)) return cookie;
+  if (!isUndefined(cookie)) {
+    assertCookieOrigin();
+    return cookie;
+  }
 
   const authorization = useAuthorization();
   return !isNull(authorization) && authorization.scheme === 'bearer' ? authorization.token : null;

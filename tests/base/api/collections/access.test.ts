@@ -27,8 +27,10 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
-import { unauthorized } from '../../../../src/ohne/http/http-error.ts';
+import { forbidden, unauthorized } from '../../../../src/ohne/http/http-error.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
@@ -53,7 +55,7 @@ useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCo
 useRoles().register('admin', { name: 'admin', role: { capabilities: ['*'] } });
 useRoles().register('notes-user', {
   name: 'notes-user',
-  role: { capabilities: ['collection.AccessNotes.*'] },
+  role: { capabilities: ['collection.AccessNotes.*', 'collection.AccessPins.*'] },
 });
 
 const own = async (): Promise<QueryScope | boolean> => {
@@ -171,6 +173,37 @@ useCollections().register('AccessLinks', {
     },
   },
 });
+useCollections().register('AccessVaults', {
+  name: 'AccessVaults',
+  collection: {
+    api: {
+      read: {
+        public: true,
+        access: () => {
+          throw forbidden();
+        },
+      },
+    },
+    fields: { label: field('text') },
+  },
+});
+useCollections().register('AccessPins', {
+  name: 'AccessPins',
+  collection: {
+    api: { read: true, create: true, update: true },
+    fields: {
+      note: field('record', { collection: 'AccessNotes', onDelete: 'restrict' }),
+      secret: field('record', { collection: 'AccessSecrets' }),
+      vault: field('record', { collection: 'AccessVaults' }),
+      who: field('record', { collection: 'Users' }),
+      author: field('record', {
+        collection: 'Users',
+        default: async () => (await useUser())?.UUID ?? null,
+      }),
+      editors: field('records', { collection: 'Users' }),
+    },
+  },
+});
 
 useMiddleware().register('access-block', () => unauthorized());
 
@@ -280,6 +313,7 @@ const gate = { collection: 'access-gate' };
 const contextual = { collection: 'access-contexts' };
 const links = { collection: 'access-links' };
 const posts = { collection: 'access-posts' };
+const pins = { collection: 'access-pins' };
 
 function titlesOf(body: unknown): unknown[] {
   return (body as Record<string, unknown>[]).map((record) => record.title);
@@ -603,5 +637,93 @@ describe('reach', () => {
       qs: '?where={draft:{has:{title:{startsWith:Dr}}}}',
     });
     strictEqual((visible.body as unknown[]).length, 1);
+  });
+});
+
+describe('link reach', () => {
+  const missing = '01900000-0000-7000-8000-000000000000';
+  const record = (body: unknown): Record<string, unknown> => body as Record<string, unknown>;
+
+  async function pin(body: Record<string, unknown>): Promise<CallResult> {
+    return call(ROUTES.create, pins, writer.token, { body });
+  }
+
+  it('refuses a link to a record the caller cannot read exactly as a missing one', async () => {
+    const hidden = await seed('AccessNotes', { title: 'Hidden', owner: other.uuid });
+    for (const [key, uuid] of [
+      ['note', hidden],
+      ['secret', secretRow],
+      ['who', other.uuid],
+    ]) {
+      const refused = await pin({ [key]: uuid });
+      strictEqual(refused.status, 422);
+      deepStrictEqual(refused.body, (await pin({ [key]: missing })).body);
+    }
+  });
+
+  it('links a record the caller reads', async () => {
+    strictEqual((await pin({ note: writerNote })).status, 201);
+  });
+
+  it("links the caller's own user, by body or by default", async () => {
+    const named = await pin({ author: writer.uuid, who: writer.uuid });
+    strictEqual(named.status, 201);
+    const defaulted = await pin({});
+    strictEqual(defaulted.status, 201);
+    strictEqual(record(defaulted.body).author, writer.uuid);
+  });
+
+  it('keeps a hidden link the record already holds when a patch resends it', async () => {
+    const held = await seed('AccessPins', { author: writer.uuid, editors: [other.uuid] });
+    const resent = await call(ROUTES.patch, { ...pins, uuid: held }, writer.token, {
+      body: { editors: [other.uuid, writer.uuid] },
+    });
+    strictEqual(resent.status, 200);
+    deepStrictEqual(record(resent.body).editors, [other.uuid, writer.uuid]);
+
+    const moved = await call(ROUTES.patch, { ...pins, uuid: held }, writer.token, {
+      body: { who: other.uuid },
+    });
+    strictEqual(moved.status, 422);
+  });
+
+  it("never lets a `restrict` link pin another user's hidden record", async () => {
+    const hidden = await seed('AccessNotes', { title: 'Pinned', owner: other.uuid });
+    strictEqual((await pin({ note: hidden })).status, 422);
+    strictEqual((await call(ROUTES.del, { ...notes, uuid: hidden }, other.token)).status, 204);
+  });
+
+  it('answers a target whose read `access` throws the same for a real and a missing record', async () => {
+    const vault = await seed('AccessVaults', { label: 'Vault' });
+    const real = await pin({ vault });
+    strictEqual(real.status, 403);
+    deepStrictEqual(await pin({ vault: missing }), real);
+  });
+
+  it('checks a link a `record:before-change` hook sets like one the caller sends', async () => {
+    hook('record:before-change', (input, context) => {
+      if (context.collection === 'AccessPins') input.secret = secretRow;
+    });
+    try {
+      strictEqual((await pin({})).status, 422);
+    } finally {
+      useHooks().delete('record:before-change');
+    }
+  });
+
+  it('keeps a link under the read check when a `record:before-change` hook tidies it', async () => {
+    hook('record:before-change', (input) => {
+      if (typeof input.note === 'string') input.note = input.note.trim().toLowerCase();
+    });
+    try {
+      const hidden = await seed('AccessNotes', { title: 'Tidied', owner: other.uuid });
+      for (const spell of [(uuid: string) => ` ${uuid} `, (uuid: string) => uuid.toUpperCase()]) {
+        const refused = await pin({ note: spell(hidden) });
+        strictEqual(refused.status, 422);
+        deepStrictEqual(refused.body, (await pin({ note: spell(missing) })).body);
+      }
+    } finally {
+      useHooks().delete('record:before-change');
+    }
   });
 });

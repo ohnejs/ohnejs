@@ -4,9 +4,11 @@
   "invalidCredentials": "Incorrect email or password",
   "invalidRoles": "Roles must be a list of role names",
   "invalidTimezone": "Invalid time zone `{timezone}`",
+  "roleNotGrantable": "You cannot grant the role `{role}`",
   "unknownRole": "Unknown role `{role}`",
   "unknownLanguage": "Unknown language `{language}`",
   "unknownLocale": "Unknown locale `{locale}`",
+  "untrustedOrigin": "Session cookies are not accepted from `{origin}`",
   "timezone": {
     "auto": "Auto (device settings)"
   },

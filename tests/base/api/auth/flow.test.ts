@@ -15,6 +15,7 @@ import localeField from '../../../../src/base/fields/locale.ts';
 import passwordField from '../../../../src/base/fields/password.ts';
 import rolesField from '../../../../src/base/fields/roles.ts';
 import timezoneField from '../../../../src/base/fields/timezone.ts';
+import corsGlobal from '../../../../src/base/middleware/global/cors.ts';
 import requireAuthMiddleware from '../../../../src/base/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -58,6 +59,7 @@ function route(method: 'GET' | 'POST', pattern: string, handler: AnyHandler): Ro
 }
 
 useMiddleware().register('require-auth', requireAuthMiddleware);
+useMiddleware().registerGlobal('cors', corsGlobal);
 const protectedRoute = route(
   'GET',
   '/protected',
@@ -74,6 +76,7 @@ interface CallOptions {
   json?: unknown;
   cookie?: string;
   bearer?: string;
+  sameSite?: string;
 }
 
 async function call(r: Route, options: CallOptions = {}): Promise<Response> {
@@ -82,6 +85,10 @@ async function call(r: Route, options: CallOptions = {}): Promise<Response> {
   if (sendBody) headers.set('Content-Type', 'application/json');
   if (options.cookie !== undefined) headers.set('Cookie', options.cookie);
   if (options.bearer !== undefined) headers.set('Authorization', `Bearer ${options.bearer}`);
+  if (options.sameSite !== undefined) {
+    headers.set('Origin', options.sameSite);
+    headers.set('Sec-Fetch-Site', 'same-site');
+  }
   const request = new Request(`http://localhost${r.pattern}`, {
     method: r.method ?? 'GET',
     headers,
@@ -198,6 +205,20 @@ describe('auth flow', () => {
     strictEqual(logout.status, 200);
     strictEqual(((await logout.json()) as { ok: boolean }).ok, true);
 
+    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 401);
+  });
+
+  it('refuses a logout forged from a same-site page, and logs out from the dashboard', async () => {
+    await createUser('forged@example.com', 'correct horse');
+    const pair = cookiePair(await login('forged@example.com', 'correct horse'));
+
+    const forged = await call(ROUTES.logout, { cookie: pair, sameSite: 'http://localhost:3000' });
+    strictEqual(forged.status, 403);
+    deepStrictEqual(forged.headers.getSetCookie(), []);
+    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 200);
+
+    const logout = await call(ROUTES.logout, { cookie: pair, sameSite: 'http://localhost:9000' });
+    strictEqual(logout.status, 200);
     strictEqual((await call(ROUTES.me, { cookie: pair })).status, 401);
   });
 

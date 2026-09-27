@@ -159,6 +159,7 @@
     "rememberMe": "Remember me",
     "showPassword": "Show password",
     "submit": "Sign in",
+    "throttled": "Too many sign-in attempts. {seconds, plural, =0 {Try again later.} one {Try again in `#` second.} other {Try again in `#` seconds.}}",
     "title": "Login",
     "unreachable": "The server cannot be reached"
   },

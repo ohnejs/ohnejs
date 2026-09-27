@@ -1,5 +1,5 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import type { DatabaseAdapter, SQLParams } from '../../../../src/ohne/database/adapter.ts';
 import type { QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
@@ -683,6 +683,29 @@ describe('POST /collections/[collection]/verdicts - the query form', () => {
       update: { total: 316 },
       delete: { total: 475 },
       deleteTranslation: { total: 316 },
+    });
+  });
+});
+
+describe('POST /collections/[collection]/verdicts - under a lowered `maxLimit`', () => {
+  before(() =>
+    useLayers().add({ path: '/verdicts-max-limit', input: { query: { guards: { maxLimit: 2 } } } }),
+  );
+  after(() => useLayers().remove('/verdicts-max-limit'));
+
+  it('names every admitted row of a batch past `maxLimit`', async () => {
+    deepStrictEqual((await ask('vd-walk', { UUIDs: walkIDs(10) })).body, {
+      update: { UUIDs: multiples(2, 10) },
+      delete: { UUIDs: multiples(2, 10) },
+      deleteTranslation: { UUIDs: multiples(2, 10) },
+    });
+  });
+
+  it('walks every listed row past `maxLimit`', async () => {
+    deepStrictEqual((await ask('vd-walk', { locale: 'de' })).body, {
+      update: { total: 330 },
+      delete: { total: 495 },
+      deleteTranslation: { total: 330 },
     });
   });
 });

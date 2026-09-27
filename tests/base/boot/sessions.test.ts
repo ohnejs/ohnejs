@@ -17,6 +17,7 @@ import rolesField from '../../../src/base/fields/roles.ts';
 import timezoneField from '../../../src/base/fields/timezone.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { collectionTableName } from '../../../src/ohne/database/naming/table-names.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
@@ -26,6 +27,7 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
+import { hashPassword } from '../../../src/utils/crypto/hash-password.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -132,5 +134,19 @@ describe('the sessions boot file', () => {
 
     strictEqual(await status(phone), 200);
     strictEqual(await status(laptop), 200);
+  });
+
+  it('keeps every session when a sign-in rehashes the same password at a new cost', async () => {
+    await account('rehash@example.com');
+    const phone = await login('rehash@example.com');
+    const stale = await hashPassword('correct horse', { cost: 2048 });
+    await db.run(`UPDATE "${collectionTableName('Users')}" SET "password" = ? WHERE "email" = ?`, [
+      stale,
+      'rehash@example.com',
+    ]);
+
+    await login('rehash@example.com');
+
+    strictEqual(await status(phone), 200);
   });
 });

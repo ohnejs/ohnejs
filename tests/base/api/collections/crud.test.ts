@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 
@@ -18,6 +18,7 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { unauthorized } from '../../../../src/ohne/http/http-error.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
@@ -250,6 +251,38 @@ describe('list', () => {
     const { status, body } = await call(ROUTES.query, many, { qs: '?limit=5' });
     strictEqual(status, 400);
     deepStrictEqual(wireData(body), { code: 'unknownParam', path: 'limit' });
+  });
+});
+
+describe('list under a lowered `maxLimit`', () => {
+  before(() =>
+    useLayers().add({ path: '/crud-max-limit', input: { query: { guards: { maxLimit: 3 } } } }),
+  );
+  after(() => useLayers().remove('/crud-max-limit'));
+
+  it('stops an unpaged read at `maxLimit`', async () => {
+    for (const qs of ['', '?limit=10', '?offset=1']) {
+      const { status, body } = await call(ROUTES.list, many, { qs });
+      strictEqual(status, 200);
+      strictEqual((body as unknown[]).length, 3);
+    }
+  });
+
+  it('stops an unpaged body query at `maxLimit`', async () => {
+    for (const body of [{}, { limit: 10 }, { offset: 1 }]) {
+      const queried = await call(ROUTES.query, many, { body });
+      strictEqual(queried.status, 200);
+      strictEqual((queried.body as unknown[]).length, 3);
+    }
+  });
+
+  it('pages past `maxLimit` with `perPage`', async () => {
+    const got = await call(ROUTES.list, many, { qs: '?page=1&perPage=5' });
+    const queried = await call(ROUTES.query, many, { body: { page: 1, perPage: 5 } });
+    for (const { status, body } of [got, queried]) {
+      strictEqual(status, 200);
+      strictEqual((body as { records: unknown[] }).records.length, 5);
+    }
   });
 });
 

@@ -34,6 +34,7 @@ export interface LoginFormOptions {
  * The email and password sign-in form.
  * An empty field earns its message under the input.
  * Wrong credentials, an unreachable server, and any other refusal each raise a toast, once per attempt.
+ * A throttled attempt keeps the form from submitting until the server's `Retry-After` has passed.
  * The password input reveals through its suffix button.
  * Enter submits from any control, including the remember-me checkbox.
  * A success updates `sessionUser`, so the page hosting the form owns the navigation.
@@ -52,6 +53,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   t('auth.invalidCredentials');
   t('dashboard.login.unreachable');
   t('dashboard.login.failed');
+  t('dashboard.login.throttled', { seconds: 0 });
 
   const submit = async (): Promise<void> => {
     if (busy.value) return;
@@ -60,6 +62,12 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     if (emailError.value || passwordError.value) return;
     busy.value = true;
     const outcome = await login(email.value, password.value, remember.value);
+    if (outcome.kind === 'throttled') {
+      const seconds = outcome.retryAfter;
+      toast(t('dashboard.login.throttled', { seconds }), { type: 'error' });
+      setTimeout(() => (busy.value = false), seconds * 1000);
+      return;
+    }
     busy.value = false;
     if (outcome.kind === 'invalid') toast(t('auth.invalidCredentials'), { type: 'error' });
     if (outcome.kind === 'unreachable') toast(t('dashboard.login.unreachable'), { type: 'error' });
