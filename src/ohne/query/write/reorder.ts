@@ -3,7 +3,7 @@ import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedScope } from '../pipeline/run-record.ts';
 
-import { isNullish, isUndefined } from '../../../utils/index.ts';
+import { isEmpty, isNullish, isUndefined, uniqueArray } from '../../../utils/index.ts';
 
 /**
  * One ordering constraint: `writer`'s new unique value is what `holder`'s kept row currently stores.
@@ -77,7 +77,7 @@ export function orderKeptWrites(
   const uniques = uniqueSubfields(subfields);
   if (uniques.length === 0 || rows.length === 0) return null;
 
-  let edges: Edge[] = [];
+  const edges: Edge[] = [];
   for (const sub of uniques) {
     const column = sub.column as string;
     const type = sub.logicalType as LogicalType;
@@ -104,27 +104,38 @@ export function orderKeptWrites(
   }
   if (edges.length === 0) return null;
 
-  const pending = new Set(rows.map((_row, index) => index));
+  const blockers = rows.map(() => 0);
+  const heldBy = rows.map((): Edge[] => []);
+  for (const edge of edges) {
+    blockers[edge.writer]++;
+    heldBy[edge.holder].push(edge);
+  }
   const sequence: OrderStep[] = [];
-  while (pending.size > 0) {
-    const free = [...pending].filter(
-      (index) => !edges.some((edge) => edge.writer === index && pending.has(edge.holder)),
-    );
+  const release = (holder: number, freed: number[]): void => {
+    for (const edge of heldBy[holder]) {
+      if (--blockers[edge.writer] === 0) freed.push(edge.writer);
+    }
+    heldBy[holder] = [];
+  };
+  let free = [...blockers.keys()].filter((index) => blockers[index] === 0);
+  let written = 0;
+  let breaker = 0;
+  while (written < rows.length) {
+    const freed: number[] = [];
     if (free.length > 0) {
       for (const index of free) {
-        pending.delete(index);
         sequence.push({ kind: 'item', index });
+        release(index, freed);
       }
-      continue;
+      written += free.length;
+    } else {
+      while (isEmpty(heldBy[breaker])) breaker++;
+      for (const sub of uniqueArray(heldBy[breaker].map((edge) => edge.sub))) {
+        sequence.push({ kind: 'sentinel', sub, uuid: rows[breaker].uuid });
+      }
+      release(breaker, freed);
     }
-    const holder = Math.min(
-      ...[...pending].filter((index) => edges.some((edge) => edge.holder === index)),
-    );
-    const held = new Set(edges.filter((edge) => edge.holder === holder).map((edge) => edge.sub));
-    for (const sub of held) {
-      sequence.push({ kind: 'sentinel', sub, uuid: rows[holder].uuid });
-    }
-    edges = edges.filter((edge) => edge.holder !== holder);
+    free = freed.sort((a, b) => a - b);
   }
   return sequence;
 }
