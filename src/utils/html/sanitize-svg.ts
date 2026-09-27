@@ -27,11 +27,13 @@ const SVG_CLOSE = /<\/svg(?=[\s/>])[^>]*>/i;
 const COMMENT = /<!--[\s\S]*?(?:-->|$)/g;
 const CDATA_OPEN = '<![CDATA[';
 const CDATA_CLOSE = ']]>';
-const TAG = /<([\p{L}_:][\p{L}\p{N}_.:-]*)([^>]*)>/gu;
+// XML and HTML space; `\s` also spans name characters such as U+1680 and U+FEFF.
+const SPACE = ' \\t\\n\\f\\r';
+const NAME_END = `${SPACE}<>/`;
+// Any name up to a delimiter, since XML starts names with more than letters, such as `、` or `⁰`.
+const TAG = new RegExp(`<([^${NAME_END}!?][^${NAME_END}]*)([^>]*)>`, 'g');
 // The lookbehind starts a match only at a space run's first character, so a run is never rescanned.
 const ATTRIBUTE = /(?<!\s)\s+([a-zA-Z_:][\w:.-]*)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'>`]+))?/g;
-// The CSS runs to the first `<`, which must be its own close tag: markup splits text the browser joins.
-const STYLE_ELEMENT = /<((?:[^\s<>/="':]+:)?style)\b[^>]*>([^<]*)(<\/\1\s*>)?/gi;
 
 // `<meta>` escapes to HTML when inlined and can redirect; `<base>` would rebase the host page's links.
 const FORBIDDEN_ELEMENTS = [
@@ -63,17 +65,23 @@ const FORBIDDEN = new Set(FORBIDDEN_ELEMENTS);
 const SEPARATOR = ' ';
 
 // Any run up to a colon, since an XML prefix may hold dots, digits, and non-ASCII letters.
-const NAMESPACE_PREFIX = '(?:[^\\s<>/="\':]+:)?';
+const NAMESPACE_PREFIX = `(?:[^${NAME_END}="':]+:)?`;
+
+// The CSS runs to the first `<`, which must be its own close tag: markup splits text the browser joins.
+const STYLE_ELEMENT = new RegExp(
+  `<(${NAMESPACE_PREFIX}style)\\b[^>]*>([^<]*)(<\\/\\1\\s*>)?`,
+  'gi',
+);
 
 const FORBIDDEN_OPEN = new RegExp(
-  `<\\s*${NAMESPACE_PREFIX}(${FORBIDDEN_ELEMENTS.join('|')})\\b[^>]*>`,
+  `<[${SPACE}]*${NAMESPACE_PREFIX}(${FORBIDDEN_ELEMENTS.join('|')})\\b[^>]*>`,
   'gi',
 );
 
 const FORBIDDEN_CLOSE = new Map(
   FORBIDDEN_ELEMENTS.map((name) => [
     name,
-    new RegExp(`<\\s*/\\s*${NAMESPACE_PREFIX}${name}\\s*>`, 'gi'),
+    new RegExp(`<[${SPACE}]*/[${SPACE}]*${NAMESPACE_PREFIX}${name}\\s*>`, 'gi'),
   ]),
 );
 

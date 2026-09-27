@@ -277,10 +277,15 @@ describe('sanitizeSVG', () => {
   });
 
   it('removes prefixed and unclosed style elements when their CSS is dangerous', () => {
-    doesNotMatch(
-      sanitizeSVG('<svg><svg:style>@import url(https://example.com/x.css);</svg:style></svg>').svg,
-      /<svg:style|@import/i,
-    );
+    for (const prefix of ['svg', '\u1680', '\ufeff']) {
+      doesNotMatch(
+        sanitizeSVG(
+          `<svg><${prefix}:style>@import url(https://example.com/x.css);</${prefix}:style></svg>`,
+        ).svg,
+        /style|@import/i,
+        prefix,
+      );
+    }
     const unclosed = sanitizeSVG('<svg><style>@import url(https://example.com/x.css);</svg>');
     doesNotMatch(unclosed.svg, /<style|@import/i);
     deepStrictEqual(unclosed.removed, ['style']);
@@ -469,6 +474,8 @@ describe('sanitizeSVG', () => {
       'prefixed names that never end': ['<a-b-c-d-e-f-g-h', '<svg>', ''],
       'a space run inside a tag': [' ', '<svg><a', '!></svg>'],
       'a space run inside a URL': ['\u00a0', '<svg><a href="x', 'x"/></svg>'],
+      'a Unicode space run after an open': ['\u1680', '<svg><', ' x></svg>'],
+      'a Unicode space run after a close': ['\ufeff', '<svg><set></', ' x></svg>'],
     };
     for (const [shape, [unit, head, tail]] of Object.entries(shapes)) {
       const input = head + unit.repeat(size / unit.length) + tail;
@@ -500,12 +507,22 @@ describe('sanitizeSVG', () => {
   });
 
   it('removes forbidden elements under any namespace prefix XML allows', () => {
-    for (const prefix of ['a.b', 'a1.b', 'é', 'a_b-c.d', 'x']) {
+    for (const prefix of ['a.b', 'a1.b', 'é', 'a_b-c.d', 'x', '\u1680', '\ufeff']) {
       const { svg, removed } = sanitizeSVG(
         `<svg xmlns="http://www.w3.org/2000/svg"><${prefix}:script xmlns:${prefix}="http://www.w3.org/2000/svg">Thrall</${prefix}:script></svg>`,
       );
       doesNotMatch(svg, /script/i, prefix);
       ok(removed.includes('script'), prefix);
+    }
+  });
+
+  it('scrubs attributes on elements whose name starts with a non-letter XML allows', () => {
+    for (const prefix of ['、', '⁰', '\u200c', '\u1680', '\ufeff']) {
+      const { svg, removed } = sanitizeSVG(
+        `<svg xmlns="http://www.w3.org/2000/svg"><${prefix}:a xmlns:${prefix}="http://www.w3.org/2000/svg" onload="Thrall()" href="javascript:alert(1)"/></svg>`,
+      );
+      doesNotMatch(svg, /onload|javascript:/i, prefix);
+      deepStrictEqual(removed, ['href', 'on*'], prefix);
     }
   });
 
