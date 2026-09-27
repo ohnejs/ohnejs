@@ -206,6 +206,7 @@ export * from './route/path-to-route-pattern.ts';
 export * from './route/path-to-route.ts';
 export * from './route/specificity.ts';
 export * from './route/strip-base-path.ts';
+export * from './route/trim-route-path.ts';
 export * from './search-params/parse-search-params.ts';
 export * from './search-params/stringify-search-params.ts';
 export * from './search/search-by-keywords.ts';

@@ -1,4 +1,5 @@
 import { isNull } from '../is/is-null.ts';
+import { trimRoutePath } from './trim-route-path.ts';
 
 /**
  * Captured route params, keyed by name.
@@ -94,9 +95,7 @@ export function compileRoute(pattern: string): RouteMatcher {
    * Matches `path` with one trailing `/` dropped, returning each param's raw capture, or `null`.
    */
   function match(path: string): RouteParams | null {
-    const trimmed =
-      path.length > 1 && path.charCodeAt(path.length - 1) === 47 ? path.slice(0, -1) : path;
-    const m = regex.exec(trimmed);
+    const m = regex.exec(trimRoutePath(path));
     if (isNull(m)) return null;
     const out: RouteParams = {};
     for (let i = 0; i < params.length; i++) {
