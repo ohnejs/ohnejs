@@ -2,6 +2,7 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { User } from '../../../../src/base/auth/types.ts';
+import type { RecordCommitted } from '../../../../src/ohne/query/write/committed.ts';
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 
 import installGetHandler from '../../../../src/base/api/auth/install.get.ts';
@@ -109,6 +110,24 @@ describe('POST /auth/install', () => {
     await reset();
   });
 
+  it('fires `record:committed` once for the first user', async () => {
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      if (event.collection === 'Users') events.push(event);
+    });
+    try {
+      const response = await call(ROUTES.post, {
+        email: 'first@example.com',
+        password: 'correct horse',
+      });
+      const user = (await response.json()) as User;
+      deepStrictEqual(events, [{ collection: 'Users', operation: 'create', uuids: [user.UUID] }]);
+    } finally {
+      useHooks().clear();
+      await reset();
+    }
+  });
+
   it('stores an omitted or empty name as null', async () => {
     const response = await call(ROUTES.post, {
       firstName: null,
@@ -142,6 +161,37 @@ describe('POST /auth/install', () => {
     });
     strictEqual(response.status, 403);
     strictEqual(await required(), false);
+    await reset();
+  });
+
+  it('refuses a setup whose body arrives after another setup finished', async () => {
+    const json = JSON.stringify({ email: 'late@example.com', password: 'correct horse' });
+    const encoder = new TextEncoder();
+    let finish = (): void => {};
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(json.slice(0, 1)));
+        finish = () => {
+          controller.enqueue(encoder.encode(json.slice(1)));
+          controller.close();
+        };
+      },
+    });
+    const request = new Request('http://localhost/auth/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: stream,
+      duplex: 'half',
+    } as RequestInit);
+    const late = dispatch(ROUTES.post, request, new URL(request.url), {});
+    await new Promise((resolve) => setImmediate(resolve));
+    strictEqual(
+      (await call(ROUTES.post, { email: 'first@example.com', password: 'correct horse' })).status,
+      200,
+    );
+    finish();
+    strictEqual((await late).response.status, 403);
+    strictEqual(await queryUntyped('Users').unscoped().count(), 1);
     await reset();
   });
 
