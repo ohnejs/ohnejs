@@ -30,6 +30,17 @@ describe('matchPages', () => {
     strictEqual(matchPages(pages, '/users/42')?.path, '/users/42');
   });
 
+  it('matches the canonical path, decoding unreserved escapes', () => {
+    const posts = compilePages([{ pattern: '/posts', url: 'posts' }]);
+    const match = matchPages(posts, '/%70osts');
+    strictEqual(match?.url, 'posts');
+    strictEqual(match?.path, '/posts');
+  });
+
+  it('matches nothing for an encoded slash', () => {
+    strictEqual(matchPages(pages, '/a%2Fb'), null);
+  });
+
   it('returns null when nothing matches', () => {
     const only = compilePages([{ pattern: '/users/[id]', url: 'x' }]);
     strictEqual(matchPages(only, '/posts/1'), null);

@@ -22,7 +22,18 @@ export type LoginOutcome =
     }
   | {
       /**
-       * The server answered a status the login has no reading for, like a `429` or a `500`.
+       * The server refused to check the password now, with a `429` or a `503`.
+       */
+      kind: 'throttled';
+
+      /**
+       * Seconds to wait before trying again, `0` when the server named none.
+       */
+      retryAfter: number;
+    }
+  | {
+      /**
+       * The server answered a status the login has no reading for, like a `500`.
        */
       kind: 'failed';
 
@@ -36,7 +47,12 @@ export type LoginOutcome =
  * The outcome a refused `POST /auth/login` answer reads as.
  */
 export function loginRefusal(
-  status: number,
-): Extract<LoginOutcome, { kind: 'invalid' | 'failed' }> {
-  return status === 401 ? { kind: 'invalid' } : { kind: 'failed', status };
+  response: Response,
+): Extract<LoginOutcome, { kind: 'invalid' | 'throttled' | 'failed' }> {
+  const { status } = response;
+  if (status === 401) return { kind: 'invalid' };
+  if (status === 429 || status === 503) {
+    return { kind: 'throttled', retryAfter: Number(response.headers.get('Retry-After')) || 0 };
+  }
+  return { kind: 'failed', status };
 }

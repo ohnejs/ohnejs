@@ -152,7 +152,7 @@ export async function login(
   } catch {
     return { kind: 'unreachable' };
   }
-  if (!response.ok) return loginRefusal(response.status);
+  if (!response.ok) return loginRefusal(response);
   startSession();
   apply((await response.json()) as SessionUser);
   invalidateDashboardMeta();

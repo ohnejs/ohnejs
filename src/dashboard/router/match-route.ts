@@ -7,6 +7,7 @@ import {
   type RouteParams,
 } from '../../utils/route/compile-route.ts';
 import { decodeRouteParams } from '../../utils/route/decode-route-params.ts';
+import { canonicalPath } from '../../utils/uri/canonical-path.ts';
 
 /**
  * A manifest entry compiled for matching.
@@ -53,11 +54,17 @@ export function compilePages(manifest: readonly PageRoute[]): CompiledPage[] {
 /**
  * Matches `path` against the compiled pages, first match wins, returning the match or `null`.
  * Params are URI-decoded, matching the server router.
+ * The path is canonicalized first, as the server does, so `/%70osts` is `/posts`.
+ * A path with an encoded slash matches nothing.
  */
 export function matchPages(pages: readonly CompiledPage[], path: string): MatchedRoute | null {
+  const canonical = canonicalPath(path);
+  if (isNull(canonical)) return null;
   for (const page of pages) {
-    const params = page.matcher(path);
-    if (!isNull(params)) return { url: page.url, params: decodeRouteParams(params), path };
+    const params = page.matcher(canonical);
+    if (!isNull(params)) {
+      return { url: page.url, params: decodeRouteParams(params), path: canonical };
+    }
   }
   return null;
 }
