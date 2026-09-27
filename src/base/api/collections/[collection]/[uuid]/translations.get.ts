@@ -21,7 +21,7 @@ import {
  *
  * Lists the locales holding a translation of one record, in the configured locale order.
  * The endpoint takes no params; any param is a `400`.
- * A non-translatable collection answers the identical `404`, so the API reveals nothing.
+ * A non-translatable collection, or a scope `select` without `_translations`, answers the identical `404`.
  * The operation's `access` scope ANDs in; its `where` reads per locale, as the scoped record read does.
  * A locale the scope hides never lists, and a record visible at no locale answers the same `404`.
  * The answer equals the record's own `_translations` as a scoped read returns it.
@@ -31,8 +31,8 @@ export default defineHandler(async ({ params }) => {
   if (!gate.ok) return gate.response;
   assertNoParams();
   const meta = queryMetadata(gate.collection);
-  if (meta.translatable !== true) throw notFound();
-  const { where } = gate.scope;
+  const { select, where } = gate.scope;
+  if (meta.translatable !== true || select?.includes('_translations') === false) throw notFound();
   if (isUndefined(where)) {
     const record = await applyQuery(
       queryUntyped(gate.collection).where({ UUID: params.uuid }),

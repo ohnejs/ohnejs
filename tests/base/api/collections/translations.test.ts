@@ -62,6 +62,22 @@ useCollections().register('TrOwned', {
     fields: { title: field('text', { translatable: true }), owner: field('text') },
   },
 });
+useCollections().register('TrSelected', {
+  name: 'TrSelected',
+  collection: {
+    api: { read: { public: true, access: () => ({ select: ['UUID', 'title'] }) } },
+    fields: { title: field('text', { translatable: true }) },
+  },
+});
+useCollections().register('TrSelectedOwned', {
+  name: 'TrSelectedOwned',
+  collection: {
+    api: {
+      read: { public: true, access: () => ({ select: ['title'], where: { owner: 'me' } }) },
+    },
+    fields: { title: field('text', { translatable: true }), owner: field('text') },
+  },
+});
 useCollections().register('TrLinks', {
   name: 'TrLinks',
   collection: {
@@ -110,6 +126,10 @@ const hidden = (await queryUntyped('TrScoped').createOrThrow({ title: 'Hidden', 
 const owned = (await queryUntyped('TrOwned').createOrThrow({ title: 'Mine', owner: 'me' }))
   .UUID as string;
 await queryUntyped('TrOwned').locale('de').where({ UUID: owned }).updateOrThrow({ title: 'Meins' });
+const selected = (await queryUntyped('TrSelected').createOrThrow({ title: 'Kept' })).UUID as string;
+const selectedOwned = (
+  await queryUntyped('TrSelectedOwned').createOrThrow({ title: 'Kept', owner: 'me' })
+).UUID as string;
 const linked = (await queryUntyped('TrLinks').createOrThrow({ label: 'L', scoped: openAtEN }))
   .UUID as string;
 
@@ -189,6 +209,12 @@ describe('GET /collections/[collection]/[uuid]/translations', () => {
 
   it('404s a record the scope hides at every locale', async () => {
     strictEqual((await call({ collection: 'tr-scoped', uuid: hidden })).status, 404);
+  });
+
+  it('404s when the scope `select` withholds `_translations`', async () => {
+    strictEqual((await call({ collection: 'tr-selected', uuid: selected })).status, 404);
+    const owned = { collection: 'tr-selected-owned', uuid: selectedOwned };
+    strictEqual((await call(owned)).status, 404);
   });
 });
 
