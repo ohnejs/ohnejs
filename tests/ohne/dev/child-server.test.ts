@@ -1,5 +1,5 @@
-import { rejects, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type AddressInfo, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +14,7 @@ import {
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
+const USE_ENV = new URL('../../../src/ohne/env/use-env.ts', import.meta.url).href;
 const TIMEOUT = { timeout: 20_000 };
 
 /**
@@ -144,6 +145,32 @@ describe('spawnServeChild', () => {
       }
     },
   );
+
+  it('forwards the env-var flags, except a var its own env sets', TIMEOUT, async () => {
+    const app = writeProject('env-flags');
+    const out = join(app, 'env.json');
+    mkdirSync(join(app, 'boot'), { recursive: true });
+    writeFileSync(
+      join(app, 'boot', 'env.ts'),
+      [
+        "import { writeFileSync } from 'node:fs'",
+        `import { useEnv } from '${USE_ENV}'`,
+        'const env = useEnv()',
+        `writeFileSync('${out}', JSON.stringify([env.get('HOST'), env.get('DB'), env.get('PORT')]))`,
+      ].join('\n'),
+    );
+    const port = await freePort();
+    const argv = process.argv;
+    process.argv = [...argv, 'dev', '--host', '127.0.0.1', '--db=:memory:', '--port', '1'];
+    try {
+      const child = spawnServeChild(app, 'api', { port, entry: BIN });
+      children.push(child);
+      await child.ready;
+    } finally {
+      process.argv = argv;
+    }
+    deepStrictEqual(JSON.parse(readFileSync(out, 'utf8')), ['127.0.0.1', ':memory:', port]);
+  });
 
   it('calls onExit when a ready child exits on its own', TIMEOUT, async () => {
     const app = writeProject('self-exit');

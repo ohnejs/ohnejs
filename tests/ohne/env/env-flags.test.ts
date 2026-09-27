@@ -1,7 +1,7 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
-import { applyEnvFlags, envGlobals } from '../../../src/ohne/env/env-flags.ts';
+import { applyEnvFlags, envFlagArgs, envGlobals } from '../../../src/ohne/env/env-flags.ts';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 
 const KEYS = ['HOST', 'PORT', 'NO_COLOR', 'FORCE_SYNC', 'DATABASE', 'DB'] as const;
@@ -68,6 +68,28 @@ describe('env flags', () => {
       process.env['HOST'] = 'from-env';
       applyEnvFlags(['dev', '--host', 'from-flag']);
       strictEqual(useEnv().get('HOST'), 'from-flag');
+    });
+  });
+
+  describe('envFlagArgs', () => {
+    it('normalizes each present env-var flag to one `--kebab=value` token', () => {
+      deepStrictEqual(
+        envFlagArgs(['dev', '--host', 'a', '--host', 'b', '--no-color', '--no-force-sync', '-x']),
+        ['--host=b', '--no-color=true', '--force-sync=false'],
+      );
+    });
+
+    it('leaves out a flag whose var is omitted', () => {
+      deepStrictEqual(envFlagArgs(['dev', '--port', '4000', '--db', 'a.db'], ['PORT']), [
+        '--db=a.db',
+      ]);
+    });
+
+    it('round-trips through `applyEnvFlags`', () => {
+      applyEnvFlags(envFlagArgs(['dev', '--no-color', '--no-force-sync', '--host', 'x']));
+      strictEqual(useEnv().get('NO_COLOR'), true);
+      strictEqual(useEnv().get('FORCE_SYNC'), false);
+      strictEqual(useEnv().get('HOST'), 'x');
     });
   });
 

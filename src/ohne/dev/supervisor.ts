@@ -288,8 +288,9 @@ export async function dev(
    */
   async function startDashboard(): Promise<void> {
     const config = useConfig();
+    const env = useEnv();
     const api = config.api;
-    const host = useEnv().get('HOST') ?? api.host ?? 'localhost';
+    const host = env.get('HOST') ?? api.host ?? 'localhost';
     const derivedURL = `http://${host}:${port}${normalizeBasePath(api.basePath)}`;
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
@@ -297,8 +298,8 @@ export async function dev(
         entry: options.entry,
         onExit: onDashboardExit,
         env: {
-          API_URL: process.env['API_URL'] ?? config.dashboard?.apiURL ?? derivedURL,
-          DASHBOARD_RELOAD: process.env['DASHBOARD_RELOAD'] ?? '1',
+          API_URL: env.get('API_URL') ?? config.dashboard?.apiURL ?? derivedURL,
+          DASHBOARD_RELOAD: env.has('DASHBOARD_RELOAD') ? String(env.get('DASHBOARD_RELOAD')) : '1',
         },
       });
       await dashboard.ready;

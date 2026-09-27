@@ -76,18 +76,9 @@ export function envGlobals(): ArgsSchema {
  * ```
  */
 export function applyEnvFlags(argv: string[]): void {
-  const flags = envFlags();
-  const booleans = flags.filter((flag) => flag.kind === 'boolean').map((flag) => flag.kebab);
-  const { flags: parsed } = parseArgv(argv, { booleans });
-  const byKebab: Record<string, FlagValue> = Object.create(null);
-  for (const [key, value] of Object.entries(parsed)) byKebab[toKebabCase(key)] = value;
   const env = useEnv();
 
-  for (const { env: name, kebab, kind } of flags) {
-    const raw = byKebab[kebab];
-    if (isUndefined(raw)) continue;
-    const value = isArray(raw) ? last(raw) : raw;
-
+  for (const { env: name, kebab, kind, value } of presentEnvFlags(argv)) {
     if (kind === 'boolean') {
       const bool = coerceToBoolean(value);
       if (!isBoolean(bool)) {
@@ -101,4 +92,40 @@ export function applyEnvFlags(argv: string[]): void {
       env.setRaw(name, value);
     }
   }
+}
+
+/**
+ * The env-var flags present in `argv`, each as one `--kebab=value` token, for a child process to apply.
+ * Flags whose env var is named in `omit` are left out, so a value the parent sets for the child wins.
+ *
+ * @example
+ * ```ts
+ * envFlagArgs(['dev', '--host', '127.0.0.1', '--no-color', '--port', '4000'], ['PORT'])
+ * // -> ['--host=127.0.0.1', '--no-color=true']
+ * ```
+ */
+export function envFlagArgs(argv: string[], omit: Iterable<string> = []): string[] {
+  const omitted = new Set(omit);
+  return presentEnvFlags(argv)
+    .filter(({ env }) => !omitted.has(env))
+    .map(({ kebab, value }) => `--${kebab}=${value}`);
+}
+
+/**
+ * The env-var flags present in `argv`, each with its last given value.
+ */
+function presentEnvFlags(argv: string[]): Array<EnvFlag & { value: string | boolean }> {
+  const flags = envFlags();
+  const booleans = flags.filter((flag) => flag.kind === 'boolean').map((flag) => flag.kebab);
+  const { flags: parsed } = parseArgv(argv, { booleans });
+  const byKebab: Record<string, FlagValue> = Object.create(null);
+  for (const [key, value] of Object.entries(parsed)) byKebab[toKebabCase(key)] = value;
+
+  const present: Array<EnvFlag & { value: string | boolean }> = [];
+  for (const flag of flags) {
+    const raw = byKebab[flag.kebab];
+    if (isUndefined(raw)) continue;
+    present.push({ ...flag, value: isArray(raw) ? last(raw)! : raw });
+  }
+  return present;
 }

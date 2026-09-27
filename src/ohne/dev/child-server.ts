@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import { formatDuration, isUndefined } from '../../utils/index.ts';
+import { envFlagArgs } from '../env/env-flags.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { reportError } from '../error/report-error.ts';
 
@@ -96,6 +97,7 @@ export interface SpawnServeChildOptions {
 
   /**
    * Extra environment variables for the child, merged over the inherited `process.env`.
+   * Each one also wins over the parent's env-var flag for the same var.
    */
   env?: Record<string, string>;
 }
@@ -111,6 +113,7 @@ const READY_TIMEOUT = 60_000;
  * `ready` settles the boot outcome; `stop` drains or kills it.
  * A child that neither readies nor exits within `readyTimeout` is killed and counts as a boot failure.
  * `process.execArgv` is forwarded so node flags carry over, minus `--inspect*` to avoid a port clash.
+ * The parent's env-var flags are forwarded too, except those whose var the child's own env sets.
  */
 export function spawnServeChild(
   cwd: string,
@@ -126,14 +129,14 @@ export function spawnServeChild(
   } = options;
 
   const env = {
-    ...process.env,
     ...(backend === 'api' ? { SKIP_CODEGEN: '1' } : {}),
     ...(isUndefined(port) ? {} : { PORT: String(port) }),
     ...options.env,
   };
-  const args = [...nodeFlags(), entry, 'serve', backend, '--cwd', cwd];
+  const flags = envFlagArgs(process.argv.slice(2), Object.keys(env));
+  const args = [...nodeFlags(), entry, 'serve', backend, '--cwd', cwd, ...flags];
   const child = spawn(process.execPath, args, {
-    env,
+    env: { ...process.env, ...env },
     stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
   });
 
