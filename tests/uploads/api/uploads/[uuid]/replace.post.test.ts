@@ -2,7 +2,9 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import corsGlobal from '../../../../../src/base/middleware/global/cors.ts';
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
+import { useMiddleware } from '../../../../../src/ohne/middleware/use-middleware.ts';
 import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 import replacePost from '../../../../../src/uploads/api/uploads/[uuid]/replace.post.ts';
 import { createFolder } from '../../../../../src/uploads/uploads/create-folder.ts';
@@ -23,6 +25,7 @@ import {
 } from '../../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
+useMiddleware().registerGlobal('cors', corsGlobal);
 
 const replace = route('POST', '/uploads/[uuid]/replace', replacePost);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
@@ -61,6 +64,34 @@ describe('POST /uploads/[uuid]/replace', () => {
     const upload = await putUpload({ directory: 'rep', name: 'b.txt', body: stream(bytes('b')) });
     strictEqual((await send(upload.UUID, stream(bytes('c')))).status, 401);
     strictEqual(text(storage.objects.get('rep/b.txt')), 'b');
+  });
+
+  it('403s a cookie replace from a same-site page, and takes one from the dashboard', async () => {
+    const upload = await putUpload({
+      directory: 'rep',
+      name: 'csrf.txt',
+      body: stream(bytes('mine')),
+    });
+    const post = (origin: string): Promise<Response> =>
+      call(
+        replace,
+        `/uploads/${upload.UUID}/replace`,
+        { uuid: upload.UUID },
+        {
+          body: stream(bytes('theirs')),
+          headers: {
+            cookie: `session=${admin}`,
+            'content-type': 'text/plain',
+            origin,
+            'sec-fetch-site': 'same-site',
+          },
+        },
+      );
+    strictEqual((await post('http://localhost:3000')).status, 403);
+    strictEqual(text(storage.objects.get('rep/csrf.txt')), 'mine');
+
+    strictEqual((await post('http://localhost:9000')).status, 200);
+    strictEqual(text(storage.objects.get('rep/csrf.txt')), 'theirs');
   });
 
   it('404s a file the read access scope hides before staging a byte', async () => {

@@ -6,6 +6,7 @@ import { createCIDRMatcher } from 'ohnejs/utils/net';
 
 import type { ImageTransforms } from './images/transforms.ts';
 
+import { LINK_MAX_AGE } from './uploads/_link-age.ts';
 import { PEEK_SIZE } from './uploads/_peek.ts';
 
 declare module 'ohnejs' {
@@ -97,6 +98,7 @@ declare module 'ohnejs' {
       /**
        * How long a private file's links stay valid, in milliseconds or as a string like `'1h'`.
        * Reads align links to these windows for browser caches, so a link lives one to two windows.
+       * At most `15d`, so no read link outlives the 30-day ceiling.
        *
        * @default
        * '1h'
@@ -372,6 +374,13 @@ export function validateUploadsConfig(): void {
         'It is a duration above zero, such as `2m`, or a number of milliseconds.',
       );
     }
+  }
+  if (parseDuration(privateMaxAge) * 2 > LINK_MAX_AGE) {
+    throw invalidValue(
+      'privateMaxAge',
+      privateMaxAge,
+      'It is at most `15d`: a read link lives up to two windows, and no link may last past `30d`.',
+    );
   }
 }
 

@@ -24,6 +24,7 @@ import { useUploadsConfig } from '../../config.ts';
 import { uploadSecrets } from '../../images/sign.ts';
 import { useStorage } from '../../storage/use-storages.ts';
 import { dispositionFor } from '../../uploads/_disposition.ts';
+import { LINK_MAX_AGE } from '../../uploads/_link-age.ts';
 import { readerReaches } from '../../uploads/_reader.ts';
 import { splitUploadPath, uploadPath } from '../../uploads/path.ts';
 import { verifyUploadLink } from '../../uploads/sign.ts';
@@ -40,6 +41,7 @@ const SVG_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
  * A private one opens through an unexpired link signed under `UPLOADS_SECRET`, or for a signed-in reader.
  * Without the secret no link verifies, so a private file opens for signed-in readers alone.
  * The link carries `?e=&s=`, and any other query is ignored.
+ * A link reaching past 30 days is a `404`.
  * The reader holds `collection.Uploads.read`, and the collection's read `access` scope admits the row.
  * Anything else is the `404` an unknown path answers, decided before any header tells the file apart.
  * The row's `hash` is the `ETag`, so a fresh `If-None-Match` answers `304`.
@@ -107,10 +109,12 @@ export default defineHandler(async ({ params }) => {
 
 /**
  * Whether the request's `?e=&s=` signs `path` under a listed secret, with `e` still ahead of now.
+ * An `e` further ahead than `LINK_MAX_AGE` fails too.
  * Either value missing, or of another shape, is no link at all.
  */
 function linkVerifies(path: string): boolean {
   const { e, s } = useSearchParams();
   if (!isNumber(e) || !isString(s)) return false;
-  return e > Date.now() && verifyUploadLink(s, path, e, uploadSecrets());
+  const now = Date.now();
+  return e > now && e <= now + LINK_MAX_AGE && verifyUploadLink(s, path, e, uploadSecrets());
 }

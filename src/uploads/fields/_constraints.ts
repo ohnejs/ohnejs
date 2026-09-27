@@ -1,4 +1,4 @@
-import type { Message, ResolvedOptions, Transaction } from 'ohnejs';
+import type { FieldWriteContext, Message, ResolvedOptions, Transaction } from 'ohnejs';
 
 import { option, queryUntyped } from 'ohnejs';
 import {
@@ -40,6 +40,11 @@ export interface UploadCheckContext {
    * The open write transaction the referenced rows are read on.
    */
   tx: Transaction;
+
+  /**
+   * Narrows the referenced `UUID`s to the uploads this write may link.
+   */
+  reachable: FieldWriteContext['reachable'];
 
   /**
    * The field's error slice, where a list check keys each failing item as `[i]`.
@@ -165,15 +170,18 @@ function uploadsMessage(name: string, params: Record<string, unknown>): Message 
 
 /**
  * Reads the constraint columns of the listed uploads on the write's transaction, keyed by `UUID`.
- * A `UUID` no row answers is left out; the pipeline's reference check reports it.
+ * A `UUID` no row answers, or one outside the write's reach, is left out.
+ * The pipeline's reference check reports it.
  */
 async function readUploads(
-  tx: Transaction,
+  ctx: UploadCheckContext,
   uuids: readonly string[],
 ): Promise<Map<string, UploadRow>> {
+  const reachable = await ctx.reachable('Uploads', uniqueArray(uuids));
+  if (reachable.size === 0) return new Map();
   const rows = await queryUntyped('Uploads')
-    .use(tx)
-    .where({ UUID: { in: uniqueArray(uuids) } })
+    .use(ctx.tx)
+    .where({ UUID: { in: [...reachable] } })
     .select('UUID', 'kind', 'type', 'size', 'width', 'height')
     .findMany();
   return new Map(rows.map((row) => [row.UUID as string, row as unknown as UploadRow]));
@@ -224,7 +232,8 @@ function checkRow(
 /**
  * Checks the one upload an `image` or `file` field references, reading its row on the write's transaction.
  * `image` additionally requires the row to be an image, so the pixel bounds have something to measure.
- * A `UUID` with no row passes here: the pipeline's reference check reports it as `invalidReference`.
+ * A `UUID` no row answers, or one outside the write's reach, is left to the reference check.
+ * That check reports it as `invalidReference`.
  *
  * @example
  * ```ts
@@ -236,14 +245,15 @@ export async function checkUpload(
   ctx: UploadCheckContext,
   image: boolean,
 ): Promise<Message | undefined> {
-  const row = (await readUploads(ctx.tx, [uuid])).get(uuid);
+  const row = (await readUploads(ctx, [uuid])).get(uuid);
   return isUndefined(row) ? undefined : checkRow(row, ctx.options, image);
 }
 
 /**
  * Checks every upload an `images` or `files` field lists, reading the rows once on the write's transaction.
  * A failing item keys its message as `[i]` in `ctx.errors`, so the failure reads at the item's position.
- * A `UUID` with no row passes here: the pipeline's reference check reports it at the same key.
+ * A `UUID` no row answers, or one outside the write's reach, is left to the reference check.
+ * That check reports it at the same key.
  * A non-list passes untouched, since the pipeline rejects it before any validator runs.
  *
  * @example
@@ -257,7 +267,7 @@ export async function checkUploadList(
   image: boolean,
 ): Promise<undefined> {
   if (!isArray<string[]>(value) || value.length === 0) return undefined;
-  const rows = await readUploads(ctx.tx, value);
+  const rows = await readUploads(ctx, value);
   for (const [index, uuid] of value.entries()) {
     const row = rows.get(uuid);
     if (isUndefined(row)) continue;

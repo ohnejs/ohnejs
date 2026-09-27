@@ -9,7 +9,7 @@ import { createFolder } from '../../../../src/uploads/uploads/create-folder.ts';
 import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
 import { signUploadLink } from '../../../../src/uploads/uploads/sign.ts';
 import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
-import { stringifySearchParams } from '../../../../src/utils/index.ts';
+import { parseDuration, stringifySearchParams } from '../../../../src/utils/index.ts';
 import { bytes, call, png, route, stream, userWith, withReadAccess } from '../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
@@ -218,6 +218,13 @@ describe('GET /uploads/[...path] on a private file', () => {
       strictEqual((await getHidden(`?e=${expires}`)).status, 404);
       strictEqual((await getHidden(`?s=${s}`)).status, 404);
       strictEqual((await getHidden()).status, 404);
+    });
+  });
+
+  it('404s a link reaching past 30 days, however well signed', async () => {
+    await withSecret('secret', async () => {
+      strictEqual((await getHidden(signed(Date.now() + parseDuration('31d')))).status, 404);
+      strictEqual((await getHidden(signed(Date.now() + parseDuration('29d')))).status, 200);
     });
   });
 

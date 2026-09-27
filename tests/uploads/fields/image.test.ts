@@ -119,6 +119,17 @@ describe('image reference', () => {
     const errors = await failing({ cover: 'no-such-upload' });
     strictEqual(errors.cover, 'validation.invalidReference');
   });
+
+  it('answers an unreachable upload as a missing one, judging none of its constraints', async () => {
+    const result = await queryUntyped('ImagePosts')
+      .linkReach(async () => false)
+      .create({ title: 'Post', cover: brief, hero: dawn });
+    ok(!result.ok);
+    deepStrictEqual(result.errors, {
+      cover: 'validation.invalidReference',
+      hero: 'validation.invalidReference',
+    });
+  });
 });
 
 describe('image size bounds', () => {

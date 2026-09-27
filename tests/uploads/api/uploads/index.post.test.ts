@@ -2,7 +2,9 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import corsGlobal from '../../../../src/base/middleware/global/cors.ts';
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
+import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
 import indexPost from '../../../../src/uploads/api/uploads/index.post.ts';
@@ -20,6 +22,7 @@ import {
 } from '../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
+useMiddleware().registerGlobal('cors', corsGlobal);
 
 const upload = route('POST', '/uploads', indexPost);
 const admin = await userWith('admin@example.com', ['uploads-admin']);
@@ -114,6 +117,30 @@ describe('POST /uploads', () => {
     strictEqual(response.status, 422);
     strictEqual(errorsOf(await response.json()).name, 'uploads.errors.contentMismatch');
     ok(![...storage.objects.keys()].some((key) => key.startsWith('.tmp/')));
+  });
+
+  it('403s a cookie upload from a same-site page, and takes one from the dashboard', async () => {
+    const post = (origin: string): Promise<Response> =>
+      call(
+        upload,
+        '/uploads?directory=csrf&name=pwn.html',
+        {},
+        {
+          body: stream(bytes('<script>pwn()</script>')),
+          headers: {
+            cookie: `session=${admin}`,
+            'content-type': 'text/plain',
+            origin,
+            'sec-fetch-site': 'same-site',
+          },
+        },
+      );
+    strictEqual((await post('http://localhost:3000')).status, 403);
+    strictEqual(await queryUntyped('Uploads').where({ directory: 'csrf' }).count(), 0);
+    strictEqual(storage.objects.has('csrf/pwn.html'), false);
+
+    strictEqual((await post('http://localhost:9000')).status, 201);
+    strictEqual(storage.objects.has('csrf/pwn.html'), true);
   });
 
   it('401s without a user and 403s without the capability', async () => {

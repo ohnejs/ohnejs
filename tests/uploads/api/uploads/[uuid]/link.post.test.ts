@@ -78,10 +78,17 @@ describe('POST /uploads/[uuid]/link', () => {
     expiresAbout((await answer(hidden.UUID, { maxAge: '7d' })).expires, before, '7d');
     expiresAbout((await answer(hidden.UUID, { maxAge: '90s' })).expires, before, '90s');
     expiresAbout((await answer(hidden.UUID, { maxAge: 5000 })).expires, before, '5s');
+    expiresAbout((await answer(hidden.UUID, { maxAge: '30d' })).expires, before, '30d');
   });
 
   it('400s a maxAge parseDuration rejects, or of another shape', async () => {
     for (const maxAge of ['soon', '-1h', [1, 2], null, true]) {
+      strictEqual((await send(hidden.UUID, { maxAge })).status, 400, JSON.stringify(maxAge));
+    }
+  });
+
+  it('400s a maxAge not above zero or reaching past 30 days', async () => {
+    for (const maxAge of ['31d', 0, '0']) {
       strictEqual((await send(hidden.UUID, { maxAge })).status, 400, JSON.stringify(maxAge));
     }
   });

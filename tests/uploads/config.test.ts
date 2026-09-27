@@ -154,6 +154,17 @@ describe('validateUploadsConfig', () => {
       });
     });
   }
+
+  it('refuses a `privateMaxAge` past `15d`, and accepts `15d`', () => {
+    deepStrictEqual(refusal({ privateMaxAge: '16d' }), {
+      title: 'Invalid `uploads.privateMaxAge` value `16d`',
+      body: [
+        'It is at most `15d`: a read link lives up to two windows, and no link may last past `30d`.',
+        'Fix it under `uploads.privateMaxAge`.',
+      ],
+    });
+    strictEqual(refusal({ privateMaxAge: '15d' }), undefined);
+  });
 });
 
 describe('the uploads env vars', () => {

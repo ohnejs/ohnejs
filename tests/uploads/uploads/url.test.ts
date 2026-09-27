@@ -89,6 +89,14 @@ describe('uploadURL', () => {
     });
   });
 
+  it('refuses to sign a private link that expires past 30 days', () => {
+    withSecret(() => {
+      const day = 86_400_000;
+      throws(() => uploadURL({ ...locked, expires: Date.now() + 31 * day }), /past `30d`/);
+      strictEqual(uploadURL({ ...locked, expires: Date.now() + 29 * day }).includes('&s='), true);
+    });
+  });
+
   it('answers the bare API route for a private file without a secret or an expiry', () => {
     withLayer({ uploads: { storage: 'served', publicURL: 'https://cdn.example.com' } }, () => {
       strictEqual(uploadURL(locked), '/uploads/photos/2024/sunset.jpg');
@@ -131,6 +139,14 @@ describe('temporaryUploadURL', () => {
   it('rejects a maxAge that parseDuration rejects', () => {
     withSecret(() => {
       throws(() => temporaryUploadURL(sunset, 'soon'), /Invalid duration/);
+    });
+  });
+
+  it('rejects a maxAge that is not above zero or reaches past 30 days', () => {
+    withSecret(() => {
+      throws(() => temporaryUploadURL(sunset, '31d'), /Link `maxAge` `31d` is out of range/);
+      throws(() => temporaryUploadURL(sunset, 0), /Link `maxAge` `0` is out of range/);
+      strictEqual(temporaryUploadURL(sunset, '30d').expires > Date.now(), true);
     });
   });
 });
