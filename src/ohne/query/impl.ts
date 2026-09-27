@@ -13,6 +13,7 @@ import type {
   UntypedWhereGroup,
   WhereGroupBuild,
 } from './untyped.ts';
+import type { ReachResolver } from './wire/reach.ts';
 import type { CreateOutcome } from './write/create.ts';
 
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
@@ -48,6 +49,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   private localeValue: string | null = null;
   private wireState: WireReach | null = null;
   private unscopedChain = false;
+  private linkResolver: ReachResolver | null = null;
   private joinedTx?: Transaction;
   private readonly meta: CollectionQueryMeta;
 
@@ -169,6 +171,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.localeValue,
       this.joinedTx,
       this.unscopedChain,
+      this.linkResolver,
     );
   }
 
@@ -180,6 +183,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.localeValue,
       this.joinedTx,
       this.unscopedChain,
+      this.linkResolver,
     );
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.record;
@@ -193,6 +197,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.localeValue,
       this.joinedTx,
       this.unscopedChain,
+      this.linkResolver,
     );
   }
 
@@ -204,6 +209,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.localeValue,
       this.joinedTx,
       this.unscopedChain,
+      this.linkResolver,
     );
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.records;
@@ -253,6 +259,11 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   unscoped(): this {
     this.unscopedChain = true;
+    return this;
+  }
+
+  linkReach(resolve: ReachResolver): this {
+    this.linkResolver = resolve;
     return this;
   }
 

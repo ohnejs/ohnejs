@@ -84,16 +84,16 @@ export async function prepareComposite(
   }
   const value = input[name];
   if (meta.kind === 'childOne') {
-    if (isNull(value)) return { value: null };
+    if (isNull(value)) return { value: null, provided: true };
     if (!isObject(value)) return { errors: { [name]: 'validation.invalidValue' } };
-    return { value, snapshot: await fieldSnapshot(name, meta, value, ctx) };
+    return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
   }
   if (isNull(value)) return { errors: { [name]: 'validation.notNullable' } };
   if (!isArray(value)) return { errors: { [name]: 'validation.invalidValue' } };
   const wellShaped = meta.kind === 'records' ? value.every(isString) : value.every(isObject);
   if (!wellShaped) return { errors: { [name]: 'validation.invalidValue' } };
-  if (meta.kind !== 'childMany') return { value };
-  return { value, snapshot: await fieldSnapshot(name, meta, value, ctx) };
+  if (meta.kind !== 'childMany') return { value, provided: true };
+  return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
 }
 
 /**
@@ -168,8 +168,26 @@ async function itemSnapshot(
  * A `null` object on update clears the existing child row instead of descending into it.
  * `snapshot` is the field's phase-A coerced view; each item descends carrying its slice.
  * An absent subfield then reuses the already-resolved default instead of resolving its callback again.
+ * A value the input did not supply marks every reference beneath it unprovided, however deep.
  */
 export async function finishComposite(
+  name: string,
+  meta: FieldQueryMeta,
+  value: unknown,
+  ctx: ScopeContext,
+  processScope: ProcessScope,
+  provided: boolean,
+  snapshot?: unknown,
+): Promise<FieldOutput> {
+  const output = await descendComposite(name, meta, value, ctx, processScope, snapshot);
+  if (provided || isUndefined(output.refs)) return output;
+  return { ...output, refs: output.refs.map((ref) => ({ ...ref, provided: false })) };
+}
+
+/**
+ * The descent `finishComposite` runs, each reference provided as far as its own scope's input goes.
+ */
+async function descendComposite(
   name: string,
   meta: FieldQueryMeta,
   value: unknown,
@@ -188,7 +206,12 @@ export async function finishComposite(
     const target = meta.target as string;
     return {
       relation: { meta, uuids },
-      refs: uuids.map((uuid, index) => ({ path: `${path}[${index}]`, target, uuid })),
+      refs: uuids.map((uuid, index) => ({
+        path: `${path}[${index}]`,
+        target,
+        uuid,
+        provided: true,
+      })),
     };
   }
 

@@ -175,6 +175,26 @@ describe('parseQueryParams reads a query chain off a URL', () => {
     strictEqual(parsed.page, null);
   });
 
+  it('fills an unpaged read with the maxLimit ceiling', () => {
+    strictEqual(parse('').limit, DEFAULT_QUERY_GUARDS.maxLimit);
+    strictEqual(parse('', { ...DEFAULT_QUERY_GUARDS, maxLimit: 7 }).limit, 7);
+  });
+
+  it('lowers limit to the maxLimit ceiling', () => {
+    strictEqual(parse('limit=100000').limit, DEFAULT_QUERY_GUARDS.maxLimit);
+  });
+
+  it('caps an offset-only read at maxLimit', () => {
+    const parsed = parse('offset=5');
+    strictEqual(parsed.limit, DEFAULT_QUERY_GUARDS.maxLimit);
+    strictEqual(parsed.offset, 5);
+  });
+
+  it('keeps limit null on a paginated read', () => {
+    strictEqual(parse('page=2').limit, null);
+    strictEqual(parse('perPage=10').limit, null);
+  });
+
   it('clamps perPage to the ceiling', () => {
     strictEqual(parse('page=2&perPage=999', tight).perPage, 50);
   });
@@ -677,10 +697,21 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
   });
 
   it('counts the worst-case locale binds toward the bound-param ceiling', () => {
-    const capped: QueryGuards = { ...DEFAULT_QUERY_GUARDS, maxBoundParams: 3 };
+    const capped: QueryGuards = { ...DEFAULT_QUERY_GUARDS, maxBoundParams: 4 };
     deepStrictEqual(parse('where={views:{in:[1,2]}}', capped).where, { views: { in: [1, 2] } });
     strictEqual(failure('where={views:{in:[1,2,3]}}', capped).code, 'tooManyBoundParams');
     strictEqual(failure('where={author:{has:{name:x}}}', capped).code, 'tooManyBoundParams');
+  });
+
+  it('reserves the filled limit bind from the bound-param ceiling', () => {
+    const where = 'where={views:{in:[1,2]}}';
+    strictEqual(
+      failure(where, { ...DEFAULT_QUERY_GUARDS, maxBoundParams: 3 }).code,
+      'tooManyBoundParams',
+    );
+    deepStrictEqual(parse(where, { ...DEFAULT_QUERY_GUARDS, maxBoundParams: 4 }).where, {
+      views: { in: [1, 2] },
+    });
   });
 
   it('rejects a query that would bind more values than the driver backstop', () => {

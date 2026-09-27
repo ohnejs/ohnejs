@@ -13,6 +13,7 @@ import { blockQueryMetadata, queryMetadata } from './metadata.ts';
 import { prefixErrors } from './pipeline/prefix-errors.ts';
 import { isValidColumn } from './pipeline/preflight.ts';
 import { runTiers, validateContext, writeContext } from './pipeline/run-field.ts';
+import { linkReachable } from './write/references.ts';
 
 /**
  * One scope's fields, keyed by name: a collection's fields, a block's, or a composite's subfields.
@@ -119,6 +120,7 @@ async function failuresOf(
     tx: owner.tx,
     path,
     ancestors: [],
+    reachable: linkReachable(),
   } as const;
   const wctx = writeContext(name, meta, {}, ctx);
   const errors: FieldErrors = {};

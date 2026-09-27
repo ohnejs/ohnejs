@@ -7,6 +7,7 @@ import type { FieldErrors } from './errors.ts';
 import { chunk, hasKey, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { defaultPath, finishScalar, writeContext } from '../pipeline/run-field.ts';
 import { columnTypes } from './reconcile.ts';
+import { linkReachable } from './references.ts';
 
 /**
  * Splits a processed scope's columns by home: the main table's, and the companion's per-locale ones.
@@ -96,6 +97,7 @@ export async function planCompanion(
     tx,
     path: '',
     ancestors: [],
+    reachable: linkReachable(),
   };
   const errors: Record<string, FieldErrors> = {};
   const defaults: Record<string, unknown> = {};

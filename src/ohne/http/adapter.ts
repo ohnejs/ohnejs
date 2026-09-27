@@ -67,7 +67,6 @@ export interface ToRequestOptions {
   onFirstRead?: () => void;
 }
 
-// A fixed base, so neither the Host header nor a `//host` target can shape the path.
 const TARGET_BASE = 'http://target';
 
 /**

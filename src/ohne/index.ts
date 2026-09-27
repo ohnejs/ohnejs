@@ -153,6 +153,7 @@ export type { BlockQueryMeta, CollectionQueryMeta, FieldQueryMeta } from './quer
 export * from './query/query.ts';
 export type { QueryRecord } from './query/read/find.ts';
 export * from './query/untyped.ts';
+export * from './query/wire/admitted.ts';
 export * from './query/wire/apply.ts';
 export * from './query/wire/body.ts';
 export type { WireErrorCode, WireErrorData } from './query/wire/errors.ts';

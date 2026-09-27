@@ -32,6 +32,14 @@ describe('resolveGuards', () => {
     strictEqual(resolved.maxSelect, 10);
   });
 
+  it('caps an unpaged read at 2000 rows by default', () => {
+    strictEqual(DEFAULT_QUERY_GUARDS.maxLimit, 2000);
+  });
+
+  it('folds a maxLimit override', () => {
+    strictEqual(resolveGuards({ maxLimit: 5 }).maxLimit, 5);
+  });
+
   it('returns a fresh table, never mutating the defaults', () => {
     resolveGuards({ maxPerPage: 1 });
     strictEqual(DEFAULT_QUERY_GUARDS.maxPerPage, 500);

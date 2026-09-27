@@ -8,6 +8,7 @@ import type { Event } from './event.ts';
 import type { RouteMatch, Router } from './router.ts';
 
 import {
+  canonicalPath,
   createGate,
   errorMessage,
   isEmpty,
@@ -204,6 +205,7 @@ export interface CreateServerOptions {
    * Base path every route is mounted under.
    * A request outside the prefix is answered `404`; inside it, the prefix is stripped before routing.
    * The stripped path is what the router, handlers, and `matchPath` see, so routes stay prefix-free.
+   * Unreserved escapes are decoded first, and a path with an encoded slash `%2F` is answered `404`.
    * Omitted, or empty, mounts at the root with no prefix.
    *
    * @example
@@ -317,6 +319,13 @@ async function handle(
       await sendResponse(res, response);
       return;
     }
+
+    const path = canonicalPath(url.pathname);
+    if (isNull(path)) {
+      await sendResponse(res, errorResponse({ type: 'not-found' }));
+      return;
+    }
+    url.pathname = path;
 
     if (basePath !== '') {
       const routePath = stripBasePath(url.pathname, basePath);

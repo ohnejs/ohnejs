@@ -98,6 +98,18 @@ useCollections().register('UVault', {
     },
   },
 });
+useCollections().register('ULinks', {
+  name: 'ULinks',
+  collection: {
+    fields: {
+      mode: field('text', { nullable: true }),
+      note: field('text', { nullable: true, when: { mode: 'on' } }),
+      author: field('record', { collection: 'UUser' }),
+      editors: field('records', { collection: 'UUser' }),
+      rows: field('repeater', { fields: { who: field('record', { collection: 'UUser' }) } }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -774,6 +786,70 @@ describe('runUpdate hidden fields', () => {
     ok(!('secret' in record));
     strictEqual(record.name, 'v4');
     strictEqual(await secretOf(record.UUID as string), 'go');
+  });
+});
+
+describe('runUpdate link reach', () => {
+  const onlyAnduin = async () => ({ where: { name: 'Anduin' } });
+
+  async function seedLinks(input: Record<string, unknown>): Promise<string> {
+    const result = await runCreate('ULinks', input, null);
+    ok(result.ok);
+    return result.record.UUID as string;
+  }
+
+  function linkUpdate(input: Record<string, unknown>, condition: ConditionNode) {
+    return runUpdate('ULinks', input, condition, null, undefined, false, onlyAnduin);
+  }
+
+  it('passes a hidden link the record already holds under the same field', async () => {
+    const uuid = await seedLinks({ author: 'u2', editors: ['u2'], rows: [{ who: 'u2' }] });
+    const result = await linkUpdate(
+      { author: 'u2', editors: ['u1', 'u2'], rows: [{ who: 'u2' }] },
+      uuidIs(uuid),
+    );
+    ok(result.ok);
+    deepStrictEqual(result.records[0].editors, ['u1', 'u2']);
+  });
+
+  it('refuses a held hidden link moved to another top-level field', async () => {
+    const uuid = await seedLinks({ author: 'u2' });
+    const result = await linkUpdate({ editors: ['u2'] }, uuidIs(uuid));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'editors[0]': 'validation.invalidReference' });
+  });
+
+  it('refuses a hidden link another record holds', async () => {
+    await seedLinks({ author: 'u2' });
+    const uuid = await seedLinks({ author: 'u1' });
+    const result = await linkUpdate({ author: 'u2' }, uuidIs(uuid));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { author: 'validation.invalidReference' });
+  });
+
+  it('refuses a hidden link only some matched records hold', async () => {
+    const a = await seedLinks({ author: 'u2' });
+    const b = await seedLinks({ author: 'u1' });
+    const result = await linkUpdate({ author: 'u2' }, inUUIDs([a, b]));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { author: 'validation.invalidReference' });
+  });
+
+  it('holds a stored link aside on the gated path too', async () => {
+    const held = await seedLinks({ mode: 'on', author: 'u2' });
+    ok((await linkUpdate({ author: 'u2', note: 'kept' }, uuidIs(held))).ok);
+    const other = await seedLinks({ mode: 'on', author: 'u1' });
+    const result = await linkUpdate({ author: 'u2', note: 'moved' }, uuidIs(other));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { author: 'validation.invalidReference' });
+  });
+
+  it('checks existence alone on a chain without `linkReach`', async () => {
+    const uuid = await seedLinks({ author: 'u1' });
+    const [record] = await queryUntyped('ULinks').where({ UUID: uuid }).updateOrThrow({
+      author: 'u2',
+    });
+    strictEqual(record.author, 'u2');
   });
 });
 

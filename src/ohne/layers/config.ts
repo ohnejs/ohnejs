@@ -599,6 +599,7 @@ export interface Config {
     /**
      * Absolute origin the browser reaches the dashboard at, such as `https://admin.example.com`.
      * The API's `cors` middleware allows it for credentialed requests, so the session cookie flows.
+     * It is also trusted to send cookie-authenticated writes.
      * The `DASHBOARD_URL` env var overrides it; omitted, it is derived from `dashboard.port`.
      * Set it when the dashboard is reached at a different origin, such as behind a reverse proxy.
      */

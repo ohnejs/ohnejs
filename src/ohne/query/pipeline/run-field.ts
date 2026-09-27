@@ -44,6 +44,7 @@ export function writeContext(
     operation: ctx.operation,
     input,
     tx: ctx.tx,
+    reachable: ctx.reachable,
   };
 }
 
@@ -170,12 +171,14 @@ export async function prepareScalar(
   const value = input[name];
   if (isNull(value)) {
     if (!meta.nullable) return { errors: { [name]: 'validation.notNullable' } };
-    return { value: null };
+    return { value: null, provided: true };
   }
   if (meta.kind === 'record') {
-    return isString(value) ? { value } : { errors: { [name]: 'validation.invalidValue' } };
+    return isString(value)
+      ? { value, provided: true }
+      : { errors: { [name]: 'validation.invalidValue' } };
   }
-  return { value: coerceColumn(value, meta.logicalType as LogicalType) };
+  return { value: coerceColumn(value, meta.logicalType as LogicalType), provided: true };
 }
 
 /**
@@ -185,6 +188,7 @@ export async function prepareScalar(
  * A column checks its base type first; a wrong type stops the field.
  * The type tier runs before the instance tier, and any type-tier error skips the instance tier.
  * A `trusted` value skips both tiers and still serializes.
+ * A `record` value's reference carries `provided`, whether the input supplied it.
  */
 export async function finishScalar(
   name: string,
@@ -193,6 +197,7 @@ export async function finishScalar(
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
   trusted = false,
+  provided = false,
 ): Promise<FieldOutput> {
   const column = meta.column as string;
   if (isNull(value)) return { column: { name: column, value: null } };
@@ -213,7 +218,7 @@ export async function finishScalar(
   const stored = meta.fieldType?.serialize ? await meta.fieldType.serialize(value, wctx) : value;
   const output: FieldOutput = { column: { name: column, value: stored } };
   if (meta.kind === 'record' && isString(value)) {
-    output.refs = [{ path: wctx.path, target: meta.target as string, uuid: value }];
+    output.refs = [{ path: wctx.path, target: meta.target as string, uuid: value, provided }];
   }
   return output;
 }

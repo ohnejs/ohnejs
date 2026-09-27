@@ -73,8 +73,9 @@ export interface CORSOptions {
  * Safe by construction: there is no origin-reflection mode.
  * A wildcard `origin: '*'` with `credentials` throws, since the browser forbids it.
  * Globals from every layer share one name order, and a digit sorts before any letter.
- * An auth middleware that rejects preflights must sort after `cors`, as `global/session.ts` does.
- * CORS governs browser read-access only; it is never a substitute for authorization.
+ * A global that reads the session must sort after `cors`.
+ * With `credentials`, the allowed origins may also send the session cookie on a write in `ohnejs/base`.
+ * CORS is never a substitute for authorization.
  *
  * @example
  * ```ts

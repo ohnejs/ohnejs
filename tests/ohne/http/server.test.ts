@@ -16,8 +16,11 @@ import {
   createServer,
   defineHandler,
   hook,
+  matchPath,
+  matchesPath,
   readRawBody,
   readTextBody,
+  unauthorized,
   useEvent,
   useHooks,
   useMiddleware,
@@ -479,6 +482,87 @@ describe('base path', () => {
         strictEqual(await (await fetch(`${base}/api/ping`)).text(), 'pong');
       },
       { basePath: 'api/' },
+    );
+  });
+});
+
+describe('canonical path', () => {
+  it('routes an escaped unreserved character as the character', async () => {
+    await withServer(
+      [
+        makeRoute('GET', '/public/[file]', () => ({
+          seen: useEvent().url.pathname,
+          public: matchPath('/public/**'),
+        })),
+      ],
+      async (base) => {
+        const res = await fetch(`${base}/%70ublic/x`);
+        strictEqual(res.status, 200);
+        deepStrictEqual(await res.json(), { seen: '/public/x', public: true });
+      },
+    );
+  });
+
+  it('fires a deny-list guard for an escaped value a param captures', async () => {
+    useMiddleware().registerGlobal('global-guard', () =>
+      matchPath('/files/secret') ? unauthorized() : undefined,
+    );
+    await withServer(
+      [makeRoute('GET', '/files/[name]', () => useEvent().params.name)],
+      async (base) => {
+        const res = await fetch(`${base}/files/%73ecret`);
+        strictEqual(res.status, 401);
+        await res.body?.cancel();
+      },
+    );
+  });
+
+  it('answers an encoded slash with the router 404, running no middleware', async () => {
+    let ran = false;
+    useMiddleware().registerGlobal('global-probe', () => {
+      ran = true;
+    });
+    await withServer([makeRoute('GET', '/files/[name]', () => 'file')], async (base) => {
+      const miss = await fetch(`${base}/nope`);
+      const res = await fetch(`${base}/files/a%2Fb`);
+      strictEqual(res.status, 404);
+      strictEqual(await res.text(), await miss.text());
+      strictEqual(ran, false);
+    });
+  });
+
+  it('strips a base path spelled with escapes', async () => {
+    await withServer(
+      [makeRoute('GET', '/x', () => 'x')],
+      async (base) => {
+        const res = await fetch(`${base}/%61pi/x`);
+        strictEqual(res.status, 200);
+        strictEqual(await res.text(), 'x');
+      },
+      { basePath: '/api' },
+    );
+  });
+
+  it('skips a middleware:resolve allow-listed global only on the real public path', async () => {
+    const sessions: string[] = [];
+    useMiddleware().registerGlobal('global-session', (event) => {
+      sessions.push(event.url.pathname);
+    });
+    hook('middleware:resolve', (names, event) =>
+      matchesPath(event.url.pathname, '/public/**')
+        ? names.filter((name) => name !== 'global-session')
+        : names,
+    );
+    await withServer(
+      [
+        makeRoute('GET', '/public/[file]', () => 'public'),
+        makeRoute('GET', '/[section]/[file]', () => 'section'),
+      ],
+      async (base) => {
+        strictEqual(await (await fetch(`${base}/%70ublic/x`)).text(), 'public');
+        strictEqual(await (await fetch(`${base}/%73ecret/x`)).text(), 'section');
+        deepStrictEqual(sessions, ['/secret/x']);
+      },
     );
   });
 });

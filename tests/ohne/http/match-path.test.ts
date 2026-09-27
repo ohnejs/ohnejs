@@ -53,7 +53,7 @@ describe('matchesPath', () => {
     strictEqual(matchesPath('/admin/', '/admin/**'), true);
   });
 
-  it('matches a glob against the raw, undecoded path', () => {
+  it('tests the path as given, leaving escapes to the request', () => {
     strictEqual(matchesPath('/%70ublic/x', '/public/**'), false);
   });
 

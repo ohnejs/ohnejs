@@ -117,6 +117,12 @@ export interface FieldWriteContext<
    * The open write transaction, so a callback can read committed-in-transaction state.
    */
   tx: Transaction;
+
+  /**
+   * The `UUID`s among `uuids` this write may link in `target`.
+   * All of them, unless the write checks link reach.
+   */
+  reachable(target: string, uuids: readonly string[]): Promise<Set<string>>;
 }
 
 /**

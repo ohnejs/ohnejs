@@ -52,6 +52,7 @@ export function matchesPath(path: string, ...patterns: string[]): boolean {
  * Tests the current request's path against one or more patterns.
  * Shorthand for `matchesPath(useEvent().url.pathname, ...patterns)`, sharing its matcher cache.
  * Valid only within a request.
+ * The request path is canonical, its unreserved escapes decoded.
  *
  * Pair it with a middleware to scope global middleware to part of the app.
  *

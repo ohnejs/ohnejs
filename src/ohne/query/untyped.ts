@@ -2,6 +2,7 @@ import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection, TargetReach } from './ir.ts';
 import type { QueryRecord } from './read/find.ts';
 import type { PaginatedResult } from './read/paginate.ts';
+import type { ReachResolver } from './wire/reach.ts';
 import type { CreateOutcome } from './write/create.ts';
 import type { DeleteOutcome } from './write/delete.ts';
 import type { UpdateOutcome } from './write/update.ts';
@@ -467,4 +468,15 @@ export interface UntypedQueryBuilder {
    * ```
    */
   unscoped(): this;
+
+  /**
+   * Checks every link the write's input provides against `resolve`.
+   * An unreachable target then fails as `invalidReference`, like a missing one.
+   *
+   * @example
+   * ```ts
+   * await queryUntyped('Posts').linkReach(readReach).createOrThrow(input)
+   * ```
+   */
+  linkReach(resolve: ReachResolver): this;
 }

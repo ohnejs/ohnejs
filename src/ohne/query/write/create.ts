@@ -5,9 +5,11 @@ import type { Dialect } from '../../database/dialect.ts';
 import type { CollectionQueryMeta } from '../metadata.ts';
 import type { ProcessedScope, RecordWriteContext } from '../pipeline/run-record.ts';
 import type { QueryRecord } from '../read/find.ts';
+import type { ReachResolver } from '../wire/reach.ts';
 import type { FieldErrors } from './errors.ts';
+import type { LinkReach } from './references.ts';
 
-import { isEmpty, isUndefined, uuidv7 } from '../../../utils/index.ts';
+import { isEmpty, isNull, isUndefined, uuidv7 } from '../../../utils/index.ts';
 import { useDialect } from '../../database/use-database.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
@@ -85,6 +87,7 @@ declare module 'ohnejs' {
  * Opens an `immediate` write transaction unless `joinedTx` supplies one, in which case the caller holds it.
  * `locale` is the chain's explicit choice or `null`; translatable values land on the effective locale.
  * `unscoped` reads the record back past the `query:filter` hook, for framework bookkeeping.
+ * `linkResolver` narrows every link the input provides to what it reaches, as `linkReach` states.
  * A validation or precheck failure returns `{ ok: false }` and writes nothing.
  * A constraint race is classified; a busy database surfaces as a retryable `busyError`, an HTTP `503`.
  */
@@ -94,6 +97,7 @@ export async function runCreate(
   locale: string | null,
   joinedTx?: Transaction,
   unscoped = false,
+  linkResolver: ReachResolver | null = null,
 ): Promise<CreateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
@@ -101,7 +105,7 @@ export async function runCreate(
     dialect,
     joinedTx,
     (o) => !o.ok,
-    (tx) => attemptCreate(tx, meta, dialect, input, locale, unscoped),
+    (tx) => attemptCreate(tx, meta, dialect, input, locale, unscoped, linkResolver),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
@@ -132,11 +136,15 @@ async function attemptCreate(
   input: Record<string, unknown>,
   locale: string | null,
   unscoped: boolean,
+  linkResolver: ReachResolver | null,
 ): Promise<CreateOutcome> {
-  const processed = await runRecord(meta, input, { operation: 'create', tx });
+  const code = effectiveLocale(locale);
+  const reach: LinkReach | undefined = isNull(linkResolver)
+    ? undefined
+    : { resolve: linkResolver, locale: code };
+  const processed = await runRecord(meta, input, { operation: 'create', tx, reach });
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
-  const code = effectiveLocale(locale);
 
   const validation = useHooks().get('record:validate');
   if (!isUndefined(validation) && validation.length > 0) {
@@ -157,7 +165,7 @@ async function attemptCreate(
   const childUniqueErrors = await checkChildUnique(tx, dialect, scope.uniqueProbes);
   if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
 
-  const referenceErrors = await checkReferences(tx, dialect, scope.refs);
+  const referenceErrors = await checkReferences(tx, dialect, scope.refs, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
   const uuid = uuidv7();

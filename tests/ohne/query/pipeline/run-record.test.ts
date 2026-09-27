@@ -1,11 +1,13 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import type { Transaction } from '../../../../src/ohne/database/adapter.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { runRecord } from '../../../../src/ohne/query/pipeline/run-record.ts';
 
@@ -597,5 +599,74 @@ describe('runRecord nested item identity', () => {
     ok(!result.ok);
     deepStrictEqual(Object.keys(result.errors), ['sections[0].items[1].UUID']);
     strictEqual(result.errors['sections[0].items[1].UUID'], 'validation.invalidValue');
+  });
+});
+
+describe('runRecord link provenance', () => {
+  useBlocks().register('PLinkBlock', {
+    name: 'PLinkBlock',
+    block: { fields: { who: field('record', { collection: 'PUser' }) } },
+  });
+  useCollections().register('PLinks', {
+    name: 'PLinks',
+    collection: {
+      fields: {
+        owner: field('record', { collection: 'PUser', default: 'u-default' }),
+        pick: field('record', { collection: 'PUser' }),
+        tags: field('records', { collection: 'PTag' }),
+        sections: field('repeater', {
+          fields: {
+            who: field('record', { collection: 'PUser' }),
+            fallback: field('record', { collection: 'PUser', default: 'u-sub' }),
+          },
+        }),
+        content: field('blocks', { allow: ['PLinkBlock'] }),
+        preset: field('repeater', {
+          fields: { who: field('record', { collection: 'PUser' }) },
+          default: () => [{ who: 'u-preset' }],
+        }),
+      },
+    },
+  });
+
+  it('marks a link the input supplies provided, and a default or snapshot link not', async () => {
+    const result = await runRecord(
+      queryMetadata('PLinks'),
+      {
+        pick: 'u1',
+        tags: ['t1', 't2'],
+        sections: [{ who: 'u2' }],
+        content: [{ block: 'PLinkBlock', fields: { who: 'u3' } }],
+      },
+      { operation: 'create', tx },
+    );
+    ok(result.ok);
+    const refs = result.scope.refs
+      .map(({ path, uuid, provided }) => [path, uuid, provided])
+      .sort(([a], [b]) => String(a).localeCompare(String(b)));
+    deepStrictEqual(refs, [
+      ['content[0].fields.who', 'u3', true],
+      ['owner', 'u-default', false],
+      ['pick', 'u1', true],
+      ['preset[0].who', 'u-preset', false],
+      ['sections[0].fallback', 'u-sub', false],
+      ['sections[0].who', 'u2', true],
+      ['tags[0]', 't1', true],
+      ['tags[1]', 't2', true],
+    ]);
+  });
+
+  describe('with a `record:before-change` hook', () => {
+    afterEach(() => useHooks().clear());
+
+    it('checks a link the hook sets like one the input sends', async () => {
+      hook('record:before-change', (input) => {
+        input.pick = 'u-hook';
+      });
+      const result = await runRecord(queryMetadata('PLinks'), {}, { operation: 'create', tx });
+      ok(result.ok);
+      const pick = result.scope.refs.find((ref) => ref.path === 'pick');
+      strictEqual(pick?.provided, true);
+    });
   });
 });

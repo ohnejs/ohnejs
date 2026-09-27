@@ -1,13 +1,15 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
 import type { Transaction } from '../../database/adapter.ts';
 import type { LogicalType } from '../../database/dialect.ts';
-import type { FieldOperation } from '../../fields/context.ts';
+import type { FieldOperation, FieldWriteContext } from '../../fields/context.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
+import type { LinkReach } from '../write/references.ts';
 
 import { evaluateCondition, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
+import { linkReachable } from '../write/references.ts';
 import { finishComposite, prepareComposite, runCompositeTiers } from './descend.ts';
 import {
   defaultPath,
@@ -92,18 +94,24 @@ export interface ScopeContext {
    * A descent never inherits it: a child without its own view resolves its absent fields afresh.
    */
   snapshot?: Record<string, unknown>;
+
+  /**
+   * The `UUID`s among `uuids` the write may link in `target`, handed to every field's write context.
+   */
+  reachable: FieldWriteContext['reachable'];
 }
 
 /**
  * One field's phase-A outcome: skipped, failed, or carrying a coerced value into phase B.
  * `trusted` marks an inactive list's own empty `[]`, which phase B lands without running its tiers.
+ * `provided` marks a value the input supplied, never a default or a snapshot.
  * `snapshot` is a provided composite's coerced, defaulted view, the value a sibling `when` reads.
  * The raw `value` still flows to phase B unchanged.
  */
 export type Prepared =
   | { skip: true }
   | { errors: FieldErrors }
-  | { value: unknown; trusted?: true; snapshot?: unknown };
+  | { value: unknown; trusted?: true; provided?: true; snapshot?: unknown };
 
 /**
  * A reference a write must prove exists before it commits: a `record` FK or a `records`/nested link.
@@ -123,6 +131,11 @@ export interface RelationRef {
    * The referenced row's `UUID`.
    */
   uuid: string;
+
+  /**
+   * Whether the caller's input supplied the `UUID`; a default or a stored snapshot did not.
+   */
+  provided: boolean;
 }
 
 /**
@@ -434,14 +447,17 @@ async function finishField(
   ctx: ScopeContext,
 ): Promise<FieldOutput> {
   const trusted = 'trusted' in entry;
-  if (isScalarField(meta)) return finishScalar(name, meta, entry.value, input, ctx, trusted);
+  const provided = 'provided' in entry;
+  if (isScalarField(meta)) {
+    return finishScalar(name, meta, entry.value, input, ctx, trusted, provided);
+  }
   if (trusted || isNull(entry.value)) {
-    return finishComposite(name, meta, entry.value, ctx, processScope);
+    return finishComposite(name, meta, entry.value, ctx, processScope, provided);
   }
   const tiered = await runCompositeTiers(name, meta, entry.value, input, ctx);
   if ('errors' in tiered) return { errors: tiered.errors };
   const snapshot = tiered.value === entry.value ? entry.snapshot : undefined;
-  return finishComposite(name, meta, tiered.value, ctx, processScope, snapshot);
+  return finishComposite(name, meta, tiered.value, ctx, processScope, provided, snapshot);
 }
 
 /**
@@ -501,11 +517,12 @@ function mergeOutput(scope: ProcessedScope, errors: FieldErrors, output: FieldOu
  * The input is copied shallowly and frozen, so a field callback cannot poison a sibling's read.
  * The caller's own object stays untouched.
  * A success carries that frozen copy as `input`, so the executor gates against what the scope read.
+ * A `reach` narrows what each field's `reachable` answers to the links it admits.
  */
 export async function runRecord(
   collectionMeta: CollectionQueryMeta,
   input: Readonly<Record<string, unknown>>,
-  options: { operation: FieldOperation; tx: Transaction },
+  options: { operation: FieldOperation; tx: Transaction; reach?: LinkReach },
 ): Promise<RunRecordResult> {
   const ctx: ScopeContext = {
     operation: options.operation,
@@ -513,6 +530,7 @@ export async function runRecord(
     tx: options.tx,
     path: '',
     ancestors: [],
+    reachable: linkReachable(options.reach),
   };
   const changeCtx: RecordWriteContext = {
     collection: collectionMeta.collection as CollectionName,

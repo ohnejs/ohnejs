@@ -83,7 +83,8 @@ export interface ParsedQuery {
   populate: (string | PopulateSpec)[];
 
   /**
-   * The row cap, or `null` when unset.
+   * The row cap, lowered to `maxLimit` and filled with it when the request names no page.
+   * `null` on a paginated read.
    */
   limit: number | null;
 
@@ -541,7 +542,8 @@ function countPopulateNode(budget: { nodes: number }, guards: QueryGuards): void
 }
 
 /**
- * Parses the windowing params, rejecting mixed modes and clamping `perPage` to its ceiling.
+ * Parses the windowing params, rejecting mixed modes and clamping `limit` and `perPage` to their ceilings.
+ * A read that names no page takes `maxLimit` as its `limit`.
  */
 function parseWindow(
   params: Record<string, SearchParamValue>,
@@ -554,7 +556,13 @@ function parseWindow(
   if ((!isNull(limit) || !isNull(offset)) && (!isNull(page) || !isNull(perPageRaw)))
     throw paginationError();
   const perPage = isNull(perPageRaw) ? null : Math.min(perPageRaw, guards.maxPerPage);
-  return { limit, offset, page, perPage };
+  const paged = !isNull(page) || !isNull(perPage);
+  return {
+    limit: paged ? null : Math.min(limit ?? guards.maxLimit, guards.maxLimit),
+    offset,
+    page,
+    perPage,
+  };
 }
 
 /**

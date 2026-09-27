@@ -4,21 +4,33 @@ import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
 import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
-import type { ProcessedChild, ProcessedScope, UniqueProbe } from '../pipeline/run-record.ts';
+import type {
+  ProcessedChild,
+  ProcessedScope,
+  RelationRef,
+  UniqueProbe,
+} from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 import type { QueryRecord } from '../read/find.ts';
+import type { ReachResolver } from '../wire/reach.ts';
 import type { RecordMutateContext } from './create.ts';
 import type { FieldErrors } from './errors.ts';
 import type { ReconcileTarget } from './reconcile.ts';
+import type { LinkReach } from './references.ts';
 
 import {
   chunk,
   evaluateCondition,
+  getOrSet,
   groupBy,
   isEmpty,
   isNull,
+  isPlainObject,
+  isString,
   isUndefined,
+  toArray,
 } from '../../../utils/index.ts';
+import { useBlocks } from '../../blocks/use-blocks.ts';
 import { useDialect } from '../../database/use-database.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
@@ -144,6 +156,8 @@ async function afterUpdate(
  * Uniqueness prechecks exclude the matched rows, so a kept value never collides with its own record.
  * The returned records are all matched rows, untouched empty inputs included, in their final state.
  * `unscoped` skips `record:condition` and reads the rows back past `query:filter`, for framework bookkeeping.
+ * `linkResolver` narrows every link the input provides to what it reaches, as `linkReach` states.
+ * A link every matched record already holds under the same top-level field passes on existence alone.
  */
 export async function runUpdate(
   collection: string,
@@ -152,6 +166,7 @@ export async function runUpdate(
   locale: string | null,
   joinedTx?: Transaction,
   unscoped = false,
+  linkResolver: ReachResolver | null = null,
 ): Promise<UpdateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
@@ -160,7 +175,7 @@ export async function runUpdate(
     dialect,
     joinedTx,
     (o) => !o.ok,
-    (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale, unscoped),
+    (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale, unscoped, linkResolver),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
@@ -194,11 +209,15 @@ async function attemptUpdate(
   condition: ConditionNode,
   locale: string | null,
   unscoped: boolean,
+  linkResolver: ReachResolver | null,
 ): Promise<UpdateOutcome> {
-  const processed = await runRecord(meta, input, { operation: 'update', tx });
+  const code = effectiveLocale(locale);
+  const reach: LinkReach | undefined = isNull(linkResolver)
+    ? undefined
+    : { resolve: linkResolver, locale: code };
+  const processed = await runRecord(meta, input, { operation: 'update', tx, reach });
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
-  const code = effectiveLocale(locale);
 
   const validation = useHooks().get('record:validate');
   if (!isUndefined(validation) && validation.length > 0) {
@@ -215,9 +234,20 @@ async function attemptUpdate(
 
   const gates = whenGates(meta.fields, processed.input, scope);
   if (isEmpty(gates) && !hasNestedGates(scope)) {
-    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale, unscoped);
+    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale, unscoped, reach);
   }
-  return attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale, unscoped);
+  return attemptGatedUpdate(
+    tx,
+    meta,
+    dialect,
+    scope,
+    gates,
+    matched,
+    code,
+    locale,
+    unscoped,
+    reach,
+  );
 }
 
 /**
@@ -233,6 +263,7 @@ async function attemptPlainUpdate(
   code: string,
   locale: string | null,
   unscoped: boolean,
+  reach: LinkReach | undefined,
 ): Promise<UpdateOutcome> {
   if (matched.length > 1 && scope.uniqueProbes.length > 0) {
     return { ok: false, errors: fannedErrors(scope.uniqueProbes) };
@@ -262,7 +293,15 @@ async function attemptPlainUpdate(
   );
   if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
 
-  const referenceErrors = await checkReferences(tx, dialect, scope.refs);
+  const refs =
+    isUndefined(reach) || !scope.refs.some((ref) => ref.provided)
+      ? scope.refs
+      : heldAside(
+          scope.refs,
+          meta.fields,
+          await readMatched(meta.collection, matched, locale, true, unscoped),
+        );
+  const referenceErrors = await checkReferences(tx, dialect, refs, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
   const plan = await planReconcile(
@@ -321,6 +360,7 @@ async function attemptGatedUpdate(
   code: string,
   locale: string | null,
   unscoped: boolean,
+  reach: LinkReach | undefined,
 ): Promise<UpdateOutcome> {
   const records = await readMatched(meta.collection, matched, locale, true, unscoped);
   const overlays = new Map(
@@ -384,7 +424,8 @@ async function attemptGatedUpdate(
     if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
   }
 
-  const referenceErrors = await checkReferences(tx, dialect, union.refs);
+  const refs = isUndefined(reach) ? union.refs : heldAside(union.refs, meta.fields, records);
+  const referenceErrors = await checkReferences(tx, dialect, refs, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
   const writes: {
@@ -447,6 +488,65 @@ function fannedErrors(probes: readonly UniqueProbe[]): FieldErrors {
   const errors: FieldErrors = {};
   for (const probe of probes) errors[probe.path] = 'validation.notUnique';
   return errors;
+}
+
+/**
+ * The refs with each provided link that every matched record already holds marked unprovided.
+ * A held link counts under the ref's own top-level field alone, so a stored link never moves elsewhere.
+ * Resending it shows nothing a read of that field on those records would not.
+ */
+function heldAside(
+  refs: readonly RelationRef[],
+  fields: Record<string, FieldQueryMeta>,
+  records: readonly QueryRecord[],
+): RelationRef[] {
+  const held = new Map<string, Set<string>>();
+  const heldBy = (name: string, target: string): Set<string> =>
+    getOrSet(held, `${name} ${target}`, () => {
+      const [first = [], ...rest] = records.map((record) =>
+        linkedUUIDs(fields[name], record[name], target),
+      );
+      return new Set([...first].filter((uuid) => rest.every((set) => set.has(uuid))));
+    });
+  return refs.map((ref) =>
+    ref.provided && heldBy(headSegment(ref.path), ref.target).has(ref.uuid)
+      ? { ...ref, provided: false }
+      : ref,
+  );
+}
+
+/**
+ * The `UUID`s a stored field value links in `target`, walking composites and blocks down to their links.
+ */
+function linkedUUIDs(
+  field: FieldQueryMeta | undefined,
+  value: unknown,
+  target: string,
+  links = new Set<string>(),
+): Set<string> {
+  if (isUndefined(field)) return links;
+  if (field.kind === 'record' || field.kind === 'records') {
+    if (field.target !== target) return links;
+    for (const uuid of toArray(value)) if (isString(uuid)) links.add(uuid);
+    return links;
+  }
+  for (const item of toArray(value).filter(isPlainObject)) {
+    if (field.kind === 'blocks') {
+      if (!isString(item.block) || !useBlocks().has(item.block) || !isPlainObject(item.fields)) {
+        continue;
+      }
+      const { fields } = blockQueryMetadata(item.block);
+      for (const [name, sub] of Object.entries(fields)) {
+        linkedUUIDs(sub, item.fields[name], target, links);
+      }
+    } else if (field.kind === 'childOne' || field.kind === 'childMany') {
+      const subfields = field.subfields as Record<string, FieldQueryMeta>;
+      for (const [name, sub] of Object.entries(subfields)) {
+        linkedUUIDs(sub, item[name], target, links);
+      }
+    }
+  }
+  return links;
 }
 
 /**

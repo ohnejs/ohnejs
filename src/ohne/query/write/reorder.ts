@@ -3,7 +3,7 @@ import type { Dialect, LogicalType } from '../../database/dialect.ts';
 import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedScope } from '../pipeline/run-record.ts';
 
-import { isEmpty, isNullish, isUndefined, uniqueArray } from '../../../utils/index.ts';
+import { isNullish, isUndefined, uniqueArray } from '../../../utils/index.ts';
 
 /**
  * One ordering constraint: `writer`'s new unique value is what `holder`'s kept row currently stores.
@@ -129,7 +129,7 @@ export function orderKeptWrites(
       }
       written += free.length;
     } else {
-      while (isEmpty(heldBy[breaker])) breaker++;
+      while (heldBy[breaker].length === 0) breaker++;
       for (const sub of uniqueArray(heldBy[breaker].map((edge) => edge.sub))) {
         sequence.push({ kind: 'sentinel', sub, uuid: rows[breaker].uuid });
       }

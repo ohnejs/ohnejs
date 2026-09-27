@@ -94,6 +94,16 @@ export interface QueryGuards {
   maxPatternBytes: number;
 
   /**
+   * The most rows a read outside pagination answers.
+   * A larger `limit` is lowered to it, and a read that names no `limit`, `page` or `perPage` stops at it.
+   * Keep it at or above `maxInLength`, so a `UUID` `in` lookup answers every row it names.
+   *
+   * @default
+   * 2000
+   */
+  maxLimit: number;
+
+  /**
    * The largest page a paginated endpoint may serve.
    *
    * @default
@@ -116,6 +126,7 @@ export const DEFAULT_QUERY_GUARDS: Readonly<QueryGuards> = {
   maxPopulateDepth: 2,
   maxValueBytes: 4096,
   maxPatternBytes: 512,
+  maxLimit: 2000,
   maxPerPage: 500,
 };
 
