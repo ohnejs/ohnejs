@@ -17,11 +17,14 @@ export interface FormatSSEOptions {
   id?: string;
 }
 
+const LINE_BREAK = /[\r\n]/;
+
 /**
  * Encodes one message into a `text/event-stream` frame for Server-Sent Events.
  *
  * Each line of `data` becomes its own `data:` line, so a multi-line payload survives intact.
  * The optional `event` and `id` are emitted as their own lines first.
+ * Either one holding a line break throws, since it would end its line and let the rest forge fields.
  * The frame ends with the blank line that terminates an event.
  *
  * @example
@@ -33,8 +36,13 @@ export interface FormatSSEOptions {
  */
 export function formatSSE(data: string, options: FormatSSEOptions = {}): string {
   let frame = '';
-  if (!isUndefined(options.event)) frame += `event: ${options.event}\n`;
-  if (!isUndefined(options.id)) frame += `id: ${options.id}\n`;
+  if (!isUndefined(options.event)) frame += field('event', options.event);
+  if (!isUndefined(options.id)) frame += field('id', options.id);
   for (const line of data.split(/\r\n|\r|\n/)) frame += `data: ${line}\n`;
   return `${frame}\n`;
+}
+
+function field(name: string, value: string): string {
+  if (LINE_BREAK.test(value)) throw new Error(`SSE \`${name}\` must not contain a line break`);
+  return `${name}: ${value}\n`;
 }

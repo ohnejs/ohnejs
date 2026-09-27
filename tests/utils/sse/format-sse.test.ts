@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { formatSSE } from '../../../src/utils/sse/format-sse.ts';
@@ -26,5 +26,12 @@ describe('formatSSE', () => {
 
   it('orders event before id before data', () => {
     strictEqual(formatSSE('x', { event: 'tick', id: '7' }), 'event: tick\nid: 7\ndata: x\n\n');
+  });
+
+  it('rejects a line break in the event or id so neither can forge fields', () => {
+    for (const value of ['a\nevent: x', 'a\rdata: x', 'a\r\n\ndata: x']) {
+      throws(() => formatSSE('x', { event: value }), /`event` must not contain a line break/);
+      throws(() => formatSSE('x', { id: value }), /`id` must not contain a line break/);
+    }
   });
 });
