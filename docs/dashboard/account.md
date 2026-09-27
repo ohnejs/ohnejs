@@ -20,7 +20,7 @@ reload is needed.
 | Date format           | `LL`                                                                     | The pattern used to render dates                                                                 |
 | Time format           | `LTS`                                                                    | The pattern used to render times                                                                 |
 | Smart clipboard       | off                                                                      | Watches the clipboard, so a block copied in another tab pastes here                              |
-| Password              |                                                                          | A new password. If left blank, the current one stays                                             |
+| Password              |                                                                          | A new password, which signs out your other devices. If left blank, the current one stays         |
 
 ## Date and time formats
 

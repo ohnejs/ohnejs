@@ -110,7 +110,8 @@ The translation routes manage a record's locales as units, on a collection with
 [translatable fields](../database/translations.md):
 
 - `GET /collections/posts/[uuid]/translations` answers `{ locales }`: the locales where the record
-  has a translation, in the configured order. It is the same list as its `_translations`.
+  has a translation, in the configured order. It is the same list as its `_translations`, so a
+  read scope whose `select` leaves `_translations` out answers `404`.
 - `POST /collections/posts/[uuid]/translations/copy`
   [copies a translation](../database/translations.md#copying-a-translation). An optional JSON body
   names the `source` locale, `?locale=` names the target, and it answers the target's new state.

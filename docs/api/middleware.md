@@ -51,6 +51,8 @@ export default defineMiddleware(async (event) => {
 
 - A pattern with a `[param]` matches like a [route](./routes.md#route-params): `/authors/[id]`.
 - Anything else is a glob: `*` matches one segment, and `**` any depth.
+- A glob also matches the path with one trailing `/` dropped, as a route does, so `/admin` covers
+  `/admin/`.
 - `matchesPath(path, ...patterns)` is the same test, for when you have a path instead of a request.
 
 The example stores the session on `event.context`, the per-request object that a middleware fills

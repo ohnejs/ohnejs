@@ -216,6 +216,10 @@ How long a session lasts depends on [`remember`](#the-endpoints):
 expired session is deleted the next time a request sends it, so an old cookie never resolves to a
 user.
 
+Changing a password ends every other session of that user, wherever the write comes from: the
+account page, the collections API, or your own `query('Users')`. The session that made the change
+stays. A change outside a request, in a script or a command, ends them all.
+
 To manage sessions from your own code, import the same helpers the endpoints use:
 
 ```ts
