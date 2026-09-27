@@ -80,6 +80,7 @@ export default defineConfig({
 - A read mints links that expire at the end of the window after the one holding now, so a link
   lives between one and two windows.
 - Every read inside one window mints the same URLs, so a browser cache keeps working.
+- `privateMaxAge` is at most `15d`, so no link a read mints lasts past `30d`.
 
 ## Who can open the bytes
 
@@ -132,9 +133,10 @@ temporaryUploadURL(upload, '7d');
 ```
 
 - `maxAge` is milliseconds or a string like `'7d'`, counted from now, not aligned to a window.
+- `maxAge` is above zero and at most `30d`. Anything else throws.
 - `POST /uploads/[uuid]/link` with the body `{ "maxAge": "7d" }` answers the same `{ url, expires }`
-  to a caller who may read `Uploads`. `maxAge` defaults to `privateMaxAge`. A public file answers
-  its plain `url` with `expires: null`.
+  to a caller who may read `Uploads`. `maxAge` defaults to `privateMaxAge`, and one out of range
+  is a `400`. A public file answers its plain `url` with `expires: null`.
 - The details popup offers the same as `Copy temporary link`.
 - Without `UPLOADS_SECRET`, `temporaryUploadURL` throws.
 

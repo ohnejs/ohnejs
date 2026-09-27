@@ -101,6 +101,10 @@ Requests match the most specific pattern first, segment by segment: a static seg
 `[param]`, which beats a `[...catch-all]`. `/authors/new` wins over `/authors/[id]` no matter how
 the files sort. A single trailing slash is allowed, so `/authors/42/` matches `/authors/[id]`.
 
+Escaped letters, digits and `-._~` are decoded before matching, so `/%70osts` is `/posts`. A path
+with an encoded slash (`%2F`) gets a `404`, so a param never holds a `/` that was not a segment
+boundary. To pass a value that contains `/`, use a `[...catch-all]` or a query param.
+
 Methods you did not define yourself are filled in:
 
 - On the same path, a method-suffixed file wins its method, and a suffixless file answers the rest.

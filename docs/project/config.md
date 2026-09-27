@@ -278,6 +278,7 @@ export default defineConfig({
 ```
 
 A limit you set replaces its default. The others keep theirs.
+Keep `maxLimit` at or above `maxInLength`.
 [Querying over HTTP](../api/url-queries.md#guards) lists every limit and its default.
 
 ## The printer

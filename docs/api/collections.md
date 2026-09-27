@@ -57,7 +57,8 @@ The list endpoint accepts the whole [URL query grammar](./url-queries.md): `wher
 `order`, `populate`, `limit`/`offset` or `page`/`perPage`, and `locale`.
 
 - With `page` or `perPage`, it answers a paginated object: `records`, `total`, `page`, `perPage`,
-  and `lastPage`. Otherwise it answers a plain array.
+  and `lastPage`. Otherwise it answers a plain array of at most `maxLimit` rows (`2000` by
+  default). Page with `limit`/`offset`, or name `page` to get the `total`.
 - `perPage` defaults to `20` when only `page` is named.
 
 A query that is too long for a URL goes in a JSON body instead. `POST /collections/posts/query`
@@ -221,7 +222,7 @@ A scope object carries these keys:
   `select` can only choose among them. On an update the same list limits the body: only fields in
   the list are written, and the answered record carries only the scoped fields.
 - `limit` - the maximum for a list read's `limit`/`offset` window. The request's own `limit` can
-  only lower it. A paginated read takes its size from `perPage` instead, which the
+  only lower it, and the [`maxLimit` guard](./url-queries.md#guards) caps it. A paginated read takes its size from `perPage` instead, which the
   [`maxPerPage` guard](./url-queries.md#guards) limits.
 - `locale` - the locale a read uses when the request names none. It is only a default, so a request
   can still name another locale.
@@ -237,11 +238,24 @@ applies.
 The filter checks the row as it is stored, so an update body can move a row out of the scope, for
 example when an author gives a post to someone else. Protect such a field through the scope's
 `select`, or lock it with
-[`writable: false`](../database/collections.md#write-only-and-locked-fields).
+[`writable: false`](../database/collections.md#write-only-and-locked-fields). The shipped `Users`
+collection protects its `roles` with the [grant rule](../auth/roles.md#delegating-user-management).
 
 When another collection's endpoint [populates or probes](./url-queries.md#across-relations) this
 one, this collection's own `read` exposure, guard, scope, and middleware decide what comes back. If
-one of its middleware answers, this collection cannot be reached that way.
+one of its middleware answers, this collection cannot be reached that way. A `record` or `records`
+value you do not populate is the parent's own data, so it
+[reads as stored](./url-queries.md#across-relations) even when you cannot read its target.
+
+A link is a read too. A `record`, `records`, or upload field in a body accepts a `UUID` only if you
+could read that record through its own collection's endpoint. A `UUID` outside that reach fails
+with the same `422` `invalidReference` as one that does not exist, so a write never reveals what you
+cannot reach. These skip the read and only need to exist:
+
+- a value from a field's `default`, since you did not send it.
+- a link the record already holds, resent in the same field. Moving it to another field is a new
+  link.
+- your own user.
 
 A `where` on translatable fields matches per locale, so it can allow a record in `en` and hide it in
 `de`. The endpoints then reduce the record's `_translations` to the allowed locales. They also refuse
@@ -313,6 +327,8 @@ matches a listed editor, and `author` reaches the author's own `manager`.
 create gets its owner. An update that names `author` is limited to the author's own rows, so when an
 editor tries to reassign a post, the answer is `404`. Lock the field with `writable: false` instead
 when nobody may change it.
+
+To name other users in `editors`, the writer needs a read on `Users`.
 
 Give a bypass a name outside the `collection.` prefix.
 [`collection.Posts.*`](../auth/roles.md#capabilities) covers every name under it, including

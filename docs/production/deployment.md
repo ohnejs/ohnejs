@@ -125,6 +125,10 @@ dashboard's origin may read API responses, cookies included.
   public domain or a port changed with `PORT`, set `DASHBOARD_URL` or `dashboard.origin` to that
   origin. Otherwise the browser blocks its requests.
 - Set `DASHBOARD_URL` on the API process, not the dashboard's.
+- Every browser frontend that signs in needs its origin in the cors policy, with credentials. A
+  write that rides the session cookie from any other page gets a `403`, as
+  [cross-site requests](../auth/authentication.md#cross-site-requests) explains.
+- Behind a proxy, set `api.trustProxy` so the API knows its public origin.
 
 ## Secrets
 
@@ -197,6 +201,10 @@ production:
 | `maxHeaderSize`, `headersTimeout`, `requestTimeout` | To drop oversized or slow clients sooner than Node's defaults, or to give slow uploads more time.         |
 | `keepAliveTimeout`                                  | Behind a load balancer that reuses connections, set it above the balancer's idle timeout.                 |
 | `waitUntilTimeout`                                  | To limit background `waitUntil` work, which a graceful shutdown otherwise waits for.                      |
+
+Sign-in runs its password checks on Node's thread pool and uses at most half of it, answering `503`
+past that. For more sign-ins at once, raise the pool with the `UV_THREADPOOL_SIZE` env var (`4` by
+default), set before the process starts.
 
 ## Logs
 

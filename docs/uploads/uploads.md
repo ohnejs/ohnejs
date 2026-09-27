@@ -77,6 +77,9 @@ guarded: the caller needs the `collection.Uploads.read`
 [routes](#uploading-over-http) or the [helpers](#in-server-code), which are the only code that moves
 bytes.
 
+Attaching an upload to a [media field](./fields.md) through the collections API needs the same
+read as fetching it: an upload the caller cannot read fails with `invalidReference`.
+
 To open that read to anyone, or limit it with [`access`](../api/collections.md#access), add your
 own `collections/Uploads.ts`. It
 [replaces the layer's `Uploads`](../project/layers.md#what-overrides-what) entirely, so spread

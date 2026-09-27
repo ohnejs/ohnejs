@@ -158,6 +158,10 @@ result.ok;            // false
 result.errors.author; // the reference does not exist
 ```
 
+Through the collections API a link must also be one the caller can read, as
+[the scope](../api/collections.md#the-scope) describes. `query()` only checks that the `UUID`
+exists.
+
 ## Updating records
 
 `update` changes every record a filter matches. `update` and `delete` exist only after a `where`, so

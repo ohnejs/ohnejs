@@ -12,7 +12,8 @@ are invite-only, some verify the email, and some ask users to accept terms.
 
 ## The endpoints
 
-These routes cover the sign-in flow, the account, and first-user setup. Each uses JSON.
+These routes cover the sign-in flow, the account, and first-user setup. A request body is always
+JSON, and the sign-out routes take none.
 
 ```bash
 # Sign in. Returns the user and sets the session cookie.
@@ -132,6 +133,9 @@ export default defineCollection({
 });
 ```
 
+Spreading `usersDefinition` keeps the [grant rule](./roles.md#delegating-user-management). If you
+set your own `api`, pass `manageUsers` from `ohnejs/auth` as each write's `access`.
+
 Make an added field [`nullable: true`](../database/collections.md#column-fields) or give it a
 `default`, because the install page creates the first admin from only an email and a password.
 [`useUser`](#reading-the-current-user) returns the `User` shape without your fields, so read them
@@ -231,6 +235,17 @@ await useSession();                    // the current session row, or null
 await destroySession();                // ends the session and clears the cookie
 ```
 
+### Cross-site requests
+
+The cookie is `SameSite=Lax`, which keeps it off requests from other sites. It does not stop a page
+on the same site, such as another port on `localhost` or a sibling subdomain. So the API checks
+where a cookie request comes from:
+
+- A request that changes something (anything but `GET`, `HEAD`, and `OPTIONS`) and rides the cookie
+  must come from the API's own origin, or from an origin your
+  [CORS policy](../api/middleware.md#cors) allows with credentials. Anything else gets a `403`.
+- `Bearer` tokens are unaffected, and so are clients like `curl` that send no `Origin`.
+
 ## Configuration
 
 The auth settings live under `auth` in [`ohne.config.ts`](../project/config.md):
@@ -277,6 +292,17 @@ You rarely need to change more than one setting. Leave `blockSize` and `parallel
 raise `cost` (a power of two, so the next step is `65536`) until a sign-in takes about 100ms on your
 server. That keeps hashing cheap for you and expensive for an attacker. An old password still works
 after you raise the cost, because each stored hash includes the cost it was made with.
+
+## Password guessing
+
+`POST /auth/login` runs one password check per client IP at a time, and at most half of Node's thread
+pool per process. A sign-in past that gets a `503` with `Retry-After: 1`. Behind a proxy, set
+[`api.trustProxy`](../production/deployment.md#behind-a-proxy), or every client shares one IP.
+
+This does not count failed attempts. To stop someone guessing passwords one at a time, rate-limit
+`/auth/login` in your proxy, or answer `429` with `Retry-After` from a
+[global middleware](../api/middleware.md#global-middleware). The dashboard's login form waits out
+either answer.
 
 ## Rolling your own
 

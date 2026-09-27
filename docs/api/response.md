@@ -151,8 +151,7 @@ Each `send` pushes one event. A multi-line payload stays complete: each of its l
 - `event` emits a typed event the browser dispatches under that name.
 - `id` sets the id the browser sends back as `Last-Event-ID` when it reconnects.
 
-Neither may contain a line break: it would end the line and let the rest pose as new fields, so
-`send` throws instead.
+Neither may contain a line break, or `send` throws.
 
 `close` ends the stream and the socket, and a `send` after that does nothing. Either ending, yours
 or the client's disconnect, runs `onClose` exactly once. Use it to stop timers or remove the stream

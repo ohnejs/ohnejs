@@ -126,6 +126,9 @@ to it:
 
 Mixing `limit` or `offset` with `page` or `perPage` is a `400`.
 
+`limit` is lowered to `maxLimit`. A read without `page` or `perPage` answers at most `maxLimit`
+rows, even with no `limit` or with `offset` alone.
+
 `applyQuery` leaves `page` and `perPage` to your endpoint, which decides whether to paginate. Read
 them from the parsed query and call [`paginate`](../database/reading.md#pagination) yourself:
 
@@ -252,6 +255,9 @@ directly:
 - A target's read scope narrows which of its rows match or populate, and which fields come back, at
   every level.
 - A target field outside that scope is refused exactly as a field that does not exist.
+- A `record` or `records` value you do not populate reads as stored, even when you cannot read its
+  target. To keep those `UUID`s private, leave the field out of the read scope's `select` or mark it
+  [`readable: false`](../database/collections.md#write-only-and-locked-fields).
 
 ## Reading from a POST body
 
@@ -308,19 +314,20 @@ use a URL to find out which fields your collection has. The full list of codes i
 The untrusted path has upper limits, so a hostile URL cannot overload the server. Each ceiling is a
 `QueryGuards` field. Its default is high enough that a real query never comes near it:
 
-| Guard              | Default | Caps                                                                |
-| ------------------ | ------- | ------------------------------------------------------------------- |
-| `maxConditions`    | `100`   | Comparisons in one `where`, `has` and `empty` included.             |
-| `maxHasDepth`      | `8`     | How deep `has` nests.                                               |
-| `maxInLength`      | `2000`  | Elements in an `in`, `includesAll`, or `includesAny` list.          |
-| `maxBoundParams`   | `10000` | Parameters one query binds, capped at the database's own limit.     |
-| `maxSelect`        | `200`   | Fields one `select` names.                                          |
-| `maxOrder`         | `10`    | Keys in one `order`.                                                |
-| `maxPopulate`      | `20`    | Nodes in one `populate` tree.                                       |
-| `maxPopulateDepth` | `2`     | How deep `populate` nests.                                          |
-| `maxValueBytes`    | `4096`  | Bytes in one string value.                                          |
-| `maxPatternBytes`  | `512`   | Bytes in a `contains`, `startsWith`, `endsWith`, or `like` pattern. |
-| `maxPerPage`       | `500`   | The largest `perPage`. A larger one is lowered to it.               |
+| Guard              | Default | Caps                                                                 |
+| ------------------ | ------- | -------------------------------------------------------------------- |
+| `maxConditions`    | `100`   | Comparisons in one `where`, `has` and `empty` included.              |
+| `maxHasDepth`      | `8`     | How deep `has` nests.                                                |
+| `maxInLength`      | `2000`  | Elements in an `in`, `includesAll`, or `includesAny` list.           |
+| `maxBoundParams`   | `10000` | Parameters one query binds, capped at the database's own limit.      |
+| `maxSelect`        | `200`   | Fields one `select` names.                                           |
+| `maxOrder`         | `10`    | Keys in one `order`.                                                 |
+| `maxPopulate`      | `20`    | Nodes in one `populate` tree.                                        |
+| `maxPopulateDepth` | `2`     | How deep `populate` nests.                                           |
+| `maxValueBytes`    | `4096`  | Bytes in one string value.                                           |
+| `maxPatternBytes`  | `512`   | Bytes in a `contains`, `startsWith`, `endsWith`, or `like` pattern.  |
+| `maxLimit`         | `2000`  | The largest `limit`, and the default. A larger one is lowered to it. |
+| `maxPerPage`       | `500`   | The largest `perPage`. A larger one is lowered to it.                |
 
 The fluent builder is trusted and never checked.
 
@@ -348,5 +355,5 @@ export default defineHandler(async () => {
 });
 ```
 
-Only the ceiling changes. Above it, `perPage` is still lowered to the ceiling, and everything else
-is still a `400` with the same code.
+Only the ceiling changes. Above it, `perPage` and `limit` are still lowered to their ceilings, and
+everything else is still a `400` with the same code.

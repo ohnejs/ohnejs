@@ -53,6 +53,8 @@ export default defineMiddleware(async (event) => {
 - Anything else is a glob: `*` matches one segment, and `**` any depth.
 - A glob also matches the path with one trailing `/` dropped, as a route does, so `/admin` covers
   `/admin/`.
+- `matchPath` sees the path the router [matches](./routes.md#matching), so `/%61dmin/x` is
+  `/admin/x`.
 - `matchesPath(path, ...patterns)` is the same test, for when you have a path instead of a request.
 
 The example stores the session on `event.context`, the per-request object that a middleware fills
@@ -159,6 +161,9 @@ export default cors({
 });
 ```
 
+Keeping the dashboard's origin and `credentials: true` is what lets the dashboard write with its
+session cookie. Any other origin you list with credentials may write with the cookie too.
+
 Only a file that resolves to the same name, `global-cors`, shadows the shipped policy. Any other
 name, such as `global/10-cors.ts`, adds a second global middleware, and both policies run.
 
@@ -186,6 +191,9 @@ credentials, and rejecting it blocks the real request that follows it. Globals f
 share one name order: `global/session.ts` above runs after `cors`, while `global/auth.ts` and
 `global/20-auth.ts` run before it.
 
-CORS controls what a browser will read, never who may call the API.
+A global that reads the session must sort after `cors` too, or the dashboard's writes are refused.
+
+CORS controls what a browser will read. With `credentials: true` it also names the cross-origin
+pages that may send the session cookie on a write. It never replaces authorization.
 [Authorization](../auth/roles.md#guarding-your-own-routes) is handled separately, and
 [deployment](../production/deployment.md#cors) covers the production setup.

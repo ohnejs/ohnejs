@@ -137,6 +137,8 @@ async function send(file: File): Promise<void> {
 - The body arrives raw. On the server, `readRawBody` from [the request](../api/request.md#the-body)
   reads it.
 - The base URL, the credentials, and the session check are the ones `api` applies.
+- Authenticate the route with `useUser`, `requireUser`, or `requireCapability`, which refuse a
+  [cross-site cookie write](../auth/authentication.md#cross-site-requests) that a raw body could send.
 - A bare-path id uploads with `POST`.
 - Pass a `signal` to cancel. The promise rejects with an `AbortError`, as `fetch` does.
 

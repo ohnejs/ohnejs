@@ -37,6 +37,9 @@ collection.Posts.*
 - Only roles use wildcards: a role holds `collection.Posts.*`, but a check always asks for one
   concrete capability.
 - A [singleton](../database/collections.md#singletons) adds `read` and `update` only.
+- A role that links records of a collection over the
+  [collections API](../api/collections.md#the-scope) needs `read` on it too, as
+  `collection.Tags.read` does for the [editor](#labels) below.
 
 [Codegen](../project/cli.md#ohne-prepare) generates these names from your collections, so they
 autocomplete wherever a capability is expected.
@@ -95,6 +98,31 @@ Adding a `roles` field to your own collection that already holds rows works like
 required field: add it with [`nullable: true`](../database/collections.md#column-fields), fill the
 existing rows, then remove the flag with a
 [switch migration](../database/migrations.md#switching-an-attribute).
+
+## Delegating user management
+
+You can hand user management to a role that is not an admin. The grant rule keeps that role from
+reaching past its own capabilities: you can grant a role only when your own capabilities cover every
+capability it lists, and you can edit or delete a user only when you could grant every role they
+hold.
+
+```ts
+// roles/support.ts
+import { defineRole } from 'ohnejs';
+
+export default defineRole({
+  capabilities: ['collection.Users.*', 'collection.Posts.*'],
+});
+```
+
+A user holding `support` can create, edit, and delete users whose roles it covers, `support` itself
+included, and view every user. It cannot:
+
+- grant `admin`. The write answers `422`, with an error at each offending `roles[n]`.
+- edit or delete an admin, who answers `404`.
+
+If you [replace the `Users` collection](./authentication.md#adding-fields-to-users), keep
+`manageUsers` on its writes.
 
 ## The collections API guard
 
