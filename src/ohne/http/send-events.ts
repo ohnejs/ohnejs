@@ -17,6 +17,7 @@ export interface EventStream {
   /**
    * Sends one event to the client.
    * A call after the stream has closed is a no-op.
+   * An `event` or `id` holding a line break throws.
    * A stalled client is disconnected once `1024` frames sit unread, so it never buffers without bound.
    */
   send(data: string, options?: FormatSSEOptions): void;
@@ -86,8 +87,9 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
     body,
     send(data, frameOptions) {
       if (!open) return;
+      const frame = encoder.encode(formatSSE(data, frameOptions));
       try {
-        controller.enqueue(encoder.encode(formatSSE(data, frameOptions)));
+        controller.enqueue(frame);
       } catch {
         finish();
         return;

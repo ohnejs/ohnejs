@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { type Event, runWithEvent, sendEvents, useEvent } from '../../../src/ohne/index.ts';
@@ -44,6 +44,14 @@ describe('sendEvents', () => {
     stream.send('hi', { event: 'greet' });
     stream.close();
     strictEqual(await read(stream.body), ': open\n\ndata: reload\n\nevent: greet\ndata: hi\n\n');
+  });
+
+  it('throws on a line break in the id and keeps the stream open', async () => {
+    const stream = runWithEvent(makeEvent(), () => sendEvents());
+    throws(() => stream.send('x', { id: '7\n\nevent: logout' }), /line break/);
+    stream.send('ok');
+    stream.close();
+    strictEqual(await read(stream.body), ': open\n\ndata: ok\n\n');
   });
 
   it('ignores sends after close and runs onClose once', () => {
