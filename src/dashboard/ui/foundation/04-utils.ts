@@ -125,7 +125,7 @@ css`
     pointer-events: none;
   }
 
-  .ohne-no-interaction * {
+  .ohne-no-interaction :not(.ohne-dropdown, .ohne-dropdown *) {
     pointer-events: none !important;
   }
 

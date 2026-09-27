@@ -171,9 +171,8 @@ css`
     font-size: calc(1rem + var(--ohne-size) * 0.125rem);
   }
 
-  .ohne-no-interaction .ohne-dropdown,
-  .ohne-no-interaction .ohne-dropdown * {
-    pointer-events: all !important;
+  .ohne-no-interaction .ohne-dropdown {
+    pointer-events: auto;
   }
 
   .ohne-dropdown-scrollable {
