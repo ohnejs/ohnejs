@@ -102,9 +102,10 @@ existing rows, then remove the flag with a
 ## Delegating user management
 
 You can hand user management to a role that is not an admin. The grant rule keeps that role from
-reaching past its own capabilities: you can grant a role only when your own capabilities cover every
-capability it lists, and you can edit or delete a user only when you could grant every role they
-hold.
+reaching past its own capabilities:
+
+- A user can grant a role only when their capabilities cover every capability the role lists.
+- A user can edit or delete another user only when they could grant every role that user holds.
 
 ```ts
 // roles/support.ts
@@ -119,7 +120,7 @@ A user holding `support` can create, edit, and delete users whose roles it cover
 included, and view every user. It cannot:
 
 - grant `admin`. The write answers `422`, with an error at each offending `roles[n]`.
-- edit or delete an admin, who answers `404`.
+- edit or delete an admin. The write answers `404`, as if the admin did not exist.
 
 If you [replace the `Users` collection](./authentication.md#adding-fields-to-users), keep
 `manageUsers` on its writes.

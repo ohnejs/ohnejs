@@ -278,7 +278,7 @@ export default defineConfig({
 ```
 
 A limit you set replaces its default. The others keep theirs.
-Keep `maxLimit` at or above `maxInLength`.
+Keep `maxLimit` at or above `maxInLength`, so a `UUID` `in` list gets back every row it names.
 [Querying over HTTP](../api/url-queries.md#guards) lists every limit and its default.
 
 ## The printer

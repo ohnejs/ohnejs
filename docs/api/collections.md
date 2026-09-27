@@ -222,8 +222,9 @@ A scope object carries these keys:
   `select` can only choose among them. On an update the same list limits the body: only fields in
   the list are written, and the answered record carries only the scoped fields.
 - `limit` - the maximum for a list read's `limit`/`offset` window. The request's own `limit` can
-  only lower it, and the [`maxLimit` guard](./url-queries.md#guards) caps it. A paginated read takes its size from `perPage` instead, which the
-  [`maxPerPage` guard](./url-queries.md#guards) limits.
+  only lower it, and the [`maxLimit` guard](./url-queries.md#guards) caps it. A paginated read
+  takes its size from `perPage` instead, which the [`maxPerPage` guard](./url-queries.md#guards)
+  limits.
 - `locale` - the locale a read uses when the request names none. It is only a default, so a request
   can still name another locale.
 
@@ -243,19 +244,20 @@ collection protects its `roles` with the [grant rule](../auth/roles.md#delegatin
 
 When another collection's endpoint [populates or probes](./url-queries.md#across-relations) this
 one, this collection's own `read` exposure, guard, scope, and middleware decide what comes back. If
-one of its middleware answers, this collection cannot be reached that way. A `record` or `records`
-value you do not populate is the parent's own data, so it
-[reads as stored](./url-queries.md#across-relations) even when you cannot read its target.
+one of its middleware answers, this collection cannot be reached that way.
 
-A link is a read too. A `record`, `records`, or upload field in a body accepts a `UUID` only if you
-could read that record through its own collection's endpoint. A `UUID` outside that reach fails
-with the same `422` `invalidReference` as one that does not exist, so a write never reveals what you
-cannot reach. These skip the read and only need to exist:
+A link you do not populate is different. The `UUID` in a post's `author` is the post's own data, so
+[it reads as stored](./url-queries.md#across-relations) even when you cannot read that user.
 
-- a value from a field's `default`, since you did not send it.
-- a link the record already holds, resent in the same field. Moving it to another field is a new
-  link.
-- your own user.
+Writing a link is a read too. A `record`, `records`, or upload field in a body accepts a `UUID` only
+if you could read that record through its own collection's endpoint. Otherwise the write fails with
+`422` `invalidReference`, the same answer as for a `UUID` that does not exist, so a write never
+reveals what you cannot read. These links only need to exist:
+
+- A value from the field's `default`, since you did not send it.
+- A link the record already holds, sent again in the same field. The same `UUID` in another field is
+  a new link.
+- A link to your own user.
 
 A `where` on translatable fields matches per locale, so it can allow a record in `en` and hide it in
 `de`. The endpoints then reduce the record's `_translations` to the allowed locales. They also refuse

@@ -80,7 +80,7 @@ export default defineConfig({
 - A read mints links that expire at the end of the window after the one holding now, so a link
   lives between one and two windows.
 - Every read inside one window mints the same URLs, so a browser cache keeps working.
-- `privateMaxAge` is at most `15d`, so no link a read mints lasts past `30d`.
+- `privateMaxAge` can be at most `15d`, so no link lasts past `30d`. A longer one stops the boot.
 
 ## Who can open the bytes
 

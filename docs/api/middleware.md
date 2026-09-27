@@ -191,7 +191,8 @@ credentials, and rejecting it blocks the real request that follows it. Globals f
 share one name order: `global/session.ts` above runs after `cors`, while `global/auth.ts` and
 `global/20-auth.ts` run before it.
 
-A global that reads the session must sort after `cors` too, or the dashboard's writes are refused.
+A global that reads the session must sort after `cors` too. The session check reads the CORS
+headers to trust the dashboard's origin, and without them the dashboard's writes get a `403`.
 
 CORS controls what a browser will read. With `credentials: true` it also names the cross-origin
 pages that may send the session cookie on a write. It never replaces authorization.

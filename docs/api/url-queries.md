@@ -126,8 +126,8 @@ to it:
 
 Mixing `limit` or `offset` with `page` or `perPage` is a `400`.
 
-`limit` is lowered to `maxLimit`. A read without `page` or `perPage` answers at most `maxLimit`
-rows, even with no `limit` or with `offset` alone.
+A `limit` above `maxLimit` is lowered to it. A read without `page` or `perPage` answers at most
+`maxLimit` rows, even with no `limit` or with `offset` alone.
 
 `applyQuery` leaves `page` and `perPage` to your endpoint, which decides whether to paginate. Read
 them from the parsed query and call [`paginate`](../database/reading.md#pagination) yourself:
