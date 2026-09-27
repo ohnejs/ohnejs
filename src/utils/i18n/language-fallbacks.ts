@@ -17,13 +17,12 @@
  * ```
  */
 export function languageFallbacks(tag: string): string[] {
-  const trimmed = tag.trim();
-  if (!trimmed) return [];
-
-  const subtags = trimmed.split('-');
   const chain: string[] = [];
-  for (let i = subtags.length; i > 0; i--) {
-    chain.push(subtags.slice(0, i).join('-'));
+  let rest = tag.trim();
+  while (rest) {
+    chain.push(rest);
+    const cut = rest.lastIndexOf('-');
+    rest = cut === -1 ? '' : rest.slice(0, cut);
   }
   return chain;
 }
