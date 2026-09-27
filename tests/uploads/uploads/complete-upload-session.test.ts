@@ -225,6 +225,18 @@ describe('completeUploadSession', () => {
     deepStrictEqual(second.record, first.record);
   });
 
+  it('answers the plain 404 on a repeat once the landed file falls out of reach', async () => {
+    const session = await upload('ironforge', 'hidden.txt', LORE);
+    const reach = { where: { private: false } };
+    const { record } = await completeUploadSession(session.UUID, { reach });
+
+    await queryUntyped('Uploads').where({ UUID: record.UUID }).updateOrThrow({ private: true });
+
+    const error = await refusal(() => completeUploadSession(session.UUID, { reach }));
+    strictEqual(error.status, 404);
+    strictEqual(error.message, 'api.http.notFound');
+  });
+
   it('sanitizes an SVG and journals the delete of the sealed object', async () => {
     const session = await upload('art', 'crest.svg', bytes(MARKUP));
     storage.failNext('delete');
