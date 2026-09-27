@@ -47,6 +47,16 @@ describe('matchesPath', () => {
     strictEqual(matchesPath('/admin/users', '/public/**'), false);
   });
 
+  it('matches a glob against the path as a route matches it', () => {
+    strictEqual(matchesPath('/admin/users/', '/admin/users'), true);
+    strictEqual(matchesPath('/admin/', '/admin'), true);
+    strictEqual(matchesPath('/admin/', '/admin/**'), true);
+  });
+
+  it('matches a glob against the raw, undecoded path', () => {
+    strictEqual(matchesPath('/%70ublic/x', '/public/**'), false);
+  });
+
   it('needs no bound request', () => {
     strictEqual(matchesPath('/users/42', '/users/[id]'), true);
   });

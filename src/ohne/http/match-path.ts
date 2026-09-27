@@ -1,4 +1,10 @@
-import { compileGlob, compileRoute, isNull, isUndefined } from '../../utils/index.ts';
+import {
+  compileGlob,
+  compileRoute,
+  isNull,
+  isUndefined,
+  trimRoutePath,
+} from '../../utils/index.ts';
 import { useEvent } from './use-event.ts';
 
 const cache = new Map<string, (path: string) => boolean>();
@@ -13,7 +19,8 @@ function matcher(pattern: string): (path: string) => boolean {
       const route = compileRoute(pattern);
       compiled = (path) => !isNull(route(path));
     } else {
-      compiled = compileGlob(pattern);
+      const glob = compileGlob(pattern);
+      compiled = (path) => glob(path) || glob(trimRoutePath(path));
     }
     cache.set(pattern, compiled);
   }
@@ -26,6 +33,7 @@ function matcher(pattern: string): (path: string) => boolean {
  *
  * A pattern is a route pattern when it contains a `[param]`, matched like a route (`/authors/[id]`).
  * Otherwise it is a glob with the same syntax as `disable.routes`: `*` per segment, `**` across segments.
+ * A glob also tests the path as a route matches it, with one trailing `/` dropped.
  *
  * Use this when you have a path in hand; `matchPath` is the shorthand for the current request.
  *
