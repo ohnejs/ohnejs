@@ -74,6 +74,7 @@ css`
     right: 0;
     bottom: 0;
     left: 0;
+    z-index: 1;
     border-radius: calc(var(--ohne-radius) - 0.25rem);
     transition-property: background-color;
     transition: var(--ohne-transition);
@@ -81,11 +82,7 @@ css`
 
   .o-upload-notification:hover .o-upload-notification-button,
   .o-upload-notification:focus .o-upload-notification-button {
-    background-color: hsl(var(--ohne-accent) / 0.08);
-  }
-
-  .o-upload-notification-button ~ * {
-    cursor: pointer;
+    background-color: hsl(var(--ohne-foreground) / 0.06);
   }
 
   .o-upload-notification-status {
@@ -104,7 +101,7 @@ css`
   }
 
   .o-upload-notification-status-completed {
-    background-color: hsl(var(--ohne-accent) / 0.16);
+    background-color: hsl(var(--ohne-foreground) / 0.12);
   }
 
   .o-upload-notification-status-failed,
@@ -115,7 +112,7 @@ css`
 
   .o-upload-notification-status-pending,
   .o-upload-notification-status-interrupted {
-    border-color: hsl(var(--ohne-accent) / 0.24);
+    border-color: hsl(var(--ohne-foreground) / 0.24);
   }
 
   .o-upload-notification-status-uploading {
@@ -146,46 +143,56 @@ css`
     color: hsl(var(--ohne-muted));
   }
 
-  .o-upload-notification-action-button {
+  .o-upload-notification-actions {
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .o-upload-notification-action-button {
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     width: 1.5rem;
     height: 1.5rem;
-    margin-left: auto;
-    background-color: hsl(var(--ohne-accent) / 0.16);
+    background-color: hsl(var(--ohne-foreground) / 0.12);
     border-radius: 50%;
+    color: hsl(var(--ohne-foreground));
     transition: var(--ohne-transition);
-    transition-property: background-color, color;
+    transition-property: background-color, color, opacity;
+  }
+
+  .o-upload-notification-action-button > * {
+    pointer-events: none;
   }
 
   .o-upload-notification-action-hide {
-    display: none;
+    opacity: 0;
   }
 
-  .o-upload-notification:hover .o-upload-notification-action-button,
-  .o-upload-notification:focus-within .o-upload-notification-action-button {
-    display: flex;
-  }
-
-  .o-upload-notification-action-button ~ .o-upload-notification-action-button {
-    margin-left: 0.25rem;
+  .o-upload-notification:hover .o-upload-notification-action-hide,
+  .o-upload-notification:focus-within .o-upload-notification-action-hide,
+  .o-upload-notification-action-retry ~ .o-upload-notification-action-hide,
+  .o-upload-notification-action-resume ~ .o-upload-notification-action-hide {
+    opacity: 1;
   }
 
   .o-upload-notification-action-button:hover,
-  .o-upload-notification-action-button:focus {
+  .o-upload-notification-action-button:focus-visible {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
 
-  .o-upload-notification-action-button.o-upload-notification-action-retry:hover,
-  .o-upload-notification-action-button.o-upload-notification-action-retry:focus,
-  .o-upload-notification-action-button.o-upload-notification-action-resume:hover,
-  .o-upload-notification-action-button.o-upload-notification-action-resume:focus {
-    background-color: hsl(var(--ohne-primary));
-    color: hsl(var(--ohne-primary-foreground));
+  .o-upload-notification-action-retry:hover,
+  .o-upload-notification-action-retry:focus-visible,
+  .o-upload-notification-action-resume:hover,
+  .o-upload-notification-action-resume:focus-visible {
+    background-color: hsl(var(--ohne-foreground));
+    color: hsl(var(--ohne-background));
   }
 
   .o-upload-notification-input {
@@ -320,6 +327,7 @@ function bell(): HTMLElement {
             type: 'button',
             class: 'o-upload-notification-button ohne-raw',
             'aria-label': () => t('uploads.dashboard.details'),
+            title: () => task().name,
             onClick: () => view(task()),
           }),
       ),
@@ -337,16 +345,20 @@ function bell(): HTMLElement {
         fileName(() => task().name),
         h('span', { class: 'o-upload-notification-detail' }, detail),
       ),
-      when(
-        () => status.value === 'uploading',
-        () => actionButton('abort', () => task().abort()),
-        () => [
-          when(
-            () => status.value === 'failed',
-            () => actionButton('retry', () => void retryUploadTask(task().id)),
-          ),
-          actionButton('hide', () => hide(task().id)),
-        ],
+      h(
+        'div',
+        { class: 'o-upload-notification-actions' },
+        when(
+          () => status.value === 'uploading',
+          () => actionButton('abort', () => task().abort()),
+          () => [
+            when(
+              () => status.value === 'failed',
+              () => actionButton('retry', () => void retryUploadTask(task().id)),
+            ),
+            actionButton('hide', () => hide(task().id)),
+          ],
+        ),
       ),
     );
   };
@@ -371,8 +383,12 @@ function bell(): HTMLElement {
           t('uploads.dashboard.pickToResume', { name: entry().name }).replaceAll('`', ''),
         ),
       ),
-      actionButton('resume', () => resume(entry())),
-      actionButton('hide', () => discard(entry().session)),
+      h(
+        'div',
+        { class: 'o-upload-notification-actions' },
+        actionButton('resume', () => resume(entry())),
+        actionButton('hide', () => discard(entry().session)),
+      ),
     );
 
   return h(
@@ -435,7 +451,7 @@ function actionButton(action: RowAction, onClick: () => void): HTMLElement {
 function fileName(name: () => string): HTMLElement {
   return h(
     'span',
-    { class: 'o-upload-notification-filename' },
+    { class: 'o-upload-notification-filename', title: name },
     h('span', { class: 'ohne-truncate' }, () => splitFileName(name()).stem),
     when(
       () => splitFileName(name()).extension !== '',
