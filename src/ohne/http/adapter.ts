@@ -67,6 +67,9 @@ export interface ToRequestOptions {
   onFirstRead?: () => void;
 }
 
+// A fixed base, so neither the Host header nor a `//host` target can shape the path.
+const TARGET_BASE = 'http://target';
+
 /**
  * Assembles the request `URL` from the target and the resolved `Host`.
  *
@@ -75,6 +78,7 @@ export interface ToRequestOptions {
  * The URL then reflects the original client request, not the proxy hop.
  * Only `X-Forwarded-Proto` and `X-Forwarded-Host` are read; the `Forwarded` header is not consulted.
  * An untrusted peer's forwarding headers are ignored, closing the cache-poisoning and open-redirect gap.
+ * The target supplies only the path and query, so a `//host` or absolute-form target cannot set the host.
  *
  * The transport assembles the URL before routing, so `toRequest` builds the body once, with the route's cap.
  */
@@ -82,7 +86,15 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
   const forwarded = trusts(trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
   const host = forwarded?.host ?? req.headers.host ?? 'localhost';
   const proto = forwarded?.proto ?? 'http';
-  return new URL(req.url ?? '/', `${proto}://${host}`);
+  const url = new URL(`${proto}://${host}`);
+  const target = req.url ?? '/';
+  const { pathname, search } = new URL(
+    target.startsWith('/') ? TARGET_BASE + target : target,
+    TARGET_BASE,
+  );
+  url.pathname = pathname;
+  url.search = search;
+  return url;
 }
 
 /**

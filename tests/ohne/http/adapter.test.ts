@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
+import { text } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 
@@ -215,6 +216,40 @@ describe('toRequest', () => {
           },
         });
         strictEqual(await res.text(), 'https://example.com/p');
+      },
+    );
+  });
+
+  it('takes only the path and query from a `//host` or absolute-form target', async () => {
+    await withServer(
+      async (req, res) => {
+        await sendResponse(res, new Response(toURL(req).href));
+      },
+      async (base) => {
+        const { port } = new URL(base);
+        const hrefs: string[] = [];
+        for (const path of ['//evil.com/p?q=1', 'http://evil.com/p?q=1']) {
+          const req = request({ port, path, headers: { host: 'app.example' } });
+          req.end();
+          const [res] = await once(req, 'response');
+          hrefs.push(await text(res));
+        }
+        deepStrictEqual(hrefs, ['http://app.example//evil.com/p?q=1', 'http://app.example/p?q=1']);
+      },
+    );
+  });
+
+  it('keeps a path in the Host header out of the URL path', async () => {
+    await withServer(
+      async (req, res) => {
+        await sendResponse(res, new Response(toURL(req).href));
+      },
+      async (base) => {
+        const { port } = new URL(base);
+        const req = request({ port, path: '/users?q=1', headers: { host: 'app.example/admin' } });
+        req.end();
+        const [res] = await once(req, 'response');
+        strictEqual(await text(res), 'http://app.example/users?q=1');
       },
     );
   });
