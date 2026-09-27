@@ -67,7 +67,7 @@ export interface HTTPServer {
  */
 export interface CreateServerOptions {
   /**
-   * How long the server waits for the complete request headers, as a `parseDuration` value.
+   * How long the server waits for the complete request headers, in milliseconds or as a string like `'10s'`.
    * Omitted keeps Node's default of 60 seconds.
    *
    * @example
@@ -80,7 +80,8 @@ export interface CreateServerOptions {
   headersTimeout?: number | string;
 
   /**
-   * How long the server allows for the entire request, headers and body, as a `parseDuration` value.
+   * How long the server allows for the entire request, headers and body.
+   * It takes milliseconds or a string like `'30s'`.
    * Omitted keeps Node's default of 5 minutes.
    *
    * @example
@@ -93,7 +94,8 @@ export interface CreateServerOptions {
   requestTimeout?: number | string;
 
   /**
-   * How long an idle keep-alive socket is held open between requests, as a `parseDuration` value.
+   * How long an idle keep-alive socket is held open between requests.
+   * It takes milliseconds or a string like `'5s'`.
    * Omitted keeps Node's default of 5 seconds.
    *
    * @example
@@ -112,7 +114,7 @@ export interface CreateServerOptions {
   maxConnections?: number;
 
   /**
-   * Largest total request header block to accept, as a `parseBytes` value.
+   * Largest total request header block to accept, in bytes or as a string like `'32kb'`.
    * Caps the request line and all headers; the parser refuses anything larger before routing.
    * Omitted keeps Node's default of 16 KiB.
    *
@@ -125,7 +127,7 @@ export interface CreateServerOptions {
   maxHeaderSize?: number | string;
 
   /**
-   * Largest request body to accept, as a `parseBytes` value.
+   * Largest request body to accept, in bytes or as a string like `'1mb'`.
    * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
    * A body that overruns mid-stream aborts with the same `413`.
    * Omitted leaves the body size unbounded.
@@ -141,7 +143,7 @@ export interface CreateServerOptions {
 
   /**
    * How long middleware and the handler may run before the request is answered with `503`.
-   * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+   * Distinct from `requestTimeout`, which bounds the socket, not the work.
    * The handler keeps running after the `503` and holds its drain ticket until it ends.
    * Omitted lets the handler run without a deadline.
    *
@@ -156,7 +158,7 @@ export interface CreateServerOptions {
 
   /**
    * How long a `waitUntil` promise may run after the response before it is abandoned.
-   * A `parseDuration` value; on overrun the promise is logged and the request's drain ticket released.
+   * On overrun the promise is logged and the request's drain ticket released.
    * Omitted lets background work run without a deadline.
    *
    * @example
@@ -187,7 +189,7 @@ export interface CreateServerOptions {
   /**
    * Hostnames the server answers to, matched against the request's `Host` (the port is ignored).
    * A `Host` outside the list is refused with `400` before routing.
-   * Each entry is a `compileGlob` pattern, so `'*.example.com'` matches any subdomain.
+   * Each entry is a glob pattern, so `'*.example.com'` matches any subdomain.
    * An empty list (the default) answers to any host.
    *
    * @example

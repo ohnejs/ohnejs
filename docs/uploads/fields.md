@@ -30,7 +30,7 @@ unless `types` narrows them.
 
 - `types` - the media types the field accepts. Defaults to `['image']` on the image fields, and to
   any file on the others.
-- `minSize`, `maxSize` - file size limits, as `parseBytes` values like `'5mb'`.
+- `minSize`, `maxSize` - file size limits, in bytes or as a string like `'5mb'`.
 - `minWidth`, `maxWidth`, `minHeight`, `maxHeight` - pixel limits, image fields only.
 - `onDelete` - what happens when the upload is deleted, as for
   [relations](../database/collections.md#relations): `setNull` by default on `image` and `file`,

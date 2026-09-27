@@ -18,17 +18,17 @@ import type { UploadRecord } from '../../uploads/types.ts';
  */
 export interface UploadConstraints {
   /**
-   * The media types accepted, as `mediaTypeMatches` patterns: exact types, wildcards, or categories.
+   * The media types accepted: exact types, wildcards, or categories.
    */
   types?: readonly string[];
 
   /**
-   * The smallest file accepted, as a `parseBytes` value.
+   * The smallest file accepted, in bytes or as a string like `'10kb'`.
    */
   minSize?: number | string;
 
   /**
-   * The largest file accepted, as a `parseBytes` value.
+   * The largest file accepted, in bytes or as a string like `'5mb'`.
    */
   maxSize?: number | string;
 

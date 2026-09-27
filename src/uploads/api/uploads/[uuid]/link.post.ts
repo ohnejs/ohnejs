@@ -15,7 +15,7 @@ import { temporaryUploadURL, uploadURL } from '../../../uploads/url.ts';
  *
  * Answers `{ url, expires }`: a link to a file's bytes, and when it stops working in epoch milliseconds.
  * A public file's is its plain `url`, with `expires: null`.
- * A private file's is signed to last the body's `maxAge`, a `parseDuration` value.
+ * A private file's is signed to last the body's `maxAge`, in milliseconds or as a string like `'7d'`.
  * Omitted, `maxAge` is `uploads.privateMaxAge`.
  * Guarded like the `Uploads` read: no user `401` and no capability `403`, unless that read is public.
  * A `maxAge` that does not parse is a `400`; a folder a `422`.

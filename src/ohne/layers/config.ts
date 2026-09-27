@@ -460,7 +460,7 @@ export interface Config {
     maxConnections?: number | false;
 
     /**
-     * Largest total request header block to accept, as a `parseBytes` value.
+     * Largest total request header block to accept, in bytes or as a string like `'32kb'`.
      * Caps the request line and all headers; the parser refuses anything larger before routing.
      * `false` keeps Node's own default of 16 KiB.
      *
@@ -477,7 +477,7 @@ export interface Config {
     maxHeaderSize?: number | string | false;
 
     /**
-     * Largest request body to accept, as a `parseBytes` value (bytes as a number, or a string like `'1mb'`).
+     * Largest request body to accept, in bytes or as a string like `'1mb'`.
      * An over-cap `Content-Length` is refused with `413` after the middleware, before the handler.
      * A body that overruns mid-stream aborts with the same `413`.
      * `false` leaves the body size unbounded.
@@ -497,7 +497,7 @@ export interface Config {
 
     /**
      * How long middleware and the handler may run before the request is answered with `503`.
-     * A `parseDuration` value, distinct from `requestTimeout`, which bounds the socket, not the work.
+     * Distinct from `requestTimeout`, which bounds the socket, not the work.
      * The handler keeps running after the `503`, and shutdown waits for it.
      * `false` lets the handler run without a deadline.
      * A route overrides it for itself through `defineHandler`.
@@ -516,7 +516,7 @@ export interface Config {
 
     /**
      * How long a `waitUntil` promise may run after the response before it is abandoned.
-     * A `parseDuration` value; on overrun the promise is logged and shutdown stops waiting for it.
+     * On overrun the promise is logged and shutdown stops waiting for it.
      * Distinct from `shutdownTimeout`, which bounds background work only while shutting down.
      * `false` lets background work run without a deadline.
      * A route overrides it for itself through `defineHandler`.
@@ -553,7 +553,7 @@ export interface Config {
     /**
      * Hostnames this server answers to, matched against the request's `Host` (the port is ignored).
      * A `Host` outside the list is refused with `400` before routing.
-     * Each entry is a `compileGlob` pattern, so `'*.example.com'` matches any subdomain.
+     * Each entry is a glob pattern, so `'*.example.com'` matches any subdomain.
      * An empty list answers to any host.
      *
      * @default

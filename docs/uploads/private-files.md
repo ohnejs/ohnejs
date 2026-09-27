@@ -65,7 +65,7 @@ upload.expires;
 
 ## How long a link lives
 
-`uploads.privateMaxAge` sets the window, as a `parseDuration` value:
+`uploads.privateMaxAge` sets the window, in milliseconds or as a string like `'1h'`:
 
 ```ts
 // ohne.config.ts
@@ -131,7 +131,7 @@ temporaryUploadURL(upload, '7d');
 // -> { url: '/uploads/press/launch.jpg?e=1700604800000&s=...', expires: 1700604800000 }
 ```
 
-- `maxAge` is a `parseDuration` value counted from now, not aligned to a window.
+- `maxAge` is milliseconds or a string like `'7d'`, counted from now, not aligned to a window.
 - `POST /uploads/[uuid]/link` with the body `{ "maxAge": "7d" }` answers the same `{ url, expires }`
   to a caller who may read `Uploads`. `maxAge` defaults to `privateMaxAge`. A public file answers
   its plain `url` with `expires: null`.

@@ -70,7 +70,8 @@ export function uploadURL(upload: UploadURLSource): string {
 }
 
 /**
- * A link to a private file that anyone can open for `maxAge`, a `parseDuration` value, from now.
+ * A link to a private file that anyone can open for `maxAge` from now.
+ * `maxAge` is milliseconds or a string like `'7d'`.
  * Unlike a read's links it is not aligned to a window, so it lasts exactly as long as asked.
  * Throws without an `UPLOADS_SECRET`, since nothing could sign it.
  *

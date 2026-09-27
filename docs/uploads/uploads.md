@@ -238,15 +238,17 @@ export default defineConfig({
 });
 ```
 
+Sizes take bytes or a string like `'8mb'`. Durations take milliseconds or a string like `'1h'`.
+
 - `storage` - the [backend](./storage.md), by name. The layer ships `fs`, and
   [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) adds `s3`.
 - `url` - where the backend keeps the files: a directory for `fs`, a bucket and prefix for
   [`s3`](./storage.md#storing-files-in-s3). `UPLOADS_URL` overrides it.
-- `maxFileSize` - the largest file that can be uploaded, as a `parseBytes` value.
-- `maxSVGSize` - the largest SVG that can be uploaded, as a `parseBytes` value. The server answers
-  nothing else while it sanitizes one, so a higher cap lets a single upload stall it for longer.
-- `chunkSize` - the size of every chunk of a [resumable upload](./resumable.md) but the last, as a
-  `parseBytes` value of `64kb` or more.
+- `maxFileSize` - the largest file that can be uploaded.
+- `maxSVGSize` - the largest SVG that can be uploaded. The server answers nothing else while it
+  sanitizes one, so a higher cap lets a single upload stall it for longer.
+- `chunkSize` - the size of every chunk of a [resumable upload](./resumable.md) but the last,
+  `64kb` or more.
 - `types` - the media types that may be uploaded: `'*'`, or a list of exact types, `image/*`
   wildcards, and category names such as `document`, in the
   [media fields grammar](./fields.md#types).
@@ -254,10 +256,9 @@ export default defineConfig({
   The default revalidates on every use, so a renamed or replaced file is never stale.
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
   the storage. Without it, records point where [serving](#serving) describes.
-- `privateMaxAge` - how long a [private file's](./private-files.md) links stay valid, as a
-  `parseDuration` value.
+- `privateMaxAge` - how long a [private file's](./private-files.md) links stay valid.
 - `sessionMaxAge` - how long a [resumable upload](./resumable.md) has from its first request to
-  completion, as a `parseDuration` value.
+  completion.
 - `images` - the [image service](./image-variants.md) that renders resized variants, and the named
   variants every image read carries. `url` has no default, and without it every image URL points at
   the original.

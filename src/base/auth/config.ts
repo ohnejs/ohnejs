@@ -8,7 +8,7 @@ declare module 'ohnejs' {
      */
     auth?: {
       /**
-       * How long a remembered session stays valid, as a `parseDuration` value.
+       * How long a remembered session stays valid, in milliseconds or as a string like `'30d'`.
        * It is also the ceiling: no session outlives it, however it was opened.
        *
        * @default
@@ -22,7 +22,8 @@ declare module 'ohnejs' {
       sessionMaxAge?: number | string;
 
       /**
-       * How long a session opened without remember me stays valid, as a `parseDuration` value.
+       * How long a session opened without remember me stays valid.
+       * It takes milliseconds or a string like `'1d'`.
        * Its cookie also ends with the browser session, so closing the browser drops it earlier.
        * A value above `sessionMaxAge` is capped to it.
        *

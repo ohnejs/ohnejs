@@ -9,7 +9,7 @@ import { isUndefined, sleep } from '../../utils/index.ts';
  */
 export interface ShutdownServerOptions {
   /**
-   * How long to keep serving before refusing connections, as a `parseDuration` value.
+   * How long to keep serving before refusing connections, in milliseconds or as a string like `'5s'`.
    * Buys the load balancer time to deregister this instance before it stops accepting.
    * Omitted means stop accepting at once.
    *
@@ -23,7 +23,8 @@ export interface ShutdownServerOptions {
   preStopDelay?: number | string;
 
   /**
-   * How long in-flight requests and their background work may take to drain, a `parseDuration` value.
+   * How long in-flight requests and their background work may take to drain.
+   * It takes milliseconds or a string like `'10s'`.
    * When it expires, every request still in flight is cancelled, even one already answered.
    * Its connection closes and its `signal` aborts, so its handler or `waitUntil` work can stop.
    * Shutdown then waits for their cleanup, so work that ignores its signal holds shutdown open.

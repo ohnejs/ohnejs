@@ -69,12 +69,12 @@ export interface ListBounds {
 
 const sizeOptions = {
   /**
-   * The smallest file the field accepts, as a `parseBytes` value.
+   * The smallest file the field accepts, in bytes or as a string like `'10kb'`.
    */
   minSize: option<number | string>(),
 
   /**
-   * The largest file the field accepts, as a `parseBytes` value.
+   * The largest file the field accepts, in bytes or as a string like `'5mb'`.
    */
   maxSize: option<number | string>(),
 };
@@ -84,7 +84,7 @@ const sizeOptions = {
  */
 export const fileOptions = {
   /**
-   * The media types the field accepts, as `mediaTypeMatches` patterns.
+   * The media types the field accepts.
    * A pattern is an exact type (`application/pdf`), a wildcard (`image/*`), or a category (`document`).
    * Omitted, any file is accepted.
    */
@@ -98,7 +98,7 @@ export const fileOptions = {
  */
 export const imageOptions = {
   /**
-   * The media types the field accepts, as `mediaTypeMatches` patterns.
+   * The media types the field accepts.
    * A pattern is an exact type (`image/png`), a wildcard (`image/*`), or a category (`image`).
    * A referenced upload must be an image whatever this lists.
    *

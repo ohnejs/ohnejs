@@ -39,7 +39,7 @@ declare module 'ohnejs' {
       url?: string;
 
       /**
-       * The largest file an upload may carry, as a `parseBytes` value.
+       * The largest file an upload may carry, in bytes or as a string like `'128mb'`.
        *
        * @default
        * '128mb'
@@ -47,7 +47,7 @@ declare module 'ohnejs' {
       maxFileSize?: number | string;
 
       /**
-       * The largest SVG an upload may carry, as a `parseBytes` value.
+       * The largest SVG an upload may carry, in bytes or as a string like `'2mb'`.
        * An SVG is sanitized whole in memory, and the API answers no other request while that runs.
        * Hostile markup takes about 120 ms per MiB, so a larger cap lets one upload stall the API for longer.
        *
@@ -57,7 +57,7 @@ declare module 'ohnejs' {
       maxSVGSize?: number | string;
 
       /**
-       * The size of every chunk of a resumable upload but the last, as a `parseBytes` value.
+       * The size of every chunk of a resumable upload but the last, in bytes or as a string like `'8mb'`.
        * It is `64kb` or more, since the first chunk must hold the bytes a file's type is checked by.
        * Keep it under the body limit of any proxy in front of the API.
        * A file that fits one chunk goes up in one request.
@@ -95,7 +95,7 @@ declare module 'ohnejs' {
       publicURL?: string;
 
       /**
-       * How long a private file's links stay valid, as a `parseDuration` value.
+       * How long a private file's links stay valid, in milliseconds or as a string like `'1h'`.
        * Reads align links to these windows for browser caches, so a link lives one to two windows.
        *
        * @default
@@ -110,7 +110,8 @@ declare module 'ohnejs' {
       privateMaxAge?: number | string;
 
       /**
-       * How long a resumable upload has from its first request to completion, as a `parseDuration` value.
+       * How long a resumable upload has from its first request to completion.
+       * It takes milliseconds or a string like `'1d'`.
        * A storage that expires unfinished writes on its own must outlive it.
        *
        * @default
@@ -157,7 +158,8 @@ declare module 'ohnejs' {
         allow?: string[];
 
         /**
-         * The deadline for one fetch, across its redirects and the whole body, as a `parseDuration` value.
+         * The deadline for one fetch, across its redirects and the whole body.
+         * It takes milliseconds or a string like `'2m'`.
          * Whatever it is, the source must start answering within 30 seconds and never go quiet for longer.
          *
          * @default
@@ -213,17 +215,17 @@ export interface ResolvedUploadsConfig {
   url: string;
 
   /**
-   * The largest file an upload may carry, as a `parseBytes` value.
+   * The largest file an upload may carry, in bytes or as a string like `'128mb'`.
    */
   maxFileSize: number | string;
 
   /**
-   * The largest SVG an upload may carry, as a `parseBytes` value.
+   * The largest SVG an upload may carry, in bytes or as a string like `'2mb'`.
    */
   maxSVGSize: number | string;
 
   /**
-   * The size of every chunk of a resumable upload but the last, as a `parseBytes` value.
+   * The size of every chunk of a resumable upload but the last, in bytes or as a string like `'8mb'`.
    */
   chunkSize: number | string;
 
@@ -243,12 +245,13 @@ export interface ResolvedUploadsConfig {
   publicURL?: string;
 
   /**
-   * How long a private file's links stay valid, as a `parseDuration` value.
+   * How long a private file's links stay valid, in milliseconds or as a string like `'1h'`.
    */
   privateMaxAge: number | string;
 
   /**
-   * How long a resumable upload has from its first request to completion, as a `parseDuration` value.
+   * How long a resumable upload has from its first request to completion.
+   * It takes milliseconds or a string like `'1d'`.
    */
   sessionMaxAge: number | string;
 
@@ -277,7 +280,7 @@ export interface ResolvedUploadsConfig {
     allow: string[];
 
     /**
-     * The deadline for one fetch, as a `parseDuration` value.
+     * The deadline for one fetch, in milliseconds or as a string like `'2m'`.
      */
     timeout: number | string;
   };
