@@ -11,7 +11,9 @@ import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import {
   bytes,
   call,
+  caption,
   errorsOf,
+  noSecrets,
   route,
   storage,
   stream,
@@ -144,5 +146,16 @@ describe('POST /uploads/private', () => {
     );
     strictEqual((await send({ uuids: [uuid], private: true }, nobody)).status, 403);
     deepStrictEqual(await privacy([uuid]), [false]);
+  });
+
+  it('answers only the locales the read scope admits each row at', async () => {
+    const uuid = await seed('pv', 'lingo.txt');
+    await caption(uuid, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      const response = await send({ uuids: [uuid], private: true });
+      strictEqual(response.status, 200);
+      const records = (await response.json()) as Record<string, unknown>[];
+      deepStrictEqual(records[0]._translations, ['en']);
+    });
   });
 });

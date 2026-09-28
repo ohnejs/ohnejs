@@ -1,5 +1,6 @@
-import { defineHandler, setResponseStatus } from 'ohnejs';
+import { defineHandler, notFound, setResponseStatus } from 'ohnejs';
 import { requireCapability } from 'ohnejs/auth';
+import { isUndefined } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../../../uploads/types.ts';
 
@@ -12,7 +13,7 @@ import { completeUploadSession } from '../../../../uploads/complete-upload-sessi
  *
  * Lands the file of a session whose every chunk arrived and answers `201` with its record.
  * A repeat answers `200` with the same record, so a retry after a lost answer is harmless.
- * A repeat whose file the caller's read `access` scope no longer admits is a `404`.
+ * A repeat is a `404` unless the caller reads `Uploads` with an `access` scope that admits its file.
  * Needs `collection.Uploads.create`: no user `401`, no capability `403`.
  * An unknown session, or another user's, is a `404`.
  * An expired one is discarded first, and its `404` says so.
@@ -27,6 +28,7 @@ export default defineHandler(async ({ params }): Promise<UploadRecord> => {
   const { UUID: author } = await requireCapability('collection.Uploads.create');
   const reach = await readerReach();
   const { record, created } = await completeUploadSession(params.uuid, { author, reach });
+  if (!created && isUndefined(reach)) throw notFound();
   if (created) setResponseStatus(201);
   return record;
 }, SESSION_ROUTE_OPTIONS);

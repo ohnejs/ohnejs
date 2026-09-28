@@ -15,7 +15,7 @@ import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
 import { ensureFolders, folderLocked } from './_folders.ts';
 import { assertPathFits } from './_path-limit.ts';
-import { assertReached, assertUploadReach, reachedSubtree } from './_reach.ts';
+import { assertReached, assertUploadReach, reachedSubtree, reachesAt } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { longestPathUnder, moveDescendants, setDescendantsPrivate } from './_subtree.ts';
 import { canonicalDirectory, canonicalFolderName, canonicalName, uploadPath } from './path.ts';
@@ -127,7 +127,7 @@ export async function deleteRow(tx: Transaction, row: UploadRow): Promise<void> 
 /**
  * Moves the row `uuid` to `target` and applies `changes`, in one transaction.
  * An explicit `private` among `changes` is applied after the move, so the move itself never locks.
- * With `reach`, a row it hides is a `404`.
+ * With `reach`, a row it hides, at its own locale or at the written one, is a `404`.
  * After the write, it must still admit that row, every row below it that matched, and every folder created.
  * Otherwise the write is a `422` and rolls back.
  */
@@ -136,18 +136,24 @@ export async function patchUpload(
   { target, changes }: { target?: MoveUploadTarget; changes?: UpdateUploadInput },
   { locale, reach }: { locale?: string; reach?: UploadReach } = {},
 ): Promise<UploadRecord> {
+  const reaches = reachesAt(reach, locale);
   const record = await useDatabase().transaction(async (tx) => {
-    if (!isUndefined(reach)) await assertUploadReach(uuid, reach, tx);
+    for (const each of reaches) await assertUploadReach(uuid, each, tx);
     const row = await readUpload(uuid, tx);
-    const below = row.kind === 'folder' ? await reachedSubtree(tx, reach, uploadPath(row)) : [];
-    let record: Record<string, unknown> = row;
+    const admitted: [UploadReach, string[]][] = [];
+    for (const each of reaches) {
+      const below = row.kind === 'folder' ? await reachedSubtree(tx, each, uploadPath(row)) : [];
+      admitted.push([each, below]);
+    }
     let created: string[] = [];
     if (!isUndefined(target)) {
-      ({ record, created } = await moveRow(tx, uuid, target, isUndefined(changes?.private)));
+      ({ created } = await moveRow(tx, uuid, target, isUndefined(changes?.private)));
     }
-    if (!isUndefined(changes)) record = await updateRow(tx, uuid, changes, locale);
-    await assertReached(tx, reach, [uuid, ...below, ...created]);
-    return record;
+    if (!isUndefined(changes)) await updateRow(tx, uuid, changes, locale);
+    for (const [each, below] of admitted) {
+      await assertReached(tx, each, [uuid, ...below, ...created]);
+    }
+    return readUpload(uuid, tx, { ...reach, locale });
   }, 'immediate');
   await drainJournal();
   return decorated(record);

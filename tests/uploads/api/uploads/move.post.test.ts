@@ -11,7 +11,9 @@ import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import {
   bytes,
   call,
+  caption,
   errorsOf,
+  noSecrets,
   route,
   storage,
   stream,
@@ -132,5 +134,21 @@ describe('POST /uploads/move', () => {
     );
     strictEqual((await send({ uuids: [uuid], directory: 'x' }, nobody)).status, 403);
     strictEqual(await pathOf(uuid), 'mv/guarded.txt');
+  });
+
+  it('answers only the locales the read scope admits each row at', async () => {
+    const moving = await seed('mv', 'lingo.txt');
+    const staying = await seed('mv/lingo', 'still.txt');
+    await caption(moving, 'Caption', 'SECRET Beschriftung');
+    await caption(staying, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      const response = await send({ uuids: [moving, staying], directory: 'mv/lingo' });
+      strictEqual(response.status, 200);
+      const records = (await response.json()) as Record<string, unknown>[];
+      deepStrictEqual(
+        records.map((record) => record._translations),
+        [['en'], ['en']],
+      );
+    });
   });
 });

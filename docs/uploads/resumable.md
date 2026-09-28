@@ -99,7 +99,7 @@ It answers `201` with the record, whose `path` is `films/arthas.mp4`.
 - Requests on one session take turns. After an API crash mid-request, the next one waits up to
   20 seconds.
 - `complete` doubles as the probe: while bytes are missing, it answers `409` with the session.
-  After landing, a repeat answers `200` with the same record.
+  After landing, a repeat answers `200` with the same record, or `404` when you cannot read it.
 - The first chunk is checked against the type of the name's extension. A mismatch is a `422` and
   ends the session.
 - A `422` at completion, such as a file in the way of a folder, keeps the session, to complete

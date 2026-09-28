@@ -11,6 +11,8 @@ import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import {
   bytes,
   call,
+  caption,
+  noSecrets,
   route,
   stalled,
   storage,
@@ -33,6 +35,12 @@ useRoles().register('uploads-updater', {
 const updater = await userWith('updater@example.com', ['uploads-updater']);
 const visibleOnly = () => ({ where: { private: false } });
 const filesOnly = () => ({ where: { kind: 'file' } });
+const foldersOrPublic = () => ({
+  where: {
+    or: [{ kind: 'folder' }, { private: false }],
+    description: { not: { contains: 'SECRET' } },
+  },
+});
 
 async function vault(name: string): Promise<string> {
   const folder = await createFolder({ directory: 'patch', name });
@@ -339,5 +347,85 @@ describe('PATCH /uploads/[uuid]', () => {
     strictEqual(row?.name, 'whole.txt');
     strictEqual(text(storage.objects.get('patch/whole.txt')), 'whole.txt');
     strictEqual(storage.objects.has('patch/part.txt'), false);
+  });
+
+  it('answers only the locales the read scope admits the row at', async () => {
+    const uuid = await seed('lingo.txt');
+    await caption(uuid, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      for (const body of [{ focalX: 0.5 }, { name: 'lingo.txt' }]) {
+        const response = await send(uuid, body);
+        strictEqual(response.status, 200);
+        deepStrictEqual(((await response.json()) as Record<string, unknown>)._translations, ['en']);
+      }
+    });
+  });
+
+  it('404s a locale the read scope hides the row at, changing nothing', async () => {
+    const uuid = await seed('hush.txt');
+    await caption(uuid, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      strictEqual((await send(uuid, { focalY: 0.5 }, admin, '?locale=de')).status, 404);
+      strictEqual((await send(uuid, { description: 'Neu' }, admin, '?locale=de')).status, 404);
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).locale('de').findFirst();
+    strictEqual(row?.description, 'SECRET Beschriftung');
+    strictEqual(row?.focalY, null);
+  });
+
+  it('404s a row the read scope hides at its own locale, whatever the ?locale=', async () => {
+    const uuid = await seed('mute.txt');
+    await caption(uuid, 'SECRET caption', 'Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      strictEqual((await send(uuid, { focalX: 0.5 }, admin, '?locale=de')).status, 404);
+    });
+    strictEqual((await queryUntyped('Uploads').where({ UUID: uuid }).findFirst())?.focalX, null);
+  });
+
+  it('422s a caption that hides the row at the written locale, changing nothing', async () => {
+    const uuid = await seed('reveal.txt');
+    await caption(uuid, 'Caption', 'Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      await refused(await send(uuid, { description: 'SECRET', focalX: 0.5 }, admin, '?locale=de'));
+    });
+    const row = await queryUntyped('Uploads').where({ UUID: uuid }).locale('de').findFirst();
+    strictEqual(row?.description, 'Beschriftung');
+    strictEqual(row?.focalX, null);
+  });
+
+  it('judges a write without ?locale= at the default locale, not the scope locale', async () => {
+    const hidden = await seed('dflt-hidden.txt');
+    await caption(hidden, 'SECRET caption', 'Beschriftung');
+    const shown = await seed('dflt-shown.txt');
+    await caption(shown, 'Caption', 'Beschriftung');
+    await withReadAccess(
+      () => ({ locale: 'de', ...noSecrets() }),
+      async () => {
+        strictEqual((await send(hidden, { description: 'Overwritten' })).status, 404);
+        await refused(await send(shown, { description: 'SECRET now' }));
+        const response = await send(shown, { description: 'New' });
+        strictEqual(((await response.json()) as Record<string, unknown>).description, 'New');
+      },
+    );
+    const row = await queryUntyped('Uploads').where({ UUID: hidden }).findFirst();
+    strictEqual(row?.description, 'SECRET caption');
+  });
+
+  it("422s a lock that hides a folder's child at the written locale, changing nothing", async () => {
+    const folder = await createFolder({ directory: 'patch', name: 'lingo' });
+    await caption(folder.UUID, 'Folder', 'Ordner');
+    const child = await putUpload({
+      directory: 'patch/lingo',
+      name: 'child.txt',
+      body: stream(bytes('child')),
+    });
+    await caption(child.UUID, 'SECRET child', 'Kind');
+    await withReadAccess(foldersOrPublic, async () => {
+      await refused(await send(folder.UUID, { private: true }, admin, '?locale=de'));
+    });
+    const rows = await queryUntyped('Uploads')
+      .where({ UUID: { in: [folder.UUID, child.UUID] } })
+      .pluck('private');
+    deepStrictEqual(rows, [false, false]);
   });
 });

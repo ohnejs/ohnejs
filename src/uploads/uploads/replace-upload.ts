@@ -1,4 +1,4 @@
-import { queryUntyped, useDatabase } from 'ohnejs';
+import { useDatabase } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
 import type { QueryRecord } from '../../ohne/query/read/find.ts';
@@ -9,7 +9,7 @@ import type { UploadRecord } from './types.ts';
 import { notFound } from '../../ohne/http/http-error.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { uploadsError } from './_errors.ts';
-import { assertReached, assertUploadReach } from './_reach.ts';
+import { assertReached, reached } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { claimStaged, discardStaged, stageUpload } from './_stage.ts';
 import { uploadPath } from './path.ts';
@@ -60,10 +60,8 @@ export async function replaceUpload(
   let record: QueryRecord;
   try {
     record = await useDatabase().transaction(async (tx) => {
-      if (!isUndefined(options.reach)) await assertUploadReach(uuid, options.reach, tx);
       await claimStaged(tx, temp);
-      const [updated] = await queryUntyped('Uploads')
-        .use(tx)
+      const [updated] = await reached(options.reach, tx)
         .where({ UUID: uuid })
         .updateOrThrow(measured);
       if (isUndefined(updated)) throw notFound();

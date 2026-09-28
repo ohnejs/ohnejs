@@ -56,7 +56,7 @@ export async function moveUploads(
       touched.push(...below, ...created);
     }
     await assertReached(tx, reach, touched);
-    return readUploads(unique, tx);
+    return readUploads(unique, tx, reach);
   }, 'immediate');
   await drainJournal();
   return records.map(decorated);

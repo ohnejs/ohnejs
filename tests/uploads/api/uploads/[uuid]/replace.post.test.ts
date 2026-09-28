@@ -13,7 +13,9 @@ import { updateUpload } from '../../../../../src/uploads/uploads/update-upload.t
 import {
   bytes,
   call,
+  caption,
   errorsOf,
+  noSecrets,
   png,
   route,
   stalled,
@@ -153,5 +155,19 @@ describe('POST /uploads/[uuid]/replace', () => {
     strictEqual(row?.hash, upload.hash);
     strictEqual(text(storage.objects.get('rep/small.txt')), 's');
     deepStrictEqual(new Set(storage.objects.keys()), staged);
+  });
+
+  it('answers only the locales the read scope admits the file at', async () => {
+    const upload = await putUpload({
+      directory: 'rep',
+      name: 'lingo.txt',
+      body: stream(bytes('l')),
+    });
+    await caption(upload.UUID, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      const response = await send(upload.UUID, stream(bytes('new')), admin);
+      strictEqual(response.status, 200);
+      deepStrictEqual(((await response.json()) as Record<string, unknown>)._translations, ['en']);
+    });
   });
 });

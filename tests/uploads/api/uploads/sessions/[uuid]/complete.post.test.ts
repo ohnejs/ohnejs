@@ -14,7 +14,9 @@ import indexPost from '../../../../../../src/uploads/api/uploads/sessions/index.
 import {
   bytes,
   call,
+  caption,
   errorsOf,
+  noSecrets,
   route,
   storage,
   stream,
@@ -152,6 +154,15 @@ describe('POST /uploads/sessions/[uuid]/complete', () => {
     strictEqual((await finish(session.UUID)).status, 200);
   });
 
+  it('404s a repeat to a caller whose read access scope is `false`', async () => {
+    const session = await upload('', 'saurfang.txt', HORDE);
+    strictEqual((await finish(session.UUID)).status, 201);
+    await withReadAccess(
+      () => false,
+      async () => strictEqual((await finish(session.UUID)).status, 404),
+    );
+  });
+
   it('404s an unknown session, and one another user opened, keeping it', async () => {
     const session = await upload('', 'zuljin.txt', HORDE);
     const foreign = await finish(session.UUID, jaina);
@@ -178,5 +189,16 @@ describe('POST /uploads/sessions/[uuid]/complete', () => {
     strictEqual((await finish(session.UUID, null)).status, 401);
     strictEqual((await finish(session.UUID, peon)).status, 403);
     strictEqual((await row(session.UUID))?.upload, null);
+  });
+
+  it('answers a repeat with only the locales the read scope admits the file at', async () => {
+    const session = await upload('', 'rexxar.txt', HORDE);
+    const record = (await (await finish(session.UUID)).json()) as UploadRecord;
+    await caption(record.UUID, 'Caption', 'SECRET Beschriftung');
+    await withReadAccess(noSecrets, async () => {
+      const repeat = await finish(session.UUID);
+      strictEqual(repeat.status, 200);
+      deepStrictEqual(((await repeat.json()) as Record<string, unknown>)._translations, ['en']);
+    });
   });
 });

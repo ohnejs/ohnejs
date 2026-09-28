@@ -274,3 +274,17 @@ export async function withReadAccess(
     api.read = original;
   }
 }
+
+/**
+ * A read `access` that hides a row at every locale whose `description` holds `SECRET`.
+ */
+export const noSecrets = () => ({ where: { description: { not: { contains: 'SECRET' } } } });
+
+/**
+ * Captions the row `uuid` with `en` and `de`, one `description` per content locale.
+ */
+export async function caption(uuid: string, en: string, de: string): Promise<void> {
+  const row = () => queryUntyped('Uploads').where({ UUID: uuid });
+  await row().updateOrThrow({ description: en });
+  await row().locale('de').updateOrThrow({ description: de });
+}

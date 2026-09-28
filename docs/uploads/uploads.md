@@ -143,7 +143,8 @@ file is [private](./private-files.md).
 
 `PATCH` takes any of `name`, `directory`, `description`, `focalX`, `focalY`, and `private`. With
 `name` or `directory` it renames or moves the row and its object. A file's extension names its
-type, so a name with another extension is a `422`. `?locale=` selects the alt text's locale.
+type, so a name with another extension is a `422`. `?locale=` selects the alt text's locale, the
+default one without it, and a row the `access` scope hides at that locale is a `404`.
 
 The upload and replace routes accept bodies up to `uploads.maxFileSize` and run with no handler
 timeout. An upload may take up to [`api.requestTimeout`](../project/config.md#the-api-server).

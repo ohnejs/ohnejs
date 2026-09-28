@@ -14,7 +14,7 @@ import type { UploadRecord } from '../../uploads/types.ts';
 import type { UpdateUploadInput } from '../../uploads/update-upload.ts';
 
 import { patchUpload } from '../../uploads/_patch.ts';
-import { assertUploadReach } from '../../uploads/_reach.ts';
+import { assertUploadReach, reachesAt } from '../../uploads/_reach.ts';
 import { uploadReach } from '../../uploads/_reader.ts';
 
 /**
@@ -23,9 +23,11 @@ import { uploadReach } from '../../uploads/_reader.ts';
  * Changes a row from `{ name?, directory?, description?, focalX?, focalY?, private? }` and answers the row.
  * `name` and `directory` move the row and its object; the rest change its metadata.
  * `private` locks or unlocks it, a folder with everything inside; a move into a private folder locks too.
- * `?locale=` writes `description` at that content locale.
+ * `?locale=` writes `description` at that content locale, the default one without it.
  * Needs `collection.Uploads.update` and the `Uploads` read guard: no user `401`, no capability `403`.
- * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any `400`.
+ * An unknown locale is a `400`.
+ * An unknown `UUID`, or one the read `access` scope hides, is a `404`, before any body `400`.
+ * The scope judges the row at its own locale and at the written one, and hidden at either is that `404`.
  * A body naming nothing, or a value of the wrong JSON type, is a `400`.
  * A changed extension, a folder moved into itself, a taken target, or an out-of-range value is a `422`.
  * So is a path past 768 bytes, a folder's deepest row included.
@@ -35,10 +37,10 @@ import { uploadReach } from '../../uploads/_reader.ts';
 export default defineHandler(async ({ params }): Promise<UploadRecord> => {
   await requireCapability('collection.Uploads.update');
   const reach = await uploadReach();
-  await assertUploadReach(params.uuid, reach);
+  const locale = parseLocaleParam(useSearchParams().locale, queryMetadata('Uploads')) ?? undefined;
+  for (const each of reachesAt(reach, locale)) await assertUploadReach(params.uuid, each);
   const body = await readJSONBody<unknown>();
   const input = isPlainObject(body) ? body : {};
-  const locale = parseLocaleParam(useSearchParams().locale, queryMetadata('Uploads')) ?? undefined;
   const target = readTarget(input);
   const changes = readChanges(input);
   if (isUndefined(target) && isUndefined(changes)) throw badRequest();

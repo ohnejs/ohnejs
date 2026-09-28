@@ -74,9 +74,22 @@ export async function assertReached(
 }
 
 /**
- * `Uploads` under `reach`, on `tx` when given.
+ * The reaches a write at `locale` keeps its rows inside: `reach`, and `reach` at `locale` when that differs.
+ * An omitted `locale` is the default one, where the write lands.
  */
-export function reached(reach: UploadReach, tx?: Transaction): UntypedQueryBuilder {
-  const uploads = applyScope(queryUntyped('Uploads'), reach);
+export function reachesAt(
+  reach: UploadReach | undefined,
+  locale: string | undefined,
+): UploadReach[] {
+  if (isUndefined(reach)) return [];
+  return reach.locale === locale ? [reach] : [reach, { ...reach, locale }];
+}
+
+/**
+ * `Uploads` under `reach` when given, on `tx` when given.
+ */
+export function reached(reach: UploadReach | undefined, tx?: Transaction): UntypedQueryBuilder {
+  const uploads = queryUntyped('Uploads');
+  if (!isUndefined(reach)) applyScope(uploads, reach);
   return isUndefined(tx) ? uploads : uploads.use(tx);
 }

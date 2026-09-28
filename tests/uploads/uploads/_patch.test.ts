@@ -13,7 +13,7 @@ import { deleteUpload } from '../../../src/uploads/uploads/delete-upload.ts';
 import { moveUpload } from '../../../src/uploads/uploads/move-upload.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
-import { bytes, storage, stream, text } from '../_fixture.ts';
+import { bytes, caption, storage, stream, text } from '../_fixture.ts';
 
 const reach = { where: { directory: { in: ['r', 'r/tmp'] } } };
 
@@ -135,5 +135,12 @@ describe('patchUpload', () => {
     } finally {
       useEnv().unset('UPLOADS_SECRET');
     }
+  });
+
+  it('answers every locale without a reach', async () => {
+    const file = await putUpload({ directory: 'r', name: 'all.txt', body: stream(bytes('a')) });
+    await caption(file.UUID, 'Caption', 'SECRET Beschriftung');
+    const record = await patchUpload(file.UUID, { changes: { focalX: 0.5 } }, { locale: 'de' });
+    deepStrictEqual((record as unknown as Record<string, unknown>)._translations, ['en', 'de']);
   });
 });

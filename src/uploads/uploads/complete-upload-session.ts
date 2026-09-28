@@ -13,7 +13,6 @@ import type { UploadRecord } from './types.ts';
 import { drainJournal, journalStorage } from '../storage/journal.ts';
 import { useStorage } from '../storage/use-storages.ts';
 import { landUpload } from './_land.ts';
-import { assertUploadReach } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import {
   readSessionRow,
@@ -76,8 +75,7 @@ async function land(
     throw sessionExpired();
   }
   if (!isNull(row.upload)) {
-    if (!isUndefined(reach)) await assertUploadReach(row.upload, reach);
-    return { record: decorated(await readUpload(row.upload)), created: false };
+    return { record: decorated(await readUpload(row.upload, undefined, reach)), created: false };
   }
   if (row.offset < row.size) throw conflict(undefined, wireSession(row));
   assertTypeAllowed(row.type);
