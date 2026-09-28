@@ -458,31 +458,49 @@ describe('dev', () => {
     strictEqual(await get(dashPort, '/'), 200);
   });
 
-  it(
-    'derives the dashboard API URL from the HOST override the api child binds',
-    TIMEOUT,
-    async () => {
-      const dashPort = await freePort();
-      const app = writeProject('dashboard-host', 0);
-      writeFileSync(
-        join(app, 'ohne.config.ts'),
-        `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
-      );
-      writeRoute(app, 'health.ts');
+  /**
+   * Runs `dev` for an app whose `/origin` route answers the `DASHBOARD_URL` the API child got.
+   * Returns the API URL the dashboard shell injects, and that origin.
+   */
+  async function devUnderHost(
+    name: string,
+    host: string,
+  ): Promise<{ dashPort: number; apiURL: string; origin: string }> {
+    const dashPort = await freePort();
+    const app = writeProject(name, 0);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      `export default { api: { port: 0 }, dashboard: { port: ${dashPort} }, printer: { silent: true } }\n`,
+    );
+    writeFileSync(
+      join(app, 'api', 'origin.ts'),
+      "import { useEnv } from 'ohnejs'\nexport default () => useEnv().get('DASHBOARD_URL')\n",
+    );
 
-      useEnv().set('HOST', '127.0.0.1');
-      try {
-        const server = await dev(app, { entry: BIN });
-        servers.push(server);
+    useEnv().set('HOST', host);
+    try {
+      const server = await dev(app, { entry: BIN });
+      servers.push(server);
+    } finally {
+      useEnv().unset('HOST');
+    }
+    await waitFor(async () => (await get(dashPort, '/')) === 200);
+    const apiURL = (await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)?.[1] ?? '';
+    const origin = await getBody(Number(apiURL.match(/:(\d+)$/)?.[1]), '/origin');
+    return { dashPort, apiURL, origin };
+  }
 
-        await waitFor(async () => (await get(dashPort, '/')) === 200);
-        const apiURL = (await getBody(dashPort, '/')).match(/"apiURL":"([^"]+)"/)?.[1] ?? '';
-        ok(/^http:\/\/127\.0\.0\.1:\d+$/.test(apiURL));
-      } finally {
-        useEnv().unset('HOST');
-      }
-    },
-  );
+  it('derives the API URL and the dashboard origin from the HOST override', TIMEOUT, async () => {
+    const { dashPort, apiURL, origin } = await devUnderHost('dashboard-host', '127.0.0.1');
+    ok(/^http:\/\/127\.0\.0\.1:\d+$/.test(apiURL));
+    strictEqual(origin, `http://127.0.0.1:${dashPort}`);
+  });
+
+  it('brackets an IPv6 HOST override in both derived URLs', TIMEOUT, async () => {
+    const { dashPort, apiURL, origin } = await devUnderHost('dashboard-ipv6', '::1');
+    ok(/^http:\/\/\[::1\]:\d+$/.test(apiURL));
+    strictEqual(origin, `http://[::1]:${dashPort}`);
+  });
 
   it('restarts the dashboard when a config change stacks a new layer', TIMEOUT, async () => {
     const dashPort = await freePort();

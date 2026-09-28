@@ -19,6 +19,7 @@ import {
   resolvePath,
   safeResolve,
 } from '../../utils/index.ts';
+import { listenOrigin } from '../../utils/net/index.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
 import { buildDashboardPageManifest } from '../dashboard/build-dashboard-page-manifest.ts';
 import { collectDashboardBoot } from '../dashboard/collect-dashboard-boot.ts';
@@ -173,8 +174,8 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const address = await listen(http.server, port, host);
   useShutdown().watch({});
 
-  usePrinter().success(`Dashboard ready at \`http://${host ?? 'localhost'}:${address.port}\``);
-  process.send?.('ready');
+  usePrinter().success(`Dashboard ready at \`${listenOrigin(host, address.port)}\``);
+  if (process.connected) process.send?.('ready');
   return http;
 }
 
@@ -254,11 +255,11 @@ function liveReload(routes: Route[]): void {
  */
 function resolveAPIURL(): string {
   const api = useConfig().api;
-  const host = useEnv().get('HOST') ?? api.host ?? 'localhost';
+  const origin = listenOrigin(useEnv().get('HOST') ?? api.host, api.port ?? DEFAULT_API_PORT);
   return (
     useEnv().get('API_URL') ??
     useConfig().dashboard?.apiURL ??
-    `http://${host}:${api.port ?? DEFAULT_API_PORT}${normalizeBasePath(api.basePath)}`
+    `${origin}${normalizeBasePath(api.basePath)}`
   );
 }
 

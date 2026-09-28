@@ -20,6 +20,7 @@ export interface LayerCodegen {
   /**
    * The file name inside the bucket, a plain `.ts` name such as `image-variants.ts`.
    * No two entries in the stack may claim the same bucket and name.
+   * A name ohne generates itself, like `routes.ts`, is reserved in every bucket.
    */
   file: string;
 

@@ -139,6 +139,62 @@ describe('syncDatabase with composites', () => {
     await db.close();
   });
 
+  it('dedupes a uniquePerParent subfield through a unique switch', async () => {
+    const db = await open();
+    const shape = (options: { unique?: boolean; uniquePerParent?: boolean }) =>
+      desiredOf({
+        name: 'Posts',
+        collection: {
+          fields: { tags: field('repeater', { fields: { slug: field('text', options) } }) },
+        },
+      });
+    await syncDatabase(db, dialect, { desired: shape({}) });
+    await insertRow(db, 'Posts', 'p1');
+    await db.run(
+      'INSERT INTO "Posts_tags" ("UUID", "_parentUUID", "_parentPosition", "slug") VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
+      ['t1', 'p1', 0, 'a', 't2', 'p1', 1, 'a'],
+    );
+    await syncDatabase(db, dialect, {
+      desired: shape({ unique: true, uniquePerParent: true }),
+      migrations: [
+        meta('app/001-tags-unique', {
+          from: { collection: 'Posts', field: 'tags.slug', unique: false },
+          transform: (_value, row, ctx) => (row.UUID === 't2' ? ctx.deleteRecord() : undefined),
+        }),
+      ],
+    });
+    deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts_tags"'), [
+      Object.assign(Object.create(null), { UUID: 't1' }),
+    ]);
+    await db.close();
+  });
+
+  it('switches a field unique off beside a composite unique that ends in the field', async () => {
+    const db = await open();
+    const shape = (unique: boolean) =>
+      desiredOf({
+        name: 'Posts',
+        collection: {
+          fields: { author: field('text'), slug: field('text', { unique }) },
+          compositeIndexes: [{ fields: ['author', 'slug'], unique: true }],
+        },
+      });
+    await syncDatabase(db, dialect, { desired: shape(true) });
+    await syncDatabase(db, dialect, {
+      desired: shape(false),
+      migrations: [
+        meta('app/001-slug-shared', {
+          from: { collection: 'Posts', field: 'slug', unique: true },
+          to: { unique: false },
+        }),
+      ],
+    });
+    deepStrictEqual(await db.query('SELECT "name", "status" FROM "ohne_migrations"'), [
+      Object.assign(Object.create(null), { name: 'app/001-slug-shared', status: 'applied' }),
+    ]);
+    await db.close();
+  });
+
   it('cascades deletes through nested repeaters', async () => {
     const db = await open();
     const desired = desiredOf({
@@ -455,6 +511,62 @@ describe('syncDatabase with composites', () => {
     ]);
     const again = await syncDatabase(db, dialect, { desired, migrations });
     deepStrictEqual(again, { deletions: [], warnings: [] });
+    await db.close();
+  });
+
+  it('frees a renamed collection name for a new collection in the same sync', async () => {
+    const db = await open();
+    const shape = (name: string): CollectionMeta => ({
+      name,
+      collection: {
+        fields: {
+          slug: field('text', { translatable: true, unique: true, uniquePerLocale: true }),
+          sections: field('repeater', {
+            fields: { items: field('repeater', { fields: { label: field('text') } }) },
+          }),
+        },
+      },
+    });
+    await syncDatabase(db, dialect, { desired: desiredOf(shape('Posts')) });
+    await syncDatabase(db, dialect, {
+      desired: desiredOf(shape('Articles'), shape('Posts')),
+      migrations: [
+        meta('app/001-articles', { from: { collection: 'Posts' }, to: { collection: 'Articles' } }),
+      ],
+    });
+    const items = await dialect.describeTable(db, 'Articles_sections_items');
+    deepStrictEqual(items.indexes, [
+      { name: 'IX__Articles_sections_items___parentUUID', columns: ['_parentUUID'] },
+    ]);
+    ok((await dialect.listTables(db)).includes('Posts_sections_items'));
+    await db.close();
+  });
+
+  it('frees a renamed field name for a new field in the same sync, nested tables included', async () => {
+    const db = await open();
+    const sections = () =>
+      field('repeater', {
+        fields: { items: field('repeater', { fields: { label: field('text') } }) },
+      });
+    await syncDatabase(db, dialect, {
+      desired: desiredOf({ name: 'Posts', collection: { fields: { sections: sections() } } }),
+    });
+    await syncDatabase(db, dialect, {
+      desired: desiredOf({
+        name: 'Posts',
+        collection: { fields: { chapters: sections(), sections: sections() } },
+      }),
+      migrations: [
+        meta('app/001-chapters', {
+          from: { collection: 'Posts', field: 'sections' },
+          to: { collection: 'Posts', field: 'chapters' },
+        }),
+      ],
+    });
+    const items = await dialect.describeTable(db, 'Posts_chapters_items');
+    deepStrictEqual(items.indexes, [
+      { name: 'IX__Posts_chapters_items___parentUUID', columns: ['_parentUUID'] },
+    ]);
     await db.close();
   });
 

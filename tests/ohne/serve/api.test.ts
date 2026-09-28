@@ -1,6 +1,8 @@
 import type { AddressInfo } from 'node:net';
 
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { fork } from 'node:child_process';
+import { once } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -71,6 +73,7 @@ function get(port: number, path: string): Promise<number> {
 }
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
+const BIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'bin.js');
 
 const dialect = new SQLiteDialect();
 
@@ -448,5 +451,33 @@ describe('serveAPI', () => {
     await rejects(() => serveAPI(dir), /Invalid server port/);
 
     useEnv().set('PORT', 0);
+  });
+
+  it('drains and exits cleanly when its dev parent is gone before it is ready', async () => {
+    const dir = serveable('orphaned');
+    const log = join(dir, 'hook.log');
+    writeFileSync(
+      join(dir, 'boot', 'index.ts'),
+      "import { appendFileSync } from 'node:fs';\n" +
+        "import { onShutdown } from 'ohnejs';\n" +
+        "if (process.connected) await new Promise((resolve) => process.once('disconnect', resolve));\n" +
+        'onShutdown(async () => {\n' +
+        '  await new Promise((resolve) => setTimeout(resolve, 100));\n' +
+        `  appendFileSync(${JSON.stringify(log)}, 'drained');\n` +
+        '});\n',
+    );
+
+    const child = fork(BIN, ['serve', 'api', '--cwd', dir], {
+      env: { ...process.env, DATABASE: ':memory:', PORT: '0', SILENT: '1' },
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+    });
+    let stderr = '';
+    child.stderr!.on('data', (chunk) => (stderr += chunk));
+    child.disconnect();
+    const [[code]] = await Promise.all([once(child, 'exit'), once(child.stderr!, 'end')]);
+
+    strictEqual(stderr, '');
+    strictEqual(code, 0);
+    strictEqual(readFileSync(log, 'utf8'), 'drained');
   });
 });

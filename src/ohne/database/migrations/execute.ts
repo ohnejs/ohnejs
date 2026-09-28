@@ -924,11 +924,14 @@ function desiredSwitchState(engine: Engine, lowered: LoweredSwitch): boolean | u
   if (isUndefined(home)) return undefined;
   const column = lowered.column as string;
   if (lowered.attribute === 'nullable') return !home.column.notNull;
-  const scoped = home.table.uniques.some((unique) =>
-    deepEqual(unique.columns, ['_localeCode', column]),
+  if (lowered.attribute === 'uniquePerLocale') {
+    return home.table.uniques.some((unique) => deepEqual(unique.columns, ['_localeCode', column]));
+  }
+  // A field's own unique widens only over `_` system columns; a composite unique names other fields.
+  return home.table.uniques.some(
+    ({ columns }) =>
+      last(columns) === column && columns.slice(0, -1).every((name) => name.startsWith('_')),
   );
-  if (lowered.attribute === 'uniquePerLocale') return scoped;
-  return scoped || home.table.uniques.some((unique) => deepEqual(unique.columns, [column]));
 }
 
 /**

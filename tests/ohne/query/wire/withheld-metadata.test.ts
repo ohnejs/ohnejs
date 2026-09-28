@@ -26,6 +26,10 @@ useCollections().register('WhPosts', {
     },
   },
 });
+useCollections().register('WhCtors', {
+  name: 'WhCtors',
+  collection: { fields: { title: field('text'), constructor: field('text') } },
+});
 
 const meta = queryMetadata('WhPosts');
 
@@ -73,6 +77,13 @@ describe('withheldMetadata', () => {
     strictEqual(scoped.fields._translations.readable, undefined);
     deepStrictEqual([...allowedOperators(scoped.fields._translations)], []);
     strictEqual(scoped.fields.title, meta.fields.title);
+  });
+
+  it('keeps every field in a null-prototype map, so an inherited name stays unknown', () => {
+    const base = queryMetadata('WhCtors');
+    const scoped = withheldMetadata(base, ['title'], false);
+    strictEqual(Object.getPrototypeOf(scoped.fields), null);
+    deepStrictEqual(Object.keys(scoped.fields), Object.keys(base.fields));
   });
 
   it('never marks the shared entry', () => {

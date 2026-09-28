@@ -81,6 +81,21 @@ describe('query:filter', () => {
     strictEqual(await queryUntyped('RPosts').count(), 2);
   });
 
+  it('hands every read terminal a frozen IR', async () => {
+    const frozen: boolean[] = [];
+    hook('query:filter', (ir) => {
+      frozen.push(Object.isFrozen(ir));
+    });
+
+    const posts = queryUntyped('RPosts');
+    await posts.findMany();
+    await posts.findFirst();
+    await posts.count();
+    await posts.paginate(1, 2);
+    await posts.pluck('title');
+    deepStrictEqual(frozen, [true, true, true, true, true, true]);
+  });
+
   it('passes over an unscoped read, which sees every row', async () => {
     let called = 0;
     hook('query:filter', (ir) => {

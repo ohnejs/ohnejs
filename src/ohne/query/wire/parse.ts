@@ -136,6 +136,7 @@ const KNOWN_PARAMS = new Set([
  * `locale` canonicalizes and must name a configured content locale on a translatable collection.
  * The untrusted path is the only one guard-checked; the fluent builder is not.
  * A `populate` or conditioned `has` reads its target collection unscoped; `parseWireQuery` scopes each.
+ * `reserved` counts bound parameters the caller compiles beside the query toward `maxBoundParams`.
  *
  * @example
  * ```ts
@@ -155,13 +156,14 @@ export function parseQueryParams(
   meta: CollectionQueryMeta,
   guards: QueryGuards,
   metaOf: MetadataOf = queryMetadata,
+  reserved = 0,
 ): ParsedQuery {
   for (const key of Object.keys(params)) {
     if (!KNOWN_PARAMS.has(key)) throw unknownParamError(key);
   }
   const window = parseWindow(params, guards);
   return Object.freeze({
-    where: parseWhere(params.where, meta, guards, windowBoundParams(window), metaOf),
+    where: parseWhere(params.where, meta, guards, windowBoundParams(window) + reserved, metaOf),
     select: parseSelect(params.select, meta, guards),
     order: parseOrder(params.order, meta, guards),
     populate: parsePopulate(params.populate, meta, guards, metaOf),
@@ -173,7 +175,7 @@ export function parseQueryParams(
 /**
  * Parses the `where` condition through the shared grammar, then gates it against the collection.
  * Field applicability, the DoS ceilings, and value types are enforced in turn, each a distinct code.
- * `reserved` is the bound parameters the row window already claims, folded into the bound-param ceiling.
+ * `reserved` is the bound parameters the row window and the caller already claim, folded into the ceiling.
  */
 function parseWhere(
   value: SearchParamValue | undefined,
@@ -226,18 +228,11 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
     }
     if (info.hasDepth > guards.maxHasDepth)
       throw limitError('hasTooDeep', 'where', guards.maxHasDepth);
-    if (child.kind === 'has' || child.kind === 'empty') {
-      boundParams += 2;
-      if (boundParams > guards.maxBoundParams) {
-        throw limitError('tooManyBoundParams', 'where', guards.maxBoundParams);
-      }
-      return;
-    }
-    if (child.kind !== 'compare' || isUndefined(child.value)) return;
-    boundParams += isArray(child.value) ? child.value.length : 1;
+    boundParams += nodeBinds(child);
     if (boundParams > guards.maxBoundParams) {
       throw limitError('tooManyBoundParams', 'where', guards.maxBoundParams);
     }
+    if (child.kind !== 'compare' || isUndefined(child.value)) return;
     const isList = child.op === 'in' || child.op === 'includesAll' || child.op === 'includesAny';
     if (isList && isArray(child.value) && child.value.length > guards.maxInLength) {
       throw limitError('listTooLong', 'where', guards.maxInLength);
@@ -258,6 +253,26 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
       }
     }
   });
+}
+
+/**
+ * The worst-case bound parameters a condition compiles to, counted as the bound-param ceiling counts them.
+ */
+export function conditionBinds(node: ConditionNode): number {
+  let binds = 0;
+  walkCondition(node, (child) => {
+    binds += nodeBinds(child);
+  });
+  return binds;
+}
+
+/**
+ * The bound parameters one condition node claims: two for a `has` or `empty`, one per compared value.
+ */
+function nodeBinds(node: ConditionNode): number {
+  if (node.kind === 'has' || node.kind === 'empty') return 2;
+  if (node.kind !== 'compare' || isUndefined(node.value)) return 0;
+  return isArray(node.value) ? node.value.length : 1;
 }
 
 /**

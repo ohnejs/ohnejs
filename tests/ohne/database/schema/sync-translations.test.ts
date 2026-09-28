@@ -767,6 +767,39 @@ describe('syncDatabase switch migrations, fan-in', () => {
     }
     await db.close();
   });
+
+  it("collapses a translatable repeater per locale, force keeping each locale's first row", async () => {
+    const db = await open();
+    const shape = (type: 'object' | 'repeater') =>
+      desiredOf({
+        name: 'Posts',
+        collection: {
+          fields: {
+            sections: field(type, { fields: { title: field('text') }, translatable: true }),
+          },
+        },
+      });
+    await syncDatabase(db, dialect, { desired: shape('repeater') });
+    await insertRow(db, 'Posts', 'p1');
+    await db.run(
+      'INSERT INTO "Posts_sections" ("UUID", "_parentUUID", "_localeCode", "_parentPosition", "title") ' +
+        'VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+      ['s1', 'p1', 'en', 0, 'one', 's2', 'p1', 'en', 1, 'two', 's3', 'p1', 'de', 0, 'eins'],
+    );
+    await rejects(
+      syncDatabase(db, dialect, { desired: shape('object') }),
+      refusalMatching(/`1` parent of `Posts_sections` holds multiple rows/),
+    );
+    const report = await syncDatabase(db, dialect, { desired: shape('object'), force: true });
+    deepStrictEqual(report.deletions, [
+      "- `1` row of `Posts_sections` deleted, keeping each parent's first row",
+    ]);
+    deepStrictEqual(await db.query('SELECT "title" FROM "Posts_sections" ORDER BY "UUID"'), [
+      Object.assign(Object.create(null), { title: 'one' }),
+      Object.assign(Object.create(null), { title: 'eins' }),
+    ]);
+    await db.close();
+  });
 });
 
 describe('syncDatabase switch migrations, value passes', () => {

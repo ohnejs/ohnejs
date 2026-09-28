@@ -105,6 +105,14 @@ describe('generateLayerCodegen', { skip: process.platform === 'win32' }, () => {
     await rejects(generateLayerCodegen(app), /Codegen file `fixture.ts` is claimed twice/);
   });
 
+  it('throws when a layer claims a file ohne generates itself', async () => {
+    const app = join(root, 'reserved');
+    writeLayer(app, 'reserved', [entry('routes.ts', "''")]);
+    await loadLayers(app);
+
+    await rejects(generateLayerCodegen(app), /Codegen file `routes.ts` is reserved/);
+  });
+
   it('throws when a file is not a plain .ts name', async () => {
     const app = join(root, 'nested');
     writeLayer(app, 'nested', [entry('sub/fixture.ts', "''")]);

@@ -2,11 +2,12 @@ import type { LayerStrategies } from '../../utils/index.ts';
 import type { Config } from '../layers/config.ts';
 import type { LayerCodegen } from '../layers/define-layer.ts';
 
+import { resolveModuleDir } from '../../utils/fs/index.ts';
 import { isNull, isUndefined, last, relativePath } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
-import { parseLayerSpecifier, resolveLayerDir, resolveLayerSubpath } from './resolve-layer-dir.ts';
+import { parseLayerSpecifier, resolveLayerSubpath } from './resolve-layer-dir.ts';
 import { type OhneLayer, resolveOhnePackages } from './resolve-ohne-layers.ts';
 
 /**
@@ -39,7 +40,8 @@ export interface ResolvedLayer extends OhneLayer {
  *
  * The app's `layers` name the layers it extends; each of those names its own, and so on.
  * Only the layers reached this way are stacked - an installed layer no one lists is left out.
- * Names resolve to directories through `resolveOhnePackages`, the app's dependency closure.
+ * A name resolves from the layer that lists it, as Node would, so each layer gets its own install.
+ * A name that layer cannot reach falls back to the app's dependency closure, `resolveOhnePackages`.
  * A name carrying a subpath (`@acme/kit/auth`) resolves through the package's `exports`.
  * The package need not be a layer itself, and the app itself counts.
  * An app can therefore list a layer its own `package.json` exports.
@@ -95,10 +97,8 @@ export async function resolveLayerStack(
     };
     for (const specifier of config.input.layers ?? []) {
       const { name, subpath } = parseLayerSpecifier(specifier);
-      const root = dirByName.get(name);
-      const dir = isUndefined(root)
-        ? await resolveLayerDir(specifier, layer.dir)
-        : await resolveLayerSubpath(root, subpath);
+      const root = (await resolveModuleDir(name, layer.dir)) ?? dirByName.get(name);
+      const dir = isUndefined(root) ? null : await resolveLayerSubpath(root, subpath);
       if (isNull(dir)) {
         throw ohneError({
           title: `Layer \`${specifier}\` cannot be used`,

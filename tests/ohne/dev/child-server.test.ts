@@ -1,4 +1,4 @@
-import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type AddressInfo, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -170,6 +170,29 @@ describe('spawnServeChild', () => {
       process.argv = argv;
     }
     deepStrictEqual(JSON.parse(readFileSync(out, 'utf8')), ['127.0.0.1', ':memory:', port]);
+  });
+
+  it('forwards the node flags, dropping only those that open a debugger', TIMEOUT, async () => {
+    const app = writeProject('node-flags');
+    const out = join(app, 'exec-argv.json');
+    mkdirSync(join(app, 'boot'), { recursive: true });
+    writeFileSync(
+      join(app, 'boot', 'argv.ts'),
+      `import { writeFileSync } from 'node:fs'\nwriteFileSync('${out}', JSON.stringify(process.execArgv))\n`,
+    );
+    const port = await freePort();
+    const execArgv = process.execArgv;
+    process.execArgv = [...execArgv, '--inspect=0', '--inspect-publish-uid', 'stderr'];
+    try {
+      const child = spawnServeChild(app, 'api', { port, entry: BIN });
+      children.push(child);
+      await child.ready;
+    } finally {
+      process.execArgv = execArgv;
+    }
+    const forwarded: string[] = JSON.parse(readFileSync(out, 'utf8'));
+    deepStrictEqual(forwarded.slice(-2), ['--inspect-publish-uid', 'stderr']);
+    ok(!forwarded.includes('--inspect=0'));
   });
 
   it('calls onExit when a ready child exits on its own', TIMEOUT, async () => {

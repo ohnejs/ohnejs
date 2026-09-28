@@ -1,5 +1,5 @@
 import { deepStrictEqual, rejects } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -149,6 +149,36 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     deepStrictEqual(
       stack.map((layer) => layer.name),
       ['mid', 'kit3/auth', 'deep-app'],
+    );
+  });
+
+  it('resolves a name from the layer that lists it, when two versions are installed', async () => {
+    const consumer = join(root, 'twin-app');
+    mkdirSync(join(consumer, 'node_modules'), { recursive: true });
+    for (const version of ['twin-1', 'twin-2']) {
+      mkdirSync(join(store, version), { recursive: true });
+      writeManifest(join(store, version), { name: 'twin' });
+    }
+    writeLayer({ name: 'holder', layers: ['twin'] });
+    mkdirSync(join(store, 'holder', 'node_modules'), { recursive: true });
+    symlinkSync(join(store, 'twin-1'), join(store, 'holder', 'node_modules', 'twin'), 'dir');
+    symlinkSync(join(store, 'twin-2'), join(consumer, 'node_modules', 'twin'), 'dir');
+    link(consumer, 'holder');
+    writeManifest(consumer, {
+      name: 'twin-app',
+      deps: ['twin', 'holder'],
+      layers: ['twin', 'holder'],
+    });
+
+    const stack = await resolveLayerStack(consumer);
+    deepStrictEqual(
+      stack.map((layer) => layer.dir),
+      [
+        realpathSync(join(store, 'twin-2')),
+        realpathSync(join(store, 'twin-1')),
+        realpathSync(join(store, 'holder')),
+        consumer,
+      ],
     );
   });
 

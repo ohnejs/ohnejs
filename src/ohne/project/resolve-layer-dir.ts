@@ -81,7 +81,8 @@ export function parseLayerSpecifier(specifier: string): LayerSpecifier {
  * Resolves an `exports` subpath within package `root` to the directory that holds its `ohne.config.ts`.
  *
  * The `.` subpath is the root itself.
- * Any other subpath maps through the package's `exports`: an exact key first, else the longest `*` pattern.
+ * Any other subpath maps through the package's `exports`: an exact key first, else a `*` pattern.
+ * Among patterns, the longest prefix before the `*` wins, then the longest key, as Node ranks them.
  * A conditional target resolves like Node does: the first of `node`, `import`, or `default`, in key order.
  * `types` never counts.
  *
@@ -136,26 +137,28 @@ function subpathDir(root: string, exports: unknown, subpath: string): string | n
 
 /**
  * Maps an `exports` subpath to its target string, or `null` when the map does not export it.
- * An exact key is authoritative; otherwise the longest matching `*` pattern wins and its fill is substituted.
+ * An exact key is authoritative; otherwise the best matching `*` pattern wins and its fill is substituted.
  */
 function resolveExports(exports: unknown, subpath: string): string | null {
   if (!isObject(exports)) return null;
   if (hasKey(exports, subpath)) return resolveTarget(exports[subpath]);
 
   let target: string | null = null;
-  let matchLength = -1;
+  let bestStar = -1;
+  let bestLength = -1;
   for (const [key, value] of Object.entries(exports)) {
     const star = key.indexOf('*');
-    if (star === -1 || key.length - 1 <= matchLength) continue;
+    if (star === -1 || star < bestStar || (star === bestStar && key.length <= bestLength)) continue;
     const prefix = key.slice(0, star);
     const suffix = key.slice(star + 1);
-    if (subpath.length < prefix.length + suffix.length) continue;
+    if (subpath.length < key.length) continue;
     if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix)) continue;
     const pattern = resolveTarget(value);
     if (isNull(pattern)) continue;
     const fill = subpath.slice(prefix.length, subpath.length - suffix.length);
     target = pattern.replaceAll('*', fill);
-    matchLength = key.length - 1;
+    bestStar = star;
+    bestLength = key.length;
   }
   return target;
 }

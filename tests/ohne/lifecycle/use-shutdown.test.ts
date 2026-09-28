@@ -1,8 +1,15 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
+import { fork } from 'node:child_process';
+import { once } from 'node:events';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { before, beforeEach, describe, it } from 'node:test';
 
 import { useShutdown, usePrinter } from '../../../src/ohne/index.ts';
 import { sleep } from '../../../src/utils/index.ts';
+
+const USE_SHUTDOWN = new URL('../../../src/ohne/lifecycle/use-shutdown.ts', import.meta.url).href;
 
 before(() => {
   usePrinter().configure({ stream: { write() {} } });
@@ -88,5 +95,31 @@ describe('useShutdown', () => {
     useShutdown().unwatch();
     strictEqual(process.listenerCount('SIGTERM'), sigterm);
     strictEqual(process.listenerCount('SIGINT'), sigint);
+  });
+
+  it('runs the hooks when the parent disconnected before watch', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ohne-shutdown-'));
+    try {
+      const log = join(dir, 'hook.log');
+      const script = join(dir, 'child.ts');
+      writeFileSync(
+        script,
+        [
+          "import { appendFileSync } from 'node:fs'",
+          `import { useShutdown } from ${JSON.stringify(USE_SHUTDOWN)}`,
+          "if (process.connected) await new Promise((resolve) => process.once('disconnect', resolve))",
+          `useShutdown().add(() => appendFileSync(${JSON.stringify(log)}, 'ran'))`,
+          'useShutdown().watch()',
+        ].join('\n'),
+      );
+      const child = fork(script, { stdio: 'ignore' });
+      child.disconnect();
+      const [code] = await once(child, 'exit');
+
+      strictEqual(code, 0);
+      strictEqual(readFileSync(log, 'utf8'), 'ran');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

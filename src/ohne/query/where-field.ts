@@ -1,7 +1,7 @@
-import { isArray, isFunction, isString } from '../../utils/index.ts';
+import { isFunction, isString } from '../../utils/index.ts';
 
 /**
- * A comparison object one operator-callback builds: operator keys, plus optional `not`/`or`.
+ * One comparison object: operator keys, each at most once, plus an optional `not`.
  */
 type Comparison = Record<string, unknown>;
 
@@ -11,14 +11,12 @@ type Comparison = Record<string, unknown>;
 type WhereObject = Record<string, unknown>;
 
 /**
- * The runtime operator collector a `where(field, (w) => ...)` callback drives.
- * Every operator records its key on the current comparison and returns the collector to chain on.
+ * The runtime operators a `where(field, (w) => ...)` callback drives.
+ * Every operator ANDs its term into the current alternative and returns the collector to chain on.
  * `has` takes a scope callback, or a block type name ahead of one.
  * The name lowers to the scope's bare `block` equality, the discriminated form the blocks grammar requires.
- * `not` opens a negated comparison; `or` opens a fresh alternative folded into the comparison's `or`.
- * The type-level state machine in `builder.ts` gates which of these are reachable; the runtime is uniform.
  */
-interface WhereFieldCollector {
+interface WhereFieldOperators {
   equalsTo(value: unknown): WhereFieldCollector;
   in(values: unknown): WhereFieldCollector;
   greaterThan(value: unknown): WhereFieldCollector;
@@ -35,12 +33,19 @@ interface WhereFieldCollector {
   isNull(): WhereFieldCollector;
   empty(): WhereFieldCollector;
   has(blockOrBuild?: string | WhereScopeBuild, build?: WhereScopeBuild): WhereFieldCollector;
-  readonly not: WhereFieldCollector;
+}
+
+/**
+ * The runtime collector: the operators, `not` to negate the next one, `or` to open an alternative.
+ * The type-level state machine in `builder.ts` gates which of these are reachable; the runtime is uniform.
+ */
+interface WhereFieldCollector extends WhereFieldOperators {
+  readonly not: WhereFieldOperators;
   readonly or: WhereFieldCollector;
 }
 
 /**
- * The callback shape `buildComparison` runs, the runtime twin of `builder.ts`'s `WhereBuild`.
+ * The callback shape `lowerField` runs, the runtime twin of `builder.ts`'s `WhereBuild`.
  */
 type WhereFieldBuild = (w: WhereFieldCollector) => unknown;
 
@@ -77,6 +82,8 @@ interface ScopeState extends WhereScope {
  *
  * A plain value becomes the field's equality shorthand (`{ title: 'ohne' }`).
  * A callback builds the field's comparison (`{ views: { atLeast: 100 } }`).
+ * An operator repeated within one alternative, `not` included, splits it into an `and` of comparisons.
+ * Several `or` alternatives lower to an `or` of them.
  * The lowered object feeds the same parse-and-gate path the object and wire forms use.
  * The fluent surface therefore has no compiler of its own.
  *
@@ -87,58 +94,68 @@ interface ScopeState extends WhereScope {
  * ```
  */
 export function lowerField(field: string, value: unknown): WhereObject {
-  if (isFunction<WhereFieldBuild>(value)) return { [field]: buildComparison(value) };
-  return { [field]: value };
+  if (!isFunction<WhereFieldBuild>(value)) return { [field]: value };
+  const conjunction = (comparisons: Comparison[]): WhereObject =>
+    comparisons.length === 1
+      ? { [field]: comparisons[0] }
+      : { and: comparisons.map((comparison) => ({ [field]: comparison })) };
+  const alternatives = collect(value);
+  return alternatives.length === 1
+    ? conjunction(alternatives[0])
+    : { or: alternatives.map(conjunction) };
 }
 
 /**
- * Runs an operator callback and returns the comparison object it built.
+ * Runs an operator callback and returns its `or` alternatives, each a list of comparisons to AND.
+ * An operator merges into the last comparison unless that one already holds its key.
+ * A negated operator hands back the outer collector, so `not` negates only the next operator.
  */
-function buildComparison(build: WhereFieldBuild): Comparison {
-  const root: Comparison = {};
-  build(collector(root, root));
-  return root;
-}
-
-/**
- * Builds one operator collector over `target`, drawing `or` alternatives from the shared `root`.
- */
-function collector(target: Comparison, root: Comparison): WhereFieldCollector {
-  const set = (op: string, value: unknown): WhereFieldCollector => {
-    target[op] = value;
+function collect(build: WhereFieldBuild): Comparison[][] {
+  let comparisons: Comparison[] = [];
+  const alternatives = [comparisons];
+  const add = (op: string, value: unknown): WhereFieldCollector => {
+    const last = comparisons.at(-1);
+    if (last && !Object.hasOwn(last, op)) last[op] = value;
+    else comparisons.push({ [op]: value });
     return self;
   };
   const self: WhereFieldCollector = {
-    equalsTo: (value) => set('equalsTo', value),
-    in: (values) => set('in', values),
-    greaterThan: (value) => set('greaterThan', value),
-    atLeast: (value) => set('atLeast', value),
-    lessThan: (value) => set('lessThan', value),
-    atMost: (value) => set('atMost', value),
-    contains: (value) => set('contains', value),
-    startsWith: (value) => set('startsWith', value),
-    endsWith: (value) => set('endsWith', value),
-    like: (value) => set('like', value),
-    includes: (value) => set('includes', value),
-    includesAll: (values) => set('includesAll', values),
-    includesAny: (values) => set('includesAny', values),
-    isNull: () => set('isNull', true),
-    empty: () => set('empty', true),
-    has: (blockOrBuild, build) => set('has', lowerHas(blockOrBuild, build)),
+    ...operators(add),
     get not() {
-      const negated: Comparison = {};
-      target.not = negated;
-      return collector(negated, root);
+      return operators((op, value) => add('not', { [op]: value }));
     },
     get or() {
-      const alternative: Comparison = {};
-      const existing = root.or;
-      if (isArray<Comparison[]>(existing)) existing.push(alternative);
-      else root.or = [alternative];
-      return collector(alternative, root);
+      comparisons = [];
+      alternatives.push(comparisons);
+      return self;
     },
   };
-  return self;
+  build(self);
+  return alternatives;
+}
+
+/**
+ * Binds every operator to `add`, which records its key and value.
+ */
+function operators(add: (op: string, value: unknown) => WhereFieldCollector): WhereFieldOperators {
+  return {
+    equalsTo: (value) => add('equalsTo', value),
+    in: (values) => add('in', values),
+    greaterThan: (value) => add('greaterThan', value),
+    atLeast: (value) => add('atLeast', value),
+    lessThan: (value) => add('lessThan', value),
+    atMost: (value) => add('atMost', value),
+    contains: (value) => add('contains', value),
+    startsWith: (value) => add('startsWith', value),
+    endsWith: (value) => add('endsWith', value),
+    like: (value) => add('like', value),
+    includes: (value) => add('includes', value),
+    includesAll: (values) => add('includesAll', values),
+    includesAny: (values) => add('includesAny', values),
+    isNull: () => add('isNull', true),
+    empty: () => add('empty', true),
+    has: (blockOrBuild, build) => add('has', lowerHas(blockOrBuild, build)),
+  };
 }
 
 /**

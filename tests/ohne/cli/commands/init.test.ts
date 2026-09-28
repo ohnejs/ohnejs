@@ -7,11 +7,12 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { usePrinter } from '../../../../src/ohne/index.ts';
@@ -228,6 +229,56 @@ describe('ohne init', () => {
     strictEqual(existsSync(join(dir, 'ohne.config.ts')), false);
     strictEqual(existsSync(join(dir, 'keep.txt')), true);
     process.exitCode = 0;
+  });
+
+  it(
+    'counts a symlink as content to refuse or purge',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const dir = freshDir('app');
+      const kept = join(freshDir('kept'), 'keep.txt');
+      writeFileSync(kept, 'mine');
+      symlinkSync(kept, join(dir, 'link'));
+
+      await runCommand(ohne, ['init', dir, '--yes']);
+      strictEqual(process.exitCode, 1);
+      strictEqual(existsSync(join(dir, 'ohne.config.ts')), false);
+      process.exitCode = 0;
+
+      await runCommand(ohne, ['init', dir, '--yes', '--force']);
+      strictEqual(readdirSync(dir).includes('link'), false);
+      strictEqual(readFileSync(kept, 'utf8'), 'mine');
+    },
+  );
+
+  it('skips the git prompt on a TTY when `--no-git` answers it', async () => {
+    const dir = join(freshDir('app'), 'flagged');
+    const { isTTY } = process.stdin;
+    const path = process.env.PATH;
+    const output: string[] = [];
+    const passThrough = process.stdout.write.bind(process.stdout);
+    const write = mock.method(process.stdout, 'write', (chunk: string | Uint8Array) => {
+      // The runner reports earlier tests as bytes on this stream; only the prompt writes strings.
+      if (typeof chunk !== 'string') return passThrough(chunk);
+      output.push(chunk);
+      // Answers any prompt, so a regression fails the assertion instead of hanging.
+      if (chunk.includes('?')) {
+        setImmediate(() => process.stdin.emit('keypress', '\r', { name: 'return' }));
+      }
+      return true;
+    });
+
+    process.stdin.isTTY = true;
+    // An empty `PATH` makes the TTY-only install fail at once instead of running npm.
+    process.env.PATH = '';
+    try {
+      await runCommand(ohne, ['init', dir, '--name', 'flagged', '--pm', 'npm', '--no-git']);
+    } finally {
+      process.env.PATH = path;
+      write.mock.restore();
+      process.stdin.isTTY = isTTY;
+    }
+    strictEqual(output.join('').includes('git repository'), false);
   });
 
   it('purges a non-empty directory with --force', async () => {

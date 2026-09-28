@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { type Event, runWithEvent, sendEvents, useEvent } from '../../../src/ohne/index.ts';
@@ -73,7 +73,7 @@ describe('sendEvents', () => {
     stream.send('after-cancel');
   });
 
-  it('disconnects a stalled client once the unread queue passes the frame bound', () => {
+  it('disconnects a stalled client once the unread queue passes the frame bound', async () => {
     let closed = false;
     const stream = runWithEvent(makeEvent(), () =>
       sendEvents({ onClose: () => void (closed = true) }),
@@ -85,6 +85,7 @@ describe('sendEvents', () => {
     }
     strictEqual(closed, true);
     strictEqual(sent <= 1030, true);
+    await rejects(read(stream.body), { name: 'AbortError' });
   });
 
   it('keeps a draining client connected across many more sends than the bound', async () => {

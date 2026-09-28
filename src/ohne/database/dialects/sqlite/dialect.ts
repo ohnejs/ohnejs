@@ -254,7 +254,8 @@ export class SQLiteDialect extends Dialect {
         await db.exec(commit ? 'COMMIT' : 'ROLLBACK');
         return result;
       } catch (error) {
-        await db.exec('ROLLBACK');
+        // A full disk or an I/O error makes SQLite roll back on its own.
+        await db.exec('ROLLBACK').catch(() => undefined);
         throw error;
       }
     } finally {
@@ -386,7 +387,7 @@ function createAdapter(db: DatabaseSync): DatabaseAdapter {
           db.exec('COMMIT');
           return result;
         } catch (error) {
-          db.exec('ROLLBACK');
+          if (db.isTransaction) db.exec('ROLLBACK');
           throw error;
         } finally {
           open = undefined;

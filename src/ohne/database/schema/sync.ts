@@ -9,7 +9,15 @@ import { ohneError } from '../../error/ohne-error.ts';
 import { executeMigrations } from '../migrations/execute.ts';
 import { touchedByMigration } from '../migrations/resolve-address.ts';
 import { ensureMigrationsTable, readStampedNames, stampMigration } from '../migrations/state.ts';
-import { OHNE_LOCKS, OHNE_MIGRATIONS, OHNE_SCHEMA } from '../naming/table-names.ts';
+import {
+  collectionTableName,
+  derivedRootName,
+  derivedTableName,
+  OHNE_LOCKS,
+  OHNE_MIGRATIONS,
+  OHNE_SCHEMA,
+  ownerTableName,
+} from '../naming/table-names.ts';
 import { diffSchemas } from './diff.ts';
 import { guardDiffs } from './guard.ts';
 import { acquireSyncLock } from './lock.ts';
@@ -156,7 +164,7 @@ export async function syncDatabase(
       live.push(await dialect.describeTable(db, name));
     }
     const classified = applyClassification(live, claimed, dialect);
-    const touched = touchedTables(diffSchemas(classified, desired, dialect), pending);
+    const touched = touchedTables(diffSchemas(classified, desired, dialect), pending, classified);
     const force = options.force ?? false;
     const dryRun = options.dryRun ?? false;
     const report = await dialect.schemaTransaction(
@@ -212,19 +220,37 @@ export async function syncDatabase(
  * Collects the tables whose constraints come down before migrations run.
  * Over-approximation is safe: every table differing pre-migration, plus every migration `from` and `to`.
  * Logical addresses lower purely to physical names here; an ambiguous one counts both readings.
+ * A migrated table carries every live table beneath it, since a rename cascades over its whole family.
  */
 function touchedTables(
   diffs: readonly TableDiff[],
   pending: readonly MigrationMeta[],
+  live: readonly TableSchema[],
 ): Set<string> {
   const touched = new Set<string>();
   for (const diff of diffs) {
     touched.add(diff.kind === 'alter' ? diff.desired.name : diff.table.name);
   }
-  for (const meta of pending) {
-    for (const table of touchedByMigration(meta)) touched.add(table);
+  const migrated = new Set(pending.flatMap(touchedByMigration));
+  for (const table of live) {
+    if (ancestorsOf(table).some((name) => migrated.has(name))) touched.add(table.name);
   }
-  return touched;
+  return touched.union(migrated);
+}
+
+/**
+ * The physical tables `table` hangs beneath: a companion's collection, or a derived table's parent chain.
+ */
+function ancestorsOf(table: TableSchema): string[] {
+  if (!isUndefined(table.companion)) return [collectionTableName(table.companion)];
+  const origin = table.derived;
+  if (isUndefined(origin)) return [];
+  const root = derivedRootName(origin);
+  const [first, ...rest] = origin.path;
+  return [
+    ownerTableName(origin),
+    ...rest.map((_, depth) => derivedTableName(root, first, ...rest.slice(0, depth))),
+  ];
 }
 
 /**

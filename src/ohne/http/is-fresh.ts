@@ -1,7 +1,7 @@
 import { isNull } from '../../utils/index.ts';
 import { useEvent } from './use-event.ts';
 
-const noCache = /(?:^|,)\s*no-cache\s*(?:,|$)/;
+const noCache = /(?:^|,)\s*no-cache\s*(?:,|$)/i;
 
 /**
  * Whether any tag in an `If-None-Match` list equals `etag`, ignoring a `W/` prefix on either side.

@@ -42,6 +42,10 @@ The lock is renewed while the function runs, so the work can take as long as it 
 process holding it crashes, the renewals stop, and the next caller takes the lock over within 20
 seconds.
 
+A renewal waits while a [transaction](./engine.md#transactions) is open on the connection. Keep each
+transaction inside the function under 20 seconds, or another caller can take the lock over while
+your work still runs.
+
 ## Timing
 
 `pollInterval` is how often a waiting caller re-checks a held lock, in milliseconds. It defaults to

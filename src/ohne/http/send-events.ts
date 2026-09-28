@@ -96,7 +96,8 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
       }
       // The transport stops pulling for a stalled client, so an uncapped queue grows with every send.
       if ((controller.desiredSize ?? 1) > -MAX_QUEUED_FRAMES) return;
-      controller.close();
+      // `close` would wait for the queue to drain; an `AbortError` drops it and the socket, unlogged.
+      controller.error(new DOMException('The client stalled', 'AbortError'));
       finish();
     },
     close() {

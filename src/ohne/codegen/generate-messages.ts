@@ -11,12 +11,14 @@ import {
 } from '../../utils/codegen/index.ts';
 import {
   errorMessage,
+  getOrSet,
   groupBy,
   isNull,
   joinPath,
   type MessageParamType,
   messageParamTypes,
   relativePath,
+  unifyMessageParamTypes,
   uniqueArray,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
@@ -24,6 +26,15 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
+
+/**
+ * One language's template for a key, reduced to where it lives and the parameters it takes.
+ */
+interface Translation {
+  language: string;
+  file: string;
+  params: Record<string, MessageParamType>;
+}
 
 /**
  * Generates the message catalog and its types from every layer's messages directory.
@@ -169,32 +180,36 @@ function emitInterface(code: CodeBuilder, head: string, members: string[]): void
 
 /**
  * Maps each key to its rendered TypeScript parameter type, sorted by key for deterministic output.
- * Throws when a key's parameters disagree between two languages.
+ * Each language may write a parameter differently; its type narrows to one every language accepts.
+ * Throws when two languages name different parameters, or use one with no common type.
  */
 function unifyKeyTypes(messages: readonly MessageMeta[]): Map<string, string> {
-  const seen = new Map<string, { language: string; file: string; type: string }>();
+  const seen = new Map<string, Translation[]>();
+  const unified = new Map<string, Record<string, MessageParamType>>();
   for (const message of messages) {
-    const type = renderParamObject(paramsOf(message));
-    const first = seen.get(message.key);
-    if (!first) {
-      seen.set(message.key, { language: message.language, file: message.file, type });
-      continue;
-    }
-    if (first.type !== type) {
+    const params = paramsOf(message);
+    const earlier = getOrSet(seen, message.key, () => []);
+    const clash = earlier.find((other) => isNull(unifyMessageParamTypes(other.params, params)));
+    if (clash) {
       throw ohneError({
         title: `Message ${codeSpan(message.key)} has different parameters across languages`,
         body: [
           `Every language must declare the same parameters for ${codeSpan(message.key)}.`,
-          `\`${first.language}\` expects \`${first.type}\`; \`${message.language}\` expects \`${type}\`.`,
+          `\`${clash.language}\` expects \`${renderParamObject(clash.params)}\`; \`${message.language}\` expects \`${renderParamObject(params)}\`.`,
           '',
-          `- \`${relativePath(process.cwd(), first.file)}\``,
+          `- \`${relativePath(process.cwd(), clash.file)}\``,
           `- \`${relativePath(process.cwd(), message.file)}\``,
         ],
       });
     }
+    earlier.push({ language: message.language, file: message.file, params });
+    const current = unified.get(message.key);
+    unified.set(message.key, current ? unifyMessageParamTypes(current, params)! : params);
   }
 
-  return new Map([...seen.keys()].sort().map((key) => [key, seen.get(key)!.type]));
+  return new Map(
+    [...unified.keys()].sort().map((key) => [key, renderParamObject(unified.get(key)!)]),
+  );
 }
 
 /**

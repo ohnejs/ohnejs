@@ -271,6 +271,48 @@ useCollections().register('WNList', {
     },
   },
 });
+useCollections().register('WNOuter', {
+  name: 'WNOuter',
+  collection: {
+    fields: {
+      mode: field('text'),
+      title: field('text', { nullable: true }),
+      sections: field('repeater', {
+        when: { mode: 'on' },
+        fields: {
+          kind: field('text'),
+          extra: field('repeater', { min: 1, when: { kind: 'a' }, fields: { x: field('text') } }),
+        },
+      }),
+    },
+  },
+});
+useCollections().register('WNPrecheck', {
+  name: 'WNPrecheck',
+  collection: {
+    fields: {
+      kind: field('text'),
+      items: field('repeater', {
+        fields: {
+          note: field('text', { nullable: true }),
+          tag: field('record', { collection: 'WRTag', when: { '../kind': 'promo' } }),
+          slug: field('text', { nullable: true, unique: true, when: { '../kind': 'promo' } }),
+        },
+      }),
+    },
+  },
+});
+useCollections().register('WNSoft', {
+  name: 'WNSoft',
+  collection: {
+    fields: {
+      kind: field('text'),
+      title: field('text'),
+      deletedAt: field('integer', { nullable: true }),
+      discount: field('integer', { nullable: true, when: { kind: 'sale' } }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -834,5 +876,88 @@ describe('when gate deactivation takes the default', () => {
       notes.map((note) => note.text),
       ['starter'],
     );
+  });
+});
+
+describe('when gates precheck only what each record writes', () => {
+  it('ignores the nested failures of a composite its record gates off', async () => {
+    const record = await created('WNOuter', { mode: 'off' });
+    const updated = await runUpdate(
+      'WNOuter',
+      { title: 'T', sections: [{ kind: 'a' }] },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    strictEqual(updated.records[0].title, 'T');
+    deepStrictEqual(updated.records[0].sections, []);
+  });
+
+  it('skips the reference and unique probes of a nested subfield gated off', async () => {
+    await created('WNPrecheck', { kind: 'promo', items: [{ slug: 'np-taken' }] });
+    const record = await created('WNPrecheck', { kind: 'plain', items: [] });
+    const updated = await runUpdate(
+      'WNPrecheck',
+      { items: [{ note: 'a', tag: 'missing', slug: 'np-taken' }] },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    deepStrictEqual(
+      (updated.records[0].items as Record<string, unknown>[]).map(({ note, tag, slug }) => ({
+        note,
+        tag,
+        slug,
+      })),
+      [{ note: 'a', tag: null, slug: null }],
+    );
+  });
+
+  it('fans a nested unique value out only across the records that write it', async () => {
+    const promo = await created('WNPrecheck', { kind: 'promo', items: [] });
+    const plain = await created('WNPrecheck', { kind: 'plain', items: [] });
+    const updated = await runUpdate(
+      'WNPrecheck',
+      { items: [{ slug: 'np-once' }] },
+      inUUIDs([promo.UUID as string, plain.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    const slugs = new Map(
+      updated.records.map((record) => [
+        record.UUID,
+        (record.items as { slug: string | null }[])[0].slug,
+      ]),
+    );
+    strictEqual(slugs.get(promo.UUID), 'np-once');
+    strictEqual(slugs.get(plain.UUID), null);
+  });
+});
+
+describe('when gate on update past the read scope', () => {
+  afterEach(() => useHooks().clear());
+
+  it('writes a matched row `query:filter` hides, gating it on its stored state', async () => {
+    const record = await created('WNSoft', { kind: 'sale', title: 'old', deletedAt: 1 });
+    hook('query:filter', (ir) => {
+      if (ir.collection !== 'WNSoft') return;
+      const live = { kind: 'compare', path: ['deletedAt'], op: 'isNull', negated: false } as const;
+      return {
+        ...ir,
+        condition: ir.condition ? { kind: 'and', nodes: [ir.condition, live] } : live,
+      };
+    });
+    const updated = await runUpdate(
+      'WNSoft',
+      { title: 'new', discount: 5 },
+      inUUIDs([record.UUID as string]),
+      null,
+    );
+    ok(updated.ok);
+    const row = await db.queryOne<{ title: string; discount: number | null }>(
+      'SELECT "title", "discount" FROM "WNSoft" WHERE "UUID" = ?',
+      [record.UUID as string],
+    );
+    deepStrictEqual({ ...row }, { title: 'new', discount: 5 });
   });
 });

@@ -252,6 +252,7 @@ const edgeCache = new Map<string, CascadeEdge[]>();
 /**
  * Every declared cascade edge into `target`, resolved once from the registries and memoized.
  * A `record` field with `onDelete: 'cascade'` contributes its main or child table.
+ * A translatable one cascades only its companion row, which places no blocks, so it adds none.
  * Blocks never hold cascade `record` fields - the metadata build rejects them - so they add none.
  */
 function cascadeEdgesInto(target: string): CascadeEdge[] {
@@ -280,7 +281,8 @@ function collectEdges(
     if (
       field.kind === 'record' &&
       field.target === target &&
-      field.options?.onDelete === 'cascade'
+      field.options?.onDelete === 'cascade' &&
+      field.companion !== true
     ) {
       edges.push({
         table,

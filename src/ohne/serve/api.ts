@@ -1,4 +1,5 @@
 import { isPort, MAX_PORT } from '../../utils/index.ts';
+import { listenOrigin } from '../../utils/net/index.ts';
 import { bootProject } from '../boot/boot-project.ts';
 import { syncProjectDatabase } from '../database/sync-project.ts';
 import { closeDatabases } from '../database/use-database.ts';
@@ -96,7 +97,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   }
   useShutdown().watch({ deadline: offToUndefined(config.deadline) });
 
-  usePrinter().success(`API ready at \`http://${host ?? 'localhost'}:${address.port}\``);
-  process.send?.('ready');
+  usePrinter().success(`API ready at \`${listenOrigin(host, address.port)}\``);
+  if (process.connected) process.send?.('ready');
   return http;
 }

@@ -86,4 +86,11 @@ describe('isFresh', () => {
       false,
     );
   });
+
+  it('reads the no-cache directive case-insensitively', () => {
+    strictEqual(
+      fresh({ 'if-none-match': '"a"', 'cache-control': 'max-age=0, No-Cache' }, { etag: '"a"' }),
+      false,
+    );
+  });
 });

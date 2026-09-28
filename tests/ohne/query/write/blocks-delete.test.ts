@@ -103,6 +103,19 @@ useCollections().register('BDDeepOwner', {
     },
   },
 });
+useCollections().register('BDAuthor', {
+  name: 'BDAuthor',
+  collection: { fields: { name: field('text') } },
+});
+useCollections().register('BDByline', {
+  name: 'BDByline',
+  collection: {
+    fields: {
+      author: field('record', { collection: 'BDAuthor', onDelete: 'cascade', translatable: true }),
+      content: field('blocks', { allow: ['BDHero'] }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -305,6 +318,28 @@ describe('runDelete cleans cascade-doomed instances', () => {
     strictEqual(result.deleted, 1);
     strictEqual(await countWhere('BDDeepOwner_items', 'UUID', items[0].UUID), 0);
     strictEqual(await countWhere('block_BDHero', 'UUID', instance), 0);
+  });
+});
+
+describe('runDelete through a translatable cascade edge', () => {
+  it('drops only the translation, keeping the record and its blocks', async () => {
+    const author = await runCreate('BDAuthor', { name: 'A' }, null);
+    ok(author.ok);
+    const authorUUID = (author.record as { UUID: string }).UUID;
+    const byline = await runCreate(
+      'BDByline',
+      { author: authorUUID, content: [{ block: 'BDHero', fields: { title: 'H' } }] },
+      null,
+    );
+    ok(byline.ok);
+    const bylineUUID = (byline.record as { UUID: string }).UUID;
+    const instance = (byline.record as { content: Envelope[] }).content[0].UUID;
+
+    const result = await runDelete('BDAuthor', uuidIs(authorUUID));
+    strictEqual(result.deleted, 1);
+    strictEqual(await countWhere('BDByline', 'UUID', bylineUUID), 1);
+    strictEqual(await countWhere('BDByline__translations', '_parentUUID', bylineUUID), 0);
+    strictEqual(await countWhere('block_BDHero', 'UUID', instance), 1);
   });
 });
 

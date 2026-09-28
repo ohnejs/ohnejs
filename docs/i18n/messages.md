@@ -140,7 +140,8 @@ static text. The framework's shipped catalogs all follow this convention.
 
 A key's parameters must be the same in every language that defines it. If `en` writes `{count}` and
 `de` spells it `{total}`, codegen fails, naming the key, both languages, and both files. A
-translation always takes the same parameters the code passes.
+translation always takes the same parameters the code passes. How it uses them may differ: `en`
+can pluralize `{count}` while `ja` writes it plain.
 
 ## Typed keys
 

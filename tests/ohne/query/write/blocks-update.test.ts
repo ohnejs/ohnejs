@@ -87,6 +87,15 @@ useCollections().register('BUTrees', {
   name: 'BUTrees',
   collection: { fields: { nodes: field('blocks', { allow: ['BUNode'] }) } },
 });
+useCollections().register('BUSides', {
+  name: 'BUSides',
+  collection: {
+    fields: {
+      left: field('blocks', { allow: ['BUSlug', 'BUGatedB'] }),
+      right: field('blocks', { allow: ['BUSlug'] }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -472,6 +481,50 @@ describe('runUpdate with blocks', () => {
     const content = result.records[0].content as Envelope[];
     strictEqual((content[0].fields as { slug: string }).slug, 'swap-b');
     strictEqual((content[1].fields as { slug: string }).slug, 'swap-a');
+  });
+});
+
+describe('runUpdate unique block values across blocks fields', () => {
+  it("keys a clash with the record's own untouched field at the written item", async () => {
+    const seeded = await runCreate(
+      'BUSides',
+      { left: [], right: [{ block: 'BUSlug', fields: { slug: 'side-kept' } }] },
+      null,
+    );
+    ok(seeded.ok);
+    const result = await runUpdate(
+      'BUSides',
+      { left: [{ block: 'BUSlug', fields: { slug: 'side-kept' } }] },
+      uuidIs(seeded.record.UUID as string),
+      null,
+    );
+    ok(!result.ok);
+    deepStrictEqual({ ...result.errors }, { 'left[0].fields.slug': 'validation.notUnique' });
+  });
+
+  it('moves a value from one rewritten field to another on the gated path', async () => {
+    const seeded = await runCreate(
+      'BUSides',
+      { left: [], right: [{ block: 'BUSlug', fields: { slug: 'side-moved' } }] },
+      null,
+    );
+    ok(seeded.ok);
+    const result = await runUpdate(
+      'BUSides',
+      {
+        left: [
+          { block: 'BUSlug', fields: { slug: 'side-moved' } },
+          { block: 'BUGatedB', fields: { mode: 'lite' } },
+        ],
+        right: [{ block: 'BUSlug', fields: { slug: 'side-fresh' } }],
+      },
+      uuidIs(seeded.record.UUID as string),
+      null,
+    );
+    ok(result.ok);
+    const [record] = result.records;
+    strictEqual(((record.left as Envelope[])[0].fields as { slug: string }).slug, 'side-moved');
+    strictEqual(((record.right as Envelope[])[0].fields as { slug: string }).slug, 'side-fresh');
   });
 });
 

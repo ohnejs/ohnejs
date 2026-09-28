@@ -58,6 +58,18 @@ describe('createRouter', () => {
     deepStrictEqual(result.type === 'matched' && result.route.pattern, '/users/me');
   });
 
+  it('prefers a static route over a param inside a segment', () => {
+    const router = createRouter([route('GET', '/feed.[format]'), route('GET', '/feed.xml')]);
+    const result = router.match('GET', '/feed.xml');
+    deepStrictEqual(result.type === 'matched' && result.route.pattern, '/feed.xml');
+  });
+
+  it('prefers a param with text around it over the bare param', () => {
+    const router = createRouter([route('GET', '/posts/[id]'), route('GET', '/posts/[id].json')]);
+    const result = router.match('GET', '/posts/42.json');
+    deepStrictEqual(result.type === 'matched' && result.route.pattern, '/posts/[id].json');
+  });
+
   it('prefers a static route over a catch-all, and falls back to the catch-all', () => {
     const router = createRouter([route('GET', '/files/[...path]'), route('GET', '/files/readme')]);
 

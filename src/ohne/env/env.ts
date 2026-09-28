@@ -55,7 +55,7 @@ export interface Env {
 
   /**
    * Origin the browser reaches the dashboard at, allowed by the API's `cors` middleware.
-   * Takes precedence over `Config.dashboard.origin` and the URL derived from `Config.dashboard.port`.
+   * Takes precedence over `Config.dashboard.origin` and the URL derived from `Config.dashboard`.
    *
    * @default
    * undefined

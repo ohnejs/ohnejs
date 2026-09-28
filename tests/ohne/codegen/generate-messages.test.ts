@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import type { OhneError } from '../../../src/ohne/error/ohne-error.ts';
+
 import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
 import { generateMessages, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 
@@ -140,6 +142,43 @@ describe('generateMessages', () => {
       generateMessages(app),
       /Message `greeting` has different parameters across languages/,
     );
+  });
+
+  it('narrows a parameter each language writes differently', async () => {
+    const app = join(root, 'narrow');
+    writePackage(app, { name: 'narrow', ohne: true });
+    writeMessages(app, 'en.json', {
+      items: '{count, plural, one {# item} other {# items}}',
+      who: '{g, select, female {She} male {He} other {They}}',
+    });
+    writeMessages(app, 'de.json', {
+      items: '{count} Artikel',
+      who: '{g, select, female {Sie} other {Er}}',
+    });
+    writeMessages(app, 'tr.json', { items: '{count} öğe', who: '{g, select, other {O}}' });
+
+    await loadLayers(app);
+    const shared = bucket(await generateMessages(app), 'shared');
+    strictEqual(shared.includes('items: { count: number };'), true);
+    strictEqual(shared.includes("who: { g: 'female' | 'male' };"), true);
+  });
+
+  it('throws when a parameter has no type every language accepts', async () => {
+    const app = join(root, 'clash');
+    writePackage(app, { name: 'clash', ohne: true });
+    writeMessages(app, 'en.json', { plan: '{tier, select, pro {Pro} other {Free}}' });
+    writeMessages(app, 'de.json', { plan: '{tier} Plan' });
+    writeMessages(app, 'fr.json', { plan: '{tier, number}' });
+
+    await loadLayers(app);
+    await rejects(generateMessages(app), (error: OhneError) => {
+      strictEqual(error.title, 'Message `plan` has different parameters across languages');
+      strictEqual(
+        error.body?.[1],
+        "`en` expects `{ tier: 'pro' }`; `fr` expects `{ tier: number }`.",
+      );
+      return true;
+    });
   });
 
   it('throws on a malformed ICU template', async () => {

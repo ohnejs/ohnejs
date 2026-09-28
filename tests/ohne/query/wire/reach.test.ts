@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
 import type { SearchParamValue } from '../../../../src/utils/index.ts';
 
+import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -55,6 +56,11 @@ useCollections().register('WrNotes', {
     fields: { title: field('text', { translatable: true }), views: field('integer') },
   },
 });
+useBlocks().register('WrHero', { name: 'WrHero', block: { fields: { title: field('text') } } });
+useCollections().register('WrPages', {
+  name: 'WrPages',
+  collection: { fields: { content: field('blocks', { allow: ['WrHero'] }) } },
+});
 useCollections().register('WrPins', {
   name: 'WrPins',
   collection: { fields: { note: field('record', { collection: 'WrNotes' }) } },
@@ -65,7 +71,7 @@ const db = await dialect.connect(':memory:');
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
-  desired: buildDesiredSchema(useCollections(), useFields() as never),
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
 const authors = queryUntyped('WrAuthors');
@@ -215,6 +221,43 @@ describe('parseWireQuery resolves the reach of every crossed collection', () => 
     await rejects(parseWireQuery({ populate: [{ author: 5 }] }, meta, guards, resolve));
     await rejects(parseWireQuery({ where: '{' }, meta, guards, resolve));
     deepStrictEqual(asked, ['WrAuthors']);
+  });
+
+  it('leaves a nested has under a field that takes none for the parse to refuse', async () => {
+    await rejects(
+      parseWireQuery(
+        { where: { title: { has: { x: { has: { y: 1 } } } } } },
+        meta,
+        guards,
+        resolver({}).resolve,
+      ),
+      (error) => messageOf(error) === 'query.invalidField' && pathOf(error) === 'where.title',
+    );
+  });
+
+  it('leaves a blocks has naming an unregistered type for the parse to refuse', async () => {
+    await rejects(
+      parseWireQuery(
+        { where: { content: { has: { block: 'Nope', title: 'x' } } } },
+        queryMetadata('WrPages'),
+        guards,
+        resolver({}).resolve,
+      ),
+      (error) => messageOf(error) === 'query.unknownBlockType',
+    );
+  });
+
+  it('counts the reach condition every conditioned has repeats toward the bound-param ceiling', async () => {
+    const where = {
+      or: ['Anduin', 'Baine', 'Chen'].map((name) => ({ author: { has: { name } } })),
+    };
+    const capped = { ...guards, maxBoundParams: 15 };
+    await parseWireQuery({ where }, meta, capped, resolver({ WrAuthors: {} }).resolve);
+    const scoped = { where: { UUID: { in: [anduin, baine, chen] } } };
+    await rejects(
+      parseWireQuery({ where }, meta, capped, resolver({ WrAuthors: scoped }).resolve),
+      (error) => messageOf(error) === 'query.tooManyBoundParams',
+    );
   });
 });
 

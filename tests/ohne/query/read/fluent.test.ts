@@ -154,6 +154,31 @@ describe('fluent where lowers to the object grammar', () => {
     ]);
   });
 
+  it('not negates only the next operator', async () => {
+    deepStrictEqual(await titles(posts().where('views', (w) => w.not.equalsTo(100).atLeast(50))), [
+      'Second',
+    ]);
+  });
+
+  it('a repeated operator ANDs instead of replacing', async () => {
+    deepStrictEqual(await titles(posts().where('title', (w) => w.contains('ir').contains('F'))), [
+      'First',
+    ]);
+    deepStrictEqual(
+      await titles(posts().where('views', (w) => w.not.equalsTo(100).not.equalsTo(20))),
+      ['Second'],
+    );
+  });
+
+  it('an or alternative keeps its own repeated operators', async () => {
+    deepStrictEqual(
+      await titles(
+        posts().where('views', (w) => w.atLeast(100).or.not.equalsTo(100).not.equalsTo(50)),
+      ),
+      ['First', 'Fourth', 'Third'],
+    );
+  });
+
   it('chained where clauses AND', async () => {
     deepStrictEqual(
       await titles(

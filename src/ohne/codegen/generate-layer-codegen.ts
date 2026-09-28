@@ -8,6 +8,16 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
 
 const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
 
+const OHNE_FILES = new Set([
+  'database.ts',
+  'layer-name.ts',
+  'messages.ts',
+  'middleware.ts',
+  'resolved-config.ts',
+  'roles.ts',
+  'routes.ts',
+]);
+
 /**
  * Generates every file the stacked layers declare under `codegen` in their `ohne.layer.ts`.
  *
@@ -16,6 +26,7 @@ const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
  * Layers come from the registered stack, so `loadLayers` must have run first.
  * Output lands in the entry's bucket under the app's `dirs.codegen` (default `.ohne`), banner first.
  * A `file` that is not a plain `.ts` name, or one two entries claim, throws naming the layer and the file.
+ * So does a name ohne generates itself, like `routes.ts`, in any bucket.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Each file is rewritten only when its contents change.
@@ -36,6 +47,15 @@ export async function generateLayerCodegen(from: string = process.cwd()): Promis
           body: [
             `\`${name}\` declares it, but a codegen file is a plain \`.ts\` name like \`my-types.ts\`.`,
             'Drop any directory; `bucket` already picks one.',
+          ],
+        });
+      }
+      if (OHNE_FILES.has(entry.file)) {
+        throw ohneError({
+          title: `Codegen file \`${entry.file}\` is reserved`,
+          body: [
+            `\`${name}\` declares it, but ohne generates a file of that name itself.`,
+            'Give the entry a file name of its own.',
           ],
         });
       }

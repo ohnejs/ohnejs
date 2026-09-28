@@ -26,6 +26,12 @@ async function errorOf(promise: Promise<unknown>): Promise<unknown> {
   );
 }
 
+async function fillUp(db: DatabaseAdapter): Promise<void> {
+  await db.exec('CREATE TABLE t (v TEXT)');
+  const [{ page_count }] = await db.query<{ page_count: number }>('PRAGMA page_count');
+  await db.exec(`PRAGMA max_page_count = ${page_count}`);
+}
+
 describe('SQLiteDialect', () => {
   it('registers under the name `sqlite`', () => {
     strictEqual(dialect.name, 'sqlite');
@@ -448,6 +454,16 @@ describe('SQLiteDialect', () => {
       deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
       await db.close();
     });
+
+    it('rethrows the failure that made SQLite roll back on its own', async () => {
+      const db = await open();
+      await fillUp(db);
+      await rejects(
+        db.transaction((tx) => tx.run('INSERT INTO t (v) VALUES (?)', ['x'.repeat(100_000)])),
+        /database or disk is full/,
+      );
+      await db.close();
+    });
   });
 
   describe('schemaTransaction', () => {
@@ -514,6 +530,18 @@ describe('SQLiteDialect', () => {
         /boom/,
       );
       deepStrictEqual(await db.query('PRAGMA foreign_keys'), [nullObj({ foreign_keys: 1 })]);
+      await db.close();
+    });
+
+    it('rethrows the failure that made SQLite roll back on its own', async () => {
+      const db = await open();
+      await fillUp(db);
+      await rejects(
+        dialect.schemaTransaction(db, (tx) =>
+          tx.run('INSERT INTO t (v) VALUES (?)', ['x'.repeat(100_000)]),
+        ),
+        /database or disk is full/,
+      );
       await db.close();
     });
   });

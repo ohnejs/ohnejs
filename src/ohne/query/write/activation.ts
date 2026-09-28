@@ -3,7 +3,7 @@ import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 
-import { evaluateCondition, isEmpty, isUndefined } from '../../../utils/index.ts';
+import { evaluateCondition, isDotPathInside, isEmpty, isUndefined } from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { isProvided } from '../pipeline/run-field.ts';
 import { whenResolver } from '../pipeline/when.ts';
@@ -129,10 +129,7 @@ export function activeScope(
   for (const [column, value] of Object.entries(scope.columns)) {
     if (!columns.has(column)) kept[column] = value;
   }
-  const keeps = (path: string): boolean =>
-    !dropped.some(
-      ({ name }) => path === name || path.startsWith(`${name}.`) || path.startsWith(`${name}[`),
-    );
+  const keeps = (path: string): boolean => !dropped.some(({ name }) => isDotPathInside(path, name));
   return {
     columns: kept,
     values: scope.values,

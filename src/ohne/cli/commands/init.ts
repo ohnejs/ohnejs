@@ -6,12 +6,11 @@ import type { BlockOptions } from '../../../utils/print/index.ts';
 
 import { codeSpan, isColorStream, pickANSIColors } from '../../../utils/ansi/index.ts';
 import { createPrompt, defineCommand, isCancel } from '../../../utils/cli/index.ts';
-import { emptyDir, listDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
+import { emptyDir, readDir, writeFile, writeJSON } from '../../../utils/fs/index.ts';
 import {
   basename,
   expandTilde,
   first,
-  isEmpty,
   isNull,
   isPackageName,
   isUndefined,
@@ -150,8 +149,8 @@ export const initCommand = defineCommand({
       });
     }
 
-    const entries = await listDir(target, { depth: 0, dirs: true, hidden: true });
-    if (!isNull(entries) && !isEmpty(entries)) {
+    const names = await readDir(target);
+    if (!isNull(names) && names.length > 0) {
       if (!values.force) {
         if (!interactive) {
           return refuse({
@@ -202,7 +201,7 @@ export const initCommand = defineCommand({
     }
 
     let git = values.git;
-    if (interactive && !values.git) {
+    if (interactive && isUndefined(values.git)) {
       const answer = await prompt.confirm({ message: 'Initialize a git repository?' });
       if (isCancel(answer)) return cancel();
       git = answer;

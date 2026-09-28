@@ -48,7 +48,7 @@ const ON_DELETE: Partial<Record<string, OnDelete>> = {
  */
 export async function listTables(db: Transaction): Promise<string[]> {
   const rows = await db.query<{ name: string }>(
-    `SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" NOT LIKE 'sqlite_%' ORDER BY "name"`,
+    `SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" NOT GLOB 'sqlite_*' ORDER BY "name"`,
   );
   return rows.map((row) => row.name);
 }

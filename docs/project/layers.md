@@ -325,7 +325,7 @@ configured.
 - `bucket` picks which TypeScript program sees the file: `node` for `ohnejs` augmentations and
   server types, `browser` for `ohnejs/dashboard` ones, `shared` for pure types both include.
 - `file` is a plain `.ts` name inside the bucket. Two entries in the stack cannot use the same
-  name, and the error names both layers.
+  name, and the error names both layers. Names ohne generates itself, like `routes.ts`, are taken.
 
 The file is written to `.ohne/node/blog-categories.ts` by default, with the
 [ohne banner](./cli.md#ohne-prepare) on its first line. It is rewritten only when its content

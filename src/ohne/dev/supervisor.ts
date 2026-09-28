@@ -1,6 +1,7 @@
 import { watch } from 'node:fs';
 
 import { debounce, extname, isNull, joinPath, normalizeBasePath } from '../../utils/index.ts';
+import { listenOrigin } from '../../utils/net/index.ts';
 import { pruneCodegen } from '../codegen/prune-codegen.ts';
 import { useEnv } from '../env/use-env.ts';
 import { reportError } from '../error/report-error.ts';
@@ -278,7 +279,7 @@ export async function dev(
     const origin =
       useEnv().get('DASHBOARD_URL') ??
       useConfig().dashboard?.origin ??
-      `http://localhost:${dashboardPort}`;
+      listenOrigin(useEnv().get('HOST') ?? useConfig().dashboard?.host, dashboardPort);
     return { DASHBOARD_URL: origin };
   }
 
@@ -290,8 +291,8 @@ export async function dev(
     const config = useConfig();
     const env = useEnv();
     const api = config.api;
-    const host = env.get('HOST') ?? api.host ?? 'localhost';
-    const derivedURL = `http://${host}:${port}${normalizeBasePath(api.basePath)}`;
+    const derivedURL =
+      listenOrigin(env.get('HOST') ?? api.host, port) + normalizeBasePath(api.basePath);
     try {
       dashboard = spawnServeChild(from, 'dashboard', {
         port: dashboardPort,

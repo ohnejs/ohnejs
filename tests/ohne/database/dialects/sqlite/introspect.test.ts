@@ -25,6 +25,13 @@ describe('listTables', () => {
     await db.run('INSERT INTO "counters" DEFAULT VALUES');
     deepStrictEqual(await dialect.listTables(db), ['counters']);
   });
+
+  it('keeps a table whose name only resembles the internal prefix', async () => {
+    const db = await open();
+    await db.exec('CREATE TABLE "SQLiteLogs" ("UUID" TEXT PRIMARY KEY)');
+    await db.exec('CREATE TABLE "sqlitex" ("UUID" TEXT PRIMARY KEY)');
+    deepStrictEqual(await dialect.listTables(db), ['SQLiteLogs', 'sqlitex']);
+  });
 });
 
 describe('describeTable', () => {

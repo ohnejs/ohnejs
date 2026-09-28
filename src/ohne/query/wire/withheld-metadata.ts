@@ -1,8 +1,8 @@
 import type { ConditionNode } from '../../../utils/index.ts';
-import type { CollectionQueryMeta } from '../metadata.ts';
+import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ConditionInput } from '../untyped.ts';
 
-import { isNull, mapValues, parseCondition, walkCondition } from '../../../utils/index.ts';
+import { isNull, parseCondition, walkCondition } from '../../../utils/index.ts';
 
 /**
  * Whether a scope `where` can admit a record at one locale and hide it at another.
@@ -42,13 +42,11 @@ export function withheldMetadata(
 ): CollectionQueryMeta {
   if (isNull(select) && !sealed) return meta;
   const visible = isNull(select) ? null : new Set(select);
-  return {
-    ...meta,
-    fields: mapValues(meta.fields, (name, entry) => {
-      if (!isNull(visible) && !visible.has(name)) return { ...entry, readable: false as const };
-      return sealed && entry.kind === 'translations'
-        ? { ...entry, narrowed: true as const }
-        : entry;
-    }),
-  };
+  const fields: Record<string, FieldQueryMeta> = Object.create(null);
+  for (const [name, entry] of Object.entries(meta.fields)) {
+    if (!isNull(visible) && !visible.has(name)) fields[name] = { ...entry, readable: false };
+    else if (sealed && entry.kind === 'translations') fields[name] = { ...entry, narrowed: true };
+    else fields[name] = entry;
+  }
+  return { ...meta, fields };
 }

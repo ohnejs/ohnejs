@@ -3,18 +3,11 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import {
-  first,
-  isArray,
-  isNull,
-  isUndefined,
-  limitStream,
-  onFirstRead,
-} from '../../utils/index.ts';
+import { first, isArray, isNull, isUndefined, lazyStream, limitStream } from '../../utils/index.ts';
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
-import { payloadTooLarge } from './http-error.ts';
+import { badRequest, notImplemented, payloadTooLarge } from './http-error.ts';
 
 declare module 'ohnejs' {
   interface Hooks {
@@ -78,6 +71,7 @@ const TARGET_BASE = 'http://target';
  * Only `X-Forwarded-Proto` and `X-Forwarded-Host` are read; the `Forwarded` header is not consulted.
  * An untrusted peer's forwarding headers are ignored, closing the cache-poisoning and open-redirect gap.
  * The target supplies only the path and query, so a `//host` or absolute-form target cannot set the host.
+ * A `Host` or target that does not parse as a URL throws `400`.
  *
  * The transport assembles the URL before routing, so `toRequest` builds the body once, with the route's cap.
  */
@@ -85,14 +79,12 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
   const forwarded = trusts(trustProxy, req) ? forwardedOrigin(req.headers) : undefined;
   const host = forwarded?.host ?? req.headers.host ?? 'localhost';
   const proto = forwarded?.proto ?? 'http';
-  const url = new URL(`${proto}://${host}`);
-  const target = req.url ?? '/';
-  const { pathname, search } = new URL(
-    target.startsWith('/') ? TARGET_BASE + target : target,
-    TARGET_BASE,
-  );
-  url.pathname = pathname;
-  url.search = search;
+  const url = URL.parse(`${proto}://${host}`);
+  const raw = req.url ?? '/';
+  const target = URL.parse(raw.startsWith('/') ? TARGET_BASE + raw : raw, TARGET_BASE);
+  if (isNull(url) || isNull(target)) throw badRequest();
+  url.pathname = target.pathname;
+  url.search = target.search;
   return url;
 }
 
@@ -101,8 +93,9 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  * The URL comes from `options.url`, or is assembled from the request via `toURL` when omitted.
  *
  * `GET` and `HEAD` are forced bodyless.
+ * `TRACE`, which a Web `Request` cannot carry, throws `501`.
  * Every other method streams the body via `Readable.toWeb` with `duplex: 'half'`.
- * The body flows on demand with backpressure rather than buffering.
+ * The body attaches to the socket on its first read, then flows on demand with backpressure.
  *
  * When `maxBodySize` is set, the streamed body is metered, so an overrun aborts mid-flight with `413`.
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
@@ -115,6 +108,7 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
 export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}): Request {
   const url = options.url ?? toURL(req);
   const method = (req.method ?? 'GET').toUpperCase();
+  if (method === 'TRACE') throw notImplemented();
 
   const headers = new Headers();
   for (const name in req.headers) {
@@ -124,17 +118,20 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
     else headers.append(name, value);
   }
 
-  const { maxBodySize } = options;
   const bodyless = method === 'GET' || method === 'HEAD';
-  let body = bodyless ? null : (Readable.toWeb(req) as ReadableStream<Uint8Array>);
-  if (!isNull(body) && !isUndefined(maxBodySize)) {
-    body = limitStream(body, maxBodySize, payloadTooLarge);
-  }
-  if (!isNull(body) && !isUndefined(options.onFirstRead)) {
-    body = onFirstRead(body, options.onFirstRead);
-  }
+  const body = bodyless ? null : lazyStream(() => openBody(req, options));
 
   return new Request(url, { method, headers, body, duplex: 'half', signal: options.signal });
+}
+
+/**
+ * Opens the request body on its first read, metered against `maxBodySize` when set.
+ */
+function openBody(req: IncomingMessage, options: ToRequestOptions): ReadableStream<Uint8Array> {
+  options.onFirstRead?.();
+  const body = Readable.toWeb(req) as ReadableStream<Uint8Array>;
+  const { maxBodySize } = options;
+  return isUndefined(maxBodySize) ? body : limitStream(body, maxBodySize, payloadTooLarge);
 }
 
 /**
@@ -234,10 +231,12 @@ export async function sendResponse(res: ServerResponse, response: Response): Pro
  */
 async function resolveHeaders(response: Response, method?: string): Promise<Headers> {
   const callbacks = useHooks().get('response:headers');
+  // A copy, since a `Response.redirect()` carries immutable headers.
+  const copy = new Headers(response.headers);
   const headers =
     isUndefined(callbacks) || callbacks.length === 0
-      ? response.headers
-      : await applyHook('response:headers', response.headers, response);
+      ? copy
+      : await applyHook('response:headers', copy, response);
   applyDefaultCORS(headers, method);
   return headers;
 }

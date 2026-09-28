@@ -1,5 +1,5 @@
 import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -34,6 +34,26 @@ describe('scanLayerAugmentations', () => {
 
     const files = await scanLayerAugmentations(root);
     deepStrictEqual(files, [env, hooks]);
+  });
+
+  it('skips a nested directory that is a layer of its own', async () => {
+    const hooks = write('kit/hooks.ts', "declare module 'ohnejs' {}\n");
+    write('kit/auth/ohne.config.ts', 'export default {}\n');
+    write('kit/auth/augments.ts', "declare module 'ohnejs' {}\n");
+
+    deepStrictEqual(await scanLayerAugmentations(join(root, 'kit')), [hooks]);
+  });
+
+  it('never opens its node_modules', { skip: process.platform === 'win32' }, async () => {
+    const hooks = write('locked/hooks.ts', "declare module 'ohnejs' {}\n");
+    const modules = join(root, 'locked', 'node_modules');
+    mkdirSync(modules);
+    chmodSync(modules, 0o000);
+    try {
+      deepStrictEqual(await scanLayerAugmentations(join(root, 'locked')), [hooks]);
+    } finally {
+      chmodSync(modules, 0o755);
+    }
   });
 
   it('returns [] for a directory that does not exist', async () => {

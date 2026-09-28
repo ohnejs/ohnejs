@@ -111,6 +111,8 @@ const shutdown: Shutdown = {
       process.off('message', onMessage);
       process.off('disconnect', trigger);
     };
+    // A parent that left before the funnel existed fired its `disconnect` into the void.
+    if (process.send && !process.connected) trigger();
   },
   unwatch() {
     detach?.();

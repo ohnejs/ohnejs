@@ -104,6 +104,7 @@ export interface SpawnServeChildOptions {
 
 const KILL_TIMEOUT = 10_000;
 const READY_TIMEOUT = 60_000;
+const DEBUGGER = /^--inspect(?:-brk|-wait)?(?:=|$)/;
 
 /**
  * Spawns `ohne serve <backend>` as a supervised child and returns handles to its lifecycle.
@@ -112,7 +113,7 @@ const READY_TIMEOUT = 60_000;
  * The supervisor owns codegen; the child only serves.
  * `ready` settles the boot outcome; `stop` drains or kills it.
  * A child that neither readies nor exits within `readyTimeout` is killed and counts as a boot failure.
- * `process.execArgv` is forwarded so node flags carry over, minus `--inspect*` to avoid a port clash.
+ * `process.execArgv` is forwarded so node flags carry over, minus those that open a debugger.
  * The parent's env-var flags are forwarded too, except those whose var the child's own env sets.
  */
 export function spawnServeChild(
@@ -233,8 +234,9 @@ export function spawnServeChild(
 }
 
 /**
- * The parent's `process.execArgv` minus any `--inspect*` flag, to avoid a debugger port clash.
+ * The parent's `process.execArgv` minus the flags that open a debugger, which would clash on its port.
+ * Such a flag takes its value only after `=`, so dropping it never strands a value token.
  */
 function nodeFlags(): string[] {
-  return process.execArgv.filter((flag) => !flag.startsWith('--inspect'));
+  return process.execArgv.filter((flag) => !DEBUGGER.test(flag));
 }

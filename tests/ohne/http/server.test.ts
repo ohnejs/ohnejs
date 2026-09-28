@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { request } from 'node:http';
+import { connect } from 'node:net';
 import { afterEach, before, describe, it } from 'node:test';
 
 import type { AnyHandler, CreateServerOptions, Route } from '../../../src/ohne/index.ts';
@@ -30,7 +31,7 @@ import {
 } from '../../../src/ohne/index.ts';
 import { isUndefined, sleep } from '../../../src/utils/index.ts';
 
-function makeRoute(method: HTTPMethod, pattern: string, handler: AnyHandler): Route {
+function makeRoute(method: HTTPMethod | null, pattern: string, handler: AnyHandler): Route {
   return { method, pattern, file: `${pattern}.ts`, layer: 'test', handler };
 }
 
@@ -59,6 +60,18 @@ function statusWithHost(base: string, host: string): Promise<number> {
   const { port } = new URL(base);
   return new Promise((resolve, reject) => {
     const req = request({ port, path: '/', headers: { host, connection: 'close' } }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function statusOf(base: string, method: string, path: string): Promise<number> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const req = request({ port, method, path, headers: { connection: 'close' } }, (res) => {
       res.resume();
       resolve(res.statusCode ?? 0);
     });
@@ -184,6 +197,22 @@ describe('createServer', () => {
       strictEqual(headers['access-control-allow-methods'], 'GET, HEAD, PUT, PATCH, POST, DELETE');
       strictEqual(headers['vary'], 'Origin');
     });
+  });
+
+  it('answers a TRACE with 501 on any path, printing nothing', async () => {
+    const printed: string[] = [];
+    usePrinter().configure({ stream: { write: (chunk) => void printed.push(chunk) } });
+    const routes = [makeRoute('GET', '/users', () => []), makeRoute(null, '/any', () => 'ok')];
+    try {
+      await withServer(routes, async (base) => {
+        for (const path of ['/users', '/any', '/nope']) {
+          strictEqual(await statusOf(base, 'TRACE', path), 501);
+        }
+      });
+    } finally {
+      usePrinter().configure({ stream: { write() {} } });
+    }
+    deepStrictEqual(printed, []);
   });
 
   it('serves a HEAD from the GET route with headers but no body', async () => {
@@ -420,6 +449,13 @@ describe('allowed hosts', () => {
       strictEqual(await statusWithHost(base, 'anything.test'), 200);
     });
   });
+
+  it('refuses a malformed Host with 400', async () => {
+    await withServer([makeRoute('GET', '/', () => 'ok')], async (base) => {
+      strictEqual(await statusWithHost(base, '[zz]'), 400);
+      strictEqual(await statusWithHost(base, 'localhost:99999'), 400);
+    });
+  });
 });
 
 describe('header size limit', () => {
@@ -482,6 +518,17 @@ describe('base path', () => {
         strictEqual(await (await fetch(`${base}/api/ping`)).text(), 'pong');
       },
       { basePath: 'api/' },
+    );
+  });
+
+  it('matches a prefix configured in any escape spelling', async () => {
+    await withServer(
+      [makeRoute('GET', '/ping', () => 'pong')],
+      async (base) => {
+        strictEqual(await (await fetch(`${base}/caf%c3%a9/ping`)).text(), 'pong');
+        strictEqual(await (await fetch(`${base}/caf%C3%A9/ping`)).text(), 'pong');
+      },
+      { basePath: '/caf%c3%a9' },
     );
   });
 });
@@ -644,6 +691,31 @@ describe('Expect: 100-continue', () => {
       strictEqual(res.statusCode, 200);
       strictEqual(informed, 0);
     });
+  });
+});
+
+describe('keep-alive', () => {
+  it('answers the next request on the connection after a large body went unread', async () => {
+    const routes = [
+      makeRoute('POST', '/scroll', () => {
+        throw unauthorized();
+      }),
+      makeRoute('GET', '/tome', () => 'Medivh'),
+    ];
+    await withServer(
+      routes,
+      async (base) => {
+        const body = 'a'.repeat(1 << 20);
+        const socket = connect(Number(new URL(base).port));
+        socket.write(
+          `POST /scroll HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${body.length}\r\n\r\n${body}`,
+        );
+        socket.write('GET /tome HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+        const answer = (await Array.fromAsync(socket)).join('');
+        deepStrictEqual(answer.match(/^HTTP\/1\.1 \d+/gm), ['HTTP/1.1 401', 'HTTP/1.1 200']);
+      },
+      { keepAliveTimeout: '1s' },
+    );
   });
 });
 

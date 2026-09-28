@@ -9,9 +9,11 @@ import type {
   TableSchema,
 } from './table-schema.ts';
 
-import { isUndefined, keyBy, pluralize } from '../../../utils/index.ts';
+import { deepEqual, isUndefined, keyBy, pluralize } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { clearSQL, danglingCondition, deleteSQL, purgedLine, sweepWrapperRows } from './purge.ts';
+
+const PARENT_KEYS = [['_parentUUID'], ['_parentUUID', '_localeCode']];
 
 /**
  * Guard behavior switches.
@@ -50,6 +52,7 @@ interface DanglingFinding {
 interface CollapseFinding {
   table: string;
   groups: number;
+  key: readonly string[];
 }
 
 interface DisallowedFinding {
@@ -228,7 +231,7 @@ async function guardAlter(
     const groups = await countDuplicateGroups(db, dialect, table, unique.columns);
     if (groups === 0) continue;
     if (unique === collapse) {
-      findings.collapses.push({ table, groups });
+      findings.collapses.push({ table, groups, key: unique.columns });
       continue;
     }
     findings.blockers.push(
@@ -359,7 +362,7 @@ async function purgeDangling(
   while (queue.length > 0 || pending.length > 0) {
     const affected = new Set<string>();
     for (const item of pending) {
-      const { changes } = await db.run(collapseSQL(dialect, item.table));
+      const { changes } = await db.run(collapseSQL(dialect, item.table, item.key));
       if (changes === 0) continue;
       lines.push(
         `- \`${changes}\` ${pluralize(changes, 'row')} of \`${item.table}\` deleted, keeping each parent's first row`,
@@ -532,13 +535,14 @@ function refusalBody(migratable: string[], blockGrade: string[], blockers: strin
 
 /**
  * Detects a many -> one cardinality collapse on one alter, returning the unique that pins it.
- * The signature: the desired shape uniques exactly `_parentUUID` while `_parentPosition` drops.
+ * The signature: the desired shape uniques exactly its parent key while `_parentPosition` drops.
+ * The parent key is `_parentUUID`, joined by `_localeCode` on a translatable child.
  * Only the desired builder emits these internal columns, so the signature is unambiguous.
  */
 function detectCollapse(alter: TableAlter): IndexSchema | undefined {
   if (!alter.dropColumns.some((column) => column.name === '_parentPosition')) return undefined;
-  return alter.addUniques.find(
-    (unique) => unique.columns.length === 1 && unique.columns[0] === '_parentUUID',
+  return alter.addUniques.find((unique) =>
+    PARENT_KEYS.some((key) => deepEqual(unique.columns, key)),
   );
 }
 
@@ -629,11 +633,11 @@ async function countDangling(
 }
 
 /**
- * Builds the `DELETE` keeping each parent's first row: lowest `_parentPosition`, `UUID` breaking ties.
+ * Builds the `DELETE` keeping each parent key's first row: lowest `_parentPosition`, `UUID` breaking ties.
  * Set-based on purpose: the table's indexes are already down, so a correlated scan would go quadratic.
  */
-function collapseSQL(dialect: Dialect, table: string): string {
-  const parent = dialect.quote('_parentUUID');
+function collapseSQL(dialect: Dialect, table: string, key: readonly string[]): string {
+  const parent = key.map((column) => dialect.quote(column)).join(', ');
   const position = dialect.quote('_parentPosition');
   const uuid = dialect.quote('UUID');
   const from = `FROM ${dialect.quote(table)}`;

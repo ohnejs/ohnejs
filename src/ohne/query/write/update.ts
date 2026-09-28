@@ -23,6 +23,7 @@ import {
   evaluateCondition,
   getOrSet,
   groupBy,
+  isDotPathInside,
   isEmpty,
   isNull,
   isPlainObject,
@@ -284,7 +285,13 @@ async function attemptPlainUpdate(
 
   const excludeChildUUIDs = isEmpty(scope.uniqueProbes)
     ? []
-    : await subtreeChildUUIDs(tx, dialect, meta.fields, matched, code);
+    : await subtreeChildUUIDs(
+        tx,
+        dialect,
+        scope.children.map((child) => child.meta),
+        matched,
+        code,
+      );
   const childUniqueErrors = await checkChildUnique(
     tx,
     dialect,
@@ -299,7 +306,7 @@ async function attemptPlainUpdate(
       : heldAside(
           scope.refs,
           meta.fields,
-          await readMatched(meta.collection, matched, locale, true, unscoped),
+          await readMatched(meta.collection, matched, locale, true, true),
         );
   const referenceErrors = await checkReferences(tx, dialect, refs, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
@@ -334,17 +341,19 @@ async function attemptPlainUpdate(
 }
 
 /**
- * The gated path: partition activation first, then precheck the union of what the groups write.
+ * The gated path: partition activation first, then precheck the union of what the records write.
  *
  * Top-level fields partition the matched records by signature, dropping each inactive gate's parts.
  * A record left with nothing to write once its inactive gates drop is untouched, with no `_updatedAt` bump.
  * Each record's overlay is its stored shape under `scope.values`, the substrate a create's gates read.
+ * It reads past `query:filter`, so a matched row the read scope hides still gates and takes its write.
  * A nested `when` reaching the root therefore reads that record's stored state.
  *
- * A field inactive for every matched record is not written, so it is not prechecked either.
- * A fully-inactive gated `unique` or `record` field can therefore never reject a valid update.
+ * A field or nested subfield inactive for a record is not written there, so it is not prechecked there.
+ * An inactive gated `unique` or `record` field can therefore never reject a valid update.
+ * A nested gate's failures count only for the records that write its item.
  * Unique columns probe with rewriter-exact exclusions: only rows that rewrite a column free theirs.
- * Child probes exclude only the rewriting records' subtrees.
+ * Child probes exclude only the subtrees the records rewrite.
  * A kept row under an inactive gate therefore still collides cleanly in the precheck.
  * The reconcile plan targets each record with its group's scope.
  * Correlation and the diff then see exactly the rows each record rewrites.
@@ -362,7 +371,7 @@ async function attemptGatedUpdate(
   unscoped: boolean,
   reach: LinkReach | undefined,
 ): Promise<UpdateOutcome> {
-  const records = await readMatched(meta.collection, matched, locale, true, unscoped);
+  const records = await readMatched(meta.collection, matched, locale, true, true);
   const overlays = new Map(
     records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
   );
@@ -378,12 +387,33 @@ async function attemptGatedUpdate(
     return groups.filter((group) => group.active.has(name)).flatMap((group) => group.uuids);
   };
 
-  const probeFields = groupBy(union.uniqueProbes, (probe) => headSegment(probe.path));
-  for (const [name, probes] of Object.entries(probeFields)) {
-    if (!isUndefined(probes) && rewriters(name).length > 1) {
-      return { ok: false, errors: fannedErrors(probes) };
+  const writes: {
+    groupScope: ProcessedScope;
+    uuids: readonly string[];
+  }[] = [];
+  const targets: ReconcileTarget[] = [];
+  const refs = new Set<RelationRef>();
+  const probeWriters = new Map<UniqueProbe, number>();
+  for (const group of groups) {
+    const groupScope = activeScope(scope, gates, group.active);
+    if (isEmptyScope(groupScope)) continue;
+    writes.push({ groupScope, uuids: group.uuids });
+    for (const uuid of group.uuids) {
+      const ancestry = [overlays.get(uuid) as ScopeValues];
+      const { errors, inactive } = nestedGating(groupScope.children, ancestry);
+      if (!isEmpty(errors)) return { ok: false, errors };
+      const written = (path: string): boolean =>
+        !inactive.some((subfield) => isDotPathInside(path, subfield));
+      for (const ref of groupScope.refs) if (written(ref.path)) refs.add(ref);
+      for (const probe of groupScope.uniqueProbes) {
+        if (written(probe.path)) probeWriters.set(probe, (probeWriters.get(probe) ?? 0) + 1);
+      }
+      targets.push({ uuid, scope: groupScope, ancestry });
     }
   }
+
+  const fanned = [...probeWriters].filter(([, count]) => count > 1).map(([probe]) => probe);
+  if (!isEmpty(fanned)) return { ok: false, errors: fannedErrors(fanned) };
 
   const exclusions = new Map<
     string,
@@ -411,46 +441,30 @@ async function attemptGatedUpdate(
   );
   if (!isEmpty(compositeUniqueErrors)) return { ok: false, errors: compositeUniqueErrors };
 
-  for (const [name, probes] of Object.entries(probeFields)) {
-    if (isUndefined(probes)) continue;
-    const exclude = await subtreeChildUUIDs(
+  if (probeWriters.size > 0) {
+    const exclude: string[] = [];
+    for (const child of union.children) {
+      exclude.push(
+        ...(await subtreeChildUUIDs(tx, dialect, [child.meta], rewriters(child.path), code)),
+      );
+    }
+    const childUniqueErrors = await checkChildUnique(
       tx,
       dialect,
-      { [name]: meta.fields[name] },
-      rewriters(name),
-      code,
+      [...probeWriters.keys()],
+      exclude,
     );
-    const childUniqueErrors = await checkChildUnique(tx, dialect, probes, exclude);
     if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
   }
 
-  const refs = isUndefined(reach) ? union.refs : heldAside(union.refs, meta.fields, records);
-  const referenceErrors = await checkReferences(tx, dialect, refs, reach);
+  const checked = isUndefined(reach) ? [...refs] : heldAside([...refs], meta.fields, records);
+  const referenceErrors = await checkReferences(tx, dialect, checked, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
-  const writes: {
-    groupScope: ProcessedScope;
-    uuids: readonly string[];
-  }[] = [];
-  const targets: ReconcileTarget[] = [];
-  for (const group of groups) {
-    const groupScope = activeScope(scope, gates, group.active);
-    if (isEmptyScope(groupScope)) continue;
-    writes.push({ groupScope, uuids: group.uuids });
-    for (const uuid of group.uuids) {
-      targets.push({ uuid, scope: groupScope, ancestry: [overlays.get(uuid) as ScopeValues] });
-    }
-  }
   const plan = await planReconcile(tx, dialect, targets, code);
   if (!isEmpty(plan.errors)) return { ok: false, errors: plan.errors };
 
   const companionPlan = await planCompanion(tx, dialect, meta, scope, matched, code);
-  for (const record of records) {
-    const ancestry = [overlays.get(record.UUID as string) as ScopeValues];
-    const failure = gatedErrors(scope.children, ancestry);
-    if (!isNull(failure)) return { ok: false, errors: failure };
-  }
-
   const columnWrites: {
     uuids: readonly string[];
     main: Record<string, unknown>;
@@ -612,19 +626,28 @@ async function updateColumns(
 }
 
 /**
- * The failures this walk's gates actually raise for one matched record, or `null` when none.
+ * What one matched record's nested gates decide: the failures they raise and the subfields they drop.
+ */
+interface NestedGating {
+  errors: FieldErrors;
+  inactive: string[];
+}
+
+/**
+ * Walks one matched record's nested gates, mirroring `gateNested`'s decision purely.
  *
- * Mirrors `gateNested`'s decision purely: each item's subfield `when` resolves over the same ancestry.
+ * Each item's subfield `when` resolves over the same ancestry the reconcile gates with.
+ * An inactive subfield's absolute path lands in `inactive`: nothing beneath it is written.
  * An inactive subfield whose default failed contributes its errors at the item's absolute path.
  * An active subfield that was omitted but needs input contributes its `required` the same way.
  * A create with that item's input fails identically, so the update rejects cleanly before any write.
  * Runs per matched record, since a gate may deactivate for one record and hold for another.
  */
-function gatedErrors(
+function nestedGating(
   children: readonly ProcessedChild[],
   ancestry: readonly ScopeValues[],
-): FieldErrors | null {
-  let errors: FieldErrors | null = null;
+  gating: NestedGating = { errors: {}, inactive: [] },
+): NestedGating {
   for (const child of children) {
     for (const [index, item] of child.items.entries()) {
       const itemPath =
@@ -633,31 +656,31 @@ function gatedErrors(
           : child.meta.kind === 'blocks'
             ? `${child.path}[${index}].fields`
             : `${child.path}[${index}]`;
-      if (!isUndefined(item.gatedDefaultErrors) || !isUndefined(item.gatedRequiredErrors)) {
-        const resolve = whenResolver(item.values, ancestry);
-        for (const [name, meta] of Object.entries(itemSubfields(child, item))) {
-          if (isUndefined(meta.when)) continue;
-          const failures = evaluateCondition(meta.when, resolve)
-            ? item.gatedRequiredErrors
-            : item.gatedDefaultErrors;
-          for (const [key, message] of Object.entries(failures ?? {})) {
-            if (key !== name && !key.startsWith(`${name}.`) && !key.startsWith(`${name}[`))
-              continue;
-            (errors ??= {})[prefixPath(itemPath, key)] = message;
-          }
+      const resolve = whenResolver(item.values, ancestry);
+      const dropped = new Set<FieldQueryMeta>();
+      for (const [name, meta] of Object.entries(itemSubfields(child, item))) {
+        if (isUndefined(meta.when)) continue;
+        const active = evaluateCondition(meta.when, resolve);
+        if (!active) {
+          gating.inactive.push(prefixPath(itemPath, name));
+          dropped.add(meta);
+        }
+        const failures = active ? item.gatedRequiredErrors : item.gatedDefaultErrors;
+        for (const [key, message] of Object.entries(failures ?? {})) {
+          if (isDotPathInside(key, name)) gating.errors[prefixPath(itemPath, key)] = message;
         }
       }
-      const nested = gatedErrors(item.children, [...ancestry, item.values]);
-      if (!isNull(nested)) Object.assign((errors ??= {}), nested);
+      const written = item.children.filter((nested) => !dropped.has(nested.meta));
+      nestedGating(written, [...ancestry, item.values], gating);
     }
   }
-  return errors;
+  return gating;
 }
 
 /**
- * Every existing composite child row under the matched records, at every nesting depth.
+ * Every existing child row the given composite fields hold under `parents`, at every nesting depth.
  *
- * An update rewrites the whole subtree of a matched record, so the precheck excludes these rows.
+ * An update rewrites the whole subtree of each composite it writes, so the precheck excludes these rows.
  * A kept value then never collides with a row that is itself being rewritten.
  * A blocks field contributes its instances by per-type row `UUID`, what its probes anchor on.
  * It recurses into each instance's own children.
@@ -666,12 +689,12 @@ function gatedErrors(
 async function subtreeChildUUIDs(
   tx: Transaction,
   dialect: Dialect,
-  fields: Record<string, FieldQueryMeta>,
+  fields: readonly FieldQueryMeta[],
   parents: readonly string[],
   locale: string,
 ): Promise<string[]> {
   const all: string[] = [];
-  for (const field of Object.values(fields)) {
+  for (const field of fields) {
     if (field.kind === 'blocks') {
       const scoped = field.localeScoped === true ? locale : null;
       const instances = await blockInstancesUnder(
@@ -690,7 +713,7 @@ async function subtreeChildUUIDs(
           ...(await subtreeChildUUIDs(
             tx,
             dialect,
-            blockQueryMetadata(type).fields,
+            Object.values(blockQueryMetadata(type).fields),
             group.map((instance) => instance.uuid),
             locale,
           )),
@@ -707,7 +730,7 @@ async function subtreeChildUUIDs(
       ...(await subtreeChildUUIDs(
         tx,
         dialect,
-        field.subfields as Record<string, FieldQueryMeta>,
+        Object.values(field.subfields as Record<string, FieldQueryMeta>),
         rows,
         locale,
       )),

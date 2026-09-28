@@ -47,6 +47,7 @@ const chain = new AsyncLocalStorage<HeldLock>();
  * The lock is a row in the main database, so it excludes every instance of the app, not just this process.
  * A held lock is waited out, or with `wait: false` skipped, resolving `undefined` without running `fn`.
  * The lock is renewed while `fn` runs, so `fn` may take as long as it needs.
+ * A renewal waits out an open transaction, so each transaction inside `fn` must stay under 20 seconds.
  * A holder that crashed stops renewing, and the next bid takes its lock over within 20 seconds.
  * Not reentrant: a call on a key its call chain holds throws, even from work `fn` did not await.
  * The `sync` key is reserved for the schema sync.

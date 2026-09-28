@@ -55,6 +55,10 @@ describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
     });
     writePackage('@acme/nested', { './*': { node: { import: './*/ohne.config.ts' } } });
     writePackage('@acme/typed', { './auth': { types: './auth/ohne.config.ts' } });
+    writePackage('@acme/overlap', {
+      './*/ohne': './x/*/ohne.config.ts',
+      './a/*': './a/*/ohne.config.ts',
+    });
   });
 
   after(() => {
@@ -85,6 +89,11 @@ describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
   it('unwraps nested conditions behind an exports wildcard', async () => {
     const nested = realpathSync(join(app, 'node_modules/@acme/nested'));
     deepStrictEqual(await resolveLayerDir('@acme/nested/blog', app), join(nested, 'blog'));
+  });
+
+  it('prefers the wildcard with the longer prefix, as Node does', async () => {
+    const overlap = realpathSync(join(app, 'node_modules/@acme/overlap'));
+    deepStrictEqual(await resolveLayerDir('@acme/overlap/a/ohne', app), join(overlap, 'a/ohne'));
   });
 
   it('returns null when the package is not installed', async () => {

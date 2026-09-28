@@ -24,11 +24,12 @@ declare module 'ohnejs' {
 /**
  * Runs the `query:filter` hook over a frozen `QueryIR`, or returns it untouched when none is registered.
  * Every read terminal calls this at its head, so a registered scope reaches every read the same way.
+ * A narrowed spread or a write's read-back arrives unfrozen, so this freezes the top level the hook sees.
  * An `unscoped` read returns untouched.
  */
 export async function resolveIR(ir: QueryIR): Promise<QueryIR> {
   if (ir.unscoped) return ir;
   const callbacks = useHooks().get('query:filter');
   if (isUndefined(callbacks) || callbacks.length === 0) return ir;
-  return applyHook('query:filter', ir);
+  return applyHook('query:filter', Object.freeze(ir));
 }

@@ -17,8 +17,9 @@ import {
 import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
 import { queryMetadata } from '../metadata.ts';
+import { allowedOperators } from '../operators.ts';
 import { blockScope, targetScope, validateCondition } from '../validate-condition.ts';
-import { parseQueryParams } from './parse.ts';
+import { conditionBinds, parseQueryParams } from './parse.ts';
 import { conditionLocaleSensitive, withheldMetadata } from './withheld-metadata.ts';
 
 /**
@@ -35,6 +36,7 @@ export type ReachResolver = (collection: string) => Promise<QueryScope | false>;
  * The walk is tolerant: a malformed entry is left for the parse to refuse, so no target shapes an error.
  * `resolve` answers each crossed collection.
  * The query then parses against metadata that hides what each reach withholds.
+ * Every conditioned `has` repeats its target's reach condition, so each counts toward `maxBoundParams`.
  * A target field outside a reach is therefore refused in a subselect or a `has` leaf as an unknown field.
  * The reach rides the parsed query for `applyQuery` to install, and every read compiles under it.
  * A reach scope's `where` and `select` carry; its `limit` and `locale` do not apply to a crossed read.
@@ -53,16 +55,20 @@ export async function parseWireQuery(
   resolve: ReachResolver,
 ): Promise<ParsedQuery> {
   const crossed = new Set<string>();
+  const probes: string[] = [];
   if (!isUndefined(params.populate)) crossPopulate(toArray(params.populate), meta, crossed);
   if (!isUndefined(params.where)) {
     const parsed = parseCondition(params.where);
-    if (parsed.ok) crossCondition(parsed.node, meta, crossed);
+    if (parsed.ok) crossCondition(parsed.node, meta, probes);
   }
+  for (const target of probes) crossed.add(target);
   if (crossed.size === 0) return parseQueryParams(params, meta, guards);
   const reach = new Map<string, TargetReach>();
   for (const collection of crossed) reach.set(collection, await targetReach(collection, resolve));
   const metaOf = (collection: string): CollectionQueryMeta => reachedMetadata(collection, reach);
-  return Object.freeze({ ...parseQueryParams(params, meta, guards, metaOf), reach });
+  let reserved = 0;
+  for (const target of probes) reserved += reachBinds(reach.get(target) as TargetReach);
+  return Object.freeze({ ...parseQueryParams(params, meta, guards, metaOf, reserved), reach });
 }
 
 /**
@@ -92,27 +98,34 @@ function crossPopulate(
 }
 
 /**
- * Collects the collections a condition's conditioned `has` probes reach, at every depth.
+ * Collects the target of every conditioned relation `has` a condition makes, once per probe, at every depth.
  * A bare `has` or `empty` never crosses: it tests the parent's own link, not the target's rows.
  */
-function crossCondition(node: ConditionNode, meta: CollectionQueryMeta, found: Set<string>): void {
+function crossCondition(node: ConditionNode, meta: CollectionQueryMeta, probes: string[]): void {
   if (node.kind === 'and' || node.kind === 'or') {
-    for (const child of node.nodes) crossCondition(child, meta, found);
+    for (const child of node.nodes) crossCondition(child, meta, probes);
     return;
   }
   if (node.kind !== 'has' || isNull(node.condition)) return;
   const name = node.path[0];
   const field = meta.fields[name];
-  if (isUndefined(field)) return;
+  if (isUndefined(field) || !allowedOperators(field).has('has')) return;
   if (field.kind === 'blocks') {
     const split = splitBlockHas(node.condition);
-    if (split.ok && !isNull(split.rest)) {
-      crossCondition(split.rest, blockScope(split.block, name, meta), found);
-    }
+    if (!split.ok || isNull(split.rest)) return;
+    if (!(field.allow as readonly string[]).includes(split.block)) return;
+    crossCondition(split.rest, blockScope(split.block, name, meta), probes);
     return;
   }
-  if (field.kind === 'record' || field.kind === 'records') found.add(field.target as string);
-  crossCondition(node.condition, targetScope(field, name, meta), found);
+  if (field.kind === 'record' || field.kind === 'records') probes.push(field.target as string);
+  crossCondition(node.condition, targetScope(field, name, meta), probes);
+}
+
+/**
+ * The bound parameters a target's reach condition adds to each conditioned probe into it.
+ */
+function reachBinds(reach: TargetReach): number {
+  return reach === false || isNull(reach.condition) ? 0 : conditionBinds(reach.condition);
 }
 
 /**

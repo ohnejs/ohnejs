@@ -254,6 +254,36 @@ describe('toRequest', () => {
     );
   });
 
+  it('refuses a malformed Host or target with 400', async () => {
+    await withServer(
+      async (req, res) => {
+        try {
+          toURL(req);
+          await sendResponse(res, new Response(null, { status: 200 }));
+        } catch (error) {
+          const status = error instanceof HTTPError ? error.status : 500;
+          await sendResponse(res, new Response(null, { status }));
+        }
+      },
+      async (base) => {
+        const { port } = new URL(base);
+        const statuses: number[] = [];
+        for (const [path, host] of [
+          ['/', '[zz]'],
+          ['/', 'localhost:99999'],
+          ['http://[zz]/p', 'app.example'],
+        ]) {
+          const req = request({ port, path, headers: { host } });
+          req.end();
+          const [res] = await once(req, 'response');
+          res.resume();
+          statuses.push(res.statusCode);
+        }
+        deepStrictEqual(statuses, [400, 400, 400]);
+      },
+    );
+  });
+
   it('appends every value of an array-valued header', async () => {
     await withServer(
       async (req, res) => {
@@ -344,6 +374,20 @@ describe('sendResponse', () => {
         strictEqual(res.status, 404);
         strictEqual(res.statusText, 'Not Found');
         strictEqual(JSON.parse(await res.text()).message, 'User not found');
+      },
+    );
+  });
+
+  it('stamps the CORS default onto a Response with immutable headers', async () => {
+    await withServer(
+      async (_req, res) => {
+        await sendResponse(res, Response.redirect('http://example.com/tome', 302));
+      },
+      async (base) => {
+        const res = await fetch(base, { redirect: 'manual' });
+        strictEqual(res.status, 302);
+        strictEqual(res.headers.get('location'), 'http://example.com/tome');
+        strictEqual(res.headers.get('access-control-allow-origin'), '*');
       },
     );
   });

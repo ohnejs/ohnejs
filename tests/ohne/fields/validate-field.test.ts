@@ -3,10 +3,12 @@ import { describe, it } from 'node:test';
 
 import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
 import type { FieldInstance } from '../../../src/ohne/fields/field.ts';
+import type { AnyOptionDef } from '../../../src/ohne/fields/option.ts';
 import type { StorageHint } from '../../../src/ohne/fields/storage-hint.ts';
 
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
+import { option } from '../../../src/ohne/fields/option.ts';
 import { validateField, validateFieldType } from '../../../src/ohne/fields/validate-field.ts';
 
 const column: FieldType = defineField({ columnType: 'text' });
@@ -120,6 +122,19 @@ describe('validateField write flags', () => {
     );
     doesNotThrow(() => check({ writable: false }, list));
     doesNotThrow(() => check({ writable: false, min: 1, default: ['a'] }, list));
+  });
+
+  it('rejects `writable: false` on a list whose type forbids the empty list by default', () => {
+    const list = (options: Record<string, AnyOptionDef>): FieldType =>
+      defineField({ columnType: 'json', jsonList: true, defaultValue: () => [], options });
+    throwsTitled(
+      () => check({ writable: false }, list({ allowEmpty: option({ default: false }) })),
+      'Field `field` could never take a value',
+    );
+    throwsTitled(
+      () => check({ writable: false }, list({ min: option({ default: 1 }) })),
+      'Field `field` could never take a value',
+    );
   });
 
   it('accepts `writable: false` with a default', () => {

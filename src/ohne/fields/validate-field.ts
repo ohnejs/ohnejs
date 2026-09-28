@@ -13,6 +13,7 @@ import {
   isUndefined,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { resolveFieldOptions } from './field.ts';
 import { forbidsEmpty } from './forbids-empty.ts';
 import { validateLayout } from './layout.ts';
 
@@ -361,7 +362,7 @@ export function validateField(args: ValidateFieldArgs): void {
   if (
     options.writable === false &&
     list &&
-    forbidsEmpty(options) &&
+    forbidsEmpty(resolveFieldOptions(fieldType, options)) &&
     options.nullable !== true &&
     (!hasKey(options, 'default') || isUndefined(options.default))
   ) {
