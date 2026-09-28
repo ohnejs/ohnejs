@@ -139,6 +139,8 @@ describe('validateUploadsConfig', () => {
 
   for (const [key, input, value] of [
     ['privateMaxAge', { privateMaxAge: 'soon' }, 'soon'],
+    ['linkMaxAge', { linkMaxAge: 'always' }, 'always'],
+    ['linkMaxAge', { linkMaxAge: 0 }, 0],
     ['sessionMaxAge', { sessionMaxAge: 'eventually' }, 'eventually'],
     ['sessionMaxAge', { sessionMaxAge: 0 }, 0],
     ['fetch.timeout', { fetch: { timeout: 'forever' } }, 'forever'],
@@ -155,15 +157,24 @@ describe('validateUploadsConfig', () => {
     });
   }
 
-  it('refuses a `privateMaxAge` past `15d`, and accepts `15d`', () => {
+  it('refuses a `privateMaxAge` past half of `linkMaxAge`, and accepts half', () => {
     deepStrictEqual(refusal({ privateMaxAge: '16d' }), {
       title: 'Invalid `uploads.privateMaxAge` value `16d`',
       body: [
-        'It is at most `15d`: a read link lives up to two windows, and no link may last past `30d`.',
+        'It is at most half of `uploads.linkMaxAge`, `30d`: a read link lives up to two windows.',
         'Fix it under `uploads.privateMaxAge`.',
       ],
     });
     strictEqual(refusal({ privateMaxAge: '15d' }), undefined);
+    strictEqual(refusal({ privateMaxAge: '2h', linkMaxAge: '4h' }), undefined);
+    strictEqual(
+      refusal({ privateMaxAge: '3h', linkMaxAge: '4h' })?.body[0],
+      'It is at most half of `uploads.linkMaxAge`, `4h`: a read link lives up to two windows.',
+    );
+  });
+
+  it('accepts a `linkMaxAge` past `30d`, and a `privateMaxAge` to match', () => {
+    strictEqual(refusal({ linkMaxAge: '90d', privateMaxAge: '45d' }), undefined);
   });
 });
 

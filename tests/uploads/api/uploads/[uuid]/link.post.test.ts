@@ -2,6 +2,7 @@ import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
+import { useLayers } from '../../../../../src/ohne/layers/use-layers.ts';
 import { useRoles } from '../../../../../src/ohne/roles/use-roles.ts';
 import linkPost from '../../../../../src/uploads/api/uploads/[uuid]/link.post.ts';
 import { createFolder } from '../../../../../src/uploads/uploads/create-folder.ts';
@@ -87,9 +88,20 @@ describe('POST /uploads/[uuid]/link', () => {
     }
   });
 
-  it('400s a maxAge not above zero or reaching past 30 days', async () => {
+  it('400s a maxAge not above zero or reaching past 30 days by default', async () => {
     for (const maxAge of ['31d', 0, '0']) {
       strictEqual((await send(hidden.UUID, { maxAge })).status, 400, JSON.stringify(maxAge));
+    }
+  });
+
+  it('takes its ceiling from `linkMaxAge`', async () => {
+    useLayers().add({ path: '/uploads-link-age', input: { uploads: { linkMaxAge: '1d' } } });
+    try {
+      strictEqual((await send(hidden.UUID, { maxAge: '2d' })).status, 400);
+      const before = Date.now();
+      expiresAbout((await answer(hidden.UUID, { maxAge: '1d' })).expires, before, '1d');
+    } finally {
+      useLayers().remove('/uploads-link-age');
     }
   });
 

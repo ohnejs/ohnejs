@@ -65,7 +65,8 @@ upload.expires;
 
 ## How long a link lives
 
-`uploads.privateMaxAge` sets the window, in milliseconds or as a string like `'1h'`:
+`uploads.privateMaxAge` sets the window, and `uploads.linkMaxAge` caps how far ahead a link may
+expire. Both take milliseconds or a string like `'1h'`:
 
 ```ts
 // ohne.config.ts
@@ -73,14 +74,18 @@ import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   layers: ['ohnejs/base', 'ohnejs/uploads'],
-  uploads: { privateMaxAge: '1h' },
+  uploads: { privateMaxAge: '1h', linkMaxAge: '30d' },
 });
 ```
 
 - A read mints links that expire at the end of the window after the one holding now, so a link
   lives between one and two windows.
 - Every read inside one window mints the same URLs, so a browser cache keeps working.
-- `privateMaxAge` can be at most `15d`, so no link lasts past `30d`. A longer one stops the boot.
+- `privateMaxAge` can be at most half of `linkMaxAge`. A longer one stops the boot.
+- A link that expires further ahead than `linkMaxAge` from now does not open. Lowering it holds
+  back links you already shared but does not revoke them. [Rotate the secret](#the-secret) for that.
+- The image service asks for the original with a variant's own expiry, so the cap reaches
+  variants too. A variant it or a browser already holds keeps showing until it expires.
 
 ## Who can open the bytes
 
@@ -133,7 +138,8 @@ temporaryUploadURL(upload, '7d');
 ```
 
 - `maxAge` is milliseconds or a string like `'7d'`, counted from now, not aligned to a window.
-- `maxAge` is above zero and at most `30d`. Anything else throws.
+- `maxAge` is above zero and at most `uploads.linkMaxAge`, `30d` unless you set it. Anything else
+  throws.
 - `POST /uploads/[uuid]/link` with the body `{ "maxAge": "7d" }` answers the same `{ url, expires }`
   to a caller who may read `Uploads`. `maxAge` defaults to `privateMaxAge`, and one out of range
   is a `400`. A public file answers its plain `url` with `expires: null`.

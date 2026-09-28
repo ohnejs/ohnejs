@@ -230,6 +230,7 @@ export default defineConfig({
     types: '*',
     cache: { noCache: true },
     privateMaxAge: '1h',
+    linkMaxAge: '30d',
     sessionMaxAge: '1d',
     images: {
       variants: {
@@ -260,6 +261,7 @@ Sizes take bytes or a string like `'8mb'`. Durations take milliseconds or a stri
 - `publicURL` - an origin that serves the stored files by their path, such as a CDN in front of
   the storage. Without it, records point where [serving](#serving) describes.
 - `privateMaxAge` - how long a [private file's](./private-files.md) links stay valid.
+- `linkMaxAge` - the longest any [private file's](./private-files.md) link may last.
 - `sessionMaxAge` - how long a [resumable upload](./resumable.md) has from its first request to
   completion.
 - `images` - the [image service](./image-variants.md) that renders resized variants, and the named

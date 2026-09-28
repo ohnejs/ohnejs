@@ -92,7 +92,8 @@ same way, under the same secret:
 5. Fetch the source at `{sourceURL}/{path}`, where `sourceURL` is the service's own setting,
    normally the app's [`/uploads` origin](./uploads.md#serving).
    - Sign the fetch with your secret for a URL that carries `e`, as `?e=<expires>&s=<signature>`:
-     `expires` a minute ahead in epoch milliseconds, and `signature` the HMAC over
+     `expires` the URL's own `e`, so the app holds the fetch to its
+     [link ceiling](./private-files.md#how-long-a-link-lives), and `signature` the HMAC over
      `e_<expires>/<path>`. A [private file's](./private-files.md) original answers `404` to
      anything else. An unsigned service has no secret and fetches bare.
    - Fetch bare for a URL without `e`, and cache the two fetches apart, so a URL that never expires

@@ -6,7 +6,7 @@ import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
 import { uploadSecrets } from '../images/sign.ts';
 import { useStorage } from '../storage/use-storages.ts';
-import { LINK_MAX_AGE } from './_link-age.ts';
+import { checkLinkExpiry, linkMaxAge } from './_link-age.ts';
 import { type UploadLocation, uploadPath } from './path.ts';
 import { signUploadLink } from './sign.ts';
 
@@ -24,7 +24,7 @@ export interface UploadURLSource extends UploadLocation {
   private?: boolean | null;
 
   /**
-   * When a private file's link stops working, in epoch milliseconds, at most 30 days ahead.
+   * When a private file's link stops working, in epoch milliseconds, at most `uploads.linkMaxAge` ahead.
    * Omitted, the link is the bare API route, which only a signed-in reader can open.
    */
   expires?: number;
@@ -75,7 +75,7 @@ export function uploadURL(upload: UploadURLSource): string {
  * A link to a private file that anyone can open for `maxAge` from now.
  * `maxAge` is milliseconds or a string like `'7d'`.
  * Unlike a read's links it is not aligned to a window, so it lasts exactly as long as asked.
- * `maxAge` is above zero and at most 30 days; anything else throws.
+ * `maxAge` is above zero and at most `uploads.linkMaxAge`; anything else throws.
  * Throws without an `UPLOADS_SECRET`, since nothing could sign it.
  *
  * @example
@@ -91,10 +91,13 @@ export function temporaryUploadURL(
   const [secret] = uploadSecrets();
   if (isUndefined(secret)) throw ohneError('Set `UPLOADS_SECRET` to make temporary links');
   const ms = parseDuration(maxAge);
-  if (!(ms > 0 && ms <= LINK_MAX_AGE)) {
+  if (!(ms > 0 && ms <= linkMaxAge())) {
+    const max = useUploadsConfig().linkMaxAge;
     throw ohneError({
       title: `Link \`maxAge\` ${codeSpan(String(maxAge))} is out of range`,
-      body: ['A temporary link lasts more than `0` and at most `30d`.'],
+      body: [
+        `A temporary link lasts more than \`0\` and at most \`uploads.linkMaxAge\`, \`${max}\`.`,
+      ],
     });
   }
   const expires = Date.now() + ms;
@@ -122,8 +125,6 @@ function signedURL(path: string, expires: number, secret: string): string {
 function privateURL(path: string, expires: number | undefined): string {
   const [secret] = uploadSecrets();
   if (isUndefined(expires) || isUndefined(secret)) return apiURL(path);
-  if (expires > Date.now() + LINK_MAX_AGE) {
-    throw ohneError(`A private link to ${codeSpan(path)} cannot expire past \`30d\` from now`);
-  }
+  checkLinkExpiry(path, expires);
   return signedURL(path, expires, secret);
 }

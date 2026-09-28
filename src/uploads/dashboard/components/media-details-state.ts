@@ -1,4 +1,4 @@
-import { basename, clamp, isNull, omit } from 'ohnejs/utils';
+import { basename, clamp, isNull, isUndefined, omit, parseDuration } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -51,6 +51,8 @@ export const PLAYABLE_VIDEO_TYPES: ReadonlySet<string> = new Set([
 // An image no larger than this centers in the preview instead of spanning it.
 const SMALL_PREVIEW = 480;
 
+const LINK_MAX_AGES = ['1h', '1d', '7d', '30d'].map((age) => parseDuration(age));
+
 /**
  * What the popup previews for a record, `null` when the type neither displays nor plays.
  */
@@ -60,6 +62,14 @@ export function previewKindOf(record: UploadRecord): DetailsPreview | null {
     return 'video';
   }
   return null;
+}
+
+/**
+ * How long a copied link may last, in milliseconds: the fixed choices below `max`, then `max` itself.
+ */
+export function linkMaxAges(max?: number): number[] {
+  if (isUndefined(max)) return LINK_MAX_AGES;
+  return [...LINK_MAX_AGES.filter((age) => age < max), max];
 }
 
 /**

@@ -6,6 +6,7 @@ import type { ImageVariantName } from './variants.ts';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
+import { checkLinkExpiry } from '../uploads/_link-age.ts';
 import { uploadType } from '../uploads/_type.ts';
 import { uploadPath } from '../uploads/path.ts';
 import { uploadURL } from '../uploads/url.ts';
@@ -80,6 +81,7 @@ export function hasImageService(): boolean {
  * Without an `UPLOADS_SECRET` the signature reads `unsigned`, which only an unsigned service renders.
  * A private image's URLs carry an `e_<expires>` token last and are always signed.
  * Without an `UPLOADS_SECRET` or an `expires` they point at the original instead.
+ * An `expires` further ahead than `uploads.linkMaxAge` throws.
  *
  * @example
  * ```ts
@@ -173,6 +175,7 @@ function tokensToSign(
 ): string | undefined {
   if (upload.private !== true) return tokens;
   if (isUndefined(secret) || isUndefined(upload.expires)) return undefined;
+  checkLinkExpiry(uploadPath(upload), upload.expires);
   return `${tokens},e_${upload.expires}`;
 }
 

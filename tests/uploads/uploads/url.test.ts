@@ -89,12 +89,22 @@ describe('uploadURL', () => {
     });
   });
 
-  it('refuses to sign a private link that expires past 30 days', () => {
+  it('refuses to sign a private link that expires past 30 days by default', () => {
     withSecret(() => {
       const day = 86_400_000;
       throws(() => uploadURL({ ...locked, expires: Date.now() + 31 * day }), /past `30d`/);
       strictEqual(uploadURL({ ...locked, expires: Date.now() + 29 * day }).includes('&s='), true);
     });
+  });
+
+  it('refuses to sign a private link past the configured `linkMaxAge`', () => {
+    withSecret(() =>
+      withLayer({ uploads: { linkMaxAge: '2h' } }, () => {
+        const hour = 3_600_000;
+        throws(() => uploadURL({ ...locked, expires: Date.now() + 3 * hour }), /past `2h`/);
+        strictEqual(uploadURL({ ...locked, expires: Date.now() + hour }).includes('&s='), true);
+      }),
+    );
   });
 
   it('answers the bare API route for a private file without a secret or an expiry', () => {
@@ -142,11 +152,25 @@ describe('temporaryUploadURL', () => {
     });
   });
 
-  it('rejects a maxAge that is not above zero or reaches past 30 days', () => {
+  it('rejects a maxAge that is not above zero or reaches past 30 days by default', () => {
     withSecret(() => {
       throws(() => temporaryUploadURL(sunset, '31d'), /Link `maxAge` `31d` is out of range/);
       throws(() => temporaryUploadURL(sunset, 0), /Link `maxAge` `0` is out of range/);
       strictEqual(temporaryUploadURL(sunset, '30d').expires > Date.now(), true);
     });
+  });
+
+  it('takes its ceiling from `linkMaxAge`', () => {
+    withSecret(() =>
+      withLayer({ uploads: { linkMaxAge: '90d' } }, () => {
+        strictEqual(temporaryUploadURL(sunset, '90d').expires > Date.now(), true);
+        throws(
+          () => temporaryUploadURL(sunset, '91d'),
+          (error: { body: string[] }) =>
+            error.body[0] ===
+            'A temporary link lasts more than `0` and at most `uploads.linkMaxAge`, `90d`.',
+        );
+      }),
+    );
   });
 });

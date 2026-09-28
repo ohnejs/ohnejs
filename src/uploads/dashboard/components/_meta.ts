@@ -11,16 +11,21 @@ declare module 'ohnejs/dashboard' {
 }
 
 /**
- * The upload limits of the uploads layer, in bytes.
+ * The upload limits of the uploads layer.
  */
 export interface UploadsMeta {
   /**
-   * The largest file one upload may carry.
+   * The largest file one upload may carry, in bytes.
    */
   maxFileSize: number;
 
   /**
-   * The size of every chunk of a resumable upload but the last.
+   * The longest a private file's link may last, in milliseconds.
+   */
+  linkMaxAge: number;
+
+  /**
+   * The size of every chunk of a resumable upload but the last, in bytes.
    * Absent when the storage has no parts or the app drops a route that opens, fills or completes a session.
    * Every file then goes whole through `POST /uploads`.
    */

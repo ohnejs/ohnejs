@@ -2,7 +2,7 @@ import type { User } from 'ohnejs/auth';
 
 import { hook } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
-import { hasRoute, isEmpty, isUndefined, parseBytes } from 'ohnejs/utils';
+import { hasRoute, isEmpty, isUndefined, parseBytes, parseDuration } from 'ohnejs/utils';
 
 import type { DashboardMenuGroup, DashboardMenuItem } from '../../base/api/dashboard.get.ts';
 
@@ -14,16 +14,21 @@ import { decorateUploads } from '../uploads/decorate.ts';
 declare module '../../base/api/dashboard.get.ts' {
   interface DashboardMeta {
     /**
-     * The upload limits of the uploads layer, in bytes, set on every discovery read.
+     * The upload limits of the uploads layer, set on every discovery read.
      */
     uploads?: {
       /**
-       * The largest file one upload may carry.
+       * The largest file one upload may carry, in bytes.
        */
       maxFileSize: number;
 
       /**
-       * The size of every chunk of a resumable upload but the last.
+       * The longest a private file's link may last, in milliseconds.
+       */
+      linkMaxAge: number;
+
+      /**
+       * The size of every chunk of a resumable upload but the last, in bytes.
        * Absent when the storage cannot assemble parts.
        * Also absent when the app drops a route that opens, fills or completes a session.
        * The dashboard then sends every file whole through `POST /uploads`.
@@ -54,8 +59,8 @@ hook('populate:targets', (targets, { collection }) => {
 hook('dashboard:menu', (menu, { user }) => mediaMenu(menu, user));
 
 hook('dashboard:meta', (meta) => {
-  const { maxFileSize, chunkSize } = useUploadsConfig();
-  meta.uploads = { maxFileSize: parseBytes(maxFileSize) };
+  const { maxFileSize, linkMaxAge, chunkSize } = useUploadsConfig();
+  meta.uploads = { maxFileSize: parseBytes(maxFileSize), linkMaxAge: parseDuration(linkMaxAge) };
   if (resumable(meta.routes)) meta.uploads.chunkSize = parseBytes(chunkSize);
 });
 

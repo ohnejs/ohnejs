@@ -180,6 +180,14 @@ describe('imageURL', () => {
     );
   });
 
+  it('refuses an expiry past `linkMaxAge`, as the link to the original does', () => {
+    const hour = 3_600_000;
+    const far = { ...sunset, private: true, expires: Date.now() + 31 * 24 * hour };
+    throws(() => imageURL(far, { width: 800 }), /cannot expire past `30d`/);
+    throws(() => imageURL(far), /cannot expire past `30d`/);
+    match(imageURL({ ...far, expires: Date.now() + hour }, { width: 800 }), /,e_\d+\//);
+  });
+
   it('never writes unsigned for a private image', () => {
     useEnv().unset('UPLOADS_SECRET');
     strictEqual(imageURL(locked, { width: 800 }), '/uploads/photos/sunset.jpg');

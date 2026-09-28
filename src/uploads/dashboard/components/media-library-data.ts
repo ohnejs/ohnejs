@@ -267,10 +267,10 @@ export async function setUploadsPrivate(
 }
 
 /**
- * Asks the server for a link to a private file that anyone can open for `maxAge`, a duration like `7d`.
+ * Asks the server for a link to a private file that anyone can open for `maxAge` milliseconds.
  * Resolves the absolute URL, or `undefined` when the server declined or could not be reached.
  */
-export async function temporaryLink(uuid: string, maxAge: string): Promise<string | undefined> {
+export async function temporaryLink(uuid: string, maxAge: number): Promise<string | undefined> {
   try {
     const response = await api(`POST /uploads/${uuid}/link`, {
       headers: { 'content-type': 'application/json' },

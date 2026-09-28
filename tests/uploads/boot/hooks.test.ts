@@ -18,7 +18,7 @@ import { scanLayerMessages } from '../../../src/ohne/messages/scan-layer-message
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
-import { joinPath, parseBytes } from '../../../src/utils/index.ts';
+import { joinPath, parseBytes, parseDuration } from '../../../src/utils/index.ts';
 import { storage } from '../_fixture.ts';
 
 const layer = { name: 'uploads', dir: joinPath(import.meta.dirname, '../../../src/uploads') };
@@ -158,7 +158,16 @@ describe('the dashboard:meta hook', () => {
     strictEqual('uploadFromURL' in (await metaFor(SESSION_ROUTES)), false);
   });
 
-  it('sends the upload limits in bytes, with a chunk size while the routes that open, fill and complete a session are served', async () => {
+  it('sends the link ceiling in milliseconds', async () => {
+    useLayers().add({ path: '/boot-hooks-link', input: { uploads: { linkMaxAge: '7d' } } });
+    try {
+      strictEqual((await metaFor([])).uploads?.linkMaxAge, parseDuration('7d'));
+    } finally {
+      useLayers().remove('/boot-hooks-link');
+    }
+  });
+
+  it('sends the upload limits, with a chunk size while the routes that open, fill and complete a session are served', async () => {
     useLayers().add({
       path: '/boot-hooks-limits',
       input: { uploads: { maxFileSize: '10gb', chunkSize: '16mb' } },
@@ -166,6 +175,7 @@ describe('the dashboard:meta hook', () => {
     try {
       deepStrictEqual((await metaFor(['POST /uploads', ...SESSION_ROUTES])).uploads, {
         maxFileSize: parseBytes('10gb'),
+        linkMaxAge: parseDuration('30d'),
         chunkSize: parseBytes('16mb'),
       });
     } finally {
@@ -181,7 +191,10 @@ describe('the dashboard:meta hook', () => {
   it('sends no chunk size while the app drops one of the routes that open, fill and complete a session', async () => {
     for (const dropped of SESSION_ROUTES) {
       const meta = await metaFor(SESSION_ROUTES.filter((id) => id !== dropped));
-      deepStrictEqual(meta.uploads, { maxFileSize: parseBytes('128mb') });
+      deepStrictEqual(meta.uploads, {
+        maxFileSize: parseBytes('128mb'),
+        linkMaxAge: parseDuration('30d'),
+      });
     }
   });
 
@@ -191,6 +204,7 @@ describe('the dashboard:meta hook', () => {
     try {
       deepStrictEqual((await metaFor(SESSION_ROUTES)).uploads, {
         maxFileSize: parseBytes('128mb'),
+        linkMaxAge: parseDuration('30d'),
       });
     } finally {
       storage.parts = parts;

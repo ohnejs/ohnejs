@@ -6,7 +6,6 @@ import { createCIDRMatcher } from 'ohnejs/utils/net';
 
 import type { ImageTransforms } from './images/transforms.ts';
 
-import { LINK_MAX_AGE } from './uploads/_link-age.ts';
 import { PEEK_SIZE } from './uploads/_peek.ts';
 
 declare module 'ohnejs' {
@@ -98,7 +97,7 @@ declare module 'ohnejs' {
       /**
        * How long a private file's links stay valid, in milliseconds or as a string like `'1h'`.
        * Reads align links to these windows for browser caches, so a link lives one to two windows.
-       * At most `15d`, so no read link outlives the 30-day ceiling.
+       * At most half of `linkMaxAge`, so no read link outlives it.
        *
        * @default
        * '1h'
@@ -110,6 +109,15 @@ declare module 'ohnejs' {
        * ```
        */
       privateMaxAge?: number | string;
+
+      /**
+       * The longest a private file's link may last, in milliseconds or as a string like `'30d'`.
+       * The API refuses a link that expires further ahead than this from now.
+       *
+       * @default
+       * '30d'
+       */
+      linkMaxAge?: number | string;
 
       /**
        * How long a resumable upload has from its first request to completion.
@@ -252,6 +260,11 @@ export interface ResolvedUploadsConfig {
   privateMaxAge: number | string;
 
   /**
+   * The longest a private file's link may last, in milliseconds or as a string like `'30d'`.
+   */
+  linkMaxAge: number | string;
+
+  /**
    * How long a resumable upload has from its first request to completion.
    * It takes milliseconds or a string like `'1d'`.
    */
@@ -300,6 +313,7 @@ export const UPLOADS_DEFAULTS = {
   types: '*',
   cache: { noCache: true },
   privateMaxAge: '1h',
+  linkMaxAge: '30d',
   sessionMaxAge: '1d',
   images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
   fetch: { allow: [], timeout: '2m' },
@@ -347,7 +361,7 @@ export function validateUploadsConfig(): void {
       });
     }
   }
-  const { maxFileSize, maxSVGSize, chunkSize, privateMaxAge, sessionMaxAge } = config;
+  const { maxFileSize, maxSVGSize, chunkSize, privateMaxAge, linkMaxAge, sessionMaxAge } = config;
   for (const [key, value] of Object.entries({ maxFileSize, maxSVGSize })) {
     if (!parses(() => parseBytes(value) > 0)) {
       throw invalidValue(
@@ -365,7 +379,12 @@ export function validateUploadsConfig(): void {
       `It is a byte size of \`${min}\` or more, such as \`8mb\`, or a number of bytes.`,
     );
   }
-  const durations = { privateMaxAge, sessionMaxAge, 'fetch.timeout': config.fetch.timeout };
+  const durations = {
+    privateMaxAge,
+    linkMaxAge,
+    sessionMaxAge,
+    'fetch.timeout': config.fetch.timeout,
+  };
   for (const [key, value] of Object.entries(durations)) {
     if (!parses(() => parseDuration(value) > 0)) {
       throw invalidValue(
@@ -375,11 +394,11 @@ export function validateUploadsConfig(): void {
       );
     }
   }
-  if (parseDuration(privateMaxAge) * 2 > LINK_MAX_AGE) {
+  if (parseDuration(privateMaxAge) * 2 > parseDuration(linkMaxAge)) {
     throw invalidValue(
       'privateMaxAge',
       privateMaxAge,
-      'It is at most `15d`: a read link lives up to two windows, and no link may last past `30d`.',
+      `It is at most half of \`uploads.linkMaxAge\`, \`${linkMaxAge}\`: a read link lives up to two windows.`,
     );
   }
 }

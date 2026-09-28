@@ -56,7 +56,6 @@ import {
   isUndefined,
   naturalCompare,
   onCleanup,
-  parseDuration,
   parseSearchParams,
   ref,
   type Ref,
@@ -69,6 +68,7 @@ import type { UploadRecord } from '../../uploads/types.ts';
 
 import { copyText } from './_clipboard.ts';
 import { useUploadsT } from './_messages.ts';
+import { uploadsMeta } from './_meta.ts';
 import { readWireError } from './_wire-error.ts';
 import {
   type DetailsState,
@@ -78,6 +78,7 @@ import {
   focalPercent,
   focalPointAt,
   isSmallPreview,
+  linkMaxAges,
   privateErrors,
   previewKindOf,
   variantTokens,
@@ -138,8 +139,6 @@ const OCTET_STREAM = 'application/octet-stream';
 const COPIED_FOR = 2000;
 
 const COMPACT_FOOTER_WIDTH = 480;
-
-const LINK_MAX_AGES = ['1h', '1d', '7d', '30d'];
 
 const CHECKER_LIGHT =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA5SURBVHgB7dGxEQAgDELRxDHYfzVYIzoChYXnQf3vNTTJKWMAnKxWXV7AgC+APWdOKMnJckrAP8ENTFgK0Z64q28AAAAASUVORK5CYII=';
@@ -1044,7 +1043,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         if (event.currentTarget instanceof HTMLElement) linkAnchor.value = event.currentTarget;
       },
     });
-  const copyLink = async (maxAge: string): Promise<void> => {
+  const copyLink = async (maxAge: number): Promise<void> => {
     const link = temporaryLink(current.value.UUID, maxAge).then((url) => url ?? Promise.reject());
     const copied = await copyText(link);
     toast(t(copied ? 'uploads.dashboard.linkCopied' : 'uploads.dashboard.linkFailed'), {
@@ -1062,10 +1061,10 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         anchor?.classList.replace('ohne-button-outline', 'ohne-button-primary');
         onCleanup(() => anchor?.classList.replace('ohne-button-primary', 'ohne-button-outline'));
         const panel = dropdown(
-          LINK_MAX_AGES.map((maxAge) =>
+          linkMaxAges(uploadsMeta()?.linkMaxAge).map((maxAge) =>
             dropdownItem(
               h('span', null, () =>
-                formatDuration(parseDuration(maxAge), { locale: language.value, style: 'long' }),
+                formatDuration(maxAge, { locale: language.value, style: 'long' }),
               ),
               {
                 onClick: () => {

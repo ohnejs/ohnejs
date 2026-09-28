@@ -9,11 +9,13 @@ import {
   focalPercent,
   focalPointAt,
   isSmallPreview,
+  linkMaxAges,
   previewKindOf,
   privateErrors,
   variantTokens,
   versionedURL,
 } from '../../../../src/uploads/dashboard/components/media-details-state.ts';
+import { parseDuration } from '../../../../src/utils/index.ts';
 
 function upload(
   name: string,
@@ -64,6 +66,27 @@ describe('isSmallPreview', () => {
 
   it('never centers an unsized image', () => {
     strictEqual(isSmallPreview(upload('a.svg', 'image/svg+xml')), false);
+  });
+});
+
+describe('linkMaxAges', () => {
+  const [hour, day, week, month] = ['1h', '1d', '7d', '30d'].map((age) => parseDuration(age));
+
+  it('offers the fixed choices up to a ceiling, then the ceiling', () => {
+    deepStrictEqual(linkMaxAges(month), [hour, day, week, month]);
+    deepStrictEqual(linkMaxAges(parseDuration('90d')), [
+      hour,
+      day,
+      week,
+      month,
+      parseDuration('90d'),
+    ]);
+    deepStrictEqual(linkMaxAges(parseDuration('2d')), [hour, day, parseDuration('2d')]);
+    deepStrictEqual(linkMaxAges(parseDuration('30m')), [parseDuration('30m')]);
+  });
+
+  it('offers the fixed choices without a ceiling', () => {
+    deepStrictEqual(linkMaxAges(), [hour, day, week, month]);
   });
 });
 

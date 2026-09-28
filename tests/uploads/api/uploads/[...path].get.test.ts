@@ -268,11 +268,23 @@ describe('GET /uploads/[...path] on a private file', () => {
     });
   });
 
-  it('404s a link reaching past 30 days, however well signed', async () => {
+  it('404s a link reaching past 30 days by default, however well signed', async () => {
     await withSecret('secret', async () => {
       strictEqual((await getHidden(signed(Date.now() + parseDuration('31d')))).status, 404);
       strictEqual((await getHidden(signed(Date.now() + parseDuration('29d')))).status, 200);
     });
+  });
+
+  it('404s a link reaching past the configured `linkMaxAge`', async () => {
+    useLayers().add({ path: '/uploads-link-age', input: { uploads: { linkMaxAge: '1d' } } });
+    try {
+      await withSecret('secret', async () => {
+        strictEqual((await getHidden(signed(Date.now() + parseDuration('2d')))).status, 404);
+        strictEqual((await getHidden(signed(Date.now() + parseDuration('12h')))).status, 200);
+      });
+    } finally {
+      useLayers().remove('/uploads-link-age');
+    }
   });
 
   it('stays closed to anyone while no secret can sign a link, open to a reader', async () => {
