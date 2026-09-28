@@ -2,6 +2,7 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { History, unsavedChanges } from '../../../../src/base/dashboard/components/history.ts';
+import { effectScope } from '../../../../src/utils/index.ts';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -109,11 +110,22 @@ describe('History', () => {
     strictEqual(history.size.value, 0);
   });
 
-  it('registers on the unsavedChanges global unless opted out', () => {
-    const watching = new History();
-    strictEqual(unsavedChanges.history, watching);
-    new History({ watchUnsavedChanges: false });
-    strictEqual(unsavedChanges.history, watching);
-    unsavedChanges.history = null;
+  it('registers on the unsavedChanges global until its scope is disposed, unless opted out', () => {
+    const scope = effectScope();
+    const watching = scope.run(() => new History());
+    scope.run(() => new History({ watchUnsavedChanges: false }));
+    deepStrictEqual([...unsavedChanges.histories], [watching]);
+    scope.dispose();
+    strictEqual(unsavedChanges.histories.size, 0);
+  });
+
+  it('keeps an outer history registered when a nested one is disposed', () => {
+    const page = effectScope();
+    const record = page.run(() => new History().push({ a: 1 }).push({ a: 2 }));
+    const popup = page.run(() => effectScope());
+    popup.run(() => new History().push({ b: 1 }).push({ b: 2 }));
+    popup.dispose();
+    deepStrictEqual([...unsavedChanges.histories], [record]);
+    page.dispose();
   });
 });

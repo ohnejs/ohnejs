@@ -261,8 +261,6 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
         // Clearing reseeds the history on the newly read locale, so Save starts clean against it.
         applied = next;
         history.clear();
-        // A confirmed prompt dropped the registration; the editor lives on, so the tab-close guard re-arms.
-        unsavedChanges.history = history;
         void load();
       };
       effect(() => {
@@ -274,10 +272,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
 
   // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard((target) => {
-    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) {
-      unsavedChanges.history = null;
-      return true;
-    }
+    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) return true;
     void unsavedChanges.prompt().then((leave) => {
       if (leave) {
         setNavigationGuard(null);

@@ -26,9 +26,8 @@ css`
  * The promise resolves `true` to leave, discarding the edits, or `false` to stay.
  * OK, and a bare Enter while no button holds focus, leave.
  * Cancel, Escape, and the overlay click stay.
- * Leaving also drops the registered history from the `unsavedChanges` global.
  * While the dialog is open, the platform undo and redo strokes are swallowed before any hotkey.
- * Independently, while a registered history is dirty, closing the tab raises the browser's leave prompt.
+ * Independently, while any registered history is dirty, closing the tab raises the browser's leave prompt.
  */
 export function unsavedChangesGuard(): Child {
   const t = useT();
@@ -56,7 +55,6 @@ export function unsavedChangesGuard(): Child {
 
   const leave = (): void => {
     visible.value = false;
-    unsavedChanges.history = null;
     settle(true);
   };
 
@@ -64,7 +62,7 @@ export function unsavedChangesGuard(): Child {
     if (isEditingText() && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    if (unsavedChanges.history?.isDirty.value === true) {
+    if ([...unsavedChanges.histories].some((history) => history.isDirty.value)) {
       event.preventDefault();
       event.returnValue = '';
     }

@@ -143,7 +143,7 @@ of these that is set:
 
 1. The [`DASHBOARD_URL`](../project/env.md#the-built-ins) env var.
 2. [`dashboard.origin`](../project/config.md#the-dashboard) in config.
-3. `http://localhost` on `dashboard.port`.
+3. `dashboard.host` on `dashboard.port`, where an unset or wildcard host means `localhost`.
 
 Without the `ohnejs/base` layer, every response carries `Access-Control-Allow-Origin: *` without
 credentials, so cookies stay safe.

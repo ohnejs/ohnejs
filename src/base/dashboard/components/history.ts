@@ -1,4 +1,4 @@
-import { isUndefined, jsonClone, omit, ref } from 'ohnejs/utils';
+import { isUndefined, jsonClone, omit, onCleanup, ref } from 'ohnejs/utils';
 
 /**
  * Options for `History`.
@@ -22,7 +22,8 @@ export interface HistoryOptions {
 
   /**
    * Whether to register the instance on the `unsavedChanges` global.
-   * The unsaved-changes surface consults it before the user navigates away from dirty edits.
+   * The unsaved-changes surface consults it before the user closes the tab on dirty edits.
+   * The registration lasts until the reactive scope that built the instance is disposed.
    *
    * @default
    * true
@@ -35,9 +36,9 @@ export interface HistoryOptions {
  */
 export interface UnsavedChanges {
   /**
-   * The current `History` instance, registered by the latest watching constructor.
+   * Every live watching `History`; closing the tab prompts while any of them is dirty.
    */
-  history: History | null;
+  histories: Set<History>;
 
   /**
    * Asks the user to confirm leaving dirty edits; resolves whether leaving is allowed.
@@ -47,9 +48,9 @@ export interface UnsavedChanges {
 }
 
 /**
- * Global reference to the current `history` instance and unsaved changes dialog `prompt` trigger.
+ * Global registry of the watching `History` instances and the unsaved changes dialog `prompt` trigger.
  */
-export const unsavedChanges: UnsavedChanges = { history: null, prompt: undefined };
+export const unsavedChanges: UnsavedChanges = { histories: new Set(), prompt: undefined };
 
 /**
  * Data history manager with undo and redo functionality.
@@ -97,7 +98,9 @@ export class History<T extends object = Record<string, unknown>> {
     this.omit = options?.omit ?? [];
     this.maxStates = options?.maxStates ?? 100;
     if (options?.watchUnsavedChanges ?? true) {
-      unsavedChanges.history = this as unknown as History;
+      const self = this as unknown as History;
+      unsavedChanges.histories.add(self);
+      onCleanup(() => unsavedChanges.histories.delete(self));
     }
   }
 

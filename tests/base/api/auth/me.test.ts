@@ -262,6 +262,19 @@ describe('PATCH /auth/me', () => {
     strictEqual((await call(ROUTES.patch, { json: { timezone: 'UTC' } })).status, 401);
   });
 
+  it('answers 401 when the user is deleted while the request runs', async () => {
+    const cookie = await signIn('vanish@example.com');
+    hook('auth:account-layout', async (layout, { user }) => {
+      await queryUntyped('Users').where({ UUID: user.UUID }).delete();
+      return layout;
+    });
+    try {
+      strictEqual((await patch(cookie, { timezone: 'UTC' })).status, 401);
+    } finally {
+      useHooks().delete('auth:account-layout');
+    }
+  });
+
   it('refuses a link to a record the user cannot read exactly as a missing one', async () => {
     const cookie = await signIn('linker@example.com');
     const hidden = (await queryUntyped('MeSecrets').createOrThrow({ label: 'x' })).UUID;

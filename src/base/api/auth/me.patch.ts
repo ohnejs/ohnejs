@@ -5,8 +5,9 @@ import {
   queryMetadata,
   queryUntyped,
   readJSONBody,
+  unauthorized,
 } from 'ohnejs';
-import { isPlainObject, pick } from 'ohnejs/utils';
+import { isPlainObject, isUndefined, pick } from 'ohnejs/utils';
 
 import type { User } from '../../auth/types.ts';
 
@@ -31,9 +32,10 @@ export default defineHandler(async (): Promise<User> => {
   if (!isPlainObject(body)) throw badRequest();
   const allowed = accountFields(await accountLayout(user));
   checkWriteInput(body, pick(queryMetadata('Users').fields, allowed), 'update');
-  const records = await queryUntyped('Users')
+  const [record] = await queryUntyped('Users')
     .linkReach(linkReach)
     .where({ UUID: user.UUID })
     .updateOrThrow(body);
-  return toUser(records[0]);
+  if (isUndefined(record)) throw unauthorized();
+  return toUser(record);
 });

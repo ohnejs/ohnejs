@@ -121,9 +121,9 @@ a large upload gets through.
 The `ohnejs/base` layer mounts a global [`cors` middleware](../api/middleware.md#cors): only the
 dashboard's origin may read API responses, cookies included.
 
-- When the dashboard is reached at any address other than `localhost` on `dashboard.port`, like a
-  public domain or a port changed with `PORT`, set `DASHBOARD_URL` or `dashboard.origin` to that
-  origin. Otherwise the browser blocks its requests.
+- When the dashboard is reached at any address other than `dashboard.host` on `dashboard.port`,
+  like a public domain or a port changed with `PORT`, set `DASHBOARD_URL` or `dashboard.origin`
+  to that origin. Otherwise the browser blocks its requests.
 - Set `DASHBOARD_URL` on the API process, not the dashboard's.
 - Every browser frontend that signs in needs its origin in the cors policy, with credentials. A
   write that rides the session cookie from any other page gets a `403`, as

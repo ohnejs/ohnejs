@@ -97,10 +97,7 @@ export function accountEditor(): Child {
 
   // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard((target) => {
-    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) {
-      unsavedChanges.history = null;
-      return true;
-    }
+    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) return true;
     void unsavedChanges.prompt().then((leave) => {
       if (leave) {
         setNavigationGuard(null);
