@@ -728,24 +728,33 @@ function randomAlphabetic(length: number): string {
 
 /**
  * Deep-copies arrays and objects as plain ones, symbol keys included; primitives and functions pass through.
+ * An object reached twice is cloned once, so shared references stay shared.
  */
-function deepCloneValue<T>(value: T): T {
+function deepCloneValue<T>(value: T, clones = new Map<object, unknown>()): T {
   if (value === null || typeof value !== 'object') {
     return value;
   }
 
+  if (clones.has(value)) {
+    return clones.get(value) as T;
+  }
+
   if (Array.isArray(value)) {
-    return value.map((item) => deepCloneValue(item)) as T;
+    const clone: unknown[] = [];
+    clones.set(value, clone);
+    for (const item of value) clone.push(deepCloneValue(item, clones));
+    return clone as T;
   }
 
   const clone: Record<PropertyKey, unknown> = {};
+  clones.set(value, clone);
 
   for (const key of Object.getOwnPropertyNames(value)) {
-    clone[key] = deepCloneValue((value as Record<string, unknown>)[key]);
+    clone[key] = deepCloneValue((value as Record<string, unknown>)[key], clones);
   }
 
   for (const symbol of Object.getOwnPropertySymbols(value)) {
-    clone[symbol] = deepCloneValue((value as Record<symbol, unknown>)[symbol]);
+    clone[symbol] = deepCloneValue((value as Record<symbol, unknown>)[symbol], clones);
   }
 
   return clone as T;

@@ -264,6 +264,7 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
         focusVisible.value = false;
       },
       onKeydown: (event: KeyboardEvent) => {
+        if (options.disabled?.()) return;
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== ' ') return;
         event.preventDefault();
         event.stopPropagation();

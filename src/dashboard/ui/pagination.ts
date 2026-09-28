@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { isPositiveInteger } from '../../utils/is/is-positive-integer.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -227,6 +228,7 @@ export function pagination(options: PaginationOptions): HTMLElement {
       {
         disabled: () => options.currentPage() === options.lastPage(),
         title: nextTitle,
+        type: 'button',
         class: 'ohne-pagination-button ohne-raw',
         onClick: () => change(options.currentPage() + 1),
       },
@@ -237,8 +239,10 @@ export function pagination(options: PaginationOptions): HTMLElement {
     get value() {
       return options.currentPage();
     },
-    set value(next) {
-      change(next);
+    set value(page) {
+      if (isPositiveInteger(page) && page <= options.lastPage() && page !== options.currentPage()) {
+        change(page);
+      }
     },
   };
 

@@ -25,6 +25,7 @@ import {
   addZonedMonths,
   addZonedYears,
   clampZoned,
+  daysInMonth,
   parseDateInput,
   resolveTimezone,
   startOfZonedDay,
@@ -437,8 +438,13 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   const initial = options.initial ?? null;
   const initialDate = isNull(initial) ? null : zonedFromTimestamp(parseDateInput(initial), zone());
 
+  const timeOfDay = (input: ZonedDate): number =>
+    (input.hour * 3600 + input.minute * 60 + input.second) * 1000;
+  const isSameDay = (input: ZonedDate | null, other: ZonedDate): boolean =>
+    input?.year === other.year && input.month === other.month && input.day === other.day;
+
   const date = ref<ZonedDate | null>(null);
-  const selectedDay = ref(today.day);
+  const time = ref(0);
 
   let lastModel: number | null | undefined;
   effect(() => {
@@ -447,7 +453,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     lastModel = value;
     untracked(() => {
       date.value = isNull(value) ? null : zonedFromTimestamp(value, zone());
-      selectedDay.value = date.value?.day ?? 0;
+      time.value = isNull(date.value) ? 0 : timeOfDay(date.value);
     });
   });
 
@@ -468,28 +474,12 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   });
   const maxDate = computed(() => zonedFromTimestamp(parseDateInput(maxInput()), zone()));
 
-  const time = computed(() => {
-    const current = date.value;
-    return isNull(current)
-      ? 0
-      : (current.hour * 3600 + current.minute * 60 + current.second) * 1000;
-  });
-  const minTime = computed(() => {
-    const min = minDate.value;
-    return selectedYear.value === min.year &&
-      selectedMonth.value === min.month &&
-      selectedDay.value === min.day
-      ? (min.hour * 3600 + min.minute * 60 + min.second) * 1000
-      : 0;
-  });
-  const maxTime = computed(() => {
-    const max = maxDate.value;
-    return selectedYear.value === max.year &&
-      selectedMonth.value === max.month &&
-      selectedDay.value === max.day
-      ? (max.hour * 3600 + max.minute * 60 + max.second) * 1000
-      : 86399000;
-  });
+  const minTime = computed(() =>
+    isSameDay(date.value, minDate.value) ? timeOfDay(minDate.value) : 0,
+  );
+  const maxTime = computed(() =>
+    isSameDay(date.value, maxDate.value) ? timeOfDay(maxDate.value) : 86399000,
+  );
 
   const displayedValue = (): string | undefined => {
     const value = model.value;
@@ -559,11 +549,13 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     const focusedDay = active?.classList.contains('ohne-calendar-day-button')
       ? Number(active.getAttribute('data-day'))
       : undefined;
+    const targetYear = year ?? selectedYear.value;
+    const targetMonth = month ?? selectedMonth.value;
     const current = zonedFromWallClock(
       zone(),
-      year ?? selectedYear.value,
-      month ?? selectedMonth.value,
-      day ?? focusedDay ?? 1,
+      targetYear,
+      targetMonth,
+      Math.min(day ?? focusedDay ?? 1, daysInMonth(targetYear, targetMonth)),
     );
     const clamped = clampDate(current);
 
@@ -746,18 +738,22 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
       return time.value;
     },
     set value(next) {
+      const current = untracked(() => date.value);
+      if (isNull(current)) {
+        time.value = next;
+        return;
+      }
       const total = next / 1000;
       const newDate = zonedFromWallClock(
         zone(),
-        untracked(() => selectedYear.value),
-        untracked(() => selectedMonth.value),
-        untracked(() => selectedDay.value),
+        current.year,
+        current.month,
+        current.day,
         Math.floor(total / 3600),
         Math.floor(total / 60) % 60,
         Math.floor(total) % 60,
       );
-      const clamped = untracked(() => clampDate(newDate));
-      model.value = prepareEmitValue(clamped);
+      model.value = prepareEmitValue(newDate);
     },
   };
 
@@ -771,6 +767,10 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         min: () => minTime.value,
         max: () => maxTime.value,
         showSeconds: options.showSeconds ?? true,
+        onCommit: () => {
+          const current = untracked(() => date.value);
+          if (!isNull(current)) model.value = prepareEmitValue(clampDate(current));
+        },
       }),
     );
 

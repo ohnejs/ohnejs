@@ -2,6 +2,7 @@ import type { TimeSpanValue } from './time-model.ts';
 
 import { isNumber } from '../../utils/is/is-number.ts';
 import { isString } from '../../utils/is/is-string.ts';
+import { modulo } from '../../utils/number/modulo.ts';
 
 /**
  * A wall-clock reading of one instant in one IANA time zone.
@@ -137,7 +138,7 @@ function wallParts(timestamp: number, zone: string): number[] {
 
 /**
  * The zone's UTC offset at `timestamp`, in whole milliseconds.
- * The instant truncates to second precision.
+ * The instant floors to second precision, as `Intl` reads it.
  */
 function zoneOffset(timestamp: number, zone: string): number {
   const [year, month, day, hour, minute, second] = wallParts(timestamp, zone) as [
@@ -148,7 +149,9 @@ function zoneOffset(timestamp: number, zone: string): number {
     number,
     number,
   ];
-  return wallValue(year, month, day, hour, minute, second, 0) - (timestamp - (timestamp % 1000));
+  return (
+    wallValue(year, month, day, hour, minute, second, 0) - (timestamp - modulo(timestamp, 1000))
+  );
 }
 
 /**
@@ -211,6 +214,7 @@ export function zonedFromTimestamp(timestamp: number, zone: string): ZonedDate {
     number,
   ];
   const wall = wallValue(year, month, day, hour, minute, second, 0);
+  const millisecond = modulo(timestamp, 1000);
   return {
     timestamp,
     year,
@@ -220,8 +224,8 @@ export function zonedFromTimestamp(timestamp: number, zone: string): ZonedDate {
     hour,
     minute,
     second,
-    millisecond: ((timestamp % 1000) + 1000) % 1000,
-    offset: (wall - (timestamp - (timestamp % 1000))) / 60000,
+    millisecond,
+    offset: (wall - (timestamp - millisecond)) / 60000,
     zone,
   };
 }
@@ -301,7 +305,7 @@ function shiftWall(date: ZonedDate, year: number, month: number): ZonedDate {
 export function addZonedMonths(date: ZonedDate, months: number): ZonedDate {
   const total = date.month - 1 + months;
   const year = date.year + Math.floor(total / 12);
-  return shiftWall(date, year, (((total % 12) + 12) % 12) + 1);
+  return shiftWall(date, year, modulo(total, 12) + 1);
 }
 
 /**
@@ -439,7 +443,7 @@ function joseSeconds(duration: string): number {
       break;
   }
 
-  return matched[1] === '-' || matched[4] === 'ago' ? -seconds : seconds;
+  return matched[1] === '-' || matched[4]?.toLowerCase() === 'ago' ? -seconds : seconds;
 }
 
 /**

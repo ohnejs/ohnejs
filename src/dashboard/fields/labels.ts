@@ -1,4 +1,4 @@
-import type { DashboardCollection } from '../runtime/meta-types.ts';
+import type { DashboardCollection, DashboardMeta } from '../runtime/meta-types.ts';
 
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
@@ -18,6 +18,7 @@ const pending = new Map<string, Set<string>>();
 const inFlight = new Set<string>();
 let scheduled = false;
 let awaitingMeta = false;
+let basis: DashboardMeta | undefined;
 
 /**
  * The resolved label for one record of the target collection, `undefined` while unresolved.
@@ -47,6 +48,7 @@ export function knownLabel(target: string, uuid: string): string | undefined {
  * Requests dedupe, batch per target, and flush on a microtask as one query per target.
  */
 export function wantLabels(target: string, uuids: readonly string[]): void {
+  sync();
   for (const uuid of uuids) {
     const known = untracked(() => entries.get(`${target}:${uuid}`)?.value);
     if (isUndefined(known)) enqueue(target, uuid);
@@ -58,6 +60,7 @@ export function wantLabels(target: string, uuids: readonly string[]): void {
  * A pending request for the `uuid` is dropped; a seeded label re-resolves every binding reading it.
  */
 export function seedLabel(target: string, uuid: string, label: string): void {
+  sync();
   pending.get(target)?.delete(uuid);
   write(target, uuid, label);
 }
@@ -86,6 +89,7 @@ export function joinLabel(row: Record<string, unknown>, collection: DashboardCol
  * The entry for `key`, created unresolved when missing; every hit refreshes its recency.
  */
 function entryOf(key: string): Ref<string | undefined> {
+  sync();
   const existing = entries.get(key);
   if (!isUndefined(existing)) {
     entries.delete(key);
@@ -137,6 +141,7 @@ function schedule(): void {
  */
 function flush(): void {
   scheduled = false;
+  sync();
   if (pending.size === 0) return;
   if (isUndefined(dashboardMeta())) {
     watchMeta();
@@ -173,6 +178,7 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
     for (const uuid of uuids) write(target, uuid, fallbackLabel(uuid));
     return;
   }
+  const source = basis;
   const names = collection.labelFields;
   const keys = uuids.map((uuid) => `${target}:${uuid}`);
   for (const key of keys) inFlight.add(key);
@@ -187,6 +193,8 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
     });
     if (!response.ok) return;
     const rows = (await response.json()) as Record<string, unknown>[];
+    sync();
+    if (basis !== source) return;
     const answered = new Set<string>();
     for (const row of rows) {
       const uuid = row.UUID;
@@ -202,7 +210,7 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
     }
   } catch {
   } finally {
-    for (const key of keys) inFlight.delete(key);
+    if (basis === source) for (const key of keys) inFlight.delete(key);
   }
 }
 
@@ -213,6 +221,21 @@ function readableCollection(name: string): DashboardCollection | undefined {
   const collection = dashboardMeta()?.collections.find((entry) => entry.name === name);
   if (isUndefined(collection) || collection.operations.read?.allowed !== true) return undefined;
   return collection;
+}
+
+/**
+ * Empties the cache once the discovery data it resolved under is gone, so labels follow the current user.
+ * Data arriving into an empty store adopts the cache as is, since its entries were made while it loaded.
+ */
+function sync(): void {
+  const current = untracked(dashboardMeta);
+  if (current === basis) return;
+  if (!isUndefined(basis)) {
+    entries.clear();
+    pending.clear();
+    inFlight.clear();
+  }
+  basis = current;
 }
 
 /**

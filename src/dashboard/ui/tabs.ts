@@ -91,7 +91,7 @@ export interface TabsNavPayload<T extends number | string> {
 export interface TabsOptions<T extends number | string> {
   /**
    * The tab list, read reactively.
-   * A structurally equal re-read does not reset the active tab.
+   * A re-read with the same tab names does not reset the active tab.
    */
   list: () => TabsListItem<T>[];
 
@@ -178,12 +178,12 @@ export function tabs<T extends number | string>(
     })),
   );
 
-  let previous: [TabsListItem<T>[], T | undefined] | undefined;
+  let previous: [T[], T | undefined] | undefined;
   effect(() => {
-    const next: [TabsListItem<T>[], T | undefined] = [options.list(), options.active?.()];
+    const next: [T[], T | undefined] = [options.list().map(({ name }) => name), options.active?.()];
     if (previous === undefined || !deepEqual(next, previous)) {
       previous = next;
-      active.value = next[1] ?? next[0][0]?.name;
+      active.value = next[1] ?? next[0][0];
     }
   });
 

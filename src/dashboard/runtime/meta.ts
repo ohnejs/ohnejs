@@ -66,7 +66,9 @@ async function load(): Promise<void> {
   const mine = generation;
   try {
     const response = await api('GET /dashboard');
-    if (response.ok && generation === mine) meta.value = (await response.json()) as DashboardMeta;
+    if (!response.ok) return;
+    const answer = (await response.json()) as DashboardMeta;
+    if (generation === mine) meta.value = answer;
   } catch {
     /* the shell's session guard owns the failure surface */
   }

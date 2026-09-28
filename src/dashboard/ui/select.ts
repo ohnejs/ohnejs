@@ -675,6 +675,7 @@ export function select(
         if (!disabled()) toggle();
       },
       onKeydown: (event: KeyboardEvent) => {
+        if (disabled()) return;
         if (event.key === 'ArrowDown') {
           event.preventDefault();
           event.stopPropagation();
@@ -704,7 +705,8 @@ export function select(
     },
     () => {
       const selected = selectedChoice.value;
-      if (selected && (selected.label || selected.value)) {
+      const text = selected?.label ?? toDisplay(selected?.value);
+      if (selected && text) {
         return h(
           'span',
           {
@@ -712,7 +714,7 @@ export function select(
               'ohne-select-selected-choice' +
               (selected.muted ? ' ohne-select-selected-choice-muted' : ''),
           },
-          selected.label ?? toDisplay(selected.value),
+          text,
         );
       }
       if (options.placeholder) {

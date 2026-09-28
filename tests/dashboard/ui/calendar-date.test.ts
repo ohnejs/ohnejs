@@ -153,6 +153,14 @@ describe('zonedFromTimestamp', () => {
     strictEqual(berlin.weekday, 1);
     strictEqual(berlin.offset, 120);
   });
+
+  it('keeps the offset whole before 1970 when the instant has milliseconds', () => {
+    const utc = zonedFromTimestamp(-1500, 'UTC');
+    strictEqual(fields(utc), '1969-12-31 23:59:58');
+    strictEqual(utc.millisecond, 500);
+    strictEqual(utc.offset, 0);
+    strictEqual(zonedFromTimestamp(-250, NY).offset, -300);
+  });
 });
 
 describe('startOfZonedDay', () => {
@@ -331,6 +339,7 @@ describe('parseTimeSpan', () => {
     strictEqual(parseTimeSpan('-1 minute'), -60000);
     strictEqual(parseTimeSpan('+2 hours'), 7200000);
     strictEqual(parseTimeSpan('1 minute from now'), 60000);
+    strictEqual(parseTimeSpan('1 minute AGO'), -60000);
   });
 
   it('throws on malformed durations', () => {

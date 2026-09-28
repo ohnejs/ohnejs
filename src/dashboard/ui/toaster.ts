@@ -820,6 +820,7 @@ function createToaster(): HTMLElement {
     dismissers.set(id, deleteToast);
     onCleanup(() => dismissers.delete(id));
 
+    let timed = record;
     let remaining = record.duration;
     let startedAt = 0;
     let pausedAt = 0;
@@ -827,6 +828,12 @@ function createToaster(): HTMLElement {
 
     effect(() => {
       clearTimeout(timer);
+      if (item() !== timed) {
+        timed = item();
+        remaining = timed.duration;
+        startedAt = 0;
+        pausedAt = 0;
+      }
       if (removed.value || remaining === Infinity) return;
       const paused = expanded.value || interacting.value;
       if (paused) {
@@ -847,9 +854,6 @@ function createToaster(): HTMLElement {
       untracked(() => {
         if (!removed.value) return;
         clearTimeout(removal);
-        remaining = item().duration;
-        startedAt = 0;
-        pausedAt = 0;
         swiping.value = false;
         swipeOut.value = false;
         swipeAmount.value = '0px';

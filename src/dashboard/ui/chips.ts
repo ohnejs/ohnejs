@@ -446,13 +446,11 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
           filterChoices();
         }
       }
-    } else {
-      if ((options.enforceUniqueItems ?? true) && model.value.includes(value)) {
-        inputValue.value = '';
-      } else if (maxItems === false || model.value.length < maxItems) {
-        model.value = [...model.value, value];
-        inputValue.value = '';
-      }
+    } else if (!value || ((options.enforceUniqueItems ?? true) && model.value.includes(value))) {
+      inputValue.value = '';
+    } else if (maxItems === false || model.value.length < maxItems) {
+      model.value = [...model.value, value];
+      inputValue.value = '';
     }
 
     input.select();

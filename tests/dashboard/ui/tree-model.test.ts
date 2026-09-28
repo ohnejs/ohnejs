@@ -406,6 +406,20 @@ describe('cloneTreeItem', () => {
     strictEqual(clone.source.id, clone.id);
   });
 
+  it('keeps a child source shared with its parent source', () => {
+    const child: VNode = { id: 'c' };
+    const parent: VNode = { id: 'p', children: [child] };
+    const item: TreeItemModel<VNode> = {
+      id: 'p',
+      source: parent,
+      nestable: true,
+      children: [{ id: 'c', source: child, nestable: false }],
+    };
+    const clone = cloneTreeItem(item, 'id') as { source: VNode; children: TreeItemModel<VNode>[] };
+    strictEqual(clone.children[0]!.source, clone.source.children![0]);
+    strictEqual(clone.source.children![0]!.id, clone.children[0]!.id);
+  });
+
   it('keeps functions by reference', () => {
     const draggable = (): boolean => true;
     const clone = cloneTreeItem({ ...leaf('a'), draggable });

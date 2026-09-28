@@ -50,6 +50,18 @@ describe('parseIntegerValue', () => {
     deepStrictEqual(parseIntegerValue(field(), ' 7 '), { value: 7 });
   });
 
+  it('parses a whole number in any decimal notation', () => {
+    deepStrictEqual(parseIntegerValue(field(), '1e3'), { value: 1000 });
+    deepStrictEqual(parseIntegerValue(field(), '2.0'), { value: 2 });
+  });
+
+  it('rejects hex and an integer past the safe range', () => {
+    deepStrictEqual(parseIntegerValue(field(), '0x10'), { error: 'dashboard.invalidInteger' });
+    deepStrictEqual(parseIntegerValue(field(), '9007199254740993'), {
+      error: 'dashboard.invalidInteger',
+    });
+  });
+
   it('rejects a float', () => {
     deepStrictEqual(parseIntegerValue(field(), '4.2'), { error: 'dashboard.invalidInteger' });
   });

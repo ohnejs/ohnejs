@@ -3,7 +3,6 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
-import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { icon } from './icon.ts';
@@ -50,7 +49,7 @@ export interface ResizerOptions {
   size?: number;
 
   /**
-   * Called once when a drag ends, with the last dragged value, for history or persistence.
+   * Called once when a drag ends, with the final value, for history or persistence.
    */
   onCommit?: (value: number) => void;
 }
@@ -147,7 +146,7 @@ css`
  * Dragging writes the model continuously; releasing calls `onCommit` once with the final value.
  * Escape, mouseup, and touchend all end the drag.
  * A `body.ohne-resizing` class suppresses text selection and iframe pointer events for the duration.
- * A movement-free click still commits the last dragged value.
+ * A movement-free click still commits.
  *
  * @example
  * ```ts
@@ -159,8 +158,6 @@ export function resizer(model: Ref<number>, options: ResizerOptions = {}): HTMLE
   const side = options.side ?? 'bottom';
   const isActive = ref(false);
   const stops: (() => void)[] = [];
-
-  let tmp = untracked(() => model.value);
 
   const handler = (event: MouseEvent | TouchEvent): void => {
     event.preventDefault();
@@ -185,12 +182,11 @@ export function resizer(model: Ref<number>, options: ResizerOptions = {}): HTMLE
         const delta = side === 'top' || side === 'left' ? prev - current : current - prev;
         const deltaRounded = delta < 0 ? Math.floor(delta) : Math.ceil(delta);
         prev = current;
-        tmp = clamp(
+        model.value = clamp(
           model.value + deltaRounded * (options.increment ?? 1),
           options.min ?? 0,
           options.max?.() ?? Infinity,
         );
-        model.value = tmp;
       }
     };
 
@@ -221,7 +217,7 @@ export function resizer(model: Ref<number>, options: ResizerOptions = {}): HTMLE
 
   const stopDragging = (): void => {
     releaseDrag();
-    options.onCommit?.(tmp);
+    options.onCommit?.(model.value);
   };
 
   // A drag interrupted by unmount releases its listeners and body state without committing.

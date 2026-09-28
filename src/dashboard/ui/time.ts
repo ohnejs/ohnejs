@@ -2,6 +2,7 @@ import type { ComputedRef } from '../../utils/reactive/computed.ts';
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { clamp } from '../../utils/number/clamp.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -131,7 +132,7 @@ css`
 /**
  * A 24-hour time-of-day input over three `numberInput` segments (hh:mm:ss).
  * The model holds ms within a day, an integer between `0` (00:00:00) and `86399000` (23:59:59).
- * Segment bounds cascade from `min` and `max`, and every write clamps the composed value into them.
+ * Segment bounds cascade from `min` and `max`, and a settled segment clamps the composed value into them.
  * A trailing hidden input carries `id`, `name`, and the composed value for label linkage and forms.
  *
  * @example
@@ -153,7 +154,12 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
   const seconds = computed(() => Math.floor((model.value / 1000) % 60));
 
   const toModelValue = (hours: number, minutes: number, seconds: number): number =>
-    composeTime(hours, minutes, seconds, min.value, max.value);
+    composeTime(hours, minutes, seconds, 0, 86399000);
+
+  const settle = (): void => {
+    model.value = clamp(model.value, min.value, max.value);
+    options.onCommit?.(model.value);
+  };
 
   const segment = (part: ComputedRef<number>, write: (value: number) => number): Ref<number> => ({
     get value() {
@@ -192,8 +198,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
           padZeros: 2,
           showSteppers: true,
           suffix: options.labels?.hoursSuffix ?? 'h',
-          onCommit: (value) =>
-            options.onCommit?.(toModelValue(value, minutes.value, seconds.value)),
+          onCommit: settle,
         },
       ),
       h('span', null, ':'),
@@ -213,7 +218,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
           padZeros: 2,
           showSteppers: true,
           suffix: options.labels?.minutesSuffix ?? 'm',
-          onCommit: (value) => options.onCommit?.(toModelValue(hours.value, value, seconds.value)),
+          onCommit: settle,
         },
       ),
       showSeconds ? h('span', null, ':') : null,
@@ -234,8 +239,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
               padZeros: 2,
               showSteppers: true,
               suffix: options.labels?.secondsSuffix ?? 's',
-              onCommit: (value) =>
-                options.onCommit?.(toModelValue(hours.value, minutes.value, value)),
+              onCommit: settle,
             },
           )
         : null,

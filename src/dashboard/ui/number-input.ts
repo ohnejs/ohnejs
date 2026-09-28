@@ -9,6 +9,7 @@ import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
@@ -300,7 +301,7 @@ function leadingZeros(value: number, width: number): string {
  * Typing writes the model on every valid number.
  * Blur, steps, and drag end settle the value, then report it to `onCommit`.
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
- * Writing the model reformats the display.
+ * Writing the model reformats the display, unless the text already reads as the new value.
  *
  * @example
  * ```ts
@@ -315,9 +316,11 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   const dragDirection = options.dragDirection ?? 'horizontal';
   const disabled = (): boolean => options.disabled?.() ?? false;
   const stringified = ref('');
+  const typed = (): number => (stringified.value.trim() ? +stringified.value : NaN);
 
   effect(() => {
-    stringified.value = leadingZeros(model.value, padZeros);
+    const value = model.value;
+    if (untracked(typed) !== value) stringified.value = leadingZeros(value, padZeros);
   });
 
   const numericValue = (): number =>
@@ -327,8 +330,8 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       : +stringified.value;
 
   const maybeEmit = (commit = false): void => {
-    const value = +stringified.value;
-    if (stringified.value.trim() && isRealNumber(value)) {
+    const value = typed();
+    if (isRealNumber(value)) {
       model.value = value;
       if (commit) options.onCommit?.(value);
     }

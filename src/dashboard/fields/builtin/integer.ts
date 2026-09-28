@@ -15,7 +15,7 @@ import { parseIntegerValue } from '../parse.ts';
 
 /**
  * The `integer` field type: cell display, inline cell editor, form control, and filter.
- * The editor and control parse entry strictly: decimal digits only, no floats, no exponents.
+ * The editor and control take any decimal notation of a safe integer, like `1e3`, and refuse fractions.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
  * The control validates on blur and on read, and steps by 1 on the arrow keys, by 10 with Shift.
  */

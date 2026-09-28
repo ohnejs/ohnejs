@@ -254,6 +254,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   let unlockWindow: (() => void) | undefined;
   let unlockContainer: (() => void) | undefined;
   let releaseTrap: (() => void) | undefined;
+  let closing: Promise<void> | undefined;
 
   const handle = h(
     'button',
@@ -371,6 +372,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   };
 
   const open = async (event?: Event): Promise<void> => {
+    if (closing) await closing;
     if (untracked(() => isActive.value)) return;
     event?.preventDefault();
     options.onOpen?.();
@@ -410,6 +412,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   };
 
   const close = async (event?: Event): Promise<void> => {
+    if (closing) return closing;
     if (!untracked(() => isActive.value)) return;
     event?.preventDefault();
     options.onClose?.();
@@ -421,7 +424,9 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       handle.focus();
     }
     isVisible.value = false;
-    await sleep(transitionDuration);
+    closing = sleep(transitionDuration);
+    await closing;
+    closing = undefined;
     isActive.value = false;
     stopOutsideClick?.();
     stopOutsideClick = undefined;
@@ -434,7 +439,7 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
   };
 
   const toggle = (event?: Event): void => {
-    if (untracked(() => isActive.value)) void close(event);
+    if (untracked(() => isVisible.value)) void close(event);
     else void open(event);
   };
 

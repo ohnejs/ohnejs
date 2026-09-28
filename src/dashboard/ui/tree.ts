@@ -409,10 +409,11 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
     }
   };
 
-  const sourceChildren = (parent?: TreeItemModel<T>): unknown[] =>
-    ((parent?.source as Record<string, unknown> | undefined)?.[
-      options.source!.props.children
-    ] as unknown[]) ?? (options.source!.root as unknown[]);
+  const sourceChildren = (parent?: TreeItemModel<T>): unknown[] => {
+    if (!parent) return options.source!.root;
+    const source = parent.source as Record<string, unknown[] | undefined>;
+    return (source[options.source!.props.children] ??= []);
+  };
 
   const duplicateItems = (items: TreeItemModel<T>[], event: Event): void => {
     event.preventDefault();
@@ -426,10 +427,7 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
       addedItems.push(clone);
 
       if (options.source) {
-        const source = added[0]!.parent?.source as Record<string, unknown> | undefined;
-        const slot = (source?.[options.source.props.children] as unknown[]) ?? options.source.root;
-
-        slot.splice(added[0]!.index, 0, clone.source);
+        sourceChildren(added[0]!.parent).splice(added[0]!.index, 0, clone.source);
       }
     }
 

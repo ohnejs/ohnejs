@@ -833,6 +833,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
         if (!disabled()) toggle();
       },
       onKeydown: (event: KeyboardEvent) => {
+        if (disabled()) return;
         if (event.key === 'ArrowDown') {
           event.preventDefault();
           event.stopPropagation();

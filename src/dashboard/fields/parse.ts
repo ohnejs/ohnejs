@@ -30,7 +30,8 @@ export function parseTextValue(field: DashboardField, raw: string): unknown {
 }
 
 /**
- * An integer input parsed strictly: decimal digits only, no floats, no exponents.
+ * An integer input parsed strictly: any decimal notation of a safe integer, like `12`, `1e3`, or `2.0`.
+ * Fractions, hex, and integers past the safe range are refused.
  * Emptied, a nullable field writes `null` and a non-nullable one is omitted.
  */
 export function parseIntegerValue(field: DashboardField, raw: string): ScalarParse {
