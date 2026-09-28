@@ -35,6 +35,16 @@ describe('stat', () => {
     strictEqual(await stat(join(dir, 'missing')), null);
   });
 
+  it('returns null for a path beneath a file', async () => {
+    const f = join(dir, 'file.txt');
+    writeFileSync(f, 'x');
+    strictEqual(await stat(join(f, 'child')), null);
+  });
+
+  it('returns null for a name too long to exist', async () => {
+    strictEqual(await stat(join(dir, 'x'.repeat(300))), null);
+  });
+
   it('propagates non-ENOENT errors', async () => {
     if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const denied = join(dir, 'denied');

@@ -1,5 +1,7 @@
 import { readFile as fsReadFile } from 'node:fs/promises';
 
+import { isMissingPath } from './_is-missing-path.ts';
+
 /**
  * Reads a UTF-8 text file.
  *
@@ -16,7 +18,7 @@ export async function readFile(path: string): Promise<string | null> {
   try {
     return await fsReadFile(path, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if (isMissingPath(err)) return null;
     throw err;
   }
 }

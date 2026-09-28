@@ -5,7 +5,6 @@ const SIGNATURES: readonly (readonly [magic: string, type: string, offset?: numb
   ['\xff\xd8\xff', 'image/jpeg'],
   ['GIF87a', 'image/gif'],
   ['GIF89a', 'image/gif'],
-  ['BM', 'image/bmp'],
   ['\0\0\x01\0', 'image/x-icon'],
   ['II*\0', 'image/tiff'],
   ['MM\0*', 'image/tiff'],
@@ -15,13 +14,15 @@ const SIGNATURES: readonly (readonly [magic: string, type: string, offset?: numb
   ['7z\xbc\xaf\x27\x1c', 'application/x-7z-compressed'],
   ['Rar!\x1a\x07', 'application/vnd.rar'],
   ['ustar', 'application/x-tar', 257],
-  ['ID3', 'audio/mpeg'],
+  ['ID3\x02', 'audio/mpeg'],
+  ['ID3\x03', 'audio/mpeg'],
+  ['ID3\x04', 'audio/mpeg'],
   ['fLaC', 'audio/flac'],
   ['OggS', 'application/ogg'],
   ['wOFF', 'font/woff'],
   ['wOF2', 'font/woff2'],
   ['\0\x01\0\0', 'font/ttf'],
-  ['OTTO', 'font/otf'],
+  ['OTTO\0', 'font/otf'],
   ['\0asm', 'application/wasm'],
 ];
 
@@ -49,6 +50,8 @@ const FTYP_BRANDS: Record<string, string> = {
   'M4A ': 'audio/mp4',
   'qt  ': 'video/quicktime',
 };
+
+const DIB_HEADER_SIZES = [12, 16, 40, 52, 56, 64, 108, 124];
 
 const EBML_HEADER = '\x1a\x45\xdf\xa3';
 
@@ -101,6 +104,16 @@ function ebmlType(bytes: Uint8Array): string | undefined {
 }
 
 /**
+ * Reports whether `bytes` opens a BMP: `BM`, then a known DIB header size at byte 14.
+ * The size keeps text that opens with `BM`, such as a CSV of `BMI` values, from passing as a bitmap.
+ */
+function isBMP(bytes: Uint8Array): boolean {
+  return (
+    matches(bytes, 0, 'BM') && DIB_HEADER_SIZES.includes(bytes[14]) && matches(bytes, 15, '\0\0\0')
+  );
+}
+
+/**
  * Reports whether `bytes` opens with an MPEG audio frame header: sync bits, layer III, a valid version.
  * Layers I and II are left alone; their sync pattern also opens a UTF-16 text file.
  */
@@ -145,6 +158,7 @@ export function sniffMediaType(bytes: Uint8Array): string | undefined {
   for (const [magic, type, offset = 0] of SIGNATURES) {
     if (matches(bytes, offset, magic)) return type;
   }
+  if (isBMP(bytes)) return 'image/bmp';
   if (isMP3Frame(bytes)) return 'audio/mpeg';
   if (isSVG(bytes)) return 'image/svg+xml';
   return undefined;

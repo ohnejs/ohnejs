@@ -118,7 +118,7 @@ export function parseArgv(argv: string[], options: ParseArgvOptions = {}): Parse
         expandShort(body.slice(0, eq - 1), assign);
         assign(body[eq - 1]!, body.slice(eq + 1));
       } else {
-        const attached = body.search(/\d/);
+        const attached = body.search(/-?\d/);
         if (attached > 0) {
           expandShort(body.slice(0, attached - 1), assign);
           assign(body[attached - 1]!, body.slice(attached));

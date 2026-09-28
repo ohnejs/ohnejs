@@ -2,7 +2,7 @@ import { relativePath } from '../path/relative-path.ts';
 
 /**
  * Builds a relative ESM import specifier from `fromDir` to `file`.
- * Resolves the path between them, then makes it import-usable by prefixing `./` when it has no leading dot.
+ * Resolves the path between them, then makes it import-usable by prefixing `./` unless it starts with `../`.
  * A bare `foo.ts` would read as a package specifier, so it becomes `./foo.ts`.
  *
  * Only `%`, `#`, and `?` are percent-encoded: raw, they break the URL parse a specifier goes through.
@@ -20,5 +20,5 @@ import { relativePath } from '../path/relative-path.ts';
  */
 export function importSpecifier(fromDir: string, file: string): string {
   const rel = relativePath(fromDir, file).replace(/[%#?]/g, encodeURIComponent);
-  return rel.startsWith('.') ? rel : `./${rel}`;
+  return rel.startsWith('../') ? rel : `./${rel}`;
 }

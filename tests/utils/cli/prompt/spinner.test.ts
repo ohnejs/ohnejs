@@ -183,6 +183,46 @@ describe('createSpinner', () => {
 
     strictEqual(out.includes('\x1b[K'), true);
   });
+
+  it('clips an animating message to the terminal columns and keeps the whole final line', () => {
+    mock.timers.enable({ apis: ['setInterval'] });
+    const out: string[] = [];
+    const spin = createSpinner({
+      input: new PassThrough(),
+      output: { write: (s) => out.push(s), isTTY: true, columns: 20 },
+      color: false,
+      frames: ['A', 'B'],
+      interval: 50,
+    });
+
+    spin.start('Installing a-very-long-package-name');
+    mock.timers.tick(50);
+    spin.stop('Installed a-very-long-package-name');
+    mock.timers.reset();
+
+    const frames = out.filter((s) => s.startsWith('\r\x1b[K'));
+    strictEqual(frames.includes('\r\x1b[KA  Installing a-ver…'), true);
+    strictEqual(frames.includes('\r\x1b[KB  Installing a-ver…'), true);
+    strictEqual(frames.at(-1), '\r\x1b[K◇  Installed a-very-long-package-name\n');
+  });
+
+  it('clips a styled message by its visible columns, keeping every escape whole', () => {
+    mock.timers.enable({ apis: ['setInterval'] });
+    const out: string[] = [];
+    const spin = createSpinner({
+      input: new PassThrough(),
+      output: { write: (s) => out.push(s), isTTY: true, columns: 20 },
+      color: false,
+      frames: ['A'],
+      interval: 50,
+    });
+
+    spin.start('\x1b[1mInstalling\x1b[22m a-very-long-package-name');
+    spin.stop();
+    mock.timers.reset();
+
+    strictEqual(out.includes('\r\x1b[KA  \x1b[1mInstalling\x1b[22m a-ver…'), true);
+  });
 });
 
 describe('createPrompt().spinner', () => {

@@ -85,6 +85,11 @@ describe('parseArgv', () => {
     deepStrictEqual(parseArgv(['-p3000']), { positionals: [], flags: flags({ p: '3000' }) });
   });
 
+  it('attaches a negative value to a short flag', () => {
+    deepStrictEqual(parseArgv(['-p-5']), { positionals: [], flags: flags({ p: '-5' }) });
+    deepStrictEqual(parseArgv(['-ap-5']), { positionals: [], flags: flags({ a: true, p: '-5' }) });
+  });
+
   it('parses -p=3000', () => {
     deepStrictEqual(parseArgv(['-p=3000']), { positionals: [], flags: flags({ p: '3000' }) });
   });

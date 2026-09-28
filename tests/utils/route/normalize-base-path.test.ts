@@ -21,6 +21,11 @@ describe('normalizeBasePath', () => {
     strictEqual(normalizeBasePath('//api//v1//'), '/api/v1');
   });
 
+  it('canonicalizes escapes the way a request path is', () => {
+    strictEqual(normalizeBasePath('/%7Eapp'), '/~app');
+    strictEqual(normalizeBasePath('/caf%c3%a9'), '/caf%C3%A9');
+  });
+
   it('yields no prefix for empty or slash-only input', () => {
     strictEqual(normalizeBasePath(''), '');
     strictEqual(normalizeBasePath('/'), '');

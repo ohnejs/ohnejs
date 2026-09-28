@@ -382,10 +382,12 @@ function highlight(
   if (positions.length === 0) return base(name);
   let out = '';
   let next = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    const matched = positions[next] === i;
-    if (matched) next += 1;
-    out += matched ? mark(name[i]) : base(name[i]);
+  let end = 0;
+  for (const char of name) {
+    end += char.length;
+    const matched = positions[next] < end;
+    while (positions[next] < end) next += 1;
+    out += matched ? mark(char) : base(char);
   }
   return out;
 }

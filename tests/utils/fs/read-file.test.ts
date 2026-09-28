@@ -27,6 +27,12 @@ describe('readFile', () => {
     strictEqual(await readFile(join(dir, 'missing')), null);
   });
 
+  it('returns null for a path beneath a file', async () => {
+    const f = join(dir, 'file.txt');
+    writeFileSync(f, 'x');
+    strictEqual(await readFile(join(f, 'child')), null);
+  });
+
   it('propagates non-ENOENT errors', async () => {
     if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const f = join(dir, 'denied');

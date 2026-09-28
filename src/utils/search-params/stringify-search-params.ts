@@ -13,7 +13,7 @@ const ENCODE = new Set([' ', '"', '#', '<', '>', "'", '%', '&', '[', ']', '{', '
  */
 function encode(str: string, encodeEquals: boolean): string {
   let out = '';
-  for (const ch of str) {
+  for (const ch of str.toWellFormed()) {
     const code = ch.codePointAt(0)!;
     if (code < 0x20 || code > 0x7e || ENCODE.has(ch) || (encodeEquals && ch === '=')) {
       out += ch === "'" ? '%27' : encodeURIComponent(ch);
@@ -83,5 +83,6 @@ export function stringifySearchParams(params: {
     const value = params[key];
     if (!isUndefined(value)) pairs.push(`${encode(key, true)}=${encodeValue(value)}`);
   }
-  return pairs.join('&');
+  // `parseSearchParams` strips a leading `?` as the query prefix.
+  return pairs.join('&').replace(/^\?/, '%3F');
 }

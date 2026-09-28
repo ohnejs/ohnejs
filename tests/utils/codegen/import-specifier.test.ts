@@ -12,6 +12,11 @@ describe('importSpecifier', () => {
     strictEqual(importSpecifier('/app/.gen', '/app/.gen/code.ts'), './code.ts');
   });
 
+  it('prefixes ./ on a dot-named target below the from-dir', () => {
+    strictEqual(importSpecifier('/app/.gen', '/app/.gen/.hidden/x.ts'), './.hidden/x.ts');
+    strictEqual(importSpecifier('/app/.gen', '/app/.gen/..weird.ts'), './..weird.ts');
+  });
+
   it('percent-encodes only the URL-breaking characters', () => {
     strictEqual(importSpecifier('/app/.gen', '/app/api/50%off.ts'), '../api/50%25off.ts');
     strictEqual(importSpecifier('/app/.gen', '/app/api/c#.ts'), '../api/c%23.ts');

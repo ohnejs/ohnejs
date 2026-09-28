@@ -154,7 +154,7 @@ function applySymbol(symbol: string, count: number, options: Intl.DateTimeFormat
       return;
 
     case 'Z':
-      options.timeZoneName = count === 5 ? 'longOffset' : count === 4 ? 'long' : 'shortOffset';
+      options.timeZoneName = count >= 4 ? 'longOffset' : 'shortOffset';
       return;
 
     case 'O':

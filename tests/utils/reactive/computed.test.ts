@@ -2,6 +2,7 @@ import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { computed } from '../../../src/utils/reactive/computed.ts';
+import { effectScope } from '../../../src/utils/reactive/effect-scope.ts';
 import { effect } from '../../../src/utils/reactive/effect.ts';
 import { ref } from '../../../src/utils/reactive/ref.ts';
 
@@ -62,6 +63,20 @@ describe('computed', () => {
     r.value = 5;
     r.value = 6;
     strictEqual(seen.join(','), '2,10,12');
+  });
+
+  it('reads the getter fresh once its scope is disposed', () => {
+    const r = ref(1);
+    const scope = effectScope();
+    const [unread, read] = scope.run(() => [
+      computed(() => r.value * 2),
+      computed(() => r.value * 10),
+    ]);
+    strictEqual(read.value, 10);
+    scope.dispose();
+    strictEqual(unread.value, 2);
+    r.value = 5;
+    strictEqual(read.value, 50);
   });
 
   it('throws on a cyclic getter', () => {

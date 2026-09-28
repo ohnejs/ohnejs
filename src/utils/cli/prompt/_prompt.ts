@@ -1,8 +1,10 @@
 import { emitKeypressEvents } from 'node:readline';
+import { stripVTControlCharacters } from 'node:util';
 
 import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import type { PromptResult } from './is-cancel.ts';
 
+import { terminalWidth } from '../../ansi/terminal-width.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
 import { CANCEL } from './is-cancel.ts';
 
@@ -189,16 +191,28 @@ function eraseFrame(rowCount: number): string {
   return `${up}\r\x1b[0J`;
 }
 
-const SGR = new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g');
-
 /**
  * Counts the terminal rows a frame occupies, wrapping each line at `columns` once styling is stripped.
  */
 function frameRows(frame: string, columns: number | undefined): number {
-  let rows = 0;
-  for (const line of frame.split('\n')) {
-    const width = [...line.replace(SGR, '')].length;
-    rows += columns && columns > 0 ? Math.max(1, Math.ceil(width / columns)) : 1;
+  const lines = frame.split('\n');
+  if (!columns || columns <= 0) return lines.length;
+  return lines.reduce((rows, line) => rows + lineRows(line, columns), 0);
+}
+
+/**
+ * Counts the rows `line` wraps onto at `columns`, moving a wide character that straddles the edge down.
+ */
+function lineRows(line: string, columns: number): number {
+  let rows = 1;
+  let column = 0;
+  for (const char of stripVTControlCharacters(line)) {
+    const width = terminalWidth(char);
+    if (column + width > columns) {
+      rows += 1;
+      column = 0;
+    }
+    column += width;
   }
   return rows;
 }

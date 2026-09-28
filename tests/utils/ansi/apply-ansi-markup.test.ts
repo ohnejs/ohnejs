@@ -18,6 +18,15 @@ describe('applyANSIMarkup', () => {
     strictEqual(applyANSIMarkup('**a** __b__', false, color), '\x1b[1ma\x1b[22m \x1b[2mb\x1b[22m');
   });
 
+  it('keeps a marker character inside a pair', () => {
+    strictEqual(applyANSIMarkup('__my_types.ts__', false, color), '\x1b[2mmy_types.ts\x1b[22m');
+    strictEqual(applyANSIMarkup('**2*3**', false, color), '\x1b[1m2*3\x1b[22m');
+    strictEqual(
+      applyANSIMarkup('**Glob `src/**` matched**', false, color),
+      '\x1b[1mGlob \x1b[96msrc/**\x1b[39m matched\x1b[22m',
+    );
+  });
+
   it('leaves word-internal __ literal', () => {
     strictEqual(applyANSIMarkup('table__name', false, color), 'table__name');
   });

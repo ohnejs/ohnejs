@@ -22,6 +22,10 @@ describe('safeResolve', () => {
     strictEqual(safeResolve('/srv/files', 'a/../../etc'), null);
   });
 
+  it('refuses a path holding a NUL byte', () => {
+    strictEqual(safeResolve('/srv/files', 'a\0.txt'), null);
+  });
+
   it('refuses an absolute path', () => {
     strictEqual(safeResolve('/srv/files', '/etc/passwd'), null);
   });

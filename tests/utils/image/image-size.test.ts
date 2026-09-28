@@ -224,6 +224,16 @@ describe('imageSize', () => {
     deepStrictEqual(imageSize(spaced), { width: 24, height: 16, type });
   });
 
+  it('never reads a size from inside another SVG attribute value', () => {
+    const type = 'image/svg+xml';
+    const nested = svg(
+      `<svg width="100" height="80" data-x=" width='5'" aria-label="a height='1'"/>`,
+    );
+    deepStrictEqual(imageSize(nested), { width: 100, height: 80, type });
+    const decoy = svg(`<svg data-x=' viewBox="0 0 1 1"' viewBox="0 0 24 16"/>`);
+    deepStrictEqual(imageSize(decoy), { width: 24, height: 16, type });
+  });
+
   it('falls back to the SVG viewBox', () => {
     const type = 'image/svg+xml';
     const only = svg('<svg viewBox="0 0 24 16"/>');

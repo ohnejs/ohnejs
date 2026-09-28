@@ -28,6 +28,13 @@ describe('formatBytes', () => {
     strictEqual(formatBytes(1234567, 0), '1mb');
   });
 
+  it('rolls over to the next unit when rounding reaches 1024', () => {
+    strictEqual(formatBytes(1023.6), '1kb');
+    strictEqual(formatBytes(1024 ** 2 - 1), '1mb');
+    strictEqual(formatBytes(1024 ** 3 - 1), '1gb');
+    strictEqual(formatBytes(1024 * 1023.9, 0), '1mb');
+  });
+
   it('clamps past the largest unit', () => {
     strictEqual(formatBytes(1024 ** 6), '1024pb');
   });

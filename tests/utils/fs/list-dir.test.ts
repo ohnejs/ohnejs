@@ -1,5 +1,5 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -97,6 +97,15 @@ describe('listDir', () => {
     deepStrictEqual(names, ['top.md', 'top.ts']);
   });
 
+  it('never enters a subdirectory `descend` rejects', async () => {
+    const entries = await listDir(dir, {
+      dirs: true,
+      descend: async (entry) => entry.name !== 'b',
+    });
+    const paths = entries!.map((entry) => entry.relativePath).sort();
+    deepStrictEqual(paths, ['a', 'a/b', 'a/mid.ts', 'top.md', 'top.ts']);
+  });
+
   it(
     'skips symlinks unless `followSymlinks: true`',
     { skip: process.platform === 'win32' },
@@ -114,6 +123,29 @@ describe('listDir', () => {
         deepStrictEqual(followed!.map((entry) => entry.name).sort(), ['link.ts', 'target.ts']);
       } finally {
         rmSync(linkRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    'keeps a backslash and `..` in a name as part of the entry',
+    { skip: process.platform === 'win32' },
+    async () => {
+      const odd = mkdtempSync(join(tmpdir(), 'ohne-list-dir-odd-'));
+      try {
+        writeFileSync(join(odd, 'x\\y.ts'), '');
+        mkdirSync(join(odd, 'd\\..'));
+        writeFileSync(join(odd, 'd\\..', 'in.ts'), '');
+
+        const entries = await listDir(odd, { dirs: true, depth: 2 });
+        const found = entries!.map((entry) => [entry.relativePath, existsSync(entry.path)]);
+        deepStrictEqual(found.sort(), [
+          ['d\\..', true],
+          ['d\\../in.ts', true],
+          ['x\\y.ts', true],
+        ]);
+      } finally {
+        rmSync(odd, { recursive: true, force: true });
       }
     },
   );

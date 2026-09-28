@@ -77,6 +77,12 @@ describe('composeCodecs', () => {
     deepStrictEqual(encode('x'), { $a: 'A:x' });
   });
 
+  it('keeps an own __proto__ key while encoding', () => {
+    const { encode } = composeCodecs(dateCodec);
+    const value = JSON.parse('{"__proto__":{"a":1}}');
+    strictEqual(JSON.stringify(encode(value)), '{"__proto__":{"a":1}}');
+  });
+
   it('leaves values matching no codec untouched', () => {
     const { encode } = composeCodecs(dateCodec);
     deepStrictEqual(encode({ x: 1, y: [2, 3] }), { x: 1, y: [2, 3] });

@@ -16,6 +16,19 @@ describe('renderTemplate', () => {
     strictEqual(renderTemplate('{last}, {first}', { first: 'Anduin' }), 'Anduin');
   });
 
+  it('keeps one separator across an absent middle field', () => {
+    strictEqual(
+      renderTemplate('{first} {middle} {last}', { first: 'Anduin', last: 'Wrynn' }),
+      'Anduin Wrynn',
+    );
+    strictEqual(
+      renderTemplate('{city}, {region}, {country}', { city: 'Vienna', country: 'Austria' }),
+      'Vienna, Austria',
+    );
+    strictEqual(renderTemplate('{a}, {b}, {c}', { b: 'y' }), 'y');
+    strictEqual(renderTemplate('{a} - {b}, {c}', { a: 'x', c: 'z' }), 'x, z');
+  });
+
   it('drops leading and trailing literals with their fields', () => {
     strictEqual(renderTemplate('{title} ({year})', { title: 'Dune', year: '1965' }), 'Dune (1965)');
     strictEqual(renderTemplate('{title} ({year})', { title: 'Dune' }), 'Dune');

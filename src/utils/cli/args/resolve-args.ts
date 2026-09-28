@@ -104,10 +104,11 @@ export function resolveArgs<const S extends ArgsSchema>(
   const errors: ArgError[] = [];
   const values: Record<string, string | number | boolean> = {};
 
+  const heads = argv.map((arg) => first(arg.split('=')));
   for (const flag of Object.keys(parsed.flags)) {
     if (aliasToName.has(flag) || canonByForm.has(toKebabCase(flag))) continue;
     const suggestion = didYouMean(toKebabCase(flag), canonByForm.keys());
-    const long = flag.length > 1 || argv.some((arg) => first(arg.split('=')) === `--${flag}`);
+    const long = flag.length > 1 || heads.includes(`--${flag}`) || heads.includes(`--no-${flag}`);
     const typed = long ? `--${flag}` : `-${flag}`;
     errors.push({
       kind: 'unknown',

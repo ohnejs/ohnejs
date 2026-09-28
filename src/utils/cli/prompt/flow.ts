@@ -1,9 +1,8 @@
 import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 
 import { applyANSIMarkup } from '../../ansi/apply-ansi-markup.ts';
+import { terminalWidth } from '../../ansi/terminal-width.ts';
 import { leadIn } from './_frame.ts';
-
-const SGR = new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g');
 
 /**
  * The opening line of a flow: a top corner and the title, with inline markup applied.
@@ -49,23 +48,16 @@ export function noteBlock(
 ): string {
   const lines = `\n${message}\n`.split('\n').map((line) => applyANSIMarkup(line, false, colors));
   const renderedTitle = applyANSIMarkup(title, false, colors);
-  const titleWidth = visibleWidth(renderedTitle);
-  const inner = Math.max(titleWidth, ...lines.map(visibleWidth)) + 2;
+  const titleWidth = terminalWidth(renderedTitle);
+  const inner = Math.max(titleWidth, ...lines.map(terminalWidth)) + 2;
 
   const top = `${colors.green('◇')}  ${renderedTitle} ${colors.dim('─'.repeat(Math.max(inner - titleWidth - 1, 1)) + '╮')}`;
   const body = lines
     .map((line) => {
-      const pad = ' '.repeat(inner - visibleWidth(line));
+      const pad = ' '.repeat(inner - terminalWidth(line));
       return `${colors.dim('│')}  ${line}${pad}${colors.dim('│')}`;
     })
     .join('\n');
   const base = colors.dim(`${last ? '└' : '├'}${'─'.repeat(inner + 2)}╯`);
   return leadIn(`${top}\n${body}\n${base}`, lead, colors);
-}
-
-/**
- * Counts the code points of `text` once styling codes are stripped.
- */
-function visibleWidth(text: string): number {
-  return [...text.replace(SGR, '')].length;
 }

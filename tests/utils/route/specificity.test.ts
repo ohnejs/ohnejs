@@ -10,6 +10,12 @@ describe('specificity', () => {
     deepStrictEqual(specificity('/[...path]'), [0]);
     deepStrictEqual(specificity('/'), []);
   });
+
+  it('scores a segment mixing text with a param half a step above the bare param', () => {
+    deepStrictEqual(specificity('/posts/[id].json'), [2, 1.5]);
+    deepStrictEqual(specificity('/v:version'), [1.5]);
+    deepStrictEqual(specificity('/files-[...path]'), [0.5]);
+  });
 });
 
 describe('compareSpecificity', () => {
@@ -19,6 +25,13 @@ describe('compareSpecificity', () => {
       '/users/[id]',
       '/[...all]',
     ]);
+  });
+
+  it('ranks a static segment before one mixing text with a param, before the bare param', () => {
+    deepStrictEqual(
+      ['/posts/[id]', '/posts/report-[id]', '/posts/report-final'].sort(compareSpecificity),
+      ['/posts/report-final', '/posts/report-[id]', '/posts/[id]'],
+    );
   });
 
   it('prefers the longer pattern on a specificity tie', () => {

@@ -18,9 +18,8 @@ function sortKeys(value: unknown): unknown {
   if (isArray(value)) return value.map(sortKeys);
 
   if (isPlainObject(value)) {
-    const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) sorted[key] = sortKeys(value[key]);
-    return sorted;
+    const keys = Object.keys(value).sort();
+    return Object.fromEntries(keys.map((key) => [key, sortKeys(value[key])]));
   }
 
   return value;

@@ -2,6 +2,7 @@ import { strictEqual } from 'node:assert';
 import { PassThrough } from 'node:stream';
 import { describe, it } from 'node:test';
 
+import { terminalWidth } from '../../../../src/utils/ansi/index.ts';
 import { createPrompt, isCancel, type TextOptions } from '../../../../src/utils/cli/index.ts';
 
 async function runText(script: string[], options: Partial<TextOptions> = {}) {
@@ -252,6 +253,32 @@ describe('createPrompt().text', () => {
       .find((l) => l.includes('…'))!;
     strictEqual(submitLine.includes('…'), true);
     strictEqual([...submitLine].length <= 13, true);
+  });
+
+  it('windows a wide value to the terminal columns while typing and after submitting', async () => {
+    const input = new PassThrough();
+    const out: string[] = [];
+    const output = { write: (s: string) => out.push(s), isTTY: true, columns: 14 };
+    const prompt = createPrompt({ input, output, color: false });
+    const result = prompt.text({ message: 'v?' });
+    for (const chunk of [...'漢字漢字漢字漢字漢字', '\r']) input.write(chunk);
+    strictEqual(await result, '漢字漢字漢字漢字漢字');
+
+    const lines = out.flatMap((frame) => frame.split('\n')).filter((line) => line.includes('漢'));
+    strictEqual(lines.length > 0, true);
+    for (const line of lines) strictEqual(terminalWidth(line) <= 14, true);
+  });
+
+  it('erases every row a wide line wraps onto before redrawing', async () => {
+    const input = new PassThrough();
+    const out: string[] = [];
+    const output = { write: (s: string) => out.push(s), isTTY: true, columns: 10 };
+    const prompt = createPrompt({ input, output, color: false });
+    const result = prompt.text({ message: '漢字漢字漢字漢字漢字' });
+    input.write('a');
+    strictEqual(out[2]!.startsWith('\x1b[5A\r\x1b[0J'), true);
+    input.write('\r');
+    await result;
   });
 
   it('redraws on terminal resize', async () => {

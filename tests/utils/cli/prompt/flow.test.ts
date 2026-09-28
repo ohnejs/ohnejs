@@ -2,6 +2,7 @@ import { strictEqual } from 'node:assert';
 import { PassThrough } from 'node:stream';
 import { describe, it } from 'node:test';
 
+import { terminalWidth } from '../../../../src/utils/ansi/index.ts';
 import { createPrompt } from '../../../../src/utils/cli/index.ts';
 
 function harness(color = false) {
@@ -69,6 +70,14 @@ describe('createPrompt().note', () => {
     const widths = rows.filter((r) => r.includes('│') || r.includes('╮') || r.includes('╯'));
     const lengths = widths.map((r) => [...r].length);
     strictEqual(new Set(lengths).size, 1);
+  });
+
+  it('sizes the border to wide characters in terminal columns', () => {
+    const { out, prompt } = harness();
+    prompt.note('short\n漢字 and 😀', 'T');
+    const rows = out[0].split('\n');
+    const framed = rows.filter((r) => r.includes('│') || r.includes('╮') || r.includes('╯'));
+    strictEqual(new Set(framed.map(terminalWidth)).size, 1);
   });
 
   it('connects to the rail after a prior prompt', async () => {

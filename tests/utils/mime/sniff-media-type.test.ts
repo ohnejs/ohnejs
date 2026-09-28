@@ -26,7 +26,8 @@ describe('sniffMediaType', () => {
     strictEqual(sniffMediaType(latin1('GIF89a\x01\x00\x01\x00')), 'image/gif');
     strictEqual(sniffMediaType(latin1('GIF87a\x01\x00\x01\x00')), 'image/gif');
     strictEqual(sniffMediaType(latin1('RIFF\x24\x00\x00\x00WEBPVP8 ')), 'image/webp');
-    strictEqual(sniffMediaType(latin1('BM\x36\x00\x0c\x00')), 'image/bmp');
+    strictEqual(sniffMediaType(latin1('BM\x3a\0\0\0\0\0\0\0\x36\0\0\0\x28\0\0\0')), 'image/bmp');
+    strictEqual(sniffMediaType(latin1('BM\x1e\0\0\0\0\0\0\0\x1a\0\0\0\x0c\0\0\0')), 'image/bmp');
     strictEqual(
       sniffMediaType(new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x01, 0x00])),
       'image/x-icon',
@@ -157,6 +158,13 @@ describe('sniffMediaType', () => {
     strictEqual(sniffMediaType(latin1('RIFF\x00\x00\x00\x00ACON')), undefined);
     strictEqual(sniffMediaType(latin1('\0\0\0\x18ftyp3gp5\0\0\0\0')), undefined);
     strictEqual(sniffMediaType(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x80])), undefined);
+  });
+
+  it('does not take text that opens with a short signature for a binary format', () => {
+    strictEqual(sniffMediaType(utf8('BMI,weight\n22.5,70\n')), undefined);
+    strictEqual(sniffMediaType(utf8('BMW service log, 2024 and onward\n')), undefined);
+    strictEqual(sniffMediaType(utf8('ID3 notes')), undefined);
+    strictEqual(sniffMediaType(utf8('OTTO;Street;City\n')), undefined);
   });
 
   it('returns undefined for text and for an empty or short header', () => {

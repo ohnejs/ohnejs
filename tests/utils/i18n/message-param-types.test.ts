@@ -1,10 +1,11 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { MessageSyntaxError } from '../../../src/utils/i18n/message-errors.ts';
 import {
   messageParamTypes,
   messageParamTypesAST,
+  unifyMessageParamTypes,
 } from '../../../src/utils/i18n/message-param-types.ts';
 import { parseMessage } from '../../../src/utils/i18n/parse-message.ts';
 
@@ -123,6 +124,16 @@ describe('messageParamTypes - edge cases', () => {
     });
   });
 
+  it('types names shared with `Object.prototype` by their own use', () => {
+    deepStrictEqual(messageParamTypes('{constructor} {valueOf, date}'), {
+      constructor: { kind: 'value' },
+      valueOf: { kind: 'date' },
+    });
+    deepStrictEqual(messageParamTypes('{toString, select, a {x} other {y}}'), {
+      toString: { kind: 'choice', options: ['a'] },
+    });
+  });
+
   it('ignores literal and pound nodes', () => {
     deepStrictEqual(messageParamTypes('{n, plural, one {# only} other {# total}}'), {
       n: { kind: 'number' },
@@ -138,5 +149,32 @@ describe('messageParamTypesAST', () => {
   it('matches the parse-then-walk convenience form', () => {
     const template = 'Must be {min} {min, plural, one {x} other {y}}';
     deepStrictEqual(messageParamTypesAST(parseMessage(template)), messageParamTypes(template));
+  });
+});
+
+describe('unifyMessageParamTypes', () => {
+  const unify = (a: string, b: string) =>
+    unifyMessageParamTypes(messageParamTypes(a), messageParamTypes(b));
+
+  it('narrows a plain placeholder against a plural', () => {
+    deepStrictEqual(unify('{n} items', '{n, plural, one {# item} other {# items}}'), {
+      n: { kind: 'number' },
+    });
+  });
+
+  it('merges the keywords of two selects, one of them other-only', () => {
+    deepStrictEqual(unify('{g, select, female {Sie} other {Er}}', '{g, select, other {O}}'), {
+      g: { kind: 'choice', options: ['female'] },
+    });
+  });
+
+  it('returns null when the parameter names differ', () => {
+    strictEqual(unify('{name}', '{count}'), null);
+    strictEqual(unify('{name}', '{name} {count}'), null);
+    strictEqual(unify('{toString}', '{name}'), null);
+  });
+
+  it('returns null when a parameter has no common type', () => {
+    strictEqual(unify('{g, select, a {A} other {B}}', '{g, number}'), null);
   });
 });

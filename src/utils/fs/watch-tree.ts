@@ -5,7 +5,7 @@ import { readdir, stat } from 'node:fs/promises';
 
 import { isNull } from '../is/is-null.ts';
 import { basename } from '../path/basename.ts';
-import { joinPath } from '../path/join-path.ts';
+import { childPath } from '../path/child-path.ts';
 import { resolvePath } from '../path/resolve-path.ts';
 
 /**
@@ -104,7 +104,7 @@ export function watchTree(
     await Promise.all(
       entries.map((entry) => {
         if (pruned(entry.name)) return undefined;
-        const child = joinPath(path, entry.name);
+        const child = childPath(path, entry.name);
         if (entry.isDirectory()) return watchDir(child, emitExisting);
         if (emitExisting) onChange(child);
         return undefined;
@@ -123,7 +123,7 @@ export function watchTree(
     }
     if (pruned(basename(filename))) return;
 
-    const changed = joinPath(watchedDir, filename);
+    const changed = childPath(watchedDir, filename);
     onChange(changed);
     reconcile(changed);
   }

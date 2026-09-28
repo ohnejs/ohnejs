@@ -2,6 +2,8 @@ import type { MessageAST, MessageNode } from './message-ast.ts';
 
 import { uniqueArray } from '../array/unique-array.ts';
 import { isNull } from '../is/is-null.ts';
+import { isUndefined } from '../is/is-undefined.ts';
+import { hasKey } from '../object/has-key.ts';
 import { parseMessage } from './parse-message.ts';
 
 /**
@@ -63,6 +65,36 @@ export function messageParamTypesAST(ast: MessageAST): Record<string, MessagePar
 }
 
 /**
+ * Unifies the parameter types of two templates meant to take the same parameters.
+ * Each name is narrowed to the type that satisfies both, as one template's repeated uses are.
+ * Returns `null` when the two name different parameters, or a name has no common type.
+ *
+ * @example
+ * ```ts
+ * unifyMessageParamTypes({ n: { kind: 'value' } }, { n: { kind: 'number' } })
+ * // -> { n: { kind: 'number' } }
+ *
+ * unifyMessageParamTypes({ n: { kind: 'value' } }, { count: { kind: 'value' } })
+ * // -> null
+ * ```
+ */
+export function unifyMessageParamTypes(
+  a: Readonly<Record<string, MessageParamType>>,
+  b: Readonly<Record<string, MessageParamType>>,
+): Record<string, MessageParamType> | null {
+  const names = Object.keys(a);
+  if (names.length !== Object.keys(b).length) return null;
+
+  const unified: Record<string, MessageParamType> = {};
+  for (const name of names) {
+    const merged = hasKey(b, name) ? narrow(a[name]!, b[name]!) : null;
+    if (isNull(merged)) return null;
+    unified[name] = merged;
+  }
+  return unified;
+}
+
+/**
  * Records into `params` the type each node in `nodes` implies.
  */
 function walk(nodes: MessageAST, params: Record<string, MessageParamType>): void {
@@ -114,8 +146,8 @@ function record(
   name: string,
   type: MessageParamType,
 ): void {
-  const existing = params[name];
-  if (!existing) {
+  const existing = hasKey(params, name) ? params[name] : undefined;
+  if (isUndefined(existing)) {
     params[name] = type;
     return;
   }

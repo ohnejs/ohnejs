@@ -39,4 +39,45 @@ describe('importDefault', () => {
     strictEqual(await importDefault(file), 1);
     strictEqual(await importDefault(file, { fresh: true }), 2);
   });
+
+  it('re-imports an edited `_` helper with fresh, through the file that imports it', async () => {
+    const helper = join(root, '_part.ts');
+    const file = join(root, 'whole.ts');
+    writeFileSync(helper, 'export default 1;\n');
+    writeFileSync(file, "import part from './_part.ts';\nexport default part;\n");
+    strictEqual(await importDefault(file, { fresh: true }), 1);
+
+    writeFileSync(helper, 'export default 2;\n');
+    utimesSync(helper, new Date(), new Date(Date.now() + 2000));
+    strictEqual(await importDefault(file, { fresh: true }), 2);
+  });
+
+  it('re-imports an edited file whose mtime stays below a newer helper elsewhere', async () => {
+    const helper = join(root, '_newest.ts');
+    const holder = join(root, 'holder.ts');
+    const file = join(root, 'older.ts');
+    writeFileSync(helper, 'export default 0;\n');
+    writeFileSync(holder, "import newest from './_newest.ts';\nexport default newest;\n");
+    utimesSync(helper, new Date(), new Date(Date.now() + 60_000));
+    await importDefault(holder, { fresh: true });
+
+    writeFileSync(file, 'export default 1;\n');
+    utimesSync(file, new Date(), new Date(Date.now() + 10_000));
+    strictEqual(await importDefault(file, { fresh: true }), 1);
+    writeFileSync(file, 'export default 2;\n');
+    utimesSync(file, new Date(), new Date(Date.now() + 20_000));
+    strictEqual(await importDefault(file, { fresh: true }), 2);
+  });
+
+  it('keeps any other import shared under fresh', async () => {
+    const shared = join(root, 'shared.ts');
+    const file = join(root, 'uses-shared.ts');
+    writeFileSync(shared, 'export default {};\n');
+    writeFileSync(file, "import shared from './shared.ts';\nexport default shared;\n");
+    const instance = await importDefault(shared);
+
+    strictEqual(await importDefault(file, { fresh: true }), instance);
+    utimesSync(file, new Date(), new Date(Date.now() + 3000));
+    strictEqual(await importDefault(file, { fresh: true }), instance);
+  });
 });

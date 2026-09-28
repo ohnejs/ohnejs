@@ -20,6 +20,13 @@ describe('jsonSerialize', () => {
     strictEqual(jsonSerialize([{ b: 2, a: 1 }]), '[{"a":1,"b":2}]');
   });
 
+  it('keeps an own __proto__ key', () => {
+    strictEqual(
+      jsonSerialize(JSON.parse('{"b":2,"__proto__":{"a":1}}')),
+      '{"__proto__":{"a":1},"b":2}',
+    );
+  });
+
   it('serializes primitives', () => {
     strictEqual(jsonSerialize(null), 'null');
     strictEqual(jsonSerialize('hi'), '"hi"');

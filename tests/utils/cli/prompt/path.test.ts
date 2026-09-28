@@ -186,6 +186,27 @@ describe('createPrompt().path', () => {
     }
   });
 
+  it('highlights a match in an astral name without splitting its surrogate pairs', async () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'ohne-path-'));
+    writeFileSync(joinPath(dir, '😀a.ts'), '');
+    writeFileSync(joinPath(dir, 'b.ts'), '');
+    const input = new PassThrough();
+    const out: string[] = [];
+    const prompt = createPrompt({ input, output: { write: (s) => out.push(s) }, color: true });
+    const result = prompt.path({ message: 'Path?', root: dir });
+    for (const chunk of [...'ts', '\x1b[B', '\x03']) input.write(chunk);
+    await result;
+    rmSync(dir, { recursive: true, force: true });
+    strictEqual(
+      out.every((frame) => frame.isWellFormed()),
+      true,
+    );
+    strictEqual(
+      out.some((frame) => frame.includes('😀') && frame.includes('\x1b[1mt')),
+      true,
+    );
+  });
+
   it('cancels on Ctrl-C', async () => {
     const { result } = await runPath([...'src', '\x03']);
     strictEqual(isCancel(result), true);

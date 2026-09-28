@@ -224,6 +224,12 @@ describe('resolveArgs', () => {
     if (!result.ok) strictEqual(result.errors[0]!.message, 'Unknown flag `--x`');
   });
 
+  it('reports an unknown one-letter negation with two dashes', () => {
+    const result = resolveArgs({ port: { type: 'number' } }, ['--no-x']);
+    strictEqual(result.ok, false);
+    if (!result.ok) strictEqual(result.errors[0]!.message, 'Unknown flag `--x`');
+  });
+
   describe('recognize', () => {
     it('accepts a recognized flag without reporting it unknown, and omits it from values', () => {
       const schema = { cwd: { type: 'string' } } as const;

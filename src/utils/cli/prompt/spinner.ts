@@ -1,5 +1,8 @@
 import { isColorStream } from '../../ansi/is-color-stream.ts';
 import { pickANSIColors } from '../../ansi/pick-ansi-colors.ts';
+import { terminalWidth } from '../../ansi/terminal-width.ts';
+import { isUndefined } from '../../is/is-undefined.ts';
+import { clipEnd } from './_line.ts';
 
 const HIDE_CURSOR = '\x1b[?25l';
 const SHOW_CURSOR = '\x1b[?25h';
@@ -28,7 +31,7 @@ export interface SpinnerOptions {
    * @default
    * process.stdout
    */
-  output?: { write(text: string): void; isTTY?: boolean };
+  output?: { write(text: string): void; isTTY?: boolean; columns?: number };
 
   /**
    * Whether to emit ANSI styling.
@@ -117,7 +120,10 @@ export function createSpinner(options: SpinnerOptions = {}): Spinner {
       output.write(`${glyph}  ${message}\n`);
       return;
     }
-    output.write(`${ERASE_LINE}${glyph}  ${message}`);
+    const room = isUndefined(output.columns)
+      ? undefined
+      : output.columns - terminalWidth(glyph) - 2;
+    output.write(`${ERASE_LINE}${glyph}  ${clipEnd(message, room)}`);
     if (lead) output.write(`\n${ERASE_REST}${colors.dim('│')}${CURSOR_UP}`);
   };
 

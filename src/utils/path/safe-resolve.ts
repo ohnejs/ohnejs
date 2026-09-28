@@ -6,6 +6,7 @@ import { resolvePath } from './resolve-path.ts';
  *
  * Returns the normalized absolute path when it stays inside `base`.
  * Returns `null` when the path would break out via `..` segments or an absolute path.
+ * A path holding a NUL byte names no file, so it is `null` too.
  * Use it before mapping a request param onto the filesystem.
  * `base` itself (an empty or `.` path) resolves to `base` and is allowed.
  *
@@ -17,9 +18,11 @@ import { resolvePath } from './resolve-path.ts';
  * safeResolve('/srv/files', '')            // -> '/srv/files'
  * safeResolve('/srv/files', '../etc')      // -> null
  * safeResolve('/srv/files', '/etc/passwd') // -> null
+ * safeResolve('/srv/files', 'a\0.txt')     // -> null
  * ```
  */
 export function safeResolve(base: string, path: string): string | null {
+  if (path.includes('\0')) return null;
   const root = resolvePath(base);
   const resolved = resolvePath(path, root);
   return isPathInside(resolved, root) ? resolved : null;

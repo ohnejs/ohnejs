@@ -2,6 +2,8 @@ import type { Stats } from 'node:fs';
 
 import { stat as fsStat } from 'node:fs/promises';
 
+import { isMissingPath } from './_is-missing-path.ts';
+
 /**
  * Reads a path's `Stats`, following symlinks.
  *
@@ -18,7 +20,7 @@ export async function stat(path: string): Promise<Stats | null> {
   try {
     return await fsStat(path);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if (isMissingPath(err)) return null;
     throw err;
   }
 }

@@ -196,7 +196,7 @@ describe('dateOptionsFromSkeleton - time zone', () => {
 
   it('Z / ZZZZ / ZZZZZ', () => {
     deepStrictEqual(opts('Z'), { timeZoneName: 'shortOffset' });
-    deepStrictEqual(opts('ZZZZ'), { timeZoneName: 'long' });
+    deepStrictEqual(opts('ZZZZ'), { timeZoneName: 'longOffset' });
     deepStrictEqual(opts('ZZZZZ'), { timeZoneName: 'longOffset' });
   });
 

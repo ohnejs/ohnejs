@@ -6,8 +6,8 @@ import { isPadded } from './_padded.ts';
 const MARKUP_PATTERN = new RegExp(
   [
     /(?<!`)(`+)(?!`)([^\n]+?)(?<!`)\1(?!`)/.source,
-    /(?<!\S)\*\*(?!\s)([^*\n]+)(?<!\s)\*\*(?!\S)/.source,
-    /(?<!\S)__(?!\s)([^_\n]+)(?<!\s)__(?!\S)/.source,
+    /(?<!\S)\*\*(?!\s)([^\n]+?)(?<!\s)\*\*(?!\S)/.source,
+    /(?<!\S)__(?!\s)([^\n]+?)(?<!\s)__(?!\S)/.source,
   ].join('|'),
   'g',
 );

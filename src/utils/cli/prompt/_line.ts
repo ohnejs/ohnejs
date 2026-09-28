@@ -1,6 +1,9 @@
 import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 
+import { terminalWidth } from '../../ansi/terminal-width.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
+
+const TOKEN_RE = /\p{Cc}\[[0-?]*[ -/]*[@-~]|[\s\S]/gu;
 
 /**
  * A single editable line of text with a caret.
@@ -208,13 +211,13 @@ export function caretValue(
   if (value === '') {
     if (isUndefined(hint) || hint === '') return colors.inverse(' ');
     const chars = [...hint];
-    const [start, end] = caretWindow(chars.length, 0, width);
+    const [start, end] = caretWindow(chars, 0, width);
     const [first, ...rest] = chars.slice(start, end);
     if (isUndefined(first)) return colors.inverse(' ');
     return colors.inverse(first) + colors.dim(rest.join(''));
   }
   const chars = [...value];
-  const [start, end] = caretWindow(chars.length, cursor, width);
+  const [start, end] = caretWindow(chars, cursor, width);
   const before = chars.slice(start, cursor).join('');
   if (cursor >= end) return before + colors.inverse(' ');
   const after = chars.slice(cursor + 1, end).join('');
@@ -222,8 +225,8 @@ export function caretValue(
 }
 
 /**
- * Clips `value` to `width` code points, marking the cut with a trailing ellipsis.
- * Used to fit a resolved value onto one line once the prompt is no longer active.
+ * Clips `value` to `width` terminal columns, marking the cut with a trailing ellipsis.
+ * ANSI escape codes fill no columns and are never split, so styling survives the cut.
  *
  * @example
  * ```ts
@@ -232,10 +235,21 @@ export function caretValue(
  * ```
  */
 export function clipEnd(value: string, width: number | undefined): string {
-  if (isUndefined(width)) return value;
-  const chars = [...value];
-  if (chars.length <= width) return value;
-  return chars.slice(0, Math.max(0, width - 1)).join('') + '…';
+  if (isUndefined(width) || terminalWidth(value) <= width) return value;
+  let kept = '';
+  let tail = '';
+  let used = 0;
+  for (const [token] of value.matchAll(TOKEN_RE)) {
+    if (token.startsWith('\x1b')) {
+      if (used < width) kept += token;
+      else tail += token;
+    } else if (used < width) {
+      used += terminalWidth(token);
+      if (used < width) kept += token;
+      else used = width;
+    }
+  }
+  return `${kept}…${tail}`;
 }
 
 /**
@@ -254,14 +268,19 @@ export function isPrintable(str: string | undefined): boolean {
 }
 
 /**
- * Returns the `[start, end)` range of a line to show so the caret stays within `width` columns.
+ * Returns the `[start, end)` range of `chars` to show so the line and its caret fit within `width` columns.
  */
-function caretWindow(length: number, cursor: number, width: number | undefined): [number, number] {
-  if (isUndefined(width) || length + 1 <= width) return [0, length];
-  const visible = Math.max(0, width - 1);
-  const end = cursor >= length ? length : cursor + 1;
-  const start = Math.max(0, end - visible);
-  return [start, Math.min(length, start + visible)];
+function caretWindow(chars: string[], cursor: number, width: number | undefined): [number, number] {
+  const widths = chars.map(terminalWidth);
+  const total = widths.reduce((sum, cells) => sum + cells, 0);
+  if (isUndefined(width) || total + 1 <= width) return [0, chars.length];
+  const room = width - 1;
+  let end = Math.min(cursor + 1, chars.length);
+  let start = end;
+  let used = 0;
+  while (start > 0 && used + widths[start - 1] <= room) used += widths[--start];
+  while (end < chars.length && used + widths[end] <= room) used += widths[end++];
+  return [start, end];
 }
 
 /**

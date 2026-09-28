@@ -33,6 +33,12 @@ describe('exists', () => {
     strictEqual(await exists(join(dir, 'missing')), false);
   });
 
+  it('returns false for a path beneath a file', async () => {
+    const f = join(dir, 'file.txt');
+    writeFileSync(f, 'x');
+    strictEqual(await exists(join(f, 'child')), false);
+  });
+
   it('propagates permission errors', async () => {
     if (process.getuid?.() === 0 || process.platform === 'win32') return;
     const locked = join(dir, 'locked');

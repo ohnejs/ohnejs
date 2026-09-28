@@ -17,6 +17,7 @@ export interface ComputedRef<T> {
  *
  * The getter runs on the first `.value` read and caches the result.
  * It re-runs only when one of its tracked dependencies changes.
+ * Once stopped with its scope, it runs the getter on every read.
  * Reads inside an `effect` or another `computed` subscribe to it.
  *
  * @example
@@ -53,6 +54,7 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
   return {
     get value() {
       if (evaluating) throw new Error('Cyclic computed');
+      if (!runner.active) return getter();
       track(subs);
       if (dirty) {
         evaluating = true;

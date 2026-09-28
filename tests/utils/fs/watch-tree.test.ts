@@ -41,6 +41,18 @@ describe('watchTree', () => {
     await waitFor(() => changed.some((path) => path.endsWith('/a.ts')));
   });
 
+  it(
+    'reports a backslash in a name as part of the name',
+    { skip: process.platform === 'win32' },
+    async () => {
+      stop = watchTree(dir, (path) => changed.push(path));
+      await delay(50);
+
+      writeFileSync(join(dir, 'x\\y.ts'), 'one');
+      await waitFor(() => changed.some((path) => path.endsWith('/x\\y.ts')));
+    },
+  );
+
   it('watches a pre-existing nested directory', async () => {
     mkdirSync(join(dir, 'nested'));
     const file = join(dir, 'nested', 'b.ts');

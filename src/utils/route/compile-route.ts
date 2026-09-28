@@ -1,4 +1,5 @@
 import { isNull } from '../is/is-null.ts';
+import { ROUTE_PARAM_RE } from './_route-param.ts';
 import { trimRoutePath } from './trim-route-path.ts';
 
 /**
@@ -50,7 +51,6 @@ export interface RouteMatcher {
   readonly regex: RegExp;
 }
 
-const TOKEN_RE = /\[(\.\.\.)?([A-Za-z_][A-Za-z0-9_]*)\]|:([A-Za-z_][A-Za-z0-9_]*)/g;
 const META_RE = /[.*+?^${}()|[\]\\]/g;
 
 /**
@@ -80,7 +80,7 @@ export function compileRoute(pattern: string): RouteMatcher {
   let regexSrc = '^';
   let cursor = 0;
 
-  for (const token of normalized.matchAll(TOKEN_RE)) {
+  for (const token of normalized.matchAll(ROUTE_PARAM_RE)) {
     regexSrc += normalized.slice(cursor, token.index).replace(META_RE, '\\$&');
     params.push(token[2] ?? token[3]);
     regexSrc += token[1] ? '(.+)' : '([^/]+)';

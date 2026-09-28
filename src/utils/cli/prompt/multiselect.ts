@@ -69,6 +69,7 @@ export function multiselectDefinition<T>(options: MultiselectOptions<T>): Prompt
   };
   const move = (delta: number): void => void (cursor = (cursor + delta + count) % count);
   const toggle = (): void => {
+    if (count === 0) return;
     if (selected.has(cursor)) selected.delete(cursor);
     else selected.add(cursor);
     sync();

@@ -5,6 +5,7 @@ export * from './exists.ts';
 export * from './find-up.ts';
 export * from './import-default.ts';
 export * from './list-dir.ts';
+export * from './read-dir.ts';
 export * from './read-file-bytes.ts';
 export * from './read-file.ts';
 export * from './read-json.ts';

@@ -40,7 +40,7 @@ const BRAND_TYPES: Record<string, string> = {
 // Each prologue body stops at its own terminator, so a run of them cannot backtrack exponentially.
 const SVG_ROOT_RE =
   /^\s*(?:(?:<\?(?:[^?]|\?(?!>))*\?>|<!--(?:[^-]|-(?!->))*-->|<!(?!--)(?:[^>[]|\[[^\]]*\])*>)\s*)*<svg(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>/;
-const SVG_ATTRIBUTE_RE = /\s(width|height|viewBox)\s*=\s*(["'])(.*?)\2/gs;
+const SVG_ATTRIBUTE_RE = /\s([^\s=]+)\s*=\s*(["'])(.*?)\2/gs;
 const SVG_LENGTH_RE = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(?:px)?\s*$/i;
 
 const SVG_HEAD = 64 * 1024;

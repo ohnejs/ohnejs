@@ -15,6 +15,16 @@ describe('withTimeout', () => {
     strictEqual(value, 'late');
   });
 
+  it('rejects with what onTimeout throws', async () => {
+    const pending = new Promise<string>(() => {});
+    await rejects(
+      withTimeout(pending, 5, () => {
+        throw new Error('timed out');
+      }),
+      /timed out/,
+    );
+  });
+
   it('rejects when the promise rejects before the deadline', async () => {
     await rejects(
       withTimeout(Promise.reject(new Error('boom')), 50, () => 'late'),

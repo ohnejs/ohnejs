@@ -50,6 +50,7 @@ describe('parseBytes', () => {
       throws(() => parseBytes('10xb'), /Invalid byte size/);
       throws(() => parseBytes('big'), /Invalid byte size/);
       throws(() => parseBytes(''), /Invalid byte size/);
+      throws(() => parseBytes('1constructor'), /Invalid byte size/);
     });
   });
 });

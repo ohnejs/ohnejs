@@ -1,5 +1,7 @@
 import { access } from 'node:fs/promises';
 
+import { isMissingPath } from './_is-missing-path.ts';
+
 /**
  * Reports whether a path exists.
  *
@@ -16,7 +18,7 @@ export async function exists(path: string): Promise<boolean> {
     await access(path);
     return true;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    if (isMissingPath(err)) return false;
     throw err;
   }
 }

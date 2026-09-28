@@ -5,9 +5,8 @@ import { opendir, stat } from 'node:fs/promises';
 import { isArray } from '../is/is-array.ts';
 import { isNull } from '../is/is-null.ts';
 import { isUndefined } from '../is/is-undefined.ts';
+import { childPath } from '../path/child-path.ts';
 import { extname } from '../path/extname.ts';
-import { joinPath } from '../path/join-path.ts';
-import { relativePath } from '../path/relative-path.ts';
 import { resolvePath } from '../path/resolve-path.ts';
 
 /**
@@ -69,7 +68,7 @@ export interface ListDirOptions {
 
   /**
    * Include directory entries in the result.
-   * Independent of recursion: subdirectories are still descended into when allowed by `depth`.
+   * Independent of recursion: subdirectories are still descended into when `depth` and `descend` allow.
    *
    * @default
    * false
@@ -90,6 +89,13 @@ export interface ListDirOptions {
    * Omitted keeps every entry.
    */
   filter?: (entry: DirEntry) => boolean;
+
+  /**
+   * Predicate deciding whether the walk enters a subdirectory.
+   * Return `false` to skip it and everything below it, never opening it.
+   * Omitted enters every subdirectory `depth` allows.
+   */
+  descend?: (entry: DirEntry) => boolean | Promise<boolean>;
 
   /**
    * Include entries whose name starts with `.`.
@@ -138,6 +144,7 @@ export async function listDir(
     dirs = false,
     ext,
     filter,
+    descend,
     hidden = false,
     followSymlinks = false,
   } = options;
@@ -149,18 +156,20 @@ export async function listDir(
   if (isNull(rootDir)) return null;
 
   const results: DirEntry[] = [];
-  await walk(rootDir, root, 0);
+  await walk(rootDir, '', 0);
   return results;
 
   /**
    * Collects the wanted entries of `dir` into `results`, descending while `currentDepth` is below `depth`.
+   * `prefix` is the path of `dir` relative to the root, with a trailing `/` below the root.
    */
-  async function walk(dir: Dir, currentDir: string, currentDepth: number): Promise<void> {
+  async function walk(dir: Dir, prefix: string, currentDepth: number): Promise<void> {
     for await (const dirent of dir) {
       const name = dirent.name;
       if (!hidden && name.startsWith('.')) continue;
 
-      const entryPath = joinPath(currentDir, name);
+      const relative = prefix + name;
+      const entryPath = childPath(root, relative);
       const type = await resolveType(dirent, entryPath, followSymlinks);
       if (isNull(type)) continue;
 
@@ -168,7 +177,7 @@ export async function listDir(
       const stem = entryExt.length > 0 ? name.slice(0, -entryExt.length) : name;
       const entry: DirEntry = {
         path: entryPath,
-        relativePath: relativePath(root, entryPath),
+        relativePath: relative,
         name,
         stem,
         ext: entryExt,
@@ -181,9 +190,9 @@ export async function listDir(
         results.push(entry);
       }
 
-      if (type === 'directory' && currentDepth < depth) {
+      if (type === 'directory' && currentDepth < depth && (!descend || (await descend(entry)))) {
         const subdir = await openDir(entryPath);
-        if (!isNull(subdir)) await walk(subdir, entryPath, currentDepth + 1);
+        if (!isNull(subdir)) await walk(subdir, `${relative}/`, currentDepth + 1);
       }
     }
   }

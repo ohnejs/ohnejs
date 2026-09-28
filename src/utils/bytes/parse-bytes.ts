@@ -1,6 +1,6 @@
 import { isRealNumber } from '../is/is-real-number.ts';
 import { isString } from '../is/is-string.ts';
-import { isUndefined } from '../is/is-undefined.ts';
+import { hasKey } from '../object/has-key.ts';
 
 const UNITS: Readonly<Record<string, number>> = {
   b: 1,
@@ -59,11 +59,11 @@ export function parseBytes(input: number | string): number {
     if (!match) {
       throw new Error(`Invalid byte size: "${input}"`);
     }
-    const factor = UNITS[(match[2] || 'b').toLowerCase()];
-    if (isUndefined(factor)) {
+    const unit = (match[2] || 'b').toLowerCase();
+    if (!hasKey(UNITS, unit)) {
       throw new Error(`Invalid byte size: "${input}"`);
     }
-    return Math.round(Number(match[1]) * factor);
+    return Math.round(Number(match[1]) * UNITS[unit]);
   }
 
   if (!isRealNumber(input) || input < 0) {

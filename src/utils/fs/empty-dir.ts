@@ -1,5 +1,5 @@
-import { readdir } from 'node:fs/promises';
-
+import { childPath } from '../path/child-path.ts';
+import { readDir } from './read-dir.ts';
 import { removeDir } from './remove-dir.ts';
 
 /**
@@ -13,10 +13,6 @@ import { removeDir } from './remove-dir.ts';
  * ```
  */
 export async function emptyDir(path: string): Promise<void> {
-  const names = await readdir(path).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  });
-  // A raw join: `joinPath` would read a `\` in a POSIX name as a separator and fold `..` lexically.
-  await Promise.all(names.map((name) => removeDir(`${path}/${name}`)));
+  const names = (await readDir(path)) ?? [];
+  await Promise.all(names.map((name) => removeDir(childPath(path, name))));
 }

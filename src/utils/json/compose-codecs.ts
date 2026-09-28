@@ -106,9 +106,7 @@ export function composeCodecs(...codecs: JSONCodec<any>[]): ComposedCodecs {
     if (isArray(value)) return value.map(encode);
 
     if (isPlainObject(value)) {
-      const out: Record<string, unknown> = {};
-      for (const key of Object.keys(value)) out[key] = encode(value[key]);
-      return out;
+      return Object.fromEntries(Object.keys(value).map((key) => [key, encode(value[key])]));
     }
 
     return value;

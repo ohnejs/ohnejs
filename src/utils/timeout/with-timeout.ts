@@ -4,7 +4,7 @@ import { longTimeout } from './long-timeout.ts';
  * Races a promise against a millisecond deadline.
  *
  * Resolves with the promise's value if it settles first, clearing the timer.
- * If the deadline passes first, resolves with `onTimeout()` instead.
+ * If the deadline passes first, resolves with `onTimeout()` instead, or rejects with what it throws.
  * The original promise keeps running, but its later settling is ignored, so a rejection cannot leak.
  * A rejection that beats the deadline still rejects the returned promise.
  *
@@ -16,7 +16,7 @@ import { longTimeout } from './long-timeout.ts';
  */
 export function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const cancel = longTimeout(() => resolve(onTimeout()), ms);
+    const cancel = longTimeout(() => resolve(Promise.try(onTimeout)), ms);
     promise.then(
       (value) => {
         cancel();

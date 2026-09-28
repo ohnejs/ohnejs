@@ -1,5 +1,7 @@
 import { readFile as fsReadFile } from 'node:fs/promises';
 
+import { isMissingPath } from './_is-missing-path.ts';
+
 /**
  * Reads a file's raw bytes.
  *
@@ -16,7 +18,7 @@ export async function readFileBytes(path: string): Promise<Uint8Array | null> {
   try {
     return await fsReadFile(path);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if (isMissingPath(err)) return null;
     throw err;
   }
 }

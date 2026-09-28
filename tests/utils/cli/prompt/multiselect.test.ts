@@ -87,6 +87,18 @@ describe('createPrompt().multiselect', () => {
     strictEqual(out.join('').includes('Select at least one option.'), true);
   });
 
+  it('keeps a required empty list open through toggles and moves', async () => {
+    const { result } = await runMultiselect(
+      [' ', '\r', '\x1b[B', ' ', '\x1b[F', ' ', '\r', '\x03'],
+      {
+        message: 'Fruit?',
+        options: [],
+        required: true,
+      },
+    );
+    strictEqual(isCancel(result), true);
+  });
+
   it('reds the rail and flattens the title to one red on a failed required submit', async () => {
     const input = new PassThrough();
     const out: string[] = [];

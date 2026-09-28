@@ -58,6 +58,14 @@ describe('stringifySearchParams', () => {
     strictEqual(stringifySearchParams({ 'a=b': 1, 'c&d': 2 }), 'a%3Db=1&c%26d=2');
   });
 
+  it('round-trips a first key that starts with ?', () => {
+    deepStrictEqual(parseSearchParams(stringifySearchParams({ '?a': 1 })), { '?a': 1 });
+  });
+
+  it('writes a lone surrogate as U+FFFD instead of throwing', () => {
+    strictEqual(stringifySearchParams({ 'k\uD800': 'v\uDC00' }), 'k%EF%BF%BD=v%EF%BF%BD');
+  });
+
   it('round-trips any JSON value', () => {
     const value = {
       title: 'red & blue',
