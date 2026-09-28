@@ -5,6 +5,8 @@ import type { UploadReach } from '../../../src/uploads/uploads/_reach.ts';
 import type { UploadRow } from '../../../src/uploads/uploads/_row.ts';
 import type { StagedUpload } from '../../../src/uploads/uploads/_stage.ts';
 
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { drainJournal } from '../../../src/uploads/storage/journal.ts';
@@ -68,6 +70,34 @@ describe('landUpload', () => {
 
     strictEqual(second.name, 'warchief-2.txt');
     strictEqual(text(storage.objects.get('orgrimmar/warchief-2.txt')), 'Garrosh');
+  });
+
+  it('suffixes past the taken names a query:filter scope hides', async () => {
+    const hidden: string[] = [];
+    for (const hero of ['Uther', 'Arthas', 'Jaina', 'Muradin', 'Falric']) {
+      hidden.push((await land(await stage(hero), 'stratholme', 'culling.txt')).UUID);
+    }
+    hook('query:filter', (ir) => {
+      if (ir.collection !== 'Uploads') return ir;
+      const scope = {
+        kind: 'compare',
+        path: ['UUID'],
+        op: 'in',
+        value: hidden,
+        negated: true,
+      } as const;
+      return {
+        ...ir,
+        condition: ir.condition ? { kind: 'and', nodes: [ir.condition, scope] } : scope,
+      };
+    });
+    try {
+      const record = await land(await stage('Marwyn'), 'stratholme', 'culling.txt');
+      strictEqual(record.name, 'culling-6.txt');
+    } finally {
+      useHooks().clear();
+    }
+    await drainJournal();
   });
 
   it('creates the missing folders on the way', async () => {

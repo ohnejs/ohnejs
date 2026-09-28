@@ -101,6 +101,7 @@ export async function landUpload(
 
 /**
  * Creates the file row under a name free among its siblings, retrying the next suffix on a lost race.
+ * A sibling an app scope hides still counts, since the unique index covers it.
  * A suffix that would carry the path past 768 bytes is a `422` at `directory`.
  */
 async function createFile(
@@ -110,6 +111,7 @@ async function createFile(
 ): Promise<UploadRow> {
   const siblings = (await queryUntyped('Uploads')
     .use(tx)
+    .unscoped()
     .where({ directory: file.directory })
     .pluck('name')) as string[];
   let name = uniqueUploadName(file.name, siblings);

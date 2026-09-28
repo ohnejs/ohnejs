@@ -5,7 +5,8 @@ import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { createFolder } from '../../../src/uploads/uploads/create-folder.ts';
-import { storage } from '../_fixture.ts';
+import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
+import { bytes, storage, stream } from '../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
@@ -31,6 +32,18 @@ describe('createFolder', () => {
     ]);
     strictEqual(storage.objects.size, before);
     strictEqual(await queryUntyped('UploadsJournal').count(), 0);
+  });
+
+  it('names a dotted folder so an upload into its path lands inside it', async () => {
+    const folder = await createFolder({ directory: 'releases', name: 'v1.2' });
+    strictEqual(folder.path, 'releases/v1-2');
+    const file = await putUpload({
+      directory: folder.path,
+      name: 'notes.txt',
+      body: stream(bytes('n')),
+    });
+    strictEqual(file.directory, folder.path);
+    strictEqual(await queryUntyped('Uploads').where({ directory: 'releases' }).count(), 1);
   });
 
   it('records the author', async () => {

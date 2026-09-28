@@ -90,6 +90,7 @@ describe('imageURL', () => {
       imageURL({ directory: '', name: 'logo.png' }, { width: 80 }).startsWith(SERVICE),
       true,
     );
+    strictEqual(imageURL({ directory: '', name: 'png' }, { width: 80 }), '/uploads/png');
   });
 
   it('writes unsigned without a secret and answers the original without a service', () => {
@@ -111,6 +112,14 @@ describe('imageURL', () => {
     );
     strictEqual(imageSrcSet(sunset, [variants.card, variants.cardWide]), byName);
     strictEqual(imageSrcSet(sunset, ['card', { width: 800, format: 'webp' }]), byName);
+  });
+
+  it('writes the rendered width as the descriptor, `dpr` included', () => {
+    match(
+      imageSrcSet(sunset, [{ width: 400, dpr: 2 }]),
+      /\/w_400,dpr_2\/photos\/sunset\.jpg 800w$/,
+    );
+    match(imageSrcSet(sunset, [{ width: 400, dpr: 1.5 }]), / 600w$/);
   });
 
   it('refuses a srcset entry without a width', () => {

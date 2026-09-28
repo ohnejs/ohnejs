@@ -15,6 +15,8 @@ import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import UploadsCollection from '../../../src/uploads/collections/Uploads.ts';
@@ -129,6 +131,16 @@ describe('image reference', () => {
       cover: 'validation.invalidReference',
       hero: 'validation.invalidReference',
     });
+  });
+
+  it('judges an upload a query:filter scope hides', async () => {
+    hook('query:filter', (ir) => (ir.collection === 'Uploads' ? { ...ir, limit: 0 } : ir));
+    try {
+      const errors = await failing({ cover: brief });
+      strictEqual(errors.cover, 'uploads.errors.notAnImage');
+    } finally {
+      useHooks().clear();
+    }
   });
 });
 

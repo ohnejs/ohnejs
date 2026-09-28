@@ -63,6 +63,19 @@ export function canonicalName(value: string): string {
 }
 
 /**
+ * Canonicalizes a folder name as the directory segment it becomes, so every path into the folder reaches it.
+ * A dot is no extension here: it turns into a hyphen, as in `canonicalDirectory`.
+ *
+ * @example
+ * ```ts
+ * canonicalFolderName('Release 1.2') // -> 'release-1-2'
+ * ```
+ */
+export function canonicalFolderName(value: string): string {
+  return canonicalName(slugify(value));
+}
+
+/**
  * Joins a location into its path, the storage key and the URL tail of a file.
  * Each segment fits 255 bytes, and every write helper refuses a whole path past 768.
  *

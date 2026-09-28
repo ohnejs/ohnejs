@@ -4,9 +4,12 @@ import {
   isArray,
   isNull,
   isPlainObject,
+  isRealNumber,
   isString,
   isUndefined,
   last,
+  longTimeout,
+  onCleanup,
   ref,
   type ConditionObject,
   type Ref,
@@ -645,6 +648,33 @@ export function rangeBetween(
     originIndex < targetIndex ? [originIndex, targetIndex] : [targetIndex, originIndex];
   const picked = list.slice(start, end + 1);
   return originIndex > targetIndex ? picked.reverse() : picked;
+}
+
+/**
+ * Returns a scheduler that calls `reload` once the soonest `expires` among the given records passes.
+ * Each call replaces the pending reload; disposing the creating scope cancels it.
+ * Each `expires` value reloads once, so an answer that brings the same value back never loops.
+ *
+ * @example
+ * ```ts
+ * const renewAt = expiryRenewal(reload)
+ *
+ * renewAt(page.records) // reloads when the first private link expires
+ * ```
+ */
+export function expiryRenewal(reload: () => void): (records: readonly UploadRecord[]) => void {
+  let cancel = (): void => {};
+  let renewed: number | undefined;
+  onCleanup(() => cancel());
+  return (records) => {
+    cancel();
+    const soonest = Math.min(...records.map((record) => record.expires ?? Infinity));
+    if (!isRealNumber(soonest) || soonest === renewed) return;
+    cancel = longTimeout(() => {
+      renewed = soonest;
+      reload();
+    }, soonest - Date.now());
+  };
 }
 
 /**

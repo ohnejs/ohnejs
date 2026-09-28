@@ -91,6 +91,29 @@ export function drainJournal(): Promise<boolean> {
 }
 
 /**
+ * The storage path that holds the bytes the database places at `path` right now.
+ * A move still in the journal leaves them at its source, so pending moves are traced back from the newest.
+ * With no move pending on the way, it is `path` itself.
+ *
+ * @example
+ * ```ts
+ * await storedAt('photos/sunset.jpg') // -> 'photos/sunset.jpg'
+ * ```
+ */
+export async function storedAt(path: string): Promise<string> {
+  const moves = (await queryUntyped('UploadsJournal')
+    .unscoped()
+    .where({ op: 'move' })
+    .orderBy('sequence', 'desc')
+    .findMany()) as { from: string; to: string }[];
+  let at = path;
+  for (const { from, to } of moves) {
+    if (isPathInside(at, to)) at = from + at.slice(to.length);
+  }
+  return at;
+}
+
+/**
  * Settles every pending entry in `sequence` order, holding back the later ones on a failed entry's paths.
  */
 async function drain(): Promise<boolean> {

@@ -11,12 +11,14 @@ const EXTENSION = /^[A-Za-z0-9]{1,8}$/;
  *
  * @example
  * ```ts
- * storedFolderName('My Folder') // -> 'my-folder'
- * storedFolderName('!!!')       // -> ''
+ * storedFolderName('My Folder')   // -> 'my-folder'
+ * storedFolderName('Release 1.2') // -> 'release-1-2'
+ * storedFolderName('!!!')         // -> ''
  * ```
  */
 export function storedFolderName(name: string): string {
-  return slugify(name) === '' ? '' : canonicalName(name);
+  const slug = slugify(name);
+  return slug === '' ? '' : canonicalName(slug);
 }
 
 /**

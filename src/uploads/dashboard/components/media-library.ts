@@ -24,7 +24,6 @@ import {
   effect,
   hasKey,
   isNull,
-  isRealNumber,
   isUndefined,
   onCleanup,
   parseSearchParams,
@@ -58,6 +57,7 @@ import {
 import {
   createMediaView,
   directoryFromParam,
+  expiryRenewal,
   type MediaGroup,
   type MediaGroupField,
   groupUploads,
@@ -293,14 +293,6 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     window.removeEventListener('blur', onBlur);
   });
 
-  let renew: ReturnType<typeof setTimeout> | undefined;
-  onCleanup(() => clearTimeout(renew));
-  const renewAt = (records: readonly UploadRecord[]): void => {
-    clearTimeout(renew);
-    const soonest = Math.min(...records.map((record) => record.expires ?? Infinity));
-    if (isRealNumber(soonest)) renew = setTimeout(reload, Math.max(0, soonest - Date.now()));
-  };
-
   let generation = 0;
   const load = async (): Promise<void> => {
     const mine = ++generation;
@@ -342,6 +334,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
   };
   const reload = debounce(() => void load(), 100);
   onCleanup(reload.cancel);
+  const renewAt = expiryRenewal(reload);
 
   effect(() => {
     void view.directory.value;

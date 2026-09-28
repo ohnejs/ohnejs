@@ -1,11 +1,4 @@
-import {
-  isNullish,
-  isString,
-  isUndefined,
-  mapValues,
-  mimeTypeFor,
-  parseMediaType,
-} from 'ohnejs/utils';
+import { isNullish, isString, isUndefined, mapValues, parseMediaType } from 'ohnejs/utils';
 
 import type { UploadURLSource } from '../uploads/url.ts';
 import type { ImageTransforms } from './transforms.ts';
@@ -13,6 +6,7 @@ import type { ImageVariantName } from './variants.ts';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { useUploadsConfig } from '../config.ts';
+import { uploadType } from '../uploads/_type.ts';
 import { uploadPath } from '../uploads/path.ts';
 import { uploadURL } from '../uploads/url.ts';
 import { signImageVariant, UNSIGNED_SIGNATURE, uploadSecrets } from './sign.ts';
@@ -106,7 +100,7 @@ export function imageURL(
   const transforms = isString(variant) ? resolveImageVariant(variant) : variant;
   const { images } = useUploadsConfig();
   if (isUndefined(images.url)) return uploadURL(upload);
-  const type = upload.type ?? mimeTypeFor(upload.name) ?? '';
+  const type = upload.type ?? uploadType(upload.name);
   if (!isOptimizableImage(type)) return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
   if (tokens === '') return uploadURL(upload);
@@ -122,7 +116,8 @@ export function imageURL(
 }
 
 /**
- * A `srcset` over `entries`, one signed variant per entry with its `width` as the `w` descriptor.
+ * A `srcset` over `entries`, one signed variant per entry with its rendered width as the `w` descriptor.
+ * The rendered width is `width` times `dpr`, as the service sizes it.
  * An entry is a configured name or ad hoc transforms; one without a `width` throws.
  *
  * @example
@@ -155,15 +150,16 @@ export function imageVariantURLs(upload: ImageSource): Record<string, string> {
 }
 
 /**
- * One `srcset` candidate: the entry's signed URL and its `width` as the descriptor.
+ * One `srcset` candidate: the entry's signed URL and its rendered width as the descriptor.
  */
 function srcSetEntry(upload: ImageSource, entry: ImageVariantName | ImageTransforms): string {
   const transforms = isString(entry) ? resolveImageVariant(entry) : entry;
-  if (isUndefined(transforms.width)) {
+  const { width, dpr = 1 } = transforms;
+  if (isUndefined(width)) {
     const subject = isString(entry) ? `Image variant \`${entry}\`` : 'A `srcset` entry';
     throw ohneError(`${subject} has no \`width\`, which the \`w\` descriptor needs`);
   }
-  return `${imageURL(upload, transforms)} ${transforms.width}w`;
+  return `${imageURL(upload, transforms)} ${Math.round(width * dpr)}w`;
 }
 
 /**

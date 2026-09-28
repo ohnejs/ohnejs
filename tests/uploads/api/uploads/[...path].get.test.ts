@@ -1,16 +1,28 @@
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
 import pathGet from '../../../../src/uploads/api/uploads/[...path].get.ts';
+import { drainJournal } from '../../../../src/uploads/storage/journal.ts';
 import { createFolder } from '../../../../src/uploads/uploads/create-folder.ts';
+import { moveUpload } from '../../../../src/uploads/uploads/move-upload.ts';
 import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
+import { replaceUpload } from '../../../../src/uploads/uploads/replace-upload.ts';
 import { signUploadLink } from '../../../../src/uploads/uploads/sign.ts';
 import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';
 import { parseDuration, stringifySearchParams } from '../../../../src/utils/index.ts';
-import { bytes, call, png, route, stream, userWith, withReadAccess } from '../../_fixture.ts';
+import {
+  bytes,
+  call,
+  png,
+  route,
+  storage,
+  stream,
+  userWith,
+  withReadAccess,
+} from '../../_fixture.ts';
 
 useEnv().set('UPLOADS_SECRET', 'secret');
 
@@ -181,6 +193,41 @@ describe('GET /uploads/[...path]', () => {
     const response = await get('serve/pic.png');
     strictEqual(response.headers.get('content-type'), 'image/png');
     strictEqual(response.headers.get('content-disposition'), 'inline; filename="pic.png"');
+  });
+
+  it('serves the bytes the row names while a replace has not reached storage', async () => {
+    const draft = await putUpload({
+      directory: 'serve',
+      name: 'draft.txt',
+      body: stream(bytes('old bytes')),
+    });
+    storage.failNext('move');
+    const replaced = await replaceUpload(draft.UUID, stream(bytes('new, longer bytes')));
+
+    const whole = await get('serve/draft.txt');
+    strictEqual(whole.headers.get('etag'), `"${replaced.hash}"`);
+    strictEqual(await whole.text(), 'new, longer bytes');
+    const part = await get('serve/draft.txt', { range: 'bytes=5-16' });
+    strictEqual(part.headers.get('content-range'), 'bytes 5-16/17');
+    strictEqual(await part.text(), 'longer bytes');
+    ok(await drainJournal());
+  });
+
+  it('follows a chain of moves that has not reached storage', async () => {
+    const shelf = await createFolder({ directory: 'serve', name: 'shelf' });
+    const book = await putUpload({
+      directory: 'serve/shelf',
+      name: 'book.txt',
+      body: stream(bytes('first draft')),
+    });
+    storage.failNext('move');
+    await replaceUpload(book.UUID, stream(bytes('second draft')));
+    storage.failNext('move');
+    await moveUpload(shelf.UUID, { name: 'rack' });
+
+    strictEqual(await (await get('serve/rack/book.txt')).text(), 'second draft');
+    ok(await drainJournal());
+    strictEqual(await (await get('serve/rack/book.txt')).text(), 'second draft');
   });
 
   it('404s a folder and an unknown path', async () => {

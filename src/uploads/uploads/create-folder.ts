@@ -7,7 +7,7 @@ import { ensureFolders } from './_folders.ts';
 import { assertPathFits } from './_path-limit.ts';
 import { assertReached } from './_reach.ts';
 import { decorated } from './_row.ts';
-import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';
+import { canonicalDirectory, canonicalFolderName, uploadPath } from './path.ts';
 
 /**
  * What `createFolder` takes: where the folder goes.
@@ -48,7 +48,7 @@ export interface CreateFolderInput {
  */
 export async function createFolder(input: CreateFolderInput): Promise<UploadRecord> {
   const directory = canonicalDirectory(input.directory);
-  const name = canonicalName(input.name);
+  const name = canonicalFolderName(input.name);
   const author = input.author ?? null;
   assertPathFits(uploadPath({ directory, name }));
   const record = await useDatabase().transaction(async (tx) => {

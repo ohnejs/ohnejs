@@ -170,6 +170,7 @@ function uploadsMessage(name: string, params: Record<string, unknown>): Message 
 
 /**
  * Reads the constraint columns of the listed uploads on the write's transaction, keyed by `UUID`.
+ * It reads past any app scope, since the reference check admits a row the scope hides.
  * A `UUID` no row answers, or one outside the write's reach, is left out.
  * The pipeline's reference check reports it.
  */
@@ -181,6 +182,7 @@ async function readUploads(
   if (reachable.size === 0) return new Map();
   const rows = await queryUntyped('Uploads')
     .use(ctx.tx)
+    .unscoped()
     .where({ UUID: { in: [...reachable] } })
     .select('UUID', 'kind', 'type', 'size', 'width', 'height')
     .findMany();

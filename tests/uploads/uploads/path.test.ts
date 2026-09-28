@@ -13,6 +13,7 @@ import { useStorage, useStorages } from '../../../src/uploads/storage/use-storag
 import {
   ancestorDirectories,
   canonicalDirectory,
+  canonicalFolderName,
   canonicalName,
   splitUploadPath,
   TEMP_PREFIX,
@@ -47,6 +48,13 @@ describe('canonical forms', () => {
   it('never cuts a name into a separator its sanitizer would drop', () => {
     strictEqual(canonicalName(`${'a'.repeat(250)}-bbbbbb.txt`), `${'a'.repeat(250)}.txt`);
     strictEqual(canonicalName(`${'a'.repeat(250)}.bbbbbbbbbb.txt`), `${'a'.repeat(250)}.txt`);
+  });
+
+  it('slugs a folder name exactly as the directory segment it becomes', () => {
+    strictEqual(canonicalFolderName('Release 1.2'), 'release-1-2');
+    for (const name of ['v1.2', 'Photos.JPG', 'My Folder', `${'Durotan '.repeat(40)}.png`]) {
+      strictEqual(canonicalFolderName(name), canonicalDirectory(name), name);
+    }
   });
 
   it('cuts a directory segment as it cuts a name', () => {

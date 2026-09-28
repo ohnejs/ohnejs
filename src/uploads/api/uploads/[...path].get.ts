@@ -22,6 +22,7 @@ import {
 
 import { useUploadsConfig } from '../../config.ts';
 import { uploadSecrets } from '../../images/sign.ts';
+import { storedAt } from '../../storage/journal.ts';
 import { useStorage } from '../../storage/use-storages.ts';
 import { dispositionFor } from '../../uploads/_disposition.ts';
 import { LINK_MAX_AGE } from '../../uploads/_link-age.ts';
@@ -98,7 +99,10 @@ export default defineHandler(async ({ params }) => {
     headers.set('content-range', `bytes ${range.start}-${range.end}/${size}`);
   }
 
-  const object = await useStorage().read(path, range);
+  const storage = useStorage();
+  // A drain may settle the pending move between `storedAt` and the read.
+  const object =
+    (await storage.read(await storedAt(path), range)) ?? (await storage.read(path, range));
   if (isNull(object)) throw notFound();
   headers.set(
     'content-length',

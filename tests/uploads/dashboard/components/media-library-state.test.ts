@@ -8,6 +8,7 @@ import {
   createMediaView,
   DEFAULT_ORDER,
   directoryFromParam,
+  expiryRenewal,
   folderPresence,
   folderWhere,
   groupUploads,
@@ -25,6 +26,7 @@ import {
   splitFileName,
 } from '../../../../src/uploads/dashboard/components/media-library-state.ts';
 import { BULK_LIMIT } from '../../../../src/uploads/uploads/_body.ts';
+import { effectScope, parseDuration, sleep } from '../../../../src/utils/index.ts';
 
 function upload(path: string, kind: 'file' | 'folder' = 'file'): UploadRecord {
   const slash = path.lastIndexOf('/');
@@ -368,5 +370,57 @@ describe('groupUploads', () => {
 
   it('answers nothing for an empty page', () => {
     deepStrictEqual(groupUploads([], 'directory'), []);
+  });
+});
+
+describe('expiryRenewal', () => {
+  const expiring = (expires?: number): UploadRecord => ({ ...sunset, expires });
+
+  it('reloads when the soonest expiry passes', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+    let reloads = 0;
+    const scope = effectScope();
+    const renewAt = scope.run(() => expiryRenewal(() => reloads++));
+    renewAt([expiring(5000), expiring(3000), expiring()]);
+    t.mock.timers.tick(2999);
+    strictEqual(reloads, 0);
+    t.mock.timers.tick(1);
+    strictEqual(reloads, 1);
+    scope.dispose();
+  });
+
+  it('waits out an expiry past the 32-bit timer limit', async () => {
+    let reloads = 0;
+    const scope = effectScope();
+    scope.run(() => expiryRenewal(() => reloads++))([expiring(Date.now() + parseDuration('30d'))]);
+    await sleep(20);
+    strictEqual(reloads, 0);
+    scope.dispose();
+  });
+
+  it('reloads once per expiry, so a clock ahead of the server never loops', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10_000 });
+    let reloads = 0;
+    const scope = effectScope();
+    const renewAt = scope.run(() => expiryRenewal(() => reloads++));
+    renewAt([expiring(5000)]);
+    t.mock.timers.tick(0);
+    renewAt([expiring(5000)]);
+    t.mock.timers.tick(1000);
+    strictEqual(reloads, 1);
+    renewAt([expiring(12_000)]);
+    t.mock.timers.tick(1000);
+    strictEqual(reloads, 2);
+    scope.dispose();
+  });
+
+  it('cancels a pending reload when its scope is disposed', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+    let reloads = 0;
+    const scope = effectScope();
+    scope.run(() => expiryRenewal(() => reloads++))([expiring(1000)]);
+    scope.dispose();
+    t.mock.timers.tick(1000);
+    strictEqual(reloads, 0);
   });
 });

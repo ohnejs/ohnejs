@@ -132,7 +132,7 @@ export function mediaLibraryPopup(options: MediaLibraryPopupOptions): Popup {
     createMediaView({
       directory: memory?.directory,
       query: memory?.query,
-      selectable: (record) => !disabled(record).value,
+      selectable: (record) => record.kind === 'file' && !disabled(record).value,
     }),
   );
   if (!isUndefined(memory)) {

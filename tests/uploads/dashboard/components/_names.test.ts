@@ -5,13 +5,13 @@ import {
   storedFileName,
   storedFolderName,
 } from '../../../../src/uploads/dashboard/components/_names.ts';
-import { canonicalName } from '../../../../src/uploads/uploads/path.ts';
+import { canonicalFolderName, canonicalName } from '../../../../src/uploads/uploads/path.ts';
 
 describe('storedFolderName', () => {
   it('slugs the name the way the server stores it', () => {
     strictEqual(storedFolderName('My Folder'), 'my-folder');
     strictEqual(storedFolderName('Fotos 2024'), 'fotos-2024');
-    strictEqual(storedFolderName('photos.JPG'), 'photos.jpg');
+    strictEqual(storedFolderName('photos.JPG'), 'photos-jpg');
     strictEqual(storedFolderName('Ünïcode'), 'unicode');
   });
 
@@ -51,7 +51,7 @@ describe('stored names past 255 bytes', () => {
     strictEqual(storedFileName(stem, 'png'), `${stem.slice(0, 251).replace(/-+$/, '')}.png`);
   });
 
-  it('previews exactly what `canonicalName` stores', () => {
+  it('previews exactly what `canonicalFolderName` and `canonicalName` store', () => {
     const typed = [
       'Arthas Menethil',
       stem,
@@ -61,7 +61,7 @@ describe('stored names past 255 bytes', () => {
       `${'a'.repeat(254)}.b!`,
       `Ünïcode ${'Sylvanas '.repeat(35)}.tar.gz`,
     ];
-    for (const name of typed) strictEqual(storedFolderName(name), canonicalName(name), name);
+    for (const name of typed) strictEqual(storedFolderName(name), canonicalFolderName(name), name);
     for (const name of typed) {
       strictEqual(storedFileName(name, 'png'), canonicalName(`${name}.png`), name);
     }

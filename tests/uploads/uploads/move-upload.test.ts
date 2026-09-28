@@ -132,6 +132,21 @@ describe('moveUpload', () => {
     strictEqual(text(storage.objects.get('tree/moved/x/b/two.txt')), '2');
   });
 
+  it('renames a folder to a dotted name its own path still reaches', async () => {
+    await put('renamed', 'inside.txt', 'i');
+    const uuid = await folderUUID('', 'renamed');
+
+    const moved = await moveUpload(uuid, { name: 'Release 2.0' });
+    strictEqual(moved.path, 'release-2-0');
+    const file = await putUpload({
+      directory: moved.path,
+      name: 'more.txt',
+      body: stream(bytes('m')),
+    });
+    strictEqual(file.path, 'release-2-0/more.txt');
+    deepStrictEqual(await paths('release-2-0'), ['release-2-0/inside.txt', 'release-2-0/more.txt']);
+  });
+
   it('refuses to move a folder into itself', async () => {
     await put('self/a/b', 'leaf.txt', 'l');
     const uuid = await folderUUID('self', 'a');

@@ -18,7 +18,7 @@ import { assertPathFits } from './_path-limit.ts';
 import { assertReached, assertUploadReach, reachedSubtree } from './_reach.ts';
 import { decorated, readUpload } from './_row.ts';
 import { longestPathUnder, moveDescendants, setDescendantsPrivate } from './_subtree.ts';
-import { canonicalDirectory, canonicalName, uploadPath } from './path.ts';
+import { canonicalDirectory, canonicalFolderName, canonicalName, uploadPath } from './path.ts';
 
 /**
  * Moves the row `uuid` on `tx`, as `moveUpload` describes.
@@ -38,7 +38,9 @@ export async function moveRow(
   const row = await readUpload(uuid, tx);
   const changes: { directory?: string; name?: string } = {};
   if (!isUndefined(to.directory)) changes.directory = canonicalDirectory(to.directory);
-  if (!isUndefined(to.name)) changes.name = canonicalName(to.name);
+  if (!isUndefined(to.name)) {
+    changes.name = row.kind === 'folder' ? canonicalFolderName(to.name) : canonicalName(to.name);
+  }
   const target = { directory: row.directory, name: row.name, ...changes };
   if (target.directory === row.directory && target.name === row.name) {
     return { record: row, created: [] };

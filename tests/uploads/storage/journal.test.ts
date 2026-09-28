@@ -11,6 +11,7 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import {
   drainJournal,
   journalStorage,
+  storedAt,
   type JournalEntry,
 } from '../../../src/uploads/storage/journal.ts';
 import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
@@ -350,5 +351,18 @@ describe('drainJournal', () => {
     await other;
     strictEqual(await drained, true);
     deepStrictEqual(await pending(), []);
+  });
+});
+
+describe('storedAt', () => {
+  it('traces a path back through the pending moves, newest first', async () => {
+    await journal(
+      { op: 'move', from: '.tmp/at', to: 'at/shelf/a.txt' },
+      { op: 'move', from: 'at/shelf', to: 'at/rack' },
+    );
+    strictEqual(await storedAt('at/rack/a.txt'), '.tmp/at');
+    strictEqual(await storedAt('at/rack/b.txt'), 'at/shelf/b.txt');
+    strictEqual(await storedAt('at/racks/b.txt'), 'at/racks/b.txt');
+    await queryUntyped('UploadsJournal').where({ op: 'move' }).delete();
   });
 });
