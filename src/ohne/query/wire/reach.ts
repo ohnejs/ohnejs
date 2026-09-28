@@ -18,9 +18,10 @@ import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
 import { queryMetadata } from '../metadata.ts';
 import { allowedOperators } from '../operators.ts';
+import { conditionLocaleSensitive } from '../read/admitted.ts';
 import { blockScope, targetScope, validateCondition } from '../validate-condition.ts';
 import { conditionBinds, parseQueryParams } from './parse.ts';
-import { conditionLocaleSensitive, withheldMetadata } from './withheld-metadata.ts';
+import { withheldMetadata } from './withheld-metadata.ts';
 
 /**
  * Resolves a caller's read reach into one collection.

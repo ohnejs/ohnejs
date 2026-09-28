@@ -54,6 +54,6 @@ export async function queryScoped(
   if (scope === false) throw notFound();
   const builder = queryUntyped(collection);
   if (operation === 'read') return applyScope(builder, scope);
-  if (operation !== 'create' && !isUndefined(scope.where)) builder.where(scope.where);
+  if (operation !== 'create' && !isUndefined(scope.where)) builder.access(scope.where);
   return builder;
 }

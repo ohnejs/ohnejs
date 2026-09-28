@@ -18,7 +18,14 @@ import type { CreateOutcome } from './write/create.ts';
 
 import { isNull, isString, isUndefined, parseCondition } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { freezeIR, type QueryIR, readCondition, type TargetReach, type WireReach } from './ir.ts';
+import {
+  freezeConditions,
+  freezeIR,
+  type QueryIR,
+  readCondition,
+  type TargetReach,
+  type WireReach,
+} from './ir.ts';
 import { checkQueryLocale } from './locale.ts';
 import { addPopulateEntries } from './populate.ts';
 import { count as countRows, exists as existsRows } from './read/count.ts';
@@ -41,6 +48,7 @@ import { runUpdate, type UpdateOutcome } from './write/update.ts';
  */
 export class QueryBuilderImpl implements UntypedQueryBuilder {
   private readonly conditions: ConditionNode[] = [];
+  private readonly accessNodes: ConditionNode[] = [];
   private readonly orderKeys: OrderEntry[] = [];
   private readonly populateNodes: PopulateNode[] = [];
   private selected: string[] | null = null;
@@ -64,6 +72,13 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
 
   whereAny(build: WhereGroupBuild): this {
     this.conditions.push(orGroup(build, this.meta));
+    return this;
+  }
+
+  access(condition: ConditionInput): this {
+    const node = toConditionNode(condition, this.meta);
+    this.conditions.push(node);
+    this.accessNodes.push(node);
     return this;
   }
 
@@ -198,6 +213,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.joinedTx,
       this.unscopedChain,
       this.linkResolver,
+      freezeConditions(this.accessNodes),
     );
   }
 
@@ -210,6 +226,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       this.joinedTx,
       this.unscopedChain,
       this.linkResolver,
+      freezeConditions(this.accessNodes),
     );
     if (!outcome.ok) throw validationError(outcome.errors);
     return outcome.records;
@@ -298,6 +315,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
       offset: this.offsetValue,
       populate: this.populateNodes,
       locale: this.localeValue,
+      access: this.accessNodes,
       wire: this.wireState,
       unscoped: this.unscopedChain,
     });
@@ -334,10 +352,14 @@ function toConditionInput(
 }
 
 /**
- * Parses and gates one condition-object input into an AST node, the step `where` and every branch share.
+ * Parses and gates one condition-object input into an AST node.
+ * Every `where`, `access`, and branch shares it, and so does the `admittedUUIDs` probe.
  * A malformed shape throws naming the parse code and its path; an inapplicable leaf throws through gating.
  */
-function toConditionNode(condition: ConditionInput, meta: CollectionQueryMeta): ConditionNode {
+export function toConditionNode(
+  condition: ConditionInput,
+  meta: CollectionQueryMeta,
+): ConditionNode {
   const parsed = parseCondition(condition);
   if (!parsed.ok) {
     const { code, path } = parsed.error;

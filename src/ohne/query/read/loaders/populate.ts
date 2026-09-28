@@ -22,6 +22,7 @@ import { compileFrom } from '../../sql/from.ts';
 import { scopeColumns } from '../../sql/select.ts';
 import { compileWhere } from '../../sql/where.ts';
 import { hydrateScope } from '../hydrate.ts';
+import { narrowTranslations } from './translations.ts';
 
 declare module 'ohnejs' {
   interface Hooks {
@@ -162,6 +163,7 @@ async function populateField(
  * One row object is shared by every parent that links it, so populated targets are never cloned.
  * Under a wire reach, an unreachable target loads nothing; a scope ANDs its condition and bounds the fields.
  * A target the reach never names loads nothing either, so a wire read fails closed.
+ * The reach condition narrows each target's `_translations` to the locales it admits the target at.
  */
 async function loadTargets(
   collection: string,
@@ -193,13 +195,20 @@ async function loadTargets(
     ? populatedSelect(null, meta.fields, node.children)
     : [...named, 'UUID'];
   const targets: QueryRecord[] = [];
-  for (const batch of chunk(uniqueArray(uuids), 900)) {
-    const marks = batch.map(() => '?').join(', ');
+  for (const keys of chunk(uniqueArray(uuids), 900)) {
+    const marks = keys.map(() => '?').join(', ');
     const rows = await useDatabase().query<Record<string, SQLValue>>(
       `SELECT ${projection} ${from.sql} WHERE ${uuid} IN (${marks})${scoped}`,
-      [...from.params, ...batch, ...(where?.params ?? [])],
+      [...from.params, ...keys, ...(where?.params ?? [])],
     );
-    targets.push(...(await hydrateScope(meta.fields, rows, hydrated, dialect, locale)));
+    const batch = await hydrateScope(meta.fields, rows, hydrated, dialect, locale);
+    await narrowTranslations(
+      meta,
+      batch,
+      rows.map((row) => row.UUID as string),
+      condition,
+    );
+    targets.push(...batch);
   }
   const filtered = await resolveTargets(targets, node, collection);
   const keyed = keyBy(filtered, (record) => record.UUID as string);

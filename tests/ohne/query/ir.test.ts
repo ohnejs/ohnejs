@@ -21,6 +21,7 @@ describe('freezeIR deep-freezes the populate tree', () => {
       },
     ],
     locale: null,
+    access: [],
     wire: null,
     unscoped: false,
   });
@@ -65,6 +66,7 @@ describe('freezeIR deep-freezes the condition tree and order entries', () => {
     offset: null,
     populate: [],
     locale: null,
+    access: [],
     wire: null,
     unscoped: false,
   });
@@ -105,6 +107,7 @@ describe('freezeIR deep-freezes the condition tree and order entries', () => {
       offset: null,
       populate: [],
       locale: null,
+      access: [],
       wire: null,
       unscoped: false,
     });

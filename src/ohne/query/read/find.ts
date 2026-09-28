@@ -17,6 +17,7 @@ import { compileSelect } from '../sql/select.ts';
 import { compileReadWhere } from '../sql/where.ts';
 import { hydrateScope } from './hydrate.ts';
 import { applyPopulate, populatedSelect } from './loaders/populate.ts';
+import { narrowTranslations } from './loaders/translations.ts';
 import { resolveIR } from './resolve-ir.ts';
 
 /**
@@ -92,6 +93,7 @@ export function compileReadTail(
  * Column values cross back through `dialect.deserialize`.
  * `records` relations and composites hydrate over the rowset in batched loader reads.
  * Populated relations then swap their `UUID`s for full records.
+ * `_translations` narrows under `ir.access`, keyed by the driver rows' own `UUID`s.
  * `keepHidden` lifts the `readable: false` hydrate skip at every depth.
  * Only the write machinery's substrate reads set it - a gate may read what no caller-facing read returns.
  */
@@ -111,6 +113,13 @@ export async function readRows(ir: QueryIR, keepHidden = false): Promise<QueryRe
   ]);
   const shape = keepHidden ? ir.select : populatedSelect(ir.select, meta.fields, ir.populate);
   const hydrated = await hydrateScope(meta.fields, rows, shape, dialect, locale, keepHidden);
+  await narrowTranslations(
+    meta,
+    hydrated,
+    rows.map((row) => row.UUID as string),
+    ir.access,
+    ir.unscoped,
+  );
   await applyPopulate(ir, meta, hydrated, dialect);
   const records = await resolveRecords(hydrated, ir);
   if (!isNull(start)) {

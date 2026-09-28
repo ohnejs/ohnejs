@@ -73,7 +73,8 @@ export interface WireReach {
  *
  * A builder accumulates plain state and freezes it into this shape when a terminal runs.
  * Compiling and executing never mutate it; `paginate` composes `count` and the row read from one snapshot.
- * `condition` is the AND of every accumulated `where`; `select` is `null` when no field was narrowed.
+ * `condition` is the AND of every accumulated `where` and `access`.
+ * `select` is `null` when no field was narrowed.
  */
 export interface QueryIR {
   /**
@@ -118,6 +119,12 @@ export interface QueryIR {
   locale: string | null;
 
   /**
+   * The access scope's condition, already ANDed into `condition`, or `null` when no scope applies.
+   * A record's `_translations` lists only the locales where the record meets it.
+   */
+  access: ConditionNode | null;
+
+  /**
    * A wire read's untrusted condition and reach, or `null` on a trusted read.
    */
   wire: WireReach | null;
@@ -144,26 +151,20 @@ export function freezeIR(state: {
   offset: number | null;
   populate: readonly PopulateNode[];
   locale: string | null;
+  access: readonly ConditionNode[];
   wire: WireReach | null;
   unscoped: boolean;
 }): QueryIR {
-  const condition = isEmpty(state.conditions)
-    ? null
-    : state.conditions.length === 1
-      ? freezeConditionNode(state.conditions[0])
-      : Object.freeze({
-          kind: 'and' as const,
-          nodes: Object.freeze(state.conditions.map(freezeConditionNode)),
-        });
   return Object.freeze({
     collection: state.collection,
-    condition,
+    condition: freezeConditions(state.conditions),
     select: isNull(state.select) ? null : Object.freeze([...state.select]),
     order: Object.freeze(state.order.map(freezeOrderEntry)),
     limit: state.limit,
     offset: state.offset,
     populate: Object.freeze(state.populate.map(freezePopulateNode)),
     locale: state.locale,
+    access: freezeConditions(state.access),
     wire: isNull(state.wire)
       ? null
       : Object.freeze({
@@ -173,6 +174,18 @@ export function freezeIR(state: {
           reach: freezeReach(state.wire.reach),
         }),
     unscoped: state.unscoped,
+  });
+}
+
+/**
+ * Folds sibling conditions into one frozen node: an empty set is `null`, a single condition stands alone.
+ */
+export function freezeConditions(nodes: readonly ConditionNode[]): ConditionNode | null {
+  if (isEmpty(nodes)) return null;
+  if (nodes.length === 1) return freezeConditionNode(nodes[0]);
+  return Object.freeze({
+    kind: 'and' as const,
+    nodes: Object.freeze(nodes.map(freezeConditionNode)),
   });
 }
 

@@ -10,12 +10,7 @@ import {
 import { isUndefined } from 'ohnejs/utils';
 
 import { notFound } from '../../../../ohne/http/http-error.ts';
-import {
-  gateCollection,
-  readReach,
-  recordParams,
-  scopeTranslations,
-} from '../../../collections-api/gate.ts';
+import { gateCollection, readReach, recordParams } from '../../../collections-api/gate.ts';
 
 /**
  * `GET /collections/[collection]/[uuid]`
@@ -30,10 +25,9 @@ import {
 export default defineHandler(async ({ params }) => {
   const gate = await gateCollection(params.collection, 'read');
   if (!gate.ok) return gate.response;
-  const meta = queryMetadata(gate.collection);
   const parsed = await parseWireQuery(
     recordParams(),
-    scopedMetadata(meta, gate.scope),
+    scopedMetadata(queryMetadata(gate.collection), gate.scope),
     resolveGuards(),
     readReach,
   );
@@ -43,6 +37,5 @@ export default defineHandler(async ({ params }) => {
     gate.scope,
   ).findFirst();
   if (isUndefined(record)) throw notFound();
-  await scopeTranslations([record], gate.collection, meta, gate.scope, parsed.populate);
   return record;
 });

@@ -222,8 +222,8 @@ whatever the URL asks for. The scope combines with the request by the rules
 [the scope](./collections.md#the-scope) describes: `where` is added to every request with AND,
 `select` narrows and hides, `limit` caps, and `locale` is only a default.
 
-`applyQuery` returns `_translations` as stored. The shipped collection endpoints
-[narrow it](./collections.md#reading) to the locales where their scope allows the record.
+`applyQuery` and `applyScope` narrow `_translations` to the locales where the scope's `where`
+allows the record, as the shipped [collection endpoints](./collections.md#reading) do.
 
 When the scope's `where` reads a translatable field or a relation, `scopedMetadata` refuses a
 request's filter on `_translations` as an `invalidField`. That filter reads every stored locale, so

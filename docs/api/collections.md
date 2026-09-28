@@ -386,6 +386,7 @@ through:
 - A missing user is a `401`, and a missing capability a `403`.
 - A read carries the whole scope. An update or delete adds the scope's `where` with AND, exactly as
   the shipped endpoints do.
+- A read or update answer lists `_translations` only at the locales the scope's `where` allows.
 
 The builder takes the same object grammar as the URL `where`:
 

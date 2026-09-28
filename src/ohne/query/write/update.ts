@@ -41,6 +41,7 @@ import { prefixPath } from '../pipeline/prefix-errors.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { whenResolver } from '../pipeline/when.ts';
 import { readRows } from '../read/find.ts';
+import { narrowTranslations } from '../read/loaders/translations.ts';
 import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import {
@@ -159,6 +160,7 @@ async function afterUpdate(
  * `unscoped` skips `record:condition` and reads the rows back past `query:filter`, for framework bookkeeping.
  * `linkResolver` narrows every link the input provides to what it reaches, as `linkReach` states.
  * A link every matched record already holds under the same top-level field passes on existence alone.
+ * `access` narrows each returned record's `_translations` to the locales where the record meets it.
  */
 export async function runUpdate(
   collection: string,
@@ -168,6 +170,7 @@ export async function runUpdate(
   joinedTx?: Transaction,
   unscoped = false,
   linkResolver: ReachResolver | null = null,
+  access: ConditionNode | null = null,
 ): Promise<UpdateOutcome> {
   const meta = queryMetadata(collection);
   const dialect = useDialect();
@@ -187,13 +190,12 @@ export async function runUpdate(
       return undefined;
     },
   );
-  if (outcome.ok && isUndefined(joinedTx)) {
-    await commitEffects({
-      collection: collection as CollectionName,
-      operation: 'update',
-      uuids: outcome.records.map((record) => record.UUID as string),
-    });
+  if (!outcome.ok) return outcome;
+  const uuids = outcome.records.map((record) => record.UUID as string);
+  if (isUndefined(joinedTx)) {
+    await commitEffects({ collection: collection as CollectionName, operation: 'update', uuids });
   }
+  await narrowTranslations(meta, outcome.records, uuids, access, unscoped);
   return outcome;
 }
 
@@ -789,6 +791,7 @@ async function readMatched(
         offset: null,
         populate: [],
         locale,
+        access: null,
         wire: null,
         unscoped,
       },

@@ -370,6 +370,7 @@ describe('readable: false', () => {
       offset: null,
       populate: [],
       locale: null,
+      access: null,
       wire: null,
       unscoped: false,
     };

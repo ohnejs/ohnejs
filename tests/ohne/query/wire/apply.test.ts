@@ -18,6 +18,7 @@ function recorder(): { builder: UntypedQueryBuilder; calls: string[] } {
   const builder = {
     locale: (code: string) => (calls.push(`locale:${code}`), builder),
     where: (condition: unknown) => (calls.push(`where:${JSON.stringify(condition)}`), builder),
+    access: (condition: unknown) => (calls.push(`access:${JSON.stringify(condition)}`), builder),
     select: (...fields: string[]) => (calls.push(`select:${fields.join(',')}`), builder),
     orderBy: (f: string, d: OrderDirection) => (calls.push(`order:${f}:${d}`), builder),
     limit: (n: number) => (calls.push(`limit:${n}`), builder),
@@ -78,7 +79,7 @@ describe('applyQuery composes a request under a scope', () => {
     const { builder, calls } = recorder();
     const scope: QueryScope = { where: { published: true } };
     applyQuery(builder, query({ where: { views: { atLeast: 10 } } }), scope);
-    deepStrictEqual(calls, ['where:{"published":true}', 'where:{"views":{"atLeast":10}}']);
+    deepStrictEqual(calls, ['access:{"published":true}', 'where:{"views":{"atLeast":10}}']);
   });
 
   it('intersects the scoped select with the request select', () => {
@@ -137,7 +138,7 @@ describe('applyScope composes a scope with no wire query', () => {
   it('applies the locale, filter, fields, and cap as they are', () => {
     const { builder, calls } = recorder();
     applyScope(builder, { locale: 'de', where: { owner: 'u1' }, select: ['title'], limit: 50 });
-    deepStrictEqual(calls, ['locale:de', 'where:{"owner":"u1"}', 'select:title', 'limit:50']);
+    deepStrictEqual(calls, ['locale:de', 'access:{"owner":"u1"}', 'select:title', 'limit:50']);
   });
 
   it('touches nothing under an empty scope', () => {

@@ -1,8 +1,8 @@
-import type { ConditionNode } from '../../../utils/index.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { ConditionInput } from '../untyped.ts';
 
-import { isNull, parseCondition, walkCondition } from '../../../utils/index.ts';
+import { isNull, parseCondition } from '../../../utils/index.ts';
+import { conditionLocaleSensitive } from '../read/admitted.ts';
 
 /**
  * Whether a scope `where` can admit a record at one locale and hide it at another.
@@ -11,22 +11,6 @@ import { isNull, parseCondition, walkCondition } from '../../../utils/index.ts';
 export function localeSensitive(where: ConditionInput, meta: CollectionQueryMeta): boolean {
   const parsed = parseCondition(where);
   return !parsed.ok || conditionLocaleSensitive(parsed.node, meta);
-}
-
-/**
- * Whether a parsed scope condition can admit a record at one locale and hide it at another.
- * A leaf over a companion field reads that locale's value; a `has` or `empty` reaches per-locale rows.
- * A condition over plain columns alone answers alike at every locale, and so does one over `_translations`.
- */
-export function conditionLocaleSensitive(node: ConditionNode, meta: CollectionQueryMeta): boolean {
-  let sensitive = false;
-  walkCondition(node, (child) => {
-    if (child.kind === 'has' || child.kind === 'empty') sensitive = true;
-    else if (child.kind === 'compare' && meta.fields[child.path[0]]?.companion === true) {
-      sensitive = true;
-    }
-  });
-  return sensitive;
 }
 
 /**

@@ -214,6 +214,18 @@ export interface UntypedQueryBuilder {
   whereAny(build: WhereGroupBuild): this;
 
   /**
+   * Adds an access scope's condition, ANDed onto whatever was already there, as `where` does.
+   * A read also narrows each record's `_translations` to the locales where the record meets it.
+   * An update's answered records narrow the same way.
+   *
+   * @example
+   * ```ts
+   * queryUntyped('Posts').access({ published: true })
+   * ```
+   */
+  access(condition: ConditionInput): this;
+
+  /**
    * Installs a wire read's own condition and its reach into every collection it crosses.
    * The condition compiles under the reach: a conditioned `has` into an unreachable target matches nothing.
    * A populate hydrates only what the target's reach admits, narrowed to the fields it names.

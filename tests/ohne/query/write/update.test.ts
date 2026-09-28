@@ -13,10 +13,20 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
 
+useLayers().add({
+  path: '/update',
+  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+});
+
+useCollections().register('UNote', {
+  name: 'UNote',
+  collection: { fields: { title: field('text', { translatable: true }), views: field('integer') } },
+});
 useCollections().register('UUser', {
   name: 'UUser',
   collection: { fields: { name: field('text') } },
@@ -850,6 +860,37 @@ describe('runUpdate link reach', () => {
       author: 'u2',
     });
     strictEqual(record.author, 'u2');
+  });
+});
+
+describe('runUpdate access', () => {
+  const open = {
+    kind: 'compare',
+    path: ['title'],
+    op: 'equalsTo',
+    value: 'Open',
+    negated: false,
+  } as const;
+
+  it('narrows each answered `_translations` to the locales `access` admits the record at', async () => {
+    const uuid = (await queryUntyped('UNote').createOrThrow({ title: 'Open', views: 0 }))
+      .UUID as string;
+    await queryUntyped('UNote').locale('de').where({ UUID: uuid }).updateOrThrow({ title: 'Zu' });
+    const all = await runUpdate('UNote', { views: 1 }, uuidIs(uuid), null);
+    ok(all.ok);
+    deepStrictEqual(all.records[0]._translations, ['en', 'de']);
+    const scoped = await runUpdate(
+      'UNote',
+      { views: 2 },
+      uuidIs(uuid),
+      null,
+      undefined,
+      false,
+      null,
+      open,
+    );
+    ok(scoped.ok);
+    deepStrictEqual(scoped.records[0]._translations, ['en']);
   });
 });
 

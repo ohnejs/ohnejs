@@ -1,5 +1,5 @@
 import { deepStrictEqual, match, ok, rejects, strictEqual, throws } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
@@ -9,9 +9,12 @@ import { registerDatabase, registerDialect } from '../../../src/ohne/database/us
 import { isOhneError, ohneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../src/ohne/query/write/create.ts';
+import { isNull } from '../../../src/utils/index.ts';
 
 useLayers().add({
   path: '/impl',
@@ -315,5 +318,49 @@ describe('QueryBuilderImpl singleton', () => {
 
   it('keeps the filter requirement on a plain collection', () => {
     throws(() => queryUntyped('IPosts').update({ views: 1 }), /without a filter/);
+  });
+});
+
+const accessed = (await queryUntyped('INotes').createOrThrow({ title: 'Open', body: 'access' }))
+  .UUID as string;
+await queryUntyped('INotes').locale('de').where({ UUID: accessed }).updateOrThrow({ title: 'Zu' });
+
+async function held(builder: ReturnType<typeof queryUntyped>): Promise<unknown> {
+  return (await builder.where({ UUID: accessed }).select('_translations').findFirst())
+    ?._translations;
+}
+
+describe('QueryBuilderImpl access', () => {
+  afterEach(() => useHooks().clear());
+
+  it('narrows `_translations` under `access` alone, never under a trusted `where`', async () => {
+    deepStrictEqual(await held(queryUntyped('INotes').where({ title: 'Open' })), ['en', 'de']);
+    deepStrictEqual(await held(queryUntyped('INotes').access({ title: 'Open' })), ['en']);
+  });
+
+  it('probes through `query:filter`, and past it on an unscoped read', async () => {
+    const hidden = {
+      kind: 'compare',
+      path: ['title'],
+      op: 'equalsTo',
+      value: 'Zu',
+      negated: true,
+    } as const;
+    hook('query:filter', (ir) =>
+      isNull(ir.condition)
+        ? undefined
+        : { ...ir, condition: { kind: 'and', nodes: [ir.condition, hidden] } as const },
+    );
+    const access = { title: { in: ['Open', 'Zu'] } };
+    deepStrictEqual(await held(queryUntyped('INotes').access(access)), ['en']);
+    deepStrictEqual(await held(queryUntyped('INotes').unscoped().access(access)), ['en', 'de']);
+  });
+
+  it('narrows the records an update answers', async () => {
+    const [record] = await queryUntyped('INotes')
+      .where({ UUID: accessed })
+      .access({ title: 'Open' })
+      .updateOrThrow({ body: 'access' });
+    deepStrictEqual(record._translations, ['en']);
   });
 });

@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
@@ -6,11 +6,9 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { allowedOperators } from '../../../../src/ohne/query/operators.ts';
 import {
-  conditionLocaleSensitive,
   localeSensitive,
   withheldMetadata,
 } from '../../../../src/ohne/query/wire/withheld-metadata.ts';
-import { parseCondition } from '../../../../src/utils/index.ts';
 
 useCollections().register('WhTags', {
   name: 'WhTags',
@@ -51,12 +49,6 @@ describe('localeSensitive', () => {
 
   it('counts an unparsable condition as sensitive', () => {
     strictEqual(localeSensitive({ views: { nope: 1 } }, meta), true);
-  });
-
-  it('reads a parsed node the same way', () => {
-    const parsed = parseCondition({ title: 'Hello' });
-    ok(parsed.ok);
-    strictEqual(conditionLocaleSensitive(parsed.node, meta), true);
   });
 });
 

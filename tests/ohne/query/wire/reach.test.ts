@@ -406,6 +406,7 @@ describe('a wire read composes under its reach', () => {
       offset: null,
       populate: [],
       locale: null,
+      access: [],
       wire: { condition: null, reach },
       unscoped: false,
     });

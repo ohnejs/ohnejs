@@ -1,5 +1,5 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import type { DatabaseAdapter, SQLParams } from '../../../../src/ohne/database/adapter.ts';
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
@@ -8,6 +8,7 @@ import uuidGet from '../../../../src/base/api/collections/[collection]/[uuid].ge
 import uuidPatch from '../../../../src/base/api/collections/[collection]/[uuid].patch.ts';
 import translationsGet from '../../../../src/base/api/collections/[collection]/[uuid]/translations.get.ts';
 import listGet from '../../../../src/base/api/collections/[collection]/index.get.ts';
+import queryPost from '../../../../src/base/api/collections/[collection]/query.post.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
@@ -15,10 +16,13 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { isNull } from '../../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -55,6 +59,35 @@ useCollections().register('TrScoped', {
     },
   },
 });
+useCollections().register('TrFiltered', {
+  name: 'TrFiltered',
+  collection: {
+    api: { read: { public: true, access: () => ({ where: { published: true } }) } },
+    fields: {
+      title: field('text', { translatable: true }),
+      published: field('boolean', { translatable: true }),
+    },
+  },
+});
+useCollections().register('TrPicked', {
+  name: 'TrPicked',
+  collection: {
+    api: {
+      read: {
+        public: true,
+        access: () => ({ where: { published: true }, select: ['title', '_translations'] }),
+      },
+      update: {
+        public: true,
+        access: () => ({ where: { published: true }, select: ['title', '_translations'] }),
+      },
+    },
+    fields: {
+      title: field('text', { translatable: true }),
+      published: field('boolean', { translatable: true }),
+    },
+  },
+});
 useCollections().register('TrOwned', {
   name: 'TrOwned',
   collection: {
@@ -82,7 +115,11 @@ useCollections().register('TrLinks', {
   name: 'TrLinks',
   collection: {
     api: { read: 'public' },
-    fields: { label: field('text'), scoped: field('record', { collection: 'TrScoped' }) },
+    fields: {
+      label: field('text'),
+      scoped: field('record', { collection: 'TrScoped' }),
+      picked: field('record', { collection: 'TrPicked' }),
+    },
   },
 });
 
@@ -123,6 +160,12 @@ const openAtDE = (
 ).UUID as string;
 const hidden = (await queryUntyped('TrScoped').createOrThrow({ title: 'Hidden', published: false }))
   .UUID as string;
+const picked = (await queryUntyped('TrPicked').createOrThrow({ title: 'Open', published: true }))
+  .UUID as string;
+await queryUntyped('TrPicked')
+  .locale('de')
+  .where({ UUID: picked })
+  .updateOrThrow({ title: 'Zu', published: false });
 const owned = (await queryUntyped('TrOwned').createOrThrow({ title: 'Mine', owner: 'me' }))
   .UUID as string;
 await queryUntyped('TrOwned').locale('de').where({ UUID: owned }).updateOrThrow({ title: 'Meins' });
@@ -130,8 +173,9 @@ const selected = (await queryUntyped('TrSelected').createOrThrow({ title: 'Kept'
 const selectedOwned = (
   await queryUntyped('TrSelectedOwned').createOrThrow({ title: 'Kept', owner: 'me' })
 ).UUID as string;
-const linked = (await queryUntyped('TrLinks').createOrThrow({ label: 'L', scoped: openAtEN }))
-  .UUID as string;
+const linked = (
+  await queryUntyped('TrLinks').createOrThrow({ label: 'L', scoped: openAtEN, picked })
+).UUID as string;
 
 function route(method: Route['method'], pattern: string, handler: unknown): Route {
   return {
@@ -147,6 +191,7 @@ const ROUTE = route('GET', '/collections/[collection]/[uuid]/translations', tran
 const LIST = route('GET', '/collections/[collection]', listGet);
 const RECORD = route('GET', '/collections/[collection]/[uuid]', uuidGet);
 const PATCH = route('PATCH', '/collections/[collection]/[uuid]', uuidPatch);
+const QUERY = route('POST', '/collections/[collection]/query', queryPost);
 
 async function send(
   target: Route,
@@ -317,5 +362,108 @@ describe('populated targets under a reach', () => {
     strictEqual(status, 200);
     const scoped = (body as { scoped: { _translations: string[] } }).scoped;
     deepStrictEqual(scoped._translations, ['en']);
+  });
+});
+
+describe('`_translations` narrows when the answer leaves `UUID` out', () => {
+  const narrowed = { title: 'Open', _translations: ['en'] };
+
+  it('narrows a by-UUID read selecting it alone', async () => {
+    const url = `http://x.test/collections/tr-scoped/${openAtEN}?select=_translations`;
+    const { body } = await send(RECORD, url, { collection: 'tr-scoped', uuid: openAtEN });
+    deepStrictEqual(body, { _translations: ['en'] });
+  });
+
+  it('narrows a list, a page, and a body query selecting it alone', async () => {
+    const params = { collection: 'tr-scoped' };
+    const list = await send(
+      LIST,
+      'http://x.test/collections/tr-scoped?select=_translations',
+      params,
+    );
+    deepStrictEqual(list.body, [{ _translations: ['en'] }]);
+    const url = 'http://x.test/collections/tr-scoped?select=_translations&page=1';
+    const page = await send(LIST, url, params);
+    deepStrictEqual((page.body as { records: unknown }).records, [{ _translations: ['en'] }]);
+    const query = await send(QUERY, 'http://x.test/collections/tr-scoped/query', params, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ select: ['_translations'] }),
+    });
+    deepStrictEqual(query.body, [{ _translations: ['en'] }]);
+  });
+
+  it('narrows a populate subselect naming it alone', async () => {
+    const url = `http://x.test/collections/tr-links/${linked}?populate={scoped:{select:[_translations]}}`;
+    const { body } = await send(RECORD, url, { collection: 'tr-links', uuid: linked });
+    deepStrictEqual((body as { scoped: unknown }).scoped, { _translations: ['en'] });
+  });
+
+  it('narrows under a scope `select` without `UUID`, read, listed, and paged', async () => {
+    const one = await send(RECORD, `http://x.test/collections/tr-picked/${picked}`, {
+      collection: 'tr-picked',
+      uuid: picked,
+    });
+    deepStrictEqual(one.body, narrowed);
+    const params = { collection: 'tr-picked' };
+    deepStrictEqual((await send(LIST, 'http://x.test/collections/tr-picked', params)).body, [
+      narrowed,
+    ]);
+    const page = await send(LIST, 'http://x.test/collections/tr-picked?page=1', params);
+    deepStrictEqual((page.body as { records: unknown }).records, [narrowed]);
+  });
+
+  it('narrows a bare populate into a reach `select` without `UUID`, named once or twice', async () => {
+    for (const populate of ['[picked]', '[picked,picked]']) {
+      const url = `http://x.test/collections/tr-links/${linked}?populate=${populate}`;
+      const { status, body } = await send(RECORD, url, { collection: 'tr-links', uuid: linked });
+      strictEqual(status, 200);
+      deepStrictEqual((body as { picked: unknown }).picked, narrowed);
+    }
+  });
+
+  it('narrows a patch answer under a scope `select` without `UUID`', async () => {
+    const { status, body } = await send(
+      PATCH,
+      `http://x.test/collections/tr-picked/${picked}`,
+      { collection: 'tr-picked', uuid: picked },
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Open' }),
+      },
+    );
+    strictEqual(status, 200);
+    deepStrictEqual(body, narrowed);
+  });
+});
+
+describe('`_translations` under a `query:filter` hook', () => {
+  afterEach(() => useHooks().clear());
+
+  it('narrows a record read to the locales the hooked translations read lists', async () => {
+    const uuid = (
+      await queryUntyped('TrFiltered').createOrThrow({ title: 'Open', published: true })
+    ).UUID as string;
+    await queryUntyped('TrFiltered')
+      .locale('fr')
+      .where({ UUID: uuid })
+      .updateOrThrow({ title: 'Geheim', published: true });
+    const secret = {
+      kind: 'compare',
+      path: ['title'],
+      op: 'equalsTo',
+      value: 'Geheim',
+      negated: true,
+    } as const;
+    hook('query:filter', (ir) =>
+      ir.collection === 'TrFiltered' && !isNull(ir.condition)
+        ? { ...ir, condition: { kind: 'and', nodes: [ir.condition, secret] } }
+        : undefined,
+    );
+    const params = { collection: 'tr-filtered', uuid };
+    const record = await send(RECORD, `http://x.test/collections/tr-filtered/${uuid}`, params);
+    deepStrictEqual((record.body as { _translations: unknown })._translations, ['en']);
+    deepStrictEqual((await call(params)).body, { locales: ['en'] });
   });
 });

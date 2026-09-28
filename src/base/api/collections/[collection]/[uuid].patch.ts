@@ -8,7 +8,6 @@ import {
   linkReach,
   readWriteBody,
   scopedRecord,
-  scopeTranslations,
   writeLocale,
 } from '../../../collections-api/gate.ts';
 
@@ -37,10 +36,8 @@ export default defineHandler(async ({ params }) => {
   const builder = queryUntyped(admitted.collection)
     .linkReach(linkReach)
     .where({ UUID: params.uuid });
-  if (!isUndefined(scope.where)) builder.where(scope.where);
+  if (!isUndefined(scope.where)) builder.access(scope.where);
   const records = await (isNull(locale) ? builder : builder.locale(locale)).updateOrThrow(input);
   if (records.length === 0) throw notFound();
-  const answer = scopedRecord(records[0], scope);
-  await scopeTranslations([answer], admitted.collection, meta, scope);
-  return answer;
+  return scopedRecord(records[0], scope);
 });

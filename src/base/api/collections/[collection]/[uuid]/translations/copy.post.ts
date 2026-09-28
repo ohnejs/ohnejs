@@ -19,7 +19,6 @@ import {
   accessScope,
   admitCollection,
   scopedRecord,
-  scopeTranslations,
   writeLocale,
 } from '../../../../../collections-api/gate.ts';
 
@@ -73,14 +72,12 @@ export default defineHandler(async ({ params }) => {
   if (!isUndefined(scope.select)) input = pick(input, scope.select);
 
   const writer = queryUntyped(admitted.collection).where({ UUID: params.uuid });
-  if (!isUndefined(scope.where)) writer.where(scope.where);
+  if (!isUndefined(scope.where)) writer.access(scope.where);
   const scoped = isNull(target) ? writer : writer.locale(target);
   // An empty update would still bump `_updatedAt`, so a copy carrying nothing skips the write.
   const current = isEmpty(input)
     ? await scoped.findFirst()
     : first(await scoped.updateOrThrow(input));
   if (isUndefined(current)) throw notFound();
-  const answer = scopedRecord(current, scope);
-  await scopeTranslations([answer], admitted.collection, meta, scope);
-  return answer;
+  return scopedRecord(current, scope);
 });

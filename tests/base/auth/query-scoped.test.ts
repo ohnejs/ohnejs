@@ -28,7 +28,7 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
-import { isNull } from '../../../src/utils/index.ts';
+import { isNull, isUndefined } from '../../../src/utils/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -85,6 +85,19 @@ useCollections().register('ScopedNotes', {
     },
   },
 });
+useCollections().register('ScopedPosts', {
+  name: 'ScopedPosts',
+  collection: {
+    api: {
+      read: { public: true, access: () => ({ where: { published: true } }) },
+      update: { public: true, access: () => ({ where: { published: true } }) },
+    },
+    fields: {
+      title: field('text', { translatable: true }),
+      published: field('boolean', { translatable: true }),
+    },
+  },
+});
 useCollections().register('ScopedRefused', {
   name: 'ScopedRefused',
   collection: {
@@ -125,16 +138,25 @@ await queryUntyped('ScopedNotes').createOrThrow({
   note: 'n',
 });
 
+const post = (await queryUntyped('ScopedPosts').createOrThrow({ title: 'Open', published: true }))
+  .UUID as string;
+await queryUntyped('ScopedPosts')
+  .locale('de')
+  .where({ UUID: post })
+  .updateOrThrow({ title: 'Zu', published: false });
+
 interface Ask {
   collection: string;
   operation: CollectionOperation;
   input?: Record<string, unknown>;
+  write?: Record<string, unknown>;
 }
 
 const handler: AnyHandler = async () => {
   const ask = await readJSONBody<Ask>();
   const builder = await queryScoped(ask.collection, ask.operation, ask.input);
-  return ask.operation === 'delete' ? builder.delete() : builder.findMany();
+  if (ask.operation === 'delete') return builder.delete();
+  return isUndefined(ask.write) ? builder.findMany() : builder.updateOrThrow(ask.write);
 };
 
 const ROUTE: Route = {
@@ -211,5 +233,15 @@ describe('queryScoped', () => {
     });
     strictEqual((body as unknown[]).length, 2);
     deepStrictEqual(contexts, [{ operation: 'create', input: { title: 'y' } }]);
+  });
+
+  it('narrows `_translations` to the locales the scope admits, read and updated', async () => {
+    const translations = (body: unknown) =>
+      (body as { _translations: string[] }[]).map((record) => record._translations);
+    const read = await call(null, { collection: 'ScopedPosts', operation: 'read' });
+    deepStrictEqual(translations(read.body), [['en']]);
+    const write = { title: 'Open' };
+    const updated = await call(null, { collection: 'ScopedPosts', operation: 'update', write });
+    deepStrictEqual(translations(updated.body), [['en']]);
   });
 });

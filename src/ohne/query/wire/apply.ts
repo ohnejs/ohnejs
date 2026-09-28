@@ -66,7 +66,7 @@ export function applyQuery(
 ): UntypedQueryBuilder {
   const locale = parsed.locale ?? scope.locale;
   if (!isUndefined(locale)) builder.locale(locale);
-  if (!isUndefined(scope.where)) builder.where(scope.where);
+  if (!isUndefined(scope.where)) builder.access(scope.where);
   if (isUndefined(parsed.reach)) {
     if (!isNull(parsed.where)) builder.where(parsed.where);
   } else {
@@ -112,7 +112,7 @@ export function scopedMetadata(meta: CollectionQueryMeta, scope: QueryScope): Co
  */
 export function applyScope(builder: UntypedQueryBuilder, scope: QueryScope): UntypedQueryBuilder {
   if (!isUndefined(scope.locale)) builder.locale(scope.locale);
-  if (!isUndefined(scope.where)) builder.where(scope.where);
+  if (!isUndefined(scope.where)) builder.access(scope.where);
   if (!isUndefined(scope.select)) builder.select(...scope.select);
   if (!isUndefined(scope.limit)) builder.limit(scope.limit);
   return builder;
