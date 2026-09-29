@@ -194,6 +194,10 @@
     "previous": "Previous page",
     "showingRecords": "Showing records {from} to {to}"
   },
+  "palette": {
+    "label": "Search the dashboard",
+    "placeholder": "Search records or jump to a page"
+  },
   "record": {
     "collectionOverview": "`{collection}` overview",
     "confirmDelete": "Are you sure you want to delete this entry?",

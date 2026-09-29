@@ -194,6 +194,10 @@
     "previous": "Prethodna stranica",
     "showingRecords": "Prikazuje zapise {from} do {to}"
   },
+  "palette": {
+    "label": "Pretraži dashboard",
+    "placeholder": "Pretraži zapise ili idi na stranicu"
+  },
   "record": {
     "collectionOverview": "Pregled `{collection}`",
     "confirmDelete": "Da li zaista želite obrisati ovaj unos?",

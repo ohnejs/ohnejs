@@ -4,7 +4,6 @@ import {
   defineDashboardPage,
   h,
   icon,
-  isMac,
   setDocumentTitle,
   textInput,
   useT,
@@ -100,25 +99,6 @@ css`
     color: hsl(var(--ohne-foreground));
   }
 
-  .o-overview-search .o-overview-search-kbd {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 0.375rem;
-    margin-left: 0;
-    padding: 0.1875rem 0.4375rem;
-    border-width: 1px;
-    border-radius: calc(var(--ohne-radius) - 0.25rem);
-    background-color: hsl(var(--ohne-muted) / 0.6);
-    color: hsl(var(--ohne-muted-foreground));
-    font-family: inherit;
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    user-select: none;
-  }
-
   .o-overview-section {
     display: flex;
     flex-direction: column;
@@ -178,12 +158,11 @@ css`
 export default defineDashboardPage(() => shell(() => overview()));
 
 /**
- * The page body: the hotkeyed search input and the Shortcuts and Activity sections.
+ * The page body: the search input and the Shortcuts and Activity sections.
  * A no-results status shows while an active search matches nothing.
  */
 function overview(): Child {
   const t = useT();
-  const mac = isMac();
   const search = createOverviewSearch();
 
   effect(() => setDocumentTitle(t('dashboard.overview.title')));
@@ -208,43 +187,21 @@ function overview(): Child {
             },
             icon('x'),
           )
-        : h(
-            'kbd',
-            { 'aria-hidden': 'true', class: 'o-overview-search-kbd' },
-            mac ? '⌘K' : 'Ctrl+K',
-          ),
+        : null,
   });
   box.classList.add('o-overview-search');
 
   const input = box.querySelector('input');
-  if (!isNull(input)) {
-    input.setAttribute('aria-keyshortcuts', 'Meta+K Control+K');
-    effect(() => input.setAttribute('aria-label', t('dashboard.search')));
-  }
-
-  const focusSearch = (): void => {
-    if (!isNull(input)) {
-      input.focus();
-      input.select();
-    }
-  };
+  if (!isNull(input)) effect(() => input.setAttribute('aria-label', t('dashboard.search')));
 
   const clearSearch = (): void => {
     search.query.value = '';
-    focusSearch();
+    input?.focus();
   };
 
   // Capture phase only: `textInput` blurs on Escape and stops the event before it can bubble here.
   const onKeydown = (event: KeyboardEvent): void => {
-    if (
-      event.code === 'KeyK' &&
-      !event.altKey &&
-      !event.shiftKey &&
-      ((mac && event.metaKey && !event.ctrlKey) || (!mac && event.ctrlKey && !event.metaKey))
-    ) {
-      event.preventDefault();
-      focusSearch();
-    } else if (event.code === 'Escape' && search.active() && document.activeElement === input) {
+    if (event.code === 'Escape' && search.active() && document.activeElement === input) {
       event.preventDefault();
       event.stopPropagation();
       clearSearch();

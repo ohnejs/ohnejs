@@ -194,6 +194,10 @@
     "previous": "Vorherige Seite",
     "showingRecords": "Zeigt Datensätze {from} bis {to}"
   },
+  "palette": {
+    "label": "Dashboard durchsuchen",
+    "placeholder": "Datensätze suchen oder zu einer Seite springen"
+  },
   "record": {
     "collectionOverview": "`{collection}`-Übersicht",
     "confirmDelete": "Diesen Eintrag wirklich löschen?",

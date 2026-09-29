@@ -96,6 +96,7 @@ the browser as type-stripped JavaScript.
   dashboard renders.
 - [Account settings](./dashboard/account.md) - each user's language, time zone, date and time
   formats, and smart clipboard.
+- [Search palette](./dashboard/palette.md) - Cmd+K search across records and pages.
 
 ## Uploads
 
