@@ -1,0 +1,71 @@
+import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { describe, it } from 'node:test';
+
+import type { RateLimitRate, RateLimitStore } from '../../../src/utils/index.ts';
+
+import { createMemoryRateLimitStore, createRateLimiter } from '../../../src/utils/index.ts';
+
+function recording(): { store: RateLimitStore; taken: [string, RateLimitRate][] } {
+  const taken: [string, RateLimitRate][] = [];
+  return {
+    taken,
+    store: {
+      async take(key, rate) {
+        taken.push([key, rate]);
+        return 0;
+      },
+      async reset() {},
+    },
+  };
+}
+
+describe('createRateLimiter', () => {
+  it('allows a burst of limit, then answers the wait', async () => {
+    const store = createMemoryRateLimitStore({ now: () => 0 });
+    const limiter = createRateLimiter({ limit: 2, window: '1s', store });
+    strictEqual(await limiter.hit('thrall'), 0);
+    strictEqual(await limiter.hit('thrall'), 0);
+    strictEqual(await limiter.hit('thrall'), 500);
+    strictEqual(await limiter.hit('jaina'), 0);
+  });
+
+  it('passes the parsed rate and a name-scoped key to its store', async () => {
+    const { store, taken } = recording();
+    await createRateLimiter({ name: 'login', limit: 5, window: '1m', store }).hit('2001:db8::/64');
+    deepStrictEqual(taken, [['["login","2001:db8::/64"]', { limit: 5, window: 60_000 }]]);
+  });
+
+  it('counts two names on one store apart', async () => {
+    const store = createMemoryRateLimitStore({ now: () => 0 });
+    const a = createRateLimiter({ name: 'a', limit: 1, window: 1000, store });
+    const b = createRateLimiter({ name: 'b', limit: 1, window: 1000, store });
+    strictEqual(await a.hit('thrall'), 0);
+    strictEqual(await b.hit('thrall'), 0);
+    strictEqual(await a.hit('thrall'), 1000);
+  });
+
+  it('keeps a key with a separator in it apart from a different name', async () => {
+    const store = createMemoryRateLimitStore({ now: () => 0 });
+    const a = createRateLimiter({ name: 'a:b', limit: 1, window: 1000, store });
+    const b = createRateLimiter({ name: 'a', limit: 1, window: 1000, store });
+    await a.hit('c');
+    strictEqual(await b.hit('b:c'), 0);
+  });
+
+  it('gives a key its full budget back on reset', async () => {
+    const limiter = createRateLimiter({ limit: 1, window: 1000 });
+    await limiter.hit('thrall');
+    await limiter.reset('thrall');
+    strictEqual(await limiter.hit('thrall'), 0);
+  });
+
+  it('throws on a limit or window that is not a positive whole number', () => {
+    for (const limit of [0, -1, 1.5, Number.NaN])
+      throws(() => createRateLimiter({ limit, window: 1000 }), /Invalid limit/);
+    for (const window of [0, 1.5, '0s', '1.5ms'])
+      throws(() => createRateLimiter({ limit: 1, window }), /Invalid window/);
+    for (const window of [-1, Number.NaN, 'soon'])
+      throws(() => createRateLimiter({ limit: 1, window }), /Invalid duration/);
+    throws(() => createRateLimiter({ limit: 2 ** 30, window: 2 ** 30 }), /Invalid window/);
+  });
+});
