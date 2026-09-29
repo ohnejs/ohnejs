@@ -62,6 +62,7 @@ useCollections().register('Users', {
     fields: {
       ...UsersCollection.fields,
       secret: field('record', { collection: 'MeSecrets' }),
+      phone: field('text', { nullable: true }),
     },
   },
 });
@@ -230,6 +231,24 @@ describe('PATCH /auth/me', () => {
       });
       strictEqual((await patch(cookie, { timezone: 'UTC' })).status, 200);
       deepStrictEqual(seen, { layout: DEFAULT_ACCOUNT_LAYOUT, email: 'narrow@example.com' });
+    } finally {
+      useHooks().delete('auth:account-layout');
+    }
+  });
+
+  it('answers a field the hook places on login, on GET, and after a PATCH', async () => {
+    hook('auth:account-layout', (layout) => [...layout, { card: ['phone'] }]);
+    try {
+      const email = 'placed@example.com';
+      await queryUntyped('Users').createOrThrow({ email, password: 'correct horse' });
+      const login = await call(ROUTES.login, { json: { email, password: 'correct horse' } });
+      strictEqual(((await login.json()) as { phone: unknown }).phone, null);
+      const cookie = cookiePair(login);
+      const patched = await patch(cookie, { phone: '+1' });
+      strictEqual(patched.status, 200);
+      strictEqual(((await patched.json()) as { phone: unknown }).phone, '+1');
+      const me = (await (await call(ROUTES.get, { cookie })).json()) as { phone: unknown };
+      strictEqual(me.phone, '+1');
     } finally {
       useHooks().delete('auth:account-layout');
     }

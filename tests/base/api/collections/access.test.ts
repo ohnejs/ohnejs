@@ -421,24 +421,25 @@ describe('field scoping', () => {
     deepStrictEqual(body, [{ title: 'Draft' }]);
   });
 
-  it('422s a key the collection cannot take before the scope narrows the rest', async () => {
+  it('422s a key the collection cannot take and one outside the scope select alike', async () => {
     const { status, body } = await call(ROUTES.patch, { ...drafts, uuid: draft }, anonymous, {
-      body: { title: 'Draft', notee: 'x' },
+      body: { title: 'Draft 2', notee: 'x', note: 'rewritten' },
     });
     strictEqual(status, 422);
     deepStrictEqual((body as { data: { errors: Record<string, string> } }).data.errors, {
       notee: 'validation.unknownField',
+      note: 'validation.unknownField',
     });
+    const row = await queryUntyped('AccessDrafts').where({ UUID: draft }).findFirst();
+    deepStrictEqual([row?.title, row?.note], ['Draft', 'hidden']);
   });
 
-  it('narrows a patch to the scope select: out-of-scope input drops, the response narrows', async () => {
+  it('narrows a patch answer to the scope select', async () => {
     const { status, body } = await call(ROUTES.patch, { ...drafts, uuid: draft }, anonymous, {
-      body: { title: 'Draft 2', note: 'rewritten' },
+      body: { title: 'Draft 2' },
     });
     strictEqual(status, 200);
     deepStrictEqual(body, { title: 'Draft 2' });
-    const row = await queryUntyped('AccessDrafts').where({ UUID: draft }).findFirst();
-    strictEqual(row?.note, 'hidden');
   });
 });
 

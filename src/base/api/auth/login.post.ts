@@ -17,6 +17,7 @@ import { enforceLoginRateLimit } from '../../auth/_login-rate-limit.ts';
 import { acquirePasswordPermit } from '../../auth/_password-permits.ts';
 import { passwordRehashes } from '../../auth/_sessions.ts';
 import { userColumns } from '../../auth/_user.ts';
+import { accountLayout } from '../../auth/account-layout.ts';
 import { useAuthConfig } from '../../auth/config.ts';
 import { createSession } from '../../auth/create-session.ts';
 import { dummyVerify } from '../../auth/dummy-verify.ts';
@@ -51,7 +52,7 @@ export default defineHandler(
     const user = await verifyCredentials(email, password).finally(release);
 
     await createSession(user.UUID, remember);
-    return toUser(user);
+    return toUser(user, await accountLayout(toUser(user)));
   },
   { maxBodySize: '4kb' },
 );

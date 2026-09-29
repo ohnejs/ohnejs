@@ -317,13 +317,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
         if (isString(outcome.record.UUID)) navigate(`${listPath}/${outcome.record.UUID}`);
         return;
       }
-      const dropped = droppedLabels(formFields, body, outcome.record);
-      if (dropped.length === 0) {
-        queueToast(t('dashboard.saved'), { type: 'success' });
-        return;
-      }
-      // The catalog backticks the value whole, so the separator closes one highlight and opens the next.
-      toast(t('dashboard.record.notSaved', { fields: dropped.join('`, `') }), { type: 'error' });
+      queueToast(t('dashboard.saved'), { type: 'success' });
       return;
     }
     if (outcome.kind === 'invalid') {
@@ -680,20 +674,6 @@ function lockOutside(
   return fields.map((field) =>
     select.includes(field.name) ? field : { ...field, writable: false },
   );
-}
-
-/**
- * The labels of the sent fields the answered record lacks: the update scope's `select` dropped them.
- * A write-only field never reads back, so only a readable one counts.
- */
-function droppedLabels(
-  fields: readonly DashboardField[],
-  body: RecordRow,
-  answered: RecordRow,
-): string[] {
-  return fields
-    .filter((field) => field.readable && hasKey(body, field.name) && !hasKey(answered, field.name))
-    .map((field) => field.label);
 }
 
 /**

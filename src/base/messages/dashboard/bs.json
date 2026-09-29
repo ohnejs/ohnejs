@@ -199,8 +199,7 @@
     "confirmDelete": "Da li zaista želite obrisati ovaj unos?",
     "deleted": "Obrisano",
     "gone": "Ovaj zapis više ne postoji",
-    "moreActions": "Više radnji",
-    "notSaved": "Nije sačuvano: `{fields}`"
+    "moreActions": "Više radnji"
   },
   "recordNotFound": "Zapis nije pronađen",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",

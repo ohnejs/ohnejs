@@ -98,7 +98,8 @@ hook('auth:account-layout', (layout) => {
   administrator changes those through the `Users` collection.
 
 The fields that the layout names are exactly what `PATCH /auth/me` accepts, so the form and the
-endpoint always match. The endpoints are covered under
+endpoint always match. The auth endpoints return every placed field too, so the page shows its value.
+The endpoints are covered under
 [authentication](../auth/authentication.md#the-endpoints).
 
 ## Format tokens

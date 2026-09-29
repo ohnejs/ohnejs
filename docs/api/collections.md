@@ -219,8 +219,9 @@ A scope object carries these keys:
   with the collection's fields as keys. It is added to every request with AND, so a request can
   filter further but can never escape it.
 - `select` - the fields the request may reach. A read returns those fields, and a request's own
-  `select` can only choose among them. On an update the same list limits the body: only fields in
-  the list are written, and the answered record carries only the scoped fields.
+  `select` can only choose among them. On an update the same list bounds the body: a field outside
+  it answers `422` exactly as a `writable: false` field does, and the answered record carries only
+  the scoped fields.
 - `limit` - the maximum for a list read's `limit`/`offset` window. The request's own `limit` can
   only lower it, and the [`maxLimit` guard](./url-queries.md#guards) caps it. A paginated read
   takes its size from `perPage` instead, which the [`maxPerPage` guard](./url-queries.md#guards)

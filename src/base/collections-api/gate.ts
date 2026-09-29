@@ -166,11 +166,32 @@ export async function writeReach(
 ): Promise<QueryScope | false> {
   const endpoint = await reachedEndpoint(collection, operation);
   if (isUndefined(endpoint)) return false;
+  return verdictScope(endpoint, operation === 'update' ? { operation, input: {} } : { operation });
+}
+
+/**
+ * The caller's reach into a collection's read, as a verdict asks it before any read runs.
+ * A closed read, a guarded one the caller lacks the capability for, and a `false` verdict reach nothing.
+ * The read's middleware never run: asking must not fire a read's rate limiter or audit log.
+ * `readReach` is the read itself, middleware included, and memoized; this is the question asked first.
+ * An `HTTPError` the resolver throws reaches nothing, as the read itself would refuse the caller.
+ * Any other throw propagates, so a misconfigured scope is a `500`, never an open door.
+ */
+export async function readScope(collection: string): Promise<QueryScope | false> {
+  const endpoint = await reachedEndpoint(collection, 'read');
+  if (isUndefined(endpoint)) return false;
+  return verdictScope(endpoint, { operation: 'read' });
+}
+
+/**
+ * Resolves an endpoint's `access` for a verdict: an `HTTPError` reaches nothing, any other throw propagates.
+ */
+async function verdictScope<O extends CollectionOperation>(
+  endpoint: CollectionEndpoint<string, O>,
+  context: AccessContext<O>,
+): Promise<QueryScope | false> {
   try {
-    return await resolveAccess(
-      endpoint,
-      operation === 'update' ? { operation, input: {} } : { operation },
-    );
+    return await resolveAccess(endpoint, context);
   } catch (error) {
     if (error instanceof HTTPError) return false;
     throw error;

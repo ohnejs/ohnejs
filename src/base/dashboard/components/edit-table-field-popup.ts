@@ -20,7 +20,6 @@ import {
 } from 'ohnejs/dashboard';
 import {
   effect,
-  hasKey,
   isNull,
   isString,
   isUndefined,
@@ -208,12 +207,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       const state = { [field.name]: record[field.name] };
       form.value.rebase(record);
       history.push(state).setOriginalState(state);
-      // The answer lacking a sent readable field means the scope's `select` dropped it from the write.
-      if (field.readable && hasKey(body, field.name) && !hasKey(outcome.record, field.name)) {
-        toast(t('dashboard.record.notSaved', { fields: field.label }), { type: 'error' });
-      } else {
-        toast(t('dashboard.saved'), { type: 'success', description: field.label });
-      }
+      toast(t('dashboard.saved'), { type: 'success', description: field.label });
       options.onUpdated?.(outcome.record);
       options.onClose(handle.close);
       return;

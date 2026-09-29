@@ -14,6 +14,7 @@ declare module 'ohnejs' {
 /**
  * The public shape of a user, as `useUser` and the auth routes return it.
  * The `password` hash never appears here, so it cannot leak through a helper's return value.
+ * The auth routes also answer every readable field the account layout places beyond these members.
  */
 export interface User {
   /**

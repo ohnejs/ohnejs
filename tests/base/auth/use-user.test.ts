@@ -131,9 +131,10 @@ describe('useUser and useSession', () => {
 });
 
 describe('userColumns', () => {
-  it('names every declared user column for a read', () => {
+  it('names every readable user column for a read', () => {
     deepStrictEqual(userColumns(), [
       'UUID',
+      '_updatedAt',
       'email',
       'firstName',
       'lastName',

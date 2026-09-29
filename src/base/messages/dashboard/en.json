@@ -199,8 +199,7 @@
     "confirmDelete": "Are you sure you want to delete this entry?",
     "deleted": "Deleted",
     "gone": "This record no longer exists",
-    "moreActions": "More actions",
-    "notSaved": "Not saved: `{fields}`"
+    "moreActions": "More actions"
   },
   "recordNotFound": "Record not found",
   "records": "{count, plural, one {# record} other {# records}}",

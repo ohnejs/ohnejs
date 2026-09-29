@@ -30,12 +30,12 @@ export default defineHandler(async (): Promise<User> => {
   const user = await requireUser();
   const body = await readJSONBody();
   if (!isPlainObject(body)) throw badRequest();
-  const allowed = accountFields(await accountLayout(user));
-  checkWriteInput(body, pick(queryMetadata('Users').fields, allowed), 'update');
+  const layout = await accountLayout(user);
+  checkWriteInput(body, pick(queryMetadata('Users').fields, accountFields(layout)), 'update');
   const [record] = await queryUntyped('Users')
     .linkReach(linkReach)
     .where({ UUID: user.UUID })
     .updateOrThrow(body);
   if (isUndefined(record)) throw unauthorized();
-  return toUser(record);
+  return toUser(record, layout);
 });

@@ -1,28 +1,11 @@
 import { queryMetadata } from 'ohnejs';
-import { hasKey } from 'ohnejs/utils';
 
 /**
- * The `Users` fields `toUser` projects, in the order the collection declares them.
- */
-export const USER_FIELDS = [
-  'UUID',
-  'email',
-  'firstName',
-  'lastName',
-  'roles',
-  'dashboardLanguage',
-  'contentLanguage',
-  'timezone',
-  'dateFormat',
-  'timeFormat',
-  'smartClipboard',
-] as const;
-
-/**
- * The `USER_FIELDS` the `Users` collection declares, for a read that names its columns.
- * A field an override dropped is skipped, so the select never names a column the table lacks.
+ * The readable `Users` fields, for a read that names `password` and must still carry the rest.
+ * `toUser` projects whatever the account layout places, so every readable field rides along.
  */
 export function userColumns(): string[] {
-  const { fields } = queryMetadata('Users');
-  return USER_FIELDS.filter((name) => hasKey(fields, name));
+  return Object.entries(queryMetadata('Users').fields)
+    .filter(([, field]) => field.readable !== false)
+    .map(([name]) => name);
 }

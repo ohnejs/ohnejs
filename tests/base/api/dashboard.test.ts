@@ -1,11 +1,11 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { DashboardCollection } from '../../../src/base/collections-api/describe.ts';
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import dashboardGet, {
   type DashboardBlock,
-  type DashboardCollection,
   type DashboardMeta,
 } from '../../../src/base/api/dashboard.get.ts';
 import { hashSessionToken } from '../../../src/base/auth/_token.ts';
