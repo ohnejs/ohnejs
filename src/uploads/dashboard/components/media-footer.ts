@@ -435,12 +435,15 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
   window.addEventListener('keydown', onArrowKey);
   onCleanup(() => window.removeEventListener('keydown', onArrowKey));
 
-  const hotkeys = useHotkeys({ allowInOverlays: mode !== 'none' });
-  hotkeys.listen('search', (event) => {
-    if (overlayCount() !== depth) return;
-    event.preventDefault();
-    searchOpen.value = true;
-  });
+  // On the media page the search hotkey belongs to the dashboard palette.
+  if (mode !== 'none') {
+    const hotkeys = useHotkeys({ allowInOverlays: true });
+    hotkeys.listen('search', (event) => {
+      if (overlayCount() !== depth) return;
+      event.preventDefault();
+      searchOpen.value = true;
+    });
+  }
 
   const root = h(
     'div',
