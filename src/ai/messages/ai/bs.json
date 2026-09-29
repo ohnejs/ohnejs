@@ -1,0 +1,48 @@
+{
+  "api": {
+    "assistantOff": "Asistent nije uključen",
+    "batchReported": "Serija već ima svoje rezultate",
+    "invalidBody": "Neispravan `{key}`",
+    "modelUnavailable": "Model `{model}` nije dostupan",
+    "resultsMismatch": "Potreban je tačno jedan rezultat po prijedlogu",
+    "turnGone": "Razgovor je zatvoren ili nepoznat",
+    "unknownBatch": "Nepoznata serija `{batch}`",
+    "unknownKey": "Nepoznat ključ `{key}`",
+    "unknownModel": "Nepoznat model `{model}`",
+    "unknownSkill": "Nepoznata vještina `{skill}`"
+  },
+  "turns": {
+    "user": {
+      "label": "Korisnik",
+      "description": "Osoba koja je pitala; samo ona može nastaviti razgovor."
+    },
+    "model": {
+      "label": "Model",
+      "description": "Unos iz `ai.models` s kojim razgovor planira."
+    },
+    "page": {
+      "label": "Stranica",
+      "description": "Ruta nadzorne ploče s koje je osoba pitala."
+    },
+    "transcript": {
+      "label": "Transkript",
+      "description": "Razgovor kako ga dobavljač vodi, kao JSON."
+    },
+    "batches": {
+      "label": "Serije",
+      "description": "Zahtjevi koje je svaki korak predložio, kao JSON."
+    },
+    "step": {
+      "label": "Koraci",
+      "description": "Koliko je koraka modela razgovor izvršio."
+    },
+    "usage": {
+      "label": "Potrošnja",
+      "description": "Tokeni koje je razgovor potrošio, kao JSON."
+    },
+    "closedAt": {
+      "label": "Zatvoren",
+      "description": "Kada je razgovor završio; prazno dok je otvoren."
+    }
+  }
+}

@@ -24,6 +24,10 @@
       "types": "./src/ohne/index.ts",
       "default": "./src/ohne/index.ts"
     },
+    "./ai": {
+      "types": "./src/ai/index.ts",
+      "default": "./src/ai/index.ts"
+    },
     "./auth": {
       "types": "./src/base/auth/index.ts",
       "default": "./src/base/auth/index.ts"

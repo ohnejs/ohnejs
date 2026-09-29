@@ -1,0 +1,48 @@
+{
+  "api": {
+    "assistantOff": "Der Assistent ist nicht aktiviert",
+    "batchReported": "Der Stapel hat seine Ergebnisse bereits",
+    "invalidBody": "Ungültiges `{key}`",
+    "modelUnavailable": "Das Modell `{model}` ist nicht verfügbar",
+    "resultsMismatch": "Pro Vorschlag ist genau ein Ergebnis nötig",
+    "turnGone": "Der Durchgang ist beendet oder unbekannt",
+    "unknownBatch": "Unbekannter Stapel `{batch}`",
+    "unknownKey": "Unbekannter Schlüssel `{key}`",
+    "unknownModel": "Unbekanntes Modell `{model}`",
+    "unknownSkill": "Unbekannte Fähigkeit `{skill}`"
+  },
+  "turns": {
+    "user": {
+      "label": "Benutzer",
+      "description": "Die Person, die gefragt hat; nur sie kann den Durchgang fortsetzen."
+    },
+    "model": {
+      "label": "Modell",
+      "description": "Der Eintrag aus `ai.models`, mit dem der Durchgang plant."
+    },
+    "page": {
+      "label": "Seite",
+      "description": "Die Dashboard-Route, von der aus die Person gefragt hat."
+    },
+    "transcript": {
+      "label": "Verlauf",
+      "description": "Das Gespräch, wie der Anbieter es führt, als JSON."
+    },
+    "batches": {
+      "label": "Stapel",
+      "description": "Die Anfragen, die jeder Schritt vorgeschlagen hat, als JSON."
+    },
+    "step": {
+      "label": "Schritte",
+      "description": "Wie viele Modellschritte der Durchgang ausgeführt hat."
+    },
+    "usage": {
+      "label": "Verbrauch",
+      "description": "Die Tokens, die der Durchgang verbraucht hat, als JSON."
+    },
+    "closedAt": {
+      "label": "Beendet am",
+      "description": "Wann der Durchgang endete; leer, solange er offen ist."
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "api": {
+    "assistantOff": "The assistant is not enabled",
+    "batchReported": "The batch already has its results",
+    "invalidBody": "Invalid `{key}`",
+    "modelUnavailable": "The model `{model}` is unavailable",
+    "resultsMismatch": "One result per proposal is required",
+    "turnGone": "The turn is closed or unknown",
+    "unknownBatch": "Unknown batch `{batch}`",
+    "unknownKey": "Unknown key `{key}`",
+    "unknownModel": "Unknown model `{model}`",
+    "unknownSkill": "Unknown skill `{skill}`"
+  },
+  "turns": {
+    "user": {
+      "label": "User",
+      "description": "The person who asked; only they can continue the turn."
+    },
+    "model": {
+      "label": "Model",
+      "description": "The `ai.models` entry the turn plans with."
+    },
+    "page": {
+      "label": "Page",
+      "description": "The dashboard route the person asked from."
+    },
+    "transcript": {
+      "label": "Transcript",
+      "description": "The conversation as the provider keeps it, as JSON."
+    },
+    "batches": {
+      "label": "Batches",
+      "description": "The requests each step proposed, as JSON."
+    },
+    "step": {
+      "label": "Steps",
+      "description": "How many model steps the turn has run."
+    },
+    "usage": {
+      "label": "Usage",
+      "description": "The tokens the turn has spent, as JSON."
+    },
+    "closedAt": {
+      "label": "Closed at",
+      "description": "When the turn ended; empty while it is open."
+    }
+  }
+}

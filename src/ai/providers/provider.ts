@@ -14,8 +14,9 @@ export interface ProviderOptions {
 
   /**
    * The API key, sent as the provider's credential header.
+   * Omitted, no credential is sent, for a local server or `headers` that carry their own.
    */
-  key: string;
+  key?: string;
 
   /**
    * The API's origin, with the path prefix the provider's own SDK expects.

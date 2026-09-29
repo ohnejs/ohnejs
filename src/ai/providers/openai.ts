@@ -15,7 +15,7 @@ import type {
 } from './provider.ts';
 
 import { retried, retriedStream } from './_retry.ts';
-import { drain, endedEarly, parseJSON, postEvents, quotaExhausted } from './_wire.ts';
+import { bearer, drain, endedEarly, parseJSON, postEvents, quotaExhausted } from './_wire.ts';
 import { DEFAULT_MAX_OUTPUT, providerError } from './provider.ts';
 
 type WireUsage = {
@@ -62,7 +62,7 @@ const ANSWER = 'answer';
  */
 export function createOpenAIProvider(options: ProviderOptions): Provider {
   const url = `${withoutTrailingSlash(options.baseURL ?? API)}/responses`;
-  const headers = { authorization: `Bearer ${options.key}`, ...options.headers };
+  const headers = { ...bearer(options.key), ...options.headers };
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>
     postEvents(url, {
       headers,

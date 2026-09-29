@@ -40,6 +40,13 @@ export interface PostOptions {
 }
 
 /**
+ * The `authorization` header carrying `key` as a bearer token, or no header without a key.
+ */
+export function bearer(key: string | undefined): Record<string, string> {
+  return isUndefined(key) ? {} : { authorization: `Bearer ${key}` };
+}
+
+/**
  * Statuses worth a rerun besides `5xx`: a timeout, a conflict, a rate limit.
  */
 const RETRY_STATUSES = new Set([408, 409, 429]);

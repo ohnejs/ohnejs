@@ -1,6 +1,6 @@
 import type { SSEMessage } from 'ohnejs/utils';
 
-import { isPlainObject, merge, withoutTrailingSlash } from 'ohnejs/utils';
+import { isPlainObject, isUndefined, merge, withoutTrailingSlash } from 'ohnejs/utils';
 
 import type {
   Completion,
@@ -98,7 +98,8 @@ const STOPS: Record<string, StopReason> = {
  */
 export function createAnthropicProvider(options: ProviderOptions): Provider {
   const url = `${withoutTrailingSlash(options.baseURL ?? API)}/v1/messages`;
-  const headers = { 'x-api-key': options.key, 'anthropic-version': VERSION, ...options.headers };
+  const key: Record<string, string> = isUndefined(options.key) ? {} : { 'x-api-key': options.key };
+  const headers = { ...key, 'anthropic-version': VERSION, ...options.headers };
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>
     postEvents(url, { headers, body: merge(options.options, body), signal, billing });
 
