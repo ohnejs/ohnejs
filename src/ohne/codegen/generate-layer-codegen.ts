@@ -10,6 +10,7 @@ const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
 
 const OHNE_FILES = new Set([
   'database.ts',
+  'flows.ts',
   'layer-name.ts',
   'messages.ts',
   'middleware.ts',

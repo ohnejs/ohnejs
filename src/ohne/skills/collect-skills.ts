@@ -1,45 +1,17 @@
-import type { ScannedFile } from '../layers/scan-layer-files.ts';
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { SkillDefinition } from './define-skill.ts';
 
-import { importDefault } from '../../utils/fs/index.ts';
-import { isPlainObject, isString, naturalCompare } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
-import { DIR_DEFAULTS } from '../layers/config.ts';
-import { scanLayerFiles } from '../layers/scan-layer-files.ts';
-import { useLayers } from '../layers/use-layers.ts';
+import { isPlainObject, isString } from '../../utils/index.ts';
+import {
+  collectLayerFiles,
+  type CollectedFile,
+  type CollectLayerFilesOptions,
+} from '../layers/collect-layer-files.ts';
 
 /**
- * One skill with its imported definition, ready for codegen.
+ * One skill with its imported definition under `skill`, ready for codegen.
  */
-export interface CollectedSkill extends ScannedFile {
-  /**
-   * The definition the file default-exports.
-   */
-  skill: SkillDefinition;
-}
-
-/**
- * Options for `collectSkills`.
- */
-export interface CollectSkillsOptions {
-  /**
-   * Skill names to drop after the merge, matched exactly.
-   *
-   * @default
-   * []
-   */
-  disable?: readonly string[];
-
-  /**
-   * Re-import each definition fresh, past the module cache.
-   * The dev supervisor sets it to pick up edits in its own long-lived process.
-   *
-   * @default
-   * false
-   */
-  fresh?: boolean;
-}
+export type CollectedSkill = CollectedFile<'skill', SkillDefinition>;
 
 /**
  * Combines the skills of every layer into one deduplicated, imported list.
@@ -50,48 +22,16 @@ export interface CollectSkillsOptions {
  * Each survivor's definition is imported; a missing or malformed default export throws.
  * Results sort by name for deterministic output.
  */
-export async function collectSkills(
+export function collectSkills(
   layers: readonly OhneLayer[],
-  options: CollectSkillsOptions = {},
+  options: CollectLayerFilesOptions = {},
 ): Promise<CollectedSkill[]> {
-  const { disable = [], fresh = false } = options;
-  const configByPath = new Map(
-    useLayers()
-      .layers()
-      .map((layer) => [layer.path, layer.input]),
-  );
-  const byName = new Map<string, ScannedFile>();
-  for (const layer of layers) {
-    const dir = configByPath.get(layer.dir)?.dirs?.skills ?? DIR_DEFAULTS.skills;
-    for (const scanned of await scanLayerFiles('skill', layer, dir)) {
-      byName.set(scanned.name, scanned);
-    }
-  }
-
-  const dropped = new Set(disable);
-  const survivors = [...byName.values()]
-    .filter((scanned) => !dropped.has(scanned.name))
-    .sort((a, b) => naturalCompare(a.name, b.name));
-
-  return Promise.all(
-    survivors.map(async (scanned) => ({
-      ...scanned,
-      skill: await definitionOf(scanned, fresh),
-    })),
-  );
+  return collectLayerFiles('skill', layers, isSkillDefinition, options);
 }
 
 /**
- * Imports one skill's definition and rejects a file that does not default-export one.
+ * Whether a default export has the shape of a `defineSkill` result.
  */
-async function definitionOf(scanned: ScannedFile, fresh: boolean): Promise<SkillDefinition> {
-  const definition = await importDefault<SkillDefinition>(scanned.file, { fresh });
-  if (!isPlainObject(definition) || !isString(definition.prompt)) {
-    throw ohneError({
-      title: `Skill \`${scanned.name}\` has no definition`,
-      body: ['Default-export a `defineSkill(...)` result from the file.'],
-      path: scanned.file,
-    });
-  }
-  return definition;
+function isSkillDefinition(definition: unknown): definition is SkillDefinition {
+  return isPlainObject(definition) && isString(definition.prompt);
 }

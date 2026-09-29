@@ -1,6 +1,7 @@
 import { isString } from '../../utils/index.ts';
 import { generateBrowserTSConfig } from './generate-browser-tsconfig.ts';
 import { generateDatabase } from './generate-database.ts';
+import { generateFlows } from './generate-flows.ts';
 import { generateLayerCodegen } from './generate-layer-codegen.ts';
 import { generateLayerName } from './generate-layer-name.ts';
 import { generateMessages } from './generate-messages.ts';
@@ -36,6 +37,7 @@ export async function generateProject(from: string = process.cwd()): Promise<str
       generateDatabase(from),
       generateRoles(from),
       generateSkills(from),
+      generateFlows(from),
       generateLayerCodegen(from),
     ])
   )

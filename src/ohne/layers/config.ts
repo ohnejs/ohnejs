@@ -12,6 +12,7 @@ import type { DashboardMenuEntry } from '../dashboard/menu.ts';
 import type { DatabaseName } from '../database/known-databases.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
+import type { KnownFlows } from '../flows/known-flows.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
@@ -161,6 +162,17 @@ export interface Config {
     skills?: string;
 
     /**
+     * Directory each layer's flows are read from.
+     * Each `.ts` file default-exports one `defineFlow` result; the file names the flow in kebab-case.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'flows'
+     */
+    flows?: string;
+
+    /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
      * A `_`-prefixed file or directory is a helper and is skipped.
@@ -285,6 +297,15 @@ export interface Config {
      * []
      */
     skills?: LiteralUnion<Extract<keyof KnownSkills, string>>[];
+
+    /**
+     * Flow names to drop, matched exactly.
+     * A dropped flow vanishes from registration and the generated `KnownFlows` type.
+     *
+     * @default
+     * []
+     */
+    flows?: LiteralUnion<Extract<keyof KnownFlows, string>>[];
   };
 
   /**
@@ -822,6 +843,7 @@ export const DEFAULTS = {
     blocks: [],
     roles: [],
     skills: [],
+    flows: [],
   },
   collections: { locales: ['en'], defaultLocale: 'en' },
   messages: { defaultLanguage: 'en' },
@@ -858,6 +880,7 @@ export const DIR_DEFAULTS = {
   blocks: 'blocks',
   roles: 'roles',
   skills: 'skills',
+  flows: 'flows',
   migrations: 'migrations',
   commands: 'commands',
   dashboard: 'dashboard',
@@ -915,6 +938,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'disable.blocks': 'concat-unique',
   'disable.roles': 'concat-unique',
   'disable.skills': 'concat-unique',
+  'disable.flows': 'concat-unique',
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',

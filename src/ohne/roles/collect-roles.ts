@@ -1,45 +1,17 @@
-import type { ScannedFile } from '../layers/scan-layer-files.ts';
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { RoleDefinition } from './define-role.ts';
 
-import { importDefault } from '../../utils/fs/index.ts';
-import { isArray, isPlainObject, naturalCompare } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
-import { DIR_DEFAULTS } from '../layers/config.ts';
-import { scanLayerFiles } from '../layers/scan-layer-files.ts';
-import { useLayers } from '../layers/use-layers.ts';
+import { isArray, isPlainObject } from '../../utils/index.ts';
+import {
+  collectLayerFiles,
+  type CollectedFile,
+  type CollectLayerFilesOptions,
+} from '../layers/collect-layer-files.ts';
 
 /**
- * One role with its imported definition, ready for codegen.
+ * One role with its imported definition under `role`, ready for codegen.
  */
-export interface CollectedRole extends ScannedFile {
-  /**
-   * The definition the file default-exports.
-   */
-  role: RoleDefinition;
-}
-
-/**
- * Options for `collectRoles`.
- */
-export interface CollectRolesOptions {
-  /**
-   * Role names to drop after the merge, matched exactly.
-   *
-   * @default
-   * []
-   */
-  disable?: readonly string[];
-
-  /**
-   * Re-import each definition fresh, past the module cache.
-   * The dev supervisor sets it to pick up edits in its own long-lived process.
-   *
-   * @default
-   * false
-   */
-  fresh?: boolean;
-}
+export type CollectedRole = CollectedFile<'role', RoleDefinition>;
 
 /**
  * Combines the roles of every layer into one deduplicated, imported list.
@@ -50,48 +22,16 @@ export interface CollectRolesOptions {
  * Each survivor's definition is imported; a missing or malformed default export throws.
  * Results sort by name for deterministic output.
  */
-export async function collectRoles(
+export function collectRoles(
   layers: readonly OhneLayer[],
-  options: CollectRolesOptions = {},
+  options: CollectLayerFilesOptions = {},
 ): Promise<CollectedRole[]> {
-  const { disable = [], fresh = false } = options;
-  const configByPath = new Map(
-    useLayers()
-      .layers()
-      .map((layer) => [layer.path, layer.input]),
-  );
-  const byName = new Map<string, ScannedFile>();
-  for (const layer of layers) {
-    const dir = configByPath.get(layer.dir)?.dirs?.roles ?? DIR_DEFAULTS.roles;
-    for (const scanned of await scanLayerFiles('role', layer, dir)) {
-      byName.set(scanned.name, scanned);
-    }
-  }
-
-  const dropped = new Set(disable);
-  const survivors = [...byName.values()]
-    .filter((scanned) => !dropped.has(scanned.name))
-    .sort((a, b) => naturalCompare(a.name, b.name));
-
-  return Promise.all(
-    survivors.map(async (scanned) => ({
-      ...scanned,
-      role: await definitionOf(scanned, fresh),
-    })),
-  );
+  return collectLayerFiles('role', layers, isRoleDefinition, options);
 }
 
 /**
- * Imports one role's definition and rejects a file that does not default-export one.
+ * Whether a default export has the shape of a `defineRole` result.
  */
-async function definitionOf(scanned: ScannedFile, fresh: boolean): Promise<RoleDefinition> {
-  const definition = await importDefault<RoleDefinition>(scanned.file, { fresh });
-  if (!isPlainObject(definition) || !isArray(definition.capabilities)) {
-    throw ohneError({
-      title: `Role \`${scanned.name}\` has no definition`,
-      body: ['Default-export a `defineRole(...)` result from the file.'],
-      path: scanned.file,
-    });
-  }
-  return definition;
+function isRoleDefinition(definition: unknown): definition is RoleDefinition {
+  return isPlainObject(definition) && isArray(definition.capabilities);
 }

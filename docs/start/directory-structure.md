@@ -26,6 +26,7 @@ my-app/
 ├── migrations/           data moves for schema changes
 ├── roles/                who may do what
 ├── skills/               what the assistant can do on request
+├── flows/                how the assistant routes a request
 ├── .data/                the local database
 ├── .ohne/                generated types
 ├── .env                  local environment variables
@@ -78,6 +79,8 @@ the whole directory as public. Server code lives outside it, and the two talk ov
   `editor` role, a named set of permissions you give to users.
 - `skills/` - skills, one per file. `skills/translate-items.ts` is the `translate-items` skill, a
   prompt the dashboard assistant runs when someone asks for it.
+- `flows/` - flows, one per file. `flows/raid-officer.ts` is the `raid-officer` flow, a graph the
+  assistant walks: it decides what a request needs, then runs the matching skill or prompt.
 - `commands/` - [commands](../project/commands.md), one per file. `commands/seed.ts` adds
   `ohne seed`, for work outside a request.
 - `messages/` - [message catalogs](../i18n/messages.md#catalogs), the strings your app translates.

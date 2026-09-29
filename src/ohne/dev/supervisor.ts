@@ -17,6 +17,7 @@ import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createDatabaseTarget } from './targets/database.ts';
+import { createFlowsTarget } from './targets/flows.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRegistryTarget } from './targets/registry.ts';
@@ -98,6 +99,7 @@ export async function dev(
   const database = createDatabaseTarget(from);
   const roles = createRolesTarget(from);
   const skills = createSkillsTarget(from);
+  const flows = createFlowsTarget(from);
   const config = createConfigTarget(from, [
     registry,
     routes,
@@ -106,8 +108,9 @@ export async function dev(
     database,
     roles,
     skills,
+    flows,
   ]);
-  const targets = [registry, routes, middleware, messages, database, roles, skills];
+  const targets = [registry, routes, middleware, messages, database, roles, skills, flows];
 
   const wantDashboard = options.dashboard ?? true;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(
