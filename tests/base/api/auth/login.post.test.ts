@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { describe, it } from 'node:test';
 
@@ -25,9 +25,11 @@ import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { createRouter } from '../../../../src/ohne/http/router.ts';
 import { createServer } from '../../../../src/ohne/http/server.ts';
 import { DEFAULTS } from '../../../../src/ohne/layers/config.ts';
+import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
+useLayers().add({ path: '/login-test', defaults: DEFAULTS, input: {} });
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
@@ -54,11 +56,15 @@ const login: Route = {
   handler: loginHandler as AnyHandler,
 };
 
-async function attempt(ip: string, signal?: AbortSignal): Promise<Response> {
+async function attempt(
+  ip: string,
+  signal?: AbortSignal,
+  email = 'thrall@horde.gg',
+): Promise<Response> {
   const request = new Request('http://localhost/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'thrall@horde.gg', password: 'lok-tar' }),
+    body: JSON.stringify({ email, password: 'lok-tar' }),
     signal,
   });
   const { response } = await dispatch(login, request, new URL(request.url), {}, { ip });
@@ -82,6 +88,16 @@ describe('POST /auth/login', () => {
 
     strictEqual((await attempt('203.0.113.8')).status, 503);
     await first;
+  });
+
+  it('answers 429 past ten attempts a minute from one IP', async () => {
+    for (let i = 0; i < 10; i++)
+      strictEqual((await attempt('198.51.100.1', undefined, `grunt-${i}@horde.gg`)).status, 401);
+    const refused = await attempt('198.51.100.1', undefined, 'grunt-10@horde.gg');
+    strictEqual(refused.status, 429);
+    const retryAfter = Number(refused.headers.get('Retry-After'));
+    ok(retryAfter >= 1 && retryAfter <= 6);
+    strictEqual((await attempt('198.51.100.2', undefined, 'grunt-10@horde.gg')).status, 401);
   });
 
   it('answers 413 to a body past 4 KB', async () => {

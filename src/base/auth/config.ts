@@ -1,4 +1,4 @@
-import { useConfig } from 'ohnejs';
+import { type RouteRateLimit, useConfig } from 'ohnejs';
 import { withDefaults } from 'ohnejs/utils';
 
 declare module 'ohnejs' {
@@ -44,6 +44,21 @@ declare module 'ohnejs' {
        * 'session'
        */
       cookieName?: string;
+
+      /**
+       * How often one client network may try to sign in, or `false` to leave the limit to your proxy.
+       * Past it, `POST /auth/login` answers `429` with `Retry-After`.
+       * Attempts count per network, never per email, so no one can lock an account from elsewhere.
+       *
+       * @default
+       * { limit: 10, window: '1m' }
+       *
+       * @example
+       * ```ts
+       * auth: { loginRateLimit: { limit: 5, window: '1m' } }
+       * ```
+       */
+      loginRateLimit?: RouteRateLimit | false;
 
       /**
        * How hard passwords are to hash, using the scrypt algorithm.
@@ -104,6 +119,11 @@ export interface ResolvedAuthConfig {
   cookieName: string;
 
   /**
+   * How often one client network may try to sign in, or `false` for no limit.
+   */
+  loginRateLimit: RouteRateLimit | false;
+
+  /**
    * The scrypt cost passed to `hashPassword`.
    */
   password: {
@@ -132,6 +152,7 @@ export const AUTH_DEFAULTS = {
   sessionMaxAge: '30d',
   transientSessionMaxAge: '1d',
   cookieName: 'session',
+  loginRateLimit: { limit: 10, window: '1m' },
   password: {
     cost: 32_768,
     blockSize: 8,

@@ -257,9 +257,10 @@ import { defineConfig } from 'ohnejs';
 export default defineConfig({
   layers: ['ohnejs/base'],
   auth: {
-    sessionMaxAge: '30d',         // a remembered session's lifetime, and the ceiling
-    transientSessionMaxAge: '1d', // the lifetime without remember me
-    cookieName: 'session',        // the session cookie's name
+    sessionMaxAge: '30d',                        // a remembered session's lifetime and ceiling
+    transientSessionMaxAge: '1d',                // the lifetime without remember me
+    cookieName: 'session',                       // the session cookie's name
+    loginRateLimit: { limit: 10, window: '1m' }, // sign-in attempts per client network
   },
 });
 ```
@@ -295,14 +296,20 @@ after you raise the cost, because each stored hash includes the cost it was made
 
 ## Password guessing
 
-`POST /auth/login` runs one password check per client IP at a time, and at most half of Node's thread
-pool per process. A sign-in past that gets a `503` with `Retry-After: 1`. Behind a proxy, set
-[`api.trustProxy`](../production/deployment.md#behind-a-proxy), or every client shares one IP.
+`POST /auth/login` gives one client network ten attempts a minute. Past that, a sign-in gets a
+`429` with `Retry-After`. Attempts are counted per network, never per email, so no one on another
+network can lock you out of your account.
 
-This does not count failed attempts. To stop someone guessing passwords one at a time, rate-limit
-`/auth/login` in your proxy, or answer `429` with `Retry-After` from a
-[global middleware](../api/middleware.md#global-middleware). The dashboard's login form waits out
-either answer.
+Change the limit with [`auth.loginRateLimit`](#configuration). Set it to `false` when your proxy
+already limits `/auth/login`.
+
+It also runs one password check per client IP at a time, and at most half of Node's thread pool per
+process. A sign-in past that gets a `503` with `Retry-After: 1`. The dashboard's login form waits
+out either answer.
+
+Behind a proxy, set [`api.trustProxy`](../production/deployment.md#behind-a-proxy), or every client
+shares one IP. Attempts count where [rate limits](../api/rate-limiting.md#across-processes) do,
+in each process's memory unless you choose a shared store.
 
 ## Rolling your own
 

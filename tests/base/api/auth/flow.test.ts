@@ -25,6 +25,7 @@ import { registerDatabase, registerDialect } from '../../../../src/ohne/database
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useEvent } from '../../../../src/ohne/http/use-event.ts';
+import { DEFAULTS } from '../../../../src/ohne/layers/config.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
@@ -35,7 +36,11 @@ import { parseDuration } from '../../../../src/utils/index.ts';
 usePrinter().configure({ stream: { write: () => true } });
 
 // A tiny scrypt cost keeps hashing and the login timing-equalizer (`dummyVerify`) fast.
-useLayers().add({ path: '/auth-flow-test', input: { auth: { password: { cost: 1024 } } } });
+useLayers().add({
+  path: '/auth-flow-test',
+  defaults: DEFAULTS,
+  input: { auth: { password: { cost: 1024 } } },
+});
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
