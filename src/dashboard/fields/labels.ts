@@ -6,7 +6,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref, type Ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
-import { renderTemplate } from '../../utils/template/render-template.ts';
+import { renderLabel } from '../../utils/template/render-label.ts';
 import { shortUUID } from '../../utils/uuid/short-uuid.ts';
 import { api } from '../runtime/api.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
@@ -78,11 +78,7 @@ export function fallbackLabel(uuid: string): string {
  * Without one, the `labelFields` values join with single spaces in order, skipping empty ones.
  */
 export function joinLabel(row: Record<string, unknown>, collection: DashboardCollection): string {
-  if (!isUndefined(collection.labelTemplate)) return renderTemplate(collection.labelTemplate, row);
-  return collection.labelFields
-    .map((name) => row[name])
-    .filter((value): value is string => isString(value) && value !== '')
-    .join(' ');
+  return renderLabel(row, collection.labelFields, collection.labelTemplate);
 }
 
 /**

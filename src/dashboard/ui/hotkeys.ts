@@ -195,7 +195,7 @@ export function isEditingText(): boolean {
 /**
  * Whether any modifier key is held on the event.
  */
-export function hasModifierKey(event: KeyboardEvent): boolean {
+export function hasModifierKey(event: KeyboardEvent | MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.altKey || event.shiftKey;
 }
 
