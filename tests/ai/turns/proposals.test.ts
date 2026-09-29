@@ -193,6 +193,8 @@ describe('checkProposal', () => {
       proposal: { route: QUERY, tier: 'read', body: { where: { level: 60 }, perPage: 5 } },
       identity: false,
     });
+    const selected = await check({ route: QUERY, body: { select: ['name'], page: 1 } });
+    deepStrictEqual(selected.ok && selected.proposal.body?.select, ['UUID', 'name']);
   });
 
   it('passes an opened field under the identity rule only for a model that sees values', async () => {

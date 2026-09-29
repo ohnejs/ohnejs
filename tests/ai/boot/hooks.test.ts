@@ -70,6 +70,7 @@ describe('the dashboard:meta hook', () => {
       model: 'smart',
       models: ['smart', 'local'],
       skills: [report],
+      resultSize: 65_536,
     });
   });
 

@@ -2,7 +2,7 @@ import type { User } from 'ohnejs/auth';
 
 import { hook, useSkills } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
-import { isUndefined, toSentenceCase } from 'ohnejs/utils';
+import { isUndefined, parseBytes, toSentenceCase } from 'ohnejs/utils';
 
 import { resolveMessage } from '../../ohne/http/translate.ts';
 import { useAIConfig } from '../config.ts';
@@ -34,6 +34,11 @@ declare module '../../base/api/dashboard.get.ts' {
        * The skills the person may start, in the viewer's language.
        */
       skills: DashboardSkill[];
+
+      /**
+       * The most bytes one answer may carry into a results post, `ai.limits.resultSize` in bytes.
+       */
+      resultSize: number;
     };
   }
 }
@@ -59,7 +64,7 @@ interface DashboardSkill {
 }
 
 hook('dashboard:meta', (meta, { user }) => {
-  const { model, models, transform } = useAIConfig();
+  const { model, models, transform, limits } = useAIConfig();
   if (isUndefined(model) || !userCan(user, 'ai.use') || !hasModelKey(model)) return;
   meta.ai = {
     model,
@@ -67,6 +72,7 @@ hook('dashboard:meta', (meta, { user }) => {
       (name) => models[name].provider !== 'jev' && hasModelKey(name),
     ),
     skills: skillsFor(user),
+    resultSize: parseBytes(limits.resultSize),
   };
   if (!isUndefined(transform.model)) meta.ai.transformModel = transform.model;
 });

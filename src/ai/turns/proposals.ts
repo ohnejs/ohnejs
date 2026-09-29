@@ -112,6 +112,7 @@ const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
  * A locale-tagged update may carry translatable fields alone; a create writes the others as well.
  * A write by set needs a route with a `uuid` param above the read tier, and its filter parses the same way.
  * A list read without a window gets `page: 1`, so its receipt carries a total.
+ * A `select` without `UUID` gains it, so every answered record names itself.
  * A refusal is a `400` receipt, its code and path as the API would answer them.
  */
 export async function checkProposal(input: unknown, surface: Surface): Promise<Checked> {
@@ -212,7 +213,7 @@ async function checkQuery(
     ? await attempt(() => parseQuery(params, reachable), 'query')
     : await attempt(() => parseLocaleParam(params.locale, reachable.meta), 'query');
   if (!parsed.ok) return parsed;
-  return { ok: true, value: params };
+  return { ok: true, value: withUUID(params) };
 }
 
 /**
@@ -243,7 +244,7 @@ async function checkBody(
     return {
       ok: true,
       value: {
-        body: windowed ? given : { ...given, page: 1 },
+        body: withUUID({ ...given, ...(windowed ? {} : { page: 1 }) }),
         identity: identityOnly(parsed.value, collection.meta.collection, collections),
       },
     };
@@ -322,6 +323,15 @@ async function checkSet(
   const parsed = await attempt(() => parseQuery(params, reachable), '');
   if (!parsed.ok) return parsed;
   return { ok: true, value: where as ConditionInput };
+}
+
+/**
+ * The params with `UUID` added to a `select` that leaves it out, so every answered record names itself.
+ */
+function withUUID<T extends Record<string, unknown>>(params: T): T {
+  const { select } = params;
+  if (!isArray(select) || select.includes('UUID')) return params;
+  return { ...params, select: ['UUID', ...select] };
 }
 
 /**
