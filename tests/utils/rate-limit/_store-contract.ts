@@ -66,6 +66,41 @@ export function storeContract(make: () => Promise<ClockedStore>): void {
     strictEqual(await store.take('thrall', rate), 1500);
   });
 
+  it('probes the wait with a charge of 0, counting nothing', async () => {
+    const { store } = await make();
+    strictEqual(await store.charge!('thrall', rate, 0), 0);
+    await store.take('thrall', rate);
+    await store.take('thrall', rate);
+    strictEqual(await store.charge!('thrall', rate, 0), 500);
+    strictEqual(await store.charge!('thrall', rate, 0), 500);
+    strictEqual(await store.charge!('jaina', rate, 0), 0);
+    strictEqual(await store.take('jaina', rate), 0);
+  });
+
+  it('charges past the cap, and refuses hits until the overdraft refills', async () => {
+    const { store, clock } = await make();
+    strictEqual(await store.charge!('thrall', rate, 1), 0);
+    strictEqual(await store.charge!('thrall', rate, 4), 2000);
+    strictEqual(await store.take('thrall', rate), 2000);
+    clock.now += 1000;
+    strictEqual(await store.take('thrall', rate), 1000);
+    clock.now += 1000;
+    strictEqual(await store.take('thrall', rate), 0);
+  });
+
+  it('adds a charge to what a take already spent', async () => {
+    const { store } = await make();
+    await store.take('thrall', rate);
+    strictEqual(await store.charge!('thrall', rate, 1), 500);
+  });
+
+  it('starts a charged key over when its rate changes', async () => {
+    const { store } = await make();
+    await store.charge!('thrall', rate, 10);
+    strictEqual(await store.charge!('thrall', { limit: 1, window: 1000 }, 0), 0);
+    strictEqual(await store.take('thrall', { limit: 1, window: 1000 }), 0);
+  });
+
   it('stays exact for a large limit at epoch time', async () => {
     const { store } = await make();
     const large = { limit: 1_000_000, window: 3_600_000 };

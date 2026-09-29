@@ -30,6 +30,15 @@ export interface RateLimitStore {
   take(key: string, rate: RateLimitRate): Promise<number>;
 
   /**
+   * Counts `cost` hits against `key`, even past the budget, and resolves the wait `take` would answer now.
+   * A `cost` of `0` counts nothing, so it only reads the wait.
+   * A key charged past its budget waits until the whole overdraft has refilled.
+   * A key last counted at a different rate starts over with its full budget.
+   * `cost` is a whole number, and `cost * window` a safe integer.
+   */
+  charge?(key: string, rate: RateLimitRate, cost: number): Promise<number>;
+
+  /**
    * Gives `key` its full budget back, whatever rate it was taken at.
    */
   reset(key: string): Promise<void>;

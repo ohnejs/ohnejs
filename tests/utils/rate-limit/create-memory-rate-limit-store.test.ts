@@ -21,4 +21,14 @@ describe('createMemoryRateLimitStore', () => {
     }
     strictEqual((await store.take('thrall', rate)) > 0, true);
   });
+
+  it('keeps an overdrawn key through a sweep past its window', async () => {
+    const clock = { now: 0 };
+    const store = createMemoryRateLimitStore({ now: () => clock.now });
+    const rate = { limit: 1, window: 1000 };
+    await store.charge!('thrall', rate, 10);
+    clock.now = 2000;
+    await store.take('jaina', rate);
+    strictEqual(await store.take('thrall', rate), 8000);
+  });
 });
