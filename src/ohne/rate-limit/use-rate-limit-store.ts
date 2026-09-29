@@ -5,11 +5,16 @@ import { resolveRateLimitStore } from './_resolve-rate-limit-store.ts';
 const store: RateLimitStore = {
   take: (key, rate) => resolveRateLimitStore().take(key, rate),
   reset: (key) => resolveRateLimitStore().reset(key),
+  get charge() {
+    const selected = resolveRateLimitStore();
+    return selected.charge?.bind(selected);
+  },
 };
 
 /**
  * Returns the app's rate-limit store, the one `api.rateLimitStore` selects.
  * It looks the selected store up on every call, so it is safe to hold at module scope.
+ * Its `charge` is the selected store's, absent when that store has none.
  * Pass it to `createRateLimiter` to count where route limits and sign-in count.
  *
  * @example

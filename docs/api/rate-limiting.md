@@ -82,6 +82,23 @@ export default defineHandler(async () => {
   too. Give each such limiter its own `name`, so two limiters never share a count.
 - `await limiter.reset(key)` gives a key its full limit back.
 
+## Charging by weight
+
+When calls cost different amounts, such as the tokens a model call spends, charge the cost instead of
+counting the call. With a `tokens` limiter made as above:
+
+```ts
+if ((await tokens.charge(user.UUID, 0)) > 0) throw tooManyRequests();
+const summary = await summarize(report);
+await tokens.charge(user.UUID, summary.tokens);
+```
+
+- `charge(key, 0)` counts nothing. It resolves the milliseconds to wait, or `0`, so you can check
+  before the work.
+- `charge(key, cost)` counts `cost` calls even past the limit, since the work already happened. The
+  key then waits until the whole overdraft has refilled.
+- `hit` and `charge` share one count per key, and every built-in store can charge.
+
 ## Sharing one limit
 
 To give several routes one shared limit, call `enforceRateLimit` from a
@@ -149,3 +166,6 @@ useRateLimitStores().register('redis', createRedisRateLimitStore);
 
 Then set `api.rateLimitStore: 'redis'`. An optional `check()` runs before the server listens, and
 an optional `close()` runs after it drains.
+
+An optional `charge(key, rate, cost)` counts `cost` hits even past the limit and resolves the wait.
+Without it, [`limiter.charge`](#charging-by-weight) rejects.

@@ -28,7 +28,7 @@ const SWEEP_INTERVAL = 60_000;
 
 /**
  * Creates a `RateLimitStore` that counts in a helper database, shared by every process that opens it.
- * Each hit is one atomic upsert, so processes never both pass the last free hit.
+ * Each hit or charge is one atomic upsert, so processes never both pass the last free hit.
  * Rows back at a full budget are swept in batches once a minute, and on each hit while a backlog remains.
  *
  * A busy database rejects with a busy error, which a request answers with `503`.
@@ -65,6 +65,14 @@ export function createDatabaseRateLimitStore({
       const at = now();
       const wait = await busy(() =>
         useDialect().takeRateLimit(useDatabase(database), key, rate, at),
+      );
+      await sweep(at);
+      return wait;
+    },
+    async charge(key, rate, cost) {
+      const at = now();
+      const wait = await busy(() =>
+        useDialect().chargeRateLimit(useDatabase(database), key, rate, cost, at),
       );
       await sweep(at);
       return wait;

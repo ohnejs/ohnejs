@@ -60,6 +60,14 @@ describe('useRateLimitStore', () => {
     strictEqual(await store.take('thrall', { limit: 1, window: 1000 }), 7);
   });
 
+  it('charges on the selected store, and has no `charge` when that store lacks one', async () => {
+    const store = useRateLimitStore();
+    strictEqual(await store.charge!('thrall', { limit: 1, window: 1000 }, 3), 3000);
+    useRateLimitStores().register('counting', counting);
+    select({ rateLimitStore: 'counting' });
+    strictEqual(store.charge, undefined);
+  });
+
   it('closes only a store that was built', async () => {
     useRateLimitStores().register('counting', counting);
     select({ rateLimitStore: 'counting' });

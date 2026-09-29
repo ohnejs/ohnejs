@@ -1,7 +1,10 @@
+import { parseDuration } from '../../utils/duration/parse-duration.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { formatSSE, type FormatSSEOptions } from '../../utils/sse/format-sse.ts';
 import { useResponse } from './use-response.ts';
 
 const OPEN = ': open\n\n';
+const PING = ': ping\n\n';
 const MAX_QUEUED_FRAMES = 1024;
 
 /**
@@ -38,6 +41,13 @@ export interface SendEventsOptions {
    * Use it to drop the stream from a broadcast registry.
    */
   onClose?: () => void;
+
+  /**
+   * How often to send a `: ping` comment while the stream is open, as milliseconds or a string like `'15s'`.
+   * A proxy that drops an idle connection keeps it while events are slow to come.
+   * Omitted, the stream sends nothing between events.
+   */
+  heartbeat?: number | string;
 }
 
 /**
@@ -46,6 +56,7 @@ export interface SendEventsOptions {
  * Sets `text/event-stream` and `cache-control: no-cache`, then returns a body the handler returns as is.
  * The transport pipes the stream to the socket, so each `send` flushes an event and the socket stays open.
  * `close` ends it; a client disconnect ends it too, and either way `onClose` runs once.
+ * A `heartbeat` pings on an interval until then, so an idle proxy keeps the connection.
  * Call it inside a request.
  *
  * @example
@@ -68,11 +79,31 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
   const encoder = new TextEncoder();
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   let open = true;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
 
   const finish = (): void => {
     if (!open) return;
     open = false;
+    clearInterval(heartbeat);
     options.onClose?.();
+  };
+
+  /**
+   * Queues `frame` on an open stream, disconnecting a client that stopped reading.
+   */
+  const push = (frame: Uint8Array): void => {
+    if (!open) return;
+    try {
+      controller.enqueue(frame);
+    } catch {
+      finish();
+      return;
+    }
+    // The transport stops pulling for a stalled client, so an uncapped queue grows with every send.
+    if ((controller.desiredSize ?? 1) > -MAX_QUEUED_FRAMES) return;
+    // `close` would wait for the queue to drain; an `AbortError` drops it and the socket, unlogged.
+    controller.error(new DOMException('The client stalled', 'AbortError'));
+    finish();
   };
 
   const body = new ReadableStream<Uint8Array>({
@@ -83,22 +114,16 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
     cancel: finish,
   });
 
+  if (!isUndefined(options.heartbeat)) {
+    const ping = encoder.encode(PING);
+    heartbeat = setInterval(() => push(ping), parseDuration(options.heartbeat));
+    heartbeat.unref();
+  }
+
   return {
     body,
     send(data, frameOptions) {
-      if (!open) return;
-      const frame = encoder.encode(formatSSE(data, frameOptions));
-      try {
-        controller.enqueue(frame);
-      } catch {
-        finish();
-        return;
-      }
-      // The transport stops pulling for a stalled client, so an uncapped queue grows with every send.
-      if ((controller.desiredSize ?? 1) > -MAX_QUEUED_FRAMES) return;
-      // `close` would wait for the queue to drain; an `AbortError` drops it and the socket, unlogged.
-      controller.error(new DOMException('The client stalled', 'AbortError'));
-      finish();
+      if (open) push(encoder.encode(formatSSE(data, frameOptions)));
     },
     close() {
       if (!open) return;

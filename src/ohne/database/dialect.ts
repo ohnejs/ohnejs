@@ -104,6 +104,8 @@ const lockTables = new WeakSet<DatabaseAdapter>();
 
 const rateLimitTables = new WeakSet<DatabaseAdapter>();
 
+const RATE_LIMIT_COLUMNS = ['limit', 'window', 'at', 'debt', 'wait'];
+
 /**
  * A database dialect: the single place a driver and its SQL live.
  *
@@ -474,19 +476,8 @@ export abstract class Dialect {
     now: number,
   ): Promise<number> {
     await this.ensureRateLimitTable(db);
-    const table = this.quote(OHNE_RATE_LIMITS);
-    const [limit, window, at, debt, wait] = ['limit', 'window', 'at', 'debt', 'wait'].map(
-      (column) => this.quote(column),
-    );
-    const int = `CAST(? AS ${this.columnType('integer')})`;
-    const old = (column: string): string => `${table}.${column}`;
-    const next = (column: string): string => `excluded.${column}`;
-    const fresh = `${old(limit)} <> ${next(limit)} OR ${old(window)} <> ${next(window)}`;
-    const drained = `${old(debt)} - (${next(at)} - ${old(at)}) * ${next(limit)}`;
-    const held =
-      `CASE WHEN ${fresh} OR ${next(at)} - ${old(at)} >= ${next(window)} THEN 0 ` +
-      `WHEN ${next(at)} <= ${old(at)} THEN ${old(debt)} ` +
-      `WHEN ${drained} > 0 THEN ${drained} ELSE 0 END`;
+    const { upsert, old, next, fresh, held } = this.rateLimitSQL();
+    const [limit, window, at, debt, wait] = RATE_LIMIT_COLUMNS.map((column) => this.quote(column));
     const due = `(${held}) + ${next(window)}`;
     const capacity = `${next(limit)} * ${next(window)}`;
     const allowed = `${due} <= ${capacity}`;
@@ -494,9 +485,7 @@ export abstract class Dialect {
     const refill = `(${due} - ${capacity} + ${next(limit)} - 1) / ${next(limit)}`;
     const ahead = `CASE WHEN ${old(at)} > ${next(at)} THEN ${old(at)} - ${next(at)} ELSE 0 END`;
     const row = await db.queryOne<{ wait: number }>(
-      `INSERT INTO ${table} (${this.quote('key')}, ${limit}, ${window}, ${at}, ${debt}, ${wait}) ` +
-        `VALUES (?, ${int}, ${int}, ${int}, ${int}, 0) ` +
-        `ON CONFLICT (${this.quote('key')}) DO UPDATE SET ` +
+      `${upsert} ` +
         `${at} = CASE WHEN NOT (${allowed}) THEN ${old(at)} ` +
         `WHEN ${fresh} OR ${next(at)} >= ${old(at)} THEN ${next(at)} ELSE ${old(at)} END, ` +
         `${debt} = CASE WHEN ${allowed} THEN ${due} ELSE ${old(debt)} END, ` +
@@ -507,6 +496,40 @@ export abstract class Dialect {
       [key, rate.limit, rate.window, now, rate.window],
     );
     return Number(row?.wait ?? 0);
+  }
+
+  /**
+   * Counts `cost` hits against `key` at `now` in one atomic upsert, even past the budget.
+   * Resolves the milliseconds until the next hit is allowed, `0` when it is allowed now.
+   * A `cost` of `0` counts nothing and only reads the wait.
+   * A key last counted at a different rate starts over with its full budget.
+   *
+   * @example
+   * ```ts
+   * await dialect.chargeRateLimit(db, 'tokens', { limit: 10, window: 1000 }, 15, Date.now()) // -> 600
+   * ```
+   */
+  async chargeRateLimit(
+    db: DatabaseAdapter,
+    key: string,
+    rate: RateLimitRate,
+    cost: number,
+    now: number,
+  ): Promise<number> {
+    await this.ensureRateLimitTable(db);
+    const { upsert, old, next, fresh, held } = this.rateLimitSQL();
+    const [limit, window, at, debt] = RATE_LIMIT_COLUMNS.map((column) => this.quote(column));
+    const row = await db.queryOne<{ at: number; debt: number }>(
+      `${upsert} ` +
+        `${at} = CASE WHEN ${fresh} OR ${next(at)} >= ${old(at)} THEN ${next(at)} ELSE ${old(at)} END, ` +
+        `${debt} = (${held}) + ${next(debt)}, ` +
+        `${limit} = ${next(limit)}, ${window} = ${next(window)} ` +
+        `RETURNING ${at}, ${debt}`,
+      [key, rate.limit, rate.window, now, cost * rate.window],
+    );
+    const over = Number(row?.debt ?? 0) + rate.window - rate.limit * rate.window;
+    if (over <= 0) return 0;
+    return Math.ceil(over / rate.limit) + Math.max(Number(row?.at ?? now) - now, 0);
   }
 
   /**
@@ -525,7 +548,7 @@ export abstract class Dialect {
   }
 
   /**
-   * Deletes up to `batch` rate-limit rows whose budget is full again at `now`, resolving how many went.
+   * Deletes up to `batch` rate-limit rows whose debt has drained by `now`, resolving how many went.
    * Such a row counts exactly as a missing one, so deleting it never forgives anything.
    *
    * @example
@@ -536,9 +559,8 @@ export abstract class Dialect {
   async sweepRateLimits(db: DatabaseAdapter, now: number, batch: number): Promise<number> {
     await this.ensureRateLimitTable(db);
     const table = this.quote(OHNE_RATE_LIMITS);
-    const expired =
-      `${this.quote('at')} + ${this.quote('window')} <= ` +
-      `CAST(? AS ${this.columnType('integer')})`;
+    const [limit, at, debt] = ['limit', 'at', 'debt'].map((column) => this.quote(column));
+    const expired = `${at} + (${debt} + ${limit} - 1) / ${limit} <= CAST(? AS ${this.columnType('integer')})`;
     // Rechecking outside the subquery keeps a row another connection just renewed.
     const { changes } = await db.run(
       `DELETE FROM ${table} WHERE ${expired} AND ${this.quote('key')} IN ` +
@@ -546,6 +568,39 @@ export abstract class Dialect {
       [now, now, batch],
     );
     return changes;
+  }
+
+  /**
+   * The SQL the rate-limit upserts share: the upsert up to its `SET` list, and the stored debt left now.
+   * `old` and `next` name a column of the stored and of the inserted row.
+   * `fresh` holds when the rate changed.
+   * `held` is the stored debt drained up to the inserted `at`, `0` for a fresh rate.
+   * The upsert binds the key, limit, window, `at` and debt, in that order.
+   */
+  protected rateLimitSQL(): {
+    upsert: string;
+    old: (column: string) => string;
+    next: (column: string) => string;
+    fresh: string;
+    held: string;
+  } {
+    const table = this.quote(OHNE_RATE_LIMITS);
+    const [limit, window, at, debt, wait] = RATE_LIMIT_COLUMNS.map((column) => this.quote(column));
+    const int = `CAST(? AS ${this.columnType('integer')})`;
+    const old = (column: string): string => `${table}.${column}`;
+    const next = (column: string): string => `excluded.${column}`;
+    const fresh = `${old(limit)} <> ${next(limit)} OR ${old(window)} <> ${next(window)}`;
+    // Checking the drain time first keeps the product below from overflowing on a long-idle row.
+    const drainedBy = `(${old(debt)} + ${next(limit)} - 1) / ${next(limit)}`;
+    const held =
+      `CASE WHEN ${fresh} OR ${next(at)} - ${old(at)} >= ${drainedBy} THEN 0 ` +
+      `WHEN ${next(at)} <= ${old(at)} THEN ${old(debt)} ` +
+      `ELSE ${old(debt)} - (${next(at)} - ${old(at)}) * ${next(limit)} END`;
+    const upsert =
+      `INSERT INTO ${table} (${this.quote('key')}, ${limit}, ${window}, ${at}, ${debt}, ${wait}) ` +
+      `VALUES (?, ${int}, ${int}, ${int}, ${int}, 0) ` +
+      `ON CONFLICT (${this.quote('key')}) DO UPDATE SET`;
+    return { upsert, old, next, fresh, held };
   }
 
   /**
@@ -558,9 +613,7 @@ export abstract class Dialect {
     await db.exec(
       `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_RATE_LIMITS)} (` +
         `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
-        ['limit', 'window', 'at', 'debt', 'wait']
-          .map((column) => `${this.quote(column)} ${integer} NOT NULL`)
-          .join(', ') +
+        RATE_LIMIT_COLUMNS.map((column) => `${this.quote(column)} ${integer} NOT NULL`).join(', ') +
         ')',
     );
     rateLimitTables.add(db);

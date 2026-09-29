@@ -46,6 +46,25 @@ describe('sendEvents', () => {
     strictEqual(await read(stream.body), ': open\n\ndata: reload\n\nevent: greet\ndata: hi\n\n');
   });
 
+  it('pings on the heartbeat interval until the stream closes', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const stream = runWithEvent(makeEvent(), () => sendEvents({ heartbeat: '15s' }));
+    t.mock.timers.tick(15_000);
+    stream.send('reload');
+    t.mock.timers.tick(15_000);
+    stream.close();
+    t.mock.timers.tick(15_000);
+    strictEqual(await read(stream.body), ': open\n\n: ping\n\ndata: reload\n\n: ping\n\n');
+  });
+
+  it('sends no ping without a heartbeat', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const stream = runWithEvent(makeEvent(), () => sendEvents());
+    t.mock.timers.tick(60_000);
+    stream.close();
+    strictEqual(await read(stream.body), ': open\n\n');
+  });
+
   it('throws on a line break in the id and keeps the stream open', async () => {
     const stream = runWithEvent(makeEvent(), () => sendEvents());
     throws(() => stream.send('x', { id: '7\n\nevent: logout' }), /line break/);

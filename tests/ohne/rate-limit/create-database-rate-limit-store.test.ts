@@ -84,6 +84,26 @@ describe('createDatabaseRateLimitStore', () => {
     strictEqual(await dialect.takeRateLimit(db, 'live', rate, 1000), 500);
   });
 
+  it('keeps an overdrawn row until its whole debt has drained', async () => {
+    const db = await dialect.connect(':memory:');
+    const rate = { limit: 1, window: 1000 };
+    strictEqual(await dialect.chargeRateLimit(db, 'thrall', rate, 5, 0), 5000);
+    strictEqual(await dialect.sweepRateLimits(db, 2000, 10), 0);
+    strictEqual(await dialect.takeRateLimit(db, 'thrall', rate, 2000), 3000);
+    strictEqual(await dialect.sweepRateLimits(db, 5000, 10), 1);
+  });
+
+  it('rejects a charge on a busy database with the retryable busy error', async () => {
+    const busy: DatabaseAdapter = {
+      ...(await dialect.connect(':memory:')),
+      exec: async () => {
+        throw BUSY;
+      },
+    };
+    const store = createDatabaseRateLimitStore({ database: await helper(busy) });
+    await rejects(store.charge!('thrall', { limit: 1, window: 1000 }, 1), isBusyError);
+  });
+
   it('sweeps at most one batch at a time', async () => {
     const db = await dialect.connect(':memory:');
     for (let i = 0; i < 5; i++)

@@ -177,6 +177,7 @@ export * from './roles/use-roles.ts';
 export * from './routes/collect-routes.ts';
 export * from './routes/define-handler.ts';
 export * from './routes/known-routes.ts';
+export * from './routes/route-glob.ts';
 export * from './routes/route.ts';
 export * from './routes/scan-layer-routes.ts';
 export * from './routes/use-api.ts';

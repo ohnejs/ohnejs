@@ -160,6 +160,16 @@ from a broadcast set.
 A client that stops reading is disconnected. Once 1024 frames wait unread, the stream closes and
 `onClose` runs, so such a client cannot use up the server's memory.
 
+A proxy may drop a connection that stays quiet too long. Set `heartbeat` to send a comment on an
+interval while the stream is open:
+
+```ts
+const stream = sendEvents({ heartbeat: '15s' });
+```
+
+- It takes milliseconds, or a string like `'15s'`.
+- `EventSource` skips comments, so `onmessage` never sees one.
+
 ## After the response
 
 `waitUntil` keeps background work running after the response. The response is sent immediately, the
