@@ -1,6 +1,6 @@
 /**
  * Flattens a type for display, collapsing intersections into a single object literal.
- * Recurses into nested objects; arrays, functions, and other values pass through unchanged.
+ * Recurses into nested objects; arrays, functions, strings, and other values pass through unchanged.
  * Purely cosmetic - the result is structurally identical to `T`.
  *
  * @example
@@ -11,7 +11,7 @@
  */
 export type DeepPrettify<T> = T extends (...args: never[]) => unknown
   ? T
-  : T extends readonly unknown[]
+  : T extends readonly unknown[] | string
     ? T
     : T extends object
       ? { [K in keyof T]: DeepPrettify<T[K]> }

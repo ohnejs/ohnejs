@@ -26,6 +26,11 @@ describe('DeepPrettify', () => {
     strictEqual(arr && fn, true);
   });
 
+  it('keeps a branded string, like the open half of `LiteralUnion`, a string', () => {
+    const x: Equal<DeepPrettify<'a' | (string & {})>, 'a' | (string & {})> = true;
+    strictEqual(x, true);
+  });
+
   it('leaves primitives unchanged', () => {
     const x: Equal<DeepPrettify<number>, number> = true;
     strictEqual(x, true);
