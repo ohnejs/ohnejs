@@ -51,14 +51,14 @@ export async function closeDatabases(): Promise<void> {
 /**
  * Returns the main database connection, or a named helper.
  *
- * `useDatabase()` is the main connection; `useDatabase('rateLimit')` a helper declared in `database.helpers`.
+ * `useDatabase()` is the main connection; `useDatabase('cache')` a helper declared in `database.helpers`.
  * Both expose the same `DatabaseAdapter`.
  * Throws when the database is not connected or the helper is unknown.
  *
  * @example
  * ```ts
  * await useDatabase().query('SELECT 1')
- * await useDatabase('rateLimit').run('DELETE FROM hits')
+ * await useDatabase('cache').run('DELETE FROM entries')
  * ```
  */
 export function useDatabase(name?: DatabaseName): DatabaseAdapter {

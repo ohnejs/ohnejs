@@ -35,7 +35,7 @@ export type MiddlewareKey = [keyof KnownMiddleware] extends [never]
  * ```ts
  * declare module 'ohnejs' {
  *   interface KnownNamedMiddleware {
- *     'rate-limit': typeof import('../middleware/rate-limit.ts').default
+ *     'audit-log': typeof import('../middleware/audit-log.ts').default
  *   }
  * }
  * ```

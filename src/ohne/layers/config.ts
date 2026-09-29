@@ -9,6 +9,7 @@ import type { KnownBlocks } from '../blocks/known-blocks.ts';
 import type { KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
 import type { DashboardMenuEntry } from '../dashboard/menu.ts';
+import type { DatabaseName } from '../database/known-databases.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { KnownFields } from '../fields/known-fields.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
@@ -566,6 +567,22 @@ export interface Config {
      * ```
      */
     allowedHosts?: string[];
+
+    /**
+     * Where rate limits count, as a store registered with `useRateLimitStores`.
+     * `'memory'` counts in each process, so every process allows the full limit and a restart clears it.
+     * `'database'` counts in the helper database `rateLimitDatabase` names, shared by every process.
+     *
+     * @default
+     * 'memory'
+     */
+    rateLimitStore?: LiteralUnion<'memory' | 'database'>;
+
+    /**
+     * The helper database the `'database'` rate-limit store counts in, a name from `database.helpers`.
+     * On SQLite, point it at its own file, never the main one, so counting never waits on your writes.
+     */
+    rateLimitDatabase?: DatabaseName;
   };
 
   /**
@@ -682,7 +699,7 @@ export interface Config {
      * @example
      * ```ts
      * database: {
-     *   helpers: { rateLimit: ':memory:' },
+     *   helpers: { cache: ':memory:' },
      * }
      * ```
      */
@@ -835,6 +852,12 @@ export const DEFAULT_DASHBOARD_PORT = 9000;
 export const DEFAULT_DIALECT = 'sqlite';
 
 /**
+ * Default rate-limit store selected when no layer sets `api.rateLimitStore`.
+ * Read at point of use, like `DEFAULT_DIALECT`, because `api.rateLimitStore` is `'own'`.
+ */
+export const DEFAULT_RATE_LIMIT_STORE = 'memory';
+
+/**
  * Default main-database URL when no layer sets `database.url` and neither `DATABASE` nor `DB` is set.
  * Read at point of use in `connect`, like `DEFAULT_API_PORT`, because `database.url` is `'own'`.
  * A relative SQLite file path, created on demand.
@@ -848,6 +871,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - Every `disable` list accumulates across layers and dedupes, so every layer can add components to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - The listed `api` and `dashboard` keys stay each layer's own: an app owns its servers and sidebar.
+ * - `api.rateLimitStore` and `api.rateLimitDatabase` stay each layer's own: an app owns where it counts.
  * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
  * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
  * - `database.helpers` is unlisted on purpose: the default per-key merge already lets any layer add one.
@@ -863,6 +887,8 @@ export const BASE_STRATEGIES: LayerStrategies = {
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',
+  'api.rateLimitStore': 'own',
+  'api.rateLimitDatabase': 'own',
   'dashboard.port': 'own',
   'dashboard.host': 'own',
   'dashboard.apiURL': 'own',

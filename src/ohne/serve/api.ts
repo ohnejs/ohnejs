@@ -1,4 +1,6 @@
-import { isPort, MAX_PORT } from '../../utils/index.ts';
+import type { Route } from '../routes/route.ts';
+
+import { errorMessage, isPort, MAX_PORT } from '../../utils/index.ts';
 import { listenOrigin } from '../../utils/net/index.ts';
 import { bootProject } from '../boot/boot-project.ts';
 import { syncProjectDatabase } from '../database/sync-project.ts';
@@ -6,6 +8,7 @@ import { closeDatabases } from '../database/use-database.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
+import { routeLimits, routeRateLimiter } from '../http/route-limits.ts';
 import { createRouter } from '../http/router.ts';
 import { createServer, type HTTPServer } from '../http/server.ts';
 import { shutdownServer } from '../http/shutdown-server.ts';
@@ -16,6 +19,11 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
+import {
+  closeRateLimitStore,
+  resolveRateLimitStore,
+} from '../rate-limit/_resolve-rate-limit-store.ts';
+import { routeID } from '../routes/route.ts';
 import { useRoutes } from '../routes/use-routes.ts';
 import { listen } from './_listen.ts';
 
@@ -40,6 +48,7 @@ declare module 'ohnejs' {
  * A skipped codegen still warns when another ohne version generated the files.
  *
  * The database connects and its schema syncs before the server is built, so a failed sync never serves.
+ * The rate-limit store and every route's options are checked next, so a bad one fails the boot.
  * The server is then started and wired to graceful shutdown through `onShutdown`.
  * Once it is listening, the `server:ready` hook runs before readiness is announced.
  * A hook that throws drains the server and rethrows, so a half-booted process exits instead of serving.
@@ -55,9 +64,12 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   await loadLayers(from);
   await bootProject(from);
   await syncProjectDatabase();
+  await resolveRateLimitStore().check?.();
 
   const config = useConfig().api;
-  const http = createServer(createRouter(Object.values(useRoutes().all())), {
+  const routes = Object.values(useRoutes().all());
+  checkRouteOptions(routes);
+  const http = createServer(createRouter(routes), {
     basePath: config.basePath,
     headersTimeout: offToUndefined(config.headersTimeout),
     requestTimeout: offToUndefined(config.requestTimeout),
@@ -86,6 +98,7 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
       shutdownTimeout: offToUndefined(config.shutdownTimeout),
     }),
   );
+  onShutdown(() => closeRateLimitStore());
   onShutdown(() => closeDatabases());
 
   const address = await listen(http.server, port, host);
@@ -100,4 +113,22 @@ export async function serveAPI(from: string = process.cwd()): Promise<HTTPServer
   usePrinter().success(`API ready at \`${listenOrigin(host, address.port)}\``);
   if (process.connected) process.send?.('ready');
   return http;
+}
+
+/**
+ * Resolves every route's options once, so an invalid one fails the boot instead of each request.
+ */
+function checkRouteOptions(routes: Route[]): void {
+  for (const route of routes) {
+    try {
+      routeLimits(route.handler);
+      routeRateLimiter(route);
+    } catch (error) {
+      throw ohneError({
+        title: `Invalid options on route \`${routeID(route.method ?? null, route.pattern)}\``,
+        body: [errorMessage(error)],
+        path: route.file,
+      });
+    }
+  }
 }

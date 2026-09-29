@@ -1,7 +1,10 @@
-import type { AnyHandler } from '../routes/route.ts';
+import type { RateLimiter } from '../../utils/index.ts';
+import type { AnyHandler, Route } from '../routes/route.ts';
 
-import { isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
+import { createRateLimiter, isUndefined, parseBytes, parseDuration } from '../../utils/index.ts';
+import { useRateLimitStore } from '../rate-limit/use-rate-limit-store.ts';
 import { getRouteOptions } from '../routes/route-options.ts';
+import { routeID } from '../routes/route.ts';
 
 interface RouteLimits {
   maxBodySize: number | false | undefined;
@@ -10,6 +13,8 @@ interface RouteLimits {
 }
 
 const cache = new WeakMap<AnyHandler, RouteLimits>();
+
+const limiters = new WeakMap<Route, RateLimiter | null>();
 
 /**
  * Parses a byte size, passing `undefined` and `false` through.
@@ -48,4 +53,23 @@ export function routeLimits(handler: AnyHandler): {
   };
   cache.set(handler, limits);
   return limits;
+}
+
+/**
+ * Returns the limiter a route's `rateLimit` declares, or `undefined` when the route is unlimited.
+ * It counts in the app's rate-limit store, under the route's id, built once per route.
+ * A `HEAD` served by its `GET` route shares that route's limiter.
+ */
+export function routeRateLimiter(route: Route): RateLimiter | undefined {
+  if (!limiters.has(route)) {
+    const rateLimit = getRouteOptions(route.handler)?.rateLimit;
+    const name = `ohne:${routeID(route.method ?? null, route.pattern)}`;
+    limiters.set(
+      route,
+      isUndefined(rateLimit)
+        ? null
+        : createRateLimiter({ ...rateLimit, name, store: useRateLimitStore() }),
+    );
+  }
+  return limiters.get(route) ?? undefined;
 }

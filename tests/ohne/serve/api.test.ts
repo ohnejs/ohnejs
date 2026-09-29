@@ -22,6 +22,7 @@ import type { GuardReport } from '../../../src/ohne/database/schema/guard.ts';
 
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { ensureSchemaTable, writeSnapshot } from '../../../src/ohne/database/schema/snapshot.ts';
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import {
   closeDatabases,
   type HTTPServer,
@@ -34,6 +35,7 @@ import {
   usePrinter,
   useShutdown,
 } from '../../../src/ohne/index.ts';
+import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 
 const scope = globalThis as typeof globalThis & {
   __ohneServeBoot: string[];
@@ -302,6 +304,28 @@ describe('serveAPI', () => {
     await rejects(get(port, '/'));
     useEnv().set('PORT', 0);
     useEnv().set('DATABASE', ':memory:');
+  });
+
+  it('never serves a route whose options are invalid', async () => {
+    const dir = serveable('badlimit');
+    writeFileSync(
+      join(dir, 'api', 'search.get.ts'),
+      "import { defineHandler } from 'ohnejs';\n" +
+        "export default defineHandler(() => [], { rateLimit: { limit: 0, window: '1m' } });\n",
+    );
+    const port = await freePort();
+    useEnv().set('PORT', port);
+
+    await rejects(serveAPI(dir), (error: unknown) => {
+      ok(isOhneError(error), String(error));
+      strictEqual(error.title, 'Invalid options on route `GET /search`');
+      deepStrictEqual(error.body, ['Invalid limit: 0']);
+      ok(error.path?.endsWith(join('api', 'search.get.ts')), String(error.path));
+      return true;
+    });
+    await rejects(get(port, '/'));
+    useRoutes().delete('GET /search');
+    useEnv().set('PORT', 0);
   });
 
   it('re-syncs a file database as a no-op on a second boot', async () => {

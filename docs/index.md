@@ -60,6 +60,7 @@ Define endpoints as files. Handlers read the request and return a value ohne ser
 - [HTTP errors](./api/errors.md) - `HTTPError` and the JSON body a client receives.
 - [Middleware](./api/middleware.md) - code that runs before the handler on every matching
   request.
+- [Rate limiting](./api/rate-limiting.md) - cap how often one client may call a route.
 - [Querying over HTTP](./api/url-queries.md) - turn a URL query into a safe, filtered read.
 - [The collections API](./api/collections.md) - REST endpoints a collection opts into.
 

@@ -28,6 +28,7 @@ import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isOhneProject } from '../project/is-ohne-project.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
+import { closeRateLimitStore } from '../rate-limit/_resolve-rate-limit-store.ts';
 
 const CWD: ArgSchema = { type: 'string', description: 'Project root to run in.' };
 
@@ -144,6 +145,7 @@ async function runInProject(project: string, work: () => void | Promise<void>): 
     await work();
   } finally {
     await useShutdown().run();
+    await closeRateLimitStore();
     await closeDatabases();
   }
 }

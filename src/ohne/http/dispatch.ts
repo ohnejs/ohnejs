@@ -17,7 +17,9 @@ import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isBusyError } from '../query/write/busy.ts';
 import { isReferenceViolation, isValidationError } from '../query/write/errors.ts';
+import { enforceRateLimit } from './enforce-rate-limit.ts';
 import { conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
+import { routeRateLimiter } from './route-limits.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
 import { resolveFieldErrors, translate } from './translate.ts';
@@ -136,6 +138,7 @@ export interface DispatchOptions {
  * The `middleware:resolve` hook may filter or reorder that combined list first.
  * Records each on `event.appliedMiddleware` as it runs, then runs the handler.
  * A middleware that returns a value short-circuits, and the handler never runs.
+ * A route's `rateLimit` then counts the call, and a client past it gets `429` before the body is read.
  * When `maxBodySize` is set, an over-cap `Content-Length` is refused with `413` before the handler runs.
  * A returned or thrown `HTTPError` maps to its status.
  * A write that fails validation, hits a busy database, or is blocked by a reference maps to its own status.
@@ -198,6 +201,8 @@ export async function dispatch(
         if (!isUndefined(result))
           return toResponse(await resolveResult(result, event), event.response);
       }
+      const limiter = routeRateLimiter(route);
+      if (!isUndefined(limiter)) await enforceRateLimit(limiter);
       if (exceedsBodySize(request, options.maxBodySize)) throw payloadTooLarge();
       const result = await (route.handler as Handler)({ params });
       return toResponse(await resolveResult(result, event), event.response);

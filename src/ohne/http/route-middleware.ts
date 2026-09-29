@@ -22,8 +22,8 @@ const cache = new WeakMap<AnyHandler, NamedMiddlewareKey[]>();
  *
  * @example
  * ```ts
- * // handler opted into ['rate-limit']; 'audit-log' is available but unselected
- * routeMiddleware(handler, ['rate-limit', 'audit-log']) // -> ['rate-limit']
+ * // handler opted into ['audit-log']; 'require-auth' is available but unselected
+ * routeMiddleware(handler, ['audit-log', 'require-auth']) // -> ['audit-log']
  * ```
  */
 export function routeMiddleware(

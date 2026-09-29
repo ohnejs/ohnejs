@@ -206,6 +206,10 @@ Sign-in runs its password checks on Node's thread pool and uses at most half of 
 past that. For more sign-ins at once, raise the pool with the `UV_THREADPOOL_SIZE` env var (`4` by
 default), set before the process starts.
 
+[Rate limits](../api/rate-limiting.md#across-processes) count in each process's memory by default,
+so every instance allows a client the full limit. Point them at a shared helper database to count
+once.
+
 ## Logs
 
 Everything the app prints goes through one printer:

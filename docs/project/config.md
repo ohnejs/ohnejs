@@ -23,8 +23,8 @@ A layer is an ohne project you install as a package and build on. Everything it 
 of your app: routes, collections, messages, dashboard pages. Anything you define yourself wins.
 
 Say you run several services, and each one needs the same API keys collection, the same roles, and
-the same rate-limit middleware. Put them in one base layer and list it in every service. You fix a
-bug once, and every service gets the fix. If one service needs a stricter limit, it overrides just
+the same audit-log middleware. Put them in one base layer and list it in every service. You fix a
+bug once, and every service gets the fix. If one service needs to log differently, it overrides just
 that middleware.
 
 ohne ships its own content as a layer too. That is why the scaffold lists `ohnejs/base`: it brings
@@ -176,24 +176,26 @@ export default defineConfig({
 Durations take milliseconds or a string like `'30s'`. Sizes take bytes or a string like `'1mb'`.
 `false` turns a limit off, or leaves Node's own default where one exists.
 
-| Key                | Default | What it does                                                                                                          |
-| ------------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `port`             | `9001`  | The port the server listens on.                                                                                       |
-| `host`             | -       | The host to bind. Unset binds every interface.                                                                        |
-| `basePath`         | `''`    | Prefix for every route. With `'/api'`, `/authors` is served at `/api/authors`, and the handler still sees `/authors`. |
-| `handlerTimeout`   | `'30s'` | How long middleware and the handler may run before the server answers with `503`.                                     |
-| `maxBodySize`      | `'1mb'` | Largest request body. A larger body is refused with `413`.                                                            |
-| `preStopDelay`     | `false` | Keeps serving after a shutdown signal, so a load balancer can deregister.                                             |
-| `shutdownTimeout`  | `false` | How long running requests may take to finish on shutdown, before they are cancelled.                                  |
-| `deadline`         | `false` | Deadline for every shutdown hook combined, the cleanup of cancelled requests included.                                |
-| `waitUntilTimeout` | `false` | How long a [`waitUntil`](../api/response.md#after-the-response) promise may run after the response.                   |
-| `headersTimeout`   | `false` | Wait for the complete request headers. Node's default is 60 seconds.                                                  |
-| `requestTimeout`   | `false` | The whole request, headers and body. Node's default is 5 minutes.                                                     |
-| `keepAliveTimeout` | `false` | Idle keep-alive sockets between requests. Node's default is 5 seconds.                                                |
-| `maxConnections`   | `false` | Limit on concurrent sockets.                                                                                          |
-| `maxHeaderSize`    | `false` | Largest request header block. Node's default is 16 KiB.                                                               |
-| `trustProxy`       | `[]`    | CIDR ranges of proxies allowed to set `X-Forwarded-*` headers.                                                        |
-| `allowedHosts`     | `[]`    | Hostnames the server answers to. Empty answers any host.                                                              |
+| Key                 | Default    | What it does                                                                                                          |
+| ------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `port`              | `9001`     | The port the server listens on.                                                                                       |
+| `host`              | -          | The host to bind. Unset binds every interface.                                                                        |
+| `basePath`          | `''`       | Prefix for every route. With `'/api'`, `/authors` is served at `/api/authors`, and the handler still sees `/authors`. |
+| `handlerTimeout`    | `'30s'`    | How long middleware and the handler may run before the server answers with `503`.                                     |
+| `maxBodySize`       | `'1mb'`    | Largest request body. A larger body is refused with `413`.                                                            |
+| `preStopDelay`      | `false`    | Keeps serving after a shutdown signal, so a load balancer can deregister.                                             |
+| `shutdownTimeout`   | `false`    | How long running requests may take to finish on shutdown, before they are cancelled.                                  |
+| `deadline`          | `false`    | Deadline for every shutdown hook combined, the cleanup of cancelled requests included.                                |
+| `waitUntilTimeout`  | `false`    | How long a [`waitUntil`](../api/response.md#after-the-response) promise may run after the response.                   |
+| `headersTimeout`    | `false`    | Wait for the complete request headers. Node's default is 60 seconds.                                                  |
+| `requestTimeout`    | `false`    | The whole request, headers and body. Node's default is 5 minutes.                                                     |
+| `keepAliveTimeout`  | `false`    | Idle keep-alive sockets between requests. Node's default is 5 seconds.                                                |
+| `maxConnections`    | `false`    | Limit on concurrent sockets.                                                                                          |
+| `maxHeaderSize`     | `false`    | Largest request header block. Node's default is 16 KiB.                                                               |
+| `trustProxy`        | `[]`       | CIDR ranges of proxies allowed to set `X-Forwarded-*` headers.                                                        |
+| `allowedHosts`      | `[]`       | Hostnames the server answers to. Empty answers any host.                                                              |
+| `rateLimitStore`    | `'memory'` | Where [rate limits](../api/rate-limiting.md#across-processes) count: each process, or a shared `'database'`.          |
+| `rateLimitDatabase` | -          | The helper database the `'database'` store counts in.                                                                 |
 
 `handlerTimeout`, `maxBodySize`, and `waitUntilTimeout` can also be set
 [per route](../api/routes.md#per-route-options).
@@ -243,7 +245,7 @@ export default defineConfig({
   layers: ['ohnejs/base'],
   database: {
     url: '.data/app.db',
-    helpers: { rateLimit: ':memory:' },
+    helpers: { cache: ':memory:' },
   },
 });
 ```

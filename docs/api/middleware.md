@@ -67,11 +67,11 @@ Every middleware outside `global/` has a name and does nothing until a route sel
 `defineHandler`'s [`middleware` option](./routes.md#per-route-options):
 
 ```ts
-// middleware/rate-limit.ts
-import { defineMiddleware, tooManyRequests } from 'ohnejs';
+// middleware/audit-log.ts
+import { defineMiddleware } from 'ohnejs';
 
 export default defineMiddleware((event) => {
-  if (overLimit(event.ip)) return tooManyRequests();
+  console.info(`${event.request.method} ${event.url.pathname} from ${event.ip}`);
 });
 ```
 
@@ -79,10 +79,10 @@ export default defineMiddleware((event) => {
 // api/search.get.ts
 import { defineHandler } from 'ohnejs';
 
-export default defineHandler(() => search(), { middleware: ['rate-limit'] });
+export default defineHandler(() => search(), { middleware: ['audit-log'] });
 ```
 
-The route runs every global middleware, then `rate-limit`, then the handler.
+The route runs every global middleware, then `audit-log`, then the handler.
 
 - An array lists the named middleware to run, in that order. Duplicates and unknown names are
   dropped.
@@ -96,7 +96,7 @@ ones to run:
 import { defineHandler } from 'ohnejs';
 
 export default defineHandler(() => report(), {
-  middleware: (available) => available.filter((name) => name !== 'rate-limit'),
+  middleware: (available) => available.filter((name) => name !== 'audit-log'),
 });
 ```
 
@@ -106,7 +106,7 @@ The selection is computed once per route, not on every request.
 
 The file's path under `middleware/` names it, in kebab-case:
 
-- `rate-limit.ts` is `rate-limit`.
+- `audit-log.ts` is `audit-log`.
 - `shop/audit.ts` is `shop-audit`.
 - `global/auth.ts` is `global-auth`, since the `global/` prefix is part of the name.
 

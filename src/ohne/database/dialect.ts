@@ -1,10 +1,11 @@
+import type { RateLimitRate } from '../../utils/index.ts';
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
 import type { DialectName } from './known-dialects.ts';
 import type { TableDiff, TableSchema } from './schema/table-schema.ts';
 
 import { randomToken } from '../../utils/crypto/index.ts';
 import { isUndefined, sleep } from '../../utils/index.ts';
-import { OHNE_LOCKS } from './naming/table-names.ts';
+import { OHNE_LOCKS, OHNE_RATE_LIMITS } from './naming/table-names.ts';
 
 /**
  * The storage-primitive column types the schema model reconciles.
@@ -101,6 +102,8 @@ export interface SchemaTransactionOptions {
 
 const lockTables = new WeakSet<DatabaseAdapter>();
 
+const rateLimitTables = new WeakSet<DatabaseAdapter>();
+
 /**
  * A database dialect: the single place a driver and its SQL live.
  *
@@ -111,6 +114,7 @@ const lockTables = new WeakSet<DatabaseAdapter>();
  * Register an instance under a name with `useDialects`; `database.dialect` selects it.
  * The base lock methods implement a portable cluster lock over an `ohne_locks` table, renewed while held.
  * A dialect with a native lock, like Postgres advisory locks, overrides each of them.
+ * The base rate-limit methods count hits in an `ohne_rate_limits` table, one atomic upsert per hit.
  */
 export abstract class Dialect {
   /**
@@ -451,5 +455,114 @@ export abstract class Dialect {
         `WHERE ${this.quote('key')} = ? AND ${this.quote('nonce')} = ?`,
       [handle.key, handle.nonce],
     );
+  }
+
+  /**
+   * Counts one hit against `key` at `now`, deciding and counting in one atomic upsert.
+   * Resolves `0` when it is allowed, else the milliseconds until the next hit is, counting nothing.
+   * A key last taken at a different rate starts over with its full budget.
+   *
+   * @example
+   * ```ts
+   * await dialect.takeRateLimit(db, 'login', { limit: 10, window: 60_000 }, Date.now()) // -> 0
+   * ```
+   */
+  async takeRateLimit(
+    db: DatabaseAdapter,
+    key: string,
+    rate: RateLimitRate,
+    now: number,
+  ): Promise<number> {
+    await this.ensureRateLimitTable(db);
+    const table = this.quote(OHNE_RATE_LIMITS);
+    const [limit, window, at, debt, wait] = ['limit', 'window', 'at', 'debt', 'wait'].map(
+      (column) => this.quote(column),
+    );
+    const int = `CAST(? AS ${this.columnType('integer')})`;
+    const old = (column: string): string => `${table}.${column}`;
+    const next = (column: string): string => `excluded.${column}`;
+    const fresh = `${old(limit)} <> ${next(limit)} OR ${old(window)} <> ${next(window)}`;
+    const drained = `${old(debt)} - (${next(at)} - ${old(at)}) * ${next(limit)}`;
+    const held =
+      `CASE WHEN ${fresh} OR ${next(at)} - ${old(at)} >= ${next(window)} THEN 0 ` +
+      `WHEN ${next(at)} <= ${old(at)} THEN ${old(debt)} ` +
+      `WHEN ${drained} > 0 THEN ${drained} ELSE 0 END`;
+    const due = `(${held}) + ${next(window)}`;
+    const capacity = `${next(limit)} * ${next(window)}`;
+    const allowed = `${due} <= ${capacity}`;
+    // Integer division rounds down, so adding `limit - 1` first rounds the wait up.
+    const refill = `(${due} - ${capacity} + ${next(limit)} - 1) / ${next(limit)}`;
+    const ahead = `CASE WHEN ${old(at)} > ${next(at)} THEN ${old(at)} - ${next(at)} ELSE 0 END`;
+    const row = await db.queryOne<{ wait: number }>(
+      `INSERT INTO ${table} (${this.quote('key')}, ${limit}, ${window}, ${at}, ${debt}, ${wait}) ` +
+        `VALUES (?, ${int}, ${int}, ${int}, ${int}, 0) ` +
+        `ON CONFLICT (${this.quote('key')}) DO UPDATE SET ` +
+        `${at} = CASE WHEN NOT (${allowed}) THEN ${old(at)} ` +
+        `WHEN ${fresh} OR ${next(at)} >= ${old(at)} THEN ${next(at)} ELSE ${old(at)} END, ` +
+        `${debt} = CASE WHEN ${allowed} THEN ${due} ELSE ${old(debt)} END, ` +
+        `${wait} = CASE WHEN ${allowed} THEN 0 ` +
+        `ELSE ${refill} + ${ahead} END, ` +
+        `${limit} = ${next(limit)}, ${window} = ${next(window)} ` +
+        `RETURNING ${wait}`,
+      [key, rate.limit, rate.window, now, rate.window],
+    );
+    return Number(row?.wait ?? 0);
+  }
+
+  /**
+   * Gives `key` its full rate-limit budget back by deleting its row.
+   *
+   * @example
+   * ```ts
+   * await dialect.resetRateLimit(db, 'login')
+   * ```
+   */
+  async resetRateLimit(db: DatabaseAdapter, key: string): Promise<void> {
+    await this.ensureRateLimitTable(db);
+    await db.run(`DELETE FROM ${this.quote(OHNE_RATE_LIMITS)} WHERE ${this.quote('key')} = ?`, [
+      key,
+    ]);
+  }
+
+  /**
+   * Deletes up to `batch` rate-limit rows whose budget is full again at `now`, resolving how many went.
+   * Such a row counts exactly as a missing one, so deleting it never forgives anything.
+   *
+   * @example
+   * ```ts
+   * await dialect.sweepRateLimits(db, Date.now(), 1000) // -> 42
+   * ```
+   */
+  async sweepRateLimits(db: DatabaseAdapter, now: number, batch: number): Promise<number> {
+    await this.ensureRateLimitTable(db);
+    const table = this.quote(OHNE_RATE_LIMITS);
+    const expired =
+      `${this.quote('at')} + ${this.quote('window')} <= ` +
+      `CAST(? AS ${this.columnType('integer')})`;
+    // Rechecking outside the subquery keeps a row another connection just renewed.
+    const { changes } = await db.run(
+      `DELETE FROM ${table} WHERE ${expired} AND ${this.quote('key')} IN ` +
+        `(SELECT ${this.quote('key')} FROM ${table} WHERE ${expired} LIMIT ?)`,
+      [now, now, batch],
+    );
+    return changes;
+  }
+
+  /**
+   * Ensures the `ohne_rate_limits` table exists, tolerating a concurrent create.
+   * It runs once per adapter, since DDL on every hit would flush a driver's statement cache.
+   */
+  protected async ensureRateLimitTable(db: DatabaseAdapter): Promise<void> {
+    if (rateLimitTables.has(db)) return;
+    const integer = this.columnType('integer');
+    await db.exec(
+      `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_RATE_LIMITS)} (` +
+        `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
+        ['limit', 'window', 'at', 'debt', 'wait']
+          .map((column) => `${this.quote(column)} ${integer} NOT NULL`)
+          .join(', ') +
+        ')',
+    );
+    rateLimitTables.add(db);
   }
 }

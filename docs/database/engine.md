@@ -39,7 +39,7 @@ DATABASE=:memory: npx ohne dev
 
 ## Helper databases
 
-Some data does not belong in your main database: rate-limit counters, a cache, anything that changes
+Some data does not belong in your main database: a cache, a scratch table, anything that changes
 very often or that you can throw away. `database.helpers` opens additional databases, each under its
 own name:
 
@@ -50,12 +50,12 @@ import { defineConfig } from 'ohnejs';
 export default defineConfig({
   layers: ['ohnejs/base'],
   database: {
-    helpers: { rateLimit: '.data/rate-limit.db' },
+    helpers: { cache: '.data/cache.db' },
   },
 });
 ```
 
-`useDatabase('rateLimit')` returns its connection.
+`useDatabase('cache')` returns its connection.
 
 - Helper names are typed by codegen, so a typo is a compile error.
 - A helper has no schema. Collections and the sync belong only to the main database, so you create a
@@ -171,6 +171,8 @@ ohne keeps its own state in the main database, in tables prefixed `ohne_`. The f
 them itself, so do not use the prefix in your own SQL:
 
 - `ohne_locks` stores the data for the [cluster lock](./locks.md).
+- `ohne_rate_limits` counts [rate limits](../api/rate-limiting.md#across-processes), in the helper
+  database you name for them.
 - `ohne_migrations` records which [migrations](./migrations.md#each-migration-runs-once) ran.
 - `ohne_schema` holds the sync's schema snapshot.
 

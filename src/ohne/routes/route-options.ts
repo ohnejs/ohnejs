@@ -3,8 +3,8 @@ import type { AnyHandler } from './route.ts';
 
 /**
  * Per-route configuration, declared on a handler through `defineHandler`.
- * Each limit field overrides the server-wide `Config.api` default for this one route.
- * A limit set to `false` opts the route out entirely, so the route owns its own bounding.
+ * Each size and timeout field overrides the server-wide `Config.api` default for this one route.
+ * One set to `false` opts the route out entirely, so the route owns its own bounding.
  * The `middleware` field selects which named middleware run for the route, after the global ones.
  */
 export interface RouteOptions {
@@ -28,6 +28,13 @@ export interface RouteOptions {
   waitUntilTimeout?: number | string | false;
 
   /**
+   * How often one client may call this route, past which it answers `429` with `Retry-After`.
+   * Checked after the middleware, before the body is read.
+   * Omitted, the route is unlimited; there is no server-wide default.
+   */
+  rateLimit?: RouteRateLimit;
+
+  /**
    * Named middleware this route opts into, run after the always-on global middleware.
    * The global middleware run on every request; this adds named ones on top, it cannot disable them.
    * Omitted, the route runs the global middleware only.
@@ -39,6 +46,22 @@ export interface RouteOptions {
   middleware?:
     | NamedMiddlewareKey[]
     | ((available: readonly NamedMiddlewareKey[]) => NamedMiddlewareKey[]);
+}
+
+/**
+ * A route's rate limit, counted per client.
+ * A client may spend the whole `limit` at once, then regains one call every `window / limit`.
+ */
+export interface RouteRateLimit {
+  /**
+   * How many calls one client may make in one `window`.
+   */
+  limit: number;
+
+  /**
+   * The span `limit` refills over, as milliseconds or `'1m'`.
+   */
+  window: number | string;
 }
 
 const OPTIONS = Symbol('ohne.routeOptions');

@@ -14,8 +14,11 @@ import {
   useHooks,
   useMiddleware,
   usePrinter,
+  useRateLimitStores,
   waitUntil,
 } from '../../../src/ohne/index.ts';
+import { DEFAULTS } from '../../../src/ohne/layers/config.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { busyError } from '../../../src/ohne/query/write/busy.ts';
 import { validationError } from '../../../src/ohne/query/write/errors.ts';
@@ -32,6 +35,8 @@ function req(url = 'http://localhost/'): Request {
 function url(href = 'http://localhost/'): URL {
   return new URL(href);
 }
+
+useLayers().add({ path: '/dispatch-test', defaults: DEFAULTS, input: {} });
 
 before(() => {
   usePrinter().configure({ stream: { write() {} } });
@@ -211,6 +216,137 @@ describe('dispatch', () => {
     const { response } = await dispatch(route, request, url(), {}, { maxBodySize: 8 });
     strictEqual(response.status, 413);
     strictEqual(handlerRan, false);
+  });
+
+  it('answers 429 with Retry-After past a route rateLimit, before the handler', async () => {
+    let runs = 0;
+    useMiddleware().registerGlobal('global-tag', (event) => {
+      event.response.headers.set('x-mw', 'on');
+    });
+    const route = makeRoute(
+      '/',
+      defineHandler(
+        () => {
+          runs++;
+          return 'ok';
+        },
+        { rateLimit: { limit: 2, window: '1m' } },
+      ),
+    );
+    for (let i = 0; i < 2; i++)
+      strictEqual(
+        (await dispatch(route, req(), url(), {}, { ip: '10.0.0.1' })).response.status,
+        200,
+      );
+    const { response } = await dispatch(route, req(), url(), {}, { ip: '10.0.0.1' });
+    strictEqual(response.status, 429);
+    strictEqual(response.headers.get('retry-after'), '30');
+    strictEqual(response.headers.get('x-mw'), 'on');
+    strictEqual(runs, 2);
+    strictEqual((await dispatch(route, req(), url(), {}, { ip: '10.0.0.2' })).response.status, 200);
+  });
+
+  it('refuses past rateLimit with 429 before an over-cap body is judged', async () => {
+    const route = makeRoute(
+      '/',
+      defineHandler(() => 'ok', { rateLimit: { limit: 1, window: 1000 } }),
+    );
+    const post = (): Request =>
+      new Request('http://localhost/', {
+        method: 'POST',
+        headers: { 'content-length': '64' },
+        body: 'x'.repeat(64),
+      });
+    const options = { ip: '10.0.0.1', maxBodySize: 8 };
+    strictEqual((await dispatch(route, post(), url(), {}, options)).response.status, 413);
+    strictEqual((await dispatch(route, post(), url(), {}, options)).response.status, 429);
+  });
+
+  it('answers 503 with Retry-After when the rate-limit store is busy', async () => {
+    let ran = false;
+    useRateLimitStores().register('busy', () => ({
+      take: () => Promise.reject(busyError()),
+      async reset() {},
+    }));
+    useLayers().add({ path: '/dispatch-busy', input: { api: { rateLimitStore: 'busy' } } });
+    const route = makeRoute(
+      '/',
+      defineHandler(
+        () => {
+          ran = true;
+          return 'ok';
+        },
+        { rateLimit: { limit: 1, window: '1m' } },
+      ),
+    );
+    const { response } = await dispatch(route, req(), url(), {}, { ip: '10.0.0.1' });
+    useLayers().remove('/dispatch-busy');
+    useRateLimitStores().delete('busy');
+    strictEqual(response.status, 503);
+    strictEqual(response.headers.get('retry-after'), '1');
+    strictEqual(ran, false);
+  });
+
+  it('answers 503 when the rate-limit store overruns handlerTimeout', async () => {
+    let release = (): void => {};
+    useRateLimitStores().register('stuck', () => ({
+      take: () => new Promise<number>((resolve) => (release = () => resolve(0))),
+      async reset() {},
+    }));
+    useLayers().add({ path: '/dispatch-stuck', input: { api: { rateLimitStore: 'stuck' } } });
+    const route = makeRoute(
+      '/',
+      defineHandler(() => 'ok', { rateLimit: { limit: 1, window: '1m' } }),
+    );
+    const { response, drain } = await dispatch(
+      route,
+      req(),
+      url(),
+      {},
+      {
+        ip: '10.0.0.1',
+        handlerTimeout: 10,
+      },
+    );
+    useLayers().remove('/dispatch-stuck');
+    useRateLimitStores().delete('stuck');
+    strictEqual(response.status, 503);
+    release();
+    await drain();
+  });
+
+  it('counts two limited routes apart for one client', async () => {
+    const limit = { rateLimit: { limit: 1, window: '1m' } };
+    const first = makeRoute(
+      '/first',
+      defineHandler(() => 'ok', limit),
+    );
+    const second = makeRoute(
+      '/second',
+      defineHandler(() => 'ok', limit),
+    );
+    const options = { ip: '10.0.0.9' };
+    strictEqual((await dispatch(first, req(), url(), {}, options)).response.status, 200);
+    strictEqual((await dispatch(second, req(), url(), {}, options)).response.status, 200);
+    strictEqual((await dispatch(first, req(), url(), {}, options)).response.status, 429);
+  });
+
+  it('never counts a call a middleware short-circuits', async () => {
+    let blocked = true;
+    useMiddleware().registerGlobal('global-guard', () =>
+      blocked ? badRequest('blocked') : undefined,
+    );
+    const route = makeRoute(
+      '/',
+      defineHandler(() => 'ok', { rateLimit: { limit: 1, window: '1m' } }),
+    );
+    for (let i = 0; i < 3; i++)
+      strictEqual(
+        (await dispatch(route, req(), url(), {}, { ip: '10.0.0.1' })).response.status,
+        400,
+      );
+    blocked = false;
+    strictEqual((await dispatch(route, req(), url(), {}, { ip: '10.0.0.1' })).response.status, 200);
   });
 
   it('lets a body with no Content-Length reach the handler under maxBodySize', async () => {

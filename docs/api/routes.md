@@ -126,7 +126,8 @@ import { defineHandler, query } from 'ohnejs';
 
 export default defineHandler(() => query('Reports').findMany(), {
   handlerTimeout: '5m',
-  middleware: ['rate-limit'],
+  rateLimit: { limit: 10, window: '1m' },
+  middleware: ['audit-log'],
 });
 ```
 
@@ -134,6 +135,8 @@ export default defineHandler(() => query('Reports').findMany(), {
   [`api.*` config](../project/config.md#the-api-server) for this one route. Each takes the same
   values as its config option: a number, a string like `'100mb'` or `'30s'`, or `false` to remove
   the limit.
+- `rateLimit` caps how often one client may call the route. [Rate limiting](./rate-limiting.md)
+  covers it.
 - `middleware` turns on [named middleware](./middleware.md#route-middleware) for the route. They run
   after the global ones, which always run.
 

@@ -30,6 +30,11 @@ interface DerivedOwnerPath extends DerivedOwner {
 export const OHNE_LOCKS = 'ohne_locks';
 
 /**
+ * The rate-limit table backing the base `takeRateLimit`: one row per counted key.
+ */
+export const OHNE_RATE_LIMITS = 'ohne_rate_limits';
+
+/**
  * The migration-state table: one row per migration, stamped `applied` or `skipped`.
  */
 export const OHNE_MIGRATIONS = 'ohne_migrations';

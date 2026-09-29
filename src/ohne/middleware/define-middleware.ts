@@ -33,17 +33,17 @@ import type { Middleware } from './middleware.ts';
  *
  * @example
  * ```ts
- * // middleware/rate-limit.ts - opt-in, named `rate-limit`
- * import { defineMiddleware, tooManyRequests } from 'ohnejs'
+ * // middleware/audit-log.ts - opt-in, named `audit-log`
+ * import { defineMiddleware } from 'ohnejs'
  *
  * export default defineMiddleware((event) => {
- *   if (overLimit(event.ip)) return tooManyRequests()
+ *   console.info(`${event.request.method} ${event.url.pathname} from ${event.ip}`)
  * })
  *
- * // api/search.get.ts - runs the global middleware, plus rate-limit
+ * // api/search.get.ts - runs the global middleware, plus audit-log
  * import { defineHandler } from 'ohnejs'
  *
- * export default defineHandler(() => search(), { middleware: ['rate-limit'] })
+ * export default defineHandler(() => search(), { middleware: ['audit-log'] })
  * ```
  */
 export function defineMiddleware(middleware: Middleware): Middleware {

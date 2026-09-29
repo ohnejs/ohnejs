@@ -53,6 +53,7 @@ throw new HTTPError(418, "I'm a teapot");
 The framework throws these itself when the request is wrong:
 
 - A body over [`api.maxBodySize`](../project/config.md#the-api-server) is a `413`.
+- A client past a route's [rate limit](./rate-limiting.md) gets a `429`.
 - A [JSON body reader](./request.md#the-body) given the wrong `Content-Type` is a `415`.
 - A malformed body is a `400`.
 

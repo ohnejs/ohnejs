@@ -8,7 +8,7 @@
  * ```ts
  * declare module 'ohnejs' {
  *   interface KnownDatabases {
- *     rateLimit: true
+ *     cache: true
  *   }
  * }
  * ```
