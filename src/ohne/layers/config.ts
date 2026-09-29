@@ -16,6 +16,7 @@ import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
 import type { KnownRoles } from '../roles/known-roles.ts';
+import type { KnownSkills } from '../skills/known-skills.ts';
 import type { LayerName } from './layer-name.ts';
 
 /**
@@ -149,6 +150,17 @@ export interface Config {
     roles?: string;
 
     /**
+     * Directory each layer's skills are read from.
+     * Each `.ts` file default-exports one `defineSkill` result; the file names the skill in kebab-case.
+     * A `_`-prefixed file or directory is a helper and is skipped.
+     * Resolved against each layer's root.
+     *
+     * @default
+     * 'skills'
+     */
+    skills?: string;
+
+    /**
      * Directory each layer's database migrations are read from.
      * Each `.ts` file default-exports one `defineMigration` result; files run in name order.
      * A `_`-prefixed file or directory is a helper and is skipped.
@@ -264,6 +276,15 @@ export interface Config {
      * []
      */
     roles?: LiteralUnion<Extract<keyof KnownRoles, string>>[];
+
+    /**
+     * Skill names to drop, matched exactly.
+     * A dropped skill vanishes from registration and the generated `KnownSkills` type.
+     *
+     * @default
+     * []
+     */
+    skills?: LiteralUnion<Extract<keyof KnownSkills, string>>[];
   };
 
   /**
@@ -793,7 +814,15 @@ export interface ConfigExtensions {}
  */
 export const DEFAULTS = {
   layers: [],
-  disable: { routes: [], messages: [], collections: [], fields: [], blocks: [], roles: [] },
+  disable: {
+    routes: [],
+    messages: [],
+    collections: [],
+    fields: [],
+    blocks: [],
+    roles: [],
+    skills: [],
+  },
   collections: { locales: ['en'], defaultLocale: 'en' },
   messages: { defaultLanguage: 'en' },
   api: {
@@ -828,6 +857,7 @@ export const DIR_DEFAULTS = {
   fields: 'fields',
   blocks: 'blocks',
   roles: 'roles',
+  skills: 'skills',
   migrations: 'migrations',
   commands: 'commands',
   dashboard: 'dashboard',
@@ -884,6 +914,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'disable.fields': 'concat-unique',
   'disable.blocks': 'concat-unique',
   'disable.roles': 'concat-unique',
+  'disable.skills': 'concat-unique',
   printer: 'own',
   'api.port': 'own',
   'api.host': 'own',

@@ -27,7 +27,7 @@ export interface SetTarget extends Target {
 export function createSetTarget(
   id: string,
   from: string,
-  dir: 'api' | 'middleware' | 'roles',
+  dir: 'api' | 'middleware' | 'roles' | 'skills',
   files: (from: string) => Promise<Set<string>>,
   generate: (from: string) => Promise<string | string[] | null>,
 ): SetTarget {

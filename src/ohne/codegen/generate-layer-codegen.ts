@@ -16,6 +16,7 @@ const OHNE_FILES = new Set([
   'resolved-config.ts',
   'roles.ts',
   'routes.ts',
+  'skills.ts',
 ]);
 
 /**

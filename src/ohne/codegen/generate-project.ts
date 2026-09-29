@@ -8,6 +8,7 @@ import { generateMiddleware } from './generate-middleware.ts';
 import { generateResolvedConfig } from './generate-resolved-config.ts';
 import { generateRoles } from './generate-roles.ts';
 import { generateRoutes } from './generate-routes.ts';
+import { generateSkills } from './generate-skills.ts';
 import { pruneCodegen } from './prune-codegen.ts';
 
 /**
@@ -34,6 +35,7 @@ export async function generateProject(from: string = process.cwd()): Promise<str
       generateMessages(from),
       generateDatabase(from),
       generateRoles(from),
+      generateSkills(from),
       generateLayerCodegen(from),
     ])
   )

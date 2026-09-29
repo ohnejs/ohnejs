@@ -72,6 +72,7 @@ export default defineConfig({
   [custom field types](../database/custom-field-types.md#where-field-types-live).
 - `blocks: 'blocks'` - [block definitions](../database/blocks.md#defining-a-block).
 - `roles: 'roles'` - [role definitions](../auth/roles.md#defining-roles).
+- `skills: 'skills'` - skill definitions, the prompts the dashboard assistant runs on request.
 - `migrations: 'migrations'` - [database migrations](../database/migrations.md#a-migration-file).
 - `commands: 'commands'` - [CLI commands](./commands.md#names).
 - `dashboard: 'dashboard'` - [dashboard pages](../dashboard/pages.md#from-file-to-route) and
@@ -106,9 +107,9 @@ export default defineConfig({
   key vanishes from the [catalog endpoint](../i18n/messages.md#the-catalog-endpoint),
   [`useT`](../i18n/messages.md#translating-with-uset), and the generated
   [`KnownMessages`](../i18n/messages.md#typed-keys) type.
-- `collections`, `fields`, `blocks`, `roles` - exact names. A dropped collection or block vanishes
-  from the schema and the generated types. A field still referencing a dropped field type fails at
-  codegen.
+- `collections`, `fields`, `blocks`, `roles`, `skills` - exact names. A dropped collection or block
+  vanishes from the schema and the generated types. A field still referencing a dropped field type
+  fails at codegen.
 
 The lists accumulate across layers: every layer's entries are combined, with duplicates removed. So
 a layer can drop components too, and you can always add more.

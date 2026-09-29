@@ -8,6 +8,7 @@ import {
   isBoolean,
   isCSSLength,
   isEmpty,
+  isMessage,
   isPlainObject,
   isString,
   isUndefined,
@@ -492,8 +493,7 @@ function invalidTabs(ctx: LayoutContext): never {
  * Validates an optional label: a message key, a plain string, or a `{ key, params }` object.
  */
 function validateLabel(label: unknown, what: string, ctx: LayoutContext): void {
-  if (isUndefined(label) || isString(label)) return;
-  if (isPlainObject(label) && isString(label.key)) return;
+  if (isUndefined(label) || isMessage(label)) return;
   throw ohneError({
     title: `Invalid \`${ctx.option}\` ${what} label`,
     body: [

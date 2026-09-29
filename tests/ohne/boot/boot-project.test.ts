@@ -29,7 +29,7 @@ import { relativePath } from '../../../src/utils/index.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 
-const REGISTRATIONS = ['routes', 'middleware', 'messages', 'database', 'roles'];
+const REGISTRATIONS = ['routes', 'middleware', 'messages', 'database', 'roles', 'skills'];
 
 const scope = globalThis as typeof globalThis & { __ohneBootProject: unknown[] };
 

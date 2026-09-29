@@ -1,6 +1,6 @@
 import type { RoleDefinition } from './define-role.ts';
 
-import { isArray, isPlainObject, isString, isUndefined } from '../../utils/index.ts';
+import { isArray, isMessage, isString, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
 /**
@@ -25,8 +25,7 @@ export function validateRoleDefinition(definition: RoleDefinition): void {
  * Rejects a declared message of the wrong shape.
  */
 function validateMessage(message: unknown, option: string): void {
-  if (isUndefined(message) || isString(message)) return;
-  if (isPlainObject(message) && isString(message.key)) return;
+  if (isUndefined(message) || isMessage(message)) return;
   throw ohneError({
     title: 'Invalid role definition',
     body: [`\`${option}\` must be a message key, a plain string, or a \`{ key, params }\` object.`],

@@ -22,6 +22,7 @@ import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRegistryTarget } from './targets/registry.ts';
 import { createRolesTarget } from './targets/roles.ts';
 import { createRoutesTarget } from './targets/routes.ts';
+import { createSkillsTarget } from './targets/skills.ts';
 import { watchLayers } from './watch-layers.ts';
 
 const DEBOUNCE = 100;
@@ -96,6 +97,7 @@ export async function dev(
   const messages = createMessagesTarget(from);
   const database = createDatabaseTarget(from);
   const roles = createRolesTarget(from);
+  const skills = createSkillsTarget(from);
   const config = createConfigTarget(from, [
     registry,
     routes,
@@ -103,8 +105,9 @@ export async function dev(
     messages,
     database,
     roles,
+    skills,
   ]);
-  const targets = [registry, routes, middleware, messages, database, roles];
+  const targets = [registry, routes, middleware, messages, database, roles, skills];
 
   const wantDashboard = options.dashboard ?? true;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(

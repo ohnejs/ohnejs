@@ -1,30 +1,30 @@
 import type { ScannedFile } from '../layers/scan-layer-files.ts';
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
-import type { RoleDefinition } from './define-role.ts';
+import type { SkillDefinition } from './define-skill.ts';
 
 import { importDefault } from '../../utils/fs/index.ts';
-import { isArray, isPlainObject, naturalCompare } from '../../utils/index.ts';
+import { isPlainObject, isString, naturalCompare } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
 import { scanLayerFiles } from '../layers/scan-layer-files.ts';
 import { useLayers } from '../layers/use-layers.ts';
 
 /**
- * One role with its imported definition, ready for codegen.
+ * One skill with its imported definition, ready for codegen.
  */
-export interface CollectedRole extends ScannedFile {
+export interface CollectedSkill extends ScannedFile {
   /**
    * The definition the file default-exports.
    */
-  role: RoleDefinition;
+  skill: SkillDefinition;
 }
 
 /**
- * Options for `collectRoles`.
+ * Options for `collectSkills`.
  */
-export interface CollectRolesOptions {
+export interface CollectSkillsOptions {
   /**
-   * Role names to drop after the merge, matched exactly.
+   * Skill names to drop after the merge, matched exactly.
    *
    * @default
    * []
@@ -42,18 +42,18 @@ export interface CollectRolesOptions {
 }
 
 /**
- * Combines the roles of every layer into one deduplicated, imported list.
+ * Combines the skills of every layer into one deduplicated, imported list.
  *
- * Each layer is scanned in its own `dirs.roles` (default `'roles'`).
- * A closer layer's role replaces a further one's under the same name.
+ * Each layer is scanned in its own `dirs.skills` (default `'skills'`).
+ * A closer layer's skill replaces a further one's under the same name.
  * Names in `disable` are dropped after the merge.
  * Each survivor's definition is imported; a missing or malformed default export throws.
  * Results sort by name for deterministic output.
  */
-export async function collectRoles(
+export async function collectSkills(
   layers: readonly OhneLayer[],
-  options: CollectRolesOptions = {},
-): Promise<CollectedRole[]> {
+  options: CollectSkillsOptions = {},
+): Promise<CollectedSkill[]> {
   const { disable = [], fresh = false } = options;
   const configByPath = new Map(
     useLayers()
@@ -62,8 +62,8 @@ export async function collectRoles(
   );
   const byName = new Map<string, ScannedFile>();
   for (const layer of layers) {
-    const dir = configByPath.get(layer.dir)?.dirs?.roles ?? DIR_DEFAULTS.roles;
-    for (const scanned of await scanLayerFiles('role', layer, dir)) {
+    const dir = configByPath.get(layer.dir)?.dirs?.skills ?? DIR_DEFAULTS.skills;
+    for (const scanned of await scanLayerFiles('skill', layer, dir)) {
       byName.set(scanned.name, scanned);
     }
   }
@@ -76,20 +76,20 @@ export async function collectRoles(
   return Promise.all(
     survivors.map(async (scanned) => ({
       ...scanned,
-      role: await definitionOf(scanned, fresh),
+      skill: await definitionOf(scanned, fresh),
     })),
   );
 }
 
 /**
- * Imports one role's definition and rejects a file that does not default-export one.
+ * Imports one skill's definition and rejects a file that does not default-export one.
  */
-async function definitionOf(scanned: ScannedFile, fresh: boolean): Promise<RoleDefinition> {
-  const definition = await importDefault<RoleDefinition>(scanned.file, { fresh });
-  if (!isPlainObject(definition) || !isArray(definition.capabilities)) {
+async function definitionOf(scanned: ScannedFile, fresh: boolean): Promise<SkillDefinition> {
+  const definition = await importDefault<SkillDefinition>(scanned.file, { fresh });
+  if (!isPlainObject(definition) || !isString(definition.prompt)) {
     throw ohneError({
-      title: `Role \`${scanned.name}\` has no definition`,
-      body: ['Default-export a `defineRole(...)` result from the file.'],
+      title: `Skill \`${scanned.name}\` has no definition`,
+      body: ['Default-export a `defineSkill(...)` result from the file.'],
       path: scanned.file,
     });
   }

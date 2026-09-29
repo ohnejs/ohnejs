@@ -43,6 +43,7 @@ export async function bootProject(from: string = process.cwd()): Promise<void> {
     'node/messages.ts',
     'node/database.ts',
     'node/roles.ts',
+    'node/skills.ts',
   ]) {
     const file = joinPath(dir, name);
     if (await exists(file)) files.push(file);

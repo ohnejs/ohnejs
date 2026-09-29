@@ -13,11 +13,11 @@ import { assertImportablePath } from '../codegen/assert-importable-path.ts';
 import { ohneError } from '../error/ohne-error.ts';
 
 /**
- * One role file found in a layer, before its definition is imported.
+ * One definition file found in a layer, before its default export is imported.
  */
-export interface ScannedRole {
+export interface ScannedFile {
   /**
-   * The role name, derived from the file's relative path via `pathToKebabName`.
+   * The definition's name, derived from the file's relative path via `pathToKebabName`.
    */
   name: string;
 
@@ -28,21 +28,25 @@ export interface ScannedRole {
 }
 
 /**
- * Reads every role file in one layer's roles directory.
+ * Reads every definition file of one kind in one layer directory.
  *
- * Each `.ts` file under `<layer.dir>/<roles>` is one role, named via `pathToKebabName`.
+ * Each `.ts` file under `<layer.dir>/<dir>` is one definition, named via `pathToKebabName`.
  * A `_`-prefixed file or directory is a helper and is skipped.
- * Two files resolving to the same name collide and throw, naming both.
- * Results sort by file path; returns `[]` when the layer has no roles directory.
+ * Two files resolving to the same name collide and throw, naming the kind and both files.
+ * Results sort by file path; returns `[]` when the layer has no such directory.
  *
  * @example
  * ```ts
- * await scanLayerRoles({ name: 'app', dir: '/app' }, 'roles')
+ * await scanLayerFiles('role', { name: 'app', dir: '/app' }, 'roles')
  * // -> [{ name: 'editor', file: '/app/roles/editor.ts' }]
  * ```
  */
-export async function scanLayerRoles(layer: OhneLayer, roles: string): Promise<ScannedRole[]> {
-  const entries = await listDir(joinPath(layer.dir, roles), { ext: 'ts', files: true });
+export async function scanLayerFiles(
+  kind: string,
+  layer: OhneLayer,
+  dir: string,
+): Promise<ScannedFile[]> {
+  const entries = await listDir(joinPath(layer.dir, dir), { ext: 'ts', files: true });
   if (isNull(entries)) return [];
 
   const seen = new Map<string, string>();
@@ -50,12 +54,12 @@ export async function scanLayerRoles(layer: OhneLayer, roles: string): Promise<S
     .filter((entry) => !entry.relativePath.split('/').some((segment) => segment.startsWith('_')))
     .sort((a, b) => naturalCompare(a.relativePath, b.relativePath))
     .map((entry) => {
-      assertImportablePath('role', entry.relativePath, entry.path);
+      assertImportablePath(kind, entry.relativePath, entry.path);
       const name = pathToKebabName(entry.relativePath);
       const clash = seen.get(name);
       if (!isUndefined(clash)) {
         throw ohneError({
-          title: `Duplicate role \`${name}\``,
+          title: `Duplicate ${kind} \`${name}\``,
           body: [
             `Two files in layer \`${layer.name}\` resolve to the same name.`,
             '',

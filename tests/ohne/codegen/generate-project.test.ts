@@ -62,10 +62,12 @@ describe('generateProject', () => {
       'node/resolved-config.ts',
       'node/roles.ts',
       'node/routes.ts',
+      'node/skills.ts',
       'shared/database.ts',
       'shared/messages.ts',
       'shared/roles.ts',
       'shared/routes.ts',
+      'shared/skills.ts',
     ].map((file) => join(app, '.ohne', file));
     deepStrictEqual([...written].sort(), expected);
     for (const file of written) strictEqual(existsSync(file), true);
