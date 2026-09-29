@@ -160,7 +160,7 @@ export function dialogHost(): Child {
           ? null
           : (() => {
               const content = h('div', { class: 'ohne-dialog-content ohne-prose' });
-              renderProse(content, dialog.content, dialog.markdown);
+              renderProse(content, dialog.content, { markdown: dialog.markdown });
               return content;
             })(),
         h(

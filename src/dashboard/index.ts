@@ -178,7 +178,7 @@ export type { PaginationOptions } from './ui/pagination.ts';
 export { popup } from './ui/popup-overlay.ts';
 export type { Popup, PopupClose, PopupOptions } from './ui/popup-overlay.ts';
 export { prose, renderProse } from './ui/prose.ts';
-export type { ProseOptions } from './ui/prose.ts';
+export type { ProseOptions, RenderProseOptions } from './ui/prose.ts';
 export { resizer } from './ui/resizer.ts';
 export type { ResizerOptions } from './ui/resizer.ts';
 export { scrollable } from './ui/scrollable.ts';

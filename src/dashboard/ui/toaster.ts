@@ -957,14 +957,14 @@ function createToaster(): HTMLElement {
         h('div', { 'data-title': '' }, () => {
           const current = item();
           const prose = h('div', { class: 'ohne-prose' });
-          renderProse(prose, current.message, current.markdown);
+          renderProse(prose, current.message, { markdown: current.markdown });
           return prose;
         }),
         () => {
           const current = item();
           if (isUndefined(current.description)) return null;
           const prose = h('div', { class: 'ohne-prose' });
-          renderProse(prose, current.description, current.markdown);
+          renderProse(prose, current.description, { markdown: current.markdown });
           return h('div', { 'data-description': '' }, prose);
         },
       ),
