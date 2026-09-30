@@ -2,6 +2,7 @@ import type { SearchParamValue, SSEMessage } from 'ohnejs/utils';
 
 import {
   isArray,
+  isNull,
   isNumber,
   isPlainObject,
   isString,
@@ -48,6 +49,27 @@ export interface Proposal {
    * The filter of a write by set, in place of `params`; the browser expands it into one request per record.
    */
   where?: Record<string, unknown>;
+
+  /**
+   * A rewrite of the update's text fields by a model, in place of `body`.
+   * The browser runs it through `POST /ai/turns/[id]/transform` and sends each approved record as an update.
+   */
+  transform?: {
+    /**
+     * The fields to rewrite.
+     */
+    fields: string[];
+
+    /**
+     * What to do with each value.
+     */
+    instruction: string;
+  };
+
+  /**
+   * Set by the server on a write the person's auto-accept covers, so it is sent without asking.
+   */
+  auto?: true;
 }
 
 /**
@@ -57,6 +79,7 @@ export type BatchResult =
   | {
       /**
        * The answer's status; a write by set answers the status of its first failure, else `200`.
+       * `0` when the connection dropped before the answer, so the request may have run.
        */
       status: number;
 
@@ -64,6 +87,11 @@ export type BatchResult =
        * The answer's JSON body, cut to what the receipt reads.
        */
       body?: unknown;
+
+      /**
+       * Set when the request was sent without asking, as its proposal's `auto` allowed.
+       */
+      auto?: true;
     }
   | {
       /**
@@ -100,6 +128,11 @@ export interface TurnBatch {
    * One result per proposal once the batch was sent, `null` while it waits.
    */
   results: BatchResult[] | null;
+
+  /**
+   * The model every transform of the batch runs on, when the flow node that proposed it names one.
+   */
+  pinned?: string;
 }
 
 /**
@@ -144,6 +177,11 @@ export interface Turn {
   skill: string | null;
 
   /**
+   * The flow the turn walks, `null` for a plain question.
+   */
+  flow: string | null;
+
+  /**
    * The turn's id once the stream named it.
    */
   id: string | null;
@@ -185,6 +223,66 @@ export interface SendProgress {
 }
 
 /**
+ * One read of a settled batch and the answer it got.
+ */
+export interface ReadOutcome {
+  /**
+   * The read as proposed.
+   */
+  proposal: Proposal;
+
+  /**
+   * What it answered.
+   */
+  result: { status: number; body?: unknown };
+}
+
+/**
+ * How the writes of a settled batch went, counted per record a write by set reached.
+ */
+export interface WriteTally {
+  /**
+   * The write proposals of the batch.
+   */
+  proposals: number;
+
+  /**
+   * The records written.
+   */
+  sent: number;
+
+  /**
+   * The records a write failed on.
+   */
+  failed: number;
+
+  /**
+   * The records whose connection dropped before the answer, so they may have been written.
+   */
+  unknown: number;
+
+  /**
+   * The write proposals the person declined.
+   */
+  declined: number;
+}
+
+/**
+ * What a settled batch did: the reads that ran, and the tally of its writes.
+ */
+export interface BatchOutcome {
+  /**
+   * The reads that ran, in order.
+   */
+  reads: ReadOutcome[];
+
+  /**
+   * The tally of the writes, `null` when the batch proposed none.
+   */
+  writes: WriteTally | null;
+}
+
+/**
  * The conversation, oldest turn first; the last turn is the live one.
  * Module state, so a shell remount or a page change loses nothing.
  * Reactive.
@@ -198,12 +296,36 @@ export const turns: Ref<readonly Turn[]> = ref([]);
 export const sending: Ref<SendProgress | null> = ref(null);
 
 /**
+ * What a turn starts with beside the person's words: a skill's instructions, or a flow to walk.
+ */
+export interface TurnStart {
+  /**
+   * The skill the turn starts with.
+   */
+  skill?: string;
+
+  /**
+   * The flow the turn walks.
+   */
+  flow?: string;
+}
+
+/**
  * Opens a turn for `input` and puts its first step up for streaming.
  */
-export function openTurn(input: string, skill: string | null = null): void {
+export function openTurn(input: string, { skill, flow }: TurnStart = {}): void {
   turns.value = [
     ...turns.value,
-    { input, skill, id: null, status: 'streaming', steps: [emptyStep()], reason: null, wait: null },
+    {
+      input,
+      skill: skill ?? null,
+      flow: flow ?? null,
+      id: null,
+      status: 'streaming',
+      steps: [emptyStep()],
+      reason: null,
+      wait: null,
+    },
   ];
 }
 
@@ -230,6 +352,25 @@ export function pendingBatch(): TurnBatch | undefined {
   if (isUndefined(turn) || turn.status !== 'waiting') return undefined;
   const batch = turn.steps.at(-1)?.batch;
   return batch?.results === null ? batch : undefined;
+}
+
+/**
+ * Whether `batch` runs without asking: every proposal a read, or a write the server tagged `auto`.
+ *
+ * @example
+ * ```ts
+ * runsUnasked({ id: 'b', kind: 'read', proposals: [read], results: null })
+ * // -> true
+ *
+ * runsUnasked({ id: 'b', kind: 'write', proposals: [read, { ...rename, auto: true }], results: null })
+ * // -> true
+ *
+ * runsUnasked({ id: 'b', kind: 'write', proposals: [read, rename], results: null })
+ * // -> false
+ * ```
+ */
+export function runsUnasked(batch: TurnBatch): boolean {
+  return batch.proposals.every((proposal) => proposal.tier === 'read' || proposal.auto === true);
 }
 
 /**
@@ -282,6 +423,7 @@ export function clearTurns(): void {
  * The turn after one event of its stream; an event the store does not read leaves it as it was.
  *
  * - `turn` names the id.
+ * - `node` starts a step for a flow node, unless the last step is still empty.
  * - `text` appends to the last step and ends a retry wait.
  * - `retry` records the wait.
  * - `batch` puts the batch on the last step.
@@ -295,10 +437,15 @@ export function clearTurns(): void {
  * ```
  */
 export function reduceTurn(turn: Turn, message: SSEMessage): Turn {
-  const data = payload(message.data);
+  const data = eventPayload(message.data);
   switch (message.event) {
     case 'turn':
       return isString(data.id) ? { ...turn, id: data.id } : turn;
+    case 'node': {
+      const last = turn.steps.at(-1);
+      if (!isUndefined(last) && last.text === '' && isNull(last.batch)) return turn;
+      return { ...turn, steps: [...turn.steps, emptyStep()] };
+    }
     case 'text': {
       if (!isString(data.text)) return turn;
       const text = data.text;
@@ -313,6 +460,7 @@ export function reduceTurn(turn: Turn, message: SSEMessage): Turn {
         kind: data.kind,
         proposals: data.proposals as Proposal[],
         results: null,
+        ...(isString(data.pinned) ? { pinned: data.pinned } : {}),
       };
       return withLastStep(turn, (step) => ({ ...step, batch }));
     }
@@ -334,9 +482,67 @@ export function reduceTurn(turn: Turn, message: SSEMessage): Turn {
 }
 
 /**
- * The event's JSON payload as an object, empty when it is not one.
+ * What a settled batch did: every read that ran with its answer, and the writes counted by outcome.
+ * A write by set or a transform counts the records its folded answer names; any other write counts as one.
+ * A status `0` counts as unknown, since the request may have run.
+ *
+ * @example
+ * ```ts
+ * const results = [{ status: 200 }, { status: 0 }]
+ * const outcome = batchOutcome({ id: 'b', kind: 'write', proposals: [read, rename], results })
+ * outcome.reads.length // -> 1
+ * outcome.writes       // -> { proposals: 1, sent: 0, failed: 0, unknown: 1, declined: 0 }
+ * ```
  */
-function payload(data: string): Record<string, unknown> {
+export function batchOutcome(batch: TurnBatch): BatchOutcome {
+  const results = batch.results ?? [];
+  const reads: ReadOutcome[] = [];
+  let writes: WriteTally | null = null;
+  for (const [index, proposal] of batch.proposals.entries()) {
+    const result = results[index];
+    if (isUndefined(result)) continue;
+    if (proposal.tier === 'read') {
+      if (!('declined' in result)) reads.push({ proposal, result });
+      continue;
+    }
+    writes ??= { proposals: 0, sent: 0, failed: 0, unknown: 0, declined: 0 };
+    writes.proposals += 1;
+    if ('declined' in result) {
+      writes.declined += 1;
+    } else if (!isUndefined(proposal.where) || !isUndefined(proposal.transform)) {
+      const body = isPlainObject(result.body) ? result.body : {};
+      writes.sent += countOf(isUndefined(proposal.transform) ? body.total : body.transformed);
+      writes.failed += countOf(body.failed);
+      writes.unknown += countOf(body.unknown);
+    } else if (result.status >= 200 && result.status < 300) {
+      writes.sent += 1;
+    } else if (result.status === 0) {
+      writes.unknown += 1;
+    } else {
+      writes.failed += 1;
+    }
+  }
+  return { reads, writes };
+}
+
+/**
+ * A count a folded answer reports, `0` when it names none.
+ */
+function countOf(value: unknown): number {
+  return isNumber(value) ? value : 0;
+}
+
+/**
+ * An event's JSON payload as an object, empty when it is not one.
+ *
+ * @example
+ * ```ts
+ * eventPayload('{"text":"Hello"}') // -> { text: 'Hello' }
+ * eventPayload('[1]')              // -> {}
+ * eventPayload('nope')             // -> {}
+ * ```
+ */
+export function eventPayload(data: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(data);
     return isPlainObject(parsed) ? parsed : {};

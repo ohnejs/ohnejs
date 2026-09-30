@@ -119,7 +119,7 @@ describe('expandSet', () => {
     deepStrictEqual(asked, [['c-1', 'c-2'], ['c-3']]);
   });
 
-  it('ends with the rows so far when a page fails, and selects only the id without label fields', async () => {
+  it('answers nothing when a page fails, never part of the set', async () => {
     let calls = 0;
     const io: SetIO = {
       page: (body) => {
@@ -131,9 +131,10 @@ describe('expandSet', () => {
       },
       verdict: (UUIDs) => Promise.resolve(new Set(UUIDs)),
     };
-    deepStrictEqual(await expandSet({ ...RETIRE, query: undefined }, { labelFields: [] }, io), [
-      { UUID: 'c-1', label: '', mine: true },
-    ]);
+    strictEqual(
+      await expandSet({ ...RETIRE, query: undefined }, { labelFields: [] }, io),
+      undefined,
+    );
     strictEqual(calls, 2);
   });
 });

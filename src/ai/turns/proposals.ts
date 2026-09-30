@@ -20,11 +20,13 @@ import {
   fillRoute,
   hasKey,
   isArray,
+  isEmpty,
   isNull,
   isPlainObject,
   isString,
   isUndefined,
   isUUID,
+  uniqueArray,
 } from 'ohnejs/utils';
 
 import type { AITier } from '../config.ts';
@@ -69,6 +71,33 @@ export interface Proposal {
    * The filter of a write by set, in place of `params`; the browser expands it into one request per record.
    */
   where?: ConditionInput;
+
+  /**
+   * A rewrite of an update's text fields by a model, in place of `body`.
+   * The browser runs it through `POST /ai/turns/[id]/transform` and sends each approved record as an update.
+   */
+  transform?: Transform;
+
+  /**
+   * Set on a write the browser sends without asking, since the person's auto-accept covers it.
+   * Only the server sets it, after the check, from the person's account setting and `ai.autoAccept`.
+   */
+  auto?: true;
+}
+
+/**
+ * A rewrite of an update's text fields, proposed in place of a body.
+ */
+export interface Transform {
+  /**
+   * The fields to rewrite, each one the surface lists as rewritable for the collection.
+   */
+  fields: string[];
+
+  /**
+   * What to do with each value, as the model wrote it.
+   */
+  instruction: string;
 }
 
 /**
@@ -98,9 +127,16 @@ export type Checked = { ok: true; accepted: Accepted } | { ok: false; receipt: R
 
 type Attempt<T> = { ok: true; value: T } | { ok: false; code: string; path: string };
 
-const PROPOSAL_KEYS = new Set(['route', 'params', 'query', 'body', 'where']);
+// `auto` is left out: the model never tags its own proposal.
+const PROPOSAL_KEYS = new Set(['route', 'params', 'query', 'body', 'where', 'transform']);
 const VERDICT_KEYS = new Set(['where', 'UUIDs', 'locale']);
+const TRANSFORM_KEYS = new Set(['fields', 'instruction']);
 const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
+
+/**
+ * The longest instruction a transform may carry.
+ */
+const MAX_INSTRUCTION = 4_000;
 
 /**
  * Checks one proposal against the surface, refusing anything the person's browser must never send.
@@ -111,6 +147,7 @@ const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
  * Its reach answers `false` for every denied collection, so a `has` or `populate` into one fails.
  * A locale-tagged update may carry translatable fields alone; a create writes the others as well.
  * A write by set needs a route with a `uuid` param above the read tier, and its filter parses the same way.
+ * A transform stands in for an update's body and names rewritable fields alone, translatable at a locale.
  * A list read without a window gets `page: 1`, so its receipt carries a total.
  * A `select` without `UUID` gains it, so every answered record names itself.
  * A refusal is a `400` receipt, its code and path as the API would answer them.
@@ -136,11 +173,18 @@ export async function checkProposal(input: unknown, surface: Surface): Promise<C
   if (!query.ok) return refuse(id, query.code, query.path);
   if (!isUndefined(query.value)) proposal.query = query.value;
 
-  const body = await checkBody(input.body, route, surface, proposal.query?.locale);
-  if (!body.ok) return refuse(id, body.code, body.path);
-  if (!isUndefined(body.value.body)) proposal.body = body.value.body;
-
-  let identity = body.value.identity;
+  let identity = false;
+  if (!isUndefined(input.transform)) {
+    if (!isUndefined(input.body)) return refuse(id, 'invalidShape', 'body');
+    const transform = checkTransform(input.transform, route, reachable, proposal.query?.locale);
+    if (!transform.ok) return refuse(id, transform.code, transform.path);
+    proposal.transform = transform.value;
+  } else {
+    const body = await checkBody(input.body, route, surface, proposal.query?.locale);
+    if (!body.ok) return refuse(id, body.code, body.path);
+    if (!isUndefined(body.value.body)) proposal.body = body.value.body;
+    identity = body.value.identity;
+  }
   if (!isUndefined(input.where)) {
     const set = await checkSet(input.where, reachable, proposal.query?.locale);
     if (!set.ok) return refuse(id, set.code, set.path);
@@ -271,6 +315,44 @@ async function checkBody(
     }
   }
   return { ok: true, value: { body: given, identity: false } };
+}
+
+/**
+ * Checks a transform: an update route, a non-empty instruction, and fields the collection may rewrite.
+ * At a locale, every field must be translatable, as the update it becomes takes translatable fields alone.
+ */
+function checkTransform(
+  input: unknown,
+  route: OfferedRoute,
+  reachable: ReachableCollection | undefined,
+  locale: SearchParamValue | undefined,
+): Attempt<Transform> {
+  if (route.method !== 'PATCH' || route.body !== 'record' || isUndefined(reachable)) {
+    return failed('invalidShape', 'transform');
+  }
+  if (!isPlainObject(input)) return failed('invalidShape', 'transform');
+  for (const key of Object.keys(input)) {
+    if (!TRANSFORM_KEYS.has(key)) return failed('unknownParam', `transform.${key}`);
+  }
+  const { fields, instruction } = input;
+  if (!isString(instruction) || instruction.trim() === '' || instruction.length > MAX_INSTRUCTION) {
+    return failed('invalidValue', 'transform.instruction');
+  }
+  if (
+    !isArray(fields) ||
+    isEmpty(fields) ||
+    !fields.every(isString) ||
+    uniqueArray(fields).length !== fields.length
+  ) {
+    return failed('invalidValue', 'transform.fields');
+  }
+  for (const [index, name] of fields.entries()) {
+    const translatable = reachable.meta.fields[name]?.companion === true;
+    if (!reachable.rewritable.includes(name) || (!isUndefined(locale) && !translatable)) {
+      return failed('invalidField', `transform.fields[${index}]`);
+    }
+  }
+  return { ok: true, value: { fields: [...fields], instruction } };
 }
 
 /**

@@ -8,8 +8,9 @@ import type { StreamedEvent } from '../_stand-in.ts';
 
 import resultsPost from '../../../../../../src/ai/api/ai/turns/[id]/results.post.ts';
 import turnsPost from '../../../../../../src/ai/api/ai/turns/index.post.ts';
-import { loadTurn } from '../../../../../../src/ai/turns/state.ts';
+import { loadTurn, openTurn } from '../../../../../../src/ai/turns/state.ts';
 import { useEnv } from '../../../../../../src/ohne/env/use-env.ts';
+import { queryUntyped } from '../../../../../../src/ohne/query/query.ts';
 import { call, route, signIn, withAI } from '../../../../_fixture.ts';
 import { startProviderServer } from '../../../../providers/_server.ts';
 import { calls, readEvents, says } from '../_stand-in.ts';
@@ -252,6 +253,57 @@ describe('POST /ai/turns/[id]/results', () => {
     });
   });
 
+  it('takes status `0` for a request whose connection dropped, and the receipt carries it', async () => {
+    await withAI(ai(), async () => {
+      const { id, batch } = await open(READ_STEP);
+      server.answer({ body: says('Let me read it first.') });
+      strictEqual((await report(id, { batch, results: [{ status: 0 }] })).status, 200);
+      const messages = server.requests[1]?.body.messages as
+        | { content: { content: string }[] }[]
+        | undefined;
+      const content = messages?.[2]?.content[0]?.content ?? '';
+      deepStrictEqual(JSON.parse(content)[0], { route: QUERY, status: 0 });
+      deepStrictEqual((await loadTurn(id))?.batches[0]?.reported, [{ status: 0 }]);
+    });
+  });
+
+  it('tags a write auto-accept covers, and keeps the browser saying it ran without asking', async () => {
+    const PATCH = 'PATCH /collections/items/[uuid]';
+    const edit = (body: Record<string, unknown>): string =>
+      calls('Editing.', [
+        {
+          id: 'toolu_1',
+          name: 'request',
+          input: { requests: [{ route: PATCH, params: { uuid: UUID }, body }] },
+        },
+      ]);
+    const proposed = (events: StreamedEvent[]): unknown => {
+      const batch = events.find((event) => event.event === 'batch');
+      return (batch?.data.proposals as Record<string, unknown>[] | undefined)?.[0];
+    };
+    const setting = (autoAccept: boolean) =>
+      queryUntyped('Users').where({ UUID: officer.uuid }).updateOrThrow({ autoAccept });
+    await withAI(ai({ autoAccept: { max: 5, fields: { Items: ['name'] } } }), async () => {
+      await setting(true);
+      try {
+        const renamed = await open(edit({ name: 'Ashbringer' }));
+        deepStrictEqual((proposed(renamed.events) as { auto?: true }).auto, true);
+        server.answer({ body: says('Renamed.') });
+        const results = [{ status: 200, auto: true }];
+        strictEqual((await report(renamed.id, { batch: renamed.batch, results })).status, 200);
+        deepStrictEqual((await loadTurn(renamed.id))?.batches[0]?.reported, results);
+        const tooltip = await open(edit({ tooltip: 'Slays.' }));
+        strictEqual((proposed(tooltip.events) as { auto?: true }).auto, undefined);
+        const claimed = await report(tooltip.id, { batch: tooltip.batch, results });
+        strictEqual(claimed.status, 400);
+      } finally {
+        await setting(false);
+      }
+      const asked = await open(edit({ name: 'Ashbringer' }));
+      strictEqual((proposed(asked.events) as { auto?: true }).auto, undefined);
+    });
+  });
+
   it('answers `409` for a turn that is unknown, closed, or not theirs', async () => {
     await withAI(ai(), async () => {
       const body = { batch: 'b', results: [] };
@@ -287,7 +339,22 @@ describe('POST /ai/turns/[id]/results', () => {
       await sleep(5);
       const stale = await report(id, { batch, results: [found] });
       deepStrictEqual([stale.status, stale.body.data], [409, { code: 'turnGone' }]);
-      ok((await loadTurn(id))?.closedAt !== null);
+      strictEqual((await loadTurn(id))?.reason, 'idle');
+    });
+  });
+
+  it('closes a turn whose step died with its process and answers `409`', async () => {
+    await withAI(ai({ limits: { step: 1 } }), async () => {
+      const { UUID } = await openTurn({
+        user: officer.uuid,
+        model: 'smart',
+        page: '/',
+        transcript: [],
+      });
+      await sleep(5);
+      const lost = await report(UUID, { batch: 'b1', results: [] });
+      deepStrictEqual([lost.status, lost.body.data], [409, { code: 'turnGone' }]);
+      strictEqual((await loadTurn(UUID))?.reason, 'lost');
     });
   });
 
@@ -300,12 +367,23 @@ describe('POST /ai/turns/[id]/results', () => {
       strictEqual((await report(id, { batch, results: [] })).status, 400);
       strictEqual((await report(id, { batch, results: [found, found] })).status, 400);
       strictEqual((await report(id, { batch, results: [{ status: 'ok' }] })).status, 400);
+      for (const status of [1, 99, 600]) {
+        strictEqual((await report(id, { batch, results: [{ status }] })).status, 400);
+      }
       strictEqual((await report(id, { batch, results: [{ status: 200, note: 'x' }] })).status, 400);
       strictEqual(
         (await report(id, { batch, results: [{ declined: true, status: 200 }] })).status,
         400,
       );
       strictEqual((await report(id, { batch, results: [{ declined: false }] })).status, 400);
+      strictEqual(
+        (await report(id, { batch, results: [{ status: 200, auto: false }] })).status,
+        400,
+      );
+      strictEqual(
+        (await report(id, { batch, results: [{ declined: true, auto: true }] })).status,
+        400,
+      );
       strictEqual((await report(id, { batch, results: [found] }, null)).status, 401);
       useEnv().unset(KEY as never);
       strictEqual((await report(id, { batch, results: [found] })).status, 503);

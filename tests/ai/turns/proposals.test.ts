@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { Proposal } from '../../../src/ai/turns/proposals.ts';
 import type { Receipt } from '../../../src/ai/turns/receipts.ts';
+import type { Config } from '../../../src/ohne/layers/config.ts';
 
 import { checkProposal } from '../../../src/ai/turns/proposals.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
@@ -50,6 +51,23 @@ async function check(proposal: unknown, token = officer.token): Promise<Outcome>
       path: '/check',
       body: proposal,
       token,
+    });
+    strictEqual(response.status, 200);
+    outcome = (await response.json()) as Outcome;
+  });
+  return outcome as Outcome;
+}
+
+/**
+ * Checks `proposal` as the officer under `ai`, for a model that sees values unless `blind`.
+ */
+async function checkUnder(ai: Config['ai'], proposal: unknown, blind = false): Promise<Outcome> {
+  let outcome: Outcome | undefined;
+  await withAI(ai, async () => {
+    const { response } = await call(blind ? BLIND_CHECK : CHECK, {
+      path: '/check',
+      body: proposal,
+      token: officer.token,
     });
     strictEqual(response.status, 200);
     outcome = (await response.json()) as Outcome;
@@ -287,6 +305,75 @@ describe('checkProposal', () => {
     deepStrictEqual(
       await check({ route: PATCH, where: { owner: { has: { email: 'a' } } }, body: {} }),
       refused(PATCH, 'invalidField', 'where.owner.email'),
+    );
+  });
+
+  it('takes a transform in place of an update body, over rewritable fields alone', async () => {
+    const opened: Config['ai'] = { data: { Items: true, Characters: ['name', 'level'] } };
+    const shout = { fields: ['name', 'tooltip'], instruction: 'Shout it.' };
+    deepStrictEqual(await checkUnder(opened, { route: PATCH_ITEM, where: {}, transform: shout }), {
+      ok: true,
+      proposal: { route: PATCH_ITEM, tier: 'write', where: {}, transform: shout },
+      identity: false,
+    });
+    const at = { params: { uuid: UUID }, query: { locale: 'de' } };
+    deepStrictEqual(await checkUnder(opened, { route: PATCH_ITEM, ...at, transform: shout }), {
+      ok: true,
+      proposal: { route: PATCH_ITEM, tier: 'write', ...at, transform: shout },
+      identity: false,
+    });
+    deepStrictEqual(
+      await checkUnder(opened, { route: PATCH_ITEM, where: {}, transform: shout, body: {} }),
+      refused(PATCH_ITEM, 'invalidShape', 'body'),
+    );
+    deepStrictEqual(
+      await checkUnder(opened, { route: GET, params: { uuid: UUID }, transform: shout }),
+      refused(GET, 'invalidShape', 'transform'),
+    );
+    deepStrictEqual(
+      await checkUnder(opened, { route: PATCH_ITEM, where: {}, transform: { ...shout, x: 1 } }),
+      refused(PATCH_ITEM, 'unknownParam', 'transform.x'),
+    );
+    for (const instruction of [undefined, '', '  ', 1, 'x'.repeat(4_001)]) {
+      deepStrictEqual(
+        await checkUnder(opened, {
+          route: PATCH_ITEM,
+          where: {},
+          transform: { fields: ['name'], instruction },
+        }),
+        refused(PATCH_ITEM, 'invalidValue', 'transform.instruction'),
+      );
+    }
+    for (const fields of [undefined, [], 'name', [1], ['name', 'name']]) {
+      deepStrictEqual(
+        await checkUnder(opened, {
+          route: PATCH_ITEM,
+          where: {},
+          transform: { fields, instruction: 'Shout it.' },
+        }),
+        refused(PATCH_ITEM, 'invalidValue', 'transform.fields'),
+      );
+    }
+    for (const fields of [['rarity'], ['secret'], ['nope'], ['name', 'level']]) {
+      const at = fields.includes('level') ? PATCH : PATCH_ITEM;
+      deepStrictEqual(
+        await checkUnder(opened, { route: at, where: {}, transform: { ...shout, fields } }),
+        refused(at, 'invalidField', `transform.fields[${fields.length - 1}]`),
+      );
+    }
+    deepStrictEqual(
+      await checkUnder(opened, { route: PATCH_ITEM, where: {}, transform: shout }, true),
+      refused(PATCH_ITEM, 'invalidField', 'transform.fields[0]'),
+    );
+    deepStrictEqual(
+      await checkUnder(undefined, { route: PATCH_ITEM, where: {}, transform: shout }),
+      refused(PATCH_ITEM, 'invalidField', 'transform.fields[0]'),
+    );
+    const entry = { provider: 'anthropic', model: 'x', key: false } as const;
+    const pinned = { ...opened, transform: { model: 'seeing' }, models: { seeing: entry } };
+    strictEqual(
+      (await checkUnder(pinned, { route: PATCH_ITEM, where: {}, transform: shout }, true)).ok,
+      true,
     );
   });
 

@@ -1,5 +1,5 @@
-import { conflict, type HTTPError, queryUntyped } from 'ohnejs';
-import { isUndefined } from 'ohnejs/utils';
+import { conflict, type HTTPError, queryUntyped, useFlows } from 'ohnejs';
+import { isEmpty, isNull, isUndefined, parseDuration } from 'ohnejs/utils';
 
 import type { AITier } from '../config.ts';
 import type { TranscriptItem, Usage } from '../providers/provider.ts';
@@ -8,6 +8,36 @@ import type { BatchResult, Receipt } from './receipts.ts';
 import type { OfferedRoute } from './surface.ts';
 
 import { translate } from '../../ohne/http/translate.ts';
+import { useAIConfig } from '../config.ts';
+
+/**
+ * Every way a turn closes, as its row's `reason` keeps it.
+ * - `end`, `length`, `refusal`: the model ended, was cut off at its output limit, or refused.
+ * - `steps`: the turn reached `ai.limits.steps`.
+ * - `limit`: the person's token budget ran out between the steps of one stream.
+ * - `timeout`, `provider`, `internal`: a step failed, with the code the browser was sent.
+ * - `left`: the browser left while a step ran.
+ * - `idle`: its batch waited past `ai.limits.turnTimeout`.
+ * - `lost`: its step stopped with the process running it, and never wrote back.
+ */
+export const CLOSE_REASONS = [
+  'end',
+  'length',
+  'refusal',
+  'steps',
+  'limit',
+  'timeout',
+  'provider',
+  'internal',
+  'left',
+  'idle',
+  'lost',
+] as const;
+
+/**
+ * One way a turn closes, a member of `CLOSE_REASONS`.
+ */
+export type CloseReason = (typeof CLOSE_REASONS)[number];
 
 /**
  * One call the model made in a step, with what answers it.
@@ -108,6 +138,37 @@ export interface TurnBatch {
 }
 
 /**
+ * Where a flow turn stands in its walk.
+ */
+export interface FlowState {
+  /**
+   * The flow's name.
+   */
+  name: string;
+
+  /**
+   * What the person typed, which every decide node judges.
+   */
+  input: string;
+
+  /**
+   * The act node running, or `null` before the first one and once the walk is over.
+   */
+  node: string | null;
+
+  /**
+   * The `ai.models` entry the transcript is in: the turn's own until an act node runs on another.
+   * It outlives the walk, so a follow-up knows which model the transcript belongs to.
+   */
+  model: string;
+
+  /**
+   * The nodes still to walk, in order; a decide node among them is answered on the way.
+   */
+  queue: string[];
+}
+
+/**
  * One turn as its `AITurns` row keeps it, its JSON columns parsed.
  */
 export interface Turn {
@@ -132,7 +193,13 @@ export interface Turn {
   page: string;
 
   /**
+   * The flow the turn walks, or `null` for a plain turn.
+   */
+  flow: FlowState | null;
+
+  /**
    * The conversation so far, in the provider's shape; it only ever grows.
+   * A flow node on another model starts it over, since a transcript is bound to its model.
    */
   transcript: TranscriptItem[];
 
@@ -155,6 +222,11 @@ export interface Turn {
    * When the turn closed, or `null` while it is open.
    */
   closedAt: number | null;
+
+  /**
+   * Why the turn closed, or `null` while it is open.
+   */
+  reason: CloseReason | null;
 
   /**
    * When the row was last written, in epoch milliseconds.
@@ -182,23 +254,59 @@ export interface TurnInit {
   page: string;
 
   /**
-   * The person's first message, in the provider's shape.
+   * The person's first message, in the provider's shape; empty for a flow, whose first node writes it.
    */
   transcript: TranscriptItem[];
+
+  /**
+   * The flow the turn walks, its queue holding the start node.
+   */
+  flow?: FlowState;
 }
 
 /**
  * Creates the row of a new turn, its first step claimed, and returns it.
  */
 export async function openTurn(init: TurnInit): Promise<Turn> {
-  const record = await queryUntyped('AITurns').createOrThrow({
-    user: init.user,
-    model: init.model,
-    page: init.page,
-    transcript: JSON.stringify(init.transcript),
-    step: 1,
-  });
+  const record = await queryUntyped('AITurns')
+    .unscoped()
+    .createOrThrow({
+      user: init.user,
+      model: init.model,
+      page: init.page,
+      flow: isUndefined(init.flow) ? null : JSON.stringify(init.flow),
+      transcript: JSON.stringify(init.transcript),
+      step: 1,
+    });
   return fromRow(record);
+}
+
+/**
+ * The `ai.models` entry the turn's transcript is in: the last act node's model in a flow, else its own.
+ *
+ * @example
+ * ```ts
+ * activeModel(turn) // -> 'fast' once the node `roster` with `model: 'fast'` ran
+ * ```
+ */
+export function activeModel(turn: Turn): string {
+  return turn.flow?.model ?? turn.model;
+}
+
+/**
+ * The `model` the turn's running act node names, or `undefined` when no node runs or it names none.
+ *
+ * @example
+ * ```ts
+ * nodeModel(turn) // -> 'fast' while the node `roster` with `model: 'fast'` runs
+ * nodeModel(turn) // -> undefined while the node `general` with `act: {}` runs
+ * ```
+ */
+export function nodeModel(turn: Turn): string | undefined {
+  const { flow } = turn;
+  if (isNull(flow) || isNull(flow.node)) return undefined;
+  const node = useFlows().get(flow.name)?.flow.nodes[flow.node];
+  return isUndefined(node) || !('act' in node) ? undefined : node.act.model;
 }
 
 /**
@@ -216,23 +324,26 @@ export async function claimStep(turn: Turn): Promise<boolean> {
  * Reads the turn `id`, or `undefined` when no row has it.
  */
 export async function loadTurn(id: string): Promise<Turn | undefined> {
-  const record = await queryUntyped('AITurns').where({ UUID: id }).findFirst();
+  const record = await queryUntyped('AITurns').unscoped().where({ UUID: id }).findFirst();
   return isUndefined(record) ? undefined : fromRow(record);
 }
 
 /**
- * Writes the turn's state back, only while the row still sits at `step`.
+ * Writes the turn's state back, only while the row is open and still sits at `step`.
  * Returns `false` when another write got there first.
  */
 export async function saveTurn(turn: Turn, step: number): Promise<boolean> {
   const records = await queryUntyped('AITurns')
-    .where({ UUID: turn.UUID, step })
+    .unscoped()
+    .where({ UUID: turn.UUID, step, closedAt: { isNull: true } })
     .updateOrThrow({
+      flow: isNull(turn.flow) ? null : JSON.stringify(turn.flow),
       transcript: JSON.stringify(turn.transcript),
       batches: JSON.stringify(turn.batches),
       step: turn.step,
       usage: JSON.stringify(turn.usage),
       closedAt: turn.closedAt,
+      reason: turn.reason,
     });
   if (records.length === 0) return false;
   turn.updatedAt = records[0]._updatedAt as number;
@@ -240,17 +351,56 @@ export async function saveTurn(turn: Turn, step: number): Promise<boolean> {
 }
 
 /**
- * Closes the turn now, whatever step its row sits at.
+ * Marks the open `turn` as written now, so its idle time starts over; a closed one is left as it is.
+ * A transform touches the turn, since the person is not idle while it runs.
  */
-export async function closeTurn(turn: Turn): Promise<void> {
-  turn.closedAt = Date.now();
-  await queryUntyped('AITurns')
-    .where({ UUID: turn.UUID })
-    .updateOrThrow({ closedAt: turn.closedAt });
+export async function touchTurn(turn: Turn): Promise<void> {
+  const records = await queryUntyped('AITurns')
+    .unscoped()
+    .where({ UUID: turn.UUID, closedAt: { isNull: true } })
+    .updateOrThrow({});
+  if (isEmpty(records)) return;
+  turn.updatedAt = records[0]._updatedAt as number;
 }
 
 /**
- * The `409` a results post gets for a turn that is closed, unknown, or someone else's.
+ * Closes the turn now for `reason`, whatever step its row sits at.
+ * A row already closed keeps its first close; the turn then takes that one.
+ */
+export async function closeTurn(turn: Turn, reason: CloseReason): Promise<void> {
+  const records = await queryUntyped('AITurns')
+    .unscoped()
+    .where({ UUID: turn.UUID, closedAt: { isNull: true } })
+    .updateOrThrow({ closedAt: Date.now(), reason });
+  const row =
+    records[0] ?? (await queryUntyped('AITurns').unscoped().where({ UUID: turn.UUID }).findFirst());
+  if (isUndefined(row)) return;
+  turn.closedAt = row.closedAt as number;
+  turn.reason = row.reason as CloseReason;
+  turn.updatedAt = row._updatedAt as number;
+}
+
+/**
+ * Closes the open `turn` when it can no longer continue, and returns whether it did.
+ * One whose batch waited past `ai.limits.turnTimeout` closes as `idle`.
+ * One with no batch waiting is running a step.
+ * Unwritten for twice `ai.limits.step`, that step died with its process, so the turn closes as `lost`.
+ * The deadline bounds only the provider call; the second one is room for the work around it.
+ */
+export async function expireTurn(turn: Turn): Promise<boolean> {
+  const { limits } = useAIConfig();
+  const last = turn.batches.at(-1);
+  const stepping = isUndefined(last) || !isUndefined(last.reported);
+  const quiet = stepping ? parseDuration(limits.step) * 2 : parseDuration(limits.turnTimeout);
+  if (Date.now() - turn.updatedAt <= quiet) return false;
+  await closeTurn(turn, stepping ? 'lost' : 'idle');
+  return true;
+}
+
+/**
+ * The `409` for a turn a results post or a follow-up cannot continue.
+ * The turn is unknown, someone else's, idle or lost.
+ * A results post also answers it for a closed turn, a follow-up for an open one.
  */
 export function turnGone(): HTTPError {
   return conflict(translate('ai.api.turnGone'), { code: 'turnGone' });
@@ -279,11 +429,13 @@ function fromRow(record: Record<string, unknown>): Turn {
     user: record.user as string,
     model: record.model as string,
     page: record.page as string,
+    flow: isNull(record.flow) ? null : (JSON.parse(record.flow as string) as FlowState),
     transcript: JSON.parse(record.transcript as string) as TranscriptItem[],
     batches: JSON.parse(record.batches as string) as TurnBatch[],
     step: record.step as number,
     usage: JSON.parse(record.usage as string) as Usage,
     closedAt: record.closedAt as number | null,
+    reason: record.reason as CloseReason | null,
     updatedAt: record._updatedAt as number,
   };
 }

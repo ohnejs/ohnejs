@@ -115,6 +115,17 @@ and serve routes, media fields, and the dashboard's Media page.
 - [The image service](./uploads/image-service.md) - the protocol a service follows to render
   variants.
 
+## Assistant
+
+An optional layer that puts an assistant behind Cmd+K. It proposes requests, the person approves
+them, and their own browser sends them, so it never does more than the person can.
+
+- [The assistant](./ai/assistant.md) - install the layer, pick models, choose what it may see.
+- [Transforms](./ai/transforms.md) - translate and rewrite text, with every change reviewed.
+- [Skills](./ai/skills.md) - teach the assistant one kind of work.
+- [Flows](./ai/flows.md) - route a question through decide and act steps.
+- [Policy](./ai/policy.md) - the prompts, routes and denied collections, all yours to change.
+
 ## Production
 
 Your app deploys as the source you wrote, with no build step.

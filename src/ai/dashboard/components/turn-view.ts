@@ -22,6 +22,9 @@ import {
   type ConditionObject,
   effect,
   isArray,
+  isComposing,
+  isEmpty,
+  isNull,
   isNumber,
   isPlainObject,
   isString,
@@ -29,17 +32,27 @@ import {
   nextTick,
   onCleanup,
   parseRouteID,
+  recordHref,
+  ref,
   untracked,
 } from 'ohnejs/utils';
 
 import type { AITranslate } from './_ai-messages.ts';
-import type { BatchResult, Proposal, Turn, TurnBatch, TurnStep } from './turn-store.ts';
+import type { Proposal, ReadOutcome, Turn, TurnBatch, TurnStep, WriteTally } from './turn-store.ts';
 
 import { useAIT } from './_ai-messages.ts';
 import { aiMeta, collectionOfRoute } from './_ai-meta.ts';
-import { approvalTable } from './approval-table.ts';
+import { spinner } from './_ai-spinner.ts';
+import { approvalTable, proposedChanges } from './approval-table.ts';
 import { answer, ask, decline } from './assistant.ts';
-import { sending, turns, turnSettled } from './turn-store.ts';
+import {
+  batchOutcome,
+  currentTurn,
+  runsUnasked,
+  sending,
+  turns,
+  turnSettled,
+} from './turn-store.ts';
 
 /**
  * How many records a read line names before it stops.
@@ -112,20 +125,37 @@ css`
     display: none;
   }
 
+  .o-turn-auto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1.375rem;
+    font-size: 0.8125rem;
+  }
+
+  .o-turn-auto-write {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+  }
+
   .o-turn-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
   }
 
-  .o-turn-spinner {
-    animation: o-turn-spin 1s linear infinite;
+  .o-turn-model {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: hsl(var(--ohne-muted-foreground));
   }
 
-  @keyframes o-turn-spin {
-    to {
-      transform: rotate(360deg);
-    }
+  .o-turn-model .ohne-select {
+    width: 12rem;
   }
 `;
 
@@ -133,7 +163,7 @@ css`
  * The palette view of the conversation, shown while `paletteView` is `'turn'`.
  * Each turn shows the person's words, then every step: the model's text, its reads, and its writes.
  * Reads render as one line each, naming the records read; a write renders as an approval table.
- * The palette's input stays the way to ask: Enter on it starts a new turn once the current one settled.
+ * The palette's input stays the way to ask: Enter on it follows up on the current turn once it settled.
  */
 export function turnView(): Child {
   return when(() => paletteView.value === 'turn', view);
@@ -147,7 +177,7 @@ function view(): Child {
 
   // Capture phase on the document: the palette's input handles Enter only under the search view.
   const onKeydown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' || isComposing(event)) return;
     if (!(event.target instanceof Element) || event.target.closest('.o-palette-search') === null) {
       return;
     }
@@ -156,7 +186,7 @@ function view(): Child {
     const input = untracked(() => paletteQuery.value.trim());
     if (input === '' || !untracked(turnSettled)) return;
     paletteQuery.value = '';
-    void ask(input);
+    void ask(input, { after: untracked(currentTurn)?.id ?? undefined });
   };
   document.addEventListener('keydown', onKeydown, true);
   onCleanup(() => document.removeEventListener('keydown', onKeydown, true));
@@ -195,8 +225,8 @@ function turnBlock(turn: () => Turn, t: AITranslate): Child {
       'div',
       { class: 'o-turn-ask' },
       when(
-        () => turn().skill !== null,
-        () => badge(() => skillTitle(turn().skill ?? ''), { color: 'secondary', size: -2 }),
+        () => !isNull(turn().skill) || !isNull(turn().flow),
+        () => badge(() => starterTitle(turn()), { color: 'secondary', size: -2 }),
       ),
       h('span', null, () => turn().input),
     ),
@@ -233,10 +263,10 @@ function stepBlock(turn: () => Turn, step: () => TurnStep, t: AITranslate): Chil
 function batchBlock(turn: () => Turn, batch: () => TurnBatch, t: AITranslate): Child {
   return when(
     () => batch().results !== null,
-    () => (batch().kind === 'read' ? readLines(batch(), t) : summaryLine(batch(), t)),
+    () => outcomeLines(batch(), t),
     () =>
       when(
-        () => turn().status === 'waiting' && batch().kind !== 'read',
+        () => turn().status === 'waiting' && !runsUnasked(batch()),
         () =>
           approvalTable(batch, {
             onApprove: (approvals) => void answer(untracked(batch), approvals),
@@ -255,23 +285,67 @@ function batchBlock(turn: () => Turn, batch: () => TurnBatch, t: AITranslate): C
 }
 
 /**
- * One line per read of a settled batch.
+ * What a settled batch did: one line per read that ran, then the writes' summary when it had any.
+ * Writes that ran without asking carry a marker, their changes folded away behind a toggle.
  */
-function readLines(batch: TurnBatch, t: AITranslate): Child {
-  const results = batch.results ?? [];
-  return batch.proposals.map((proposal, index) => readLine(proposal, results[index], t));
+function outcomeLines(batch: TurnBatch, t: AITranslate): Child {
+  const { reads, writes } = batchOutcome(batch);
+  const auto = batch.proposals.filter((proposal) => proposal.auto === true);
+  return [
+    reads.map(({ proposal, result }) => readLine(proposal, result, t)),
+    isNull(writes)
+      ? null
+      : isEmpty(auto)
+        ? line(summaryText(writes, t))
+        : autoSummary(auto, writes, t),
+  ];
+}
+
+/**
+ * The summary of writes that ran without asking: the marker, and each write's changes once unfolded.
+ */
+function autoSummary(auto: readonly Proposal[], writes: WriteTally, t: AITranslate): Child {
+  const open = ref(false);
+  return [
+    line(
+      summaryText(writes, t),
+      badge(() => t('ai.dashboard.batch.auto'), { color: 'secondary', size: -2 }),
+      button(
+        () => t(open.value ? 'ai.dashboard.batch.hideChanges' : 'ai.dashboard.batch.showChanges'),
+        { variant: 'ghost', size: -2, onClick: () => void (open.value = !open.value) },
+      ),
+    ),
+    when(
+      () => open.value,
+      () => h('div', { class: 'o-turn-auto' }, auto.map(autoWrite)),
+    ),
+  ];
+}
+
+/**
+ * One write that ran without asking: the record it wrote, when it names one, and the fields it set.
+ */
+function autoWrite(proposal: Proposal): HTMLElement {
+  const collection = collectionOfRoute(proposal.route);
+  const uuid = proposal.params?.uuid;
+  return h(
+    'div',
+    { class: 'o-turn-auto-write' },
+    isUndefined(collection) || isUndefined(uuid) ? null : chips(collection, [{ UUID: uuid }]),
+    proposedChanges(proposal),
+  );
 }
 
 /**
  * What one read answered: how many records, which ones, and where to open them.
  */
-function readLine(proposal: Proposal, result: BatchResult | undefined, t: AITranslate): Child {
-  if (isUndefined(result) || 'declined' in result) return null;
+function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITranslate): Child {
   const collection = collectionOfRoute(proposal.route);
   if (isUndefined(collection)) {
     return line(t('ai.dashboard.read.app', { route: proposal.route }).replaceAll('`', ''));
   }
   const name = collection.label;
+  if (result.status === 0) return line(t('ai.dashboard.read.unknown', { collection: name }));
   if (result.status < 200 || result.status >= 300) {
     return line(t('ai.dashboard.read.failed', { collection: name, status: result.status }));
   }
@@ -299,39 +373,19 @@ function readLine(proposal: Proposal, result: BatchResult | undefined, t: AITran
 }
 
 /**
- * The outcome of a settled write batch: the changes sent and failed, or the decline.
+ * The words of a batch's writes: the changes sent, failed and unknown, or the decline.
  */
-function summaryLine(batch: TurnBatch, t: AITranslate): Child {
-  const results = batch.results ?? [];
-  let sent = 0;
-  let failed = 0;
-  let declined = 0;
-  let writes = 0;
-  for (const [index, proposal] of batch.proposals.entries()) {
-    const result = results[index];
-    if (proposal.tier === 'read' || isUndefined(result)) continue;
-    writes += 1;
-    if ('declined' in result) {
-      declined += 1;
-      continue;
-    }
-    const body = isPlainObject(result.body) ? result.body : {};
-    if (!isUndefined(proposal.where)) {
-      sent += isNumber(body.total) ? body.total : 0;
-      failed += isNumber(body.failed) ? body.failed : 0;
-    } else if (result.status >= 200 && result.status < 300) {
-      sent += 1;
-    } else {
-      failed += 1;
-    }
-  }
-  if (declined === writes) return line(t('ai.dashboard.batch.declined'));
-  const failures = failed === 0 ? '' : `, ${t('ai.dashboard.batch.failed', { count: failed })}`;
-  return line(`${t('ai.dashboard.batch.sent', { count: sent })}${failures}`);
+function summaryText(writes: WriteTally, t: AITranslate): string {
+  if (writes.declined === writes.proposals) return t('ai.dashboard.batch.declined');
+  const parts = [t('ai.dashboard.batch.sent', { count: writes.sent })];
+  if (writes.failed > 0) parts.push(t('ai.dashboard.batch.failed', { count: writes.failed }));
+  if (writes.unknown > 0) parts.push(t('ai.dashboard.batch.unknown', { count: writes.unknown }));
+  return parts.join(', ');
 }
 
 /**
  * The turn's standing under its steps: a retry wait, the first token's wait, a failure, or a cut.
+ * A turn that closed without a word or a request says it found nothing to do.
  */
 function standing(turn: Turn, t: AITranslate): Child {
   if (turn.wait !== null) {
@@ -350,6 +404,12 @@ function standing(turn: Turn, t: AITranslate): Child {
   if (turn.status === 'closed' && turn.reason !== null && turn.reason !== 'end') {
     return reasonText(turn.reason, t);
   }
+  if (
+    turn.status === 'closed' &&
+    turn.steps.every((step) => step.text === '' && isNull(step.batch))
+  ) {
+    return t('ai.dashboard.reason.empty');
+  }
   return null;
 }
 
@@ -362,10 +422,12 @@ function reasonText(reason: string | null, t: AITranslate): string {
 }
 
 /**
- * The title of the skill `name`, or the name when the discovery read does not list it.
+ * The title of the skill or flow the turn started with, or its name when the discovery read does not list it.
  */
-function skillTitle(name: string): string {
-  return aiMeta()?.skills.find((skill) => skill.name === name)?.title ?? name;
+function starterTitle({ skill, flow }: Turn): string {
+  const meta = aiMeta();
+  if (!isNull(skill)) return meta?.skills.find((entry) => entry.name === skill)?.title ?? skill;
+  return meta?.flows.find((entry) => entry.name === flow)?.title ?? flow ?? '';
 }
 
 /**
@@ -373,15 +435,6 @@ function skillTitle(name: string): string {
  */
 function line(text: string, ...rest: Child[]): HTMLElement {
   return h('div', { class: 'o-turn-line' }, icon('eye'), h('span', null, text), rest);
-}
-
-/**
- * The spinning loader of a line that waits.
- */
-function spinner(): SVGSVGElement {
-  const glyph = icon('loader-2');
-  glyph.classList.add('o-turn-spinner');
-  return glyph;
 }
 
 /**
@@ -399,7 +452,7 @@ function chips(collection: DashboardCollection, records: readonly unknown[]): Ch
       const label = joinLabel(record, collection);
       if (label !== '') seedLabel(collection.name, uuid, label);
       return button(() => labelOf(collection.name, uuid) ?? fallbackLabel(uuid), {
-        href: `/collections/${collection.segment}/${uuid}`,
+        href: recordHref(collection, uuid),
         variant: 'outline',
         size: -2,
         onClick: () => closePalette(),

@@ -45,10 +45,9 @@ function routeTable(): TableRow[] {
   const config = useConfig();
   let table = tables.get(config);
   if (isUndefined(table)) {
-    table = Object.entries(useAIConfig().routes).map(([glob, tier]) => ({
-      matches: routeGlobMatcher([glob]),
-      tier,
-    }));
+    table = Object.entries(useAIConfig().routes).flatMap(([glob, tier]) =>
+      isUndefined(tier) ? [] : [{ matches: routeGlobMatcher([glob]), tier }],
+    );
     tables.set(config, table);
   }
   return table;

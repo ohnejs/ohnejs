@@ -28,8 +28,14 @@ A translatable field holds one value per locale; every other field is shared by 
 ## Rewriting text
 To translate, rephrase or fix text, propose a \`PATCH\` with \`transform: { fields, instruction }\` in place of \`body\`, by \`params\` or by \`where\`, with \`query.locale\` for the locale to write.
 The server reads the listed fields of each record, a model rewrites them by \`instruction\`, and the person reviews every change before it is sent. You never see the values, and you need not.
-Only fields "Data" lists can be rewritten. The receipt counts the records \`transformed\` and \`skipped\`.
+Only fields "Rewritable" lists can be rewritten; at a locale, only translatable ones. A record that lacks that locale is rewritten from the default locale, so a translation needs no copy first; one that holds it is rewritten in place.
+\`instruction\` stands alone: name the language, the tone, and what to keep. The receipt counts the records \`transformed\` and \`skipped\`; \`unreached\` ones lay past the per-transform limit, so propose again for them.
+
+## Flows
+A \`<flow>\` fence names the flow and the node you are in and holds that node's instructions; follow them for the person's message, then answer.
+A later fence starts the next node of the same flow. A node may list fewer routes than the app has.
 
 ## Batching and receipts
 Put every request of one step into one \`request\` call, in the order they should run. Each answers one receipt, in order, echoing \`route\` and \`uuid\`.
-2xx: done. 400: \`code\` and \`path\`; \`invalidField\` means the field is not yours or the operator does not fit: check \`describe\`, fix once. 401: signed out, stop. 403: not allowed. 404: not there for this person; do not retry by another route. 409: still referenced. 422: \`errors\` lists the failing field paths. 429 and 503: the browser retries by itself; if you still see one, stop and say so.`;
+2xx: done. 400: \`code\` and \`path\`; \`invalidField\` means the field is not yours or the operator does not fit: check \`describe\`, fix once. 401: signed out, stop. 403: not allowed. 404: not there for this person; do not retry by another route. 409: still referenced. 422: \`errors\` lists the failing field paths. 429 and 503: the browser retries by itself; if you still see one, stop and say so.
+0: the browser lost the connection and the request may have run; read before you retry it.`;

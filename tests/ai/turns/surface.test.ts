@@ -1,10 +1,13 @@
 import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { Config } from '../../../src/ohne/layers/config.ts';
+
 import { AI_DEFAULTS } from '../../../src/ai/config.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
 import { useSearchParams } from '../../../src/ohne/http/use-search-params.ts';
+import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
 import { call, route, signIn, withAI } from '../_fixture.ts';
@@ -16,7 +19,13 @@ interface Rendered {
 }
 
 const SURFACE = route('POST', '/surface', async (): Promise<Rendered> => {
-  const surface = await renderSurface(await requireUser(), useSearchParams().blind === undefined);
+  const params = useSearchParams();
+  const tiers = params.tiers === undefined ? undefined : String(params.tiers).split(',');
+  const surface = await renderSurface(
+    await requireUser(),
+    params.blind === undefined,
+    tiers as ('read' | 'write' | 'destructive')[] | undefined,
+  );
   return {
     text: surface.text,
     routes: [...surface.routes.keys()].toSorted(),
@@ -51,14 +60,21 @@ const admin = await signIn('admin@surface.example.com', ['admin']);
 /**
  * The surface as rendered for the person `token` signs in, for a model that sees values unless `blind`.
  */
-async function surfaceFor(token: string, blind = false): Promise<Rendered> {
-  const { response } = await call(SURFACE, { path: blind ? '/surface?blind' : '/surface', token });
+async function surfaceFor(token: string, blind = false, tiers?: string[]): Promise<Rendered> {
+  const query = [blind ? 'blind' : '', tiers === undefined ? '' : `tiers=${tiers.join(',')}`]
+    .filter((part) => part !== '')
+    .join('&');
+  const { response } = await call(SURFACE, {
+    path: query === '' ? '/surface' : `/surface?${query}`,
+    token,
+  });
   strictEqual(response.status, 200);
   return (await response.json()) as Rendered;
 }
 
 const BLIND_DATA =
   'Data: you receive status, counts and ids only, never a field value; you can find, count and change records, never read or translate them.';
+const NOTHING_REWRITABLE = 'Rewritable: nothing; you cannot translate or rewrite text here.';
 
 const ITEMS_READ = [
   'GET /collections/items/[uuid]',
@@ -98,6 +114,27 @@ describe('renderSurface', () => {
     });
   });
 
+  it('offers only the routes of the tiers a flow node opens', async () => {
+    await withAI(undefined, async () => {
+      const { routes, text } = await surfaceFor(officer.token, false, ['read']);
+      deepStrictEqual(
+        routes,
+        [
+          ...CHARACTERS.filter(
+            (id) => id.startsWith('GET') || id.startsWith('POST /collections/characters/'),
+          ),
+          ...GUILDS_READ,
+          ...ITEMS_READ,
+        ].toSorted(),
+      );
+      ok(!text.includes('PATCH /collections/items/[uuid]'));
+      const { routes: writes } = await surfaceFor(officer.token, false, ['write', 'destructive']);
+      ok(!writes.some((id) => id.startsWith('GET') || id.endsWith('/query')));
+      ok(writes.includes('PATCH /collections/characters/[uuid]'));
+      ok(writes.includes('DELETE /collections/characters/[uuid]'));
+    });
+  });
+
   it('offers nothing to a person who reaches no collection', async () => {
     await withAI(undefined, async () => {
       const { text, routes, collections } = await surfaceFor(asker.token);
@@ -129,9 +166,9 @@ describe('renderSurface', () => {
       const { text } = await surfaceFor(officer.token);
       match(
         text,
-        /^# This app\nLocales: en \(default\), de\.\nLimits: perPage at most 500\. At most 50 requests per step\. The person approves every write\.\nData: /,
+        /^# This app\nLocales: en \(default\), de\.\nLimits: perPage at most 500\. At most 50 requests per step, 200 records per transform\. The person approves every write\.\nData: /,
       );
-      ok(text.includes(`\n${BLIND_DATA}\n`));
+      ok(text.includes(`\n${BLIND_DATA}\n${NOTHING_REWRITABLE}\n`));
       ok(
         text.includes(
           '## Characters (`characters`): query, create, update, delete.\nLabel: name.\n',
@@ -170,28 +207,82 @@ describe('renderSurface', () => {
             '\nData: you receive field values from Items (name, tooltip, rarity), Guilds (name), and Characters (name, level). From every other collection you receive status, counts and ids only; you can find, count and change such records, never read or translate them.\n',
           ),
         );
+        ok(text.includes('\nRewritable: Items (name, tooltip) and Characters (name).\n'));
         ok(
           text.includes(
-            '## Items (`items`): query, update.\nLabel: name. Translatable. Data: name, tooltip, rarity.\n',
+            '## Items (`items`): query, update.\nLabel: name. Translatable. Data: name, tooltip, rarity. Rewritable: name, tooltip.\n',
           ),
         );
         ok(
           text.includes(
-            '## Characters (`characters`): query, create, update, delete.\nLabel: name. Data: name, level.\n',
+            '## Characters (`characters`): query, create, update, delete.\nLabel: name. Data: name, level. Rewritable: name.\n',
           ),
         );
         ok(!text.includes('secret'));
         const { text: blind } = await surfaceFor(officer.token, true);
-        ok(blind.includes(`\n${BLIND_DATA}\n`));
+        ok(blind.includes(`\n${BLIND_DATA}\n${NOTHING_REWRITABLE}\n`));
         ok(!blind.includes('Data: name'));
         const { text: askers } = await surfaceFor(asker.token);
-        ok(askers.includes(`\n${BLIND_DATA}\n`));
+        ok(askers.includes(`\n${BLIND_DATA}\n${NOTHING_REWRITABLE}\n`));
       },
     );
+    const entry = { provider: 'anthropic', model: 'x', key: false } as const;
+    await withAI(
+      { data: { Items: true }, transform: { model: 'seeing' }, models: { seeing: entry } },
+      async () => {
+        const { text: blind } = await surfaceFor(officer.token, true);
+        ok(blind.includes(`\n${BLIND_DATA}\nRewritable: Items (name, tooltip).\n`));
+        ok(blind.includes('Label: name. Translatable. Rewritable: name, tooltip.\n'));
+      },
+    );
+    await withAI({ data: { Items: true, Guilds: true } }, async () => {
+      const { text } = await surfaceFor(asker.token);
+      ok(text.includes(`\n${NOTHING_REWRITABLE}\n`));
+    });
     await withAI({ data: { Items: ['secret'] } }, async () => {
       const { text } = await surfaceFor(officer.token);
       ok(text.includes(`\n${BLIND_DATA}\n`));
       ok(!text.includes('secret'));
+    });
+  });
+
+  it('states in the limits which writes run without asking, once the person turned it on', async () => {
+    const ai = {
+      model: 'smart',
+      models: { smart: { provider: 'anthropic', model: 'x', key: false } },
+      autoAccept: { max: 5, fields: { Items: ['name'], Guilds: true, Characters: true } },
+    } satisfies Config['ai'];
+    const APPROVES = 'The person approves every write.\n';
+    await withAI(ai, async () => {
+      ok((await surfaceFor(officer.token)).text.includes(APPROVES));
+      await queryUntyped('Users').where({ UUID: officer.uuid }).updateOrThrow({ autoAccept: true });
+      try {
+        const { text } = await surfaceFor(officer.token);
+        ok(
+          text.includes(
+            ' 200 records per transform. A write whose body names only these fields runs without asking, at most 5 per turn: Items (name) and Characters (every field). Destructive requests, writes by `where`, writes at another locale, and rewrites always ask. The person approves every other write.\n',
+          ),
+        );
+        ok((await surfaceFor(asker.token)).text.includes(APPROVES));
+      } finally {
+        await queryUntyped('Users')
+          .where({ UUID: officer.uuid })
+          .updateOrThrow({ autoAccept: false });
+      }
+    });
+    await withAI({ ...ai, autoAccept: { ...ai.autoAccept, ask: [] } }, async () => {
+      await queryUntyped('Users').where({ UUID: officer.uuid }).updateOrThrow({ autoAccept: true });
+      try {
+        ok(
+          (await surfaceFor(officer.token)).text.includes(
+            ' Writes by `where` and rewrites always ask.',
+          ),
+        );
+      } finally {
+        await queryUntyped('Users')
+          .where({ UUID: officer.uuid })
+          .updateOrThrow({ autoAccept: false });
+      }
     });
   });
 

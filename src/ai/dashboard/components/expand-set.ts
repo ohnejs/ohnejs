@@ -93,13 +93,13 @@ const PER_PAGE = 50;
 /**
  * Expands a write by set into the rows it reaches, in the read's order.
  * Every page matching the proposal's `where` is read at its `locale`, then the verdict marks each row.
- * A page that fails to read ends the expansion with the rows so far.
+ * A page that fails to read answers `undefined`, since part of a set must never pass for all of it.
  */
 export async function expandSet(
   proposal: Proposal,
   labeling: SetLabeling,
   io: SetIO,
-): Promise<SetRow[]> {
+): Promise<SetRow[] | undefined> {
   const locale = proposal.query?.locale;
   const rows: SetRow[] = [];
   for (let page = 1; ; page++) {
@@ -110,7 +110,7 @@ export async function expandSet(
       page,
       perPage: PER_PAGE,
     });
-    if (isUndefined(loaded)) break;
+    if (isUndefined(loaded)) return undefined;
     const records = loaded.records.filter((record) => isString(record.UUID));
     const mine = await io.verdict(records.map((record) => record.UUID as string));
     for (const record of records) {

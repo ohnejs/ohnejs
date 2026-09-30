@@ -7,6 +7,7 @@ import type { Config } from '../../../src/ohne/layers/config.ts';
 
 import '../../../src/ai/boot/hooks.ts';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
+import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
@@ -40,6 +41,38 @@ useSkills().register('weekly-report', {
   skill: { description: 'Sum up the week.', prompt: 'Report.' },
 });
 
+useFlows().register('raid-officer', {
+  name: 'raid-officer',
+  flow: {
+    title: 'skills.translate.title',
+    description: 'Routes a request.',
+    start: 'triage',
+    nodes: {
+      triage: {
+        decide: { questions: { intent: { yesNo: 'Is it about translation?' } } },
+        next: { on: 'intent', cases: { yes: 'translate', no: 'general' } },
+      },
+      translate: { act: { skill: 'translate-items' } },
+      general: { act: {} },
+    },
+  },
+});
+useFlows().register('weekly', {
+  name: 'weekly',
+  flow: {
+    description: 'Runs the weekly report.',
+    start: 'report',
+    nodes: { report: { act: { skill: 'weekly-report' } } },
+  },
+});
+
+const raidOfficer = {
+  name: 'raid-officer',
+  title: 'Translate items',
+  description: 'Routes a request.',
+};
+const weekly = { name: 'weekly', title: 'Weekly', description: 'Runs the weekly report.' };
+
 const translate = {
   name: 'translate-items',
   title: 'Translate items',
@@ -69,9 +102,24 @@ describe('the dashboard:meta hook', () => {
     deepStrictEqual(await metaFor(userWith('asker'), ai), {
       model: 'smart',
       models: ['smart', 'local'],
+      transformModels: ['smart', 'local'],
       skills: [report],
+      flows: [weekly],
       resultSize: 65_536,
     });
+  });
+
+  it('lists a flow only for a holder of every skill its nodes name', async () => {
+    deepStrictEqual((await metaFor(userWith('editor'), ai))?.flows, [raidOfficer, weekly]);
+  });
+
+  it('offers a transform only the models that may see values', async () => {
+    const models = { ...ai?.models, local: { ...ai?.models?.local, data: false } } as NonNullable<
+      NonNullable<Config['ai']>['models']
+    >;
+    const meta = await metaFor(userWith('asker'), { ...ai, models });
+    deepStrictEqual(meta?.models, ['smart', 'local']);
+    deepStrictEqual(meta?.transformModels, ['smart']);
   });
 
   it('lists a model once its key is set', async () => {

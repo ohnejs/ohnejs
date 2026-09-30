@@ -2,11 +2,14 @@
   "api": {
     "assistantOff": "Der Assistent ist nicht aktiviert",
     "batchReported": "Der Stapel hat seine Ergebnisse bereits",
+    "blindModel": "Das Modell `{model}` darf keine Feldwerte sehen",
     "invalidBody": "Ungültiges `{key}`",
+    "modelPinned": "Jede Umschreibung läuft auf `{model}`, ein anderes Modell kann nicht gewählt werden",
     "modelUnavailable": "Das Modell `{model}` ist nicht verfügbar",
     "resultsMismatch": "Pro Vorschlag ist genau ein Ergebnis nötig",
-    "turnGone": "Der Durchgang ist beendet oder unbekannt",
+    "turnGone": "Der Durchgang kann nicht fortgesetzt werden",
     "unknownBatch": "Unbekannter Stapel `{batch}`",
+    "unknownFlow": "Unbekannter Ablauf `{flow}`",
     "unknownKey": "Unbekannter Schlüssel `{key}`",
     "unknownModel": "Unbekanntes Modell `{model}`",
     "unknownSkill": "Unbekannte Fähigkeit `{skill}`"
@@ -23,6 +26,10 @@
     "page": {
       "label": "Seite",
       "description": "Die Dashboard-Route, von der aus die Person gefragt hat."
+    },
+    "flow": {
+      "label": "Ablauf",
+      "description": "Der Weg eines Ablauf-Durchgangs: der Ablauf, die eingegebene Nachricht, der laufende Knoten und die noch ausstehenden Knoten, als JSON."
     },
     "transcript": {
       "label": "Verlauf",
@@ -43,14 +50,28 @@
     "closedAt": {
       "label": "Beendet am",
       "description": "Wann der Durchgang endete; leer, solange er offen ist."
+    },
+    "reason": {
+      "label": "Grund",
+      "description": "Warum der Durchgang endete; leer, solange er offen ist."
+    }
+  },
+  "users": {
+    "autoAccept": {
+      "label": "Automatisch übernehmen",
+      "description": "Lass den Assistenten die Änderungen, die diese App erlaubt, ohne Rückfrage übernehmen. Alles andere wartet weiter auf deine Freigabe.",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert",
+      "ownOnly": "Nur die Person, der das Konto gehört, kann das in ihren Kontoeinstellungen aktivieren"
     }
   },
   "dashboard": {
     "assistant": "Assistent",
+    "model": "Modell",
     "ask": "Fragen: `{query}`",
     "skills": "Fähigkeiten",
-    "noSkills": "Keine passende Fähigkeit",
-    "start": "Oben eine Frage eingeben und Enter drücken, oder `/` für eine Fähigkeit",
+    "flows": "Abläufe",
+    "start": "Oben eine Frage eingeben und Enter drücken, oder `/` für eine Fähigkeit oder einen Ablauf",
     "followUp": "Oben eine Rückfrage eingeben und Enter drücken",
     "thinking": "Denkt nach",
     "reading": "Liest",
@@ -72,7 +93,9 @@
       "unavailable": "Das Modell ist nicht verfügbar.",
       "forbidden": "Du darfst den Assistenten nicht verwenden.",
       "off": "Der Assistent ist nicht aktiviert.",
-      "signedOut": "Du bist abgemeldet."
+      "signedOut": "Du bist abgemeldet.",
+      "blindModel": "Dieses Modell darf keine Feldwerte sehen. Wähl ein anderes.",
+      "empty": "Der Assistent hat nichts zu tun gefunden."
     },
     "read": {
       "list": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} gelesen",
@@ -81,6 +104,7 @@
       "verdicts": "Geprüft, was du in {collection} ändern darfst",
       "app": "`{route}` aufgerufen",
       "failed": "{collection} konnte nicht gelesen werden ({status})",
+      "unknown": "Verbindung beim Lesen von {collection} verloren",
       "open": "In {collection} öffnen"
     },
     "batch": {
@@ -107,6 +131,7 @@
       "notYours": "Nicht von dir bearbeitbar",
       "noRows": "Nichts passt",
       "loading": "Datensätze werden geladen",
+      "loadFailed": "Die betroffenen Datensätze konnten nicht geladen werden, daher kann diese Änderung nicht freigegeben werden",
       "approveSelected": "Ausgewählte freigeben",
       "approveAll": "Alle freigeben",
       "decline": "Ablehnen",
@@ -114,7 +139,28 @@
       "note": "Sag dem Assistenten, warum (optional)",
       "sent": "{count, plural, one {# Änderung gesendet} other {# Änderungen gesendet}}",
       "failed": "{count, plural, one {# fehlgeschlagen} other {# fehlgeschlagen}}",
-      "declined": "Abgelehnt"
+      "unknown": "{count, plural, one {# möglicherweise ausgeführt} other {# möglicherweise ausgeführt}}",
+      "declined": "Abgelehnt",
+      "auto": "Ohne Rückfrage übernommen",
+      "showChanges": "Änderungen anzeigen",
+      "hideChanges": "Änderungen ausblenden"
+    },
+    "transform": {
+      "header": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} umschreiben",
+      "progress": "Schreibt {done} von {total} um",
+      "skipped": "{count, plural, one {# Datensatz übersprungen} other {# Datensätze übersprungen}}: {reasons}",
+      "reason": {
+        "notYours": "{count} nicht von dir bearbeitbar",
+        "incomplete": "{count} brauchen ein Feld, das diese Umschreibung auslässt",
+        "failed": "{count} ohne Antwort des Modells",
+        "malformed": "{count} vom Modell falsch beantwortet"
+      },
+      "unreached": "{count, plural, one {# weiterer Datensatz wurde} other {# weitere Datensätze wurden}} nicht erreicht; frag erneut für den Rest",
+      "unchanged": "Unverändert",
+      "nothing": "Nichts umzuschreiben",
+      "retry": "Erneut versuchen",
+      "noModel": "Kein Modell darf Feldwerte sehen, daher kann nichts umgeschrieben werden",
+      "failed": "Das Umschreiben ist fehlgeschlagen"
     },
     "filter": {
       "and": "{a} und {b}",
@@ -155,6 +201,7 @@
         "includesAll": "{field} enthält nicht alle von `{value}`",
         "includesAny": "{field} enthält keines von `{value}`"
       }
-    }
+    },
+    "newQuestion": "Neue Frage"
   }
 }

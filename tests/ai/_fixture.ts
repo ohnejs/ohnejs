@@ -5,11 +5,11 @@ import type { Config } from '../../src/ohne/layers/config.ts';
 import type { AnyHandler, Route } from '../../src/ohne/routes/route.ts';
 
 import AITurnsCollection from '../../src/ai/collections/AITurns.ts';
+import UsersCollection from '../../src/ai/collections/Users.ts';
 import aiLayer from '../../src/ai/ohne.layer.ts';
 import { hashSessionToken } from '../../src/base/auth/_token.ts';
 import { toUser } from '../../src/base/auth/to-user.ts';
 import SessionsCollection from '../../src/base/collections/Sessions.ts';
-import UsersCollection from '../../src/base/collections/Users.ts';
 import datePatternField from '../../src/base/fields/date-pattern.ts';
 import languageField from '../../src/base/fields/language.ts';
 import localeField from '../../src/base/fields/locale.ts';

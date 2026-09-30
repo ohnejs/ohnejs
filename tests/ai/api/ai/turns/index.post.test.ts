@@ -1,13 +1,15 @@
 import { deepStrictEqual, match, ok, strictEqual } from 'node:assert';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { Config } from '../../../../../src/ohne/layers/config.ts';
 import type { ProviderServer } from '../../../providers/_server.ts';
 import type { StreamedEvent } from './_stand-in.ts';
 
 import turnsPost from '../../../../../src/ai/api/ai/turns/index.post.ts';
-import { loadTurn } from '../../../../../src/ai/turns/state.ts';
+import { closeTurn, loadTurn, openTurn } from '../../../../../src/ai/turns/state.ts';
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
+import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 import { useSkills } from '../../../../../src/ohne/skills/use-skills.ts';
 import { call, route, signIn, withAI } from '../../../_fixture.ts';
 import { startProviderServer } from '../../../providers/_server.ts';
@@ -44,6 +46,7 @@ function ai(extra: Partial<NonNullable<Config['ai']>> = {}): Config['ai'] {
     model: 'smart',
     models: {
       smart: { provider: 'anthropic', model: 'claude-test', key: KEY, baseURL: server.url },
+      fast: { provider: 'anthropic', model: 'claude-fast', key: KEY, baseURL: server.url },
       router: { provider: 'jev', model: 'jev-test', key: false, baseURL: server.url },
     },
     ...extra,
@@ -125,6 +128,7 @@ describe('POST /ai/turns', () => {
       strictEqual(turn?.page, '/collections/characters');
       strictEqual(turn?.step, 1);
       ok(turn?.closedAt !== null);
+      strictEqual(turn?.reason, 'end');
       deepStrictEqual(turn?.usage, { fresh: 25, cacheRead: 0, cacheWrite: 0, output: 12 });
       deepStrictEqual(turn?.transcript, [
         { role: 'user', content: 'Who is level 60?' },
@@ -293,7 +297,19 @@ describe('POST /ai/turns', () => {
       ]);
       const turn = await loadTurn(events[0]?.data.id as string);
       ok(turn?.closedAt !== null);
+      strictEqual(turn?.reason, 'steps');
       deepStrictEqual(turn?.batches, []);
+      deepStrictEqual(turn?.transcript.at(-1), {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_1',
+            content: '{"error":"turnClosed"}',
+            is_error: true,
+          },
+        ],
+      });
     });
   });
 
@@ -302,10 +318,10 @@ describe('POST /ai/turns', () => {
     await withAI(ai(), async () => {
       const first = await open(ask);
       deepStrictEqual(first.events.at(-1), { event: 'done', data: { reason: 'length' } });
-      ok((await loadTurn(first.events[0]?.data.id as string))?.closedAt !== null);
+      strictEqual((await loadTurn(first.events[0]?.data.id as string))?.reason, 'length');
       const second = await open(ask);
       deepStrictEqual(second.events.slice(1), [{ event: 'error', data: { code: 'provider' } }]);
-      ok((await loadTurn(second.events[0]?.data.id as string))?.closedAt !== null);
+      strictEqual((await loadTurn(second.events[0]?.data.id as string))?.reason, 'provider');
     });
   });
 
@@ -322,6 +338,119 @@ describe('POST /ai/turns', () => {
       const { status, body } = await open(ask);
       strictEqual(status, 429);
       strictEqual(body.statusCode, 429);
+    });
+  });
+
+  it('follows up on a closed turn: the new turn starts from its transcript', async () => {
+    server.answer({ body: says('Nobody yet.') }, { body: says('Still nobody.') });
+    await withAI(ai(), async () => {
+      const first = await open(ask);
+      const id = first.events[0]?.data.id as string;
+      const next = await open({ ...ask, input: 'And level 59?', after: id });
+      strictEqual(next.status, 200);
+      const follow = next.events[0]?.data.id as string;
+      ok(follow !== id);
+      const conversation = [
+        { role: 'user', content: 'Who is level 60?' },
+        { role: 'assistant', content: [{ type: 'text', text: 'Nobody yet.' }] },
+        { role: 'user', content: 'And level 59?' },
+      ];
+      deepStrictEqual(server.requests[1]?.body.messages, conversation);
+      const turn = await loadTurn(follow);
+      deepStrictEqual(turn?.transcript, [
+        ...conversation,
+        { role: 'assistant', content: [{ type: 'text', text: 'Still nobody.' }] },
+      ]);
+      strictEqual(turn?.step, 1);
+      strictEqual((await loadTurn(id))?.transcript.length, 2);
+    });
+  });
+
+  it('closes the calls a turn left waiting before it follows up on it', async () => {
+    server.answer(
+      {
+        body: calls('Reading.', [
+          { id: 'toolu_1', name: 'describe', input: { collection: 'Items' } },
+        ]),
+      },
+      { body: says('Fine.') },
+    );
+    await withAI(ai(), async () => {
+      const first = await open(ask);
+      const id = first.events[0]?.data.id as string;
+      await closeTurn((await loadTurn(id))!, 'idle');
+      strictEqual((await open({ ...ask, input: 'Never mind.', after: id })).status, 200);
+      const messages = server.requests[1]?.body.messages as unknown[];
+      deepStrictEqual(messages.slice(2), [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'toolu_1',
+              content: '{"error":"turnClosed"}',
+              is_error: true,
+            },
+          ],
+        },
+        { role: 'user', content: 'Never mind.' },
+      ]);
+    });
+  });
+
+  it('starts fresh when the follow-up picks another model', async () => {
+    server.answer({ body: says('Nobody yet.') }, { body: says('Hello.') });
+    await withAI(ai(), async () => {
+      const first = await open(ask);
+      const id = first.events[0]?.data.id as string;
+      const next = await open({ ...ask, input: 'Hi', model: 'fast', after: id });
+      strictEqual(next.status, 200);
+      deepStrictEqual(server.requests[1]?.body.messages, [{ role: 'user', content: 'Hi' }]);
+      strictEqual((await loadTurn(next.events[0]?.data.id as string))?.model, 'fast');
+    });
+  });
+
+  it('refuses to follow up on a turn that is open, unknown, not theirs, or idle too long', async () => {
+    server.answer(
+      {
+        body: calls('Reading.', [
+          { id: 'toolu_1', name: 'describe', input: { collection: 'Items' } },
+        ]),
+      },
+      { body: says('Done.') },
+    );
+    await withAI(ai({ limits: { turnTimeout: 300 } }), async () => {
+      const waiting = (await open(ask)).events[0]?.data.id as string;
+      const closed = (await open(ask)).events[0]?.data.id as string;
+      server.requests.length = 0;
+      strictEqual((await open({ ...ask, after: 1 })).status, 400);
+      for (const after of [waiting, UUID, 'nope']) {
+        const refused = await open({ ...ask, after });
+        deepStrictEqual([refused.status, refused.body.data], [409, { code: 'turnGone' }]);
+      }
+      strictEqual((await loadTurn(waiting))?.closedAt, null);
+      const theirs = await open({ ...ask, after: closed }, asker.token);
+      deepStrictEqual([theirs.status, theirs.body.data], [409, { code: 'turnGone' }]);
+      await sleep(350);
+      const stale = await open({ ...ask, after: closed });
+      deepStrictEqual([stale.status, stale.body.data], [409, { code: 'turnGone' }]);
+      const idle = await open({ ...ask, after: waiting });
+      deepStrictEqual([idle.status, idle.body.data], [409, { code: 'turnGone' }]);
+      strictEqual((await loadTurn(waiting))?.reason, 'idle');
+      strictEqual(server.requests.length, 0);
+    });
+  });
+
+  it('prunes the turns `ai.audit.retain` no longer keeps once a turn starts', async () => {
+    server.answer({ body: says('Done.') });
+    await withAI(ai({ audit: { retain: '1d' } }), async () => {
+      const old = await openTurn({ user: officer.uuid, model: 'smart', page: '/', transcript: [] });
+      await closeTurn(old, 'end');
+      await queryUntyped('AITurns')
+        .where({ UUID: old.UUID })
+        .updateOrThrow({ closedAt: Date.now() - 2 * 86_400_000 });
+      strictEqual((await open(ask)).status, 200);
+      strictEqual(await loadTurn(old.UUID), undefined);
     });
   });
 });

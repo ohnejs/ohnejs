@@ -5,6 +5,7 @@ import type { Proposal, TurnBatch } from '../../../../src/ai/dashboard/component
 
 import {
   foldSet,
+  foldTransform,
   postResults,
   requestOf,
   sendBatch,
@@ -65,6 +66,13 @@ const RETIRE: Proposal = {
   tier: 'write',
   where: { level: { lessThan: 10 } },
   body: { status: 'retired' },
+};
+
+const SHOUT: Proposal = {
+  route: 'PATCH /collections/items/[uuid]',
+  tier: 'write',
+  where: {},
+  transform: { fields: ['name'], instruction: 'Shout it.' },
 };
 
 const READ: Proposal = {
@@ -158,7 +166,7 @@ describe('foldSet', () => {
   it('counts the rows written and leads with the first failure', () => {
     deepStrictEqual(foldSet([{ status: 200 }, { status: 200 }]), {
       status: 200,
-      body: { total: 2, failed: 0 },
+      body: { total: 2, failed: 0, unknown: 0 },
     });
     deepStrictEqual(
       foldSet([
@@ -166,13 +174,70 @@ describe('foldSet', () => {
         { status: 404, body: { message: 'Not found' } },
         { status: 422, body: { message: 'Invalid' } },
       ]),
-      { status: 404, body: { message: 'Not found', total: 1, failed: 2 } },
+      { status: 404, body: { message: 'Not found', total: 1, failed: 2, unknown: 0 } },
     );
-    deepStrictEqual(foldSet([]), { status: 200, body: { total: 0, failed: 0 } });
+    deepStrictEqual(foldSet([]), { status: 200, body: { total: 0, failed: 0, unknown: 0 } });
+  });
+
+  it('counts a dropped connection as unknown, apart from the failures', () => {
+    deepStrictEqual(foldSet([{ status: 200 }, { status: 0 }, { status: 404 }]), {
+      status: 0,
+      body: { total: 1, failed: 1, unknown: 1 },
+    });
+  });
+});
+
+describe('foldTransform', () => {
+  it('counts the records rewritten, the reached ones skipped, the unreached, and leads with the first failure', () => {
+    deepStrictEqual(foldTransform([{ status: 200 }, { status: 200 }], { matched: 7, reached: 5 }), {
+      status: 200,
+      body: { transformed: 2, skipped: 3, unreached: 2, failed: 0, unknown: 0 },
+    });
+    const three = { matched: 3, reached: 3 };
+    deepStrictEqual(foldTransform([{ status: 200 }, { status: 422 }, { status: 0 }], three), {
+      status: 422,
+      body: { transformed: 1, skipped: 2, unreached: 0, failed: 1, unknown: 1 },
+    });
+    deepStrictEqual(foldTransform([], { matched: 0, reached: 0 }), {
+      status: 200,
+      body: { transformed: 0, skipped: 0, unreached: 0, failed: 0, unknown: 0 },
+    });
   });
 });
 
 describe('sendBatch', () => {
+  it('sends each approved record of a transform as its update and folds the answers', async () => {
+    const transport = stub([{ status: 200 }, { status: 404 }]);
+    const progress: [number, number][] = [];
+    const results = await sendBatch(
+      batch([SHOUT]),
+      [
+        {
+          send: true,
+          records: [
+            { UUID: 'a', body: { name: 'ASHBRINGER' } },
+            { UUID: 'b', body: { name: 'THUNDERFURY' } },
+          ],
+          counts: { matched: 4, reached: 4 },
+        },
+      ],
+      transport,
+      { limit: 10_000, onProgress: (sent, total) => void progress.push([sent, total]) },
+    );
+    deepStrictEqual(transport.calls, [
+      { route: 'PATCH /collections/items/a', body: { name: 'ASHBRINGER' } },
+      { route: 'PATCH /collections/items/b', body: { name: 'THUNDERFURY' } },
+    ]);
+    deepStrictEqual(results, [
+      { status: 404, body: { transformed: 1, skipped: 3, unreached: 0, failed: 1, unknown: 0 } },
+    ]);
+    deepStrictEqual(progress, [
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ]);
+  });
+
   it('sends the approved proposals in order and answers one result each, declines included', async () => {
     const transport = stub([
       { status: 200, body: { records: [{ UUID: 'x' }], total: 1 } },
@@ -201,6 +266,20 @@ describe('sendBatch', () => {
     ]);
   });
 
+  it('marks the result of a proposal tagged `auto` as sent without asking', async () => {
+    const transport = stub([{ status: 200, body: { UUID: 'a' } }, { status: 422 }]);
+    const results = await sendBatch(
+      batch([READ, { ...UPDATE, auto: true }]),
+      [{ send: true }, { send: true }],
+      transport,
+      { limit: 10_000 },
+    );
+    deepStrictEqual(results, [
+      { status: 200, body: { UUID: 'a' } },
+      { status: 422, auto: true },
+    ]);
+  });
+
   it('expands a write by set into one request per row and folds the answers', async () => {
     const transport = stub([{ status: 200 }, { status: 404 }, { status: 200 }]);
     const results = await sendBatch(
@@ -219,7 +298,7 @@ describe('sendBatch', () => {
         'PATCH /collections/characters/c-3',
       ],
     );
-    deepStrictEqual(results, [{ status: 404, body: { total: 2, failed: 1 } }]);
+    deepStrictEqual(results, [{ status: 404, body: { total: 2, failed: 1, unknown: 0 } }]);
   });
 
   it('waits for Retry-After on a 429 and a 503, then takes the last answer', async () => {
@@ -247,14 +326,28 @@ describe('sendBatch', () => {
     deepStrictEqual(long.waits, []);
   });
 
-  it('never sends a request again after a dropped connection', async () => {
-    const transport = stub([new Error('offline'), { status: 200 }]);
-    await rejects(
-      sendBatch(batch([UPDATE]), [{ send: true }], transport, { limit: 100 }),
-      /offline/,
+  it('answers status `0` for a dropped connection, never resends it, and goes on', async () => {
+    const transport = stub([new Error('offline'), { status: 200, body: { UUID: 'b' } }]);
+    const results = await sendBatch(
+      batch([UPDATE, { ...UPDATE, params: { uuid: 'b' } }]),
+      [{ send: true }, { send: true }],
+      transport,
+      { limit: 100 },
     );
-    strictEqual(transport.calls.length, 1);
+    deepStrictEqual(results, [{ status: 0 }, { status: 200, body: { UUID: 'b' } }]);
+    strictEqual(transport.calls.length, 2);
     deepStrictEqual(transport.waits, []);
+  });
+
+  it('folds a dropped row of a write by set as unknown', async () => {
+    const transport = stub([{ status: 200 }, new Error('offline')]);
+    const results = await sendBatch(
+      batch([RETIRE]),
+      [{ send: true, UUIDs: ['c-1', 'c-2'] }],
+      transport,
+      { limit: 100 },
+    );
+    deepStrictEqual(results, [{ status: 0, body: { total: 1, failed: 0, unknown: 1 } }]);
   });
 });
 

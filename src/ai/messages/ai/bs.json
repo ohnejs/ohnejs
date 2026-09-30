@@ -2,11 +2,14 @@
   "api": {
     "assistantOff": "Asistent nije uključen",
     "batchReported": "Serija već ima svoje rezultate",
+    "blindModel": "Model `{model}` ne smije vidjeti vrijednosti zapisa",
     "invalidBody": "Neispravan `{key}`",
+    "modelPinned": "Svako prepisivanje se izvodi na `{model}`, pa se drugi model ne može odabrati",
     "modelUnavailable": "Model `{model}` nije dostupan",
     "resultsMismatch": "Potreban je tačno jedan rezultat po prijedlogu",
-    "turnGone": "Razgovor je zatvoren ili nepoznat",
+    "turnGone": "Razgovor se ne može nastaviti",
     "unknownBatch": "Nepoznata serija `{batch}`",
+    "unknownFlow": "Nepoznat tok `{flow}`",
     "unknownKey": "Nepoznat ključ `{key}`",
     "unknownModel": "Nepoznat model `{model}`",
     "unknownSkill": "Nepoznata vještina `{skill}`"
@@ -23,6 +26,10 @@
     "page": {
       "label": "Stranica",
       "description": "Ruta nadzorne ploče s koje je osoba pitala."
+    },
+    "flow": {
+      "label": "Tok",
+      "description": "Put razgovora kroz tok: tok, upisana poruka, čvor koji se izvodi i čvorovi koji još čekaju, kao JSON."
     },
     "transcript": {
       "label": "Transkript",
@@ -43,14 +50,28 @@
     "closedAt": {
       "label": "Zatvoren",
       "description": "Kada je razgovor završio; prazno dok je otvoren."
+    },
+    "reason": {
+      "label": "Razlog",
+      "description": "Zašto je razgovor završio; prazno dok je otvoren."
+    }
+  },
+  "users": {
+    "autoAccept": {
+      "label": "Automatsko prihvatanje",
+      "description": "Dozvolite asistentu da bez pitanja primijeni izmjene koje ova aplikacija dopušta. Sve ostalo i dalje čeka vaše odobrenje.",
+      "enabled": "Uključeno",
+      "disabled": "Isključeno",
+      "ownOnly": "Samo vlasnik računa može ovo uključiti, u postavkama svog računa"
     }
   },
   "dashboard": {
     "assistant": "Asistent",
+    "model": "Model",
     "ask": "Pitaj: `{query}`",
     "skills": "Vještine",
-    "noSkills": "Nijedna vještina ne odgovara",
-    "start": "Upišite pitanje iznad i pritisnite Enter, ili `/` za vještinu",
+    "flows": "Tokovi",
+    "start": "Upišite pitanje iznad i pritisnite Enter, ili `/` za vještinu ili tok",
     "followUp": "Upišite nastavak iznad i pritisnite Enter",
     "thinking": "Razmišlja",
     "reading": "Čita",
@@ -72,7 +93,9 @@
       "unavailable": "Model nije dostupan.",
       "forbidden": "Ne smijete koristiti asistenta.",
       "off": "Asistent nije uključen.",
-      "signedOut": "Odjavljeni ste."
+      "signedOut": "Odjavljeni ste.",
+      "blindModel": "Ovaj model ne smije vidjeti vrijednosti zapisa. Odaberite drugi.",
+      "empty": "Asistent nije našao ništa za uraditi."
     },
     "read": {
       "list": "Pročitano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
@@ -81,6 +104,7 @@
       "verdicts": "Provjereno šta smijete mijenjati u {collection}",
       "app": "Pozvano `{route}`",
       "failed": "Nije moguće pročitati {collection} ({status})",
+      "unknown": "Veza je prekinuta tokom čitanja {collection}",
       "open": "Otvori u {collection}"
     },
     "batch": {
@@ -107,6 +131,7 @@
       "notYours": "Nije vaše za uređivanje",
       "noRows": "Ništa ne odgovara",
       "loading": "Učitavanje zapisa",
+      "loadFailed": "Zapise na koje se ova izmjena odnosi nije moguće učitati, pa je ne možete odobriti",
       "approveSelected": "Odobri odabrane",
       "approveAll": "Odobri sve",
       "decline": "Odbij",
@@ -114,7 +139,28 @@
       "note": "Recite asistentu zašto (neobavezno)",
       "sent": "{count, plural, one {# izmjena poslana} few {# izmjene poslane} other {# izmjena poslano}}",
       "failed": "{count, plural, one {# neuspješna} few {# neuspješne} other {# neuspješnih}}",
-      "declined": "Odbijeno"
+      "unknown": "{count, plural, one {# je možda izvršena} few {# su možda izvršene} other {# je možda izvršeno}}",
+      "declined": "Odbijeno",
+      "auto": "Primijenjeno bez pitanja",
+      "showChanges": "Prikaži izmjene",
+      "hideChanges": "Sakrij izmjene"
+    },
+    "transform": {
+      "header": "Prepiši {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
+      "progress": "Prepisuje {done} od {total}",
+      "skipped": "{count, plural, one {# zapis preskočen} few {# zapisa preskočena} other {# zapisa preskočeno}}: {reasons}",
+      "reason": {
+        "notYours": "{count} nije vaše za uređivanje",
+        "incomplete": "{count} traži polje koje ovo prepisivanje izostavlja",
+        "failed": "{count} bez odgovora modela",
+        "malformed": "{count} model je loše odgovorio"
+      },
+      "unreached": "{count, plural, one {Još # zapis nije dosegnut} few {Još # zapisa nisu dosegnuta} other {Još # zapisa nije dosegnuto}}; pitajte ponovo za ostatak",
+      "unchanged": "Nepromijenjeno",
+      "nothing": "Nema šta prepisati",
+      "retry": "Pokušaj ponovo",
+      "noModel": "Nijedan model ne smije vidjeti vrijednosti zapisa, pa se ništa ne može prepisati",
+      "failed": "Prepisivanje nije uspjelo"
     },
     "filter": {
       "and": "{a} i {b}",
@@ -155,6 +201,7 @@
         "includesAll": "{field} ne uključuje sve od `{value}`",
         "includesAny": "{field} ne uključuje ništa od `{value}`"
       }
-    }
+    },
+    "newQuestion": "Novo pitanje"
   }
 }

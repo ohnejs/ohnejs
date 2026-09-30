@@ -2,11 +2,14 @@
   "api": {
     "assistantOff": "The assistant is not enabled",
     "batchReported": "The batch already has its results",
+    "blindModel": "The model `{model}` cannot see record values",
     "invalidBody": "Invalid `{key}`",
+    "modelPinned": "Every transform runs on `{model}`, so no other model can be picked",
     "modelUnavailable": "The model `{model}` is unavailable",
     "resultsMismatch": "One result per proposal is required",
-    "turnGone": "The turn is closed or unknown",
+    "turnGone": "The turn cannot be continued",
     "unknownBatch": "Unknown batch `{batch}`",
+    "unknownFlow": "Unknown flow `{flow}`",
     "unknownKey": "Unknown key `{key}`",
     "unknownModel": "Unknown model `{model}`",
     "unknownSkill": "Unknown skill `{skill}`"
@@ -23,6 +26,10 @@
     "page": {
       "label": "Page",
       "description": "The dashboard route the person asked from."
+    },
+    "flow": {
+      "label": "Flow",
+      "description": "A flow turn's walk: the flow, the typed message, the node running and the nodes still to run, as JSON."
     },
     "transcript": {
       "label": "Transcript",
@@ -43,14 +50,28 @@
     "closedAt": {
       "label": "Closed at",
       "description": "When the turn ended; empty while it is open."
+    },
+    "reason": {
+      "label": "Reason",
+      "description": "Why the turn ended; empty while it is open."
+    }
+  },
+  "users": {
+    "autoAccept": {
+      "label": "Auto-accept",
+      "description": "Let the assistant apply the edits this app allows without asking first. Everything else still waits for your approval.",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "ownOnly": "Only the account's owner can turn this on, in their account settings"
     }
   },
   "dashboard": {
     "assistant": "Assistant",
+    "model": "Model",
     "ask": "Ask: `{query}`",
     "skills": "Skills",
-    "noSkills": "No skill matches",
-    "start": "Type a question above and press Enter, or `/` for a skill",
+    "flows": "Flows",
+    "start": "Type a question above and press Enter, or `/` for a skill or a flow",
     "followUp": "Type a follow-up above and press Enter",
     "thinking": "Thinking",
     "reading": "Reading",
@@ -72,7 +93,9 @@
       "unavailable": "The model is unavailable.",
       "forbidden": "You may not use the assistant.",
       "off": "The assistant is not enabled.",
-      "signedOut": "You are signed out."
+      "signedOut": "You are signed out.",
+      "blindModel": "This model cannot see record values. Pick another one.",
+      "empty": "The assistant found nothing to do."
     },
     "read": {
       "list": "Read {count, plural, one {# record} other {# records}} of {collection}",
@@ -81,6 +104,7 @@
       "verdicts": "Checked what you may change in {collection}",
       "app": "Called `{route}`",
       "failed": "Could not read {collection} ({status})",
+      "unknown": "Lost the connection while reading {collection}",
       "open": "Open in {collection}"
     },
     "batch": {
@@ -107,6 +131,7 @@
       "notYours": "Not yours to edit",
       "noRows": "Nothing matches",
       "loading": "Loading the records",
+      "loadFailed": "Could not load the records this change reaches, so it cannot be approved",
       "approveSelected": "Approve selected",
       "approveAll": "Approve all",
       "decline": "Decline",
@@ -114,7 +139,28 @@
       "note": "Tell the assistant why (optional)",
       "sent": "{count, plural, one {# change sent} other {# changes sent}}",
       "failed": "{count, plural, one {# failed} other {# failed}}",
-      "declined": "Declined"
+      "unknown": "{count, plural, one {# may have run} other {# may have run}}",
+      "declined": "Declined",
+      "auto": "Applied without asking",
+      "showChanges": "Show changes",
+      "hideChanges": "Hide changes"
+    },
+    "transform": {
+      "header": "Rewrite {count, plural, one {# record} other {# records}} of {collection}",
+      "progress": "Rewriting {done} of {total}",
+      "skipped": "{count, plural, one {# record skipped} other {# records skipped}}: {reasons}",
+      "reason": {
+        "notYours": "{count} not yours to edit",
+        "incomplete": "{count} need a field this rewrite leaves out",
+        "failed": "{count} without an answer from the model",
+        "malformed": "{count} answered badly by the model"
+      },
+      "unreached": "{count, plural, one {# more record was} other {# more records were}} not reached; ask again for the rest",
+      "unchanged": "Unchanged",
+      "nothing": "Nothing to rewrite",
+      "retry": "Retry",
+      "noModel": "No model may see record values, so nothing can be rewritten",
+      "failed": "The rewrite failed"
     },
     "filter": {
       "and": "{a} and {b}",
@@ -155,6 +201,7 @@
         "includesAll": "{field} does not include all of `{value}`",
         "includesAny": "{field} includes none of `{value}`"
       }
-    }
+    },
+    "newQuestion": "New question"
   }
 }

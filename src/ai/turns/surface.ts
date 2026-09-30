@@ -1,19 +1,29 @@
-import type { CollectionQueryMeta, QueryScope } from 'ohnejs';
+import type { CollectionQueryMeta, FlowTier, QueryScope } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
 import type { HTTPMethod } from 'ohnejs/utils';
 
 import { queryMetadata, resolveGuards, routeID, useEvent, useRoutes, useSkills } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
-import { compileRoute, isArray, isEmpty, isNull, isPlainObject, isUndefined } from 'ohnejs/utils';
+import {
+  capitalize,
+  compileRoute,
+  isArray,
+  isEmpty,
+  isNull,
+  isPlainObject,
+  isUndefined,
+  uniqueArray,
+} from 'ohnejs/utils';
 
 import type { DashboardCollection, DashboardField } from '../../base/collections-api/describe.ts';
-import type { AITier } from '../config.ts';
+import type { AIAskKind, AITier } from '../config.ts';
 
 import { describeCollections } from '../../base/collections-api/describe.ts';
 import { readScope, writeReach } from '../../base/collections-api/gate.ts';
 import { defaultLanguage, resolveMessage } from '../../ohne/http/translate.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { useAIConfig } from '../config.ts';
+import { autoAccepts } from './auto-accept.ts';
 import { openedFields, SYSTEM_FIELDS } from './redact.ts';
 import { tierOf } from './tiers.ts';
 
@@ -107,6 +117,13 @@ export interface ReachableCollection {
    * The fields whose values reach the model, in declared order; empty for a collection it reads blind.
    */
   opened: readonly string[];
+
+  /**
+   * The text fields a transform may rewrite, in declared order; empty when none may.
+   * They are the opened fields the person may update, as text, and that a model may see.
+   * Under a blind turn model they exist only while `ai.transform.model` pins a model that sees values.
+   */
+  rewritable: readonly string[];
 }
 
 /**
@@ -127,6 +144,11 @@ export interface Surface {
    * The collections the model may reach, by name.
    */
   collections: ReadonlyMap<string, ReachableCollection>;
+
+  /**
+   * Whether the person's writes may run without asking, as `autoAccepts` answers it.
+   */
+  autoAccept: boolean;
 }
 
 interface ShippedRoute {
@@ -175,27 +197,44 @@ const OPERATION_WORDS = { read: 'query', create: 'create', update: 'update', del
 const LISTING = new Intl.ListFormat('en', { type: 'conjunction' });
 
 /**
+ * The words the `Limits:` line names each kind of write that always asks by.
+ */
+const ASK_WORDS: Readonly<Record<AIAskKind, string>> = {
+  destructive: 'destructive requests',
+  set: 'writes by `where`',
+  locale: 'writes at another locale',
+  transform: 'rewrites',
+};
+
+/**
  * Renders the surface for `user`: locales, limits, the routes and collections they reach, and their skills.
+ * The limits state which writes run without asking, once the person turned auto-accept on.
  * A collection `ai.deny.collections` lists never appears, whatever the person may do with it.
  * A route appears when `ai.routes` gives it a tier and the person may run its operation on that collection.
+ * With `tiers`, a flow node's, only the routes of those tiers appear, so the node can propose no other.
  * Fields outside the person's read scope stay out, as do the ones no read returns.
  * `values` is whether the turn's model may see record values; a blind one reads no opened field.
  * The text is in the app's default language, so it reads the same for everyone with the same reach.
  * Valid only within a request.
  */
-export function renderSurface(user: User, values: boolean): Promise<Surface> {
+export function renderSurface(
+  user: User,
+  values: boolean,
+  tiers?: readonly FlowTier[],
+): Promise<Surface> {
   return inDefaultLanguage(async () => {
     const collections = await reachableCollections(user, values);
-    const routes = offeredRoutes(collections);
+    const routes = offeredRoutes(collections, tiers);
+    const autoAccept = await autoAccepts(user);
     const text = [
-      appBlock(collections),
+      appBlock(collections, autoAccept),
       routesBlock(routes),
       collectionsBlock(collections),
       skillsBlock(user),
     ]
       .filter((block) => block !== '')
       .join('\n\n');
-    return { text, routes, collections };
+    return { text, routes, collections, autoAccept };
   });
 }
 
@@ -207,8 +246,12 @@ export function describeCollection({
   meta,
   scope,
   opened,
+  rewritable,
 }: ReachableCollection): string {
-  const lines = [`## ${collectionHeading(described)}`, collectionFacts(described, opened)];
+  const lines = [
+    `## ${collectionHeading(described)}`,
+    collectionFacts(described, opened, rewritable),
+  ];
   const hidden = scope === false || isUndefined(scope.select) ? null : new Set(scope.select);
   for (const field of described.fields) {
     if (SYSTEM_FIELDS.has(field.name) || !field.readable) continue;
@@ -239,45 +282,80 @@ async function reachableCollections(
   user: User,
   values: boolean,
 ): Promise<Map<string, ReachableCollection>> {
-  const denied = new Set(useAIConfig().deny.collections);
+  const { deny, transform } = useAIConfig();
+  const denied = new Set(deny.collections);
+  const rewrites = values || !isUndefined(transform.model);
   const reachable = new Map<string, ReachableCollection>();
   for (const described of describeCollections(user)) {
     if (denied.has(described.name)) continue;
     const { name, operations } = described;
     const scope = operations.read?.allowed === true ? await readScope(name) : false;
+    const update = operations.update?.allowed === true ? await writeReach(name, 'update') : false;
     const admitted = {
       read: scope !== false,
       create: operations.create?.allowed === true,
-      update: operations.update?.allowed === true && (await writeReach(name, 'update')) !== false,
+      update: update !== false,
       delete: operations.delete?.allowed === true && (await writeReach(name, 'delete')) !== false,
     };
     if (!Object.values(admitted).some(Boolean)) continue;
     const opened = values && scope !== false ? openedFields(name, scope) : [];
+    const rewritable =
+      rewrites && scope !== false && update !== false
+        ? rewritableFields(described, openedFields(name, scope), update)
+        : [];
     reachable.set(name, {
       described,
       meta: queryMetadata(name),
       scope,
       operations: admitted,
       opened,
+      rewritable,
     });
   }
   return reachable;
 }
 
 /**
+ * The text fields among `opened` the person may write under their update `scope`, in declared order.
+ */
+function rewritableFields(
+  { fields }: DashboardCollection,
+  opened: readonly string[],
+  scope: QueryScope,
+): string[] {
+  const writable = isUndefined(scope.select) ? null : new Set(scope.select);
+  return fields
+    .filter(
+      (field) =>
+        opened.includes(field.name) &&
+        field.type === 'text' &&
+        field.writable &&
+        !field.immutable &&
+        (isNull(writable) || writable.has(field.name)),
+    )
+    .map((field) => field.name);
+}
+
+/**
  * The routes the person may propose: each registered route the table tiers, per reachable collection.
  * A route shaped like a collections route that the framework does not ship is never offered.
+ * With `tiers`, a route of any other tier is left out.
  */
-function offeredRoutes(collections: Map<string, ReachableCollection>): Map<string, OfferedRoute> {
+function offeredRoutes(
+  collections: Map<string, ReachableCollection>,
+  tiers?: readonly FlowTier[],
+): Map<string, OfferedRoute> {
   const routes = Object.values(useRoutes().all());
   const offered = new Map<string, OfferedRoute>();
   const add = (route: OfferedRoute): void => void offered.set(route.id, route);
+  const open = (tier: AITier | false | undefined): tier is AITier =>
+    tier !== false && !isUndefined(tier) && (isUndefined(tiers) || tiers.includes(tier));
   for (const { described, meta, operations } of collections.values()) {
     for (const { method, pattern } of routes) {
       const shipped = SHIPPED[routeID(method, pattern)];
       if (isNull(method) || isUndefined(shipped)) continue;
       const tier = tierOf(method, pattern);
-      if (tier === false || isUndefined(tier)) continue;
+      if (!open(tier)) continue;
       if (!operations[shipped.needs]) continue;
       if (shipped.translatable && meta.translatable !== true) continue;
       add({
@@ -295,7 +373,7 @@ function offeredRoutes(collections: Map<string, ReachableCollection>): Map<strin
   for (const { method, pattern } of routes) {
     if (isNull(method) || pattern.includes('[collection]')) continue;
     const tier = tierOf(method, pattern);
-    if (tier === false || isUndefined(tier)) continue;
+    if (!open(tier)) continue;
     add({
       id: routeID(method, pattern),
       method,
@@ -310,18 +388,61 @@ function offeredRoutes(collections: Map<string, ReachableCollection>): Map<strin
 }
 
 /**
- * The `# This app` block: locales, limits, and what the model receives.
+ * The `# This app` block: locales, limits, what the model receives, and what a transform may rewrite.
+ * `autoAccept` is whether the person's writes may run without asking.
  */
-function appBlock(collections: Map<string, ReachableCollection>): string {
+function appBlock(collections: Map<string, ReachableCollection>, autoAccept: boolean): string {
   const { locales, defaultLocale } = queryLocales();
   const { limits } = useAIConfig();
   const { maxPerPage } = resolveGuards();
   return [
     '# This app',
     `Locales: ${locales.map((locale) => (locale === defaultLocale ? `${locale} (default)` : locale)).join(', ')}.`,
-    `Limits: perPage at most ${maxPerPage}. At most ${limits.requests} requests per step. The person approves every write.`,
+    `Limits: perPage at most ${maxPerPage}. At most ${limits.requests} requests per step, ${limits.transform} records per transform. ${approvalSentence(collections, autoAccept)}`,
     dataLine(collections),
+    rewritableLine(collections),
   ].join('\n');
+}
+
+/**
+ * The sentence of the `Limits:` line on approval: every write asks, or which run without asking.
+ * Only the collections the person may write are named.
+ */
+function approvalSentence(
+  collections: Map<string, ReachableCollection>,
+  autoAccept: boolean,
+): string {
+  const { max, fields, ask } = useAIConfig().autoAccept;
+  const covered = Object.entries(fields as Record<string, true | string[] | undefined>)
+    .filter(([name, listed]) => !isUndefined(listed) && writes(collections.get(name)))
+    .map(([name, listed]) => `${name} (${listed === true ? 'every field' : listed?.join(', ')})`);
+  if (!autoAccept || isEmpty(covered)) return 'The person approves every write.';
+  const asking = uniqueArray<AIAskKind>([...ask, 'set', 'transform']).map(
+    (kind) => ASK_WORDS[kind],
+  );
+  return `A write whose body names only these fields runs without asking, at most ${max} per turn: ${LISTING.format(covered)}. ${capitalize(LISTING.format(asking))} always ask. The person approves every other write.`;
+}
+
+/**
+ * Whether the person may create, update or delete in `collection`; `false` for one out of reach.
+ */
+function writes(collection: ReachableCollection | undefined): boolean {
+  if (isUndefined(collection)) return false;
+  const { create, update, delete: remove } = collection.operations;
+  return create || update || remove;
+}
+
+/**
+ * The `Rewritable:` line: the collections and text fields a transform may rewrite, or that none may.
+ */
+function rewritableLine(collections: Map<string, ReachableCollection>): string {
+  const sources = [...collections.values()]
+    .filter(({ rewritable }) => !isEmpty(rewritable))
+    .map(({ described, rewritable }) => `${described.name} (${rewritable.join(', ')})`);
+  if (isEmpty(sources)) {
+    return 'Rewritable: nothing; you cannot translate or rewrite text here.';
+  }
+  return `Rewritable: ${LISTING.format(sources)}.`;
 }
 
 /**
@@ -376,16 +497,18 @@ function collectionHeading({ name, segment, operations }: DashboardCollection): 
 }
 
 /**
- * The facts line of a collection: its label fields, whether it is translatable, and its opened fields.
+ * The facts line of a collection: label fields, translatable or not, the opened and the rewritable fields.
  */
 function collectionFacts(
   { labelFields, translatable }: DashboardCollection,
   opened: readonly string[],
+  rewritable: readonly string[],
 ): string {
   const facts: string[] = [];
   if (!isEmpty(labelFields)) facts.push(`Label: ${labelFields.join(', ')}.`);
   if (translatable) facts.push('Translatable.');
   if (!isEmpty(opened)) facts.push(`Data: ${opened.join(', ')}.`);
+  if (!isEmpty(rewritable)) facts.push(`Rewritable: ${rewritable.join(', ')}.`);
   return facts.join(' ');
 }
 

@@ -1,6 +1,8 @@
+import type { FlowAct, Prompt } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
 
-import { formatDatePattern, isEmpty } from 'ohnejs/utils';
+import { promptText, useSkills } from 'ohnejs';
+import { formatDatePattern, isEmpty, isUndefined } from 'ohnejs/utils';
 
 import type { PromptBlock } from '../providers/provider.ts';
 
@@ -23,7 +25,10 @@ export interface TurnContext {
   page: string;
 }
 
-const SKILL_TAG = /<skill\b/gi;
+/**
+ * The opening of a fence the person must not forge: a skill's or a flow node's.
+ */
+const FENCE_TAG = /<(?=(?:skill|flow)\b)/gi;
 
 /**
  * Builds the system prompt of one step: guard, operator, instructions, surface, then the turn context.
@@ -51,11 +56,39 @@ export function buildPrompt(surface: string, context: TurnContext): PromptBlock[
 
 /**
  * The text of the person's message: the skill's fence first when one starts the turn, then the input.
- * A `<skill` the person typed is escaped, so nobody forges a skill's authority from the palette.
+ * A `<skill` or `<flow` the person typed is escaped, so nobody forges a fence's authority from the palette.
  */
-export function userMessage(input: string, skill?: { name: string; prompt: string }): string {
-  const typed = input.replace(SKILL_TAG, '&lt;skill');
+export function userMessage(input: string, skill?: { name: string; prompt: Prompt }): string {
+  const typed = escapeFences(input);
   return skill ? `${skillFence(skill.name, skill.prompt)}\n\n${typed}` : typed;
+}
+
+/**
+ * The message that enters a flow's act node: its fence, then the person's input when `input` is given.
+ * The fence holds the node's skill as its own fence and the node's prompt, whichever it names.
+ * The input follows on the first message of a transcript; a later node adds its fence alone.
+ *
+ * @example
+ * ```ts
+ * nodeMessage('raid-officer', 'roster', { prompt: 'Answer from Characters.', tiers: ['read'] }, 'Who is 60?')
+ * // -> '<flow name="raid-officer" node="roster">\nAnswer from Characters.\n</flow>\n\nWho is 60?'
+ * ```
+ */
+export function nodeMessage(flow: string, node: string, act: FlowAct, input?: string): string {
+  const skill = isUndefined(act.skill) ? undefined : useSkills().get(act.skill)?.skill;
+  const body = [
+    ...(isUndefined(skill) ? [] : [skillFence(act.skill as string, skill.prompt)]),
+    ...(isUndefined(act.prompt) ? [] : [promptText(act.prompt)]),
+  ].join('\n\n');
+  const fence = `<flow name="${flow}" node="${node}">${body === '' ? '' : `\n${body}\n`}</flow>`;
+  return isUndefined(input) ? fence : `${fence}\n\n${escapeFences(input)}`;
+}
+
+/**
+ * The typed text with every fence opening escaped.
+ */
+function escapeFences(input: string): string {
+  return input.replace(FENCE_TAG, '&lt;');
 }
 
 /**
@@ -67,8 +100,8 @@ export function userMessage(input: string, skill?: { name: string; prompt: strin
  * // -> '<skill name="translate-items">\nTranslate every item.\n</skill>'
  * ```
  */
-export function skillFence(name: string, prompt: string): string {
-  return `<skill name="${name}">\n${prompt.trim()}\n</skill>`;
+export function skillFence(name: string, prompt: Prompt): string {
+  return `<skill name="${name}">\n${promptText(prompt)}\n</skill>`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert';
+import { strictEqual } from 'node:assert';
 import { after, describe, it } from 'node:test';
 
 import turnsPost from '../../../src/ai/api/ai/turns/index.post.ts';
@@ -91,7 +91,7 @@ describe('runStep', () => {
           if (message.event === 'text') controller.abort();
         }
         await opened.drain();
-        ok((await loadTurn(id))?.closedAt !== null);
+        strictEqual((await loadTurn(id))?.reason, 'left');
         const next = await open();
         strictEqual(next.status, 429);
         await next.drain();

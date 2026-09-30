@@ -42,11 +42,25 @@ export function hasModelKey(name: string): boolean {
  * ```
  */
 export function useProvider(name: string): Provider {
-  const entry = modelEntry(name);
-  if (isUndefined(entry)) throw ohneError(`Unknown model \`${name}\``);
+  const { entry, options } = modelOptions(name);
   if (entry.provider === 'jev') {
     throw ohneError(`The \`jev\` model \`${name}\` answers flow decisions only`);
   }
+  return FACTORIES[entry.provider](options);
+}
+
+/**
+ * The `ai.models` entry `name` and what its provider is built from, the key read from the env at this call.
+ * It throws for a name `ai.models` lacks, and for a key whose env var is unset.
+ *
+ * @example
+ * ```ts
+ * modelOptions('router').entry.provider // -> 'jev'
+ * ```
+ */
+export function modelOptions(name: string): { entry: AIModel; options: ProviderOptions } {
+  const entry = modelEntry(name);
+  if (isUndefined(entry)) throw ohneError(`Unknown model \`${name}\``);
   const key = entry.key === false ? undefined : readKey(entry.key);
   if (entry.key !== false && isUndefined(key)) {
     throw ohneError({
@@ -55,7 +69,7 @@ export function useProvider(name: string): Provider {
     });
   }
   const { model, baseURL, headers, options } = entry;
-  return FACTORIES[entry.provider]({ model, key, baseURL, headers, options });
+  return { entry, options: { model, key, baseURL, headers, options } };
 }
 
 /**

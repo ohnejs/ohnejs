@@ -1,4 +1,4 @@
-import type { OhneError } from 'ohnejs';
+import type { FlowQuestion, OhneError } from 'ohnejs';
 
 import { ohneError } from 'ohnejs';
 import { hasKey, isUndefined } from 'ohnejs/utils';
@@ -326,6 +326,68 @@ export interface Completion {
 }
 
 /**
+ * The questions a decide node asks about one message.
+ */
+export interface DecideRequest {
+  /**
+   * The message to judge: what the person typed, and nothing a request answered.
+   */
+  input: string;
+
+  /**
+   * The questions by name, as the flow declares them.
+   */
+  questions: Record<string, FlowQuestion>;
+}
+
+/**
+ * The answer to one question of a decide node.
+ */
+export interface DecideAnswer {
+  /**
+   * The option picked: a `choice` option, a `score` level, or `yes` and `no`.
+   */
+  answer: string;
+
+  /**
+   * How sure the model is, from `0` to `1`, which a branch's `below` threshold reads.
+   */
+  confidence: number;
+}
+
+/**
+ * The answers to a `DecideRequest`.
+ */
+export interface Decision {
+  /**
+   * One answer per question, by name.
+   */
+  answers: Record<string, DecideAnswer>;
+
+  /**
+   * The tokens the call consumed.
+   */
+  usage: Usage;
+
+  /**
+   * The model that answered, as the provider names it.
+   */
+  model: string;
+}
+
+/**
+ * One model that answers a decide node's questions.
+ * A failure throws a `ProviderError`; an answer outside the questions' options throws `malformed`.
+ */
+export interface Decider {
+  /**
+   * Answers every question about the request's input, in one call.
+   * Aborting `signal` rejects with the signal's reason.
+   */
+  decide(request: DecideRequest, signal: AbortSignal): Promise<Decision>;
+}
+
+/**
  * One model behind one API, with the key already resolved.
  * A failure throws a `ProviderError`.
  * A step the provider answered but cut short ends in a `done` that says so in its `stop`.
@@ -476,4 +538,43 @@ export function isProviderError(value: unknown): value is ProviderError {
  */
 export function usageCost(usage: Usage): number {
   return usage.fresh + usage.cacheWrite + usage.output + Math.ceil(usage.cacheRead / 10);
+}
+
+/**
+ * The sum of two usages.
+ *
+ * @example
+ * ```ts
+ * addUsage(
+ *   { fresh: 1, cacheRead: 2, cacheWrite: 3, output: 4 },
+ *   { fresh: 1, cacheRead: 0, cacheWrite: 0, output: 1 },
+ * )
+ * // -> { fresh: 2, cacheRead: 2, cacheWrite: 3, output: 5 }
+ * ```
+ */
+export function addUsage(a: Usage, b: Usage): Usage {
+  return {
+    fresh: a.fresh + b.fresh,
+    cacheRead: a.cacheRead + b.cacheRead,
+    cacheWrite: a.cacheWrite + b.cacheWrite,
+    output: a.output + b.output,
+  };
+}
+
+/**
+ * A request's input as fresh tokens, estimated at four characters a token.
+ * For a call that ended before the provider reported its usage, since the provider bills it all the same.
+ *
+ * @example
+ * ```ts
+ * estimatedUsage({ input: 'Translate' }) // -> { fresh: 6, cacheRead: 0, cacheWrite: 0, output: 0 }
+ * ```
+ */
+export function estimatedUsage(request: unknown): Usage {
+  return {
+    fresh: Math.ceil(JSON.stringify(request).length / 4),
+    cacheRead: 0,
+    cacheWrite: 0,
+    output: 0,
+  };
 }

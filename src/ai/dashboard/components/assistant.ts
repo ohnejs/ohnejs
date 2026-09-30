@@ -5,14 +5,17 @@ import type { Approval, SendTransport } from './send-queue.ts';
 import type { BatchResult, TurnBatch } from './turn-store.ts';
 
 import { aiMeta } from './_ai-meta.ts';
+import { turnModel } from './_ai-model-pick.ts';
 import { fetchWithRetry, postResults, sendBatch } from './send-queue.ts';
 import {
   applyTurnEvent,
+  clearTurns,
   currentTurn,
   markTurn,
   nextStep,
   openTurn,
   pendingBatch,
+  runsUnasked,
   sending,
   settleBatch,
   turnSettled,
@@ -38,19 +41,56 @@ const REASONS: Readonly<Record<number, string>> = {
 };
 
 /**
+ * Options for `ask`.
+ */
+export interface AskOptions {
+  /**
+   * The skill whose instructions start the turn.
+   */
+  skill?: string;
+
+  /**
+   * The flow the turn walks from its start.
+   */
+  flow?: string;
+
+  /**
+   * The id of the settled turn this one follows up on, so the model continues that conversation.
+   */
+  after?: string;
+}
+
+/**
  * Asks the assistant: opens a turn for `input` on the server and streams its first step into the store.
- * `skill` starts the turn with that skill's instructions.
- * A read batch runs at once; any other waits in the palette for the person.
+ * The turn plans on the model the person picked, when it is not the app's default.
+ * A `skill` starts it with that skill's instructions; a `flow` walks that flow instead.
+ * A follow-up the server cannot continue answers `409`, and the question is then asked afresh.
+ * A batch of reads and `auto` writes runs at once; any other waits in the palette for the person.
  * Nothing happens while a turn still runs, since the store follows one turn at a time.
  */
-export async function ask(input: string, skill?: string): Promise<void> {
+export async function ask(input: string, { skill, flow, after }: AskOptions = {}): Promise<void> {
   if (!untracked(turnSettled)) return;
-  openTurn(input, skill ?? null);
+  if (isUndefined(after)) clearTurns();
+  openTurn(input, { skill, flow });
   const page = useRoute()?.path ?? '/';
-  const body = { input, page, ...(isUndefined(skill) ? {} : { skill }) };
+  const model = untracked(turnModel);
+  const open = (follows?: string): Promise<Response> =>
+    fetchWithRetry(
+      TRANSPORT,
+      'POST /ai/turns',
+      json({
+        input,
+        page,
+        ...(isUndefined(model) ? {} : { model }),
+        ...(isUndefined(skill) ? {} : { skill }),
+        ...(isUndefined(flow) ? {} : { flow }),
+        ...(isUndefined(follows) ? {} : { after: follows }),
+      }),
+    );
   let response: Response;
   try {
-    response = await fetchWithRetry(TRANSPORT, 'POST /ai/turns', json(body));
+    response = await open(after);
+    if (response.status === 409 && !isUndefined(after)) response = await open();
   } catch {
     markTurn('error', 'network');
     return;
@@ -77,7 +117,7 @@ export async function answer(batch: TurnBatch, approvals: readonly Approval[]): 
     });
   } catch {
     sending.value = null;
-    markTurn('error', 'network');
+    markTurn('error', 'internal');
     return;
   }
   sending.value = null;
@@ -107,7 +147,7 @@ export function decline(batch: TurnBatch, note?: string): Promise<void> {
 }
 
 /**
- * Reads one step's stream into the store, then runs a read batch without asking.
+ * Reads one step's stream into the store, then runs a batch of reads and `auto` writes without asking.
  * A refused request fails the turn with the reason its status names.
  */
 async function consume(response: Response): Promise<void> {
@@ -123,7 +163,7 @@ async function consume(response: Response): Promise<void> {
   }
   if (currentTurn()?.status === 'streaming') markTurn('error', 'network');
   const batch = pendingBatch();
-  if (!isUndefined(batch) && batch.kind === 'read') {
+  if (!isUndefined(batch) && runsUnasked(batch)) {
     await answer(
       batch,
       batch.proposals.map(() => ({ send: true })),

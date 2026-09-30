@@ -60,6 +60,7 @@ export interface Receipt {
 
   /**
    * The answer's status, or `400` for a proposal the server refused before it was sent.
+   * `0` when the connection dropped before the answer, so the request may have run.
    * Absent when the person declined the proposal.
    */
   status?: number;
@@ -110,6 +111,21 @@ export interface Receipt {
   truncated?: true;
 
   /**
+   * How many records a transform rewrote and the person sent.
+   */
+  transformed?: number;
+
+  /**
+   * How many records a transform reached but did not write: skipped, left unchecked, or failed.
+   */
+  skipped?: number;
+
+  /**
+   * How many records a transform matched past its limit and never read, to propose again.
+   */
+  unreached?: number;
+
+  /**
    * Set when the person declined the proposal.
    */
   declined?: true;
@@ -126,7 +142,7 @@ export interface Receipt {
 export type BatchResult =
   | {
       /**
-       * The answer's status.
+       * The answer's status, `0` when the connection dropped before it.
        */
       status: number;
 
@@ -134,6 +150,11 @@ export type BatchResult =
        * The answer's JSON body, when it had one.
        */
       body?: unknown;
+
+      /**
+       * Set when the browser sent the request without asking, as the proposal's `auto` allowed.
+       */
+      auto?: true;
     }
   | {
       /**
@@ -195,6 +216,8 @@ export function refusal(route: string, code: string, path?: string): Receipt {
  * A `2xx` carries counts, and ids when the proposal's filter passed the identity rule.
  * With `values`, it also carries the records it answered, redacted, for a collection `ai.data` opens.
  * A `400` carries its code and path, a `422` its failing field paths; any other status stands alone.
+ * A write by set carries the rows it wrote whatever its status, since a failed row never undoes the rest.
+ * A transform likewise carries the records it rewrote and the ones it did not.
  * A decline carries the person's note.
  * Nothing else of the body reaches the model.
  * Valid only within a request.
@@ -216,6 +239,13 @@ export async function shapeReceipt(
   receipt.status = result.status;
   const body = isPlainObject(result.body) ? result.body : undefined;
   const data = isPlainObject(body?.data) ? body.data : undefined;
+  if (!isUndefined(proposal.transform)) {
+    if (isInteger(body?.transformed)) receipt.transformed = body.transformed;
+    if (isInteger(body?.skipped)) receipt.skipped = body.skipped;
+    if (isInteger(body?.unreached) && body.unreached > 0) receipt.unreached = body.unreached;
+  } else if (!isUndefined(proposal.where) && isInteger(body?.total)) {
+    receipt.total = body.total;
+  }
   if (result.status === 400 && !isUndefined(data)) {
     if (isString(data.code)) receipt.code = data.code.slice(0, MAX_TEXT);
     if (isString(data.path)) receipt.path = data.path.slice(0, MAX_TEXT);
@@ -232,7 +262,6 @@ export async function shapeReceipt(
     if (route.pattern.endsWith('/translations') && isArray(body?.locales)) {
       receipt.locales = body.locales.filter(isString);
     }
-    if (!isUndefined(proposal.where) && isInteger(body?.total)) receipt.total = body.total;
     const { collection } = route;
     const records = values && !isUndefined(collection) ? answeredRecords(result.body) : null;
     if (!isNull(records) && !isUndefined(collection)) {

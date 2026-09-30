@@ -9,7 +9,6 @@ import {
   isUndefined,
   isUUID,
   parseBytes,
-  parseDuration,
 } from 'ohnejs/utils';
 
 import type { BatchResult } from '../../../../turns/receipts.ts';
@@ -19,9 +18,10 @@ import { useAIConfig } from '../../../../config.ts';
 import { hasModelKey, useProvider } from '../../../../providers/use-provider.ts';
 import { acquireStepPermit, probeTokens } from '../../../../turns/limits.ts';
 import {
+  activeModel,
   batchReported,
   claimStep,
-  closeTurn,
+  expireTurn,
   loadTurn,
   turnGone,
   unknownBatch,
@@ -39,23 +39,25 @@ const MAX_NOTE = 1_000;
 const ENVELOPE = 64 * 1024;
 
 const BODY_KEYS = new Set(['batch', 'results']);
-const RESULT_KEYS = new Set(['status', 'body', 'declined', 'note']);
+const RESULT_KEYS = new Set(['status', 'body', 'auto', 'declined', 'note']);
 
 /**
  * `POST /ai/turns/[id]/results`
  *
  * Reports what the browser got for a batch's proposals and streams the next step, as `POST /ai/turns` does.
  * The body is `{ batch, results }`, one result per proposal in order.
- * A result is `{ status, body? }`, or `{ declined, note? }` when the person declined the proposal.
+ * A result is `{ status, body?, auto? }`, or `{ declined, note? }` when the person declined the proposal.
+ * `auto: true` says the browser sent it without asking, and only a proposal tagged `auto` may carry it.
+ * Status `0` reports a request whose connection dropped before it answered, so it may have run.
  * The server shapes each into the receipt the model reads.
  * A body reaches it only as the redacted records of a collection `ai.data` opens.
  * On a `data: false` model no body reaches it at all.
  * Needs `ai.use`: no user `401`, a missing capability `403`.
- * A turn that is unknown, closed, idle past `ai.limits.turnTimeout`, or someone else's is a `409`.
+ * A turn that is unknown, closed, idle past `ai.limits.turnTimeout`, lost, or someone else's is a `409`.
  * So is a batch that already has its results, or an id the turn never produced; `data.code` names which.
  * A body that is not an object, an unknown key, a bad result, or the wrong number of them is a `400`.
  * A person past `ai.limits.tokens`, or already streaming two steps, is a `429`.
- * A model whose key is unset is a `503`.
+ * A model whose key is unset is a `503`; a flow turn runs on its node's model.
  * The body may hold every proposal's answer up to `ai.limits.resultSize`, so its cap is raised to fit them.
  */
 export default defineHandler(
@@ -73,11 +75,7 @@ export default defineHandler(
     }
     const turn = isUUID(params.id) ? await loadTurn(params.id) : undefined;
     if (isUndefined(turn) || turn.user !== user.UUID || !isNull(turn.closedAt)) throw turnGone();
-    const { limits } = useAIConfig();
-    if (Date.now() - turn.updatedAt > parseDuration(limits.turnTimeout)) {
-      await closeTurn(turn);
-      throw turnGone();
-    }
+    if (await expireTurn(turn)) throw turnGone();
     const pending = turn.batches.at(-1);
     if (isUndefined(pending) || pending.id !== batch) {
       throw turn.batches.some((entry) => entry.id === batch)
@@ -88,14 +86,20 @@ export default defineHandler(
     if (results.length !== pending.proposals.length) {
       throw badRequest(translate('ai.api.resultsMismatch'));
     }
-    if (!hasModelKey(turn.model)) {
-      throw new HTTPError(503, translate('ai.api.modelUnavailable', { model: turn.model }));
+    if (
+      results.some((result, index) => isAuto(result) && !pending.proposals[index].proposal.auto)
+    ) {
+      throw badRequest(translate('ai.api.invalidBody', { key: 'results' }));
+    }
+    const model = activeModel(turn);
+    if (!hasModelKey(model)) {
+      throw new HTTPError(503, translate('ai.api.modelUnavailable', { model }));
     }
     await probeTokens(user);
-    const provider = useProvider(turn.model);
+    const provider = useProvider(model);
     const release = acquireStepPermit(user);
     try {
-      const answers = await answerBatch(pending, results, provider, turn.model);
+      const answers = await answerBatch(pending, results, provider, model);
       turn.transcript = [...turn.transcript, ...answers];
       if (!(await claimStep(turn))) throw batchReported();
     } catch (error) {
@@ -108,7 +112,7 @@ export default defineHandler(
 );
 
 /**
- * Whether `value` is one result: an answer with a whole-number status, or a decline with an optional note.
+ * Whether `value` is one result: an answer with an HTTP status or `0`, or a decline with an optional note.
  */
 function isResult(value: unknown): value is BatchResult {
   if (!isPlainObject(value)) return false;
@@ -116,15 +120,27 @@ function isResult(value: unknown): value is BatchResult {
     if (!RESULT_KEYS.has(key)) return false;
   }
   if (value.declined === true) {
-    return isUndefined(value.status) && isUndefined(value.body) && isNote(value.note);
+    return (
+      isUndefined(value.status) &&
+      isUndefined(value.body) &&
+      isUndefined(value.auto) &&
+      isNote(value.note)
+    );
   }
   return (
     isUndefined(value.declined) &&
     isUndefined(value.note) &&
+    (isUndefined(value.auto) || value.auto === true) &&
     isInteger(value.status) &&
-    value.status >= 100 &&
-    value.status <= 599
+    (value.status === 0 || (value.status >= 100 && value.status <= 599))
   );
+}
+
+/**
+ * Whether `result` reports a request the browser sent without asking.
+ */
+function isAuto(result: BatchResult): boolean {
+  return 'auto' in result && result.auto === true;
 }
 
 /**

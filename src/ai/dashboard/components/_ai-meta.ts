@@ -26,6 +26,11 @@ export interface AIMeta {
   models: string[];
 
   /**
+   * The `ai.models` entries a transform may run on: those of `models` that may see record values.
+   */
+  transformModels: string[];
+
+  /**
    * The `ai.models` entry every transform runs on, when `ai.transform.model` pins one.
    */
   transformModel?: string;
@@ -34,6 +39,11 @@ export interface AIMeta {
    * The skills the person may start, in the viewer's language.
    */
   skills: AISkillMeta[];
+
+  /**
+   * The flows the person may start, in the viewer's language.
+   */
+  flows: AIFlowMeta[];
 
   /**
    * The most bytes one answer may carry into a results post, `ai.limits.resultSize` resolved.
@@ -57,6 +67,26 @@ export interface AISkillMeta {
 
   /**
    * What the skill does.
+   */
+  description: string;
+}
+
+/**
+ * A flow as the palette lists it.
+ */
+export interface AIFlowMeta {
+  /**
+   * The flow's name, typed after `/` to start it.
+   */
+  name: string;
+
+  /**
+   * The flow's title, or its name in sentence case when it declares none.
+   */
+  title: string;
+
+  /**
+   * What the flow does.
    */
   description: string;
 }

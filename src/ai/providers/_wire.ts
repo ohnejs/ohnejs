@@ -82,6 +82,35 @@ export async function postEvents(
 }
 
 /**
+ * Posts `body` and returns the parsed JSON of the answer.
+ * It fails as `postEvents` does, and an answer that is not JSON throws `malformed`.
+ */
+export async function postJSON(url: string, options: PostOptions): Promise<unknown> {
+  const { headers, body, signal, billing } = options;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (error) {
+    signal.throwIfAborted();
+    throw providerError({ code: 'network', message: networkMessage(error), retry: true });
+  }
+  if (!response.ok) throw await statusError(response, billing);
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    signal.throwIfAborted();
+    throw providerError({ code: 'stream', message: networkMessage(error), retry: true });
+  }
+  return parseJSON(text, 'The answer');
+}
+
+/**
  * Runs a reader to its end and returns what it returned, dropping the text it yields.
  */
 export async function drain<T>(reader: AsyncGenerator<unknown, T>): Promise<T> {

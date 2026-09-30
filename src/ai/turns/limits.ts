@@ -49,12 +49,19 @@ export async function enforceTurnsLimit(user: User): Promise<void> {
  * Asked before every step, so a person past `ai.limits.tokens` runs no more of them.
  */
 export async function probeTokens(user: User): Promise<void> {
-  const { tokens } = rateLimiters();
-  if (tokens === false) return;
-  const wait = await tokens.charge(user.UUID, 0);
+  const wait = await tokenWait(user);
   if (wait === 0) return;
   useResponse().headers.set('Retry-After', String(Math.ceil(wait / 1000)));
   throw tooManyRequests();
+}
+
+/**
+ * How long the person waits before `ai.limits.tokens` admits another call, `0` while it does; counts nothing.
+ * A stream asks it between provider calls, where a `429` can no longer be answered.
+ */
+export async function tokenWait(user: User): Promise<number> {
+  const { tokens } = rateLimiters();
+  return tokens === false ? 0 : tokens.charge(user.UUID, 0);
 }
 
 /**

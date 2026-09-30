@@ -18,10 +18,13 @@ import {
 } from 'ohnejs/dashboard';
 import {
   chunk,
+  isArray,
+  isNull,
   isPlainObject,
   isString,
   isUndefined,
   parseRouteID,
+  recordHref,
   ref,
   untracked,
 } from 'ohnejs/utils';
@@ -32,7 +35,9 @@ import type { Proposal, TurnBatch } from './turn-store.ts';
 
 import { useAIT } from './_ai-messages.ts';
 import { collectionOfRoute } from './_ai-meta.ts';
+import { transformTable } from './_ai-transform-table.ts';
 import { describeWhere, expandSet } from './expand-set.ts';
+import { currentTurn } from './turn-store.ts';
 
 /**
  * Options for `approvalTable`.
@@ -80,6 +85,14 @@ interface Change {
 type Armed = 'selected' | 'all' | null;
 
 /**
+ * The rows of every write, and the writes whose records could not be loaded.
+ */
+interface LoadedRows {
+  rows: ApprovalRow[];
+  failed: ReadonlySet<number>;
+}
+
+/**
  * How many records one read of current values asks for.
  */
 const PAGE = 50;
@@ -117,6 +130,11 @@ css`
 
   .o-approval-filter {
     color: hsl(var(--ohne-muted-foreground));
+    font-weight: 400;
+  }
+
+  .o-approval-error {
+    color: hsl(var(--ohne-destructive));
     font-weight: 400;
   }
 
@@ -170,7 +188,9 @@ css`
 /**
  * The approval table of one batch: every write it proposes, one row per record it reaches.
  * A write by set expands into its rows; a row outside the person's reach is greyed and never sent.
+ * A set whose records fail to load shows an error line and no rows, so it cannot be approved.
  * An update shows each field's current value beside the proposed one, when the person may read it.
+ * A transform gets its own table, run by the model, whose checked and edited records the approval carries.
  * The person approves the selected rows, every row, or declines with a note; a destructive batch asks twice.
  * A read in the batch runs whatever the person decides, since reads never ask.
  */
@@ -178,15 +198,25 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
   const t = useAIT();
   const current = untracked(batch);
   const destructive = current.kind === 'destructive';
-  const writes = current.proposals
-    .map((proposal, index) => ({ proposal, index }))
-    .filter(({ proposal }) => proposal.tier !== 'read');
+  const listed = current.proposals.map((proposal, index) => ({ proposal, index }));
+  const writes = listed.filter(
+    ({ proposal }) => proposal.tier !== 'read' && isUndefined(proposal.transform),
+  );
+  const turn = untracked(currentTurn)?.id ?? '';
+  const transforms = listed
+    .filter(({ proposal }) => !isUndefined(proposal.transform))
+    .map(({ proposal, index }) => ({
+      index,
+      table: transformTable(proposal, { turn, batch: current.id, index, pinned: current.pinned }),
+    }));
   const rows = ref<ApprovalRow[] | null>(null);
+  const failed = ref<ReadonlySet<number>>(new Set());
   const selected = ref<Record<string, boolean>>({});
   const note = ref('');
   const armed = ref<Armed>(null);
   void loadRows(writes).then((loaded) => {
-    rows.value = loaded;
+    failed.value = loaded.failed;
+    rows.value = loaded.rows;
   });
 
   const rowOf = (id: number | string): ApprovalRow | undefined =>
@@ -197,11 +227,18 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
     const count = chosen().length;
     return count === 0 ? false : count === mine().length ? true : 'indeterminate';
   };
+  const mineCount = (): number =>
+    transforms.reduce((sum, { table }) => sum + table.mine(), mine().length);
+  const chosenCount = (): number =>
+    transforms.reduce((sum, { table }) => sum + table.chosen(), chosen().length);
+  const busy = (): boolean => transforms.some(({ table }) => table.busy());
 
-  const approve = (picked: ApprovalRow[]): void => {
+  const approve = (picked: ApprovalRow[], all: boolean): void => {
     options.onApprove(
       current.proposals.map((proposal, index) => {
         if (proposal.tier === 'read') return { send: true };
+        const transform = transforms.find((entry) => entry.index === index);
+        if (!isUndefined(transform)) return transform.table.approval(all);
         const own = picked.filter((row) => row.proposal === index);
         if (own.length === 0) return { send: false };
         if (isUndefined(proposal.where)) return { send: true };
@@ -214,7 +251,7 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       armed.value = which;
       return;
     }
-    approve(which === 'all' ? untracked(mine) : untracked(chosen));
+    approve(which === 'all' ? untracked(mine) : untracked(chosen), which === 'all');
   };
   const label = (which: 'selected' | 'all'): string =>
     armed.value === which
@@ -259,16 +296,28 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
   return h(
     'div',
     { class: `o-approval${destructive ? ' o-approval-destructive' : ''}` },
-    h(
-      'div',
-      { class: 'o-approval-header' },
-      writes.map(({ proposal, index }) => headerLine(proposal, index, rows, t)),
-    ),
     when(
-      () => rows.value !== null,
-      () => h('div', { class: 'o-approval-rows' }, grid.root),
-      () => h('div', { class: 'ohne-muted' }, () => t('ai.dashboard.batch.loading')),
+      () => writes.length > 0,
+      () => [
+        h(
+          'div',
+          { class: 'o-approval-header' },
+          writes.map(({ proposal, index }) =>
+            headerLine(proposal, index, rows, () => failed.value.has(index), t),
+          ),
+        ),
+        when(
+          () => !isNull(rows.value),
+          () =>
+            when(
+              () => (rows.value ?? []).length > 0 || failed.value.size === 0,
+              () => h('div', { class: 'o-approval-rows' }, grid.root),
+            ),
+          () => h('div', { class: 'ohne-muted' }, () => t('ai.dashboard.batch.loading')),
+        ),
+      ],
     ),
+    transforms.map(({ table }) => table.root),
     textArea(note, { placeholder: () => t('ai.dashboard.batch.note'), rows: 1, size: -1 }),
     h(
       'div',
@@ -276,32 +325,43 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       button(() => label('selected'), {
         variant: destructive ? 'destructive' : 'primary',
         size: -1,
-        disabled: () => chosen().length === 0,
+        disabled: () => busy() || chosenCount() === 0,
         onClick: () => act('selected'),
       }),
       button(() => label('all'), {
         variant: destructive ? 'destructive' : 'secondary',
         size: -1,
-        disabled: () => mine().length === 0,
+        disabled: () => busy() || mineCount() === 0,
         onClick: () => act('all'),
       }),
       button(() => t('ai.dashboard.batch.decline'), {
         variant: 'outline',
         size: -1,
-        onClick: () => options.onDecline(untracked(() => note.value)),
+        onClick: () => {
+          for (const { table } of transforms) table.stop();
+          options.onDecline(untracked(() => note.value));
+        },
       }),
     ),
   );
 }
 
 /**
+ * The fields one write sets, each with its proposed value, as a row of the table lists them.
+ */
+export function proposedChanges(proposal: Proposal): Child {
+  return proposed(proposal, collectionOfRoute(proposal.route) ?? null).map(changeLine);
+}
+
+/**
  * The header line of one write: what it does to how many records of which collection.
- * A write by set adds its filter in words.
+ * A write by set adds its filter in words, and an error line when its records failed to load.
  */
 function headerLine(
   proposal: Proposal,
   index: number,
   rows: { value: ApprovalRow[] | null },
+  failed: () => boolean,
   t: AITranslate,
 ): Child {
   const collection = collectionOfRoute(proposal.route);
@@ -333,17 +393,24 @@ function headerLine(
       () => filter() !== '',
       () => h('span', { class: 'o-approval-filter' }, () => `: ${filter()}`),
     ),
+    when(failed, () =>
+      h('div', { class: 'o-approval-error', role: 'alert' }, () =>
+        t('ai.dashboard.batch.loadFailed'),
+      ),
+    ),
   );
 }
 
 /**
  * The rows of every write: a write by set expanded, a record named, or the record a create makes.
  * An update then reads the current values of the fields it sets, one page of records at a time.
+ * A write by set whose expansion fails gets no rows and is listed as failed.
  */
 async function loadRows(
   writes: readonly { proposal: Proposal; index: number }[],
-): Promise<ApprovalRow[]> {
+): Promise<LoadedRows> {
   const rows: ApprovalRow[] = [];
+  const failed = new Set<number>();
   for (const { proposal, index } of writes) {
     const verb = verbOf(proposal);
     const collection = collectionOfRoute(proposal.route) ?? null;
@@ -369,6 +436,10 @@ async function loadRows(
         page: (body) => loadPage(collection.segment, body),
         verdict: async (UUIDs) => (await loadVerdicts(collection, UUIDs, locale))[operation],
       });
+      if (isUndefined(expanded)) {
+        failed.add(index);
+        continue;
+      }
       for (const row of expanded) {
         if (row.label !== '') seedLabel(collection.name, row.UUID, row.label);
         own.push({ ...base, id: `${index}:${row.UUID}`, UUID: row.UUID, mine: row.mine });
@@ -386,7 +457,7 @@ async function loadRows(
     if (verb === 'update') await fillChanges(own, proposal, collection, locale);
     rows.push(...own);
   }
-  return rows;
+  return { rows, failed };
 }
 
 /**
@@ -460,11 +531,11 @@ function changeLine(change: Change): HTMLElement {
  */
 function recordName(row: ApprovalRow, t: AITranslate): Child {
   if (row.collection === null) return dimMark('-');
-  const { name, segment } = row.collection;
+  const collection = row.collection;
   if (row.UUID === null) return dimMark(t('ai.dashboard.batch.newRecord'));
   const uuid = row.UUID;
-  return button(() => labelOf(name, uuid) ?? fallbackLabel(uuid), {
-    href: `/collections/${segment}/${uuid}`,
+  return button(() => labelOf(collection.name, uuid) ?? fallbackLabel(uuid), {
+    href: recordHref(collection, uuid),
     target: '_blank',
     variant: 'ghost',
     size: -2,
@@ -477,7 +548,7 @@ function recordName(row: ApprovalRow, t: AITranslate): Child {
 function formatValue(value: unknown): Child {
   if (isUndefined(value) || value === null || value === '') return dimMark('-');
   if (isString(value)) return value;
-  return isPlainObject(value) || Array.isArray(value) ? JSON.stringify(value) : String(value);
+  return isPlainObject(value) || isArray(value) ? JSON.stringify(value) : String(value);
 }
 
 /**

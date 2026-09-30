@@ -2,7 +2,9 @@ import type {
   CollectionName,
   Config,
   Env,
+  KnownAIModels,
   KnownCollections,
+  KnownRoutes,
   QueryFieldsOf,
   RouteRateLimit,
 } from 'ohnejs';
@@ -41,14 +43,24 @@ declare module 'ohnejs' {
       /**
        * The `models` entry the assistant plans with.
        * Omitted, or without its key, the palette is search only.
+       *
+       * @example
+       * ```ts
+       * model: 'claude'
+       * ```
        */
-      model?: string;
+      model?: AIModelKey;
 
       /**
        * The `models` entry that answers a flow's `decide` nodes, and the one entry that may be `jev`.
        * Omitted, `model` answers them with structured output.
+       *
+       * @example
+       * ```ts
+       * decide: 'router'
+       * ```
        */
-      decide?: string;
+      decide?: AIModelKey;
 
       /**
        * How a transform, a rewrite of text fields, runs.
@@ -58,8 +70,13 @@ declare module 'ohnejs' {
          * The `models` entry every transform runs on, whatever the person picked.
          * Pin one to keep record values with one provider.
          * Omitted, a transform runs on the turn's model.
+         *
+         * @example
+         * ```ts
+         * transform: { model: 'local' }
+         * ```
          */
-        model?: string;
+        model?: AIModelKey;
       };
 
       /**
@@ -67,6 +84,19 @@ declare module 'ohnejs' {
        *
        * @default
        * {}
+       *
+       * @example
+       * ```ts
+       * models: {
+       *   claude: { provider: 'anthropic', model: 'claude-opus-5-5', key: 'ANTHROPIC_API_KEY' },
+       *   local: {
+       *     provider: 'openai-compatible',
+       *     model: 'qwen3',
+       *     baseURL: 'http://localhost:11434/v1',
+       *     key: false,
+       *   },
+       * }
+       * ```
        */
       models?: Record<string, AIModel>;
 
@@ -76,6 +106,11 @@ declare module 'ohnejs' {
        *
        * @default
        * {}
+       *
+       * @example
+       * ```ts
+       * data: { Items: true, Characters: ['name', 'level'] }
+       * ```
        */
       data?: AIFields;
 
@@ -85,6 +120,11 @@ declare module 'ohnejs' {
        *
        * @default
        * []
+       *
+       * @example
+       * ```ts
+       * instructions: ['Never delete a Character; set `status` to `retired` instead.']
+       * ```
        */
       instructions?: string[];
 
@@ -144,6 +184,11 @@ declare module 'ohnejs' {
          *
          * @default
          * ['Users', 'Sessions', 'AITurns']
+         *
+         * @example
+         * ```ts
+         * deny: { collections: [...AI_DEFAULTS.deny.collections, 'Invoices'] }
+         * ```
          */
         collections?: LiteralUnion<Extract<keyof KnownCollections, string>>[];
       };
@@ -157,8 +202,17 @@ declare module 'ohnejs' {
        *
        * @default
        * AI_DEFAULTS.routes
+       *
+       * @example
+       * ```ts
+       * routes: {
+       *   ...AI_DEFAULTS.routes,
+       *   'DELETE /collections/[collection]/[uuid]': false,
+       *   'POST /reports/[name]': 'read',
+       * }
+       * ```
        */
-      routes?: Record<string, AITier | false>;
+      routes?: Partial<Record<LiteralUnion<Extract<keyof KnownRoutes, string>>, AITier | false>>;
 
       /**
        * Which writes run without asking, for a person who turned auto-accept on in their account.
@@ -166,6 +220,7 @@ declare module 'ohnejs' {
       autoAccept?: {
         /**
          * The most writes one turn applies without asking.
+         * A batch of writes that would pass it asks as a whole.
          *
          * @default
          * 0
@@ -178,11 +233,17 @@ declare module 'ohnejs' {
          *
          * @default
          * {}
+         *
+         * @example
+         * ```ts
+         * fields: { Items: ['name', 'tooltip'] }
+         * ```
          */
         fields?: AIFields;
 
         /**
          * The kinds of write that always ask, whatever `fields` allows.
+         * A write by set and a transform ask whatever this lists: the person sees their rows first.
          *
          * @default
          * ['destructive', 'set', 'locale', 'transform']
@@ -296,38 +357,131 @@ declare module 'ohnejs' {
 export type AIProvider = 'anthropic' | 'openai' | 'openai-compatible' | 'jev';
 
 /**
- * One model the assistant may run on.
+ * A `models` entry's name, as `ai.model`, `ai.decide` and a flow node take it.
+ * Suggests the names `ai.models` declares once codegen has run; any string is accepted until then.
  */
-export interface AIModel {
+export type AIModelKey = LiteralUnion<Extract<keyof KnownAIModels, string>>;
+
+/**
+ * One model the assistant may run on, shaped by its `provider`.
+ */
+export type AIModel = AnthropicModel | OpenAIModel | OpenAICompatibleModel | JevModel;
+
+/**
+ * A model served by the Anthropic Messages API.
+ */
+export interface AnthropicModel extends AIModelBase {
   /**
    * The provider API the model is served by.
    */
-  provider: AIProvider;
+  provider: 'anthropic';
 
   /**
-   * The model name as the provider's API takes it.
+   * The model id as the API takes it; the current Claude models are suggested.
+   *
+   * @example
+   * ```ts
+   * model: 'claude-opus-5-5'
+   * ```
+   */
+  model: LiteralUnion<
+    'claude-fable-5-1' | 'claude-opus-5-5' | 'claude-sonnet-5-5' | 'claude-haiku-4-5'
+  >;
+}
+
+/**
+ * A model served by the OpenAI Responses API.
+ */
+export interface OpenAIModel extends AIModelBase {
+  /**
+   * The provider API the model is served by.
+   */
+  provider: 'openai';
+
+  /**
+   * The model id as the API takes it.
    */
   model: string;
+}
 
+/**
+ * A model served by any Chat Completions API: Ollama, vLLM, LM Studio, OpenRouter, Groq, Mistral and more.
+ */
+export interface OpenAICompatibleModel extends AIModelBase {
+  /**
+   * The provider API the model is served by.
+   */
+  provider: 'openai-compatible';
+
+  /**
+   * The model id as the server takes it.
+   *
+   * @example
+   * ```ts
+   * model: 'qwen3'
+   * ```
+   */
+  model: string;
+}
+
+/**
+ * Jev, TypeSafe AI's decision model: it answers a flow's `decide` nodes and nothing else.
+ */
+export interface JevModel extends AIModelBase {
+  /**
+   * The provider API the model is served by.
+   */
+  provider: 'jev';
+
+  /**
+   * The Jev version, `jev-latest` for the newest.
+   */
+  model: LiteralUnion<'jev-latest'>;
+}
+
+/**
+ * What every `models` entry takes, whatever its provider.
+ */
+export interface AIModelBase {
   /**
    * The env var holding the API key, read at every call.
    * `false` sends no key, for a local server or one the `headers` authenticate with.
+   *
+   * @example
+   * ```ts
+   * key: 'ANTHROPIC_API_KEY'
+   * ```
    */
   key: LiteralUnion<Extract<keyof Env, string>> | false;
 
   /**
    * The API's origin, with the path prefix the provider's own SDK expects.
    * Omitted, the provider's public API.
+   *
+   * @example
+   * ```ts
+   * baseURL: 'http://localhost:11434/v1'
+   * ```
    */
   baseURL?: string;
 
   /**
    * Headers sent with every request, on top of the provider's own.
+   *
+   * @example
+   * ```ts
+   * headers: { 'HTTP-Referer': 'https://guild.example.com' }
+   * ```
    */
   headers?: Record<string, string>;
 
   /**
    * Provider-native request fields, deep-merged under the fields the layer sets.
+   *
+   * @example
+   * ```ts
+   * options: { output_config: { effort: 'high' } }
+   * ```
    */
   options?: Record<string, unknown>;
 
@@ -352,6 +506,11 @@ export interface AIModel {
 export type AIFields = {
   [C in CollectionName]?: true | Extract<keyof QueryFieldsOf<C>, string>[];
 };
+
+/**
+ * `AIFields` as the server reads it: by a collection name known only at runtime.
+ */
+export type ResolvedAIFields = Partial<Record<string, true | string[]>>;
 
 /**
  * What a proposed request may do, and so how the person approves it.
@@ -404,7 +563,7 @@ export interface ResolvedAIConfig {
   /**
    * The collections whose values may reach a model.
    */
-  data: AIFields;
+  data: ResolvedAIFields;
 
   /**
    * The app's own lines, closest layer first.
@@ -454,7 +613,7 @@ export interface ResolvedAIConfig {
   /**
    * Route globs mapped to their tier, or `false` to forbid.
    */
-  routes: Record<string, AITier | false>;
+  routes: Partial<Record<string, AITier | false>>;
 
   /**
    * Which writes run without asking.
@@ -468,7 +627,7 @@ export interface ResolvedAIConfig {
     /**
      * The collections and fields whose writes may run without asking.
      */
-    fields: AIFields;
+    fields: ResolvedAIFields;
 
     /**
      * The kinds of write that always ask.

@@ -28,8 +28,24 @@ export interface SendTransport {
 }
 
 /**
+ * One record a transform writes, with the body the person approved.
+ */
+export interface ApprovedRecord {
+  /**
+   * The record's `UUID`.
+   */
+  UUID: string;
+
+  /**
+   * The fields to update, each with the value the person approved.
+   */
+  body: Record<string, unknown>;
+}
+
+/**
  * What the person decided for one proposal.
- * A write by set names the rows to write; without them nothing is sent.
+ * A write by set names the rows to write, a transform the records with their bodies.
+ * Without them nothing is sent.
  */
 export type Approval =
   | {
@@ -42,6 +58,17 @@ export type Approval =
        * The rows a write by set writes, in order.
        */
       UUIDs?: readonly string[];
+
+      /**
+       * The records a transform writes, in order.
+       */
+      records?: readonly ApprovedRecord[];
+
+      /**
+       * How many records the transform's filter matched, and how many of them it reached.
+       * The result counts the reached ones it did not write, and the ones past its limit.
+       */
+      counts?: { matched: number; reached: number };
     }
   | {
       /**
@@ -75,7 +102,7 @@ export interface OutgoingRequest {
  */
 export interface Answer {
   /**
-   * The answer's status.
+   * The answer's status, `0` when the connection dropped before it, so the request may have run.
    */
   status: number;
 
@@ -163,12 +190,18 @@ export async function fetchWithRetry(
 
 /**
  * Sends one request and reads its answer; a body that is not JSON reads as none.
+ * A dropped connection answers status `0`, never a rerun.
  */
 export async function sendRequest(
   transport: SendTransport,
   request: OutgoingRequest,
 ): Promise<Answer> {
-  const response = await fetchWithRetry(transport, request.route, request.init);
+  let response: Response;
+  try {
+    response = await fetchWithRetry(transport, request.route, request.init);
+  } catch {
+    return { status: 0 };
+  }
   if (response.status === 204) return { status: response.status };
   const body: unknown = await response.json().catch(() => undefined);
   return isUndefined(body) ? { status: response.status } : { status: response.status, body };
@@ -203,29 +236,78 @@ export function shapeResult(status: number, body: unknown, limit: number): Answe
 }
 
 /**
- * Folds the answers of a write by set into one result: how many rows it wrote, and the first failure.
- * Every row written answers `200`; otherwise the first failing answer's status and body lead.
+ * Folds the answers of a write by set into one result: the rows written, failed, and unknown.
+ * A row is unknown when its connection dropped, so it may have been written.
+ * Every row written answers `200`; otherwise the first answer outside `2xx` leads with its status and body.
  *
  * @example
  * ```ts
- * foldSet([{ status: 200 }, { status: 404 }, { status: 200 }])
- * // -> { status: 404, body: { total: 2, failed: 1 } }
+ * foldSet([{ status: 200 }, { status: 404 }, { status: 0 }])
+ * // -> { status: 404, body: { total: 1, failed: 1, unknown: 1 } }
  * ```
  */
 export function foldSet(answers: readonly Answer[]): BatchResult {
-  const failed = answers.filter((answer) => answer.status < 200 || answer.status >= 300);
-  const total = answers.length - failed.length;
-  const first = failed[0];
-  if (isUndefined(first)) return { status: 200, body: { total, failed: 0 } };
+  const { written, failed, unknown, first } = tally(answers);
+  const counts = { total: written, failed, unknown };
+  if (isUndefined(first)) return { status: 200, body: counts };
   const body = isPlainObject(first.body) ? first.body : {};
-  return { status: first.status, body: { ...body, total, failed: failed.length } };
+  return { status: first.status, body: { ...body, ...counts } };
+}
+
+/**
+ * Folds the answers of a transform's records into one result: the records rewritten, and the ones left.
+ * A reached record not written counts as skipped; one past the transform's limit counts as unreached.
+ * The status is `200` when every record answered `2xx`, else the first other status.
+ *
+ * @example
+ * ```ts
+ * foldTransform([{ status: 200 }, { status: 422 }], { matched: 7, reached: 5 })
+ * // -> { status: 422, body: { transformed: 1, skipped: 4, unreached: 2, failed: 1, unknown: 0 } }
+ * ```
+ */
+export function foldTransform(
+  answers: readonly Answer[],
+  { matched, reached }: { matched: number; reached: number },
+): BatchResult {
+  const { written, failed, unknown, first } = tally(answers);
+  return {
+    status: first?.status ?? 200,
+    body: {
+      transformed: written,
+      skipped: reached - written,
+      unreached: matched - reached,
+      failed,
+      unknown,
+    },
+  };
+}
+
+/**
+ * The answers counted: the `2xx` ones, the failed ones, the dropped ones, and the first outside `2xx`.
+ */
+function tally(answers: readonly Answer[]): {
+  written: number;
+  failed: number;
+  unknown: number;
+  first: Answer | undefined;
+} {
+  const missed = answers.filter((answer) => answer.status < 200 || answer.status >= 300);
+  const unknown = missed.filter((answer) => answer.status === 0).length;
+  return {
+    written: answers.length - missed.length,
+    failed: missed.length - unknown,
+    unknown,
+    first: missed[0],
+  };
 }
 
 /**
  * Sends the approved proposals of `batch` in order and answers one result per proposal.
  * A declined proposal answers the decline the server expects; a write by set folds its rows into one.
+ * A transform sends each approved record as the update it stands for, and folds them the same way.
  * Every answer is cut with `shapeResult` before it is kept.
- * A network failure stops the send and throws.
+ * A request whose connection drops answers status `0`, and the send goes on to the next.
+ * A proposal tagged `auto` answers `auto: true`, so the server learns it ran without asking.
  */
 export async function sendBatch(
   batch: TurnBatch,
@@ -246,9 +328,22 @@ export async function sendBatch(
       );
       continue;
     }
+    if (!isUndefined(proposal.transform)) {
+      const answers: Answer[] = [];
+      for (const { UUID, body } of approval.records ?? []) {
+        const answer = await sendRequest(transport, requestOf({ ...proposal, body }, UUID));
+        answers.push(shapeResult(answer.status, answer.body, options.limit));
+        sent += 1;
+        progress();
+      }
+      const counts = approval.counts ?? { matched: answers.length, reached: answers.length };
+      results.push(foldTransform(answers, counts));
+      continue;
+    }
     if (isUndefined(proposal.where)) {
       const answer = await sendRequest(transport, requestOf(proposal));
-      results.push(shapeResult(answer.status, answer.body, options.limit));
+      const result = shapeResult(answer.status, answer.body, options.limit);
+      results.push(proposal.auto === true ? { ...result, auto: true } : result);
       sent += 1;
       progress();
       continue;
@@ -291,7 +386,7 @@ export async function postResults(
  */
 function countOf(approval: Approval): number {
   if (!approval.send) return 0;
-  return isUndefined(approval.UUIDs) ? 1 : approval.UUIDs.length;
+  return approval.records?.length ?? approval.UUIDs?.length ?? 1;
 }
 
 /**
