@@ -328,6 +328,12 @@ export interface DashboardCollection {
   icon?: IconName;
 
   /**
+   * The declared dashboard path a record opens at, its `[uuid]` token standing for the record.
+   * Absent when the collection declares none, so a record opens in the editor under `/collections/`.
+   */
+  recordPath?: string;
+
+  /**
    * The declared dashboard list-view defaults; absent when the collection declares none.
    */
   table?: DashboardTable;

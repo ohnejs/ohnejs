@@ -9,6 +9,7 @@ import { deepEqual } from '../../../utils/object/deep-equal.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { recordHref } from '../../../utils/route/record-href.ts';
 import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
@@ -98,7 +99,7 @@ export const recordsType: FieldType = {
       noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
       removeItemLabel: untracked(() => t('dashboard.removeItem')),
       onDblclick: (value) => {
-        window.open(`/collections/${target.segment}/${String(value)}`, '_blank');
+        window.open(recordHref(target, String(value)), '_blank');
       },
     });
     const input = chips.querySelector<HTMLInputElement>('.ohne-dynamic-chips-input');

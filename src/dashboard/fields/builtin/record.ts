@@ -17,6 +17,7 @@ import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { recordHref } from '../../../utils/route/record-href.ts';
 import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
 import { h } from '../../render/h.ts';
 import { api } from '../../runtime/api.ts';
@@ -273,7 +274,7 @@ export const recordType: FieldType = {
         const canUpdate = updatable.value.has(value);
         const open = button(icon(canUpdate ? 'pencil' : 'list-search'), {
           variant: 'outline',
-          href: `/collections/${target.segment}/${value}`,
+          href: recordHref(target, value),
           target: '_blank',
           ariaLabel: t(canUpdate ? 'dashboard.edit' : 'dashboard.view'),
         });
