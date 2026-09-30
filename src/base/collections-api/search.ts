@@ -2,7 +2,7 @@ import type { CollectionQueryMeta, FieldQueryMeta, QueryScope } from 'ohnejs';
 import type { ConditionObject, SearchParamValue } from 'ohnejs/utils';
 
 import { parseWireQuery, queryMetadata, resolveGuards, scopedMetadata } from 'ohnejs';
-import { isEmpty, isString, renderLabel, searchByKeywords } from 'ohnejs/utils';
+import { isEmpty, isString, isUndefined, renderLabel, searchByKeywords } from 'ohnejs/utils';
 
 import type { User } from '../auth/types.ts';
 
@@ -32,6 +32,29 @@ export interface SearchResult {
 }
 
 /**
+ * How a search windows its answer.
+ */
+export interface SearchWindow {
+  /**
+   * The records to answer per collection.
+   */
+  limit: number;
+
+  /**
+   * The one collection to search, by its registered name, to page through it.
+   */
+  collection?: string;
+
+  /**
+   * The matches to skip in each collection, newest first.
+   *
+   * @default
+   * 0
+   */
+  offset?: number;
+}
+
+/**
  * The records a search answers per collection when the request names no `limit`.
  */
 export const SEARCH_LIMIT = 5;
@@ -48,15 +71,21 @@ const MAX_TOKENS = 10;
  * Only the first ten tokens count, and together they stay within `maxConditions` and `maxHasDepth`.
  * Plain text fields fill that budget first, then the nested ones in field order; what does not fit drops.
  * A refused read, or a scope hiding the `UUID` or every label field, skips the collection.
- * Each collection answers its most recently created matches.
+ * Each collection answers its most recently created matches, from `offset` on.
  * Records whose label holds every token lead, the earliest hits first; the rest follow in registry order.
+ * With `collection` only that one is searched, newest first, so its pages follow each other.
  */
-export async function searchRecords(user: User, q: string, limit: number): Promise<SearchResult[]> {
+export async function searchRecords(
+  user: User,
+  q: string,
+  { limit, collection: only, offset = 0 }: SearchWindow,
+): Promise<SearchResult[]> {
   const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_TOKENS);
   if (tokens.length === 0) return [];
   const guards = resolveGuards();
   const results: SearchResult[] = [];
   for (const collection of describeCollections(user)) {
+    if (!isUndefined(only) && collection.name !== only) continue;
     if (collection.singleton || collection.operations.read?.allowed !== true) continue;
     const reach = await reachOf(collection.name);
     if (reach === false) continue;
@@ -72,6 +101,7 @@ export async function searchRecords(user: User, q: string, limit: number): Promi
         where: { and: tokens.map((token) => ({ or: match(token) })) } as SearchParamValue,
         order: ['-UUID'],
         limit,
+        offset,
       },
       meta,
       guards,
@@ -84,6 +114,7 @@ export async function searchRecords(user: User, q: string, limit: number): Promi
       results.push({ collection: collection.name, UUID: row.UUID, label });
     }
   }
+  if (!isUndefined(only)) return results;
   const named = searchByKeywords(results, tokens, 'label');
   const lead = new Set(named);
   return [...named, ...results.filter((result) => !lead.has(result))];

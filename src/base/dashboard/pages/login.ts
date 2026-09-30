@@ -6,7 +6,7 @@ import {
   setDocumentTitle,
   useT,
 } from 'ohnejs/dashboard';
-import { effect, isNullish, isString, parseSearchParams } from 'ohnejs/utils';
+import { effect, isLocalPath, isNullish, isString, parseSearchParams } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { loginForm } from '../components/login-form.ts';
@@ -42,7 +42,5 @@ export default defineDashboardPage(() => {
  */
 function nextPath(): string {
   const next = parseSearchParams(location.search).next;
-  if (!isString(next)) return '/';
-  if (next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) return next;
-  return '/';
+  return isString(next) && isLocalPath(next) ? next : '/';
 }

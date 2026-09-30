@@ -196,7 +196,8 @@
   },
   "palette": {
     "label": "Dashboard durchsuchen",
-    "placeholder": "Datensätze suchen oder zu einer Seite springen"
+    "placeholder": "Datensätze suchen oder zu einer Seite springen",
+    "loadMore": "Mehr laden"
   },
   "record": {
     "collectionOverview": "`{collection}`-Übersicht",

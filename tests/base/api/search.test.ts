@@ -1,4 +1,4 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { SearchResult } from '../../../src/base/collections-api/search.ts';
@@ -271,6 +271,26 @@ describe('POST /search', () => {
     ]);
   });
 
+  it('pages through one collection with `collection` and `offset`, each match once', async () => {
+    const page = async (offset: number) =>
+      (await search({ q: 'ashbringer', collection: 'SearchItems', limit: 1, offset }, admin.token))
+        .body.results;
+    const pages = [await page(0), await page(1), await page(2)];
+    ok(pages.every((results) => results.length === 1));
+    deepStrictEqual(
+      pages
+        .flat()
+        .map((result) => result.UUID)
+        .toSorted(),
+      [blade, helm, lore].toSorted(),
+    );
+    deepStrictEqual(await page(3), []);
+    deepStrictEqual(
+      (await search({ q: 'ashbringer', collection: 'Nowhere' }, admin.token)).body.results,
+      [],
+    );
+  });
+
   it('respects the read scope and never searches a field outside it', async () => {
     const { body } = await search({ q: 'ashbringer' }, admin.token);
     const notes = body.results.filter((result) => result.collection === 'SearchNotes');
@@ -321,12 +341,14 @@ describe('POST /search', () => {
     deepStrictEqual(ten.body.results, []);
   });
 
-  it('refuses a guest, an unknown key, a non-string `q`, and a bad `limit`', async () => {
+  it('refuses a guest, an unknown key, a non-string `q`, and a bad `limit`, `offset` or `collection`', async () => {
     strictEqual((await search({ q: 'ashbringer' }, null)).status, 401);
     strictEqual((await search({ q: 'a', page: 1 }, admin.token)).status, 400);
     strictEqual((await search({ q: 1 }, admin.token)).status, 400);
     strictEqual((await search({}, admin.token)).status, 400);
     strictEqual((await search({ q: 'a', limit: 0 }, admin.token)).status, 400);
     strictEqual((await search({ q: 'a', limit: 1.5 }, admin.token)).status, 400);
+    strictEqual((await search({ q: 'a', offset: -1 }, admin.token)).status, 400);
+    strictEqual((await search({ q: 'a', collection: 1 }, admin.token)).status, 400);
   });
 });

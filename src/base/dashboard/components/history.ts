@@ -108,10 +108,13 @@ export class History<T extends object = Record<string, unknown>> {
    * Adds a new state to the history stack and manages the maximum number of stored states.
    */
   push(state: T): this {
-    const newState = omit(state, this.omit as (keyof T)[]);
-    const currentState = omit(this.getCurrentState() ?? ({} as T), this.omit as (keyof T)[]);
+    const current = this.getCurrentState();
+    const changed =
+      isUndefined(current) ||
+      JSON.stringify(omit(state, this.omit as (keyof T)[])) !==
+        JSON.stringify(omit(current, this.omit as (keyof T)[]));
 
-    if (JSON.stringify(newState) !== JSON.stringify(currentState)) {
+    if (changed) {
       this.states = this.states.slice(0, this.currentIndex + 1);
       this.states.push(jsonClone(state));
       this.currentIndex++;

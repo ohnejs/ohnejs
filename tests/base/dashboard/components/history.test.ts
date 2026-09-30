@@ -26,6 +26,15 @@ describe('History', () => {
     strictEqual(history.isDirty.value, false);
   });
 
+  it('keeps an empty first push as the original, as a blank create form seeds it', () => {
+    const history = new History<Record<string, string>>({ watchUnsavedChanges: false });
+    history.push({}).push({ title: 'Hello' });
+    strictEqual(history.isDirty.value, true);
+    deepStrictEqual(history.getOriginalState(), {});
+    deepStrictEqual(history.undo(), {});
+    strictEqual(history.isDirty.value, false);
+  });
+
   it('ignores omitted keys in comparisons', () => {
     const history = new History({ omit: ['tab'], watchUnsavedChanges: false });
     history.push({ a: 1, tab: 'x' }).push({ a: 1, tab: 'y' });

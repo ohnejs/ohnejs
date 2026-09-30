@@ -83,6 +83,12 @@ export interface PaletteRow {
   icon?: IconName;
 
   /**
+   * An instant the row shows at its end, in epoch milliseconds.
+   * It reads relative, with the full date and time on hover.
+   */
+  time?: number;
+
+  /**
    * Runs when the row is picked, by Enter or by a click.
    * The palette stays open, so the row may switch `paletteView` or close it itself.
    */
@@ -110,13 +116,34 @@ export interface PaletteRowGroup {
 }
 
 /**
+ * The row that pages on through a collection's hits.
+ */
+export interface PaletteMore {
+  /**
+   * The collections whose hits may go on, by registered name.
+   */
+  collections: ReadonlySet<string>;
+
+  /**
+   * The row label.
+   */
+  label: string;
+
+  /**
+   * Loads the next hits of `collection`.
+   */
+  load: (collection: string) => void;
+}
+
+/**
  * One row the palette lists: a dashboard path to open, or an action to run.
  */
 export interface PaletteEntry {
   /**
-   * The row's position across every group, which the keyboard selection counts in.
+   * A key for the row, stable while the row stays listed, which the selection holds.
+   * It is the group key plus the row's path or label, with an ordinal on a repeat.
    */
-  index: number;
+  key: string;
 
   /**
    * The row label.
@@ -127,6 +154,16 @@ export interface PaletteEntry {
    * The row icon.
    */
   icon?: IconName;
+
+  /**
+   * An instant the row shows at its end, in epoch milliseconds.
+   */
+  time?: number;
+
+  /**
+   * Whether the row loads a group's next hits, drawn quieter than a hit.
+   */
+  more?: boolean;
 
   /**
    * The dashboard path the row opens, once the palette has closed.
@@ -184,9 +221,10 @@ export const paletteQuery: Ref<string> = ref('');
 export const paletteHits: Ref<readonly PaletteHit[]> = ref([]);
 
 /**
- * The index of the row Enter opens, across every group.
+ * The key of the row Enter opens.
+ * `''` selects the first row, so the closest hit leads until the person picks a row.
  */
-export const paletteActive: Ref<number> = ref(0);
+export const paletteActive: Ref<string> = ref('');
 
 /**
  * The text the palette searches for: the trimmed query while the search view shows, else `''`.
@@ -207,15 +245,31 @@ export function isPaletteCommand(query: string): boolean {
   return query.trimStart().startsWith('/');
 }
 
+let opens = 0;
+
 /**
- * Opens the palette on a blank search.
+ * Opens the palette where the person left it: the same view, words and selection.
  */
 export function openPalette(): void {
+  opens += 1;
+  paletteOpen.value = true;
+}
+
+/**
+ * How many times the palette was asked to open, so a closing one can tell it was asked again meanwhile.
+ */
+export function paletteOpens(): number {
+  return opens;
+}
+
+/**
+ * Returns the palette to where it starts: a blank search.
+ */
+export function resetPalette(): void {
   paletteView.value = 'search';
   paletteQuery.value = '';
   paletteHits.value = [];
-  paletteActive.value = 0;
-  paletteOpen.value = true;
+  paletteActive.value = '';
 }
 
 /**
@@ -226,19 +280,32 @@ export function closePalette(): void {
 }
 
 /**
- * Moves the selection by `step` rows among `count`, wrapping at either end.
+ * The position of the selected row among `entries`, or the first row once it is no longer listed.
  */
-export function movePaletteActive(step: number, count: number): void {
+export function paletteActiveIndex(entries: readonly PaletteEntry[], key: string): number {
+  return Math.max(
+    0,
+    entries.findIndex((entry) => entry.key === key),
+  );
+}
+
+/**
+ * Moves the selection by `step` rows among `entries`, wrapping at either end.
+ */
+export function movePaletteActive(step: number, entries: readonly PaletteEntry[]): void {
+  const count = entries.length;
   if (count === 0) return;
-  paletteActive.value = (((paletteActive.value + step) % count) + count) % count;
+  const at = paletteActiveIndex(entries, paletteActive.value);
+  paletteActive.value = entries[(((at + step) % count) + count) % count].key;
 }
 
 /**
  * The rows the palette lists: the hits grouped by collection, the menu rows matching `query`, then `rows`.
  * Hit groups follow the order their first hit arrives in, so the closest match leads.
  * A hit of a collection `collections` does not list is dropped.
- * A blank query lists every menu row; a command lists only `rows`.
- * The rows are numbered across every group, so one selection walks them all.
+ * A blank query lists `rows` first, then every menu row; a command lists only `rows`.
+ * With `more`, each hit group whose collection may go on ends in a row loading its next hits.
+ * Each row gets a key, so a selection follows its row as rows arrive around it.
  */
 export function paletteGroups(
   query: string,
@@ -246,6 +313,7 @@ export function paletteGroups(
   collections: readonly PaletteCollection[],
   menu: readonly PaletteMenuGroup[],
   rows: readonly PaletteRowGroup[] = [],
+  more?: PaletteMore,
 ): PaletteGroup[] {
   const groups: PaletteGroup[] = [];
   const byCollection = new Map<string, PaletteGroup>();
@@ -259,19 +327,38 @@ export function paletteGroups(
       byCollection.set(collection.name, group);
       groups.push(group);
     }
-    group.entries.push({ index: 0, label: hit.label, to: recordHref(collection, hit.UUID) });
+    group.entries.push({ key: '', label: hit.label, to: recordHref(collection, hit.UUID) });
   }
+  for (const [name, group] of byCollection) {
+    if (isUndefined(more) || !more.collections.has(name)) continue;
+    group.entries.push({
+      key: '',
+      label: more.label,
+      more: true,
+      onSelect: () => more.load(name),
+    });
+  }
+  const layerGroups = rows.map((group) => ({
+    key: group.key,
+    label: group.label,
+    entries: group.rows.map((row) => ({ key: '', ...row })),
+  }));
+  if (query === '') groups.push(...layerGroups);
   (command ? [] : menu).forEach((group, at) => {
     const items = searchByKeywords(group.items, query, 'label');
     if (items.length === 0) return;
-    const entries = items.map(({ to, label }) => ({ index: 0, label, to }));
+    const entries = items.map(({ to, label }) => ({ key: '', label, to }));
     groups.push({ key: `menu:${at}`, label: group.label, entries });
   });
-  for (const group of rows) {
-    const entries = group.rows.map((row) => ({ index: 0, ...row }));
-    groups.push({ key: group.key, label: group.label, entries });
+  if (query !== '') groups.push(...layerGroups);
+  const seen = new Map<string, number>();
+  for (const group of groups) {
+    for (const entry of group.entries) {
+      const base = `${group.key}\n${entry.to ?? entry.label}`;
+      const repeat = seen.get(base) ?? 0;
+      seen.set(base, repeat + 1);
+      entry.key = repeat === 0 ? base : `${base}\n${repeat}`;
+    }
   }
-  let index = 0;
-  for (const group of groups) for (const entry of group.entries) entry.index = index++;
   return groups;
 }

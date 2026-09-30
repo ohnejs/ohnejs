@@ -2,8 +2,6 @@ import {
   applyHook,
   blockQueryMetadata,
   type Capability,
-  type DashboardMenuEntry,
-  type DashboardMenuLink,
   defineHandler,
   type Message,
   queryMetadata,
@@ -16,7 +14,6 @@ import {
 } from 'ohnejs';
 import {
   isEmpty,
-  isString,
   isUndefined,
   naturalCompare,
   pick,
@@ -38,6 +35,7 @@ import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
 import { describeCollections, describeFields, resolveLayout } from '../collections-api/describe.ts';
+import { resolveDashboardMenu } from '../menu/resolve-menu.ts';
 
 /**
  * One block type a `blocks` field may hold, described for the dashboard's editors.
@@ -194,19 +192,6 @@ export interface DashboardMeta {
 declare module 'ohnejs' {
   interface Hooks {
     /**
-     * Filters the sidebar menu after `dashboard.menu` resolves, before `GET /dashboard` answers.
-     * Fires once per discovery read, inside the request context, so the viewer's language is in scope.
-     * The groups arrive resolved: every row carries a `to`, a translated `label`, and any icon.
-     * Append a group, reorder the rows, or drop a link the `context.user` should not see.
-     * Collection rows are already scoped to what the user may reach; a declared link is not.
-     * Return a replacement `DashboardMenuGroup[]`, or mutate the array in place and return nothing.
-     */
-    'dashboard:menu': (
-      menu: DashboardMenuGroup[],
-      context: { user: User; collections: readonly DashboardCollection[] },
-    ) => void | DashboardMenuGroup[] | Promise<void | DashboardMenuGroup[]>;
-
-    /**
      * Extends the discovery payload after everything else resolved, before `GET /dashboard` answers.
      * Fires once per read, inside the request context, so the viewer and their language are in scope.
      * Mutate the object in place; whatever it holds afterwards is the answer.
@@ -215,10 +200,6 @@ declare module 'ohnejs' {
     'dashboard:meta': (meta: DashboardMeta, context: { user: User }) => void | Promise<void>;
   }
 }
-
-const DEFAULT_MENU: { label?: Message; items: DashboardMenuEntry[] }[] = [
-  { items: [{ to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' }] },
-];
 
 /**
  * `GET /dashboard`
@@ -238,7 +219,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
   const user = await requireUser();
   const collections = describeCollections(user);
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
-  const menu = await applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
+  const menu = await resolveDashboardMenu(user, collections);
   const account = await describeAccount(user);
   const meta: DashboardMeta = {
     menu,
@@ -334,57 +315,4 @@ function describeRoles(): DashboardRole[] {
  */
 function declaredLabelOf(name: string, label: Message | undefined): string {
   return isUndefined(label) ? toSentenceCase(name) : resolveMessage(label);
-}
-
-/**
- * Folds the configured `dashboard.menu` over the accessible collections.
- * Configured groups keep their order and drop inaccessible names; the rest trail unlabeled.
- * A named collection is spent on first use, so a later group cannot repeat it.
- * A declared link resolves as authored: the dashboard knows no capability for a page.
- * `DEFAULT_MENU` stands in for an omitted `dashboard.menu`.
- */
-function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
-  const unplaced = new Map(collections.map((collection) => [collection.name, collection]));
-  const groups: DashboardMenuGroup[] = [];
-  for (const group of useConfig().dashboard?.menu ?? DEFAULT_MENU) {
-    const items: DashboardMenuItem[] = [];
-    for (const entry of group.items) {
-      if (!isString(entry)) {
-        items.push(linkItem(entry));
-        continue;
-      }
-      const collection = unplaced.get(entry);
-      if (isUndefined(collection)) continue;
-      unplaced.delete(entry);
-      items.push(collectionItem(collection));
-    }
-    if (!isEmpty(items)) {
-      groups.push({ label: isUndefined(group.label) ? '' : resolveMessage(group.label), items });
-    }
-  }
-  if (unplaced.size > 0) {
-    groups.push({ label: '', items: [...unplaced.values()].map(collectionItem) });
-  }
-  return groups;
-}
-
-/**
- * One collection's row: its list route, its label, and its declared icon.
- */
-function collectionItem(collection: DashboardCollection): DashboardMenuItem {
-  const item: DashboardMenuItem = {
-    to: `/collections/${collection.segment}`,
-    label: collection.label,
-  };
-  if (!isUndefined(collection.icon)) item.icon = collection.icon;
-  return item;
-}
-
-/**
- * One declared link's row, its label resolved in the request's language.
- */
-function linkItem(link: DashboardMenuLink): DashboardMenuItem {
-  const item: DashboardMenuItem = { to: link.to, label: resolveMessage(link.label) };
-  if (!isUndefined(link.icon)) item.icon = link.icon;
-  return item;
 }

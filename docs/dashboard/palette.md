@@ -2,8 +2,8 @@
 
 Press Cmd+K (Ctrl+K on Windows and Linux) on any dashboard page, or click the search box in the
 header, to open the palette. Type to find records across every collection you can read, or to jump
-to a page from the sidebar. Arrow keys move the selection, Enter opens it, Escape closes the
-palette.
+to a page from the sidebar. Arrow keys move the selection and Enter opens it. Escape steps back to
+a blank search, then closes the palette; opening it again picks up where you left it.
 
 A record shows under its collection by its label, so give each collection one:
 
@@ -41,6 +41,7 @@ and `tooltip` are searched; an `integer` field never is.
   record's own fields first.
 - A collection that refuses the read is skipped, never an error.
 - Records whose label holds every word come first.
+- Each collection shows its five newest matches. "Load more" under it shows the next five.
 - Only the first ten words count.
 - A query starting with `/` is a command for a layer's own rows, like the assistant's skills, and
   searches nothing.
@@ -59,7 +60,9 @@ const { results } = await response.json();
 ```
 
 - `limit` caps the records per collection. Omitted, each collection answers five.
+- `collection` searches that one alone, and `offset` skips its first matches, to page through it.
 - `label` is `''` when a record's label fields are empty.
 - The route needs a signed-in user; a guest gets `401`.
 
-With the [assistant](../ai/assistant.md) installed, the last row asks it your question instead.
+With the [assistant](../ai/assistant.md) installed, the last row asks it your question instead, and so
+does Tab, whatever row is selected.

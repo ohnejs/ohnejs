@@ -1,5 +1,5 @@
-import { css, h, icon, textInput, useT } from 'ohnejs/dashboard';
-import { effect, type Ref } from 'ohnejs/utils';
+import { attachTooltip, type Child, css, h, icon, textInput, useT, when } from 'ohnejs/dashboard';
+import { effect, onCleanup, type Ref } from 'ohnejs/utils';
 
 /**
  * Options for `searchInput`.
@@ -28,6 +28,11 @@ export interface SearchInputOptions {
    * false
    */
   autofocus?: boolean;
+
+  /**
+   * Controls set before the clear button, read reactively.
+   */
+  actions?: () => Child;
 }
 
 /**
@@ -64,9 +69,7 @@ css`
     justify-content: center;
     margin-right: 0.375rem;
     margin-left: 0;
-    padding: 0.1875rem;
-    border-width: 1px;
-    border-color: transparent;
+    padding: 0.25rem;
     border-radius: calc(var(--ohne-radius) - 0.25rem);
     outline: none;
     background-color: transparent;
@@ -81,13 +84,13 @@ css`
   }
 
   .o-search-input .o-search-input-clear:focus-visible {
-    border-color: hsl(var(--ohne-ring));
+    box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
     color: hsl(var(--ohne-foreground));
   }
 `;
 
 /**
- * A search box: a magnifier before the text and, while there is text, a clear button after it.
+ * A search box: a magnifier before the text, then any `actions` and, while there is text, a clear button.
  * Clearing empties `query` and focuses the input again, so typing goes on.
  */
 export function searchInput(query: Ref<string>, options: SearchInputOptions): SearchInput {
@@ -103,20 +106,26 @@ export function searchInput(query: Ref<string>, options: SearchInputOptions): Se
     autofocus: options.autofocus,
     placeholder: options.placeholder,
     prefix: magnifier,
-    suffix: () =>
-      query.value === ''
-        ? null
-        : h(
+    suffix: [
+      () => options.actions?.() ?? null,
+      when(
+        () => query.value !== '',
+        () => {
+          const button = h(
             'button',
             {
               type: 'button',
               class: 'o-search-input-clear ohne-raw',
               'aria-label': () => t('dashboard.clearSearch'),
-              title: () => t('dashboard.clearSearch'),
               onClick: clear,
             },
             icon('x'),
-          ),
+          );
+          onCleanup(attachTooltip(button, () => t('dashboard.clearSearch')));
+          return button;
+        },
+      ),
+    ],
   });
   box.classList.add('o-search-input');
   const input = box.querySelector('input')!;

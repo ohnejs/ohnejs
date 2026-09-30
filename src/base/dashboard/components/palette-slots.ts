@@ -8,6 +8,8 @@ import type { PaletteRowGroup } from './palette-state.ts';
  * The palette numbers them with its own rows, so the keyboard walks every row alike.
  * `view` renders in the palette body whatever the view, so a renderer shows itself only under its own view.
  * `footer` renders in a bar under the body, for controls that hold whatever the view.
+ * `placeholder` words the search input, read reactively; the first string wins, `null` passes.
+ * `tab` offers to take the typed words on the first screen; the first offer shows as a Tab key.
  */
 export interface PaletteSlots {
   /**
@@ -24,6 +26,31 @@ export interface PaletteSlots {
    * The controls to render in the footer bar.
    */
   footer: () => Child;
+
+  /**
+   * The search input's placeholder, or `null` to leave it to the next layer or the palette's own.
+   */
+  placeholder: () => string | null;
+
+  /**
+   * Offers to take the typed words on Tab, or `null` to leave them to the next layer, read reactively.
+   */
+  tab: (query: string) => PaletteTab | null;
+}
+
+/**
+ * What a layer does with the typed words on Tab.
+ */
+export interface PaletteTab {
+  /**
+   * The Tab key's tooltip, naming what it does.
+   */
+  label: string;
+
+  /**
+   * Takes the words.
+   */
+  take: () => void;
 }
 
 /**
@@ -31,11 +58,16 @@ export interface PaletteSlots {
  */
 export type PaletteSlot = keyof PaletteSlots;
 
-const registry: { [S in PaletteSlot]: PaletteSlots[S][] } = { row: [], view: [], footer: [] };
+const registry: { [S in PaletteSlot]: PaletteSlots[S][] } = {
+  row: [],
+  view: [],
+  footer: [],
+  placeholder: [],
+  tab: [],
+};
 
 /**
  * Registers what a layer gives one palette slot.
- * This is the seam a layer's dashboard boot file uses to add palette rows, a view, or footer controls.
  * Not reactive by design: registration happens at boot, before the palette first opens.
  */
 export function registerPaletteSlot<S extends PaletteSlot>(slot: S, give: PaletteSlots[S]): void {

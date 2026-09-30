@@ -196,7 +196,8 @@
   },
   "palette": {
     "label": "Pretraži dashboard",
-    "placeholder": "Pretraži zapise ili idi na stranicu"
+    "placeholder": "Pretraži zapise ili idi na stranicu",
+    "loadMore": "Učitaj još"
   },
   "record": {
     "collectionOverview": "Pregled `{collection}`",

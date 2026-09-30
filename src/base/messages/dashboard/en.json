@@ -196,7 +196,8 @@
   },
   "palette": {
     "label": "Search the dashboard",
-    "placeholder": "Search records or jump to a page"
+    "placeholder": "Search records or jump to a page",
+    "loadMore": "Load more"
   },
   "record": {
     "collectionOverview": "`{collection}` overview",

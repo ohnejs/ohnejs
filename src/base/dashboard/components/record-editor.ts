@@ -272,16 +272,9 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   }
 
   // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
-  setNavigationGuard((target) => {
-    if (!history.isDirty.value || isUndefined(unsavedChanges.prompt)) return true;
-    void unsavedChanges.prompt().then((leave) => {
-      if (leave) {
-        setNavigationGuard(null);
-        navigate(target);
-      }
-    });
-    return false;
-  });
+  setNavigationGuard(() =>
+    !history.isDirty.value || isUndefined(unsavedChanges.prompt) ? true : unsavedChanges.prompt(),
+  );
   onCleanup(() => setNavigationGuard(null));
 
   const save = async (): Promise<void> => {

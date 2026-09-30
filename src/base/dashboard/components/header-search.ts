@@ -59,6 +59,14 @@ css`
     padding: 0 0.375em;
     border: 1px solid hsl(var(--ohne-border));
     border-radius: calc(var(--ohne-radius) - 0.25rem);
+    transition: var(--ohne-transition);
+    transition-property: background-color, border-color, color;
+  }
+
+  .o-header-search:hover > kbd > span {
+    background-color: hsl(var(--ohne-primary));
+    border-color: hsl(var(--ohne-primary));
+    color: hsl(var(--ohne-primary-foreground));
   }
 
   @media (max-width: 767px) {

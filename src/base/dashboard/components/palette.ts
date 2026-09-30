@@ -1,11 +1,15 @@
 import {
   api,
+  attachTooltip,
   type Child,
   css,
   dashboardMeta,
   each,
   fallbackLabel,
+  formatDateTime,
+  formatRelative,
   h,
+  icon,
   hasModifierKey,
   navigate,
   type Popup,
@@ -17,11 +21,13 @@ import {
 import {
   computed,
   debounce,
+  groupBy,
   effect,
   isComposing,
   isEmpty,
   isNull,
   isNullish,
+  isString,
   isUndefined,
   nextTick,
   onCleanup,
@@ -29,21 +35,60 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
-import { paletteSlots } from './palette-slots.ts';
+import { type PaletteTab, paletteSlots } from './palette-slots.ts';
 import {
   closePalette,
   movePaletteActive,
+  openPalette,
   type PaletteEntry,
   type PaletteHit,
   paletteActive,
+  paletteActiveIndex,
   paletteGroups,
   paletteHits,
+  paletteOpens,
   paletteOpen,
   paletteQuery,
   paletteSearchTerm,
   paletteView,
+  resetPalette,
 } from './palette-state.ts';
 import { searchInput } from './search-input.ts';
+
+/**
+ * The hits a search answers per collection, and each page a "Load more" adds.
+ */
+const PAGE = 5;
+
+css`
+  .o-palette-tab {
+    display: inline-flex;
+    align-items: center;
+    height: 1.25rem;
+    margin-right: 0.25rem;
+    padding: 0 0.3125rem;
+    border: 1px solid hsl(var(--ohne-border));
+    border-radius: calc(var(--ohne-radius) - 0.25rem);
+    color: hsl(var(--ohne-muted-foreground));
+    font-family: var(--ohne-font);
+    font-size: 0.6875rem;
+    line-height: 1;
+  }
+
+  .o-palette-tab:hover {
+    background-color: hsl(var(--ohne-muted) / 0.6);
+    color: hsl(var(--ohne-foreground));
+  }
+
+  .o-palette-tab:focus-visible {
+    box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
+    outline: none;
+  }
+
+  .o-palette-tab > kbd {
+    font: inherit;
+  }
+`;
 
 css`
   .o-palette .ohne-popup-container {
@@ -56,7 +101,6 @@ css`
     gap: 0.5rem;
     align-items: center;
     justify-content: flex-end;
-    padding: 0.375rem 0.75rem;
     color: hsl(var(--ohne-muted-foreground));
     font-size: 0.75rem;
   }
@@ -64,7 +108,21 @@ css`
   .o-palette-results {
     display: flex;
     flex-direction: column;
-    gap: 1em;
+    gap: 0.75em;
+  }
+
+  .o-palette-results > .ohne-vertical-menu + .ohne-vertical-menu {
+    padding-top: 0.75em;
+    border-top: 1px solid hsl(var(--ohne-border));
+  }
+
+  .o-palette-results .ohne-vertical-menu-item-button:has(> .o-palette-more) {
+    justify-content: center;
+    gap: 0.25em;
+  }
+
+  .o-palette-results .o-palette-more {
+    order: 1;
   }
 
   /* Hovering a row selects it, so the menu's own hover tint would mark a second row. */
@@ -73,6 +131,14 @@ css`
     .ohne-vertical-menu-item-button:hover {
     background-color: transparent;
     color: hsl(var(--ohne-muted-foreground));
+  }
+
+  /* The active row moves with the pointer, so the menu's bolder active label would make rows jump. */
+  .o-palette-results
+    .ohne-vertical-menu-item-active
+    > .ohne-vertical-menu-item-wrapper
+    > .ohne-vertical-menu-item-button {
+    font-weight: inherit;
   }
 
   .o-palette-empty {
@@ -89,7 +155,11 @@ css`
  * Typing searches every collection through `POST /search` after a pause, only under the search view.
  * The hits group by collection.
  * The sidebar's menu rows matching the query follow, then the rows the `row` slots list.
- * ArrowUp and ArrowDown move the selection through every row, Enter picks it, and Escape closes the palette.
+ * ArrowUp and ArrowDown move the selection through every row, and Enter picks it.
+ * On the first screen, Tab hands the typed words to a layer, such as the assistant, whatever row is selected.
+ * A Tab key in the input shows while a layer takes them, and a click on it does the same.
+ * Escape steps back to a blank search, and closes the palette from there.
+ * Closing keeps the view, so the palette opens again where the person left it.
  * The pointer moves the selection too, so a hover and a keystroke never mark two rows.
  * A key that composes text through an input method is left to it.
  * A row's path navigates once the palette has closed, or the next page's shell would mount it again.
@@ -103,6 +173,32 @@ export function palette(): Child {
     () => {
       const t = useT();
       const searching = ref(false);
+      const more = ref<ReadonlySet<string>>(new Set());
+      const loading = new Set<string>();
+      const loadMore = async (collection: string): Promise<void> => {
+        if (loading.has(collection)) return;
+        loading.add(collection);
+        const group = `collection:${collection}`;
+        const query = untracked(paletteSearchTerm);
+        const offset = untracked(() => paletteHits.value).filter(
+          (hit) => hit.collection === collection,
+        ).length;
+        const next = await fetchHits(query, { collection, offset });
+        loading.delete(collection);
+        if (!live || untracked(paletteSearchTerm) !== query) return;
+        const onMore = untracked(
+          () => active.value?.key.startsWith(`${group}\n`) === true && isUndefined(active.value.to),
+        );
+        paletteHits.value = [...untracked(() => paletteHits.value), ...next];
+        if (next.length === PAGE) return;
+        const rest = new Set(untracked(() => more.value));
+        rest.delete(collection);
+        more.value = rest;
+        const last = untracked(() =>
+          groups.value.find((found) => found.key === group)?.entries.at(-1),
+        );
+        if (onMore && !isUndefined(last)) paletteActive.value = last.key;
+      };
       const groups = computed(() => {
         const meta = dashboardMeta();
         const rows = paletteSlots('row').flatMap((list) => list());
@@ -112,18 +208,28 @@ export function palette(): Child {
           meta?.collections ?? [],
           meta?.menu ?? [],
           rows,
+          {
+            collections: more.value,
+            label: t('dashboard.palette.loadMore'),
+            load: (collection) => void loadMore(collection),
+          },
         );
       });
       const entries = computed(() => groups.value.flatMap((group) => group.entries));
+      const active = computed(
+        () => entries.value[paletteActiveIndex(entries.value, paletteActive.value)],
+      );
 
       let live = true;
       let closing = false;
       const close = (after?: () => void): void => {
         if (closing) return;
         closing = true;
+        const asked = paletteOpens();
         void handle.close().then(() => {
           closePalette();
           after?.();
+          if (paletteOpens() !== asked) void nextTick().then(openPalette);
         });
       };
       const pick = (entry: PaletteEntry): void => {
@@ -136,6 +242,11 @@ export function palette(): Child {
         const hits = await fetchHits(query);
         if (!live || untracked(paletteSearchTerm) !== query) return;
         paletteHits.value = hits;
+        more.value = new Set(
+          Object.entries(groupBy(hits, (hit) => hit.collection))
+            .filter(([, found = []]) => found.length === PAGE)
+            .map(([name]) => name),
+        );
         searching.value = false;
       }, 200);
       onCleanup(() => {
@@ -156,16 +267,35 @@ export function palette(): Child {
         });
       });
 
-      // A settling turn relists the rows too; only a new query or new hits restart the selection.
       effect(() => {
         void paletteQuery.value;
-        void paletteHits.value;
-        untracked(() => (paletteActive.value = 0));
+        untracked(() => (paletteActive.value = ''));
       });
 
       const field = searchInput(paletteQuery, {
         autofocus: true,
-        placeholder: () => t('dashboard.palette.placeholder'),
+        actions: () =>
+          when(
+            () => !isNull(tabOffer()),
+            () => {
+              const key = h(
+                'button',
+                {
+                  type: 'button',
+                  class: 'o-palette-tab ohne-raw',
+                  'aria-label': () => tabOffer()?.label ?? '',
+                  onClick: () => untracked(tabOffer)?.take(),
+                },
+                h('kbd', null, 'Tab'),
+              );
+              onCleanup(attachTooltip(key, () => tabOffer()?.label ?? null));
+              return key;
+            },
+          ),
+        placeholder: () =>
+          paletteSlots('placeholder')
+            .map((word) => word())
+            .find(isString) ?? t('dashboard.palette.placeholder'),
         label: () => t('dashboard.palette.label'),
       });
       field.box.classList.add('o-palette-search');
@@ -178,7 +308,16 @@ export function palette(): Child {
           if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
-            close();
+            if (untracked(() => paletteView.value === 'search' && paletteQuery.value === ''))
+              close();
+            else resetPalette();
+            return;
+          }
+          if (event.key === 'Tab' && !event.shiftKey) {
+            const offer = untracked(tabOffer);
+            if (isNull(offer)) return;
+            event.preventDefault();
+            offer.take();
             return;
           }
           if (untracked(() => paletteView.value) !== 'search') return;
@@ -186,10 +325,10 @@ export function palette(): Child {
             event.preventDefault();
             movePaletteActive(
               event.key === 'ArrowDown' ? 1 : -1,
-              untracked(() => entries.value).length,
+              untracked(() => entries.value),
             );
           } else if (event.key === 'Enter') {
-            const entry = untracked(() => entries.value)[untracked(() => paletteActive.value)];
+            const entry = untracked(() => active.value);
             if (isUndefined(entry)) return;
             event.preventDefault();
             pick(entry);
@@ -211,8 +350,8 @@ export function palette(): Child {
             if (event.clientX === pointerX && event.clientY === pointerY) return;
             pointerX = event.clientX;
             pointerY = event.clientY;
-            const at = rowIndex(results, event.target);
-            if (at !== -1) paletteActive.value = at;
+            const entry = untracked(() => entries.value)[rowIndex(results, event.target)];
+            if (!isUndefined(entry)) paletteActive.value = entry.key;
           },
           onClick: (event: MouseEvent) => {
             const target = event.target instanceof Element ? event.target : null;
@@ -225,23 +364,29 @@ export function palette(): Child {
         each(
           () => groups.value,
           (group) => group.key,
-          (group) =>
-            verticalMenu({
-              title: untracked(group).label || undefined,
+          (group) => {
+            const menu = verticalMenu({
+              title: untracked(group).label === '' ? undefined : () => group().label,
               items: () =>
                 group().entries.map((entry) => ({
                   to: entry.to,
                   action: entry.onSelect,
                   label: entry.label,
-                  icon: entry.icon,
-                  active: entry.index === paletteActive.value,
+                  icon: entry.more === true ? moreIcon() : entry.icon,
+                  hint: isUndefined(entry.time)
+                    ? undefined
+                    : { text: formatRelative(entry.time), tooltip: formatDateTime(entry.time) },
+                  active: entry.key === active.value?.key,
                 })),
-            }),
+            });
+            menu.dataset.group = untracked(group).key;
+            return menu;
+          },
         ),
       );
 
       effect(() => {
-        void paletteActive.value;
+        void active.value;
         void groups.value;
         void nextTick().then(() =>
           results
@@ -285,12 +430,23 @@ export function palette(): Child {
         },
       );
 
+      effect(() => {
+        if (paletteView.value === 'search')
+          void nextTick().then(() => handle.content.scrollTo(0, 0));
+      });
+
       // The popup autofocuses a timeout later, too late for the first keystroke after the hotkey.
       field.input.focus();
       const refocus = (): void => {
         const active = document.activeElement;
-        // A control the click focused keeps it; the body, the popup or its scroll pane hand it back.
-        if (closing || (active instanceof HTMLElement && active.tabIndex >= 0)) return;
+        // A control or dropdown the click focused keeps it; the body, popup or scroll pane hand it back.
+        if (
+          closing ||
+          (active instanceof HTMLElement &&
+            (active.tabIndex >= 0 || !isNull(active.closest('.ohne-dropdown'))))
+        ) {
+          return;
+        }
         // A drag that selected text keeps it; focusing the input would drop the selection.
         if (document.getSelection()?.isCollapsed === false) return;
         field.input.focus();
@@ -300,6 +456,28 @@ export function palette(): Child {
       return null;
     },
   );
+}
+
+/**
+ * What Tab does with the typed words on the first screen: the first layer's offer, or `null` for none.
+ */
+function tabOffer(): PaletteTab | null {
+  const query = paletteQuery.value.trim();
+  if (paletteView.value !== 'search' || query === '') return null;
+  for (const offer of paletteSlots('tab')) {
+    const taken = offer(query);
+    if (!isNull(taken)) return taken;
+  }
+  return null;
+}
+
+/**
+ * The chevron that trails a Load more label, marking its row for the quieter style.
+ */
+function moreIcon(): Element {
+  const chevron = icon('chevron-down');
+  chevron.classList.add('o-palette-more');
+  return chevron;
 }
 
 /**
@@ -313,14 +491,19 @@ function rowIndex(results: HTMLElement, target: EventTarget | null): number {
 }
 
 /**
- * The records `POST /search` finds for `query`, each unlabeled one named by its short `UUID`.
+ * The records `POST /search` finds for `query`, a page per collection.
+ * Each unlabeled one is named by its short `UUID`.
+ * With `collection`, only that one is searched, from `offset` on.
  * A failed request finds nothing.
  */
-async function fetchHits(query: string): Promise<PaletteHit[]> {
+async function fetchHits(
+  query: string,
+  window: { collection?: string; offset?: number } = {},
+): Promise<PaletteHit[]> {
   try {
     const response = await api('POST /search', {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ q: query }),
+      body: JSON.stringify({ q: query, limit: PAGE, ...window }),
     });
     if (!response.ok) return [];
     const { results } = (await response.json()) as { results: PaletteHit[] };
