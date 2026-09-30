@@ -28,7 +28,7 @@ export const repeater = defineField({
      *
      * @example
      * ```ts
-     * layout: [
+     * [
      *   { row: ['label', 'url', 'newTab | auto'] },
      *   '---',
      *   { card: ['description'] },

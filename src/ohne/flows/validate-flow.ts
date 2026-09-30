@@ -23,8 +23,8 @@ const TIERS: ReadonlySet<unknown> = new Set<FlowTier>(['read', 'write', 'destruc
  * `description` is required and `title` optional.
  * Each is a message key, a plain string, or a `{ key, params }` object.
  * `start` and every edge name a node, and every node is reachable from `start`.
- * A decide node has questions and a `next`; an act node's `next` is a node or a list of nodes.
- * A branch routes `on` a question of its own node, with `cases` only for that question's options.
+ * A decide node asks one question and branches on it: `next.on` names it, and `cases` key only its options.
+ * An act node's `next` is a node or a list of nodes.
  * Decide nodes never route in a cycle among themselves, so every walk reaches an act node or ends.
  */
 export function validateFlowDefinition(definition: FlowDefinition): void {
@@ -109,8 +109,14 @@ function validateNode(id: string, node: unknown, ids: ReadonlySet<string>): stri
     return isUndefined(next) ? [] : targetsOf(`${path}.next`, next, ids);
   }
   const options = validateDecide(`${path}.decide`, decide);
-  if (isUndefined(next)) throw invalid(`${path}.next`, 'be set on a decide node');
-  return validateNext(`${path}.next`, next, options, ids);
+  if (!isPlainObject(next)) throw invalid(`${path}.next`, 'be a branch with `on` and `cases`');
+  const targets = validateNext(`${path}.next`, next, options, ids);
+  for (const name of options.keys()) {
+    if (name !== next.on) {
+      throw invalid(`${path}.decide.questions.${name}`, 'be the question `next` routes `on`');
+    }
+  }
+  return targets;
 }
 
 /**
@@ -171,16 +177,14 @@ function validateAct(path: string, act: unknown): void {
 }
 
 /**
- * Validates a decide node's `next` and returns the ids it leads to.
+ * Validates a decide node's branch and returns the ids it leads to.
  */
 function validateNext(
   path: string,
-  next: unknown,
+  next: Record<string, unknown>,
   options: ReadonlyMap<string, string[]>,
   ids: ReadonlySet<string>,
 ): string[] {
-  if (!isPlainObject(next)) return targetsOf(path, next, ids);
-
   const { on, cases, below } = next;
   const known = isString(on) ? options.get(on) : undefined;
   if (isUndefined(known)) throw invalid(`${path}.on`, 'name a question of its node');

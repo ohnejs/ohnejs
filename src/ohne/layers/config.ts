@@ -675,7 +675,7 @@ export interface Config {
      *
      * @example
      * ```ts
-     * menu: [
+     * [
      *   { label: 'menu.content', items: ['Pages', 'Posts'] },
      *   {
      *     label: 'Shop',
@@ -694,8 +694,8 @@ export interface Config {
        *
        * @example
        * ```ts
-       * label: 'menu.content'                         // a message key, translated
-       * label: { key: 'menu.shop', params: { n: 2 } } // a parameterized message
+       * 'menu.content'                         // a message key, translated
+       * { key: 'menu.shop', params: { n: 2 } } // a parameterized message
        * ```
        */
       label?: Message;

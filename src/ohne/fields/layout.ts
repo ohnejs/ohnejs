@@ -86,9 +86,9 @@ export interface FieldLayoutRow<TField extends string = string> {
    *
    * @example
    * ```ts
-   * row: ['firstName', 'lastName']
-   * row: ['countryCode | 6rem', 'phone']
-   * row: [{ card: ['pinned'] }, 'archived | auto']
+   * ['firstName', 'lastName']
+   * ['countryCode | 6rem', 'phone']
+   * [{ card: ['pinned'] }, 'archived | auto']
    * ```
    */
   row: readonly (FieldLayoutItem<TField> | FieldLayoutCard<TField> | FieldLayoutTabs<TField>)[];
@@ -104,9 +104,9 @@ export interface FieldLayoutCard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * card: ['comments', 'assignee']
+   * ['comments', 'assignee']
    *
-   * card: {
+   * {
    *   label: 'app.posts.internal',
    *   collapsible: true,
    *   fields: [{ row: ['comments', 'assignee'] }, '---', 'history'],
@@ -127,9 +127,9 @@ export interface FieldLayoutCardOptions<TField extends string = string> {
    *
    * @example
    * ```ts
-   * label: 'Internal notes'
-   * label: 'app.posts.internal'
-   * label: { key: 'app.posts.step', params: { n: 2 } }
+   * 'Internal notes'
+   * 'app.posts.internal'
+   * { key: 'app.posts.step', params: { n: 2 } }
    * ```
    */
   label?: Message;
@@ -148,7 +148,7 @@ export interface FieldLayoutCardOptions<TField extends string = string> {
    *
    * @example
    * ```ts
-   * fields: [{ row: ['publishedAt', 'author'] }, '---', 'notes']
+   * [{ row: ['publishedAt', 'author'] }, '---', 'notes']
    * ```
    */
   fields: FieldLayout<TField>;
@@ -165,7 +165,7 @@ export interface FieldLayoutTabs<TField extends string = string> {
    *
    * @example
    * ```ts
-   * tabs: [
+   * [
    *   { label: 'app.posts.content', fields: ['title', 'body'] },
    *   { label: 'SEO', fields: [{ row: ['metaTitle', 'metaDescription'] }] },
    * ]
@@ -184,8 +184,8 @@ export interface FieldLayoutTab<TField extends string = string> {
    *
    * @example
    * ```ts
-   * label: 'Address'
-   * label: 'app.contacts.address'
+   * 'Address'
+   * 'app.contacts.address'
    * ```
    */
   label: Message;
@@ -195,7 +195,7 @@ export interface FieldLayoutTab<TField extends string = string> {
    *
    * @example
    * ```ts
-   * fields: ['street | 40%', { row: ['zip | 8rem', 'city'] }]
+   * ['street | 40%', { row: ['zip | 8rem', 'city'] }]
    * ```
    */
   fields: FieldLayout<TField>;

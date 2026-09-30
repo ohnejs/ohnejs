@@ -17,8 +17,8 @@ export interface SkillDefinition {
    *
    * @example
    * ```ts
-   * title: 'Translate items'
-   * title: 'app.skills.translateItems.title'
+   * 'Translate items'
+   * 'app.skills.translateItems.title'
    * ```
    */
   title?: Message;
@@ -30,8 +30,8 @@ export interface SkillDefinition {
    *
    * @example
    * ```ts
-   * description: 'Translates the listed items into another locale.'
-   * description: 'app.skills.translateItems.description'
+   * 'Translates the listed items into another locale.'
+   * 'app.skills.translateItems.description'
    * ```
    */
   description: Message;
@@ -41,7 +41,7 @@ export interface SkillDefinition {
    *
    * @example
    * ```ts
-   * prompt: [
+   * [
    *   'Find the items that lack the target locale: `_translations` does not include it.',
    *   'Rewrite `name` and `tooltip` into the locale the person names.',
    * ]

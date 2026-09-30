@@ -195,9 +195,7 @@ const ask = { input: 'Who is level 60?', page: '/collections/characters', flow: 
 describe('routeAnswers', () => {
   const answers = { intent: { answer: 'roster', confidence: 0.7 } };
 
-  it('takes a plain target, a list, a case, the below branch, and nothing for a missing case', () => {
-    deepStrictEqual(routeAnswers('roster', answers), ['roster']);
-    deepStrictEqual(routeAnswers(['a', 'b'], answers), ['a', 'b']);
+  it('takes the case, the below branch under the threshold, and nothing for a missing case', () => {
     const branch = {
       on: 'intent',
       cases: { roster: ['roster', 'general'] },

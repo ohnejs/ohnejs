@@ -16,8 +16,8 @@ export interface RoleDefinition {
    *
    * @example
    * ```ts
-   * label: 'Editor'
-   * label: 'app.roles.editor.label'
+   * 'Editor'
+   * 'app.roles.editor.label'
    * ```
    */
   label?: Message;
@@ -28,8 +28,8 @@ export interface RoleDefinition {
    *
    * @example
    * ```ts
-   * description: 'Writes and publishes posts.'
-   * description: 'app.roles.editor.description'
+   * 'Writes and publishes posts.'
+   * 'app.roles.editor.description'
    * ```
    */
   description?: Message;

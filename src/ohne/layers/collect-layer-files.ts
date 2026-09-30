@@ -2,8 +2,8 @@ import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { ScannedFile } from './scan-layer-files.ts';
 
 import { importDefault } from '../../utils/fs/index.ts';
-import { capitalize, naturalCompare } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { capitalize, isUndefined, naturalCompare } from '../../utils/index.ts';
+import { isOhneError, ohneError } from '../error/ohne-error.ts';
 import { DIR_DEFAULTS } from './config.ts';
 import { scanLayerFiles } from './scan-layer-files.ts';
 import { useLayers } from './use-layers.ts';
@@ -77,7 +77,13 @@ export async function collectLayerFiles<K extends LayerFileKind, T>(
 
   return Promise.all(
     survivors.map(async (scanned) => {
-      const definition = await importDefault<unknown>(scanned.file, { fresh });
+      const definition = await importDefault<unknown>(scanned.file, { fresh }).catch(
+        (error: unknown) => {
+          // A `define*` call validates on import, before it can know the file it sits in.
+          if (isOhneError(error) && isUndefined(error.path)) error.path = scanned.file;
+          throw error;
+        },
+      );
       if (!accepts(definition)) {
         throw ohneError({
           title: `${capitalize(kind)} \`${scanned.name}\` has no definition`,

@@ -68,7 +68,7 @@ export interface FieldType<
    *
    * @example
    * ```ts
-   * options: {
+   * {
    *   max: option({ default: 255 }),
    *   collection: option<string>({ required: true }),
    * }

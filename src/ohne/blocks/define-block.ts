@@ -15,7 +15,7 @@ export interface BlockDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * layout: [
+   * [
    *   { row: ['title', 'alignment | 9rem'] },
    *   'tagline',
    *   '---',
@@ -42,8 +42,8 @@ export interface BlockDefinition<
    *
    * @example
    * ```ts
-   * label: 'blocks.hero'                               // a message key, translated
-   * label: { key: 'blocks.columns', params: { n: 3 } } // a parameterized message
+   * 'blocks.hero'                               // a message key, translated
+   * { key: 'blocks.columns', params: { n: 3 } } // a parameterized message
    * ```
    */
   label?: Message;
@@ -53,7 +53,7 @@ export interface BlockDefinition<
    *
    * @example
    * ```ts
-   * fields: {
+   * {
    *   title: field('text'),
    *   url: field('text', { nullable: true }),
    * }
@@ -66,7 +66,7 @@ export interface BlockDefinition<
    *
    * @example
    * ```ts
-   * dashboard: {
+   * {
    *   layout: [
    *     { row: ['title', 'subtitle | 40%'] },
    *     'body',

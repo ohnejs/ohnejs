@@ -1,4 +1,4 @@
-import type { FlowAct, FlowDefinition, FlowMeta, FlowNext, FlowTarget } from 'ohnejs';
+import type { FlowAct, FlowBranch, FlowDefinition, FlowMeta, FlowTarget } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
 
 import { ohneError, useFlows } from 'ohnejs';
@@ -79,8 +79,8 @@ export function flowModels(flow: FlowDefinition, model: string): string[] {
 }
 
 /**
- * The nodes a decide node's `next` leads to for `answers`, in order; none ends the flow's branch.
- * A branch takes its `below.to` when the answer's confidence falls under the threshold, else its case.
+ * The nodes a decide node's branch leads to for `answers`, in order; none ends that path.
+ * It takes `below.to` when the answer's confidence falls under the threshold, else the answer's case.
  *
  * @example
  * ```ts
@@ -91,8 +91,7 @@ export function flowModels(flow: FlowDefinition, model: string): string[] {
  * // -> ['general']
  * ```
  */
-export function routeAnswers(next: FlowNext, answers: Record<string, DecideAnswer>): string[] {
-  if (isString(next) || isArray(next)) return targetsOf(next);
+export function routeAnswers(next: FlowBranch, answers: Record<string, DecideAnswer>): string[] {
   const answer = answers[next.on];
   if (!isUndefined(next.below) && answer.confidence < next.below.confidence) {
     return targetsOf(next.below.to);

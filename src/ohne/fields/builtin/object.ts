@@ -26,7 +26,7 @@ export const object = defineField({
      *
      * @example
      * ```ts
-     * layout: [
+     * [
      *   { row: ['street', 'number | 6rem'] },
      *   { row: ['zip | 8rem', 'city'] },
      *   { card: { label: 'Delivery notes', collapsible: true, fields: ['notes'] } },

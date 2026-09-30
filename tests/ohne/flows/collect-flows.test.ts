@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { collectFlows, loadLayers, useLayers } from '../../../src/ohne/index.ts';
+import { collectFlows, isOhneError, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { stackedLayers } from '../../../src/ohne/layers/stacked-layers.ts';
 
 /**
@@ -106,5 +106,24 @@ describe('collectFlows', () => {
       writeFileSync(file, 'export const translate = 1;\n');
     });
     await rejects(collectFlows(stackedLayers()), /`translate-items` has no definition/);
+  });
+
+  it('points an invalid definition at its file', async () => {
+    const index = join(import.meta.dirname, '../../../src/ohne/index.ts');
+    let file = '';
+    await appWith('invalid', (app) => {
+      file = join(app, 'flows', 'triage.ts');
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(
+        file,
+        `import { defineFlow } from '${index}';\n` +
+          "export default defineFlow({ description: 'd', start: 'a', nodes: { a: { decide: { questions: { q: { yesNo: 'Q?' } } }, next: 'a' } } });\n",
+      );
+    });
+    await rejects(
+      collectFlows(stackedLayers()),
+      (error) =>
+        isOhneError(error) && error.message === 'Invalid flow definition' && error.path === file,
+    );
   });
 });

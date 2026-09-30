@@ -26,8 +26,8 @@ export const boolean = defineField({
      *
      * @example
      * ```ts
-     * trueLabel: 'Enabled'
-     * trueLabel: 'app.flags.enabled'
+     * 'Enabled'
+     * 'app.flags.enabled'
      * ```
      */
     trueLabel: option<Message>(),
@@ -39,8 +39,8 @@ export const boolean = defineField({
      *
      * @example
      * ```ts
-     * falseLabel: 'Disabled'
-     * falseLabel: 'app.flags.disabled'
+     * 'Disabled'
+     * 'app.flags.disabled'
      * ```
      */
     falseLabel: option<Message>(),

@@ -62,7 +62,7 @@ export interface LayerDefinition {
    *
    * @example
    * ```ts
-   * strategies: {
+   * {
    *   'myFeature.tags': 'concat-unique',
    * }
    * ```
@@ -79,7 +79,7 @@ export interface LayerDefinition {
    *
    * @example
    * ```ts
-   * codegen: [
+   * [
    *   {
    *     bucket: 'node',
    *     file: 'my-feature.ts',

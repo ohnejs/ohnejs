@@ -223,7 +223,7 @@ export interface CollectionTable<TField extends string = string> {
    *
    * @example
    * ```ts
-   * columns: ['title | 320px', 'views', '_updatedAt | 150px']
+   * ['title | 320px', 'views', '_updatedAt | 150px']
    * ```
    */
   columns?: readonly TableColumnEntry<TField>[];
@@ -240,7 +240,7 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * icon: 'note'
+   * 'note'
    * ```
    */
   icon?: IconName;
@@ -254,9 +254,9 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * recordLabel: 'title'
-   * recordLabel: ['firstName', 'lastName']
-   * recordLabel: '{lastName}, {firstName}'
+   * 'title'
+   * ['firstName', 'lastName']
+   * '{lastName}, {firstName}'
    * ```
    */
   recordLabel?: RecordLabel<TField>;
@@ -269,7 +269,7 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * recordPath: '/media?details=[uuid]'
+   * '/media?details=[uuid]'
    * ```
    */
   recordPath?: RecordPath;
@@ -281,7 +281,7 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * table: { columns: ['title | 25% | 256px', 'views', '_updatedAt | 150px'] }
+   * { columns: ['title | 25% | 256px', 'views', '_updatedAt | 150px'] }
    * ```
    */
   table?: CollectionTable<TField>;
@@ -294,7 +294,7 @@ export interface CollectionDashboard<TField extends string = string> {
    *
    * @example
    * ```ts
-   * layout: [
+   * [
    *   { row: ['title', 'slug | 40%'] },
    *   'body',
    *   {
@@ -354,7 +354,7 @@ export interface CollectionDefinition<
    *
    * @example
    * ```ts
-   * fields: {
+   * {
    *   title: field('text'),
    *   views: field('integer', { index: true }),
    * }
@@ -370,7 +370,7 @@ export interface CollectionDefinition<
    *
    * @example
    * ```ts
-   * compositeIndexes: [
+   * [
    *   { fields: ['email', 'tenantId'], unique: true },
    *   { fields: ['status', 'createdAt'] },
    * ]
@@ -390,7 +390,7 @@ export interface CollectionDefinition<
    *
    * @example
    * ```ts
-   * api: {
+   * {
    *   read: 'public',
    *   create: true,
    *   update: { middleware: ['audit'] },
@@ -423,7 +423,7 @@ export interface CollectionDefinition<
    *
    * @example
    * ```ts
-   * copyTranslation: ({ input, targetLocale }) => ({
+   * ({ input, targetLocale }) => ({
    *   ...input,
    *   title: `${input.title} (${targetLocale})`,
    * })
@@ -438,7 +438,7 @@ export interface CollectionDefinition<
    *
    * @example
    * ```ts
-   * dashboard: {
+   * {
    *   icon: 'note',
    *   recordLabel: 'title',
    *   table: { columns: ['title | 320px', '_updatedAt'] },

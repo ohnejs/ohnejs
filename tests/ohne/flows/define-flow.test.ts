@@ -48,32 +48,30 @@ describe('defineFlow', () => {
     strictEqual(defineFlow(definition), definition);
   });
 
-  it('accepts every question form, a bare act, parallel targets and a `below` threshold', () => {
+  it('accepts every question form, a bare act, a list of targets and a `below` threshold', () => {
     const flow = defineFlow({
       title: { key: 'dashMenu.tools', params: { n: 2 } },
       description: 'Routes a request.',
       start: 'triage',
       nodes: {
         triage: {
-          decide: {
-            model: 'small',
-            questions: {
-              urgent: { yesNo: 'Is it urgent?' },
-              effort: { score: ['low', 'high'] },
-            },
-          },
+          decide: { model: 'small', questions: { urgent: { yesNo: 'Is it urgent?' } } },
           next: {
             on: 'urgent',
-            cases: { yes: ['now', 'log'], no: 'later' },
+            cases: { yes: ['now', 'log'], no: 'effort' },
             below: { confidence: 0.5, to: 'later' },
           },
+        },
+        effort: {
+          decide: { questions: { effort: { score: ['low', 'high'] } } },
+          next: { on: 'effort', cases: { low: 'later', high: 'now' } },
         },
         now: { act: { prompt: 'Act now.', model: 'big' }, next: 'log' },
         later: { act: {} },
         log: { act: { prompt: 'Log it.' } },
       },
     });
-    deepStrictEqual(Object.keys(flow.nodes), ['triage', 'now', 'later', 'log']);
+    deepStrictEqual(Object.keys(flow.nodes), ['triage', 'effort', 'now', 'later', 'log']);
   });
 
   it('types every edge against the node ids', () => {
@@ -105,9 +103,14 @@ describe('defineFlow', () => {
     );
   });
 
-  it('rejects a decide node without `next` or questions', () => {
+  it('rejects a decide node without questions or a branch', () => {
     throws(
       () => defineFlow(withTriage({ decide: { questions: { q: { yesNo: 'Q?' } } } })),
+      failsOn('nodes.triage.next'),
+    );
+    throws(
+      () =>
+        defineFlow(withTriage({ decide: { questions: { q: { yesNo: 'Q?' } } }, next: 'roster' })),
       failsOn('nodes.triage.next'),
     );
     throws(
@@ -118,7 +121,10 @@ describe('defineFlow', () => {
 
   it('rejects a question of another shape', () => {
     const asking = (question: unknown) =>
-      withTriage({ decide: { questions: { q: question } }, next: ['translate', 'roster'] });
+      withTriage({
+        decide: { questions: { q: question } },
+        next: { on: 'q', cases: {} },
+      });
     throws(
       () => defineFlow(asking({ choice: {} })),
       failsOn('nodes.triage.decide.questions.q.choice'),
@@ -170,6 +176,19 @@ describe('defineFlow', () => {
       () => defineFlow(withTriage({ ...flow.nodes.triage, next })),
       failsOn('nodes.triage.next.on'),
     );
+  });
+
+  it('rejects a question the branch does not route on', () => {
+    const triaging = {
+      decide: {
+        questions: {
+          intent: { choice: { translate: 'Translate.', roster: 'Roster.' } },
+          urgent: { yesNo: 'Is it urgent?' },
+        },
+      },
+      next: { on: 'intent', cases: { translate: 'translate', roster: 'roster' } },
+    };
+    throws(() => defineFlow(withTriage(triaging)), failsOn('nodes.triage.decide.questions.urgent'));
   });
 
   it('rejects a case for an option its question lacks', () => {
@@ -228,7 +247,10 @@ describe('defineFlow', () => {
   });
 
   it('rejects decide nodes that route in a cycle, and accepts two branches meeting at one', () => {
-    const ask = (to: string) => ({ decide: { questions: { go: { yesNo: 'Go on?' } } }, next: to });
+    const ask = (to: string) => ({
+      decide: { questions: { go: { yesNo: 'Go on?' } } },
+      next: { on: 'go', cases: { yes: to } },
+    });
     throws(
       () =>
         defineFlow<string>({
