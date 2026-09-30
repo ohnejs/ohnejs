@@ -1,4 +1,5 @@
 import type { ConditionNode, SearchParamValue } from '../../../utils/index.ts';
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { HTTPError } from '../../http/http-error.ts';
 import type { OrderDirection, OrderEntry, TargetReach } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
@@ -106,7 +107,7 @@ export interface ParsedQuery {
   /**
    * The validated content locale the query reads, or `null` for the default.
    */
-  locale: string | null;
+  locale: LocaleCode | null;
 
   /**
    * The read reach into every collection the query populates or probes, set by `parseWireQuery`.
@@ -606,7 +607,7 @@ export function parseLocaleParam(
   value: SearchParamValue | undefined,
   meta: CollectionQueryMeta,
   path = 'locale',
-): string | null {
+): LocaleCode | null {
   if (isUndefined(value)) return null;
   if (meta.translatable !== true) throw localeNotApplicableError();
   if (!isString(value)) throw invalidLocaleError(String(value), path);
@@ -614,7 +615,7 @@ export function parseLocaleParam(
   if (isNull(canonical) || !queryLocales().locales.includes(canonical)) {
     throw invalidLocaleError(value, path);
   }
-  return canonical;
+  return canonical as LocaleCode;
 }
 
 /**

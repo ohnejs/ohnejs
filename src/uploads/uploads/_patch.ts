@@ -1,4 +1,4 @@
-import type { Transaction } from 'ohnejs';
+import type { LocaleCode, Transaction } from 'ohnejs';
 
 import { queryUntyped, useDatabase } from 'ohnejs';
 import { extname, isBoolean, isUndefined, omit } from 'ohnejs/utils';
@@ -82,7 +82,7 @@ export async function updateRow(
   tx: Transaction,
   uuid: string,
   input: UpdateUploadInput,
-  locale?: string,
+  locale?: LocaleCode,
 ): Promise<QueryRecord> {
   const locks = isBoolean(input.private);
   const row = await readUpload(uuid, tx);
@@ -134,7 +134,7 @@ export async function deleteRow(tx: Transaction, row: UploadRow): Promise<void> 
 export async function patchUpload(
   uuid: string,
   { target, changes }: { target?: MoveUploadTarget; changes?: UpdateUploadInput },
-  { locale, reach }: { locale?: string; reach?: UploadReach } = {},
+  { locale, reach }: { locale?: LocaleCode; reach?: UploadReach } = {},
 ): Promise<UploadRecord> {
   const reaches = reachesAt(reach, locale);
   const record = await useDatabase().transaction(async (tx) => {

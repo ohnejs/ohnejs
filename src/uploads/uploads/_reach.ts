@@ -1,4 +1,4 @@
-import type { QueryScope, Transaction, UntypedQueryBuilder } from 'ohnejs';
+import type { LocaleCode, QueryScope, Transaction, UntypedQueryBuilder } from 'ohnejs';
 
 import { applyScope, notFound, queryUntyped } from 'ohnejs';
 import { chunk, isUndefined, uniqueArray } from 'ohnejs/utils';
@@ -79,7 +79,7 @@ export async function assertReached(
  */
 export function reachesAt(
   reach: UploadReach | undefined,
-  locale: string | undefined,
+  locale: LocaleCode | undefined,
 ): UploadReach[] {
   if (isUndefined(reach)) return [];
   return reach.locale === locale ? [reach] : [reach, { ...reach, locale }];

@@ -1,3 +1,5 @@
+import type { LocaleCode } from 'ohnejs';
+
 import { useDatabase } from 'ohnejs';
 
 import type { UploadRecord } from './types.ts';
@@ -39,7 +41,7 @@ export interface UpdateUploadOptions {
   /**
    * The content locale `description` lands on; omitted writes the default locale.
    */
-  locale?: string;
+  locale?: LocaleCode;
 }
 
 /**
