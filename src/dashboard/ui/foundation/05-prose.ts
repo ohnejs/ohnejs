@@ -80,10 +80,21 @@ css`
 
   .ohne-prose :where(ol) {
     list-style-type: decimal;
+    font-variant-numeric: tabular-nums;
   }
 
   .ohne-prose :where(li) {
     margin-top: calc(0.5em + var(--ohne-spacing) * 0.125em);
+  }
+
+  .ohne-prose :where(.ohne-prose-task) {
+    list-style: none;
+  }
+
+  .ohne-prose :where(.ohne-prose-task) > svg {
+    display: inline-block;
+    margin-inline-end: 0.375em;
+    vertical-align: -0.125em;
   }
 
   .ohne-prose :where(code) {
@@ -98,6 +109,9 @@ css`
     font-size: calc(1em - 0.0625rem);
     font-weight: 500;
     font-style: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
 
   .ohne-prose :where(pre) {
@@ -126,6 +140,10 @@ css`
     font-weight: 500;
   }
 
+  .ohne-prose :where(blockquote) > :where(* + *) {
+    margin-top: calc(1em + var(--ohne-spacing) * 0.25em);
+  }
+
   .ohne-prose :where(dt) {
     margin-top: calc(1.5em + var(--ohne-spacing) * 0.25em);
     font-weight: 600;
@@ -134,6 +152,12 @@ css`
   .ohne-prose :where(dd) {
     margin-top: calc(0.25em + var(--ohne-spacing) * 0.125em);
     padding-inline-start: calc(1em + var(--ohne-spacing) * 0.125em);
+  }
+
+  .ohne-prose :where(.ohne-prose-table) {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--ohne-foreground) / 0.25) transparent;
   }
 
   .ohne-prose :where(table) {
@@ -155,6 +179,11 @@ css`
   .ohne-prose :where(th, td) {
     padding: calc(0.5em + var(--ohne-spacing) * 0.125em);
     text-align: start;
+  }
+
+  .ohne-prose :where(td) {
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
   }
 
   .ohne-prose :where(th) {

@@ -3,14 +3,17 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
+import { type Child } from '../render/insert.ts';
 import { when } from '../render/when.ts';
 import { icon, type IconName } from './icon.ts';
+import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
 
 /**
@@ -42,6 +45,21 @@ export interface VerticalMenuItemModel {
   icon?: IconName | Element;
 
   /**
+   * A muted note at the end of the row, such as a relative time.
+   */
+  hint?: {
+    /**
+     * The note.
+     */
+    text: string;
+
+    /**
+     * The note's tooltip.
+     */
+    tooltip?: string;
+  };
+
+  /**
    * Whether the item is active.
    * If the item is a submenu item, it will automatically expand all parent items.
    *
@@ -61,9 +79,9 @@ export interface VerticalMenuItemModel {
  */
 export interface VerticalMenuOptions {
   /**
-   * The menu title.
+   * The menu title; a getter reads reactively.
    */
-  title?: string;
+  title?: string | (() => string);
 
   /**
    * The menu items, read reactively.
@@ -197,6 +215,17 @@ css`
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  .ohne-vertical-menu-item-button > .ohne-vertical-menu-item-hint {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: calc(1em - 0.125rem);
+    opacity: 0.72;
+  }
+
+  .ohne-vertical-menu-item-hint + .ohne-vertical-menu-item-button-toggle {
+    margin-left: 0;
   }
 
   .ohne-vertical-menu-item-button:hover {
@@ -408,6 +437,17 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
     return isString(glyph) ? icon(glyph) : glyph;
   };
 
+  // Built once while the item has a hint, so a tooltip survives the item's every re-read.
+  const hintChild = (): Child =>
+    when(
+      () => !isUndefined(item().hint),
+      () => {
+        const note = h('span', { class: 'ohne-vertical-menu-item-hint' }, () => item().hint?.text);
+        onCleanup(attachTooltip(note, () => item().hint?.tooltip ?? null));
+        return note;
+      },
+    );
+
   const toggleRow = (): HTMLElement =>
     h(
       'div',
@@ -427,6 +467,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
         },
         iconChild,
         h('span', null, () => item().label),
+        hintChild(),
         h('span', { class: 'ohne-vertical-menu-item-button-toggle' }, icon('chevron-right')),
       ),
     );
@@ -446,6 +487,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
         },
         iconChild,
         h('span', null, () => item().label),
+        hintChild(),
       ),
       when(
         () => (item().submenu?.length ?? 0) > 0,

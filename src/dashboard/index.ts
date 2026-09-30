@@ -50,7 +50,12 @@ export { mount } from './render/mount.ts';
 export { when } from './render/when.ts';
 export { defineDashboardPage } from './router/define-dashboard-page.ts';
 export { lastNavigation, navigate, setNavigationGuard, useRoute } from './router/router.ts';
-export type { DashboardPage, NavigationCause, RouteContext } from './router/router.ts';
+export type {
+  DashboardPage,
+  NavigationCause,
+  NavigationGuard,
+  RouteContext,
+} from './router/router.ts';
 export { apiUpload } from './runtime/api-upload.ts';
 export type { UploadBody, UploadOptions } from './runtime/api-upload.ts';
 export { api, setUnauthorizedHandler } from './runtime/api.ts';

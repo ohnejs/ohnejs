@@ -3,6 +3,7 @@ import type { PageRoute } from '../../utils/route/page-route.ts';
 import type { Child } from '../render/insert.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
@@ -38,11 +39,20 @@ interface Active extends MatchedRoute {
  */
 export type NavigationCause = 'load' | 'navigate' | 'popstate';
 
+/**
+ * Decides whether a navigation to `target` may go on: `true` lets it pass, `false` aborts it.
+ * A promise holds it until it settles, as a dialog asking whether to leave does.
+ */
+export type NavigationGuard = (target: string) => boolean | Promise<boolean>;
+
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 let token = 0;
-let guard: ((target: string) => boolean) | null = null;
+let guard: NavigationGuard | null = null;
 let rendered = '';
+let at = 0;
+let settling: 'undo' | 'undo-replay' | 'replay' | null = null;
+let held = 0;
 let cause: NavigationCause = 'load';
 
 /**
@@ -56,15 +66,7 @@ export async function startRouter(
   container: Element,
 ): Promise<void> {
   pages = compilePages(manifest);
-  window.addEventListener('popstate', () => {
-    const target = location.pathname + location.search + location.hash;
-    if (!isNull(guard) && !guard(target)) {
-      history.pushState(null, '', rendered);
-      return;
-    }
-    cause = 'popstate';
-    void render();
-  });
+  window.addEventListener('popstate', traverse);
   document.addEventListener('click', interceptLink);
   await render();
   mount(() => view(), container);
@@ -72,16 +74,100 @@ export async function startRouter(
 
 /**
  * Navigates to `path` through the History API and re-renders; a no-op when already there.
- * A navigation guard set through `setNavigationGuard` may abort it.
+ * A navigation guard set through `setNavigationGuard` may hold or abort it.
  * `replace` swaps the current history entry instead of pushing one.
+ * Resolves whether the location got there, once any guard settled.
+ * Without a guard holding it, history moves before this returns.
  */
-export function navigate(path: string, options?: { replace?: boolean }): void {
-  if (path === location.pathname + location.search + location.hash) return;
-  if (!isNull(guard) && !guard(path)) return;
+export function navigate(path: string, options?: { replace?: boolean }): Promise<boolean> {
+  if (path === here()) return Promise.resolve(true);
+  const verdict = isNull(guard) ? true : guard(path);
+  if (verdict === false) return Promise.resolve(false);
+  if (verdict === true) {
+    go(path, options);
+    return Promise.resolve(true);
+  }
+  return verdict.then((leave) => leave && arrive(path, options));
+}
+
+/**
+ * Handles the back and forward buttons: a step the guard holds or blocks is undone, then replayed on leave.
+ * Undoing and replaying move within history, so a held step never adds an entry or drops the forward ones.
+ * A step that keeps its entry index, or runs without the Navigation API, pushes the rendered path back.
+ */
+function traverse(): void {
+  const step = settling;
+  settling = null;
+  if (step === 'undo') return;
+  if (step === 'undo-replay') {
+    replay();
+    return;
+  }
+  const target = here();
+  const verdict = step === 'replay' || isNull(guard) ? true : guard(target);
+  if (verdict === true) {
+    cause = 'popstate';
+    void render();
+    return;
+  }
+  const to = entryIndex();
+  if (isUndefined(to) || to === at) {
+    history.pushState(null, '', rendered);
+    if (verdict !== false) void verdict.then((leave) => leave && arrive(target));
+    return;
+  }
+  held = verdict === false ? 0 : to - at;
+  settling = 'undo';
+  history.go(at - to);
+  if (verdict !== false) void verdict.then((leave) => leave && replay());
+}
+
+/**
+ * Replays the held step once, however many prompts resolved with it, after its undo has landed.
+ */
+function replay(): void {
+  if (held === 0) return;
+  if (settling === 'undo') {
+    settling = 'undo-replay';
+    return;
+  }
+  const delta = held;
+  held = 0;
+  settling = 'replay';
+  history.go(delta);
+}
+
+/**
+ * The session-history index of the current entry, or `undefined` without the Navigation API.
+ */
+function entryIndex(): number | undefined {
+  return typeof navigation === 'undefined' ? undefined : navigation.currentEntry?.index;
+}
+
+/**
+ * Moves history to `path` past any guard unless it is already there, and returns `true`.
+ * Several navigations a guard held all resume on one answer, so only the first one moves.
+ */
+function arrive(path: string, options?: { replace?: boolean }): true {
+  return path === here() || go(path, options);
+}
+
+/**
+ * Moves history to `path` past any guard, re-renders, and returns `true`.
+ */
+function go(path: string, options?: { replace?: boolean }): true {
   if (options?.replace === true) history.replaceState(null, '', path);
   else history.pushState(null, '', path);
   cause = 'navigate';
   void render();
+  return true;
+}
+
+/**
+ * The current location as a dashboard path.
+ */
+function here(): string {
+  return location.pathname + location.search + location.hash;
 }
 
 /**
@@ -101,11 +187,10 @@ export function lastNavigation(): NavigationCause {
 
 /**
  * Installs the guard every navigation consults before touching history, or uninstalls it with `null`.
- * A guard returning `false` aborts the navigation and owns resuming it later.
- * A resuming `navigate` call consults the guard again, so the guard must let it pass or be uninstalled.
- * The back and forward buttons are guarded too: a blocked popstate re-pushes the rendered path.
+ * A guard answering a promise holds the navigation, and the router resumes it past the guard on `true`.
+ * The back and forward buttons are guarded too: a held or blocked step is undone, and replayed on leave.
  */
-export function setNavigationGuard(next: ((target: string) => boolean) | null): void {
+export function setNavigationGuard(next: NavigationGuard | null): void {
   guard = next;
 }
 
@@ -147,7 +232,8 @@ function notFound(): Child {
  */
 async function render(): Promise<void> {
   const mine = ++token;
-  rendered = location.pathname + location.search + location.hash;
+  rendered = here();
+  at = entryIndex() ?? 0;
   const match = matchPages(pages, location.pathname);
   if (isNull(match)) {
     active.value = null;

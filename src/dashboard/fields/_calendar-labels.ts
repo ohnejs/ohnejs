@@ -1,5 +1,6 @@
 import type { CalendarLabels } from '../ui/calendar.ts';
 
+import { intlLanguage } from '../../utils/i18n/intl-language.ts';
 import { getOrSet } from '../../utils/map/get-or-set.ts';
 import { useT } from '../runtime/use-t.ts';
 
@@ -28,8 +29,9 @@ export function calendarLabels(language: string): CalendarLabels {
  * Both read `UTC` instants, so the device zone never shifts a month start or a weekday.
  */
 function intlNames(language: string): CalendarNames {
-  const month = new Intl.DateTimeFormat(language, { month: 'long', timeZone: 'UTC' });
-  const weekday = new Intl.DateTimeFormat(language, { weekday: 'short', timeZone: 'UTC' });
+  const tag = intlLanguage(language);
+  const month = new Intl.DateTimeFormat(tag, { month: 'long', timeZone: 'UTC' });
+  const weekday = new Intl.DateTimeFormat(tag, { weekday: 'short', timeZone: 'UTC' });
   return {
     months: Array.from({ length: 12 }, (_, index) => month.format(Date.UTC(2024, index, 1))),
     daysShort: Array.from({ length: 7 }, (_, index) =>
