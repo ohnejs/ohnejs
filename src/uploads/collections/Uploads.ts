@@ -22,7 +22,7 @@ import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
 const uploads = defineCollection({
   api: { read: true },
   compositeIndexes: [{ fields: ['directory', 'name'], unique: true }],
-  dashboard: { icon: 'library-photo', recordLabel: 'name' },
+  dashboard: { icon: 'library-photo', recordLabel: 'name', recordPath: '/media?details=[uuid]' },
   fields: {
     kind: field('select', {
       choices: ['file', 'folder'],

@@ -57,6 +57,7 @@ import {
   naturalCompare,
   onCleanup,
   parseSearchParams,
+  recordHref,
   ref,
   type Ref,
   sleep,
@@ -719,9 +720,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     const readable = !isUndefined(users) && users.operations.read?.allowed === true;
     return row(
       () => t('uploads.dashboard.uploadedBy'),
-      readable
-        ? h('a', { href: `/collections/${users.segment}/${author}`, target: '_blank' }, label)
-        : label,
+      readable ? h('a', { href: recordHref(users, author), target: '_blank' }, label) : label,
     );
   };
 
