@@ -15,6 +15,7 @@ import localeField from '../../../src/base/fields/locale.ts';
 import passwordField from '../../../src/base/fields/password.ts';
 import rolesField from '../../../src/base/fields/roles.ts';
 import timezoneField from '../../../src/base/fields/timezone.ts';
+import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
@@ -111,6 +112,38 @@ useCollections().register('SearchUnlabeled', {
   },
 });
 
+useBlocks().register('SearchHero', {
+  name: 'SearchHero',
+  block: {
+    fields: { heading: field('text'), author: field('record', { collection: 'SearchItems' }) },
+  },
+});
+useBlocks().register('SearchStack', {
+  name: 'SearchStack',
+  block: { fields: { parts: field('blocks', { allow: ['SearchStack', 'SearchHero'] }) } },
+});
+useCollections().register('SearchPages', {
+  name: 'SearchPages',
+  collection: {
+    api: { read: true },
+    fields: {
+      title: field('text'),
+      body: field('blocks', { allow: ['SearchHero', 'SearchStack'] }),
+      meta: field('object', { fields: { summary: field('text', { nullable: true }) } }),
+    },
+  },
+});
+useCollections().register('SearchWide', {
+  name: 'SearchWide',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'f01' },
+    fields: Object.fromEntries(
+      Array.from({ length: 11 }, (_, at) => [`f${String(at + 1).padStart(2, '0')}`, field('text')]),
+    ),
+  },
+});
+
 useRoutes().register(routeID('POST', '/collections/[collection]/query'), {
   method: 'POST',
   pattern: '/collections/[collection]/query',
@@ -124,7 +157,7 @@ const db = await dialect.connect(':memory:');
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
-  desired: buildDesiredSchema(useCollections(), useFields() as never),
+  desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
 
 async function userWith(email: string, roles: string[]): Promise<{ uuid: string; token: string }> {
@@ -159,6 +192,32 @@ await seed('SearchNotes', { title: 'Quiet', secret: 'ashbringer', owner: admin.u
 await seed('SearchBlocked', { title: 'Blocked ashbringer' });
 await seed('SearchVaults', { title: 'Vault ashbringer' });
 await seed('SearchUnlabeled', { title: 'Unlabeled', note: 'ashbringer' });
+const stacked = await seed('SearchPages', {
+  title: 'Stacked',
+  body: [
+    {
+      block: 'SearchStack',
+      fields: {
+        parts: [{ block: 'SearchHero', fields: { heading: 'Frozen throne', author: blade } }],
+      },
+    },
+  ],
+  meta: { summary: null },
+});
+const summed = await seed('SearchPages', {
+  title: 'Summed',
+  body: [],
+  meta: { summary: 'Lordaeron falls' },
+});
+const wide = await seed(
+  'SearchWide',
+  Object.fromEntries(
+    Array.from({ length: 11 }, (_, at) => [
+      `f${String(at + 1).padStart(2, '0')}`,
+      `wide ${at + 1}`,
+    ]),
+  ),
+);
 
 const ROUTE: Route = {
   method: 'POST',
@@ -233,6 +292,33 @@ describe('POST /search', () => {
       body.results.map((result) => result.UUID),
       [blade, helm, lore],
     );
+  });
+
+  it('finds a token in the text of a nested block', async () => {
+    const { status, body } = await search({ q: 'throne frozen' }, admin.token);
+    strictEqual(status, 200);
+    deepStrictEqual(body.results, [{ collection: 'SearchPages', UUID: stacked, label: 'Stacked' }]);
+  });
+
+  it('finds a token in a child field', async () => {
+    const { body } = await search({ q: 'lordaeron' }, admin.token);
+    deepStrictEqual(body.results, [{ collection: 'SearchPages', UUID: summed, label: 'Summed' }]);
+  });
+
+  it('never searches a relation target', async () => {
+    const { body } = await search({ q: 'corrupted' }, admin.token);
+    deepStrictEqual(
+      body.results.map((result) => result.collection),
+      ['SearchItems'],
+    );
+  });
+
+  it('drops the fields past the condition budget instead of refusing', async () => {
+    const one = await search({ q: '11' }, admin.token);
+    deepStrictEqual(one.body.results, [{ collection: 'SearchWide', UUID: wide, label: 'wide 1' }]);
+    const ten = await search({ q: `11 ${'wide '.repeat(9)}` }, admin.token);
+    strictEqual(ten.status, 200);
+    deepStrictEqual(ten.body.results, []);
   });
 
   it('refuses a guest, an unknown key, a non-string `q`, and a bad `limit`', async () => {

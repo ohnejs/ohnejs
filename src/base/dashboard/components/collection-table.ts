@@ -43,10 +43,10 @@ import {
   isString,
   isUndefined,
   onCleanup,
+  recordHref,
   type Ref,
   ref,
   sleep,
-  stringifySearchParams,
   uniqueArray,
   untracked,
 } from 'ohnejs/utils';
@@ -481,7 +481,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     data.value = data.value.map((row) => (row.id === id ? { ...row, ...record, id } : row));
   };
 
-  const rowHref = (id: number | string): string => `/collections/${segment}/${String(id)}`;
+  const rowHref = (id: number | string): string => recordHref(collection, String(id));
 
   const mayUpdate = (id: number | string): boolean => admitsRow(verdicts.value.update, id);
 
@@ -532,7 +532,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         const rowID = String(payload.row.id);
         const chips: TranslationsCellOptions = { canUpdate: mayUpdate(payload.row.id) };
         if (isString(payload.row.id)) {
-          chips.href = (code) => `${rowHref(rowID)}?${stringifySearchParams({ locale: code })}`;
+          chips.href = (code) => recordHref(collection, rowID, { locale: code });
         }
         return editableFieldCell(translationsCell(row, chips), {
           cell: payload,

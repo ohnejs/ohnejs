@@ -10,8 +10,10 @@ import {
   paletteHits,
   paletteOpen,
   paletteQuery,
+  paletteSearchTerm,
   paletteView,
 } from '../../../../src/base/dashboard/components/palette-state.ts';
+import { effect } from '../../../../src/utils/index.ts';
 
 const COLLECTIONS = [
   { name: 'Items', label: 'Items', segment: 'items' },
@@ -67,6 +69,23 @@ describe('paletteGroups', () => {
     ]);
   });
 
+  it("links a hit to its collection's recordPath when one is declared", () => {
+    const media = {
+      name: 'Uploads',
+      label: 'Uploads',
+      segment: 'uploads',
+      recordPath: '/media?details=[uuid]',
+    };
+    const hits = [{ collection: 'Uploads', UUID: 'u', label: 'sunset.jpg' }];
+    deepStrictEqual(paletteGroups('sun', hits, [media], []), [
+      {
+        key: 'collection:Uploads',
+        label: 'Uploads',
+        entries: [{ index: 0, label: 'sunset.jpg', to: '/media?details=u' }],
+      },
+    ]);
+  });
+
   it('keeps the menu rows matching every word, and drops a hit of an unlisted collection', () => {
     const hits = [{ collection: 'Secrets', UUID: 's', label: 'Items vault' }];
     deepStrictEqual(paletteGroups('ITEMS', hits, COLLECTIONS, MENU), [
@@ -75,6 +94,38 @@ describe('paletteGroups', () => {
         label: 'Collections',
         entries: [{ index: 0, label: 'Items', to: '/collections/items' }],
       },
+    ]);
+  });
+
+  it("numbers a layer's rows after the menu rows, keeping their icon and action", () => {
+    const onSelect = (): void => {};
+    const rows = [
+      {
+        key: 'ai:ask',
+        label: '',
+        rows: [{ label: 'Ask: items', icon: 'sparkles' as const, onSelect }],
+      },
+    ];
+    deepStrictEqual(paletteGroups('items', [], COLLECTIONS, MENU, rows), [
+      {
+        key: 'menu:1',
+        label: 'Collections',
+        entries: [{ index: 0, label: 'Items', to: '/collections/items' }],
+      },
+      {
+        key: 'ai:ask',
+        label: '',
+        entries: [{ index: 1, label: 'Ask: items', icon: 'sparkles', onSelect }],
+      },
+    ]);
+  });
+
+  it("answers a command with the layers' rows alone", () => {
+    const hits = [{ collection: 'Items', UUID: 'a', label: 'Items vault' }];
+    const onSelect = (): void => {};
+    const rows = [{ key: 'ai:skill', label: 'Skills', rows: [{ label: 'Tidy', onSelect }] }];
+    deepStrictEqual(paletteGroups(' /items', hits, COLLECTIONS, MENU, rows), [
+      { key: 'ai:skill', label: 'Skills', entries: [{ index: 0, label: 'Tidy', onSelect }] },
     ]);
   });
 });
@@ -103,5 +154,25 @@ describe('the palette store', () => {
     strictEqual(paletteActive.value, 0);
     movePaletteActive(1, 0);
     strictEqual(paletteActive.value, 0);
+  });
+
+  it('searches the trimmed query only while the search view shows', () => {
+    const seen: string[] = [];
+    paletteView.value = 'search';
+    paletteQuery.value = '  ash ';
+    const stop = effect(() => void seen.push(paletteSearchTerm()));
+    paletteView.value = 'turn';
+    paletteQuery.value = 'retire every character';
+    paletteQuery.value = 'ash';
+    paletteView.value = 'search';
+    stop();
+    deepStrictEqual(seen, ['ash', '', 'ash']);
+  });
+
+  it('never searches a command', () => {
+    paletteView.value = 'search';
+    paletteQuery.value = '/translate-items into German';
+    strictEqual(paletteSearchTerm(), '');
+    paletteQuery.value = '';
   });
 });

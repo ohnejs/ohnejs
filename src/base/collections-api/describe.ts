@@ -366,6 +366,12 @@ export interface DashboardCollection {
   icon?: IconName;
 
   /**
+   * The declared dashboard path a record opens at, its `[uuid]` token standing for the record.
+   * Absent when the collection declares none, so a record opens in the editor under `/collections/`.
+   */
+  recordPath?: string;
+
+  /**
    * The declared dashboard list-view defaults; absent when the collection declares none.
    */
   table?: DashboardTable;
@@ -465,6 +471,7 @@ export function describeCollections(user: User): DashboardCollection[] {
       collection.labelTemplate = recordLabel;
     }
     if (!isUndefined(dashboard?.icon)) collection.icon = dashboard.icon;
+    if (!isUndefined(dashboard?.recordPath)) collection.recordPath = dashboard.recordPath;
     if (!isUndefined(dashboard?.table)) collection.table = dashboard.table;
     const layout = resolveLayout(dashboard?.layout, fields);
     if (!isUndefined(layout)) collection.layout = layout;

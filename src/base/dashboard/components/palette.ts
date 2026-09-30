@@ -7,11 +7,9 @@ import {
   fallbackLabel,
   h,
   hasModifierKey,
-  icon,
   navigate,
   type Popup,
   popup,
-  textInput,
   useT,
   verticalMenu,
   when,
@@ -20,6 +18,8 @@ import {
   computed,
   debounce,
   effect,
+  isComposing,
+  isEmpty,
   isNull,
   isNullish,
   isUndefined,
@@ -33,31 +33,46 @@ import { paletteSlots } from './palette-slots.ts';
 import {
   closePalette,
   movePaletteActive,
+  type PaletteEntry,
   type PaletteHit,
   paletteActive,
   paletteGroups,
   paletteHits,
   paletteOpen,
   paletteQuery,
+  paletteSearchTerm,
   paletteView,
 } from './palette-state.ts';
+import { searchInput } from './search-input.ts';
 
 css`
   .o-palette .ohne-popup-container {
+    max-height: min(40rem, calc(100% - 12dvh));
     margin-top: 12dvh;
   }
 
-  .o-palette-search .o-palette-search-icon {
-    margin-left: 0.75rem;
-    margin-right: 0;
+  .o-palette .ohne-popup-footer {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.375rem 0.75rem;
     color: hsl(var(--ohne-muted-foreground));
-    font-size: 1rem;
+    font-size: 0.75rem;
   }
 
   .o-palette-results {
     display: flex;
     flex-direction: column;
     gap: 1em;
+  }
+
+  /* Hovering a row selects it, so the menu's own hover tint would mark a second row. */
+  .o-palette-results
+    .ohne-vertical-menu-item:not(.ohne-vertical-menu-item-active)
+    .ohne-vertical-menu-item-button:hover {
+    background-color: transparent;
+    color: hsl(var(--ohne-muted-foreground));
   }
 
   .o-palette-empty {
@@ -71,12 +86,16 @@ css`
 /**
  * The search palette, mounted by the dashboard boot into the shell's `global` slot.
  * It renders while `paletteOpen` is set: a search input over the matching records and pages.
- * Typing searches every collection through `POST /search` after a pause; the hits group by collection.
- * The sidebar's menu rows matching the query follow, so a page is one Enter away.
- * ArrowUp and ArrowDown move the selection, Enter opens it, and Escape closes the palette.
- * A row navigates once the palette has closed, or the next page's shell would mount it again.
+ * Typing searches every collection through `POST /search` after a pause, only under the search view.
+ * The hits group by collection.
+ * The sidebar's menu rows matching the query follow, then the rows the `row` slots list.
+ * ArrowUp and ArrowDown move the selection through every row, Enter picks it, and Escape closes the palette.
+ * The pointer moves the selection too, so a hover and a keystroke never mark two rows.
+ * A key that composes text through an input method is left to it.
+ * A row's path navigates once the palette has closed, or the next page's shell would mount it again.
  * A modified click on a row keeps the browser's behaviour and the palette open.
- * The `row` slot renderers follow the results, and the `view` slot renderers fill the body under their view.
+ * The input takes focus as the palette opens, and again after a click that leaves nothing else focused.
+ * The `view` slot renderers fill the body under their view, and the `footer` ones a bar under it.
  */
 export function palette(): Child {
   return when(
@@ -86,8 +105,14 @@ export function palette(): Child {
       const searching = ref(false);
       const groups = computed(() => {
         const meta = dashboardMeta();
-        const query = paletteQuery.value;
-        return paletteGroups(query, paletteHits.value, meta?.collections ?? [], meta?.menu ?? []);
+        const rows = paletteSlots('row').flatMap((list) => list());
+        return paletteGroups(
+          paletteQuery.value,
+          paletteHits.value,
+          meta?.collections ?? [],
+          meta?.menu ?? [],
+          rows,
+        );
       });
       const entries = computed(() => groups.value.flatMap((group) => group.entries));
 
@@ -101,10 +126,15 @@ export function palette(): Child {
           after?.();
         });
       };
+      const pick = (entry: PaletteEntry): void => {
+        const { to } = entry;
+        if (isUndefined(to)) entry.onSelect?.();
+        else close(() => navigate(to));
+      };
 
       const search = debounce(async (query: string) => {
         const hits = await fetchHits(query);
-        if (!live || untracked(() => paletteQuery.value.trim()) !== query) return;
+        if (!live || untracked(paletteSearchTerm) !== query) return;
         paletteHits.value = hits;
         searching.value = false;
       }, 200);
@@ -114,7 +144,7 @@ export function palette(): Child {
       });
 
       effect(() => {
-        const query = paletteQuery.value.trim();
+        const query = paletteSearchTerm();
         untracked(() => {
           searching.value = query !== '';
           if (query === '') {
@@ -126,27 +156,25 @@ export function palette(): Child {
         });
       });
 
+      // A settling turn relists the rows too; only a new query or new hits restart the selection.
       effect(() => {
-        void groups.value;
+        void paletteQuery.value;
+        void paletteHits.value;
         untracked(() => (paletteActive.value = 0));
       });
 
-      const searchIcon = icon('search');
-      searchIcon.classList.add('o-palette-search-icon');
-      const box = textInput(paletteQuery, {
+      const field = searchInput(paletteQuery, {
         autofocus: true,
         placeholder: () => t('dashboard.palette.placeholder'),
-        prefix: searchIcon,
+        label: () => t('dashboard.palette.label'),
       });
-      box.classList.add('o-palette-search');
-      const input = box.querySelector('input');
-      if (!isNull(input))
-        effect(() => input.setAttribute('aria-label', t('dashboard.palette.label')));
+      field.box.classList.add('o-palette-search');
 
       // Capture phase: the input's own Escape handler blurs it and stops the event from bubbling.
-      box.addEventListener(
+      field.box.addEventListener(
         'keydown',
         (event) => {
+          if (isComposing(event)) return;
           if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
@@ -164,16 +192,28 @@ export function palette(): Child {
             const entry = untracked(() => entries.value)[untracked(() => paletteActive.value)];
             if (isUndefined(entry)) return;
             event.preventDefault();
-            close(() => navigate(entry.to));
+            pick(entry);
           }
         },
         { capture: true },
       );
 
+      let pointerX = NaN;
+      let pointerY = NaN;
       const results = h(
         'div',
         {
           class: 'o-palette-results',
+          // The rows never take focus, so the input keeps it through a click.
+          onMousedown: (event: MouseEvent) => event.preventDefault(),
+          onMousemove: (event: MouseEvent) => {
+            // A scroll under a resting pointer replays the event; only a real move selects the row.
+            if (event.clientX === pointerX && event.clientY === pointerY) return;
+            pointerX = event.clientX;
+            pointerY = event.clientY;
+            const at = rowIndex(results, event.target);
+            if (at !== -1) paletteActive.value = at;
+          },
           onClick: (event: MouseEvent) => {
             const target = event.target instanceof Element ? event.target : null;
             const to = target?.closest('a')?.getAttribute('href');
@@ -191,7 +231,9 @@ export function palette(): Child {
               items: () =>
                 group().entries.map((entry) => ({
                   to: entry.to,
+                  action: entry.onSelect,
                   label: entry.label,
+                  icon: entry.icon,
                   active: entry.index === paletteActive.value,
                 })),
             }),
@@ -226,7 +268,6 @@ export function palette(): Child {
                     () => t('dashboard.noResultsFound'),
                   ),
               ),
-              paletteSlots('row').map((render) => render()),
             ],
           ),
           paletteSlots('view').map((render) => render()),
@@ -236,13 +277,39 @@ export function palette(): Child {
           size: -1,
           fullHeight: 'auto',
           additionalClasses: ['o-palette'],
-          header: box,
+          header: field.box,
+          ...(isEmpty(paletteSlots('footer'))
+            ? {}
+            : { footer: paletteSlots('footer').map((render) => render()) }),
           onClose: () => close(),
         },
       );
+
+      // The popup autofocuses a timeout later, too late for the first keystroke after the hotkey.
+      field.input.focus();
+      const refocus = (): void => {
+        const active = document.activeElement;
+        // A control the click focused keeps it; the body, the popup or its scroll pane hand it back.
+        if (closing || (active instanceof HTMLElement && active.tabIndex >= 0)) return;
+        // A drag that selected text keeps it; focusing the input would drop the selection.
+        if (document.getSelection()?.isCollapsed === false) return;
+        field.input.focus();
+      };
+      // A timeout: a click's own handlers run first, and a control they unmount drops focus to the body.
+      handle.root.addEventListener('click', () => setTimeout(refocus));
       return null;
     },
   );
+}
+
+/**
+ * The position of the row under `target` among the results' rows, or `-1` off any row.
+ * The rows sit in document order, the order the entries are numbered in.
+ */
+function rowIndex(results: HTMLElement, target: EventTarget | null): number {
+  const row = target instanceof Element ? target.closest('.ohne-vertical-menu-item') : null;
+  if (isNull(row)) return -1;
+  return [...results.querySelectorAll('.ohne-vertical-menu-item')].indexOf(row);
 }
 
 /**

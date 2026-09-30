@@ -23,6 +23,7 @@ import {
   formatLocaleCode,
   isUndefined,
   onCleanup,
+  recordHref,
   ref,
   sleep,
   stringifySearchParams,
@@ -165,8 +166,8 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
 
   const activate = (code: string): void => {
     closeThen(() => {
-      const target = `/collections/${collection.segment}/${uuid}`;
-      if (location.pathname !== target) navigate(target);
+      const target = recordHref(collection, uuid);
+      if (location.pathname + location.search !== target) navigate(target);
       if (code !== effectiveContentLocale()) contentLocale.value = code;
     });
   };

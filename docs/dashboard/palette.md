@@ -1,8 +1,9 @@
 # Search palette
 
-Press Cmd+K (Ctrl+K on Windows and Linux) on any dashboard page to open the palette. Type to find
-records across every collection you can read, or to jump to a page from the sidebar. Arrow keys
-move the selection, Enter opens it, Escape closes the palette.
+Press Cmd+K (Ctrl+K on Windows and Linux) on any dashboard page, or click the search box in the
+header, to open the palette. Type to find records across every collection you can read, or to jump
+to a page from the sidebar. Arrow keys move the selection, Enter opens it, Escape closes the
+palette.
 
 A record shows under its collection by its label, so give each collection one:
 
@@ -21,6 +22,8 @@ export default defineCollection({
 ```
 
 Typing `ashbringer` now lists the item named Ashbringer, and any item whose tooltip mentions it.
+Picking a record opens its editor, or the page its collection's
+[`recordPath`](../database/collections.md#the-collection-in-the-dashboard) names.
 
 ## What is searched
 
@@ -32,9 +35,15 @@ and `tooltip` are searched; an `integer` field never is.
 - The search reads as the collection's own list read, so its
   [access rules](../api/collections.md#access) and read middleware apply. A field outside your
   read scope is never searched.
+- Text inside a record's own objects, repeaters, and blocks is searched too. A related record's text
+  is not.
+- A collection with very many text fields searches only as many as the query limits allow, the
+  record's own fields first.
 - A collection that refuses the read is skipped, never an error.
 - Records whose label holds every word come first.
 - Only the first ten words count.
+- A query starting with `/` is a command for a layer's own rows, like the assistant's skills, and
+  searches nothing.
 
 ## Searching from your code
 
@@ -52,3 +61,5 @@ const { results } = await response.json();
 - `limit` caps the records per collection. Omitted, each collection answers five.
 - `label` is `''` when a record's label fields are empty.
 - The route needs a signed-in user; a guest gets `401`.
+
+With the [assistant](../ai/assistant.md) installed, the last row asks it your question instead.

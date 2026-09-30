@@ -41,6 +41,7 @@ import {
   isUndefined,
   onCleanup,
   parseSearchParams,
+  recordHref,
   ref,
   sleep,
   stringifySearchParams,
@@ -314,7 +315,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       seedRecordLabel(collection, loaded);
       if (create) {
         queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
-        if (isString(outcome.record.UUID)) navigate(`${listPath}/${outcome.record.UUID}`);
+        if (isString(outcome.record.UUID)) navigate(recordHref(collection, outcome.record.UUID));
         return;
       }
       queueToast(t('dashboard.saved'), { type: 'success' });

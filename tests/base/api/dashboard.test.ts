@@ -178,7 +178,7 @@ useCollections().register('DashPeople', {
   name: 'DashPeople',
   collection: {
     api: { read: 'public' },
-    dashboard: { recordLabel: '{lastName}, {firstName}' },
+    dashboard: { recordLabel: '{lastName}, {firstName}', recordPath: '/people?open=[uuid]' },
     fields: { firstName: field('text'), lastName: field('text') },
   },
 });
@@ -534,6 +534,14 @@ describe('table', () => {
     const { body } = await call(admin);
     strictEqual(collection(body, 'Users').icon, 'users');
     strictEqual(collection(body, 'Sessions').icon, 'key');
+  });
+});
+
+describe('recordPath', () => {
+  it('ships a declared recordPath, and nothing for a collection without one', async () => {
+    const { body } = await call(user);
+    strictEqual(collection(body, 'DashPeople').recordPath, '/people?open=[uuid]');
+    strictEqual('recordPath' in collection(body, 'DashNotes'), false);
   });
 });
 

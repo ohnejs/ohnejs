@@ -39,6 +39,7 @@ import {
   isUndefined,
   nextTick,
   onCleanup,
+  recordHref,
   type Ref,
   ref,
   uniqueArray,
@@ -403,7 +404,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
             h('span', null, () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view')),
           ],
           {
-            href: `/collections/${segment}/${String(row.id)}`,
+            href: recordHref(collection, String(row.id)),
             target: '_blank',
             onClick: () => close(),
           },

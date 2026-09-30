@@ -12,7 +12,7 @@ import {
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { effect, isUndefined } from 'ohnejs/utils';
+import { effect, isUndefined, recordHref } from 'ohnejs/utils';
 
 import { recordEditor } from '../../../components/record-editor.ts';
 import { shell } from '../../../components/shell.ts';
@@ -31,6 +31,7 @@ css`
  * One record's page: the record editor, at `/collections/[collection]/[uuid]`.
  * The reserved uuid `new` opens the same editor in create mode, so create and edit are one surface.
  * A singleton has no create mode, so its `new` redirects to the collection's own page.
+ * A collection that declares a `recordPath` opens its records there, so this page redirects to it.
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
 export default defineDashboardPage((route) =>
@@ -73,6 +74,10 @@ function pane(segment: () => string, uuid: () => string): Child {
           const id = uuid();
           if (collection.singleton && id === 'new') {
             navigate(`/collections/${collection.segment}`, { replace: true });
+            return null;
+          }
+          if (!isUndefined(collection.recordPath) && id !== 'new') {
+            navigate(recordHref(collection, id), { replace: true });
             return null;
           }
           return recordEditor(collection, id === 'new' ? undefined : id);

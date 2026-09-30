@@ -30,6 +30,7 @@ import {
   isUndefined,
   keywordsCondition,
   onCleanup,
+  recordHref,
   ref,
   untracked,
 } from 'ohnejs/utils';
@@ -423,7 +424,7 @@ async function fillBucket(bucket: Bucket): Promise<void> {
         uuid,
         label: label !== '' ? label : fallbackLabel(uuid),
         updatedAt,
-        editURL: singleton ? `/collections/${segment}` : `/collections/${segment}/${uuid}`,
+        editURL: singleton ? `/collections/${segment}` : recordHref(bucket.collection, uuid),
       });
     }
   } catch {

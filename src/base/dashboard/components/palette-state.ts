@@ -1,4 +1,11 @@
-import { isUndefined, type Ref, ref, searchByKeywords } from 'ohnejs/utils';
+import {
+  type IconName,
+  isUndefined,
+  recordHref,
+  type Ref,
+  ref,
+  searchByKeywords,
+} from 'ohnejs/utils';
 
 /**
  * One record `POST /search` found, its label already filled for display.
@@ -39,6 +46,11 @@ export interface PaletteCollection {
    * The URL segment under `/collections/`.
    */
   segment: string;
+
+  /**
+   * The declared dashboard path a record opens at; absent for the record editor.
+   */
+  recordPath?: string;
 }
 
 /**
@@ -57,7 +69,48 @@ export interface PaletteMenuGroup {
 }
 
 /**
- * One row the palette lists: a dashboard path to open.
+ * One row a layer adds to the palette: a label and what picking it does.
+ */
+export interface PaletteRow {
+  /**
+   * The row label.
+   */
+  label: string;
+
+  /**
+   * The row icon.
+   */
+  icon?: IconName;
+
+  /**
+   * Runs when the row is picked, by Enter or by a click.
+   * The palette stays open, so the row may switch `paletteView` or close it itself.
+   */
+  onSelect: () => void;
+}
+
+/**
+ * One titled run of rows a layer adds under the results.
+ */
+export interface PaletteRowGroup {
+  /**
+   * A key stable across renders, unique among the groups of every layer.
+   */
+  key: string;
+
+  /**
+   * The group heading; `''` for none.
+   */
+  label: string;
+
+  /**
+   * The rows, in order.
+   */
+  rows: PaletteRow[];
+}
+
+/**
+ * One row the palette lists: a dashboard path to open, or an action to run.
  */
 export interface PaletteEntry {
   /**
@@ -71,17 +124,30 @@ export interface PaletteEntry {
   label: string;
 
   /**
-   * The dashboard path the row opens.
+   * The row icon.
    */
-  to: string;
+  icon?: IconName;
+
+  /**
+   * The dashboard path the row opens, once the palette has closed.
+   * A hit and a menu row carry one.
+   */
+  to?: string;
+
+  /**
+   * What the row runs instead of opening a path.
+   * A layer's row carries one.
+   */
+  onSelect?: () => void;
 }
 
 /**
- * One titled run of rows: the hits of one collection, or one sidebar menu group.
+ * One titled run of rows: the hits of one collection, one sidebar menu group, or a layer's group.
  */
 export interface PaletteGroup {
   /**
-   * A key stable across renders: `collection:` plus the name, or `menu:` plus the group index.
+   * A key stable across renders.
+   * It is `collection:` plus the name, `menu:` plus the group index, or the key the layer gave.
    */
   key: string;
 
@@ -123,6 +189,25 @@ export const paletteHits: Ref<readonly PaletteHit[]> = ref([]);
 export const paletteActive: Ref<number> = ref(0);
 
 /**
+ * The text the palette searches for: the trimmed query while the search view shows, else `''`.
+ * Another view owns the input, so what the person types there never reaches `POST /search`.
+ * A command, a query starting with `/`, is no search either.
+ * Reactive.
+ */
+export function paletteSearchTerm(): string {
+  if (paletteView.value !== 'search') return '';
+  const query = paletteQuery.value.trim();
+  return isPaletteCommand(query) ? '' : query;
+}
+
+/**
+ * Whether `query` is a command: it starts with `/`, and only the layers' rows answer it.
+ */
+export function isPaletteCommand(query: string): boolean {
+  return query.trimStart().startsWith('/');
+}
+
+/**
  * Opens the palette on a blank search.
  */
 export function openPalette(): void {
@@ -149,20 +234,23 @@ export function movePaletteActive(step: number, count: number): void {
 }
 
 /**
- * The rows the palette lists: the hits grouped by collection, then the menu rows matching `query`.
+ * The rows the palette lists: the hits grouped by collection, the menu rows matching `query`, then `rows`.
  * Hit groups follow the order their first hit arrives in, so the closest match leads.
  * A hit of a collection `collections` does not list is dropped.
- * A blank query lists every menu row.
+ * A blank query lists every menu row; a command lists only `rows`.
+ * The rows are numbered across every group, so one selection walks them all.
  */
 export function paletteGroups(
   query: string,
   hits: readonly PaletteHit[],
   collections: readonly PaletteCollection[],
   menu: readonly PaletteMenuGroup[],
+  rows: readonly PaletteRowGroup[] = [],
 ): PaletteGroup[] {
   const groups: PaletteGroup[] = [];
   const byCollection = new Map<string, PaletteGroup>();
-  for (const hit of hits) {
+  const command = isPaletteCommand(query);
+  for (const hit of command ? [] : hits) {
     const collection = collections.find((candidate) => candidate.name === hit.collection);
     if (isUndefined(collection)) continue;
     let group = byCollection.get(collection.name);
@@ -171,15 +259,18 @@ export function paletteGroups(
       byCollection.set(collection.name, group);
       groups.push(group);
     }
-    const to = `/collections/${collection.segment}/${hit.UUID}`;
-    group.entries.push({ index: 0, label: hit.label, to });
+    group.entries.push({ index: 0, label: hit.label, to: recordHref(collection, hit.UUID) });
   }
-  menu.forEach((group, at) => {
+  (command ? [] : menu).forEach((group, at) => {
     const items = searchByKeywords(group.items, query, 'label');
     if (items.length === 0) return;
     const entries = items.map(({ to, label }) => ({ index: 0, label, to }));
     groups.push({ key: `menu:${at}`, label: group.label, entries });
   });
+  for (const group of rows) {
+    const entries = group.rows.map((row) => ({ index: 0, ...row }));
+    groups.push({ key: group.key, label: group.label, entries });
+  }
   let index = 0;
   for (const group of groups) for (const entry of group.entries) entry.index = index++;
   return groups;

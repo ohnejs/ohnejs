@@ -5,14 +5,14 @@ import {
   h,
   icon,
   setDocumentTitle,
-  textInput,
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { computed, effect, isNull, isString, onCleanup, type Ref, ref } from 'ohnejs/utils';
+import { computed, effect, isString, onCleanup, type Ref, ref } from 'ohnejs/utils';
 
 import { overviewQuickCreate } from '../components/overview-quick-create.ts';
 import { overviewRecentEdits } from '../components/overview-recent-edits.ts';
+import { searchInput } from '../components/search-input.ts';
 import { shell } from '../components/shell.ts';
 
 /**
@@ -63,40 +63,6 @@ css`
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-  }
-
-  .o-overview-search .o-overview-search-icon {
-    margin-left: 0.75rem;
-    margin-right: 0;
-    color: hsl(var(--ohne-muted-foreground));
-    font-size: 1rem;
-  }
-
-  .o-overview-search .o-overview-search-clear {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 0.375rem;
-    margin-left: 0;
-    padding: 0.1875rem;
-    border-width: 1px;
-    border-color: transparent;
-    border-radius: calc(var(--ohne-radius) - 0.25rem);
-    outline: none;
-    background-color: transparent;
-    color: hsl(var(--ohne-muted-foreground));
-    font-size: 0.75rem;
-    line-height: 1;
-  }
-
-  .o-overview-search .o-overview-search-clear:hover {
-    background-color: hsl(var(--ohne-muted) / 0.6);
-    color: hsl(var(--ohne-foreground));
-  }
-
-  .o-overview-search .o-overview-search-clear:focus-visible {
-    border-color: hsl(var(--ohne-ring));
-    color: hsl(var(--ohne-foreground));
   }
 
   .o-overview-section {
@@ -167,44 +133,18 @@ function overview(): Child {
 
   effect(() => setDocumentTitle(t('dashboard.overview.title')));
 
-  const searchIcon = icon('search');
-  searchIcon.classList.add('o-overview-search-icon');
-
-  const box = textInput(search.query, {
+  const field = searchInput(search.query, {
     size: -1,
     placeholder: () => t('dashboard.search'),
-    prefix: searchIcon,
-    suffix: () =>
-      search.active()
-        ? h(
-            'button',
-            {
-              type: 'button',
-              class: 'o-overview-search-clear ohne-raw',
-              'aria-label': () => t('dashboard.clear'),
-              title: () => t('dashboard.clear'),
-              onClick: () => clearSearch(),
-            },
-            icon('x'),
-          )
-        : null,
+    label: () => t('dashboard.search'),
   });
-  box.classList.add('o-overview-search');
-
-  const input = box.querySelector('input');
-  if (!isNull(input)) effect(() => input.setAttribute('aria-label', t('dashboard.search')));
-
-  const clearSearch = (): void => {
-    search.query.value = '';
-    input?.focus();
-  };
 
   // Capture phase only: `textInput` blurs on Escape and stops the event before it can bubble here.
   const onKeydown = (event: KeyboardEvent): void => {
-    if (event.code === 'Escape' && search.active() && document.activeElement === input) {
+    if (event.code === 'Escape' && search.active() && document.activeElement === field.input) {
       event.preventDefault();
       event.stopPropagation();
-      clearSearch();
+      field.clear();
     }
   };
   window.addEventListener('keydown', onKeydown, { capture: true });
@@ -213,7 +153,7 @@ function overview(): Child {
   return h(
     'div',
     { class: () => 'o-overview' + (search.active() ? ' o-overview-searching' : '') },
-    box,
+    field.box,
     h(
       'section',
       { class: 'o-overview-section' },

@@ -550,6 +550,9 @@ export default defineCollection({
   icon.
 - `recordLabel` - the field that gives a record its title, as [record labels](#record-labels)
   describes.
+- `recordPath` - where the dashboard opens a record, like `'/media?details=[uuid]'`. Every record
+  link fills `[uuid]` with the record's `UUID`, and the record's editor page redirects there. If you
+  omit it, a record opens in its editor.
 - `table` - the list view's [default columns](#table-columns).
 - `layout` - how the record editor [arranges the fields](../dashboard/field-layouts.md).
 
