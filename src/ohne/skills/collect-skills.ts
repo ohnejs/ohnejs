@@ -1,12 +1,13 @@
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { SkillDefinition } from './define-skill.ts';
 
-import { isPlainObject, isString } from '../../utils/index.ts';
+import { isPlainObject } from '../../utils/index.ts';
 import {
   collectLayerFiles,
   type CollectedFile,
   type CollectLayerFilesOptions,
 } from '../layers/collect-layer-files.ts';
+import { isPrompt } from './prompt.ts';
 
 /**
  * One skill with its imported definition under `skill`, ready for codegen.
@@ -33,5 +34,5 @@ export function collectSkills(
  * Whether a default export has the shape of a `defineSkill` result.
  */
 function isSkillDefinition(definition: unknown): definition is SkillDefinition {
-  return isPlainObject(definition) && isString(definition.prompt);
+  return isPlainObject(definition) && isPrompt(definition.prompt);
 }

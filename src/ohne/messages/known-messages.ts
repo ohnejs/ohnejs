@@ -37,17 +37,20 @@ export type ParamlessMessageKey = {
  * A message key paired with its parameters as a `{ key, params }` object.
  * The `key` discriminates the union, so `params` is typed to exactly what the chosen template expects.
  * A param-free key carries no `params`: `{ key: 'validation.required' }` alone is valid.
+ * Every param-free key shares one member, so the union stays small in an app with many messages.
  *
  * Until codegen populates `KnownMessages`, the object loosens to a plain `string` key and record.
  * A parameterized message then reads and type-checks without a cast.
  */
 export type MessageObject = [keyof KnownMessages] extends [never]
   ? { key: string; params?: Record<string, unknown> }
-  : {
-      [K in keyof KnownMessages]: [keyof KnownMessages[K]] extends [never]
-        ? { key: K; params?: never }
-        : { key: K; params: KnownMessages[K] };
-    }[keyof KnownMessages];
+  :
+      | { key: ParamlessMessageKey; params?: never }
+      | {
+          [K in keyof KnownMessages]: [keyof KnownMessages[K]] extends [never]
+            ? never
+            : { key: K; params: KnownMessages[K] };
+        }[keyof KnownMessages];
 
 /**
  * A message to translate or show: a param-free key, a `{ key, params }` object, or a plain string.

@@ -1,4 +1,4 @@
-import { deepStrictEqual, doesNotThrow, match, ok, throws } from 'node:assert';
+import { deepStrictEqual, doesNotThrow, match, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { defineCollection } from '../../../src/ohne/collections/define-collection.ts';
@@ -314,6 +314,27 @@ describe('defineCollection', () => {
         }),
       /Unknown icon `constructor`/,
     );
+  });
+
+  it('accepts a recordPath holding `[uuid]`', () => {
+    const uploads = defineCollection({
+      fields: { title: field('text') },
+      dashboard: { recordPath: '/media?details=[uuid]' },
+    });
+    strictEqual(uploads.dashboard?.recordPath, '/media?details=[uuid]');
+  });
+
+  it('rejects a recordPath off the dashboard, without `[uuid]`, or with another param', () => {
+    for (const recordPath of ['//evil.test/[uuid]', '/media', '/media/[folder]?details=[uuid]']) {
+      throws(
+        () =>
+          defineCollection({
+            fields: { title: field('text') },
+            dashboard: { recordPath: recordPath as '/[uuid]' },
+          }),
+        /Invalid `dashboard.recordPath` declaration/,
+      );
+    }
   });
 
   it('accepts a recordLabel field name and list unchanged', () => {

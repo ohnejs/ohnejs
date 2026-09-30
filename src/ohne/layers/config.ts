@@ -17,6 +17,7 @@ import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
 import type { KnownRoles } from '../roles/known-roles.ts';
+import type { KnownRoutes } from '../routes/known-routes.ts';
 import type { KnownSkills } from '../skills/known-skills.ts';
 import type { LayerName } from './layer-name.ts';
 
@@ -229,7 +230,7 @@ export interface Config {
      * }
      * ```
      */
-    routes?: string[];
+    routes?: LiteralUnion<Extract<keyof KnownRoutes, string>>[];
 
     /**
      * Message keys to drop, as globs over the dot-separated key.

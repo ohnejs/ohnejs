@@ -1,5 +1,6 @@
 import type { Message } from '../messages/known-messages.ts';
 import type { Capability } from '../roles/known-capabilities.ts';
+import type { Prompt } from './prompt.ts';
 
 import { validateSkillDefinition } from './validate-skill.ts';
 
@@ -36,9 +37,17 @@ export interface SkillDefinition {
   description: Message;
 
   /**
-   * The instructions the assistant follows when the skill runs, as plain text.
+   * The instructions the assistant follows when the skill runs: one text, or a list of lines.
+   *
+   * @example
+   * ```ts
+   * prompt: [
+   *   'Find the items that lack the target locale: `_translations` does not include it.',
+   *   'Rewrite `name` and `tooltip` into the locale the person names.',
+   * ]
+   * ```
    */
-  prompt: string;
+  prompt: Prompt;
 
   /**
    * The capability a person must hold to see and run the skill.

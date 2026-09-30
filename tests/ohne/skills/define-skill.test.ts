@@ -46,9 +46,11 @@ describe('defineSkill', () => {
     );
   });
 
-  it('rejects a missing or empty prompt', () => {
+  it('takes a prompt as a list of lines, and rejects a missing, blank or mistyped one', () => {
+    defineSkill({ description: 'd', prompt: ['Read first.', 'Then write.'] });
     throws(() => defineSkill({ description: 'd' } as never), failsOn('prompt'));
     throws(() => defineSkill({ description: 'd', prompt: '' }), failsOn('prompt'));
+    throws(() => defineSkill({ description: 'd', prompt: ['', ' '] }), failsOn('prompt'));
     throws(() => defineSkill({ description: 'd', prompt: 1 as never }), failsOn('prompt'));
   });
 

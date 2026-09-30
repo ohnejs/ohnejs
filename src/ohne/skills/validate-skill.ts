@@ -2,6 +2,7 @@ import type { SkillDefinition } from './define-skill.ts';
 
 import { isMessage, isString, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { isPrompt } from './prompt.ts';
 
 const MESSAGE = 'a message key, a plain string, or a `{ key, params }` object';
 
@@ -9,7 +10,7 @@ const MESSAGE = 'a message key, a plain string, or a `{ key, params }` object';
  * Validates a skill definition.
  * `description` is required and `title` optional.
  * Each is a message key, a plain string, or a `{ key, params }` object.
- * `prompt` is a non-empty string, and so is `capability` when set.
+ * `prompt` is a text or a list of lines that is not blank, and `capability` a non-empty string when set.
  */
 export function validateSkillDefinition(definition: SkillDefinition): void {
   const {
@@ -20,7 +21,7 @@ export function validateSkillDefinition(definition: SkillDefinition): void {
   }: Partial<Record<keyof SkillDefinition, unknown>> = definition;
   if (!isMessage(description)) throw invalid('description', MESSAGE);
   if (!isUndefined(title) && !isMessage(title)) throw invalid('title', MESSAGE);
-  if (!isString(prompt) || prompt === '') throw invalid('prompt', 'a non-empty string');
+  if (!isPrompt(prompt)) throw invalid('prompt', 'a non-blank string or list of strings');
   if (!isUndefined(capability) && (!isString(capability) || capability === '')) {
     throw invalid('capability', 'a non-empty capability string');
   }

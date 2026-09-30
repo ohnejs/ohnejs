@@ -226,4 +226,30 @@ describe('defineFlow', () => {
         String(error.body).includes('- `gone`'),
     );
   });
+
+  it('rejects decide nodes that route in a cycle, and accepts two branches meeting at one', () => {
+    const ask = (to: string) => ({ decide: { questions: { go: { yesNo: 'Go on?' } } }, next: to });
+    throws(
+      () =>
+        defineFlow<string>({
+          description: 'Loops',
+          start: 'a',
+          nodes: { a: ask('b'), b: ask('a') },
+        }),
+      (error) =>
+        isOhneError(error) &&
+        String(error.body).includes('- `a`') &&
+        String(error.body).includes('- `b`'),
+    );
+    defineFlow<string>({
+      description: 'Meets',
+      start: 'x',
+      nodes: {
+        x: { act: { prompt: 'x' }, next: ['y', 'z'] },
+        z: ask('y'),
+        y: ask('end'),
+        end: { act: {} },
+      },
+    });
+  });
 });

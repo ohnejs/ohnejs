@@ -1,5 +1,7 @@
 import type { Message } from '../messages/known-messages.ts';
 import type { SkillName } from '../skills/known-skills.ts';
+import type { Prompt } from '../skills/prompt.ts';
+import type { AIModelName } from './known-ai-models.ts';
 
 import { validateFlowDefinition } from './validate-flow.ts';
 
@@ -89,10 +91,10 @@ export interface FlowActNode<N extends string = string> {
  */
 export interface FlowDecide {
   /**
-   * The model that answers.
+   * The model that answers, an `ai.models` entry.
    * Omitted, the assistant's own decide model answers.
    */
-  model?: string;
+  model?: AIModelName;
 
   /**
    * The questions by name; `next` routes `on` one of them.
@@ -131,15 +133,15 @@ export interface FlowAct {
   skill?: SkillName;
 
   /**
-   * The instructions the assistant follows, as plain text.
+   * The instructions the assistant follows: one text, or a list of lines.
    */
-  prompt?: string;
+  prompt?: Prompt;
 
   /**
-   * The model the node runs on.
+   * The model the node runs on, an `ai.models` entry.
    * Omitted, the turn's model runs it.
    */
-  model?: string;
+  model?: AIModelName;
 
   /**
    * The request tiers the node may propose.

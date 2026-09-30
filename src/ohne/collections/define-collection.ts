@@ -206,6 +206,11 @@ export type RecordLabel<TField extends string = string> =
   | `${string}{${TField}}${string}`;
 
 /**
+ * A dashboard path that opens one record: it starts with `/` and holds the `[uuid]` token.
+ */
+export type RecordPath = `/${string}[uuid]${string}`;
+
+/**
  * A collection's dashboard list-view defaults.
  */
 export interface CollectionTable<TField extends string = string> {
@@ -255,6 +260,19 @@ export interface CollectionDashboard<TField extends string = string> {
    * ```
    */
   recordLabel?: RecordLabel<TField>;
+
+  /**
+   * The dashboard path a record opens at, its `[uuid]` token filled with the record's `UUID`.
+   * Every record link follows it, and the plain record page redirects to it.
+   * It must start with `/` and name no param besides `[uuid]`; anything else fails at boot.
+   * Omitted, a record opens in the editor at `/collections/<segment>/<uuid>`.
+   *
+   * @example
+   * ```ts
+   * recordPath: '/media?details=[uuid]'
+   * ```
+   */
+  recordPath?: RecordPath;
 
   /**
    * The list view's defaults for this collection.

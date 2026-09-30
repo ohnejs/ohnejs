@@ -10,6 +10,7 @@ import {
   isUndefined,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { isPrompt } from '../skills/prompt.ts';
 
 const MESSAGE = 'be a message key, a plain string, or a `{ key, params }` object';
 
@@ -24,6 +25,7 @@ const TIERS: ReadonlySet<unknown> = new Set<FlowTier>(['read', 'write', 'destruc
  * `start` and every edge name a node, and every node is reachable from `start`.
  * A decide node has questions and a `next`; an act node's `next` is a node or a list of nodes.
  * A branch routes `on` a question of its own node, with `cases` only for that question's options.
+ * Decide nodes never route in a cycle among themselves, so every walk reaches an act node or ends.
  */
 export function validateFlowDefinition(definition: FlowDefinition): void {
   const { title, description, start, nodes }: Partial<Record<keyof FlowDefinition, unknown>> =
@@ -51,6 +53,46 @@ export function validateFlowDefinition(definition: FlowDefinition): void {
       ],
     });
   }
+  const cycle = decideCycle(nodes, edges);
+  if (!isUndefined(cycle)) {
+    throw ohneError({
+      title: 'Invalid flow definition',
+      body: [
+        'These decide nodes route to each other and never reach an act node:',
+        '',
+        ...cycle.map((id) => `- \`${id}\``),
+      ],
+    });
+  }
+}
+
+/**
+ * The first cycle made of decide nodes alone, in walk order, or `undefined` when there is none.
+ */
+function decideCycle(
+  nodes: Record<string, unknown>,
+  edges: ReadonlyMap<string, string[]>,
+): string[] | undefined {
+  const deciding = (id: string): boolean => isPlainObject(nodes[id]) && 'decide' in nodes[id];
+  const done = new Set<string>();
+  const visit = (id: string, path: string[]): string[] | undefined => {
+    const at = path.indexOf(id);
+    if (at !== -1) return path.slice(at);
+    if (done.has(id)) return undefined;
+    for (const target of edges.get(id) ?? []) {
+      if (!deciding(target)) continue;
+      const cycle = visit(target, [...path, id]);
+      if (!isUndefined(cycle)) return cycle;
+    }
+    done.add(id);
+    return undefined;
+  };
+  for (const id of Object.keys(nodes)) {
+    if (!deciding(id)) continue;
+    const cycle = visit(id, []);
+    if (!isUndefined(cycle)) return cycle;
+  }
+  return undefined;
 }
 
 /**
@@ -119,8 +161,8 @@ function validateAct(path: string, act: unknown): void {
   if (!isPlainObject(act)) throw invalid(path, 'be an object');
   const { skill, prompt, model, tiers } = act;
   if (!isUndefined(skill) && !isText(skill)) throw invalid(`${path}.skill`, 'be a skill name');
-  if (!isUndefined(prompt) && !isText(prompt)) {
-    throw invalid(`${path}.prompt`, 'be a non-empty string');
+  if (!isUndefined(prompt) && !isPrompt(prompt)) {
+    throw invalid(`${path}.prompt`, 'be a non-blank string or list of strings');
   }
   validateModel(`${path}.model`, model);
   if (!isUndefined(tiers) && (!isArray(tiers) || !tiers.every((tier) => TIERS.has(tier)))) {

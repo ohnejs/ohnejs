@@ -3,6 +3,7 @@ import type { CollectionDefinition, CompositeIndex } from './define-collection.t
 
 import {
   didYouMean,
+  fillRoute,
   isArray,
   isBoolean,
   isCSSLength,
@@ -25,6 +26,8 @@ const API_OPERATIONS = new Set(['read', 'create', 'update', 'delete']);
 
 const SINGLETON_CLOSED = ['create', 'delete'] as const;
 
+const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
+
 /**
  * Validates a collection definition.
  *
@@ -34,9 +37,10 @@ const SINGLETON_CLOSED = ['create', 'delete'] as const;
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `singleton` must be a boolean; when `true`, `api` may name `read` and `update` only.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
- * - `dashboard` must be an object holding only `icon`, `recordLabel`, `table`, and `layout`.
+ * - `dashboard` must be an object holding only `icon`, `recordLabel`, `recordPath`, `table`, and `layout`.
  * - `dashboard.icon` must name an icon the vendored set carries.
  * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
+ * - `dashboard.recordPath` must be a dashboard path holding `[uuid]` and no other param.
  * - `dashboard.table.columns` must be a non-empty list naming distinct, readable fields.
  * - A column is a declared field, `UUID`, `_updatedAt`, or `_translations` beside a translatable field.
  * - `dashboard.layout` must name declared fields, each once, in the node grammar `validateLayout` sets.
@@ -56,7 +60,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateDashboard(definition.dashboard, definition.fields, collection);
 }
 
-const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'table', 'layout']);
+const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'recordPath', 'table', 'layout']);
 
 /**
  * Rejects a malformed `dashboard` declaration.
@@ -84,13 +88,14 @@ function validateDashboard(
         title: `Unknown \`dashboard\` key \`${key}\``,
         body: [
           `The \`dashboard\` option${scope} names \`${key}\`.`,
-          'The keys are `icon`, `recordLabel`, `table`, and `layout`.',
+          'The keys are `icon`, `recordLabel`, `recordPath`, `table`, and `layout`.',
         ],
       });
     }
   }
   validateIcon(dashboard.icon, collection);
   validateRecordLabel(dashboard.recordLabel, fields, collection);
+  validateRecordPath(dashboard.recordPath, collection);
   validateTable(dashboard.table, fields, collection);
   validateLayout(dashboard.layout, Object.keys(fields), 'dashboard.layout', scope);
 }
@@ -240,6 +245,28 @@ function validateCopyTranslation(
  */
 function hasTranslatableField(fields: Record<string, FieldInstance>): boolean {
   return Object.values(fields).some((instance) => instance.options.translatable === true);
+}
+
+/**
+ * Rejects a `dashboard.recordPath` that is not a dashboard path with exactly the `[uuid]` param.
+ * Filling it with a sample `UUID` proves both: any other param has no value, so the fill throws.
+ */
+function validateRecordPath(recordPath: unknown, collection?: string): void {
+  if (isUndefined(recordPath)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (isString(recordPath) && /^\/(?!\/)/.test(recordPath) && recordPath.includes('[uuid]')) {
+    try {
+      fillRoute(recordPath, { uuid: SAMPLE_UUID });
+      return;
+    } catch {}
+  }
+  throw ohneError({
+    title: 'Invalid `dashboard.recordPath` declaration',
+    body: [
+      `The \`dashboard.recordPath\` option${scope} must be a dashboard path holding \`[uuid]\` and no other param.`,
+      "Write `recordPath: '/media?details=[uuid]'`.",
+    ],
+  });
 }
 
 /**
