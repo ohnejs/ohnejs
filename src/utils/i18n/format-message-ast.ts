@@ -19,6 +19,7 @@ import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
 import { hasKey } from '../object/has-key.ts';
 import { dateOptionsFromSkeleton } from './date-options-from-skeleton.ts';
+import { intlLanguage } from './intl-language.ts';
 import { MessageFormatError } from './message-errors.ts';
 import { numberOptionsFromSkeleton } from './number-options-from-skeleton.ts';
 
@@ -187,7 +188,7 @@ function renderSelect(node: MessageSelectNode, ctx: Context): string {
 function renderPound(ctx: Context): string {
   if (!ctx.pound) return '#';
   const adjusted = ctx.pound.value - ctx.pound.offset;
-  return new Intl.NumberFormat(ctx.language).format(adjusted);
+  return new Intl.NumberFormat(intlLanguage(ctx.language)).format(adjusted);
 }
 
 /**
@@ -266,16 +267,17 @@ function notify(ctx: Context, message: string): void {
  * Builds the number formatter for no style, `integer`, `percent`, or a `::` skeleton; other styles throw.
  */
 function numberFormat(style: string | null, language: string): Intl.NumberFormat {
-  if (isNull(style)) return new Intl.NumberFormat(language);
-  if (style === 'integer') return new Intl.NumberFormat(language, { maximumFractionDigits: 0 });
-  if (style === 'percent') return new Intl.NumberFormat(language, { style: 'percent' });
+  const tag = intlLanguage(language);
+  if (isNull(style)) return new Intl.NumberFormat(tag);
+  if (style === 'integer') return new Intl.NumberFormat(tag, { maximumFractionDigits: 0 });
+  if (style === 'percent') return new Intl.NumberFormat(tag, { style: 'percent' });
   if (style === 'currency') {
     throw new MessageFormatError(
       'bare `currency` style requires a code; use `::currency/XXX` skeleton instead',
     );
   }
   if (style.startsWith('::')) {
-    return new Intl.NumberFormat(language, numberOptionsFromSkeleton(style.slice(2)));
+    return new Intl.NumberFormat(tag, numberOptionsFromSkeleton(style.slice(2)));
   }
   throw new MessageFormatError(`unknown number style \`${style}\``);
 }
@@ -285,13 +287,14 @@ function numberFormat(style: string | null, language: string): Intl.NumberFormat
  */
 function dateFormat(style: string | null, language: string): Intl.DateTimeFormat {
   const key = style ?? 'medium';
+  const tag = intlLanguage(language);
   if (DATETIME_STYLE_KEYWORDS.has(key)) {
-    return new Intl.DateTimeFormat(language, {
+    return new Intl.DateTimeFormat(tag, {
       dateStyle: key as 'short' | 'medium' | 'long' | 'full',
     });
   }
   if (!isNull(style) && style.startsWith('::')) {
-    return new Intl.DateTimeFormat(language, dateOptionsFromSkeleton(style.slice(2)));
+    return new Intl.DateTimeFormat(tag, dateOptionsFromSkeleton(style.slice(2)));
   }
   throw new MessageFormatError(`unknown date style \`${style}\``);
 }
@@ -301,13 +304,14 @@ function dateFormat(style: string | null, language: string): Intl.DateTimeFormat
  */
 function timeFormat(style: string | null, language: string): Intl.DateTimeFormat {
   const key = style ?? 'medium';
+  const tag = intlLanguage(language);
   if (DATETIME_STYLE_KEYWORDS.has(key)) {
-    return new Intl.DateTimeFormat(language, {
+    return new Intl.DateTimeFormat(tag, {
       timeStyle: key as 'short' | 'medium' | 'long' | 'full',
     });
   }
   if (!isNull(style) && style.startsWith('::')) {
-    return new Intl.DateTimeFormat(language, dateOptionsFromSkeleton(style.slice(2)));
+    return new Intl.DateTimeFormat(tag, dateOptionsFromSkeleton(style.slice(2)));
   }
   throw new MessageFormatError(`unknown time style \`${style}\``);
 }

@@ -1,4 +1,5 @@
 import { getOrSet } from '../map/get-or-set.ts';
+import { intlLanguage } from './intl-language.ts';
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -78,6 +79,6 @@ function formatFor(language: string): Intl.RelativeTimeFormat {
   return getOrSet(
     formats,
     language,
-    () => new Intl.RelativeTimeFormat(language, { numeric: 'auto' }),
+    () => new Intl.RelativeTimeFormat(intlLanguage(language), { numeric: 'auto' }),
   );
 }

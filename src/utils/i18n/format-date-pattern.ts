@@ -1,5 +1,6 @@
 import { isString } from '../is/is-string.ts';
 import { getOrSet } from '../map/get-or-set.ts';
+import { intlLanguage } from './intl-language.ts';
 
 /**
  * Options for `formatDatePattern`.
@@ -128,7 +129,7 @@ function formatterFor(key: IntlKey, { language, timeZone }: Context): Intl.DateT
   return getOrSet(
     formatters,
     `${key}|${language}|${timeZone ?? ''}`,
-    () => new Intl.DateTimeFormat(language, { timeZone, ...INTL_OPTIONS[key] }),
+    () => new Intl.DateTimeFormat(intlLanguage(language), { timeZone, ...INTL_OPTIONS[key] }),
   );
 }
 
