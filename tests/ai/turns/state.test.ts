@@ -11,6 +11,7 @@ import {
   closeTurn,
   expireTurn,
   loadTurn,
+  loadTurns,
   openTurn,
   saveTurn,
   touchTurn,
@@ -18,6 +19,7 @@ import {
   unknownBatch,
 } from '../../../src/ai/turns/state.ts';
 import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
+import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isNull } from '../../../src/utils/is/is-null.ts';
 import { signIn, withAI } from '../_fixture.ts';
 
@@ -54,6 +56,7 @@ describe('the turn state', () => {
       user: owner.uuid,
       model: 'smart',
       page: '/collections/items',
+      input: 'Hi',
       transcript: [{ role: 'user', content: 'Hi' }],
     });
     deepStrictEqual(await loadTurn(turn.UUID), turn);
@@ -66,12 +69,26 @@ describe('the turn state', () => {
     ok(turn.updatedAt > 0);
   });
 
+  it('reads turns without their transcripts when asked, every other field intact', async () => {
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Light',
+      transcript: [{ role: 'user', content: 'Light' }],
+    });
+    const [light] = await loadTurns({ UUID: turn.UUID }, { transcript: false });
+    deepStrictEqual(light, { ...turn, transcript: [] });
+    deepStrictEqual((await loadTurns({ UUID: turn.UUID }))[0], turn);
+  });
+
   it("keeps a flow turn's walk and runs on its transcript's model", async () => {
     const flow = { name: 'state-flow', input: 'Hi', node: null, model: 'smart', queue: ['fast'] };
     const turn = await openTurn({
       user: owner.uuid,
       model: 'smart',
       page: '/',
+      input: 'Hi',
       transcript: [],
       flow,
     });
@@ -83,7 +100,13 @@ describe('the turn state', () => {
     deepStrictEqual((await loadTurn(turn.UUID))?.flow, turn.flow);
     turn.flow.node = null;
     strictEqual(activeModel(turn), 'fast');
-    const plain = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const plain = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     strictEqual(plain.flow, null);
     strictEqual(activeModel(plain), 'smart');
   });
@@ -93,7 +116,13 @@ describe('the turn state', () => {
   });
 
   it('writes the state back only while the row still sits at the expected step', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     turn.transcript = [
       { role: 'user', content: 'Hi' },
       { role: 'assistant', content: 'Yo' },
@@ -114,7 +143,13 @@ describe('the turn state', () => {
   });
 
   it('claims the next step once, so a stale copy of the turn is refused', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     const stale = { ...turn };
     strictEqual(await claimStep(turn), true);
     strictEqual(turn.step, 2);
@@ -124,7 +159,13 @@ describe('the turn state', () => {
   });
 
   it('closes a turn whatever step it sits at, with its reason', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     strictEqual(turn.reason, null);
     await closeTurn(turn, 'timeout');
     ok(!isNull(turn.closedAt));
@@ -134,7 +175,13 @@ describe('the turn state', () => {
   });
 
   it('keeps the first close, and hands it to a later closer', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     const late = { ...turn };
     await closeTurn(turn, 'provider');
     await closeTurn(late, 'left');
@@ -143,7 +190,13 @@ describe('the turn state', () => {
   });
 
   it('writes no step into a closed row', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     await closeTurn({ ...turn }, 'idle');
     turn.transcript = [{ role: 'user', content: 'Hi' }];
     strictEqual(await saveTurn(turn, 1), false);
@@ -151,7 +204,13 @@ describe('the turn state', () => {
   });
 
   it('touches an open turn, so its idle time starts over, and leaves a closed one', async () => {
-    const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
     const opened = turn.updatedAt;
     await sleep(5);
     await touchTurn(turn);
@@ -166,24 +225,90 @@ describe('the turn state', () => {
   });
 
   it('closes a turn as `idle` once its batch waited past `ai.limits.turnTimeout`', async () => {
-    await withAI({ limits: { turnTimeout: 1, step: '1h' } }, async () => {
-      const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+    await withAI({ limits: { turnTimeout: 1000, step: '1h' } }, async () => {
+      const turn = await openTurn({
+        user: owner.uuid,
+        model: 'smart',
+        page: '/',
+        input: 'Hi',
+        transcript: [],
+      });
       turn.batches = [batch];
       strictEqual(await saveTurn(turn, 1), true);
-      strictEqual(await expireTurn(turn), false);
-      await sleep(5);
-      strictEqual(await expireTurn(turn), true);
+      strictEqual(await expireTurn({ ...turn, updatedAt: Date.now() - 500 }), false);
+      strictEqual(await expireTurn({ ...turn, updatedAt: Date.now() - 2000 }), true);
       strictEqual((await loadTurn(turn.UUID))?.reason, 'idle');
     });
   });
 
   it('closes a turn as `lost` once its step stayed unwritten for twice `ai.limits.step`', async () => {
     await withAI({ limits: { turnTimeout: '1h', step: 1000 } }, async () => {
-      const turn = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+      const turn = await openTurn({
+        user: owner.uuid,
+        model: 'smart',
+        page: '/',
+        input: 'Hi',
+        transcript: [],
+      });
       strictEqual(await expireTurn({ ...turn, updatedAt: Date.now() - 1000 }), false);
       strictEqual(await expireTurn({ ...turn, updatedAt: Date.now() - 3000 }), true);
       strictEqual((await loadTurn(turn.UUID))?.reason, 'lost');
     });
+  });
+
+  it('keeps what the person typed, the skill and the chat, and round-trips `texts`', async () => {
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Who is level 60?',
+      skill: 'weekly-report',
+      chat: '019f3c1a-8b2d-7f4e-9a6b-1c2d3e4f5a6b',
+      transcript: [],
+    });
+    deepStrictEqual(
+      [turn.input, turn.skill, turn.chat, turn.texts],
+      ['Who is level 60?', 'weekly-report', '019f3c1a-8b2d-7f4e-9a6b-1c2d3e4f5a6b', []],
+    );
+    turn.texts = ['Reading.'];
+    strictEqual(await saveTurn(turn, 1), true);
+    deepStrictEqual((await loadTurn(turn.UUID))?.texts, ['Reading.']);
+    const plain = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
+    deepStrictEqual([plain.skill, plain.chat], [null, null]);
+  });
+
+  it('reads a row without `texts` as none', async () => {
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
+    await queryUntyped('AITurns')
+      .unscoped()
+      .where({ UUID: turn.UUID })
+      .updateOrThrow({ texts: null });
+    deepStrictEqual((await loadTurn(turn.UUID))?.texts, []);
+  });
+
+  it('keeps the text streamed so far when it closes a turn', async () => {
+    const turn = await openTurn({
+      user: owner.uuid,
+      model: 'smart',
+      page: '/',
+      input: 'Hi',
+      transcript: [],
+    });
+    turn.texts = ['Half an ans'];
+    await closeTurn(turn, 'provider');
+    deepStrictEqual((await loadTurn(turn.UUID))?.texts, ['Half an ans']);
   });
 
   it('names its conflicts', () => {

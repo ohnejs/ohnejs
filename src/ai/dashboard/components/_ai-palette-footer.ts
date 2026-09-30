@@ -13,16 +13,12 @@ css`
   .o-ai-new-question {
     margin-right: auto;
   }
-
-  .o-ai-model-menu-check {
-    margin-left: auto;
-    color: hsl(var(--ohne-muted-foreground));
-  }
 `;
 
 /**
  * The palette footer's "New question" button, shown while a settled conversation fills the palette.
  * It clears the conversation and returns to search, where the next question starts fresh.
+ * The chat stays on the server, listed under Recent chats.
  */
 export function aiNewQuestion(): Child {
   return when(
@@ -79,16 +75,17 @@ export function aiModelMenu(): Child {
           () => open.value,
           () =>
             dropdown(
-              (aiMeta()?.models ?? []).map((name) =>
-                dropdownItem([h('span', null, name), name === currentModel() ? check() : null], {
+              (aiMeta()?.models ?? []).map((name) => {
+                const selected = name === currentModel();
+                return dropdownItem([selected ? icon('check') : null, h('span', null, name)], {
+                  indent: !selected,
                   onClick: () => pick(name),
-                }),
-              ),
+                });
+              }),
               {
                 reference: trigger,
                 placement: 'end',
                 restoreFocus: SEARCH_INPUT,
-                size: -1,
                 onClose: () => {
                   open.value = false;
                 },
@@ -98,13 +95,4 @@ export function aiModelMenu(): Child {
       );
     },
   );
-}
-
-/**
- * The check that marks the model in use.
- */
-function check(): SVGSVGElement {
-  const svg = icon('check');
-  svg.classList.add('o-ai-model-menu-check');
-  return svg;
 }

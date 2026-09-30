@@ -9,6 +9,7 @@
     "resultsMismatch": "Pro Vorschlag ist genau ein Ergebnis nötig",
     "turnGone": "Der Durchgang kann nicht fortgesetzt werden",
     "unknownBatch": "Unbekannter Stapel `{batch}`",
+    "unknownChat": "Unbekannter Chat",
     "unknownFlow": "Unbekannter Ablauf `{flow}`",
     "unknownKey": "Unbekannter Schlüssel `{key}`",
     "unknownModel": "Unbekanntes Modell `{model}`",
@@ -25,7 +26,19 @@
     },
     "page": {
       "label": "Seite",
-      "description": "Die Dashboard-Route, von der aus die Person gefragt hat."
+      "description": "Der Dashboard-Pfad, von dem aus die Person gefragt hat."
+    },
+    "input": {
+      "label": "Eingabe",
+      "description": "Was die Person eingegeben hat, ohne die Einfassungen darum."
+    },
+    "skill": {
+      "label": "Fähigkeit",
+      "description": "Die Fähigkeit, mit der der Durchgang begann; leer für keine."
+    },
+    "chat": {
+      "label": "Chat",
+      "description": "Der erste Durchgang des Chats, den dieser fortsetzt; leer beim ersten Durchgang selbst."
     },
     "flow": {
       "label": "Ablauf",
@@ -38,6 +51,10 @@
     "batches": {
       "label": "Stapel",
       "description": "Die Anfragen, die jeder Schritt vorgeschlagen hat, als JSON."
+    },
+    "texts": {
+      "label": "Texte",
+      "description": "Der Text des Modells pro Schritt, als JSON."
     },
     "step": {
       "label": "Schritte",
@@ -71,15 +88,23 @@
     "ask": "Fragen: `{query}`",
     "skills": "Fähigkeiten",
     "flows": "Abläufe",
-    "start": "Oben eine Frage eingeben und Enter drücken, oder `/` für eine Fähigkeit oder einen Ablauf",
+    "recentChats": "Letzte Chats",
+    "askAssistant": "Den Assistenten fragen",
+    "placeholder": "Suchen oder den Assistenten fragen",
+    "placeholderFollowUp": "Rückfrage stellen",
+    "placeholderStarters": "Suchen, fragen oder / für Fähigkeiten tippen",
+    "start": "Oben eine Frage eingeben und Enter drücken, oder / für eine Fähigkeit oder einen Ablauf",
     "followUp": "Oben eine Rückfrage eingeben und Enter drücken",
     "thinking": "Denkt nach",
     "reading": "Liest",
-    "waiting": "Wartet {seconds} s",
+    "waiting": "Neuer Versuch in {seconds} s",
     "working": "Assistent: arbeitet",
     "sending": "Assistent: sendet {sent} von {total}",
+    "progress": {
+      "working": "Arbeitet",
+      "sending": "Sendet {sent} von {total}"
+    },
     "approval": "Assistent: wartet auf deine Freigabe",
-    "failed": "Der Assistent konnte das nicht tun",
     "reason": {
       "timeout": "Es hat zu lange gedauert. Es wurde nichts weiter geändert.",
       "provider": "Das Modell hat nicht geantwortet.",
@@ -88,17 +113,23 @@
       "steps": "Der Assistent hat sein Schrittlimit für eine Frage erreicht.",
       "length": "Die Antwort wurde abgeschnitten.",
       "refusal": "Das Modell hat die Antwort verweigert.",
-      "turnGone": "Dieses Gespräch ist beendet. Frag erneut, um ein neues zu beginnen.",
+      "turnGone": "Dieses Gespräch kann nicht mehr fortgesetzt werden. Deine Frage beginnt ein neues.",
       "limit": "Du hast das Limit des Assistenten vorerst erreicht.",
       "unavailable": "Das Modell ist nicht verfügbar.",
       "forbidden": "Du darfst den Assistenten nicht verwenden.",
       "off": "Der Assistent ist nicht aktiviert.",
       "signedOut": "Du bist abgemeldet.",
+      "left": "Die Seite wurde geschlossen, während der Assistent antwortete.",
+      "idle": "Das hat zu lange auf eine Antwort gewartet und wurde beendet.",
+      "lost": "Der Server wurde beim Antworten angehalten.",
+      "running": "Wird gerade in einem anderen Fenster beantwortet.",
       "blindModel": "Dieses Modell darf keine Feldwerte sehen. Wähl ein anderes.",
       "empty": "Der Assistent hat nichts zu tun gefunden."
     },
     "read": {
       "list": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} gelesen",
+      "listFiltered": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} nach einem Filter gelesen",
+      "found": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} zu `{query}` gefunden",
       "record": "Einen Datensatz aus {collection} gelesen",
       "translations": "Die Übersetzungen eines Datensatzes aus {collection} gelesen",
       "verdicts": "Geprüft, was du in {collection} ändern darfst",
@@ -202,6 +233,12 @@
         "includesAny": "{field} enthält keines von `{value}`"
       }
     },
-    "newQuestion": "Neue Frage"
+    "newQuestion": "Neue Frage",
+    "page": {
+      "pending": "Öffnet {page}, sobald das erledigt ist",
+      "opened": "{page} geöffnet",
+      "stayed": "Hier geblieben, um deine ungespeicherten Änderungen zu behalten",
+      "declined": "{page} nicht geöffnet"
+    }
   }
 }

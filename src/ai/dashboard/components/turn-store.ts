@@ -2,6 +2,7 @@ import type { SearchParamValue, SSEMessage } from 'ohnejs/utils';
 
 import {
   isArray,
+  isLocalPath,
   isNull,
   isNumber,
   isPlainObject,
@@ -106,6 +107,15 @@ export type BatchResult =
     };
 
 /**
+ * What became of the page a batch opens.
+ *
+ * - `opened`: the location is the page, or already was.
+ * - `stayed`: a navigation guard kept the current page.
+ * - `declined`: the person declined the batch.
+ */
+export type OpenOutcome = 'opened' | 'stayed' | 'declined';
+
+/**
  * The proposals of one step and what the browser answered for them.
  */
 export interface TurnBatch {
@@ -133,6 +143,21 @@ export interface TurnBatch {
    * The model every transform of the batch runs on, when the flow node that proposed it names one.
    */
   pinned?: string;
+
+  /**
+   * When the server last wrote the turn of a reopened waiting batch, in epoch milliseconds.
+   */
+  since?: number;
+
+  /**
+   * The dashboard path the batch opens once answered.
+   */
+  open?: string;
+
+  /**
+   * What became of `open`, once the batch was answered.
+   */
+  opened?: OpenOutcome;
 }
 
 /**
@@ -394,12 +419,17 @@ export function nextStep(): void {
 }
 
 /**
- * Records what the browser answered for the live turn's last batch.
+ * Records what the browser answered for the live turn's last batch, and what became of its page.
  */
-export function settleBatch(results: BatchResult[]): void {
+export function settleBatch(results: BatchResult[], opened?: OpenOutcome): void {
   replaceCurrent((turn) =>
     withLastStep(turn, (step) =>
-      step.batch === null ? step : { ...step, batch: { ...step.batch, results } },
+      isNull(step.batch)
+        ? step
+        : {
+            ...step,
+            batch: { ...step.batch, results, ...(isUndefined(opened) ? {} : { opened }) },
+          },
     ),
   );
 }
@@ -420,13 +450,22 @@ export function clearTurns(): void {
 }
 
 /**
+ * Puts `next` up as the conversation, the resume counterpart of `clearTurns`.
+ * A past chat reopens this way, so the next follow-up continues its last turn.
+ */
+export function replaceTurns(next: readonly Turn[]): void {
+  turns.value = next;
+  sending.value = null;
+}
+
+/**
  * The turn after one event of its stream; an event the store does not read leaves it as it was.
  *
  * - `turn` names the id.
  * - `node` starts a step for a flow node, unless the last step is still empty.
  * - `text` appends to the last step and ends a retry wait.
- * - `retry` records the wait.
- * - `batch` puts the batch on the last step.
+ * - `retry` records the wait and drops the step's text, which the rerun streams afresh.
+ * - `batch` puts the batch on the last step, with the page it opens when that is a path on this origin.
  * - `done` waits on a batch, else closes the turn with its reason.
  * - `error` fails the turn with its code.
  *
@@ -452,7 +491,8 @@ export function reduceTurn(turn: Turn, message: SSEMessage): Turn {
       return withLastStep({ ...turn, wait: null }, (step) => ({ ...step, text: step.text + text }));
     }
     case 'retry':
-      return isNumber(data.wait) ? { ...turn, wait: data.wait } : turn;
+      if (!isNumber(data.wait)) return turn;
+      return withLastStep({ ...turn, wait: data.wait }, (step) => ({ ...step, text: '' }));
     case 'batch': {
       if (!isString(data.id) || !isTier(data.kind) || !isArray(data.proposals)) return turn;
       const batch: TurnBatch = {
@@ -461,6 +501,7 @@ export function reduceTurn(turn: Turn, message: SSEMessage): Turn {
         proposals: data.proposals as Proposal[],
         results: null,
         ...(isString(data.pinned) ? { pinned: data.pinned } : {}),
+        ...(isString(data.open) && isLocalPath(data.open) ? { open: data.open } : {}),
       };
       return withLastStep(turn, (step) => ({ ...step, batch }));
     }

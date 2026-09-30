@@ -560,6 +560,8 @@ hook('dashboard:menu', (menu, { user }) => {
 
 - It fires once per discovery read, inside the request context, so the viewer's language is
   available.
+- The [assistant](../ai/assistant.md) runs it too, in the default language, to learn which pages
+  it may open.
 - Every row already carries a `to`, a translated `label`, and any icon.
 - The threaded value is a `DashboardMenuGroup[]`.
 - The `context` also carries `collections`: the collections the user can access, as the same read

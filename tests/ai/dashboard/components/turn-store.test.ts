@@ -15,7 +15,9 @@ import {
   openTurn,
   pendingBatch,
   reduceTurn,
+  replaceTurns,
   runsUnasked,
+  sending,
   settleBatch,
   type Turn,
   turns,
@@ -85,11 +87,22 @@ describe('reduceTurn', () => {
     strictEqual('pinned' in (reduceTurn(fresh(), plain).steps[0].batch ?? {}), false);
   });
 
-  it('records a retry wait and clears it once text streams again', () => {
-    let turn = reduceTurn(fresh(), event('retry', { wait: 6000 }));
-    strictEqual(turn.wait, 6000);
+  it('keeps the page a batch opens only when it is a path on this origin', () => {
+    const opens = (open: unknown): string | undefined =>
+      reduceTurn(fresh(), event('batch', { id: 'b1', kind: 'read', proposals: [], open })).steps[0]
+        .batch?.open;
+    strictEqual(opens('/media?details=x'), '/media?details=x');
+    strictEqual(opens('//evil.example.com'), undefined);
+    strictEqual(opens('https://evil.example.com'), undefined);
+    strictEqual(opens(42), undefined);
+  });
+
+  it('records a retry wait, drops the text the rerun streams afresh, and clears the wait on text', () => {
+    let turn = reduceTurn(fresh(), event('text', { text: 'Half an ans' }));
+    turn = reduceTurn(turn, event('retry', { wait: 6000 }));
+    deepStrictEqual([turn.wait, turn.steps.at(-1)?.text], [6000, '']);
     turn = reduceTurn(turn, event('text', { text: 'Back.' }));
-    strictEqual(turn.wait, null);
+    deepStrictEqual([turn.wait, turn.steps.at(-1)?.text], [null, 'Back.']);
   });
 
   it('closes the turn with the done reason when no batch follows', () => {
@@ -139,6 +152,22 @@ describe('turn store', () => {
     strictEqual(turn?.steps[1].text, '');
   });
 
+  it('settles a batch with what became of its page', () => {
+    clearTurns();
+    openTurn('open the items');
+    applyTurnEvent(event('batch', { id: 'b3', kind: 'read', proposals: [], open: '/items' }));
+    applyTurnEvent(event('done', { reason: 'batch' }));
+    settleBatch([], 'opened');
+    deepStrictEqual(currentTurn()?.steps[0].batch, {
+      id: 'b3',
+      kind: 'read',
+      proposals: [],
+      results: [],
+      open: '/items',
+      opened: 'opened',
+    });
+  });
+
   it('keeps earlier turns and only touches the last one', () => {
     clearTurns();
     openTurn('first');
@@ -148,6 +177,16 @@ describe('turn store', () => {
     strictEqual(turns.value.length, 2);
     strictEqual(turns.value[0].status, 'closed');
     strictEqual(turns.value[1].steps[0].text, 'Hi');
+  });
+
+  it('puts a past chat up as the conversation, and resets the send', () => {
+    clearTurns();
+    openTurn('live');
+    sending.value = { sent: 1, total: 3 };
+    const past: Turn = { ...fresh(), id: 'turn-9', status: 'closed', reason: 'end' };
+    replaceTurns([past]);
+    deepStrictEqual(turns.value, [past]);
+    strictEqual(sending.value, null);
   });
 
   it('does nothing before the first question', () => {

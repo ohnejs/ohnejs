@@ -52,6 +52,13 @@ const READ_STEP = calls('Reading.', [
   { id: 'toolu_2', name: 'describe', input: { collection: 'Guilds' } },
 ]);
 
+/**
+ * A step that opens the overview and proposes nothing.
+ */
+const OPEN_STEP = calls('Opening.', [
+  { id: 'toolu_1', name: 'open', input: { page: '/overview' } },
+]);
+
 interface Answered {
   status: number;
   events: StreamedEvent[];
@@ -190,7 +197,9 @@ describe('POST /ai/turns/[id]/results', () => {
       const turn = await loadTurn(id);
       strictEqual(turn?.step, 2);
       ok(turn?.closedAt !== null);
-      deepStrictEqual(turn?.batches[0]?.reported, [{ status: 200 }]);
+      deepStrictEqual(turn?.batches[0]?.reported, [
+        { status: 200, body: { total: 1, records: [{ UUID }] } },
+      ]);
       deepStrictEqual(turn?.batches[0]?.calls[0]?.receipts?.[0], {
         route: QUERY,
         status: 200,
@@ -349,6 +358,7 @@ describe('POST /ai/turns/[id]/results', () => {
         user: officer.uuid,
         model: 'smart',
         page: '/',
+        input: 'Hi',
         transcript: [],
       });
       await sleep(5);
@@ -388,6 +398,31 @@ describe('POST /ai/turns/[id]/results', () => {
       useEnv().unset(KEY as never);
       strictEqual((await report(id, { batch, results: [found] })).status, 503);
       strictEqual((await loadTurn(id))?.batches[0]?.reported, undefined);
+    });
+  });
+
+  it('takes what became of the page a batch opens, and streams the next step', async () => {
+    await withAI(ai(), async () => {
+      const { id, batch } = await open(OPEN_STEP);
+      server.answer({ body: says('There it is.') });
+      const { status, events } = await report(id, { batch, results: [], open: 'opened' });
+      strictEqual(status, 200);
+      deepStrictEqual(events.at(-2), { event: 'text', data: { text: 'There it is.' } });
+      strictEqual((await loadTurn(id))?.batches[0]?.opened, 'opened');
+    });
+  });
+
+  it('refuses an `open` missing or unknown on a batch that opens a page, and any on one that does not', async () => {
+    await withAI(ai(), async () => {
+      const opening = await open(OPEN_STEP);
+      for (const outcome of [undefined, 'maybe', true]) {
+        const body = { batch: opening.batch, results: [], open: outcome };
+        strictEqual((await report(opening.id, body)).status, 400);
+      }
+      const reading = await open(READ_STEP);
+      const body = { batch: reading.batch, results: [found], open: 'opened' };
+      strictEqual((await report(reading.id, body)).status, 400);
+      strictEqual((await loadTurn(opening.id))?.batches[0]?.reported, undefined);
     });
   });
 });

@@ -20,7 +20,7 @@ export interface TurnContext {
   user: User;
 
   /**
-   * The dashboard route pattern the person asked from.
+   * The dashboard path the person asked from.
    */
   page: string;
 }

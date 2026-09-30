@@ -84,7 +84,9 @@ ai: {
 - `read` runs without asking; `write` asks; `destructive` asks with a second click.
 - `false` forbids a route. The first matching pattern wins, and a route no pattern matches is
   never offered.
-- Omitted, the table offers the [collections API](../api/collections.md) routes.
+- Omitted, the table offers the [collections API](../api/collections.md) routes and
+  [`POST /search`](../dashboard/palette.md#searching-from-your-code). A blind model learns only how
+  many records a search found per collection, never which.
 - A table you set replaces the default whole, so spread `AI_DEFAULTS.routes` to extend it.
 - Routes under `/auth/` and `/ai/` are never offered, whatever the table says. A request there
   would act on the person's session or on the assistant itself.

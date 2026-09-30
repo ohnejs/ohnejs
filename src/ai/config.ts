@@ -46,18 +46,19 @@ declare module 'ohnejs' {
        *
        * @example
        * ```ts
-       * model: 'claude'
+       * 'claude'
        * ```
        */
       model?: AIModelKey;
 
       /**
-       * The `models` entry that answers a flow's `decide` nodes, and the one entry that may be `jev`.
-       * Omitted, `model` answers them with structured output.
+       * The `models` entry that answers a flow's `decide` nodes that name no model of their own.
+       * It may be `jev`, as a node's own `decide.model` may.
+       * Omitted, the model the person picked answers, else `model`, with structured output.
        *
        * @example
        * ```ts
-       * decide: 'router'
+       * 'router'
        * ```
        */
       decide?: AIModelKey;
@@ -87,7 +88,7 @@ declare module 'ohnejs' {
        *
        * @example
        * ```ts
-       * models: {
+       * {
        *   claude: { provider: 'anthropic', model: 'claude-opus-5-5', key: 'ANTHROPIC_API_KEY' },
        *   local: {
        *     provider: 'openai-compatible',
@@ -109,7 +110,7 @@ declare module 'ohnejs' {
        *
        * @example
        * ```ts
-       * data: { Items: true, Characters: ['name', 'level'] }
+       * { Items: true, Characters: ['name', 'level'] }
        * ```
        */
       data?: AIFields;
@@ -123,7 +124,7 @@ declare module 'ohnejs' {
        *
        * @example
        * ```ts
-       * instructions: ['Never delete a Character; set `status` to `retired` instead.']
+       * ['Never delete a Character; set `status` to `retired` instead.']
        * ```
        */
       instructions?: string[];
@@ -205,7 +206,7 @@ declare module 'ohnejs' {
        *
        * @example
        * ```ts
-       * routes: {
+       * {
        *   ...AI_DEFAULTS.routes,
        *   'DELETE /collections/[collection]/[uuid]': false,
        *   'POST /reports/[name]': 'read',
@@ -236,7 +237,7 @@ declare module 'ohnejs' {
          *
          * @example
          * ```ts
-         * fields: { Items: ['name', 'tooltip'] }
+         * { Items: ['name', 'tooltip'] }
          * ```
          */
         fields?: AIFields;
@@ -305,7 +306,8 @@ declare module 'ohnejs' {
         step?: number | string;
 
         /**
-         * How long a turn may sit idle before it closes, in milliseconds or as a string like `'10m'`.
+         * How long a batch may wait for an answer before its turn closes, in milliseconds or as `'10m'`.
+         * It never bounds a follow-up: a closed turn stays open to one as long as `ai.audit.retain` keeps it.
          *
          * @default
          * '10m'
@@ -327,6 +329,7 @@ declare module 'ohnejs' {
       audit?: {
         /**
          * The age a closed turn is deleted at, in milliseconds or as a string like `'90d'`.
+         * It is also how long a person's past chats stay listed.
          * `false` keeps every turn.
          *
          * @default
@@ -381,7 +384,7 @@ export interface AnthropicModel extends AIModelBase {
    *
    * @example
    * ```ts
-   * model: 'claude-opus-5-5'
+   * 'claude-opus-5-5'
    * ```
    */
   model: LiteralUnion<
@@ -418,7 +421,7 @@ export interface OpenAICompatibleModel extends AIModelBase {
    *
    * @example
    * ```ts
-   * model: 'qwen3'
+   * 'qwen3'
    * ```
    */
   model: string;
@@ -449,7 +452,7 @@ export interface AIModelBase {
    *
    * @example
    * ```ts
-   * key: 'ANTHROPIC_API_KEY'
+   * 'ANTHROPIC_API_KEY'
    * ```
    */
   key: LiteralUnion<Extract<keyof Env, string>> | false;
@@ -460,7 +463,7 @@ export interface AIModelBase {
    *
    * @example
    * ```ts
-   * baseURL: 'http://localhost:11434/v1'
+   * 'http://localhost:11434/v1'
    * ```
    */
   baseURL?: string;
@@ -470,7 +473,7 @@ export interface AIModelBase {
    *
    * @example
    * ```ts
-   * headers: { 'HTTP-Referer': 'https://guild.example.com' }
+   * { 'HTTP-Referer': 'https://guild.example.com' }
    * ```
    */
   headers?: Record<string, string>;
@@ -480,7 +483,7 @@ export interface AIModelBase {
    *
    * @example
    * ```ts
-   * options: { output_config: { effort: 'high' } }
+   * { output_config: { effort: 'high' } }
    * ```
    */
   options?: Record<string, unknown>;
@@ -670,7 +673,7 @@ export interface ResolvedAIConfig {
     step: number | string;
 
     /**
-     * How long a turn may sit idle, in milliseconds or as a string like `'10m'`.
+     * How long a batch may wait for the person's answer, in milliseconds or as a string like `'10m'`.
      */
     turnTimeout: number | string;
 
@@ -709,6 +712,7 @@ export const AI_DEFAULTS = {
   },
   deny: { collections: ['Users', 'Sessions', 'AITurns'] },
   routes: {
+    'POST /search': 'read',
     'POST /collections/[collection]/query': 'read',
     'POST /collections/[collection]/verdicts': 'read',
     'GET /collections/[collection]/[uuid]': 'read',

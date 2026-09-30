@@ -9,7 +9,16 @@ import { checkProposal } from '../../../src/ai/turns/proposals.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
 import { readJSONBody } from '../../../src/ohne/http/read-json-body.ts';
+import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { call, route, signIn, withAI } from '../_fixture.ts';
+
+useRoutes().register('POST /search', {
+  method: 'POST',
+  pattern: '/search',
+  file: '/search.post.ts',
+  layer: 'ohnejs/base',
+  handler: () => null,
+});
 
 type Outcome =
   | { ok: true; proposal: Proposal; identity: boolean }
@@ -374,6 +383,23 @@ describe('checkProposal', () => {
     strictEqual(
       (await checkUnder(pinned, { route: PATCH_ITEM, where: {}, transform: shout }, true)).ok,
       true,
+    );
+  });
+
+  it('checks a search body: `q` as text, and only its window beside it', async () => {
+    const search = (body: unknown) => check({ route: 'POST /search', body });
+    strictEqual(
+      (await search({ q: 'blocked', collection: 'Items', limit: 5, offset: 5 })).ok,
+      true,
+    );
+    deepStrictEqual(await search({ q: 1 }), refused('POST /search', 'invalidValue', 'body.q'));
+    deepStrictEqual(
+      await search({ q: 'x', limit: 'all' }),
+      refused('POST /search', 'invalidValue', 'body.limit'),
+    );
+    deepStrictEqual(
+      await search({ q: 'x', where: {} }),
+      refused('POST /search', 'unknownParam', 'body.where'),
     );
   });
 

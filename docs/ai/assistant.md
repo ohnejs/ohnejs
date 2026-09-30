@@ -61,13 +61,20 @@ models: {
 4. The browser sends what was approved, and the model says what happened.
 
 A delete, or a write to many records at once, always asks. The person can close the palette while
-the assistant works; a small pill brings them back.
+the assistant works; a button in the header brings them back.
+
+Ask it to open something, and it opens it: any page the person's
+[sidebar](../dashboard/pages.md#the-sidebar) shows, their account, or a record it has read.
+
+Chats are kept on the server, visible only to the person who asked, and reopen from "Recent chats"
+in Cmd+K. They last as long as `ai.audit.retain` keeps turns: `'90d'` by default, `false` to keep
+them all.
 
 ## What reaches the model
 
-By default the model is **blind**. It gets your schema, the routes the person may use, and after
-each request a receipt: the status, counts, and record ids. It never sees a field's value, so it
-can find, count and change records, but not read them.
+By default the model is **blind**. It gets your schema, the routes the person may use, the pages
+they may open, and after each request a receipt: the status, counts, and record ids. It never sees
+a field's value, so it can find, count and change records, but not read them.
 
 To let it read values, list collections, and optionally fields, in `ai.data`:
 

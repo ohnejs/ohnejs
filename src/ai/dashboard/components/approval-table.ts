@@ -5,10 +5,8 @@ import {
   css,
   type DashboardCollection,
   dimMark,
-  fallbackLabel,
   h,
   icon,
-  labelOf,
   loadVerdicts,
   seedLabel,
   table,
@@ -18,13 +16,13 @@ import {
 } from 'ohnejs/dashboard';
 import {
   chunk,
+  groupBy,
   isArray,
   isNull,
   isPlainObject,
   isString,
   isUndefined,
   parseRouteID,
-  recordHref,
   ref,
   untracked,
 } from 'ohnejs/utils';
@@ -36,6 +34,7 @@ import type { Proposal, TurnBatch } from './turn-store.ts';
 import { useAIT } from './_ai-messages.ts';
 import { collectionOfRoute } from './_ai-meta.ts';
 import { transformTable } from './_ai-transform-table.ts';
+import { recordLink } from './_record-link.ts';
 import { describeWhere, expandSet } from './expand-set.ts';
 import { currentTurn } from './turn-store.ts';
 
@@ -124,7 +123,7 @@ css`
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    font-size: 0.875rem;
+    font-size: 1em;
     font-weight: 500;
   }
 
@@ -141,7 +140,6 @@ css`
   .o-approval-rows {
     max-height: 20rem;
     overflow: auto;
-    font-size: 0.8125rem;
   }
 
   .o-approval-foreign {
@@ -158,7 +156,7 @@ css`
   .o-approval-change > svg {
     align-self: center;
     flex-shrink: 0;
-    font-size: 0.875rem;
+    font-size: 1em;
   }
 
   .o-approval-field {
@@ -259,9 +257,9 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       : t(which === 'all' ? 'ai.dashboard.batch.approveAll' : 'ai.dashboard.batch.approveSelected');
 
   const columns = {
-    record: tableColumn<string>({ label: t('ai.dashboard.batch.record'), width: '12rem' }),
-    action: tableColumn<string>({ label: t('ai.dashboard.batch.action'), width: '7rem' }),
-    changes: tableColumn<Change[]>({ label: t('ai.dashboard.batch.changes') }),
+    record: tableColumn<string>({ label: t('ai.dashboard.batch.record'), width: '30%' }),
+    action: tableColumn<string>({ label: t('ai.dashboard.batch.action'), width: '6em' }),
+    changes: tableColumn<Change[]>({ label: t('ai.dashboard.batch.changes'), minWidth: '8em' }),
   };
 
   const grid = table({
@@ -302,9 +300,17 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
         h(
           'div',
           { class: 'o-approval-header' },
-          writes.map(({ proposal, index }) =>
-            headerLine(proposal, index, rows, () => failed.value.has(index), t),
-          ),
+          Object.values(
+            groupBy(writes, ({ proposal, index }) =>
+              isUndefined(proposal.where)
+                ? `${verbOf(proposal)} ${proposal.route} ${localeOf(proposal) ?? ''}`
+                : String(index),
+            ),
+          ).map((group = []) => {
+            const indexes = group.map(({ index }) => index);
+            const failing = (): boolean => indexes.some((index) => failed.value.has(index));
+            return headerLine(group[0].proposal, indexes, rows, failing, t);
+          }),
         ),
         when(
           () => !isNull(rows.value),
@@ -354,12 +360,13 @@ export function proposedChanges(proposal: Proposal): Child {
 }
 
 /**
- * The header line of one write: what it does to how many records of which collection.
- * A write by set adds its filter in words, and an error line when its records failed to load.
+ * The header line of the writes at `indexes`: what they do to how many records of which collection.
+ * Single-record writes of one kind share a line; a write by set adds its filter in words.
+ * An error line follows when its records failed to load.
  */
 function headerLine(
   proposal: Proposal,
-  index: number,
+  indexes: readonly number[],
   rows: { value: ApprovalRow[] | null },
   failed: () => boolean,
   t: AITranslate,
@@ -367,7 +374,8 @@ function headerLine(
   const collection = collectionOfRoute(proposal.route);
   const verb = verbOf(proposal);
   const locale = proposal.query?.locale;
-  const count = (): number => (rows.value ?? []).filter((row) => row.proposal === index).length;
+  const count = (): number =>
+    (rows.value ?? []).filter((row) => indexes.includes(row.proposal)).length;
   const words = (): string => {
     if (isUndefined(collection)) {
       return t('ai.dashboard.batch.request', { route: proposal.route }).replaceAll('`', '');
@@ -531,15 +539,8 @@ function changeLine(change: Change): HTMLElement {
  */
 function recordName(row: ApprovalRow, t: AITranslate): Child {
   if (row.collection === null) return dimMark('-');
-  const collection = row.collection;
   if (row.UUID === null) return dimMark(t('ai.dashboard.batch.newRecord'));
-  const uuid = row.UUID;
-  return button(() => labelOf(collection.name, uuid) ?? fallbackLabel(uuid), {
-    href: recordHref(collection, uuid),
-    target: '_blank',
-    variant: 'ghost',
-    size: -2,
-  });
+  return recordLink(row.collection, row.UUID, { newTab: true });
 }
 
 /**

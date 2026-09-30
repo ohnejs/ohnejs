@@ -16,7 +16,13 @@ const DAY = 86_400_000;
  * Opens a turn, closed `daysAgo` days before `now` unless `daysAgo` is `null`, and returns its id.
  */
 async function turnClosed(daysAgo: number | null, now: number): Promise<string> {
-  const { UUID } = await openTurn({ user: owner.uuid, model: 'smart', page: '/', transcript: [] });
+  const { UUID } = await openTurn({
+    user: owner.uuid,
+    model: 'smart',
+    page: '/',
+    input: 'Hi',
+    transcript: [],
+  });
   if (!isNull(daysAgo)) {
     await queryUntyped('AITurns')
       .where({ UUID })

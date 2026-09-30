@@ -106,6 +106,7 @@ describe('the dashboard:meta hook', () => {
       skills: [report],
       flows: [weekly],
       resultSize: 65_536,
+      turnTimeout: 600_000,
     });
   });
 

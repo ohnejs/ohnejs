@@ -49,6 +49,11 @@ export interface AIMeta {
    * The most bytes one answer may carry into a results post, `ai.limits.resultSize` resolved.
    */
   resultSize: number;
+
+  /**
+   * How long a batch waits for the person before its turn closes, in milliseconds.
+   */
+  turnTimeout: number;
 }
 
 /**

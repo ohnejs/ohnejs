@@ -2,13 +2,22 @@ import type { CollectionQueryMeta, FlowTier, QueryScope } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
 import type { HTTPMethod } from 'ohnejs/utils';
 
-import { queryMetadata, resolveGuards, routeID, useEvent, useRoutes, useSkills } from 'ohnejs';
+import {
+  queryMetadata,
+  resolveGuards,
+  routeID,
+  useCollections,
+  useEvent,
+  useRoutes,
+  useSkills,
+} from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
 import {
   capitalize,
   compileRoute,
   isArray,
   isEmpty,
+  isLocalPath,
   isNull,
   isPlainObject,
   isUndefined,
@@ -18,9 +27,11 @@ import {
 import type { DashboardCollection, DashboardField } from '../../base/collections-api/describe.ts';
 import type { AIAskKind, AITier } from '../config.ts';
 
+import { accountFields, accountLayout } from '../../base/auth/account-layout.ts';
 import { describeCollections } from '../../base/collections-api/describe.ts';
 import { readScope, writeReach } from '../../base/collections-api/gate.ts';
-import { defaultLanguage, resolveMessage } from '../../ohne/http/translate.ts';
+import { resolveDashboardMenu } from '../../base/menu/resolve-menu.ts';
+import { defaultLanguage, resolveMessage, translate } from '../../ohne/http/translate.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { useAIConfig } from '../config.ts';
 import { autoAccepts } from './auto-accept.ts';
@@ -35,9 +46,10 @@ import { tierOf } from './tiers.ts';
  * - `record`: a record's fields, as a create or update takes them.
  * - `copy`: an optional `source` locale.
  * - `none`: nothing.
+ * - `search`: a `POST /search` body, `q` with an optional `collection`, `limit` and `offset`.
  * - `app`: any JSON object, since the route is the app's own.
  */
-export type BodyShape = 'query' | 'verdicts' | 'record' | 'copy' | 'none' | 'app';
+export type BodyShape = 'query' | 'verdicts' | 'record' | 'copy' | 'none' | 'search' | 'app';
 
 /**
  * One route the assistant may propose, as the surface lists it.
@@ -146,6 +158,11 @@ export interface Surface {
   collections: ReadonlyMap<string, ReachableCollection>;
 
   /**
+   * Each dashboard path the person may open, mapped to its label in the default language.
+   */
+  pages: ReadonlyMap<string, string>;
+
+  /**
    * Whether the person's writes may run without asking, as `autoAccepts` answers it.
    */
   autoAccept: boolean;
@@ -157,6 +174,11 @@ interface ShippedRoute {
   query: readonly string[];
   body: BodyShape;
 }
+
+/**
+ * The dashboard's search, which finds records by text across every collection.
+ */
+const SEARCH_ROUTE = 'POST /search';
 
 /**
  * The shipped collections routes: the operation each needs, and what a proposal to it may carry.
@@ -192,6 +214,11 @@ const SHIPPED: Readonly<Record<string, ShippedRoute>> = {
   },
 };
 
+/**
+ * The pages never offered: signing in, signing out, and installing are the person's own acts.
+ */
+const CLOSED_PAGES = new Set(['/login', '/logout', '/install']);
+
 const OPERATION_WORDS = { read: 'query', create: 'create', update: 'update', delete: 'delete' };
 
 const LISTING = new Intl.ListFormat('en', { type: 'conjunction' });
@@ -207,12 +234,13 @@ const ASK_WORDS: Readonly<Record<AIAskKind, string>> = {
 };
 
 /**
- * Renders the surface for `user`: locales, limits, the routes and collections they reach, and their skills.
+ * Renders the surface for `user`: locales, limits, the routes, collections and pages they reach, and skills.
  * The limits state which writes run without asking, once the person turned auto-accept on.
  * A collection `ai.deny.collections` lists never appears, whatever the person may do with it.
  * A route appears when `ai.routes` gives it a tier and the person may run its operation on that collection.
  * With `tiers`, a flow node's, only the routes of those tiers appear, so the node can propose no other.
  * Fields outside the person's read scope stay out, as do the ones no read returns.
+ * The pages are the person's sidebar rows and their account page, never a denied collection's.
  * `values` is whether the turn's model may see record values; a blind one reads no opened field.
  * The text is in the app's default language, so it reads the same for everyone with the same reach.
  * Valid only within a request.
@@ -223,18 +251,21 @@ export function renderSurface(
   tiers?: readonly FlowTier[],
 ): Promise<Surface> {
   return inDefaultLanguage(async () => {
-    const collections = await reachableCollections(user, values);
+    const described = describeCollections(user);
+    const collections = await reachableCollections(described, values);
     const routes = offeredRoutes(collections, tiers);
+    const pages = await offeredPages(user, described);
     const autoAccept = await autoAccepts(user);
     const text = [
       appBlock(collections, autoAccept),
       routesBlock(routes),
+      pagesBlock(pages),
       collectionsBlock(collections),
       skillsBlock(user),
     ]
       .filter((block) => block !== '')
       .join('\n\n');
-    return { text, routes, collections, autoAccept };
+    return { text, routes, collections, pages, autoAccept };
   });
 }
 
@@ -276,19 +307,19 @@ async function inDefaultLanguage<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * The collections `user` reaches, each with its scope, its admitted operations, and its opened fields.
+ * The collections of `described` the person reaches, with scope, admitted operations and opened fields.
  */
 async function reachableCollections(
-  user: User,
+  described: readonly DashboardCollection[],
   values: boolean,
 ): Promise<Map<string, ReachableCollection>> {
   const { deny, transform } = useAIConfig();
   const denied = new Set(deny.collections);
   const rewrites = values || !isUndefined(transform.model);
   const reachable = new Map<string, ReachableCollection>();
-  for (const described of describeCollections(user)) {
-    if (denied.has(described.name)) continue;
-    const { name, operations } = described;
+  for (const collection of described) {
+    if (denied.has(collection.name)) continue;
+    const { name, operations } = collection;
     const scope = operations.read?.allowed === true ? await readScope(name) : false;
     const update = operations.update?.allowed === true ? await writeReach(name, 'update') : false;
     const admitted = {
@@ -301,10 +332,10 @@ async function reachableCollections(
     const opened = values && scope !== false ? openedFields(name, scope) : [];
     const rewritable =
       rewrites && scope !== false && update !== false
-        ? rewritableFields(described, openedFields(name, scope), update)
+        ? rewritableFields(collection, openedFields(name, scope), update)
         : [];
     reachable.set(name, {
-      described,
+      described: collection,
       meta: queryMetadata(name),
       scope,
       operations: admitted,
@@ -313,6 +344,49 @@ async function reachableCollections(
     });
   }
   return reachable;
+}
+
+/**
+ * The pages the person may open, by path: their sidebar rows, then their account page when they have one.
+ * A row off this origin, a closed page, or one under a denied collection is left out.
+ * A denied collection owns its `/collections/<segment>` pages and the page its `recordPath` opens.
+ * A repeated path keeps its first label.
+ */
+async function offeredPages(
+  user: User,
+  described: DashboardCollection[],
+): Promise<Map<string, string>> {
+  const denied = new Set(useAIConfig().deny.collections);
+  const closed = described
+    .filter((collection) => denied.has(collection.name))
+    .flatMap((collection) => [
+      `/collections/${collection.segment}`,
+      ...(isUndefined(collection.recordPath)
+        ? []
+        : [collection.recordPath.split(/[?#]/, 1)[0].replace(/\/\[uuid\].*$/, '')]),
+    ])
+    .filter((prefix) => prefix !== '' && prefix !== '/');
+  const pages = new Map<string, string>();
+  for (const { items } of await resolveDashboardMenu(user, described)) {
+    for (const { to, label } of items) {
+      const path = to.split(/[?#]/, 1)[0];
+      if (pages.has(to) || !isLocalPath(to) || CLOSED_PAGES.has(path)) continue;
+      if (closed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue;
+      pages.set(to, label);
+    }
+  }
+  if (!pages.has('/account') && (await hasAccountPage(user))) {
+    pages.set('/account', translate('dashboard.account.title'));
+  }
+  return pages;
+}
+
+/**
+ * Whether `user` has an account page: the `Users` collection exists and its layout places a field they edit.
+ */
+async function hasAccountPage(user: User): Promise<boolean> {
+  if (isUndefined(useCollections().get('Users'))) return false;
+  return accountFields(await accountLayout(user)).length > 0;
 }
 
 /**
@@ -372,6 +446,7 @@ function offeredRoutes(
   }
   for (const { method, pattern } of routes) {
     if (isNull(method) || pattern.includes('[collection]')) continue;
+    if (routeID(method, pattern) === SEARCH_ROUTE && collections.size === 0) continue;
     const tier = tierOf(method, pattern);
     if (!open(tier)) continue;
     add({
@@ -381,7 +456,7 @@ function offeredRoutes(
       tier,
       params: compileRoute(pattern).params,
       query: [],
-      body: 'app',
+      body: routeID(method, pattern) === SEARCH_ROUTE ? 'search' : 'app',
     });
   }
   return offered;
@@ -459,11 +534,27 @@ function dataLine(collections: Map<string, ReachableCollection>): string {
 }
 
 /**
- * The `# Your routes` block, one id per line.
+ * The `# Your routes` block, one id per line, then how to search when the search is offered.
  */
 function routesBlock(routes: Map<string, OfferedRoute>): string {
   const ids = [...routes.keys()];
-  return ['# Your routes', ...(isEmpty(ids) ? ['(none)'] : ids)].join('\n');
+  const search = routes.has(SEARCH_ROUTE)
+    ? [
+        '',
+        `\`${SEARCH_ROUTE}\` with \`{ q }\` finds records holding every word of \`q\` in any text field; \`collection\` narrows it, \`limit\` and \`offset\` page it.`,
+        'Its receipt counts what each collection found, and names the records only where their data is open to you.',
+        'A count at `limit` (default 5) means more may match: page on with `offset`.',
+      ]
+    : [];
+  return ['# Your routes', ...(isEmpty(ids) ? ['(none)'] : ids), ...search].join('\n');
+}
+
+/**
+ * The `# Your pages` block, one `- path: label` line per page; empty without pages.
+ */
+function pagesBlock(pages: Map<string, string>): string {
+  if (pages.size === 0) return '';
+  return ['# Your pages', ...[...pages].map(([path, label]) => `- ${path}: ${label}`)].join('\n');
 }
 
 /**

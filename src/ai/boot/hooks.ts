@@ -2,7 +2,7 @@ import type { User } from 'ohnejs/auth';
 
 import { hook, useSkills } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
-import { isUndefined, parseBytes, toSentenceCase } from 'ohnejs/utils';
+import { isUndefined, parseBytes, parseDuration, toSentenceCase } from 'ohnejs/utils';
 
 import { resolveMessage } from '../../ohne/http/translate.ts';
 import { useAIConfig } from '../config.ts';
@@ -51,6 +51,11 @@ declare module '../../base/api/dashboard.get.ts' {
        * The most bytes one answer may carry into a results post, `ai.limits.resultSize` in bytes.
        */
       resultSize: number;
+
+      /**
+       * How long a batch waits for the person before its turn closes, in milliseconds.
+       */
+      turnTimeout: number;
     };
   }
 }
@@ -108,6 +113,7 @@ hook('dashboard:meta', (meta, { user }) => {
     skills: skillsFor(user),
     flows: flowsFor(user),
     resultSize: parseBytes(limits.resultSize),
+    turnTimeout: parseDuration(limits.turnTimeout),
   };
   if (!isUndefined(transform.model)) meta.ai.transformModel = transform.model;
 });

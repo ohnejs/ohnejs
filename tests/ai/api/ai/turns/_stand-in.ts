@@ -80,14 +80,16 @@ export function says(text: string): string {
 
 /**
  * An answer that says `text`, then makes `calls`.
+ * An empty `text` streams no text block, as a tool-only answer does.
  */
 export function calls(text: string, scripted: ScriptedCall[]): string {
+  const first = text === '' ? 0 : 1;
   return sse([
     start(),
-    ...block(0, { type: 'text', text: '' }, { type: 'text_delta', text }),
+    ...(text === '' ? [] : block(0, { type: 'text', text: '' }, { type: 'text_delta', text })),
     ...scripted.flatMap(({ id, name, input }, index) =>
       block(
-        index + 1,
+        index + first,
         { type: 'tool_use', id, name, input: {} },
         { type: 'input_json_delta', partial_json: JSON.stringify(input) },
       ),

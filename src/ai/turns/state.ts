@@ -1,4 +1,4 @@
-import { conflict, type HTTPError, queryUntyped, useFlows } from 'ohnejs';
+import { conflict, type HTTPError, queryMetadata, queryUntyped, useFlows } from 'ohnejs';
 import { isEmpty, isNull, isUndefined, parseDuration } from 'ohnejs/utils';
 
 import type { AITier } from '../config.ts';
@@ -16,7 +16,7 @@ import { useAIConfig } from '../config.ts';
  * - `steps`: the turn reached `ai.limits.steps`.
  * - `limit`: the person's token budget ran out between the steps of one stream.
  * - `timeout`, `provider`, `internal`: a step failed, with the code the browser was sent.
- * - `left`: the browser left while a step ran.
+ * - `left`: the browser left while a step ran, or a follow-up took the turn over.
  * - `idle`: its batch waited past `ai.limits.turnTimeout`.
  * - `lost`: its step stopped with the process running it, and never wrote back.
  */
@@ -61,7 +61,7 @@ export interface BatchCall {
   receipts?: (Receipt | null)[];
 
   /**
-   * The answer of a `describe` or `skill` call, or the error text of a call the server could not take.
+   * The answer of a `describe`, `skill` or `open` call, or the error of a call the server could not take.
    */
   content?: string;
 
@@ -102,6 +102,15 @@ export interface BatchProposal {
 }
 
 /**
+ * What became of the page a batch opens, as the browser reports it.
+ *
+ * - `opened`: the location is the page, or already was.
+ * - `stayed`: a navigation guard kept the current page.
+ * - `declined`: the person declined the batch.
+ */
+export type OpenOutcome = 'opened' | 'stayed' | 'declined';
+
+/**
  * The calls of one step and the proposals the browser answers for them.
  * A batch without `reported` is pending; only the last batch can be.
  */
@@ -132,9 +141,20 @@ export interface TurnBatch {
   proposals: BatchProposal[];
 
   /**
-   * What the browser reported per proposal, bodies left out; it is the browser's claim, never checked.
+   * What the browser reported per proposal: status, counts and record ids, never a value.
+   * It is the browser's claim, never checked.
    */
   reported?: BatchResult[];
+
+  /**
+   * The page the browser opens once it answers, and the index of the `open` call in `calls`.
+   */
+  open?: { call: number; path: string };
+
+  /**
+   * What became of `open`; like `reported`, it is the browser's claim, never checked.
+   */
+  opened?: OpenOutcome;
 }
 
 /**
@@ -188,9 +208,24 @@ export interface Turn {
   model: string;
 
   /**
-   * The dashboard route pattern the person asked from.
+   * The dashboard path the person asked from.
    */
   page: string;
+
+  /**
+   * What the person typed, without the fences around it; `null` on a row older than the column.
+   */
+  input: string | null;
+
+  /**
+   * The skill the turn started with, or `null` for none.
+   */
+  skill: string | null;
+
+  /**
+   * The `UUID` of the chat's first turn, or `null` on that first turn itself.
+   */
+  chat: string | null;
 
   /**
    * The flow the turn walks, or `null` for a plain turn.
@@ -207,6 +242,11 @@ export interface Turn {
    * The batches of every step so far.
    */
   batches: TurnBatch[];
+
+  /**
+   * The model's text per step, at `step - 1`, as the person read it streamed.
+   */
+  texts: string[];
 
   /**
    * How many steps have run.
@@ -249,9 +289,24 @@ export interface TurnInit {
   model: string;
 
   /**
-   * The dashboard route pattern the person asked from.
+   * The dashboard path the person asked from.
    */
   page: string;
+
+  /**
+   * What the person typed.
+   */
+  input: string;
+
+  /**
+   * The name of the skill the turn starts with.
+   */
+  skill?: string;
+
+  /**
+   * The `UUID` of the chat's first turn, when the turn follows up on one.
+   */
+  chat?: string;
 
   /**
    * The person's first message, in the provider's shape; empty for a flow, whose first node writes it.
@@ -274,6 +329,9 @@ export async function openTurn(init: TurnInit): Promise<Turn> {
       user: init.user,
       model: init.model,
       page: init.page,
+      input: init.input,
+      skill: init.skill ?? null,
+      chat: init.chat ?? null,
       flow: isUndefined(init.flow) ? null : JSON.stringify(init.flow),
       transcript: JSON.stringify(init.transcript),
       step: 1,
@@ -329,6 +387,23 @@ export async function loadTurn(id: string): Promise<Turn | undefined> {
 }
 
 /**
+ * Reads the turns matching `where`, oldest first.
+ * With `transcript: false` the transcripts stay unread and come back empty, so such turns are never saved.
+ */
+export async function loadTurns(
+  where: Record<string, unknown>,
+  { transcript = true }: { transcript?: boolean } = {},
+): Promise<Turn[]> {
+  const query = queryUntyped('AITurns').unscoped().where(where).orderBy('UUID');
+  if (transcript) return (await query.findMany()).map(fromRow);
+  const columns = Object.keys(queryMetadata('AITurns').fields).filter(
+    (name) => name !== 'transcript',
+  );
+  const records = await query.select('UUID', '_updatedAt', ...columns).findMany();
+  return records.map((record) => fromRow({ ...record, transcript: '[]' }));
+}
+
+/**
  * Writes the turn's state back, only while the row is open and still sits at `step`.
  * Returns `false` when another write got there first.
  */
@@ -340,6 +415,7 @@ export async function saveTurn(turn: Turn, step: number): Promise<boolean> {
       flow: isNull(turn.flow) ? null : JSON.stringify(turn.flow),
       transcript: JSON.stringify(turn.transcript),
       batches: JSON.stringify(turn.batches),
+      texts: JSON.stringify(turn.texts),
       step: turn.step,
       usage: JSON.stringify(turn.usage),
       closedAt: turn.closedAt,
@@ -365,13 +441,14 @@ export async function touchTurn(turn: Turn): Promise<void> {
 
 /**
  * Closes the turn now for `reason`, whatever step its row sits at.
+ * It keeps the text streamed so far, so a turn that failed mid-step replays what the person read.
  * A row already closed keeps its first close; the turn then takes that one.
  */
 export async function closeTurn(turn: Turn, reason: CloseReason): Promise<void> {
   const records = await queryUntyped('AITurns')
     .unscoped()
     .where({ UUID: turn.UUID, closedAt: { isNull: true } })
-    .updateOrThrow({ closedAt: Date.now(), reason });
+    .updateOrThrow({ closedAt: Date.now(), reason, texts: JSON.stringify(turn.texts) });
   const row =
     records[0] ?? (await queryUntyped('AITurns').unscoped().where({ UUID: turn.UUID }).findFirst());
   if (isUndefined(row)) return;
@@ -381,26 +458,35 @@ export async function closeTurn(turn: Turn, reason: CloseReason): Promise<void> 
 }
 
 /**
- * Closes the open `turn` when it can no longer continue, and returns whether it did.
+ * How the open `turn` closes once it can no longer continue, or `null` while it still can.
  * One whose batch waited past `ai.limits.turnTimeout` closes as `idle`.
  * One with no batch waiting is running a step.
  * Unwritten for twice `ai.limits.step`, that step died with its process, so the turn closes as `lost`.
  * The deadline bounds only the provider call; the second one is room for the work around it.
  */
-export async function expireTurn(turn: Turn): Promise<boolean> {
+export function expiredReason(turn: Turn): 'idle' | 'lost' | null {
   const { limits } = useAIConfig();
   const last = turn.batches.at(-1);
   const stepping = isUndefined(last) || !isUndefined(last.reported);
   const quiet = stepping ? parseDuration(limits.step) * 2 : parseDuration(limits.turnTimeout);
-  if (Date.now() - turn.updatedAt <= quiet) return false;
-  await closeTurn(turn, stepping ? 'lost' : 'idle');
+  if (Date.now() - turn.updatedAt <= quiet) return null;
+  return stepping ? 'lost' : 'idle';
+}
+
+/**
+ * Closes the open `turn` for the reason `expiredReason` names, and returns whether it did.
+ */
+export async function expireTurn(turn: Turn): Promise<boolean> {
+  const reason = expiredReason(turn);
+  if (isNull(reason)) return false;
+  await closeTurn(turn, reason);
   return true;
 }
 
 /**
  * The `409` for a turn a results post or a follow-up cannot continue.
- * The turn is unknown, someone else's, idle or lost.
- * A results post also answers it for a closed turn, a follow-up for an open one.
+ * The turn is unknown or someone else's.
+ * A results post also answers it for a closed, idle or lost turn.
  */
 export function turnGone(): HTTPError {
   return conflict(translate('ai.api.turnGone'), { code: 'turnGone' });
@@ -429,9 +515,13 @@ function fromRow(record: Record<string, unknown>): Turn {
     user: record.user as string,
     model: record.model as string,
     page: record.page as string,
+    input: record.input as string | null,
+    skill: record.skill as string | null,
+    chat: record.chat as string | null,
     flow: isNull(record.flow) ? null : (JSON.parse(record.flow as string) as FlowState),
     transcript: JSON.parse(record.transcript as string) as TranscriptItem[],
     batches: JSON.parse(record.batches as string) as TurnBatch[],
+    texts: isNull(record.texts) ? [] : (JSON.parse(record.texts as string) as string[]),
     step: record.step as number,
     usage: JSON.parse(record.usage as string) as Usage,
     closedAt: record.closedAt as number | null,

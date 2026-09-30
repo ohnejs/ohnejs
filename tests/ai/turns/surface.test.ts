@@ -6,7 +6,11 @@ import type { Config } from '../../../src/ohne/layers/config.ts';
 import { AI_DEFAULTS } from '../../../src/ai/config.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
+import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { useSearchParams } from '../../../src/ohne/http/use-search-params.ts';
+import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
@@ -16,6 +20,7 @@ interface Rendered {
   text: string;
   routes: string[];
   collections: string[];
+  pages: string[];
 }
 
 const SURFACE = route('POST', '/surface', async (): Promise<Rendered> => {
@@ -30,6 +35,7 @@ const SURFACE = route('POST', '/surface', async (): Promise<Rendered> => {
     text: surface.text,
     routes: [...surface.routes.keys()].toSorted(),
     collections: [...surface.collections.keys()],
+    pages: [...surface.pages.keys()],
   };
 });
 
@@ -44,6 +50,13 @@ useSkills().register('retire-characters', {
 useSkills().register('weekly-report', {
   name: 'weekly-report',
   skill: { description: 'Sum up the week.', prompt: 'Report.' },
+});
+useRoutes().register('POST /search', {
+  method: 'POST',
+  pattern: '/search',
+  file: '/search.post.ts',
+  layer: 'ohnejs/base',
+  handler: () => null,
 });
 useRoutes().register('GET /reports', {
   method: 'GET',
@@ -108,6 +121,7 @@ describe('renderSurface', () => {
           ...ITEMS_READ,
           'PATCH /collections/items/[uuid]',
           'POST /collections/items/[uuid]/translations/copy',
+          'POST /search',
         ].toSorted(),
       );
       deepStrictEqual(collections, ['Items', 'Guilds', 'Characters']);
@@ -125,6 +139,7 @@ describe('renderSurface', () => {
           ),
           ...GUILDS_READ,
           ...ITEMS_READ,
+          'POST /search',
         ].toSorted(),
       );
       ok(!text.includes('PATCH /collections/items/[uuid]'));
@@ -302,5 +317,101 @@ describe('renderSurface', () => {
       ok(routes.includes('GET /reports'));
       ok(!routes.some((id) => id.includes('/auth/') || id.includes('/ai/')));
     });
+  });
+
+  it('offers the search and tells the model how to use it', async () => {
+    await withAI(undefined, async () => {
+      const { text, routes } = await surfaceFor(officer.token);
+      ok(routes.includes('POST /search'));
+      match(text, /`POST \/search` with `\{ q \}` finds records holding every word/);
+    });
+  });
+
+  it('lists the sidebar rows and the account page under `# Your pages`', async () => {
+    await withAI(undefined, async () => {
+      const { text, pages } = await surfaceFor(officer.token);
+      deepStrictEqual(pages, [
+        '/overview',
+        '/collections/items',
+        '/collections/guilds',
+        '/collections/characters',
+        '/account',
+      ]);
+      match(text, /\n# Your pages\n- \/overview: .+\n- \/collections\/items: Items\n/);
+      ok(text.indexOf('# Your routes') < text.indexOf('# Your pages'));
+    });
+  });
+
+  it('drops a link off this origin, a closed page, and the rows of a denied collection', async () => {
+    const menu = {
+      items: [
+        'Guilds',
+        'Items',
+        { to: 'https://docs.example.com', label: 'Docs' },
+        { to: '//evil.example.com', label: 'Evil' },
+        { to: '/logout?next=/', label: 'Sign out' },
+        { to: '/collections/guilds/archive', label: 'Archive' },
+        { to: '/reports?range=week', label: 'Weekly' },
+        { to: '/collections/items', label: 'Items again' },
+      ],
+    };
+    const ai = { deny: { collections: [...AI_DEFAULTS.deny.collections, 'Guilds'] } };
+    useLayers().add({ path: '/pages-test/app', input: { ai, dashboard: { menu: [menu] } } });
+    try {
+      const { text, pages } = await surfaceFor(officer.token);
+      deepStrictEqual(pages, [
+        '/collections/items',
+        '/reports?range=week',
+        '/collections/characters',
+        '/account',
+      ]);
+      ok(text.includes('- /collections/items: Items\n'));
+    } finally {
+      useLayers().remove('/pages-test/app');
+    }
+  });
+
+  it("drops the page a denied collection's `recordPath` opens, wherever a hook puts it", async () => {
+    const guilds = useCollections().get('Guilds')!.collection;
+    const dashboard = guilds.dashboard;
+    guilds.dashboard = { ...dashboard, recordPath: '/guilds?details=[uuid]' };
+    hook('dashboard:menu', (menu) => [
+      ...menu,
+      { label: '', items: [{ to: '/guilds', label: 'Guild hall' }] },
+    ]);
+    const ai = { deny: { collections: [...AI_DEFAULTS.deny.collections, 'Guilds'] } };
+    try {
+      await withAI(ai, async () => {
+        ok(!(await surfaceFor(officer.token)).pages.includes('/guilds'));
+      });
+      await withAI(undefined, async () => {
+        ok((await surfaceFor(officer.token)).pages.includes('/guilds'));
+      });
+    } finally {
+      guilds.dashboard = dashboard;
+      useHooks().delete('dashboard:menu');
+    }
+  });
+
+  it('lists a row the `dashboard:menu` hook adds or rewrites', async () => {
+    hook('dashboard:menu', (menu) => [
+      ...menu.map((group) => ({
+        ...group,
+        items: group.items.map((item) =>
+          item.to === '/collections/items' ? { ...item, to: '/media' } : item,
+        ),
+      })),
+      { label: '', items: [{ to: '/audit', label: 'Audit' }] },
+    ]);
+    try {
+      await withAI(undefined, async () => {
+        const { text, pages } = await surfaceFor(officer.token);
+        ok(pages.includes('/media'));
+        ok(!pages.includes('/collections/items'));
+        ok(text.includes('- /audit: Audit'));
+      });
+    } finally {
+      useHooks().delete('dashboard:menu');
+    }
   });
 });

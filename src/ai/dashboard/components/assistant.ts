@@ -1,8 +1,9 @@
-import { api, useRoute } from 'ohnejs/dashboard';
+import { closePalette } from 'app/components/palette-state.ts';
+import { api, navigate, useRoute } from 'ohnejs/dashboard';
 import { isUndefined, parseSSE, sleep, untracked } from 'ohnejs/utils';
 
 import type { Approval, SendTransport } from './send-queue.ts';
-import type { BatchResult, TurnBatch } from './turn-store.ts';
+import type { BatchResult, OpenOutcome, TurnBatch } from './turn-store.ts';
 
 import { aiMeta } from './_ai-meta.ts';
 import { turnModel } from './_ai-model-pick.ts';
@@ -15,6 +16,7 @@ import {
   nextStep,
   openTurn,
   pendingBatch,
+  replaceTurns,
   runsUnasked,
   sending,
   settleBatch,
@@ -64,8 +66,9 @@ export interface AskOptions {
  * Asks the assistant: opens a turn for `input` on the server and streams its first step into the store.
  * The turn plans on the model the person picked, when it is not the app's default.
  * A `skill` starts it with that skill's instructions; a `flow` walks that flow instead.
- * A follow-up the server cannot continue answers `409`, and the question is then asked afresh.
+ * A follow-up the server cannot continue answers `409`; the question is then asked afresh, alone in the view.
  * A batch of reads and `auto` writes runs at once; any other waits in the palette for the person.
+ * A batch that names a page closes the palette and opens it once answered; a declined batch leaves it.
  * Nothing happens while a turn still runs, since the store follows one turn at a time.
  */
 export async function ask(input: string, { skill, flow, after }: AskOptions = {}): Promise<void> {
@@ -90,7 +93,11 @@ export async function ask(input: string, { skill, flow, after }: AskOptions = {}
   let response: Response;
   try {
     response = await open(after);
-    if (response.status === 409 && !isUndefined(after)) response = await open();
+    if (response.status === 409 && !isUndefined(after)) {
+      const current = currentTurn();
+      if (!isUndefined(current)) replaceTurns([current]);
+      response = await open();
+    }
   } catch {
     markTurn('error', 'network');
     return;
@@ -100,9 +107,16 @@ export async function ask(input: string, { skill, flow, after }: AskOptions = {}
 
 /**
  * Answers the batch that waits: sends what `approvals` allow, posts the results, streams the next step.
+ * A batch that names a page closes the palette and opens it once answered; a declined batch leaves it.
+ * The page opens after the writes, so it shows what they changed.
+ * `open: false` leaves the page as it is.
  * A batch that no longer waits is left alone.
  */
-export async function answer(batch: TurnBatch, approvals: readonly Approval[]): Promise<void> {
+export async function answer(
+  batch: TurnBatch,
+  approvals: readonly Approval[],
+  { open = true }: { open?: boolean } = {},
+): Promise<void> {
   const turn = currentTurn();
   if (isUndefined(turn) || turn.id === null || pendingBatch()?.id !== batch.id) return;
   markTurn('sending');
@@ -121,11 +135,16 @@ export async function answer(batch: TurnBatch, approvals: readonly Approval[]): 
     return;
   }
   sending.value = null;
-  settleBatch(results);
+  const opened: OpenOutcome | undefined = isUndefined(batch.open)
+    ? undefined
+    : open
+      ? await openPage(batch.open)
+      : 'declined';
+  settleBatch(results, opened);
   nextStep();
   let response: Response | undefined;
   try {
-    response = await postResults(TRANSPORT, turn.id, batch.id, results);
+    response = await postResults(TRANSPORT, turn.id, batch.id, results, opened);
   } catch {
     markTurn('error', 'network');
     return;
@@ -136,6 +155,7 @@ export async function answer(batch: TurnBatch, approvals: readonly Approval[]): 
 /**
  * Declines the batch that waits: its reads still run, every write answers the person's decline with `note`.
  * The note is cut to what the results route takes.
+ * A page the batch names stays unopened, and the model reads it as declined.
  */
 export function decline(batch: TurnBatch, note?: string): Promise<void> {
   const said = note?.trim().slice(0, MAX_NOTE) ?? '';
@@ -143,7 +163,18 @@ export function decline(batch: TurnBatch, note?: string): Promise<void> {
   return answer(
     batch,
     batch.proposals.map((proposal) => (proposal.tier === 'read' ? { send: true } : declined)),
+    { open: false },
   );
+}
+
+/**
+ * Closes the palette and opens `path`, answering whether the location got there.
+ * A guard asking about unsaved changes holds the answer until the person decides.
+ */
+async function openPage(path: string): Promise<OpenOutcome> {
+  // Closed first, or the next page's shell would mount the palette again.
+  closePalette();
+  return (await navigate(path)) ? 'opened' : 'stayed';
 }
 
 /**

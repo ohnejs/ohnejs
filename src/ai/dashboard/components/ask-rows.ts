@@ -13,7 +13,12 @@ export interface AskRow {
   /**
    * The row icon.
    */
-  icon: 'sparkles';
+  icon: 'sparkles' | 'route' | 'history';
+
+  /**
+   * An instant the row shows at its end, in epoch milliseconds.
+   */
+  time?: number;
 
   /**
    * Runs when the row is picked.
@@ -81,6 +86,11 @@ export interface AskRowsOptions {
   flows: readonly { name: string; title: string }[];
 
   /**
+   * The person's latest chats, newest first.
+   */
+  recent: readonly { id: string; title: string; updatedAt: number }[];
+
+  /**
    * Whether the current turn settled, so a question may start a new one.
    */
   settled: boolean;
@@ -99,15 +109,27 @@ export interface AskRowsOptions {
    * Shows the turn view without starting a turn.
    */
   view(): void;
+
+  /**
+   * Shows the turn view on a new, empty conversation.
+   */
+  fresh(): void;
+
+  /**
+   * Reopens the chat `id` in the turn view.
+   */
+  resume(id: string): void;
 }
 
 const WHITESPACE = /\s+/;
 
 /**
- * The rows the assistant adds under the palette's results.
+ * The rows the assistant adds to the palette.
  * A query without a leading `/` gets one row: "Ask: <query>", or "Assistant" on a blank query.
  * Picking it starts a turn with the query.
- * On a blank query, or while a turn still runs, it only shows the turn view.
+ * On a blank query it opens a new chat, and while a turn still runs it only shows the turn view.
+ * Once the turn settled, it also lists the person's recent chats whose title matches, newest activity first.
+ * Each shows when it was last active; picking one reopens it.
  * A query starting with `/` lists the skills and the flows matching the word after it, skills first.
  * Picking one starts a turn with that skill, or walks that flow.
  * The words after the name are the question; without any, the title stands in.
@@ -120,10 +142,27 @@ export function askRows(options: AskRowsOptions): AskRowGroup[] {
         ? t('ai.dashboard.assistant')
         : t('ai.dashboard.ask', { query }).replaceAll('`', '');
     const onSelect = (): void => {
-      if (query === '' || !options.settled) options.view();
+      if (!options.settled) options.view();
+      else if (query === '') options.fresh();
       else options.start(query);
     };
-    return [{ key: 'ai:ask', label: '', rows: [{ label, icon: 'sparkles', onSelect }] }];
+    const ask: AskRowGroup = {
+      key: 'ai:ask',
+      label: '',
+      rows: [{ label, icon: 'sparkles', onSelect }],
+    };
+    const matching = new Set(searchByKeywords(options.recent, query, 'title'));
+    const recent = options.recent.filter((chat) => matching.has(chat));
+    if (!options.settled || recent.length === 0) return [ask];
+    const rows = recent.map(
+      (chat): AskRow => ({
+        label: chat.title,
+        icon: 'history',
+        time: chat.updatedAt,
+        onSelect: () => options.resume(chat.id),
+      }),
+    );
+    return [ask, { key: 'ai:recent', label: t('ai.dashboard.recentChats'), rows }];
   }
   const [name = '', ...rest] = query.slice(1).split(WHITESPACE);
   const words = rest.join(' ');
@@ -138,7 +177,7 @@ export function askRows(options: AskRowsOptions): AskRowGroup[] {
       .map(
         (starter): AskRow => ({
           label: starter.title,
-          icon: 'sparkles',
+          icon: starter.kind === 'flow' ? 'route' : 'sparkles',
           onSelect: () => options.start(words === '' ? starter.title : words, starter),
         }),
       );

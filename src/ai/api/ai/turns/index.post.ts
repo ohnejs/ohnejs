@@ -3,15 +3,7 @@ import type { User } from 'ohnejs/auth';
 
 import { badRequest, defineHandler, HTTPError, notFound, readJSONBody, useEvent } from 'ohnejs';
 import { requireCapability } from 'ohnejs/auth';
-import {
-  hasKey,
-  isNull,
-  isPlainObject,
-  isString,
-  isUndefined,
-  isUUID,
-  parseDuration,
-} from 'ohnejs/utils';
+import { hasKey, isNull, isPlainObject, isString, isUndefined, isUUID } from 'ohnejs/utils';
 
 import type { ResolvedAIConfig } from '../../../config.ts';
 import type { Turn } from '../../../turns/state.ts';
@@ -24,7 +16,14 @@ import { userMessage } from '../../../turns/prompt.ts';
 import { pruneTurns } from '../../../turns/prune.ts';
 import { flowModels, startableFlows } from '../../../turns/run-flow.ts';
 import { usableSkill } from '../../../turns/skills.ts';
-import { activeModel, expireTurn, loadTurn, openTurn, turnGone } from '../../../turns/state.ts';
+import {
+  closeTurn,
+  activeModel,
+  expireTurn,
+  loadTurn,
+  openTurn,
+  turnGone,
+} from '../../../turns/state.ts';
 import { followUpTranscript, streamStep } from '../../../turns/step.ts';
 
 /**
@@ -33,12 +32,12 @@ import { followUpTranscript, streamStep } from '../../../turns/step.ts';
 const MAX_INPUT = 16_000;
 
 /**
- * The longest page pattern accepted.
+ * The longest page path accepted.
  */
 const MAX_PAGE = 256;
 
 /**
- * A dashboard route pattern: a leading slash, then no whitespace or control character.
+ * A dashboard path: a leading slash, then no whitespace or control character.
  * The page lands in the system prompt, so it never opens a line of its own there.
  */
 const PAGE_RE = /^\/[^\s\p{Cc}]*$/u;
@@ -54,6 +53,7 @@ const BODY_KEYS = new Set(['input', 'page', 'model', 'skill', 'flow', 'after']);
  * A flow turn streams `node` before each act node it enters.
  * It may step through several nodes in one stream.
  * The stream ends with the step; the browser answers a `batch` through `POST /ai/turns/[id]/results`.
+ * A `batch` may name a dashboard path to `open`, which the browser opens once it answers.
  * Needs `ai.use`: no user `401`, a missing capability `403`.
  * Without `ai.model` the assistant is off, a `404`.
  * `model` picks another `ai.models` entry; one unknown, or a `jev` one, is a `400`.
@@ -63,7 +63,9 @@ const BODY_KEYS = new Set(['input', 'page', 'model', 'skill', 'flow', 'after']);
  * A model the flow's nodes name whose key is unset is a `503`.
  * `after` names a turn the new one follows up on, which then starts from that turn's transcript.
  * A follow-up is a plain turn, so a `flow` beside `after` is a `400`.
- * It must be the person's own closed turn, written within `ai.limits.turnTimeout`, or it is a `409`.
+ * It must be the person's own turn, at any age retention keeps it, or it is a `409`.
+ * An open turn is closed and followed: as `idle` or `lost` once it expired, else as `left`.
+ * The new turn keeps the chat's first turn in `chat`, so `GET /ai/chats` lists them as one.
  * A transcript is bound to its model, so a follow-up on another model starts fresh.
  * A body that is not an object, an unknown key, an empty or over-long `input`, or a bad `page` is a `400`.
  * So is an `after` that is not a string.
@@ -91,7 +93,7 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
   if (!isUndefined(flow) && (!isUndefined(skill) || !isUndefined(body.after))) {
     throw invalid('flow');
   }
-  const after = isUndefined(body.after) ? undefined : await followedTurn(body.after, user, config);
+  const after = isUndefined(body.after) ? undefined : await followedTurn(body.after, user);
   await probeTokens(user);
   await enforceTurnsLimit(user);
   useEvent().waitUntil(pruneTurns());
@@ -103,6 +105,9 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
       user: user.UUID,
       model,
       page,
+      input,
+      skill: skill?.name,
+      chat: isUndefined(after) ? undefined : (after.chat ?? after.UUID),
       transcript: isUndefined(flow)
         ? [
             ...(!isUndefined(after) && activeModel(after) === model
@@ -157,19 +162,16 @@ function startingFlow(name: unknown, user: User, model: string): FlowMeta {
 }
 
 /**
- * The turn a follow-up continues: the person's own, closed, and last written within `ai.limits.turnTimeout`.
- * An open one it names is closed first when it can no longer continue, as a results post would.
+ * The turn a follow-up continues: the person's own, closed now if still open, as `left` unless it expired.
+ * It reads the row again after the close, so a step that answered meanwhile is continued with its answer.
  */
-async function followedTurn(id: unknown, user: User, { limits }: ResolvedAIConfig): Promise<Turn> {
+async function followedTurn(id: unknown, user: User): Promise<Turn> {
   if (!isString(id)) throw invalid('after');
   const turn = isUUID(id) ? await loadTurn(id) : undefined;
   if (isUndefined(turn) || turn.user !== user.UUID) throw turnGone();
-  if (isNull(turn.closedAt)) {
-    await expireTurn(turn);
-    throw turnGone();
-  }
-  if (Date.now() - turn.updatedAt > parseDuration(limits.turnTimeout)) throw turnGone();
-  return turn;
+  if (!isNull(turn.closedAt)) return turn;
+  if (!(await expireTurn(turn))) await closeTurn(turn, 'left');
+  return (await loadTurn(id)) ?? turn;
 }
 
 /**

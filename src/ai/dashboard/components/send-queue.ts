@@ -9,7 +9,7 @@ import {
   stringifySearchParams,
 } from 'ohnejs/utils';
 
-import type { BatchResult, Proposal, TurnBatch } from './turn-store.ts';
+import type { BatchResult, OpenOutcome, Proposal, TurnBatch } from './turn-store.ts';
 
 /**
  * What the queue sends through: the dashboard's `api` and a sleep it can wait on.
@@ -364,19 +364,21 @@ export async function sendBatch(
  * Posts the results of one batch to `POST /ai/turns/[id]/results` and answers the next step's stream.
  * A batch is posted at most once: a second call for the same id answers `undefined` without a request.
  * That holds when the first post failed too, since the server may have taken it.
+ * `open` reports what became of the batch's page, for a batch that opens one.
  */
 export async function postResults(
   transport: SendTransport,
   turn: string,
   batch: string,
   results: readonly BatchResult[],
+  open?: OpenOutcome,
 ): Promise<Response | undefined> {
   if (posted.has(batch)) return undefined;
   posted.add(batch);
   const route = `POST ${fillRoute('/ai/turns/[id]/results', { id: turn })}`;
   const response = await fetchWithRetry(transport, route, {
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ batch, results }),
+    body: JSON.stringify({ batch, results, ...(isUndefined(open) ? {} : { open }) }),
   });
   return response;
 }

@@ -3,19 +3,23 @@ import type { ConditionNode } from 'ohnejs/utils';
 
 import { parseLocaleParam, queryMetadata, resolveGuards } from 'ohnejs';
 import {
+  groupBy,
   isArray,
+  isEmpty,
   isInteger,
   isNull,
   isPlainObject,
   isString,
   isUndefined,
   isUUID,
+  mapValues,
   parseCondition,
 } from 'ohnejs/utils';
 
 import type { Proposal } from './proposals.ts';
 import type { OfferedRoute, ReachableCollection } from './surface.ts';
 
+import { useAIConfig } from '../config.ts';
 import { redactRecords, SYSTEM_FIELDS } from './redact.ts';
 
 /**
@@ -41,6 +45,21 @@ export type ReceiptVerdict = {
    * The fields an update may write, when its scope limits them.
    */
   select?: string[];
+};
+
+/**
+ * What a search found in one collection.
+ */
+export type ReceiptFound = {
+  /**
+   * The records found, named only where `ai.data` opens the whole collection.
+   */
+  UUIDs?: string[];
+
+  /**
+   * How many records this page of the search found, at most its `limit`, where their ids stay unnamed.
+   */
+  total?: number;
 };
 
 /**
@@ -89,6 +108,11 @@ export interface Receipt {
    * The ids a list answered, only when its filter and order named identity fields alone.
    */
   UUIDs?: string[];
+
+  /**
+   * What a search found, by collection: a count, and the ids where `ai.data` opens the whole collection.
+   */
+  found?: Record<string, ReceiptFound>;
 
   /**
    * The locales a record holds, from a translations read.
@@ -199,6 +223,61 @@ const MAX_TEXT = 256;
 const MAX_ERRORS = 100;
 
 /**
+ * The most record ids a replayed read keeps, as many as the palette names in one read line.
+ */
+const REPLAY_IDS = 12;
+
+/**
+ * The counts a replayed body keeps.
+ */
+const REPLAY_COUNTS = ['total', 'failed', 'unknown', 'transformed'] as const;
+
+/**
+ * The part of a reported body a chat replays: its counts and record ids, never a value.
+ * `records` keeps the first ids as `{ UUID }`; a body that is itself a record keeps its `UUID`.
+ * A search keeps the first `{ collection, UUID }` pairs of each collection.
+ * Its `found` counts the hits per collection.
+ * `undefined` when nothing is left.
+ *
+ * @example
+ * ```ts
+ * replayBody({ total: 2, records: [{ UUID: A, name: 'Thrall' }, { UUID: B }] })
+ * // -> { total: 2, records: [{ UUID: A }, { UUID: B }] }
+ *
+ * replayBody({ UUID: A, name: 'Thrall' })
+ * // -> { UUID: A }
+ *
+ * replayBody({ name: 'Thrall' })
+ * // -> undefined
+ * ```
+ */
+export function replayBody(body: unknown): Record<string, unknown> | undefined {
+  if (!isPlainObject(body)) return undefined;
+  const kept: Record<string, unknown> = {};
+  for (const key of REPLAY_COUNTS) {
+    if (isInteger(body[key])) kept[key] = body[key];
+  }
+  if (isUUID(body.UUID)) kept.UUID = body.UUID;
+  if (isArray(body.records)) {
+    kept.records = body.records
+      .map((record) => (isPlainObject(record) ? record.UUID : undefined))
+      .filter(isUUID)
+      .slice(0, REPLAY_IDS)
+      .map((UUID) => ({ UUID }));
+  }
+  if (isArray(body.results)) {
+    const hits = body.results
+      .filter(isPlainObject)
+      .filter((hit) => isString(hit.collection) && isUUID(hit.UUID))
+      .map((hit) => ({ collection: hit.collection as string, UUID: hit.UUID }));
+    const grouped = groupBy(hits, (hit) => hit.collection);
+    kept.results = Object.values(grouped).flatMap((group = []) => group.slice(0, REPLAY_IDS));
+    kept.found = mapValues(grouped, (_, group = []) => group.length);
+  }
+  return isEmpty(kept) ? undefined : kept;
+}
+
+/**
  * The receipt of a proposal the server refuses before the browser sees it, shaped as a `400`.
  *
  * @example
@@ -256,6 +335,7 @@ export async function shapeReceipt(
   } else if (result.status >= 200 && result.status < 300) {
     if (route.body === 'query') shapeList(receipt, result.body, identity);
     if (route.body === 'verdicts' && !isUndefined(body)) shapeVerdicts(receipt, body, identity);
+    if (route.body === 'search') shapeSearch(receipt, body?.results, values);
     if (route.body === 'record' && route.method === 'POST' && isString(body?.UUID)) {
       receipt.uuid = body.UUID;
     }
@@ -355,6 +435,26 @@ function shapeList(receipt: Receipt, body: unknown, identity: boolean): void {
       records.map((record) => (isPlainObject(record) ? record.UUID : undefined)),
     );
   }
+}
+
+/**
+ * Fills a search receipt per collection: a count always, the ids only where `ai.data` opens it all.
+ * A search matches any text field, so its ids would tell a hidden field's text.
+ * A collection `ai.deny` names never appears.
+ */
+function shapeSearch(receipt: Receipt, results: unknown, values: boolean): void {
+  const { data, deny } = useAIConfig();
+  const found: Record<string, ReceiptFound> = {};
+  const rows = isArray(results) ? results.filter(isPlainObject) : [];
+  for (const [collection, hits = []] of Object.entries(
+    groupBy(rows, (row) => String(row.collection)),
+  )) {
+    if (deny.collections.includes(collection)) continue;
+    const uuids = reportedUUIDs(hits.map((hit) => hit.UUID));
+    found[collection] =
+      values && data[collection] === true ? { UUIDs: uuids } : { total: uuids.length };
+  }
+  receipt.found = found;
 }
 
 /**

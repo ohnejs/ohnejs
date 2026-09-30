@@ -42,6 +42,12 @@ describe('the AITurns collection', () => {
     strictEqual(await queryUntyped('AITurns').where({ user }).count(), 0);
   });
 
+  it('leaves what the person typed, the skill, the chat and the texts empty unless given', async () => {
+    const user = await createUser('bare@example.com');
+    const turn = await queryUntyped('AITurns').createOrThrow({ user, model: 'smart', page: '/' });
+    deepStrictEqual([turn.input, turn.skill, turn.chat, turn.texts], [null, null, null, null]);
+  });
+
   it('is never exposed over the API', () => {
     strictEqual(AITurnsCollection.api, undefined);
   });

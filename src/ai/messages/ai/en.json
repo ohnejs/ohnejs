@@ -9,6 +9,7 @@
     "resultsMismatch": "One result per proposal is required",
     "turnGone": "The turn cannot be continued",
     "unknownBatch": "Unknown batch `{batch}`",
+    "unknownChat": "Unknown chat",
     "unknownFlow": "Unknown flow `{flow}`",
     "unknownKey": "Unknown key `{key}`",
     "unknownModel": "Unknown model `{model}`",
@@ -25,7 +26,19 @@
     },
     "page": {
       "label": "Page",
-      "description": "The dashboard route the person asked from."
+      "description": "The dashboard path the person asked from."
+    },
+    "input": {
+      "label": "Input",
+      "description": "What the person typed, without the fences around it."
+    },
+    "skill": {
+      "label": "Skill",
+      "description": "The skill the turn started with; empty for none."
+    },
+    "chat": {
+      "label": "Chat",
+      "description": "The first turn of the chat this one follows up in; empty on that first turn."
     },
     "flow": {
       "label": "Flow",
@@ -38,6 +51,10 @@
     "batches": {
       "label": "Batches",
       "description": "The requests each step proposed, as JSON."
+    },
+    "texts": {
+      "label": "Texts",
+      "description": "The model's text per step, as JSON."
     },
     "step": {
       "label": "Steps",
@@ -71,15 +88,23 @@
     "ask": "Ask: `{query}`",
     "skills": "Skills",
     "flows": "Flows",
-    "start": "Type a question above and press Enter, or `/` for a skill or a flow",
+    "recentChats": "Recent chats",
+    "askAssistant": "Ask the assistant",
+    "placeholder": "Search or ask the assistant",
+    "placeholderFollowUp": "Ask a follow-up",
+    "placeholderStarters": "Search, ask, or type / for skills and flows",
+    "start": "Type a question above and press Enter, or / for a skill or a flow",
     "followUp": "Type a follow-up above and press Enter",
     "thinking": "Thinking",
     "reading": "Reading",
-    "waiting": "Waiting {seconds} s",
+    "waiting": "Retrying in {seconds} s",
     "working": "Assistant: working",
     "sending": "Assistant: sending {sent} of {total}",
+    "progress": {
+      "working": "Working",
+      "sending": "Sending {sent} of {total}"
+    },
     "approval": "Assistant: waiting for your approval",
-    "failed": "The assistant could not do that",
     "reason": {
       "timeout": "It took too long. Nothing more was changed.",
       "provider": "The model did not answer.",
@@ -88,17 +113,23 @@
       "steps": "The assistant reached its step limit for one question.",
       "length": "The answer was cut short.",
       "refusal": "The model declined to answer.",
-      "turnGone": "This conversation is closed. Ask again to start a new one.",
+      "turnGone": "This conversation can no longer be continued. Your question starts a new one.",
       "limit": "You have reached the assistant's limit for now.",
       "unavailable": "The model is unavailable.",
       "forbidden": "You may not use the assistant.",
       "off": "The assistant is not enabled.",
       "signedOut": "You are signed out.",
+      "left": "The page closed while the assistant was answering.",
+      "idle": "This waited too long for an answer and closed.",
+      "lost": "The server stopped while answering.",
+      "running": "Still being answered in another window.",
       "blindModel": "This model cannot see record values. Pick another one.",
       "empty": "The assistant found nothing to do."
     },
     "read": {
       "list": "Read {count, plural, one {# record} other {# records}} of {collection}",
+      "listFiltered": "Read {count, plural, one {# record} other {# records}} of {collection} matching a filter",
+      "found": "Found {count, plural, one {# record} other {# records}} in {collection} for `{query}`",
       "record": "Read a record of {collection}",
       "translations": "Read the translations of a record of {collection}",
       "verdicts": "Checked what you may change in {collection}",
@@ -202,6 +233,12 @@
         "includesAny": "{field} includes none of `{value}`"
       }
     },
-    "newQuestion": "New question"
+    "newQuestion": "New question",
+    "page": {
+      "pending": "Opens {page} once this is done",
+      "opened": "Opened {page}",
+      "stayed": "Stayed here to keep your unsaved changes",
+      "declined": "Did not open {page}"
+    }
   }
 }

@@ -3,7 +3,16 @@ import type { FlowAct } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
 
 import { ohneError, sendEvents, useEvent, useFlows, useRequest } from 'ohnejs';
-import { isArray, isEmpty, isNull, isString, isUndefined, pick } from 'ohnejs/utils';
+import {
+  isArray,
+  isEmpty,
+  isNull,
+  isString,
+  isUndefined,
+  isUUID,
+  pick,
+  recordHref,
+} from 'ohnejs/utils';
 import { randomToken } from 'ohnejs/utils/crypto';
 
 import type { AITier } from '../config.ts';
@@ -17,7 +26,15 @@ import type {
 } from '../providers/provider.ts';
 import type { BatchResult } from './receipts.ts';
 import type { Entered, Running } from './run-flow.ts';
-import type { BatchCall, BatchProposal, CloseReason, FlowState, Turn, TurnBatch } from './state.ts';
+import type {
+  BatchCall,
+  BatchProposal,
+  CloseReason,
+  FlowState,
+  OpenOutcome,
+  Turn,
+  TurnBatch,
+} from './state.ts';
 import type { Surface } from './surface.ts';
 
 import { useAIConfig } from '../config.ts';
@@ -26,7 +43,7 @@ import { tagAutoAccept } from './auto-accept.ts';
 import { chargeTokens, stepSignal, tokenWait } from './limits.ts';
 import { buildPrompt, skillFence } from './prompt.ts';
 import { checkProposal } from './proposals.ts';
-import { shapeReceipt } from './receipts.ts';
+import { replayBody, shapeReceipt } from './receipts.ts';
 import { modelSeesValues } from './redact.ts';
 import { enterNode, leaveNode } from './run-flow.ts';
 import { usableSkill } from './skills.ts';
@@ -92,6 +109,7 @@ export function streamStep(
  * Text and retries stream as they come.
  * A step that ends in calls becomes a batch, streamed for the browser to answer, and the turn waits.
  * The batch names the node's model as `pinned` when it has one, since its transforms run there.
+ * It names the page it opens as `open`, for the browser to open once it answers.
  * One that ends any other way closes the turn, as does the step that reaches `ai.limits.steps`.
  * A closed turn keeps why in its `reason`.
  * A closing step answers its calls as closed, so a follow-up continues from a whole transcript.
@@ -102,7 +120,9 @@ export function streamStep(
  * Nodes left past `ai.limits.steps` close it as `steps`, before any of them is decided or entered.
  * A node the token budget no longer admits closes it as `limit`.
  * A failure streams `error` with its code and closes the turn; the client leaving streams nothing.
+ * A step whose turn another request closed first ends quietly, keeping that close.
  * A step that ends before `done` is charged its estimated input, since the provider bills it all the same.
+ * Each step keeps its text at `texts[step - 1]` as it streams, so a failed turn keeps what was read.
  */
 export async function runStep(run: StepRun, stream: EventStream): Promise<void> {
   const { turn, user } = run;
@@ -162,10 +182,20 @@ export async function runStep(run: StepRun, stream: EventStream): Promise<void> 
       deadline = stepSignal();
       charged = false;
       let done: DoneEvent | undefined;
+      let said = '';
+      turn.texts[turn.step - 1] = said;
       for await (const event of running.provider.step(request, deadline)) {
-        if (event.type === 'text') send(stream, 'text', { text: event.text });
-        else if (event.type === 'retry') send(stream, 'retry', { wait: event.wait });
-        else done = event;
+        if (event.type === 'text') {
+          said += event.text;
+          turn.texts[turn.step - 1] = said;
+          send(stream, 'text', { text: event.text });
+        } else if (event.type === 'retry') {
+          said = '';
+          turn.texts[turn.step - 1] = said;
+          send(stream, 'retry', { wait: event.wait });
+        } else {
+          done = event;
+        }
       }
       if (isUndefined(done)) throw ohneError('The provider ended the step without `done`');
       charged = true;
@@ -191,6 +221,7 @@ export async function runStep(run: StepRun, stream: EventStream): Promise<void> 
         kind: batch.kind,
         proposals,
         ...(isUndefined(act?.model) ? {} : { pinned: act.model }),
+        ...(isUndefined(batch.open) ? {} : { open: batch.open.path }),
       });
       send(stream, 'done', { reason: 'batch' });
       return;
@@ -204,6 +235,7 @@ export async function runStep(run: StepRun, stream: EventStream): Promise<void> 
     const code = deadline.aborted ? 'timeout' : isProviderError(error) ? 'provider' : 'internal';
     // Closed before the browser hears of it, so a follow-up typed at once finds the turn closed.
     await closeTurn(turn, code);
+    if (turn.reason !== code) return;
     send(stream, 'error', { code });
     if (code === 'internal') throw error;
   }
@@ -226,11 +258,14 @@ function runningNode(turn: Turn, running: Running): Entered {
  * Fills the pending batch with what the browser reported and returns the transcript items answering it.
  * Each result shapes the receipt of its proposal; the calls the server answered itself keep their content.
  * Record values ride along only when `model` may see them.
+ * The batch keeps each report for replay: its counts and record ids, never a value.
+ * The page the batch opens is answered with what the browser reported as `opened`.
  * Valid only within a request.
  */
 export async function answerBatch(
   batch: TurnBatch,
   results: BatchResult[],
+  opened: OpenOutcome | undefined,
   provider: Provider,
   model: string,
 ): Promise<TranscriptItem[]> {
@@ -239,11 +274,26 @@ export async function answerBatch(
     const call = batch.calls[entry.call];
     (call.receipts ??= [])[entry.index] = await shapeReceipt(entry, results[index], values);
   }
-  batch.reported = results.map((result) =>
-    'declined' in result
-      ? result
-      : { status: result.status, ...(result.auto === true ? { auto: true } : {}) },
-  );
+  batch.reported = results.map((result) => {
+    if ('declined' in result) return result;
+    const body = replayBody(result.body);
+    return {
+      status: result.status,
+      ...(result.auto === true ? { auto: true } : {}),
+      ...(isUndefined(body) ? {} : { body }),
+    };
+  });
+  if (!isUndefined(batch.open) && !isUndefined(opened)) {
+    const { call, path } = batch.open;
+    const answer = batch.calls[call];
+    batch.opened = opened;
+    if (opened === 'opened') {
+      answer.content = JSON.stringify({ opened: path });
+    } else {
+      answer.content = JSON.stringify({ error: opened, page: path });
+      answer.error = true;
+    }
+  }
   return provider.transcript.results(batch.calls.map(toolResult));
 }
 
@@ -275,7 +325,8 @@ function send(stream: EventStream, event: string, data: unknown): void {
 }
 
 /**
- * The batch of a step's calls: proposals checked, `describe` and `skill` answered, bad calls refused.
+ * The batch of a step's calls: proposals checked, `describe` and `skill` answered, `open` filed.
+ * A bad call is refused.
  * Its writes are then tagged to run without asking, when the person's auto-accept covers every one.
  */
 async function buildBatch(
@@ -298,6 +349,8 @@ async function buildBatch(
       batch.calls.push(describeCall(call, surface));
     } else if (call.name === 'skill') {
       batch.calls.push(skillCall(call, user));
+    } else if (call.name === 'open') {
+      batch.calls.push(openCall(call, surface, batch));
     } else {
       batch.calls.push(errorCall(call, { error: 'unknownTool' }));
     }
@@ -358,6 +411,37 @@ function skillCall(call: ToolCall, user: User): BatchCall {
   const skill = usableSkill(user, name);
   if (isUndefined(skill)) return errorCall(call, { error: 'unknownSkill' });
   return { id: call.id, name: call.name, content: skillFence(name as string, skill.prompt) };
+}
+
+/**
+ * Files an `open` call's page on the batch, answered once the browser reports what became of it.
+ * A page not listed, a record out of reach, or a second `open` in the step is refused.
+ */
+function openCall(call: ToolCall, surface: Surface, batch: TurnBatch): BatchCall {
+  if (!isUndefined(batch.open)) return errorCall(call, { error: 'oneOpen' });
+  const path = openPath(call.input, surface);
+  if (!isString(path)) return errorCall(call, path);
+  batch.open = { call: batch.calls.length, path };
+  return { id: call.id, name: call.name };
+}
+
+/**
+ * The path an `open` call names: a listed page, a readable collection's list, or one of its records.
+ * A singleton opens its editor, whatever `uuid` says.
+ */
+function openPath(input: Record<string, unknown>, surface: Surface): string | { error: string } {
+  const { page, collection, uuid } = input;
+  if (isString(page) && isUndefined(collection) && isUndefined(uuid)) {
+    return surface.pages.has(page) ? page : { error: 'unknownPage' };
+  }
+  if (!isString(collection) || !isUndefined(page) || !(isUndefined(uuid) || isString(uuid))) {
+    return { error: 'invalidShape' };
+  }
+  const reachable = surface.collections.get(collection);
+  if (isUndefined(reachable) || !reachable.operations.read) return { error: 'unknownCollection' };
+  const { described } = reachable;
+  if (isUndefined(uuid) || described.singleton) return `/collections/${described.segment}`;
+  return isUUID(uuid) ? recordHref(described, uuid) : { error: 'unknownRecord' };
 }
 
 /**

@@ -365,6 +365,19 @@ describe('postResults', () => {
     });
   });
 
+  it('reports what became of the page only when there is one', async () => {
+    const transport = stub([{ status: 200 }, { status: 200 }]);
+    await postResults(transport, 'turn-1', 'opens', [], 'stayed');
+    await postResults(transport, 'turn-1', 'stays', []);
+    deepStrictEqual(
+      transport.calls.map((entry) => entry.body),
+      [
+        { batch: 'opens', results: [], open: 'stayed' },
+        { batch: 'stays', results: [] },
+      ],
+    );
+  });
+
   it('never posts a batch again after the connection dropped', async () => {
     const transport = stub([new Error('offline'), { status: 200 }]);
     await rejects(postResults(transport, 'turn-1', 'dropped', []), /offline/);

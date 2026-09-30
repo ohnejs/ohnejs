@@ -160,7 +160,7 @@ describe('POST /ai/turns', () => {
     const tools = seen?.body.tools as { name: string }[] | undefined;
     deepStrictEqual(
       tools?.map((tool) => tool.name),
-      ['request', 'describe', 'skill'],
+      ['request', 'describe', 'skill', 'open'],
     );
     deepStrictEqual(seen?.body.messages, [
       {
@@ -410,7 +410,7 @@ describe('POST /ai/turns', () => {
     });
   });
 
-  it('refuses to follow up on a turn that is open, unknown, not theirs, or idle too long', async () => {
+  it('refuses to follow up on a turn unknown or not theirs, and takes over one still open', async () => {
     server.answer(
       {
         body: calls('Reading.', [
@@ -418,33 +418,78 @@ describe('POST /ai/turns', () => {
         ]),
       },
       { body: says('Done.') },
+      { body: says('Again.') },
     );
-    await withAI(ai({ limits: { turnTimeout: 300 } }), async () => {
+    await withAI(ai(), async () => {
       const waiting = (await open(ask)).events[0]?.data.id as string;
       const closed = (await open(ask)).events[0]?.data.id as string;
       server.requests.length = 0;
       strictEqual((await open({ ...ask, after: 1 })).status, 400);
-      for (const after of [waiting, UUID, 'nope']) {
+      for (const after of [UUID, 'nope']) {
         const refused = await open({ ...ask, after });
         deepStrictEqual([refused.status, refused.body.data], [409, { code: 'turnGone' }]);
       }
-      strictEqual((await loadTurn(waiting))?.closedAt, null);
       const theirs = await open({ ...ask, after: closed }, asker.token);
       deepStrictEqual([theirs.status, theirs.body.data], [409, { code: 'turnGone' }]);
-      await sleep(350);
-      const stale = await open({ ...ask, after: closed });
-      deepStrictEqual([stale.status, stale.body.data], [409, { code: 'turnGone' }]);
-      const idle = await open({ ...ask, after: waiting });
-      deepStrictEqual([idle.status, idle.body.data], [409, { code: 'turnGone' }]);
-      strictEqual((await loadTurn(waiting))?.reason, 'idle');
       strictEqual(server.requests.length, 0);
+      const retry = await open({ ...ask, input: 'retry', after: waiting });
+      strictEqual(retry.status, 200);
+      strictEqual((await loadTurn(waiting))?.reason, 'left');
+      strictEqual((await loadTurn(retry.events[0]?.data.id as string))?.chat, waiting);
+      const messages = server.requests[0]?.body.messages as { role: string; content: unknown }[];
+      deepStrictEqual(messages.at(-1), { role: 'user', content: 'retry' });
+    });
+  });
+
+  it('follows up on a turn older than `ai.limits.turnTimeout`, and continues an idle one', async () => {
+    server.answer(
+      {
+        body: calls('Reading.', [
+          { id: 'toolu_1', name: 'describe', input: { collection: 'Items' } },
+        ]),
+      },
+      { body: says('Done.') },
+      { body: says('Still here.') },
+      { body: says('Picked up.') },
+    );
+    await withAI(ai({ limits: { turnTimeout: 300 } }), async () => {
+      const waiting = (await open(ask)).events[0]?.data.id as string;
+      const closed = (await open(ask)).events[0]?.data.id as string;
+      await sleep(350);
+      strictEqual((await open({ ...ask, after: closed })).status, 200);
+      const idle = await open({ ...ask, after: waiting });
+      strictEqual(idle.status, 200);
+      strictEqual((await loadTurn(waiting))?.reason, 'idle');
+      strictEqual((await loadTurn(idle.events[0]?.data.id as string))?.chat, waiting);
+    });
+  });
+
+  it('keeps what the person typed and the skill, and the first turn of the chat on every follow-up', async () => {
+    server.answer({ body: says('One.') }, { body: says('Two.') }, { body: says('Three.') });
+    await withAI(ai(), async () => {
+      const first = (await open({ ...ask, skill: 'weekly-report' })).events[0]?.data.id as string;
+      const second = (await open({ ...ask, input: 'And 59?', after: first })).events[0]?.data
+        .id as string;
+      const third = (await open({ ...ask, input: 'And 58?', after: second })).events[0]?.data
+        .id as string;
+      const root = await loadTurn(first);
+      deepStrictEqual([root?.input, root?.skill, root?.chat], [ask.input, 'weekly-report', null]);
+      const next = await loadTurn(second);
+      deepStrictEqual([next?.input, next?.skill, next?.chat], ['And 59?', null, first]);
+      strictEqual((await loadTurn(third))?.chat, first);
     });
   });
 
   it('prunes the turns `ai.audit.retain` no longer keeps once a turn starts', async () => {
     server.answer({ body: says('Done.') });
     await withAI(ai({ audit: { retain: '1d' } }), async () => {
-      const old = await openTurn({ user: officer.uuid, model: 'smart', page: '/', transcript: [] });
+      const old = await openTurn({
+        user: officer.uuid,
+        model: 'smart',
+        page: '/',
+        input: 'Hi',
+        transcript: [],
+      });
       await closeTurn(old, 'end');
       await queryUntyped('AITurns')
         .where({ UUID: old.UUID })

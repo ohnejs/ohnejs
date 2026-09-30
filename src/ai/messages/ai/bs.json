@@ -9,6 +9,7 @@
     "resultsMismatch": "Potreban je tačno jedan rezultat po prijedlogu",
     "turnGone": "Razgovor se ne može nastaviti",
     "unknownBatch": "Nepoznata serija `{batch}`",
+    "unknownChat": "Nepoznat razgovor",
     "unknownFlow": "Nepoznat tok `{flow}`",
     "unknownKey": "Nepoznat ključ `{key}`",
     "unknownModel": "Nepoznat model `{model}`",
@@ -25,7 +26,19 @@
     },
     "page": {
       "label": "Stranica",
-      "description": "Ruta nadzorne ploče s koje je osoba pitala."
+      "description": "Putanja nadzorne ploče s koje je osoba pitala."
+    },
+    "input": {
+      "label": "Unos",
+      "description": "Ono što je osoba upisala, bez oznaka oko toga."
+    },
+    "skill": {
+      "label": "Vještina",
+      "description": "Vještina kojom je razgovor počeo; prazno ako nijedna."
+    },
+    "chat": {
+      "label": "Nit razgovora",
+      "description": "Prvi razgovor u niti koju ovaj nastavlja; prazno na tom prvom razgovoru."
     },
     "flow": {
       "label": "Tok",
@@ -38,6 +51,10 @@
     "batches": {
       "label": "Serije",
       "description": "Zahtjevi koje je svaki korak predložio, kao JSON."
+    },
+    "texts": {
+      "label": "Tekstovi",
+      "description": "Tekst modela po koraku, kao JSON."
     },
     "step": {
       "label": "Koraci",
@@ -71,15 +88,23 @@
     "ask": "Pitaj: `{query}`",
     "skills": "Vještine",
     "flows": "Tokovi",
-    "start": "Upišite pitanje iznad i pritisnite Enter, ili `/` za vještinu ili tok",
+    "recentChats": "Nedavni razgovori",
+    "askAssistant": "Pitaj asistenta",
+    "placeholder": "Pretraži ili pitaj asistenta",
+    "placeholderFollowUp": "Postavi dodatno pitanje",
+    "placeholderStarters": "Pretraži, pitaj ili upiši / za vještine i tokove",
+    "start": "Upišite pitanje iznad i pritisnite Enter, ili / za vještinu ili tok",
     "followUp": "Upišite nastavak iznad i pritisnite Enter",
     "thinking": "Razmišlja",
     "reading": "Čita",
-    "waiting": "Čeka {seconds} s",
+    "waiting": "Novi pokušaj za {seconds} s",
     "working": "Asistent: radi",
     "sending": "Asistent: šalje {sent} od {total}",
+    "progress": {
+      "working": "Radi",
+      "sending": "Šalje {sent} od {total}"
+    },
     "approval": "Asistent: čeka vaše odobrenje",
-    "failed": "Asistent to nije mogao uraditi",
     "reason": {
       "timeout": "Trajalo je predugo. Ništa više nije promijenjeno.",
       "provider": "Model nije odgovorio.",
@@ -88,17 +113,23 @@
       "steps": "Asistent je dosegao ograničenje koraka za jedno pitanje.",
       "length": "Odgovor je prekinut.",
       "refusal": "Model je odbio odgovoriti.",
-      "turnGone": "Ovaj razgovor je zatvoren. Pitajte ponovo da započnete novi.",
+      "turnGone": "Ovaj razgovor se više ne može nastaviti. Vaše pitanje započinje novi.",
       "limit": "Dosegli ste ograničenje asistenta za sada.",
       "unavailable": "Model nije dostupan.",
       "forbidden": "Ne smijete koristiti asistenta.",
       "off": "Asistent nije uključen.",
       "signedOut": "Odjavljeni ste.",
+      "left": "Stranica je zatvorena dok je asistent odgovarao.",
+      "idle": "Ovo je predugo čekalo odgovor i zatvoreno je.",
+      "lost": "Server je stao tokom odgovaranja.",
+      "running": "Odgovor se upravo piše u drugom prozoru.",
       "blindModel": "Ovaj model ne smije vidjeti vrijednosti zapisa. Odaberite drugi.",
       "empty": "Asistent nije našao ništa za uraditi."
     },
     "read": {
       "list": "Pročitano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
+      "listFiltered": "Pročitano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection} po filteru",
+      "found": "Pronađeno {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection} za `{query}`",
       "record": "Pročitan jedan zapis iz {collection}",
       "translations": "Pročitani prijevodi jednog zapisa iz {collection}",
       "verdicts": "Provjereno šta smijete mijenjati u {collection}",
@@ -202,6 +233,12 @@
         "includesAny": "{field} ne uključuje ništa od `{value}`"
       }
     },
-    "newQuestion": "Novo pitanje"
+    "newQuestion": "Novo pitanje",
+    "page": {
+      "pending": "Otvara {page} kada ovo bude gotovo",
+      "opened": "Otvoreno: {page}",
+      "stayed": "Ostalo ovdje da se sačuvaju nesačuvane izmjene",
+      "declined": "Nije otvoreno: {page}"
+    }
   }
 }

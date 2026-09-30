@@ -6,11 +6,9 @@ import {
   css,
   type DashboardCollection,
   dimMark,
-  fallbackLabel,
   h,
   icon,
   joinLabel,
-  labelOf,
   type Primitive,
   seedLabel,
   select,
@@ -29,7 +27,6 @@ import {
   isString,
   isUndefined,
   parseSSE,
-  recordHref,
   type Ref,
   ref,
   type SSEMessage,
@@ -44,6 +41,7 @@ import { useAIT } from './_ai-messages.ts';
 import { aiMeta, collectionOfRoute } from './_ai-meta.ts';
 import { currentModel } from './_ai-model-pick.ts';
 import { spinner } from './_ai-spinner.ts';
+import { recordLink } from './_record-link.ts';
 import { eventPayload } from './turn-store.ts';
 
 /**
@@ -140,6 +138,7 @@ interface TransformState {
   standing: Ref<Standing>;
   model: Ref<Primitive>;
   started: boolean;
+  ticket: symbol | null;
   controller: AbortController | null;
 }
 
@@ -156,6 +155,11 @@ const REASONS: Readonly<Record<number, string>> = {
 };
 
 const runs = new Map<string, TransformState>();
+
+/**
+ * The run every new one waits behind, since the server streams only a couple of runs per person at once.
+ */
+let lane: Promise<void> = Promise.resolve();
 
 css`
   .o-transform {
@@ -176,7 +180,7 @@ css`
     flex-wrap: wrap;
     align-items: center;
     gap: 0.375rem;
-    font-size: 0.8125rem;
+    font-size: calc(1em - 0.0625rem);
     color: hsl(var(--ohne-muted-foreground));
   }
 
@@ -189,21 +193,21 @@ css`
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8125rem;
   }
 
   .o-transform-model > :first-child {
+    flex-shrink: 0;
     color: hsl(var(--ohne-muted-foreground));
   }
 
-  .o-transform-model .ohne-select {
-    width: 12rem;
+  .o-transform-model > .ohne-select-wrapper {
+    flex: 0 1 12rem;
+    min-width: 0;
   }
 
   .o-transform-rows {
     max-height: 24rem;
     overflow: auto;
-    font-size: 0.8125rem;
   }
 
   .o-transform-cell {
@@ -235,7 +239,7 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
   const pinned = options.pinned ?? untracked(aiMeta)?.transformModel;
   const state = stateOf(options, pinned);
   const { rows, selected, skipped, matched, reached, standing } = state;
-  if (!state.started) void run(state, options, pinned, collection);
+  if (!state.started) queue(state, options, pinned, collection);
 
   const changed = (row: TransformRow): Record<string, unknown> => {
     const body: Record<string, unknown> = {};
@@ -325,6 +329,13 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
         ),
     ),
     when(
+      () => standing.value === 'done' && reached.value === 0 && isEmpty(skipped.value),
+      () =>
+        h('div', { class: 'o-transform-line' }, icon('circle-off'), () =>
+          t('ai.dashboard.transform.nothing'),
+        ),
+    ),
+    when(
       () => standing.value === 'done' && matched.value > reached.value,
       () =>
         h('div', { class: 'o-transform-line' }, icon('circle-off'), () =>
@@ -341,6 +352,7 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
     busy,
     stop: () => {
       if (!untracked(busy)) return;
+      state.ticket = null;
       state.controller?.abort();
       state.controller = null;
       standing.value = 'done';
@@ -374,6 +386,7 @@ function stateOf(options: TransformTableOptions, pinned: string | undefined): Tr
       standing: ref('done'),
       model: ref(pinned ?? firstTransformModel() ?? null),
       started: false,
+      ticket: null,
       controller: null,
     };
     runs.set(key, state);
@@ -388,6 +401,25 @@ function firstTransformModel(): string | undefined {
   const models = untracked(aiMeta)?.transformModels ?? [];
   const turn = untracked(currentModel);
   return !isUndefined(turn) && models.includes(turn) ? turn : models[0];
+}
+
+/**
+ * Starts the transform once the runs before it are done, showing it as working meanwhile.
+ * A run stopped while it waits never starts.
+ */
+function queue(
+  state: TransformState,
+  options: TransformTableOptions,
+  pinned: string | undefined,
+  collection: DashboardCollection | null,
+): void {
+  const ticket = Symbol('run');
+  state.started = true;
+  state.ticket = ticket;
+  state.standing.value = 'streaming';
+  lane = lane.then(() =>
+    state.ticket === ticket ? run(state, options, pinned, collection) : undefined,
+  );
 }
 
 /**
@@ -560,7 +592,7 @@ function modelRow(
       variant: 'outline',
       size: -1,
       disabled: () => state.standing.value === 'streaming' || choices().length === 0,
-      onClick: () => void run(state, options, undefined, collection),
+      onClick: () => queue(state, options, undefined, collection),
     }),
   );
 }
@@ -610,12 +642,7 @@ function recordCell(
   return h(
     'div',
     { class: 'o-transform-cell' },
-    button(() => labelOf(collection.name, row.UUID) ?? fallbackLabel(row.UUID), {
-      href: recordHref(collection, row.UUID),
-      target: '_blank',
-      variant: 'ghost',
-      size: -2,
-    }),
+    recordLink(collection, row.UUID, { newTab: true }),
     when(
       () => isEmpty(changed(row)),
       () => h('div', { class: 'ohne-muted' }, () => t('ai.dashboard.transform.unchanged')),

@@ -12,6 +12,7 @@ import {
 } from 'ohnejs/utils';
 
 import type { BatchResult } from '../../../../turns/receipts.ts';
+import type { OpenOutcome } from '../../../../turns/state.ts';
 
 import { translate } from '../../../../../ohne/http/translate.ts';
 import { useAIConfig } from '../../../../config.ts';
@@ -38,14 +39,17 @@ const MAX_NOTE = 1_000;
  */
 const ENVELOPE = 64 * 1024;
 
-const BODY_KEYS = new Set(['batch', 'results']);
+const BODY_KEYS = new Set(['batch', 'results', 'open']);
+const OPEN_OUTCOMES = new Set<unknown>(['opened', 'stayed', 'declined'] satisfies OpenOutcome[]);
 const RESULT_KEYS = new Set(['status', 'body', 'auto', 'declined', 'note']);
 
 /**
  * `POST /ai/turns/[id]/results`
  *
  * Reports what the browser got for a batch's proposals and streams the next step, as `POST /ai/turns` does.
- * The body is `{ batch, results }`, one result per proposal in order.
+ * The body is `{ batch, results, open? }`, one result per proposal in order.
+ * `open` reports what became of the batch's page: `opened`, `stayed` or `declined`.
+ * A batch that opens a page needs it, and any other refuses it.
  * A result is `{ status, body?, auto? }`, or `{ declined, note? }` when the person declined the proposal.
  * `auto: true` says the browser sent it without asking, and only a proposal tagged `auto` may carry it.
  * Status `0` reports a request whose connection dropped before it answered, so it may have run.
@@ -56,6 +60,7 @@ const RESULT_KEYS = new Set(['status', 'body', 'auto', 'declined', 'note']);
  * A turn that is unknown, closed, idle past `ai.limits.turnTimeout`, lost, or someone else's is a `409`.
  * So is a batch that already has its results, or an id the turn never produced; `data.code` names which.
  * A body that is not an object, an unknown key, a bad result, or the wrong number of them is a `400`.
+ * So is a missing, unknown or unwanted `open`.
  * A person past `ai.limits.tokens`, or already streaming two steps, is a `429`.
  * A model whose key is unset is a `503`; a flow turn runs on its node's model.
  * The body may hold every proposal's answer up to `ai.limits.resultSize`, so its cap is raised to fit them.
@@ -83,6 +88,10 @@ export default defineHandler(
         : unknownBatch(batch);
     }
     if (!isUndefined(pending.reported)) throw batchReported();
+    const open = isOpenOutcome(body.open) ? body.open : undefined;
+    if (open !== body.open || isUndefined(open) !== isUndefined(pending.open)) {
+      throw badRequest(translate('ai.api.invalidBody', { key: 'open' }));
+    }
     if (results.length !== pending.proposals.length) {
       throw badRequest(translate('ai.api.resultsMismatch'));
     }
@@ -99,7 +108,7 @@ export default defineHandler(
     const provider = useProvider(model);
     const release = acquireStepPermit(user);
     try {
-      const answers = await answerBatch(pending, results, provider, model);
+      const answers = await answerBatch(pending, results, open, provider, model);
       turn.transcript = [...turn.transcript, ...answers];
       if (!(await claimStep(turn))) throw batchReported();
     } catch (error) {
@@ -134,6 +143,13 @@ function isResult(value: unknown): value is BatchResult {
     isInteger(value.status) &&
     (value.status === 0 || (value.status >= 100 && value.status <= 599))
   );
+}
+
+/**
+ * Whether `value` says what became of a batch's page.
+ */
+function isOpenOutcome(value: unknown): value is OpenOutcome {
+  return OPEN_OUTCOMES.has(value);
 }
 
 /**

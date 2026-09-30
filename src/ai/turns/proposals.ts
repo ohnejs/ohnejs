@@ -23,6 +23,7 @@ import {
   isEmpty,
   isNull,
   isPlainObject,
+  isInteger,
   isString,
   isUndefined,
   isUUID,
@@ -129,6 +130,11 @@ type Attempt<T> = { ok: true; value: T } | { ok: false; code: string; path: stri
 
 // `auto` is left out: the model never tags its own proposal.
 const PROPOSAL_KEYS = new Set(['route', 'params', 'query', 'body', 'where', 'transform']);
+
+/**
+ * The keys a `POST /search` body may carry.
+ */
+const SEARCH_KEYS = new Set(['q', 'collection', 'limit', 'offset']);
 const VERDICT_KEYS = new Set(['where', 'UUIDs', 'locale']);
 const TRANSFORM_KEYS = new Set(['fields', 'instruction']);
 const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
@@ -261,6 +267,26 @@ async function checkQuery(
 }
 
 /**
+ * Checks a `POST /search` body: `q` as text, with an optional `collection`, `limit` and `offset`.
+ */
+function checkSearch(
+  body: Record<string, unknown>,
+): Attempt<{ body: Record<string, unknown>; identity: boolean }> {
+  for (const key of Object.keys(body)) {
+    if (!SEARCH_KEYS.has(key)) return failed('unknownParam', `body.${key}`);
+  }
+  if (!isString(body.q)) return failed('invalidValue', 'body.q');
+  if (!isUndefined(body.collection) && !isString(body.collection)) {
+    return failed('invalidValue', 'body.collection');
+  }
+  for (const key of ['limit', 'offset'] as const) {
+    if (!isUndefined(body[key]) && !isInteger(body[key]))
+      return failed('invalidValue', `body.${key}`);
+  }
+  return { ok: true, value: { body, identity: false } };
+}
+
+/**
  * Checks the body by what the route takes, and whether a list read's filter passed the identity rule.
  */
 async function checkBody(
@@ -277,6 +303,7 @@ async function checkBody(
       : failed('unknownParam', 'body');
   }
   if (route.body === 'app') return { ok: true, value: { body: given, identity: false } };
+  if (route.body === 'search') return checkSearch(given ?? {});
   const collection = collections.get(route.collection as string) as ReachableCollection;
   if (route.body === 'query') {
     const parsed = await attempt(
