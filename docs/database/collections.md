@@ -568,8 +568,8 @@ text field.
   `Wrynn, Anduin`. A literal renders only between filled fields, so an empty `firstName` gives
   `Wrynn`, not `Wrynn,`.
 
-Search and sorting use the label's fields. A picker search matches each of its first ten words
-against every field.
+Search and sorting use the label's fields. A picker search matches each of its words against every
+field, read as the [palette reads them](../dashboard/palette.md#what-is-searched).
 
 If you omit the option, the first readable text field gives the record its title. A record with no
 label text shows `#` plus the last eight characters of its `UUID`.

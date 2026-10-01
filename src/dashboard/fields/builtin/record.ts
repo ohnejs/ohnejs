@@ -18,6 +18,7 @@ import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { recordHref } from '../../../utils/route/record-href.ts';
+import { searchTokens } from '../../../utils/search/search-tokens.ts';
 import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
 import { h } from '../../render/h.ts';
 import { api } from '../../runtime/api.ts';
@@ -43,7 +44,7 @@ const PER_PAGE = 50;
  */
 export interface RecordChoiceSource {
   /**
-   * Resolves one page of target choices; each of the first ten `keyword` tokens must match a label field.
+   * Resolves one page of target choices; each of `keyword`'s `searchTokens` must match a label field.
    * A failed request resolves an empty first page, so the dropdown settles on "no results".
    */
   choicesResolver(page: number, keyword: string): Promise<DynamicSelectPaginatedChoices>;
@@ -104,10 +105,7 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
   return {
     async choicesResolver(page, keyword) {
       // Ten tokens over at most ten parts keep the `where` inside the server's condition cap.
-      const tokens = keyword
-        .split(/\s+/)
-        .filter((token) => token !== '')
-        .slice(0, 10);
+      const tokens = searchTokens(keyword);
       try {
         const response = await api(`POST /collections/${target.segment}/query`, {
           headers: { 'content-type': 'application/json' },
