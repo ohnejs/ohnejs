@@ -22,14 +22,15 @@ const operatorCache = new WeakMap<FieldQueryMeta, ReadonlySet<QueryOperator>>();
  * The `UUID` entries (`id` marker) take the identity tests alone.
  * A `record` takes identity tests, `isNull` when nullable, and the relation pair `has`/`empty`.
  * A UUID-typed foreign key never gains the substring operators or ordering.
- * `records`, the child kinds, and `blocks` take `has`/`empty` only.
+ * `records` takes `includes`/`includesAny` over target `UUID`s beside `has`/`empty`.
+ * The child kinds and `blocks` take `has`/`empty` only.
  * `childOne` gets nothing null-related, since `empty` covers it.
  * Scalar groups gate on the column's logical type.
  * `equalsTo` admits `text`/`integer`/`real`/`boolean`; `in` and ordering admit `text`/`integer`/`real`.
  * The substring operators and `like` admit `text` alone.
  * `isNull` requires nullability or a companion column.
  * A missing translation reads `null` whatever the option says.
- * `includes*` requires a column flagged `jsonList`.
+ * On a column, `includes*` requires the `jsonList` flag.
  * A `translations` entry takes `includes*` alone, and nothing once a scope marks it `narrowed`.
  */
 export function allowedOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
@@ -59,6 +60,9 @@ function computeOperators(meta: FieldQueryMeta): ReadonlySet<QueryOperator> {
     return new Set<QueryOperator>(
       meta.narrowed === true ? [] : ['includes', 'includesAll', 'includesAny'],
     );
+  }
+  if (meta.kind === 'records') {
+    return new Set<QueryOperator>(['includes', 'includesAny', 'has', 'empty']);
   }
   if (meta.kind !== 'column') return new Set<QueryOperator>(['has', 'empty']);
 

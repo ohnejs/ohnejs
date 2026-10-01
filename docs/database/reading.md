@@ -49,11 +49,15 @@ await query('Posts')
 | `greaterThan`, `atLeast`, `lessThan`, `atMost` | Text and number columns                                                                                                                                                   |
 | `contains`, `startsWith`, `endsWith`, `like`   | Text columns                                                                                                                                                              |
 | `includes`, `includesAll`, `includesAny`       | [`multiSelect`](./field-types.md#multiselect), a [custom field type](./custom-field-types.md#storage) marked `jsonList`, and [`_translations`](./translations.md#reading) |
+| `includes`, `includesAny`                      | [`records`](#filtering-relations), by the linked record's `UUID`                                                                                                          |
 | `isNull`                                       | [Nullable fields](#null)                                                                                                                                                  |
 | `has`, `empty`                                 | [Relations](#filtering-relations), [`object`](./field-types.md#object), [`repeater`](./field-types.md#repeater), and [blocks](#blocks)                                    |
 
 An operator the field does not allow, like ordering on a boolean or `contains` on a number, does not
 compile.
+
+`contains`, `startsWith`, and `endsWith` ignore case in every script, so `contains('émile')` finds
+`Émile`. Accents still count: `cafe` does not find `Café`.
 
 Chained `where` calls are combined with AND. Each returns the builder, so you keep filtering.
 
@@ -124,6 +128,14 @@ await query('Posts').where('tags', (w) => w.empty()).findMany();
 An [`object` or `repeater`](./collections.md#composite-fields) field takes the same pair. `has()`
 with no argument tests that it holds anything, `empty()` tests the opposite, and a callback filters
 on the composite's subfields.
+
+A `records` field also takes `includes` and `includesAny`. They match by the linked record's
+`UUID`, without reading the linked record itself:
+
+```ts
+const news = await query('Tags').where('label', 'News').findFirst();
+if (news) await query('Posts').where('tags', (w) => w.includes(news.UUID)).findMany();
+```
 
 ## Populating relations
 

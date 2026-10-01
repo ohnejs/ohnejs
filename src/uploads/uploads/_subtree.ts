@@ -87,7 +87,7 @@ function underFolder(path: string): { directory: string; where: string; params: 
   const directory = dialect.quote(queryMetadata('Uploads').fields.directory.column as string);
   return {
     directory,
-    where: `${directory} = ? OR ${dialect.textMatch(directory)}`,
+    where: `${directory} = ? OR ${dialect.textMatch(directory, false)}`,
     params: [path, `${escapeLike(path)}/%`],
   };
 }

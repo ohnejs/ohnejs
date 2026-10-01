@@ -342,14 +342,36 @@ describe('SQLiteDialect', () => {
       return db;
     }
 
-    function match(db: DatabaseAdapter, pattern: string): Promise<{ name: string }[]> {
-      return db.query(`SELECT name FROM t WHERE ${dialect.textMatch('"name"')} ORDER BY name`, [
-        pattern,
-      ]);
+    function match(
+      db: DatabaseAdapter,
+      pattern: string,
+      fold = false,
+    ): Promise<{ name: string }[]> {
+      const where = dialect.textMatch('"name"', fold);
+      return db.query(`SELECT name FROM t WHERE ${where} ORDER BY name`, [pattern]);
     }
 
     it('emits LIKE with a backslash escape and one placeholder', () => {
-      strictEqual(dialect.textMatch('"name"'), `"name" LIKE ? ESCAPE '\\'`);
+      strictEqual(dialect.textMatch('"name"', false), `"name" LIKE ? ESCAPE '\\'`);
+    });
+
+    it('folds the column through `ohne_lower` when asked', () => {
+      strictEqual(dialect.textMatch('"name"', true), `ohne_lower("name") LIKE ? ESCAPE '\\'`);
+    });
+
+    it('a folded match finds non-ASCII text by its lowercased pattern', async () => {
+      const db = await seed(['Émile Zola', 'ΣΟΦΙΑ', 'Привет мир', 'emile']);
+      deepStrictEqual(await match(db, '%émile%', true), [nullObj({ name: 'Émile Zola' })]);
+      deepStrictEqual(await match(db, 'σοφια', true), [nullObj({ name: 'ΣΟΦΙΑ' })]);
+      deepStrictEqual(await match(db, '%привет%', true), [nullObj({ name: 'Привет мир' })]);
+      deepStrictEqual(await match(db, '%émile%'), []);
+      await db.close();
+    });
+
+    it('a folded match reads a final sigma as a medial one', async () => {
+      const db = await seed(['ΣΟΦΙΑΣΜΟΣ']);
+      deepStrictEqual(await match(db, '%σοφιασ%', true), [nullObj({ name: 'ΣΟΦΙΑΣΜΟΣ' })]);
+      await db.close();
     });
 
     it('matches case-insensitively', async () => {
@@ -381,6 +403,14 @@ describe('SQLiteDialect', () => {
       const db = await seed(['C:\\dir\\file', 'C:dir']);
       deepStrictEqual(await match(db, `%${escapeLike('\\dir')}%`), [
         nullObj({ name: 'C:\\dir\\file' }),
+      ]);
+      await db.close();
+    });
+
+    it('`ohne_lower` lowercases text and keeps `NULL`', async () => {
+      const db = await open();
+      deepStrictEqual(await db.query(`SELECT ohne_lower('ÄÖÜ Σ') AS v, ohne_lower(NULL) AS n`), [
+        nullObj({ v: 'äöü σ', n: null }),
       ]);
       await db.close();
     });

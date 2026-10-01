@@ -19,6 +19,15 @@ useFields().register('PARList', {
   name: 'PARList' as FieldTypeName,
   fieldType: defineField({ columnType: 'json', jsonList: true, forceNullable: true }),
 });
+useCollections().register('PARTargets', {
+  name: 'PARTargets',
+  collection: {
+    fields: {
+      name: field('text'),
+      rows: field('records', { collection: 'PARRows', inverse: 'links' }),
+    },
+  },
+});
 useCollections().register('PARRows', {
   name: 'PARRows',
   collection: {
@@ -27,6 +36,10 @@ useCollections().register('PARRows', {
       views: field('integer', { nullable: true }),
       flag: field('boolean', { nullable: true }),
       labels: { type: 'PARList', options: {} } as unknown as FieldInstance,
+      links: field('records', { collection: 'PARTargets' }),
+      items: field('repeater', {
+        fields: { code: field('text'), target: field('record', { collection: 'PARTargets' }) },
+      }),
     },
   },
 });
@@ -43,8 +56,9 @@ const seeds: [string, string | null, number | null, boolean | null, unknown[] | 
   ['p1', 'alpha', 10, true, ['red', 'green']],
   ['p2', 'Beta', 0, false, ['red', 10, true]],
   ['p3', null, null, null, null],
-  ['p4', 'ÄPFEL', -5, true, []],
+  ['p4', 'ÄPFEL Émile ΣΟΦΙΑ', -5, true, []],
   ['p5', '%wild_', 100, null, ['blue', false, -5]],
+  ['p6', 'ΣΟΦΙΑΣΜΟΣ \u212A', 1, false, null],
 ];
 for (const [uuid, title, views, flag, labels] of seeds) {
   await db.run(
@@ -60,8 +74,42 @@ for (const [uuid, title, views, flag, labels] of seeds) {
   );
 }
 
+for (const [uuid, name] of [
+  ['t1', 'one'],
+  ['t2', 'two'],
+  ['t3', 'three'],
+]) {
+  await db.run('INSERT INTO "PARTargets" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+    uuid,
+    0,
+    name,
+  ]);
+}
+const links: [string, string][] = [
+  ['p1', 't1'],
+  ['p1', 't2'],
+  ['p2', 't2'],
+  ['p4', 't3'],
+];
+for (const [index, [parent, target]] of links.entries()) {
+  await db.run(
+    'INSERT INTO "PARRows_links" ("_parentUUID","_targetUUID","_parentPosition","_targetPosition") VALUES (?,?,?,?)',
+    [parent, target, index, index],
+  );
+}
+const items: [string, string, string, string | null][] = [
+  ['i1', 'p1', 'x', 't3'],
+  ['i2', 'p2', 'y', null],
+  ['i3', 'p5', 'x', 't1'],
+];
+for (const [index, [uuid, parent, code, target]] of items.entries()) {
+  await db.run(
+    'INSERT INTO "PARRows_items" ("UUID","_parentUUID","_parentPosition","code","target") VALUES (?,?,?,?,?)',
+    [uuid, parent, index, code, target],
+  );
+}
+
 // One truth table for both halves of the grammar: the `where` compiler and the `when` evaluator.
-// Non-ASCII stays same-case.
 const CORPUS: Record<string, unknown>[] = [
   { title: 'alpha' },
   { title: { not: { equalsTo: 'alpha' } } },
@@ -78,6 +126,13 @@ const CORPUS: Record<string, unknown>[] = [
   { title: { not: { startsWith: 'be' } } },
   { title: { endsWith: 'A' } },
   { title: { contains: 'ÄPF' } },
+  { title: { contains: 'äpf' } },
+  { title: { contains: 'émile' } },
+  { title: { not: { contains: 'émile' } } },
+  { title: { startsWith: 'äpfel' } },
+  { title: { endsWith: 'σοφια' } },
+  { title: { contains: 'ΣΟΦΙΑΣ' } },
+  { title: { contains: 'k' } },
   { title: { like: 'alp%' } },
   { title: { not: { like: '%a' } } },
   { title: { like: '%wild%' } },
@@ -99,6 +154,17 @@ const CORPUS: Record<string, unknown>[] = [
   { labels: { includesAny: ['green', 10] } },
   { labels: { includesAny: [] } },
   { labels: { not: { includesAny: ['red', 'blue'] } } },
+  { links: { includes: 't2' } },
+  { links: { not: { includes: 't2' } } },
+  { links: { includesAny: ['t1', 't3'] } },
+  { links: { includesAny: [] } },
+  { links: { not: { includesAny: ['t2', 't9'] } } },
+  { items: { has: { UUID: 'i1' } } },
+  { items: { has: { UUID: { in: ['i2', 'i3'] } } } },
+  { items: { has: { target: 't1' } } },
+  { items: { has: { or: [{ UUID: 'i2' }, { target: { in: ['t3'] } }] } } },
+  { items: { not: { has: { UUID: 'i1' } } } },
+  { items: { has: { UUID: 'i3', code: 'x' } } },
 ];
 
 describe('condition grammar parity', () => {

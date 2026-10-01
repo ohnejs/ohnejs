@@ -211,6 +211,28 @@ describe('compileWhere', () => {
     });
   });
 
+  it('a non-ASCII needle folds the column and lowercases the pattern', () => {
+    deepStrictEqual(compile({ title: { contains: 'Émile' } }), {
+      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
+      params: ['%émile%'],
+    });
+    deepStrictEqual(compile({ title: { startsWith: 'ΣΟΦ' } }), {
+      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
+      params: ['σοφ%'],
+    });
+    deepStrictEqual(compile({ title: { endsWith: 'Мир' } }), {
+      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
+      params: ['%мир'],
+    });
+  });
+
+  it('an ASCII needle keeps the plain match and its case', () => {
+    deepStrictEqual(compile({ title: { contains: 'OHNE' } }), {
+      sql: `"title" LIKE ? ESCAPE '\\'`,
+      params: ['%OHNE%'],
+    });
+  });
+
   it('`like` binds its pattern raw, without escaping', () => {
     deepStrictEqual(compile({ title: { like: '%oh_' } }), {
       sql: '"title" LIKE ?',
@@ -360,6 +382,108 @@ describe('compileWhere relational', () => {
       sql: 'NOT (NOT EXISTS (SELECT 1 FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_parentUUID" = "WPosts"."UUID"))',
       params: [],
     });
+  });
+});
+
+describe('compileWhere records membership', () => {
+  it('`includes` probes the junction alone, never joining the target', () => {
+    deepStrictEqual(compile({ tags: { includes: 't1' } }), {
+      sql: '"WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_targetUUID" IN (?))',
+      params: ['t1'],
+    });
+  });
+
+  it('`includesAny` lists each distinct target once; an empty list matches nothing', () => {
+    deepStrictEqual(compile({ tags: { includesAny: ['t1', 't2', 't1'] } }), {
+      sql: '"WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_targetUUID" IN (?, ?))',
+      params: ['t1', 't2'],
+    });
+    deepStrictEqual(compile({ tags: { includesAny: [] } }), { sql: '1 = 0', params: [] });
+  });
+
+  it('the inverse side swaps the link columns', () => {
+    deepStrictEqual(compileOn('WTags', { posts: { includes: 'p1' } }), {
+      sql: '"WTags"."UUID" IN (SELECT "_sub0"."_targetUUID" FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_parentUUID" IN (?))',
+      params: ['p1'],
+    });
+  });
+
+  it('a locale-scoped junction binds the querying locale', () => {
+    deepStrictEqual(compileTranslatable({ tags: { includes: 't1' } }, 'de'), {
+      sql: '"WLPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WLPosts_tags" "_sub0" WHERE "_sub0"."_targetUUID" IN (?) AND "_sub0"."_localeCode" = ?)',
+      params: ['t1', 'de'],
+    });
+    deepStrictEqual(compileOn('WLTags', { posts: { includesAny: ['p1'] } }), {
+      sql: '"WLTags"."UUID" IN (SELECT "_sub0"."_targetUUID" FROM "WLPosts_tags" "_sub0" WHERE "_sub0"."_parentUUID" IN (?) AND "_sub0"."_localeCode" = ?)',
+      params: ['p1', 'en'],
+    });
+  });
+
+  it('negation wraps the probe whole', () => {
+    deepStrictEqual(compile({ tags: { not: { includes: 't1' } } }), {
+      sql: 'NOT ("WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_tags" "_sub0" WHERE "_sub0"."_targetUUID" IN (?)))',
+      params: ['t1'],
+    });
+  });
+});
+
+describe('compileWhere identity-only has', () => {
+  it('a `records` has on the target UUID selects the parent links uncorrelated', () => {
+    deepStrictEqual(compile({ tags: { has: { UUID: 't1' } } }), {
+      sql: '"WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_tags" "_sub0" JOIN "WTags" "_sub1" ON "_sub1"."UUID" = "_sub0"."_targetUUID" WHERE "_sub1"."UUID" = ?)',
+      params: ['t1'],
+    });
+  });
+
+  it('a locale-scoped junction keeps its locale pin inside the subquery', () => {
+    deepStrictEqual(compileTranslatable({ tags: { has: { UUID: { in: ['t1', 't2'] } } } }), {
+      sql: '"WLPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WLPosts_tags" "_sub0" JOIN "WLTags" "_sub1" ON "_sub1"."UUID" = "_sub0"."_targetUUID" WHERE "_sub0"."_localeCode" = ? AND "_sub1"."UUID" IN (?, ?))',
+      params: ['en', 't1', 't2'],
+    });
+  });
+
+  it('a child has on an item UUID selects the owners', () => {
+    deepStrictEqual(compile({ sections: { has: { UUID: 's1' } } }), {
+      sql: '"WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_sections" "_sub0" WHERE "_sub0"."UUID" = ?)',
+      params: ['s1'],
+    });
+  });
+
+  it('a blocks has pairs its discriminator with a relation column', () => {
+    deepStrictEqual(compileOn('WBPages', { content: { has: { block: 'WBHero', author: 'a1' } } }), {
+      sql: '"WBPages"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WBPages_content" "_sub0" JOIN "block_WBHero" "_sub1" ON "_sub1"."UUID" = "_sub0"."_blockUUID" WHERE "_sub0"."_blockType" = ? AND "_sub1"."author" = ?)',
+      params: ['WBHero', 'a1'],
+    });
+  });
+
+  it('groups of identity leaves and nested membership stay uncorrelated', () => {
+    deepStrictEqual(
+      compile({ tags: { has: { or: [{ UUID: 't1' }, { posts: { includes: 'p1' } }] } } }),
+      {
+        sql: '"WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_tags" "_sub0" JOIN "WTags" "_sub1" ON "_sub1"."UUID" = "_sub0"."_targetUUID" WHERE ("_sub1"."UUID" = ? OR "_sub1"."UUID" IN (SELECT "_sub2"."_targetUUID" FROM "WPosts_tags" "_sub2" WHERE "_sub2"."_parentUUID" IN (?))))',
+        params: ['t1', 'p1'],
+      },
+    );
+  });
+
+  it('negation wraps the uncorrelated probe', () => {
+    deepStrictEqual(compile({ sections: { not: { has: { UUID: 's1' } } } }), {
+      sql: 'NOT ("WPosts"."UUID" IN (SELECT "_sub0"."_parentUUID" FROM "WPosts_sections" "_sub0" WHERE "_sub0"."UUID" = ?))',
+      params: ['s1'],
+    });
+  });
+
+  it('a nullable foreign key, a text leaf, a negated leaf, or a nested has keeps the EXISTS', () => {
+    for (const condition of [
+      { author: { has: { UUID: 'a1' } } },
+      { tags: { has: { UUID: 't1', label: 'red' } } },
+      { tags: { has: { UUID: { not: { equalsTo: 't1' } } } } },
+      { sections: { has: { items: { has: { UUID: 'i1' } } } } },
+      { content: { has: { block: 'WBHero' } } },
+    ]) {
+      const collection = 'content' in condition ? 'WBPages' : 'WPosts';
+      ok(compileOn(collection, condition).sql.startsWith('EXISTS ('), JSON.stringify(condition));
+    }
   });
 });
 
@@ -768,5 +892,76 @@ describe('compileWhere blocks behavior', () => {
       'Alpha',
     ]);
     deepStrictEqual(await pageTitles({ content: { has: { block: 'WBHero', title: 'Sage' } } }), []);
+  });
+});
+
+await db.run(
+  'INSERT INTO "WTags" ("UUID", "_updatedAt", "label") VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
+  ['t1', 0, 'red', 't2', 0, 'green', 't3', 0, 'blue'],
+);
+for (const [uuid, title] of [
+  ['w1', 'One'],
+  ['w2', 'Two'],
+  ['w3', 'Three'],
+]) {
+  await db.run(
+    'INSERT INTO "WPosts" ("UUID", "_updatedAt", "title", "views", "featured") VALUES (?, ?, ?, ?, ?)',
+    [uuid, 0, title, 0, 0],
+  );
+}
+await db.run(
+  'INSERT INTO "WPosts_tags" ("_parentUUID", "_targetUUID", "_parentPosition", "_targetPosition") ' +
+    'VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)',
+  ['w1', 't1', 0, 0, 'w1', 't2', 1, 0, 'w2', 't2', 0, 1],
+);
+await db.run(
+  'INSERT INTO "WPosts_sections" ("UUID", "_parentUUID", "_parentPosition", "heading") VALUES (?, ?, ?, ?)',
+  ['s1', 'w3', 0, 'Intro'],
+);
+
+async function postRows(
+  condition: Record<string, unknown>,
+  plan = false,
+): Promise<{ titles: string[]; plan: string }> {
+  const parsed = parseCondition(condition);
+  if (!parsed.ok) throw new Error(`parse failed: ${parsed.error.code}`);
+  const fragment = compileWhere(parsed.node, meta, dialect, 'en');
+  const sql = `SELECT "title" FROM "WPosts" WHERE ${fragment.sql} ORDER BY "title"`;
+  const rows = await db.query<{ title: string }>(sql, fragment.params);
+  const steps = plan
+    ? await db.query<{ detail: string }>(`EXPLAIN QUERY PLAN ${sql}`, fragment.params)
+    : [];
+  return {
+    titles: rows.map((row) => row.title),
+    plan: steps.map((step) => step.detail).join('\n'),
+  };
+}
+
+describe('compileWhere records membership behavior', () => {
+  it('`includes` and `includesAny` match the linking rows, negation the rest', async () => {
+    deepStrictEqual((await postRows({ tags: { includes: 't2' } })).titles, ['One', 'Two']);
+    deepStrictEqual((await postRows({ tags: { includesAny: ['t1', 't3'] } })).titles, ['One']);
+    deepStrictEqual((await postRows({ tags: { not: { includes: 't1' } } })).titles, [
+      'Three',
+      'Two',
+    ]);
+  });
+
+  it('an identity-only has finds the same rows as its correlated twin', async () => {
+    const identity = await postRows({ tags: { has: { UUID: 't2' } } });
+    const correlated = await postRows({ tags: { has: { UUID: 't2', label: { contains: 'e' } } } });
+    deepStrictEqual(identity.titles, ['One', 'Two']);
+    deepStrictEqual(correlated.titles, identity.titles);
+    deepStrictEqual((await postRows({ sections: { has: { UUID: 's1' } } })).titles, ['Three']);
+  });
+
+  it('a reverse lookup searches the parent table by key instead of scanning it', async () => {
+    for (const condition of [{ tags: { includes: 't2' } }, { tags: { has: { UUID: 't2' } } }]) {
+      const { plan } = await postRows(condition, true);
+      ok(/SEARCH WPosts USING/.test(plan), plan);
+      ok(!/SCAN WPosts\b/.test(plan), plan);
+    }
+    const { plan } = await postRows({ tags: { has: { label: 'green' } } }, true);
+    ok(/SCAN WPosts\b/.test(plan), plan);
   });
 });

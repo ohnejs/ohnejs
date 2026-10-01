@@ -4,7 +4,16 @@ import type { Dialect, ListMembershipOperator, LogicalType } from '../../databas
 import type { QueryIR, TargetReach } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 
-import { intersection, isEmpty, isNull, isUndefined, uniqueArray } from '../../../utils/index.ts';
+import {
+  foldCase,
+  intersection,
+  isASCII,
+  isEmpty,
+  isNull,
+  isUndefined,
+  toArray,
+  uniqueArray,
+} from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import { splitBlockHas } from '../block-has.ts';
 import { queryLocales } from '../locale.ts';
@@ -31,6 +40,19 @@ interface WhereScope {
 }
 
 /**
+ * A subquery's tie to its outer row: an inner column equal to an outer one, plus any pin on the inner rows.
+ * The pin is the locale a locale-scoped table binds and the type a blocks wrapper narrows to.
+ * `keyed` marks `outer` as the scope's never-null `UUID`, the one shape an uncorrelated `IN` may replace.
+ * Over a nullable foreign key, `NOT (fk IN (...))` would drop a `NULL` row that `NOT EXISTS` keeps.
+ */
+interface Correlation {
+  inner: string;
+  outer: string;
+  pin: SQLFragment | null;
+  keyed: boolean;
+}
+
+/**
  * The per-compile state: the `_subN` alias counter, the effective locale, and the wire reach in force.
  * Every companion join and locale-scoped table binds the locale.
  * One counter threads the whole tree, so nested and self-referential relations never share an alias.
@@ -49,6 +71,8 @@ interface CompileContext {
  * An empty `and` matches all (`1 = 1`), an empty `or` matches nothing (`1 = 0`) - the one place both render.
  * A `compare` leaf renders its operator over the field's column.
  * `has`/`empty` render correlated `EXISTS` subqueries per kind, aliased `_subN` from one counter.
+ * An identity-only `has` renders an uncorrelated `UUID IN (SELECT ...)` instead, which searches by key.
+ * `records` membership probes the junction alone the same way, never joining the target.
  * A locale-scoped junction or child table adds its `_localeCode` predicate.
  * An `EXISTS` target whose condition addresses companion columns joins its companion at the locale.
  * Negation wraps the positive fragment in `NOT (...)`; parsing already folded `not` groups by De Morgan.
@@ -124,9 +148,13 @@ function compileNode(
     case 'compare': {
       const field = scope.fields[node.path[0]];
       if (node.op === 'includes' || node.op === 'includesAll' || node.op === 'includesAny') {
-        return field.kind === 'translations'
-          ? negateIf(node.negated, translationsFragment(node, scope, field, dialect, ctx))
-          : membershipFragment(node, scope, field, dialect);
+        if (field.kind === 'translations') {
+          return negateIf(node.negated, translationsFragment(node, scope, field, dialect, ctx));
+        }
+        if (field.kind === 'records') {
+          return negateIf(node.negated, recordsMembership(node, scope, field, dialect, ctx));
+        }
+        return membershipFragment(node, scope, field, dialect);
       }
       if (node.op === 'in' && node.negated && isEmpty(node.value)) {
         // The empty-set probe is column-free, so a bare `NOT` over it would match `NULL` rows.
@@ -262,6 +290,40 @@ function translationsFragment(
 }
 
 /**
+ * Compiles `includes`/`includesAny` over a `records` field: the parents whose junction links a target.
+ * It reads the junction alone, so no target row is joined and no reach into the target applies.
+ * The inverse side swaps the link columns, and a locale-scoped junction binds the locale, as `has` does.
+ */
+function recordsMembership(
+  node: Extract<ConditionNode, { kind: 'compare' }>,
+  scope: WhereScope,
+  field: FieldQueryMeta,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment {
+  const targets = uniqueArray(toArray(node.value) as SQLValue[]);
+  if (isEmpty(targets)) return rawFragment('1 = 0');
+  const junction = dialect.quote(nextAlias(ctx));
+  const [parentLink, targetLink] = junctionLinks(field, dialect);
+  const match = inFragment(`${junction}.${targetLink}`, targets);
+  const pin = localePin(field, junction, dialect, ctx);
+  const where = isNull(pin) ? match : joinFragments([match, pin], ' AND ');
+  return {
+    sql: `${selfUUID(scope, dialect)} IN (SELECT ${junction}.${parentLink} FROM ${dialect.quote(field.table as string)} ${junction} WHERE ${where.sql})`,
+    params: where.params,
+  };
+}
+
+/**
+ * A junction's quoted parent-side and target-side link columns, swapped on the inverse side.
+ */
+function junctionLinks(field: FieldQueryMeta, dialect: Dialect): [string, string] {
+  const [parent, target] =
+    field.inverse === true ? ['_targetUUID', '_parentUUID'] : ['_parentUUID', '_targetUUID'];
+  return [dialect.quote(parent), dialect.quote(target)];
+}
+
+/**
  * Compiles `has` per relation kind: a record's non-null foreign key, or an `EXISTS` over the relation.
  * A bare `record` `has` is its foreign key being set; a conditioned one probes the target row.
  * A conditioned `blocks` `has` pins the wrapper to its discriminated type.
@@ -326,9 +388,12 @@ function recordExists(
     sql: `${dialect.quote(target.table)} ${alias}${companion.sql}`,
     params: companion.params,
   };
-  const correlation = rawFragment(
-    `${alias}.${dialect.quote('UUID')} = ${qualifiedFieldRef(scope, field, dialect)}`,
-  );
+  const correlation: Correlation = {
+    inner: `${alias}.${dialect.quote('UUID')}`,
+    outer: qualifiedFieldRef(scope, field, dialect),
+    pin: null,
+    keyed: false,
+  };
   const inner: WhereScope = {
     fields: target.fields,
     self: alias,
@@ -352,10 +417,10 @@ function recordsExists(
   ctx: CompileContext,
 ): SQLFragment {
   const junction = dialect.quote(nextAlias(ctx));
-  const [parentLink, targetLink] =
-    field.inverse === true ? ['_targetUUID', '_parentUUID'] : ['_parentUUID', '_targetUUID'];
-  const correlation = scopedCorrelation(
-    `${junction}.${dialect.quote(parentLink)} = ${selfUUID(scope, dialect)}`,
+  const [parentLink, targetLink] = junctionLinks(field, dialect);
+  const correlation = childCorrelation(
+    `${junction}.${parentLink}`,
+    scope,
     field,
     junction,
     dialect,
@@ -369,7 +434,7 @@ function recordsExists(
   const reach = probeReach(target, ctx);
   if (reach === false) return rawFragment('1 = 0');
   const targetAlias = dialect.quote(nextAlias(ctx));
-  const join = `JOIN ${dialect.quote(target.table)} ${targetAlias} ON ${targetAlias}.${dialect.quote('UUID')} = ${junction}.${dialect.quote(targetLink)}`;
+  const join = `JOIN ${dialect.quote(target.table)} ${targetAlias} ON ${targetAlias}.${dialect.quote('UUID')} = ${junction}.${targetLink}`;
   const companion = companionJoin(target, targetAlias, withReach(condition, reach), dialect, ctx);
   const from = { sql: `${junctionFrom} ${join}${companion.sql}`, params: companion.params };
   const inner: WhereScope = {
@@ -432,13 +497,8 @@ function childExists(
 ): SQLFragment {
   const alias = dialect.quote(nextAlias(ctx));
   const from = rawFragment(`${dialect.quote(field.table as string)} ${alias}`);
-  const correlation = scopedCorrelation(
-    `${alias}.${dialect.quote('_parentUUID')} = ${selfUUID(scope, dialect)}`,
-    field,
-    alias,
-    dialect,
-    ctx,
-  );
+  const parent = `${alias}.${dialect.quote('_parentUUID')}`;
+  const correlation = childCorrelation(parent, scope, field, alias, dialect, ctx);
   const inner: WhereScope = {
     fields: field.subfields as Record<string, FieldQueryMeta>,
     self: alias,
@@ -465,17 +525,11 @@ function blocksExists(
     throw ohneError('A blocks `has` reached the compiler without its `block` discriminator');
   }
   const wrapper = dialect.quote(nextAlias(ctx));
-  const correlation = scopedCorrelation(
-    `${wrapper}.${dialect.quote('_parentUUID')} = ${selfUUID(scope, dialect)}`,
-    field,
-    wrapper,
-    dialect,
-    ctx,
-  );
-  const typed = {
-    sql: `${correlation.sql} AND ${wrapper}.${dialect.quote('_blockType')} = ?`,
-    params: [...correlation.params, split.block],
-  };
+  const parent = `${wrapper}.${dialect.quote('_parentUUID')}`;
+  const correlation = childCorrelation(parent, scope, field, wrapper, dialect, ctx);
+  const type = rawFragment(`${wrapper}.${dialect.quote('_blockType')} = ?`, [split.block]);
+  const pin = isNull(correlation.pin) ? type : joinFragments([correlation.pin, type], ' AND ');
+  const typed: Correlation = { ...correlation, pin };
   const wrapperFrom = `${dialect.quote(field.table as string)} ${wrapper}`;
   if (isNull(split.rest)) {
     return existsFragment(rawFragment(wrapperFrom), typed, null, scope, dialect, ctx);
@@ -495,20 +549,31 @@ function blocksExists(
 }
 
 /**
- * Appends the `_localeCode` predicate to a derived table's correlation when the field is locale-scoped.
+ * Ties a derived table's parent link to the scope's `UUID`, pinned to the locale when the field is scoped.
  */
-function scopedCorrelation(
-  correlation: string,
+function childCorrelation(
+  parentLink: string,
+  scope: WhereScope,
   field: FieldQueryMeta,
   alias: string,
   dialect: Dialect,
   ctx: CompileContext,
-): SQLFragment {
-  if (field.localeScoped !== true) return rawFragment(correlation);
-  return {
-    sql: `${correlation} AND ${alias}.${dialect.quote('_localeCode')} = ?`,
-    params: [ctx.locale],
-  };
+): Correlation {
+  const pin = localePin(field, alias, dialect, ctx);
+  return { inner: parentLink, outer: selfUUID(scope, dialect), pin, keyed: true };
+}
+
+/**
+ * The `_localeCode` predicate of a locale-scoped derived table, `null` for an unscoped one.
+ */
+function localePin(
+  field: FieldQueryMeta,
+  alias: string,
+  dialect: Dialect,
+  ctx: CompileContext,
+): SQLFragment | null {
+  if (field.localeScoped !== true) return null;
+  return rawFragment(`${alias}.${dialect.quote('_localeCode')} = ?`, [ctx.locale]);
 }
 
 /**
@@ -543,29 +608,55 @@ function companionJoin(
 /**
  * Assembles an `EXISTS (SELECT 1 FROM ... WHERE <correlation> [AND <condition>])` fragment.
  * A `null` condition tests bare existence; otherwise the condition compiles within `inner`.
+ * An identity-only condition under a keyed correlation drops the tie for `<outer> IN (SELECT <inner> ...)`.
+ * That set is computed once and searched by key, where the `EXISTS` would scan the outer table.
  */
 function existsFragment(
   from: SQLFragment,
-  correlation: SQLFragment,
+  correlation: Correlation,
   condition: ConditionNode | null,
   inner: WhereScope,
   dialect: Dialect,
   ctx: CompileContext,
   reach: ConditionNode | null = null,
 ): SQLFragment {
-  if (isNull(condition)) {
-    return {
-      sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql})`,
-      params: [...from.params, ...correlation.params],
-    };
+  const uncorrelated =
+    correlation.keyed && !isNull(condition) && isIdentityOnly(condition, inner.fields);
+  const parts: SQLFragment[] = [];
+  if (!uncorrelated) parts.push(rawFragment(`${correlation.inner} = ${correlation.outer}`));
+  if (!isNull(correlation.pin)) parts.push(correlation.pin);
+  if (!isNull(condition)) {
+    parts.push(compileNode(condition, inner, dialect, ctx));
+    if (!isNull(reach)) {
+      const scoped = compileTrusted(reach, inner, dialect, ctx);
+      parts.push({ sql: `(${scoped.sql})`, params: scoped.params });
+    }
   }
-  const cond = compileNode(condition, inner, dialect, ctx);
-  const scoped = isNull(reach) ? null : compileTrusted(reach, inner, dialect, ctx);
-  const tail = isNull(scoped) ? '' : ` AND (${scoped.sql})`;
+  const where = joinFragments(parts, ' AND ');
+  const select = uncorrelated
+    ? `${correlation.outer} IN (SELECT ${correlation.inner}`
+    : 'EXISTS (SELECT 1';
   return {
-    sql: `EXISTS (SELECT 1 FROM ${from.sql} WHERE ${correlation.sql} AND ${cond.sql}${tail})`,
-    params: [...from.params, ...correlation.params, ...cond.params, ...(scoped?.params ?? [])],
+    sql: `${select} FROM ${from.sql} WHERE ${where.sql})`,
+    params: [...from.params, ...where.params],
   };
+}
+
+/**
+ * Whether a `has` condition pins identities alone, which makes its subquery selective on its own.
+ * Its leaves are un-negated `equalsTo`/`in` on a `UUID` or a `record` column, or `records` membership.
+ * Any other leaf keeps the correlated `EXISTS`, so an ordered, limited read can stop at its first rows.
+ */
+function isIdentityOnly(node: ConditionNode, fields: Record<string, FieldQueryMeta>): boolean {
+  if (node.kind === 'and' || node.kind === 'or') {
+    return !isEmpty(node.nodes) && node.nodes.every((child) => isIdentityOnly(child, fields));
+  }
+  if (node.kind !== 'compare' || node.negated) return false;
+  const field = fields[node.path[0]];
+  if (node.op === 'equalsTo' || node.op === 'in') {
+    return field.id === true || field.kind === 'record';
+  }
+  return (node.op === 'includes' || node.op === 'includesAny') && field.kind === 'records';
 }
 
 /**
@@ -602,11 +693,11 @@ function compareFragment(
     case 'atMost':
       return { sql: `${column} <= ?`, params: [dialect.serialize(type, value)] };
     case 'contains':
-      return { sql: dialect.textMatch(column), params: [`%${escapeLike(value as string)}%`] };
+      return textMatch(column, `%${escapeLike(value as string)}%`, dialect);
     case 'startsWith':
-      return { sql: dialect.textMatch(column), params: [`${escapeLike(value as string)}%`] };
+      return textMatch(column, `${escapeLike(value as string)}%`, dialect);
     case 'endsWith':
-      return { sql: dialect.textMatch(column), params: [`%${escapeLike(value as string)}`] };
+      return textMatch(column, `%${escapeLike(value as string)}`, dialect);
     case 'like':
       return { sql: `${column} LIKE ?`, params: [value as SQLValue] };
     case 'isNull':
@@ -616,4 +707,13 @@ function compareFragment(
     case 'includesAny':
       throw ohneError('List-membership operators do not reach the scalar compiler');
   }
+}
+
+/**
+ * Compiles a case-insensitive text match, folding the column with `foldCase` only for a non-ASCII pattern.
+ * An ASCII pattern folds ASCII letters alone, as the plain match does and the evaluator mirrors.
+ */
+function textMatch(column: string, pattern: string, dialect: Dialect): SQLFragment {
+  const fold = !isASCII(pattern);
+  return { sql: dialect.textMatch(column, fold), params: [fold ? foldCase(pattern) : pattern] };
 }

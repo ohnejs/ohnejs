@@ -244,6 +244,34 @@ type JsonOps<M extends QueryFieldMeta> = M extends { jsonList: true }
   : object;
 
 /**
+ * The target-membership operators of a `records` field, over target `UUID`s.
+ * They read the junction's links alone, so no target row is probed.
+ */
+type RecordsOps<M extends QueryFieldMeta> = M extends { records: string }
+  ? {
+      /**
+       * Matches rows that link the target `UUID`.
+       *
+       * @example
+       * ```ts
+       * query('Posts').where('tags', (w) => w.includes(tagUUID))
+       * ```
+       */
+      includes(uuid: string): WhereFieldAfterOp<M>;
+
+      /**
+       * Matches rows that link at least one of the target `UUID`s; an empty list matches nothing.
+       *
+       * @example
+       * ```ts
+       * query('Posts').where('tags', (w) => w.includesAny([newsUUID, sportsUUID]))
+       * ```
+       */
+      includesAny(uuids: readonly string[]): WhereFieldAfterOp<M>;
+    }
+  : object;
+
+/**
  * The list-membership operators over `_translations`, typed to the configured locale codes.
  * They test the locales a record holds a translation at, whatever locale the chain reads.
  */
@@ -407,6 +435,7 @@ type FieldOps<M extends QueryFieldMeta> = EqualityOps<M> &
   OrderingOps<M> &
   TextOps<M> &
   JsonOps<M> &
+  RecordsOps<M> &
   TranslationsOps<M> &
   NullOps<M> &
   RelationalOps<M>;
@@ -464,7 +493,8 @@ export type WhereBuild<M extends QueryFieldMeta> = (w: WhereFieldFresh<M>) => Wh
 
 /**
  * The equality shorthand's value type: the field's scalar, or `never` where a scalar cannot compare.
- * `records`, composite, and blocks fields have no shorthand (use `has`); `_translations` takes `includes`.
+ * `records` (use `includes` or `has`), composite, and blocks fields have no shorthand (use `has`).
+ * `_translations` takes `includes`.
  * `null` is never a value (use `isNull`).
  */
 type EqValue<M extends QueryFieldMeta> = M extends { records: string }

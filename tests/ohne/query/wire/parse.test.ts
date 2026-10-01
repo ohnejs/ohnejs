@@ -307,6 +307,16 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
     });
   });
 
+  it('takes target UUIDs on a records membership test, never another type', () => {
+    deepStrictEqual(parse('where={tags:{includesAny:[t1,t2]}}').where, {
+      tags: { includesAny: ['t1', 't2'] },
+    });
+    deepStrictEqual(failure('where={tags:{includes:5}}'), {
+      code: 'invalidValue',
+      path: 'where.tags',
+    });
+  });
+
   it('rejects a wrong-typed value inside a has by its path', () => {
     deepStrictEqual(failure('where={author:{has:{name:5}}}'), {
       code: 'invalidValue',
@@ -701,6 +711,10 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
     deepStrictEqual(parse('where={views:{in:[1,2]}}', capped).where, { views: { in: [1, 2] } });
     strictEqual(failure('where={views:{in:[1,2,3]}}', capped).code, 'tooManyBoundParams');
     strictEqual(failure('where={author:{has:{name:x}}}', capped).code, 'tooManyBoundParams');
+    deepStrictEqual(parse('where={tags:{includes:t1}}', capped).where, {
+      tags: { includes: 't1' },
+    });
+    strictEqual(failure('where={tags:{includesAny:[t1,t2]}}', capped).code, 'tooManyBoundParams');
   });
 
   it('reserves the filled limit bind from the bound-param ceiling', () => {

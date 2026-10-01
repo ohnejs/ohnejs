@@ -188,14 +188,19 @@ export abstract class Dialect {
    * The caller binds a pattern whose literal parts went through `escapeLike`.
    * Backslash is the escape character.
    * Backs `contains`/`startsWith`/`endsWith` - case-insensitivity is their cross-dialect contract.
+   * `fold` lowercases the column Unicode-wide, and the caller binds the pattern lowercased.
+   * A caller folds only a pattern holding non-ASCII characters, since the plain match folds ASCII.
    *
    * @example
    * ```ts
-   * dialect.textMatch('"title"')
+   * dialect.textMatch('"title"', false)
    * // -> `"title" LIKE ? ESCAPE '\'` on SQLite
+   *
+   * dialect.textMatch('"title"', true)
+   * // -> `ohne_lower("title") LIKE ? ESCAPE '\'` on SQLite
    * ```
    */
-  abstract textMatch(quotedColumn: string): string;
+  abstract textMatch(quotedColumn: string, fold: boolean): string;
 
   /**
    * The dialect's list-membership match over an already-quoted `json` list column.

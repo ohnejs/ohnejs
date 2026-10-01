@@ -88,9 +88,9 @@ const table: [name: string, meta: FieldQueryMeta, expected: QueryOperator[]][] =
     ['equalsTo', 'in', 'isNull', 'has', 'empty'],
   ],
   [
-    'records takes the relation pair alone',
+    'records takes target membership and the relation pair',
     { kind: 'records', nullable: false, target: 'Tags', table: 'Posts_tags' },
-    ['has', 'empty'],
+    ['includes', 'includesAny', 'has', 'empty'],
   ],
   [
     'childOne takes the relation pair, nothing null-related',

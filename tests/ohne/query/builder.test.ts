@@ -559,6 +559,13 @@ query('Posts').where('author', (c) => c.contains('x'));
 query('Posts').where('UUID', (c) => c.greaterThan('x'));
 // @ts-expect-error a records relation has no equality shorthand
 query('Posts').where('tags', 'x');
+query('Posts').where('tags', (w) => w.includes('t1'));
+query('Posts').where('tags', (w) => w.not.includes('t1').or.includesAny(['t2', 't3']));
+query('Tags').where('posts', (w) => w.includesAny(['p1']));
+// @ts-expect-error a records relation takes no includesAll
+query('Posts').where('tags', (w) => w.includesAll(['t1']));
+// @ts-expect-error records membership takes target UUIDs
+query('Posts').where('tags', (w) => w.includes(1));
 // @ts-expect-error a callback must apply an operator
 query('Posts').where('views', (c) => c);
 // @ts-expect-error unknown field

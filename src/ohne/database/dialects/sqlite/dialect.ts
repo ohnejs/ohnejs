@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from 'node:sqlite';
 
 import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
 import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-schema.ts';
@@ -7,6 +7,7 @@ import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-sche
 import { truncateWithHash } from '../../../../utils/crypto/index.ts';
 import { ensureDir } from '../../../../utils/fs/index.ts';
 import {
+  foldCase,
   createMutex,
   dirname,
   errorMessage,
@@ -15,6 +16,7 @@ import {
   isNullish,
   isNumber,
   isObject,
+  isString,
   isUndefined,
   uniqueArray,
 } from '../../../../utils/index.ts';
@@ -59,11 +61,13 @@ export class SQLiteDialect extends Dialect {
   /**
    * Opens the database at `url` (a file path or `:memory:`) and applies the pragma set before returning.
    * A file path's parent directory is created on demand, since SQLite creates the file but not its folder.
+   * It registers `ohne_lower`, the Unicode-wide lowercasing a folded `textMatch` reads through.
    */
   async connect(url: string): Promise<DatabaseAdapter> {
     if (url !== ':memory:' && !url.startsWith('file:')) await ensureDir(dirname(url));
     const db = new DatabaseSync(url);
     applyPragmas(db);
+    db.function('ohne_lower', { deterministic: true }, lowerText);
     return createAdapter(db);
   }
 
@@ -122,12 +126,14 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
-   * SQLite's default `LIKE` is ASCII-case-insensitive, exactly the operator contract.
-   * The plain operator suffices, with backslash declared as the escape character.
+   * SQLite's default `LIKE` folds ASCII case alone, so a plain match serves an ASCII pattern exactly.
+   * A folded match lowercases the column through `ohne_lower` for a lowercased non-ASCII pattern.
+   * Backslash is declared as the escape character.
    * `PRAGMA case_sensitive_like` must never be set: it would make the text-match operators case-sensitive.
    */
-  textMatch(quotedColumn: string): string {
-    return `${quotedColumn} LIKE ? ESCAPE '\\'`;
+  textMatch(quotedColumn: string, fold: boolean): string {
+    const column = fold ? `ohne_lower(${quotedColumn})` : quotedColumn;
+    return `${column} LIKE ? ESCAPE '\\'`;
   }
 
   /**
@@ -323,6 +329,14 @@ function needsRebuild(diff: TableAlter): boolean {
       index.name.startsWith('sqlite_autoindex_'),
     )
   );
+}
+
+/**
+ * The `ohne_lower` SQL function: the full `foldCase`, so SQL folds as the evaluator does.
+ * `NULL` and any non-text value pass through unchanged.
+ */
+function lowerText(value: SQLOutputValue): SQLInputValue {
+  return isString(value) ? foldCase(value) : value;
 }
 
 /**

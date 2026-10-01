@@ -269,11 +269,13 @@ export function conditionBinds(node: ConditionNode): number {
 
 /**
  * The bound parameters one condition node claims: two for a `has` or `empty`, one per compared value.
+ * A membership test claims one more, the locale a locale-scoped `records` junction binds.
  */
 function nodeBinds(node: ConditionNode): number {
   if (node.kind === 'has' || node.kind === 'empty') return 2;
   if (node.kind !== 'compare' || isUndefined(node.value)) return 0;
-  return isArray(node.value) ? node.value.length : 1;
+  const values = isArray(node.value) ? node.value.length : 1;
+  return node.op === 'includes' || node.op === 'includesAny' ? values + 1 : values;
 }
 
 /**
@@ -317,10 +319,13 @@ function checkValues(
 /**
  * Whether a wire value matches a field's storage type.
  * A UUID is a string, an integer a safe number, a real a finite one.
+ * A `records` membership test takes target `UUID`s.
  * A `_translations` value is a configured locale, as the `locale` param is.
  */
 function matchesLogical(value: unknown, field: FieldQueryMeta): boolean {
-  if (field.kind === 'record' || field.id === true) return isString(value);
+  if (field.kind === 'record' || field.kind === 'records' || field.id === true) {
+    return isString(value);
+  }
   if (field.kind === 'translations') return queryLocales().locales.includes(value as string);
   switch (field.logicalType) {
     case 'integer':
