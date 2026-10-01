@@ -230,7 +230,7 @@ export interface CollectionTable<TField extends string = string> {
 }
 
 /**
- * How the dashboard presents a collection: its menu icon, record labels, list view, and editor layout.
+ * How the dashboard presents a collection: menu icon, record labels, list view, editor layout, and search.
  */
 export interface CollectionDashboard<TField extends string = string> {
   /**
@@ -315,6 +315,22 @@ export interface CollectionDashboard<TField extends string = string> {
    * ```
    */
   layout?: FieldLayout<TField>;
+
+  /**
+   * How word search treats this collection.
+   * `false` removes it from word search, as a result and as a record others are found through.
+   * `{ via: false }` keeps its own hits, but no record is found through a link to it.
+   * Use it for a collection so many fields point at that links to it would flood the results.
+   * A pasted `UUID` ignores both: it still finds the record and every place it is used.
+   * Omitted, the collection takes part both ways.
+   *
+   * @example
+   * ```ts
+   * false
+   * { via: false }
+   * ```
+   */
+  search?: false | { via: false };
 }
 
 /**

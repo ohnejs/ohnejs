@@ -1,4 +1,6 @@
+import type { ConditionValue } from '../../utils/index.ts';
 import type { LogicalType } from '../database/dialect.ts';
+import type { Message } from '../messages/known-messages.ts';
 import type {
   ColumnValue,
   EmitTypeContext,
@@ -193,7 +195,71 @@ export interface FieldType<
    * ```
    */
   deserialize?(value: unknown, ctx: FieldContext<TOptions>): unknown;
+
+  /**
+   * How word search matches a field of this type.
+   *
+   * - `false` locks the type out: a field of it never matches words and refuses `search: true`.
+   * - A function turns the type on and maps each search token to a condition on the field.
+   * - `{ default: false }` keeps the type's matcher but leaves its fields off until one sets `search: true`.
+   *
+   * Without a function, a plain `text` column matches a token by `contains`.
+   * A relation or composite has no matcher: search follows it into the records or items it holds.
+   * A function on such a type would never run, so it fails at boot.
+   * A field's own `search` option decides whether its field joins in; see `FieldSearch` for the hook.
+   *
+   * @example
+   * ```ts
+   * search: false
+   *
+   * search: ({ token }) => (/^\d{4}$/.test(token) ? { startsWith: token } : null)
+   *
+   * search: { default: false }
+   * ```
+   */
+  search?: false | FieldSearch<TOptions> | { default: false; match?: FieldSearch<TOptions> };
 }
+
+/**
+ * The context a field type's search hook receives: the field, plus the token to match.
+ */
+export interface FieldSearchContext<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+> extends FieldContext<TOptions> {
+  /**
+   * One search token, as the query split it: a word or a quoted phrase, never empty.
+   * Its case is the user's; normalize it the way the type normalizes a stored value.
+   */
+  token: string;
+
+  /**
+   * Renders a message, like a choice label, in the language the search runs in.
+   */
+  resolveMessage: (message: Message) => string;
+}
+
+/**
+ * A field type's search hook: maps one token to a condition on the field, or `null` when it cannot match.
+ * The result is the value side of a condition, as `{ [field]: result }`, so `{ in: [...] }` or a scalar.
+ * It runs in Node once per token and field, before the query, and never sees a record.
+ * Each operator in the result must be one the field admits; any other fails the search loudly.
+ *
+ * @example
+ * ```ts
+ * // A `sku` type matches `ab-1042` against the uppercase code it stores
+ * defineField({
+ *   columnType: 'text',
+ *   sanitizers: [(value) => value.toUpperCase()],
+ *   search: ({ token }) => (/^[a-z]{2}-\d+$/i.test(token) ? { startsWith: token.toUpperCase() } : null),
+ * })
+ * ```
+ */
+export type FieldSearch<
+  TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
+> = {
+  // A method is bivariant, so a concrete field type stays assignable to the wide `FieldType`.
+  match(ctx: FieldSearchContext<TOptions>): ConditionValue | null;
+}['match'];
 
 /**
  * Defines a field type.

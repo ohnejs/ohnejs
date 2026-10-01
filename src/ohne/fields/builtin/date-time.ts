@@ -9,6 +9,7 @@ import { validationMessage } from '../validation-message.ts';
  * The same representation `_updatedAt` uses, so instants compare and sort as plain integers.
  * Writes take the integer alone.
  * The dashboard renders it in the viewer's time zone setting, unless `timezone` pins one.
+ * Search has nothing to match in it, so a field of it never joins in.
  */
 export const dateTime = defineField({
   columnType: 'integer',

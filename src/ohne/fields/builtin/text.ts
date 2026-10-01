@@ -8,6 +8,7 @@ import { validationMessage } from '../validation-message.ts';
  *
  * Non-empty by default: it rejects `''` unless `allowEmpty` is set.
  * `min` and `max` bound the length in characters, counted as UTF-16 units like `String#length`.
+ * Search matches a value that contains the token, ignoring case.
  */
 export const text = defineField({
   columnType: 'text',

@@ -262,6 +262,32 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts `false` and `{ via: false }` as `dashboard.search`', () => {
+    const off = defineCollection({
+      fields: { title: field('text') },
+      dashboard: { search: false },
+    });
+    strictEqual(off.dashboard?.search, false);
+    const quiet = defineCollection({
+      fields: { title: field('text') },
+      dashboard: { search: { via: false } },
+    });
+    deepStrictEqual(quiet.dashboard?.search, { via: false });
+  });
+
+  it('rejects any other `dashboard.search`', () => {
+    for (const search of [true, {}, { via: true }, { via: false, direct: false }, 'off']) {
+      throws(
+        () =>
+          defineCollection({
+            fields: { title: field('text') },
+            dashboard: { search: search as false },
+          }),
+        /Invalid `dashboard.search` declaration/,
+      );
+    }
+  });
+
   it('accepts an icon the vendored set carries', () => {
     doesNotThrow(() =>
       defineCollection({ fields: { title: field('text') }, dashboard: { icon: 'note' } }),

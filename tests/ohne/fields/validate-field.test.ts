@@ -198,3 +198,108 @@ describe('validateFieldType jsonList', () => {
     doesNotThrow(() => validateFieldType({ columnType: 'json', jsonList: true }));
   });
 });
+
+describe('validateField search', () => {
+  const hook = () => ({ startsWith: 'x' });
+  const locked: FieldType = defineField({ columnType: 'text', search: false });
+  const bare: FieldType = defineField({ columnType: 'integer' });
+  const optIn: FieldType = defineField({
+    columnType: 'integer',
+    search: { default: false, match: hook },
+  });
+  const hooked: FieldType = defineField({
+    columnType: false,
+    search: hook,
+    schema: () => junction,
+  });
+
+  it('refuses a search hook on every field with a storage hint', () => {
+    const title = 'Field type `x` declares a search hook that never runs';
+    const foreignKey: StorageHint = { kind: 'foreignKey', collection: 'Tags' };
+    const textHooked: FieldType = defineField({ columnType: 'text', search: hook });
+    throwsTitled(() => check({}, textHooked, foreignKey), title);
+    throwsTitled(() => check({}, hooked, junction), title);
+    throwsTitled(() => check({}, hooked, childOne), title);
+    throwsTitled(() => check({}, hooked, childMany), title);
+    throwsTitled(() => check({}, hooked, blocksHint), title);
+    const textOptIn: FieldType = defineField({
+      columnType: 'text',
+      search: { default: false, match: hook },
+    });
+    throwsTitled(() => check({}, textOptIn, foreignKey), title);
+  });
+
+  it('accepts `{ default: false }` without a hook on a relation', () => {
+    const quiet: FieldType = defineField({
+      columnType: false,
+      search: { default: false },
+      schema: () => junction,
+    });
+    doesNotThrow(() => check({ search: true }, quiet, junction));
+  });
+
+  it('refuses `search: true` on a locked type', () => {
+    throwsTitled(() => check({ search: true }, locked), 'Field `field` cannot turn search on');
+    doesNotThrow(() => check({ search: false }, locked));
+  });
+
+  it('refuses `search: true` on a column with nothing to match', () => {
+    throwsTitled(
+      () => check({ search: true }, bare),
+      'Field `field` has nothing to match words against',
+    );
+    doesNotThrow(() => check({ search: false }, bare));
+  });
+
+  it('accepts `search: true` on a text column, a hooked column, and a relation', () => {
+    doesNotThrow(() => check({ search: true }));
+    doesNotThrow(() => check({ search: true }, optIn));
+    doesNotThrow(() => check({ search: true }, columnLess, junction));
+  });
+
+  it('refuses `search: true` beside `readable: false`', () => {
+    throwsTitled(
+      () => check({ search: true, readable: false }),
+      'Field `field` sets `search` beside `readable: false`',
+    );
+    doesNotThrow(() => check({ search: false, readable: false }));
+  });
+});
+
+describe('validateFieldType search', () => {
+  const title = "A field type's `search` must be `false`, a function, or `{ default: false }`";
+
+  it('accepts `false`, a hook, and `{ default: false }` with or without `match`', () => {
+    doesNotThrow(() => validateFieldType({ columnType: 'text', search: false }));
+    doesNotThrow(() => validateFieldType({ columnType: 'text', search: () => null }));
+    doesNotThrow(() => validateFieldType({ columnType: 'text', search: { default: false } }));
+    doesNotThrow(() =>
+      validateFieldType({ columnType: 'text', search: { default: false, match: () => null } }),
+    );
+  });
+
+  it('refuses any other shape', () => {
+    for (const search of [
+      true,
+      {},
+      { default: true },
+      { default: false, match: 'x' },
+      { match: () => null },
+    ]) {
+      throwsTitled(() => validateFieldType({ columnType: 'text', search: search as false }), title);
+    }
+    throwsTitled(
+      () =>
+        validateFieldType({ columnType: 'text', search: { default: false, extra: 1 } as never }),
+      title,
+    );
+  });
+
+  it('reserves `search` as an option name', () => {
+    throwsTitled(
+      () =>
+        validateFieldType({ columnType: 'text', options: { search: option({ default: true }) } }),
+      'Field option `search` is reserved',
+    );
+  });
+});

@@ -22,6 +22,7 @@ import {
   derivedTableName,
 } from '../database/naming/table-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { resolveFieldSearch } from '../fields/field-search.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { validateSingleton } from './validate-singleton.ts';
@@ -94,6 +95,14 @@ export interface FieldQueryMeta {
    * Marks a field locked after create; the wire refuses it in update bodies.
    */
   immutable?: true;
+
+  /**
+   * Marks a field word search reads, resolved once from the type's `search` and the field's option.
+   * On a column a token matches through the type's hook (`searchHook`), or by `contains` without one.
+   * On a relation or composite it means search follows the field into what it holds.
+   * Absent, words never match the field; the system entries never carry it.
+   */
+  search?: true;
 
   /**
    * Marks a translatable column-bearing field: its column lives on the collection's companion table.
@@ -432,6 +441,7 @@ function fieldEntry(
     ...(options.readable === false ? { readable: false as const } : {}),
     ...(options.writable === false ? { writable: false as const } : {}),
     ...(options.immutable === true ? { immutable: true as const } : {}),
+    ...(resolveFieldSearch(fieldType, options, hint) ? { search: true as const } : {}),
   };
 
   if (kind === 'blocks') {

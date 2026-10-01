@@ -178,6 +178,7 @@ describe('queryMetadata', () => {
           nullable: false,
           logicalType: 'text',
           column: 'title',
+          search: true,
         },
         summary: {
           kind: 'column',
@@ -186,6 +187,7 @@ describe('queryMetadata', () => {
           nullable: true,
           logicalType: 'text',
           column: 'summary',
+          search: true,
         },
         views: {
           kind: 'column',
@@ -211,6 +213,7 @@ describe('queryMetadata', () => {
           logicalType: 'text',
           column: 'author',
           target: 'QUsers',
+          search: true,
         },
         tags: {
           kind: 'records',
@@ -219,6 +222,7 @@ describe('queryMetadata', () => {
           nullable: false,
           target: 'QTags',
           table: 'QPosts_tags',
+          search: true,
         },
         meta: {
           kind: 'childOne',
@@ -226,6 +230,7 @@ describe('queryMetadata', () => {
           options: { ...COMMON, fields: metaFields },
           nullable: true,
           table: 'QPosts_meta',
+          search: true,
           subfields: {
             UUID: UUID_ENTRY,
             description: {
@@ -235,6 +240,7 @@ describe('queryMetadata', () => {
               nullable: true,
               logicalType: 'text',
               column: 'description',
+              search: true,
             },
             links: {
               kind: 'childMany',
@@ -242,6 +248,7 @@ describe('queryMetadata', () => {
               options: { ...LIST, fields: linkFields },
               nullable: false,
               table: 'QPosts_meta_links',
+              search: true,
               subfields: {
                 UUID: UUID_ENTRY,
                 url: {
@@ -251,6 +258,7 @@ describe('queryMetadata', () => {
                   nullable: false,
                   logicalType: 'text',
                   column: 'url',
+                  search: true,
                 },
               },
             },
@@ -262,6 +270,7 @@ describe('queryMetadata', () => {
           options: { ...LIST, fields: sectionFields },
           nullable: false,
           table: 'QPosts_sections',
+          search: true,
           subfields: {
             UUID: UUID_ENTRY,
             heading: {
@@ -271,6 +280,7 @@ describe('queryMetadata', () => {
               nullable: false,
               logicalType: 'text',
               column: 'heading',
+              search: true,
             },
           },
         },
@@ -280,6 +290,7 @@ describe('queryMetadata', () => {
           options: LIST,
           nullable: false,
           table: 'QPosts_content',
+          search: true,
           allow: ['QHero', 'QQuote'],
         },
       },
@@ -689,5 +700,105 @@ describe('queryMetadata singletons', () => {
   it('leaves the same bare field alone on a plain collection', () => {
     register('QSinglePlain', { title: field('text') }, false);
     ok(queryMetadata('QSinglePlain'));
+  });
+});
+
+describe('queryMetadata search flag', () => {
+  useFields().register('qQuiet', {
+    name: 'qQuiet' as FieldTypeName,
+    fieldType: defineField({ columnType: 'text', search: { default: false } }),
+  });
+  useFields().register('qLocked', {
+    name: 'qLocked' as FieldTypeName,
+    fieldType: defineField({ columnType: 'text', search: false }),
+  });
+  useFields().register('qYear', {
+    name: 'qYear' as FieldTypeName,
+    fieldType: defineField({ columnType: 'integer', search: () => null }),
+  });
+  useCollections().register('QSearchTags', {
+    name: 'QSearchTags',
+    collection: {
+      fields: {
+        name: field('text'),
+        notes: field('records', { collection: 'QSearchPosts', inverse: 'tags' }),
+        linked: field('records', { collection: 'QSearchPosts', inverse: 'pinned', search: true }),
+      },
+    },
+  });
+  useCollections().register('QSearchPosts', {
+    name: 'QSearchPosts',
+    collection: {
+      fields: {
+        title: field('text'),
+        hidden: field('text', { search: false }),
+        secret: field('text', { readable: false, nullable: true }),
+        status: field('select', { choices: ['draft', 'live'] }),
+        labels: field('multiSelect'),
+        day: field('date', { nullable: true }),
+        at: field('time', { nullable: true }),
+        stamp: field('dateTime', { nullable: true }),
+        flag: field('boolean'),
+        views: field('integer'),
+        counted: field('integer', { search: true }),
+        price: field('number', { search: true }),
+        year: field('qYear' as FieldTypeName, {} as never),
+        quiet: field('qQuiet' as FieldTypeName, {} as never),
+        loud: field('qQuiet' as FieldTypeName, { search: true } as never),
+        locked: field('qLocked' as FieldTypeName, {} as never),
+        author: field('record', { collection: 'QUsers' }),
+        editor: field('record', { collection: 'QUsers', search: false }),
+        tags: field('records', { collection: 'QSearchTags' }),
+        pinned: field('records', { collection: 'QSearchTags' }),
+        meta: field('object', { fields: { note: field('text', { search: false }) } }),
+        items: field('repeater', { fields: { caption: field('text') }, search: false }),
+        body: field('blocks'),
+      },
+    },
+  });
+
+  const searched = (collection: string) =>
+    Object.entries(queryMetadata(collection).fields)
+      .filter(([, entry]) => entry.search === true)
+      .map(([name]) => name);
+
+  it('turns on text, matched columns, relations, and composites by default', () => {
+    deepStrictEqual(searched('QSearchPosts'), [
+      'title',
+      'status',
+      'labels',
+      'day',
+      'at',
+      'counted',
+      'price',
+      'year',
+      'loud',
+      'author',
+      'tags',
+      'pinned',
+      'meta',
+      'body',
+    ]);
+  });
+
+  it('resolves a subfield on its own', () => {
+    const meta = queryMetadata('QSearchPosts').fields.meta;
+    strictEqual(meta.subfields?.note?.search, undefined);
+    strictEqual(queryMetadata('QSearchPosts').fields.items.subfields?.caption?.search, true);
+  });
+
+  it('leaves an inverse `records` off unless it opts in', () => {
+    deepStrictEqual(searched('QSearchTags'), ['name', 'linked']);
+  });
+
+  it('never marks a system entry', () => {
+    const { fields } = queryMetadata('QSearchPosts');
+    strictEqual(fields.UUID.search, undefined);
+    strictEqual(fields._updatedAt.search, undefined);
+  });
+
+  it('keeps the type hook reachable beside the flag', () => {
+    const { fields } = queryMetadata('QSearchPosts');
+    strictEqual(typeof fields.year.fieldType?.search, 'function');
   });
 });

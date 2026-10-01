@@ -1,7 +1,10 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldSearchContext } from '../../../../src/ohne/fields/define-field.ts';
+
 import { multiSelect } from '../../../../src/ohne/fields/builtin/multi-select.ts';
+import { searchHook } from '../../../../src/ohne/fields/field-search.ts';
 
 type ValidateCtx = Parameters<NonNullable<typeof multiSelect.validators>[number]>[1];
 type WriteCtx = Parameters<NonNullable<typeof multiSelect.sanitizers>[number]>[1];
@@ -97,5 +100,32 @@ describe('multiSelect count', () => {
   it('accepts a list within bounds', () => {
     strictEqual(count(['a', 'b'], ctx({ min: 1, max: 3 })), undefined);
     strictEqual(count([], ctx({})), undefined);
+  });
+});
+
+const multiSelectSearch = searchHook(multiSelect)!;
+
+const search = (token: string, options: Record<string, unknown> = {}) =>
+  multiSelectSearch({
+    name: 'field',
+    options,
+    token,
+    resolveMessage: (message) => (message === 'app.status.live' ? 'Published' : String(message)),
+  } as FieldSearchContext);
+
+describe('multiSelect search', () => {
+  const choices = ['red', { value: 'live', label: 'app.status.live' }];
+
+  it('matches lists holding any choice whose value or label has a matching word', () => {
+    deepStrictEqual(search('re', { choices }), { includesAny: ['red'] });
+    deepStrictEqual(search('pub', { choices }), { includesAny: ['live'] });
+  });
+
+  it('gives `null` when no choice matches', () => {
+    strictEqual(search('blue', { choices }), null);
+  });
+
+  it('matches the token as an entry without choices', () => {
+    deepStrictEqual(search('urgent'), { includes: 'urgent' });
   });
 });

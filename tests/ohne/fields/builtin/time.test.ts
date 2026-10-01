@@ -1,7 +1,10 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldSearchContext } from '../../../../src/ohne/fields/define-field.ts';
+
 import { time } from '../../../../src/ohne/fields/builtin/time.ts';
+import { searchHook } from '../../../../src/ohne/fields/field-search.ts';
 
 type ValidateCtx = Parameters<NonNullable<typeof time.validators>[number]>[1];
 type WriteCtx = Parameters<NonNullable<typeof time.sanitizers>[number]>[1];
@@ -66,5 +69,27 @@ describe('time bounds', () => {
       params: { min: '08:00:01' },
     });
     strictEqual(bounds('08:00:01', ctx({ min: '08:00:01' })), undefined);
+  });
+});
+
+const timeSearch = searchHook(time)!;
+
+const search = (token: string, options: Record<string, unknown> = {}) =>
+  timeSearch({
+    name: 'field',
+    options,
+    token,
+    resolveMessage: (message) => (message === 'app.status.live' ? 'Published' : String(message)),
+  } as FieldSearchContext);
+
+describe('time search', () => {
+  it('matches a clock prefix', () => {
+    deepStrictEqual(search('10:'), { startsWith: '10:' });
+    deepStrictEqual(search('10:30'), { startsWith: '10:30' });
+    deepStrictEqual(search('10:30:15'), { startsWith: '10:30:15' });
+  });
+
+  it('gives `null` for bare digits and anything else', () => {
+    for (const token of ['10', '1:30', '10:3', 'noon']) strictEqual(search(token), null);
   });
 });

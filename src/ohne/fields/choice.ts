@@ -1,6 +1,6 @@
 import type { Message } from '../messages/known-messages.ts';
 
-import { isString } from '../../utils/index.ts';
+import { isString, matchesWordStart } from '../../utils/index.ts';
 
 /**
  * A choice value paired with its display label.
@@ -36,4 +36,32 @@ export type FieldChoice = string | LabeledChoice;
  */
 export function choiceValues(choices: readonly FieldChoice[]): string[] {
   return choices.map((choice) => (isString(choice) ? choice : choice.value));
+}
+
+/**
+ * The stored values of the choices whose value or label has a word starting with `token`, ignoring case.
+ * A label renders through `resolveMessage`, so a message key matches in the language search runs in.
+ *
+ * @example
+ * ```ts
+ * const choices = ['draft', { value: 'live', label: 'Published' }]
+ *
+ * matchingChoices(choices, 'pub', String) // -> ['live']
+ * matchingChoices(choices, 'dr', String)  // -> ['draft']
+ * matchingChoices(choices, 'xyz', String) // -> []
+ * ```
+ */
+export function matchingChoices(
+  choices: readonly FieldChoice[],
+  token: string,
+  resolveMessage: (message: Message) => string,
+): string[] {
+  return choiceValues(
+    choices.filter((choice) =>
+      isString(choice)
+        ? matchesWordStart(choice, token)
+        : matchesWordStart(choice.value, token) ||
+          matchesWordStart(resolveMessage(choice.label), token),
+    ),
+  );
 }

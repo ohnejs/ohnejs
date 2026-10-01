@@ -47,6 +47,7 @@ covers them in depth.
 | `label`        | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
 | `readable`     | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`  | `false` keeps [search](./collections.md#search) from looking inside the blocks.                                                                                         |
 | `translatable` | `false` | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
 | `validators`   | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
@@ -73,6 +74,7 @@ covers them in depth.
 | `nullable`        | `false`      | Lets the field hold `null`.                                                                                                                                             |
 | `readable`        | `true`       | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -            | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false`      | A boolean has nothing for [search](./collections.md#search) to match, so `true` fails at boot.                                                                          |
 | `translatable`    | `false`      | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `trueLabel`       | -            | The `true` button's label under `display: 'buttons'`, as a string or a [message key](../i18n/messages.md). Omitted, it reads "Yes".                                     |
 | `unique`          | `false`      | Rejects a value that another row already holds.                                                                                                                         |
@@ -104,6 +106,7 @@ A calendar day, stored as `YYYY-MM-DD` text. No time zone is involved.
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match the field. A year, month, or day like `2024-06` finds the days it starts.                                                  |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -136,6 +139,7 @@ An instant, stored as epoch milliseconds. A write takes that number only, so con
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `relativeTime`    | `false` | Shows the instant as elapsed time, like "2 hours ago", with the exact date on hover.                                                                                    |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | An instant has nothing for [search](./collections.md#search) to match, so `true` fails at boot.                                                                         |
 | `timezone`        | -       | A fixed IANA zone the dashboard shows and edits the instant in. Omitted, the viewer's own zone applies.                                                                 |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
@@ -167,6 +171,7 @@ A whole number within JavaScript's safe range. For money, store minor units like
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact number, like `1042`.                                                                                       |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -198,6 +203,7 @@ An ordered list of distinct strings, stored as a JSON list. Duplicates are remov
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match the field: a word of a choice's value or label, or the exact entry without `choices`.                                      |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -228,6 +234,7 @@ A finite decimal, exactly like a JavaScript number. `NaN` and the infinities are
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact number, like `1.5`.                                                                                        |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -256,6 +263,7 @@ holds one group or none.
 | `layout`       | -        | How the editor [arranges the subfields](../dashboard/field-layouts.md). Omitted, they stack in order.                                                                   |
 | `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`   | `false` keeps [search](./collections.md#search) from looking inside the object.                                                                                         |
 | `translatable` | `false`  | Keeps [one group per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
@@ -281,6 +289,7 @@ A [reference](./collections.md#one-reference) to one record of another collectio
 | `onDelete`        | `'setNull'` | What happens when the target is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
 | `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`      | `false` stops [search](./collections.md#search) from finding records through this link.                                                                                 |
 | `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
 | `unique`          | `false`     | Lets at most one row reference each target, for a one-to-one relation.                                                                                                  |
 | `uniquePerLocale` | `false`     | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -313,6 +322,7 @@ stored in a junction table. A list that names the same `UUID` twice is rejected.
 | `onDelete`     | `'cascade'` | What happens to a link when its target is deleted: `'cascade'` removes the link, and `'restrict'` blocks the delete. Not on an `inverse` field.                         |
 | `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`      | `false` stops [search](./collections.md#search) from finding records through these links. Off by default on an `inverse` field.                                         |
 | `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only, and not on an `inverse` field.                                         |
 | `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
@@ -341,6 +351,7 @@ table. Every item keeps its own `UUID`.
 | `min`          | -        | The fewest items a written list may hold.                                                                                                                               |
 | `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`   | `false` keeps [search](./collections.md#search) from looking inside the items.                                                                                          |
 | `translatable` | `false`  | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
 | `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
@@ -368,6 +379,7 @@ list is rejected.
 | `placeholder`     | -        | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`   | Lets [search](./collections.md#search) match the field by a word of a choice's value or label, like `pub` for `Published`.                                              |
 | `translatable`    | `false`  | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false`  | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false`  | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -400,6 +412,7 @@ A string. It rejects the empty string unless `allowEmpty` is set.
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match any value that contains the typed word.                                                                                    |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -429,6 +442,7 @@ A time of day, stored as `HH:MM:SS` text. `HH:MM` input is stored with `:00` sec
 | `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match the field. A time like `10:30` finds the times that start with it.                                                         |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -463,6 +477,7 @@ at most 64 characters and may not be blank.
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) match any value that contains the typed word.                                                                             |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -492,6 +507,7 @@ language that has a [message catalog](../i18n/messages.md#catalogs) is accepted.
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) match any value that contains the typed word.                                                                             |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -521,6 +537,7 @@ One of your [content locales](../project/config.md#content-locales), as its cano
 | `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) match any value that contains the typed word.                                                                             |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -550,6 +567,7 @@ text, so a policy like a minimum length goes in a validator. Pass
 | `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | Locked: [search](./collections.md#search) never matches a password, and `true` fails at boot.                                                                           |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -578,6 +596,7 @@ name a defined role, and duplicates are removed on write.
 | `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the holders of a role by its exact name.                                                                             |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -605,6 +624,7 @@ An IANA time zone name, like `Europe/Berlin`.
 | `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) match any value that contains the typed word.                                                                             |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
@@ -640,6 +660,7 @@ so no option makes it required.
 | `onDelete`        | `'setNull'` | What happens when the upload is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
 | `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`      | `false` stops [search](./collections.md#search) from finding records through this file.                                                                                 |
 | `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
 | `types`           | -           | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). Omitted, any file is accepted.                                        |
 | `unique`          | `false`     | Lets at most one row reference each upload.                                                                                                                             |
@@ -673,6 +694,7 @@ An ordered list of references to uploaded files, stored in a junction table.
 | `placeholder`  | -           | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`      | `false` stops [search](./collections.md#search) from finding records through these files.                                                                               |
 | `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
 | `types`        | -           | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). Omitted, any file is accepted.                                        |
 | `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
@@ -704,6 +726,7 @@ so no option makes it required.
 | `onDelete`        | `'setNull'` | What happens when the upload is deleted: `'setNull'` clears the reference, `'cascade'` deletes this row, and `'restrict'` blocks the delete.                            |
 | `readable`        | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`      | `false` stops [search](./collections.md#search) from finding records through this image.                                                                                |
 | `translatable`    | `false`     | Keeps [one reference per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                   |
 | `types`           | `['image']` | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). The file must be an image either way.                                 |
 | `unique`          | `false`     | Lets at most one row reference each upload.                                                                                                                             |
@@ -741,6 +764,7 @@ An ordered list of references to uploaded images, stored in a junction table.
 | `placeholder`  | -           | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
 | `readable`     | `true`      | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -           | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`      | `false` stops [search](./collections.md#search) from finding records through these images.                                                                              |
 | `translatable` | `false`     | Keeps [one list per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                        |
 | `types`        | `['image']` | The media types accepted, as exact types, wildcards, or [categories](../uploads/fields.md#types). The file must be an image either way.                                 |
 | `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |

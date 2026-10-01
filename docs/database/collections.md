@@ -555,6 +555,7 @@ export default defineCollection({
   omit it, a record opens in its editor.
 - `table` - the list view's [default columns](#table-columns).
 - `layout` - how the record editor [arranges the fields](../dashboard/field-layouts.md).
+- `search` - whether the collection takes part in [search](#a-collection-in-search).
 
 ### Record labels
 
@@ -586,3 +587,67 @@ widths as `name|width|minWidth`, each a CSS length or percentage like `320px` or
 
 A viewer can rearrange the columns in the dashboard. Their choice is stored in the URL and overrides
 the declared defaults until they restore them.
+
+## Search
+
+The [search palette](../dashboard/palette.md) finds records by the words you type. Each field type
+decides how a word matches it, and most fields take part on their own: text, choices, dates,
+relations, and composites. [Field types](./field-types.md) lists the default of each type.
+
+A record is also found through the records it links to. A post whose cover image is named `beach`
+shows up for `beach`, as a post found through that upload.
+
+The `search` option turns one field on or off:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  dashboard: { recordLabel: 'title' },
+  fields: {
+    title: field('text'),
+    internalNote: field('text', { nullable: true, search: false }),
+    views: field('integer', { default: 0, search: true }),
+    cover: field('record', { collection: 'Uploads' }),
+    author: field('record', { collection: 'Users', search: false }),
+  },
+});
+```
+
+- `internalNote` never matches a word.
+- `views` asks to be searched, so `1042` finds the post with 1042 views. Number fields are off
+  unless they ask.
+- `cover` is on by default, so a post is found through its cover image.
+- `author` is off, so a post is never found through its author. On an object, repeater, or blocks
+  field, `search: false` keeps search from looking inside.
+
+`search: true` fails at boot on a field with nothing to match, like a `boolean`, on a type that
+locks search out, like `password`, and beside `readable: false`.
+
+`search` decides only which words match. A pasted `UUID` still finds the record and every place it
+is used.
+
+### A collection in search
+
+`dashboard.search` sets how the whole collection takes part:
+
+```ts
+// collections/Tags.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  dashboard: { recordLabel: 'name', search: { via: false } },
+  fields: {
+    name: field('text'),
+  },
+});
+```
+
+- `search: false` takes the collection out of word search. Its records never show, and no record is
+  found through a link to one of them.
+- `search: { via: false }` keeps its records in the results, but no record is found through a link
+  to them. Reach for it when many fields point at the collection, so one tag name would bring up
+  every record that carries it.
+
+Neither one hides a pasted `UUID`: the record and the places it is used still show.

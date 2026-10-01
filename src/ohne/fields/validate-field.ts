@@ -10,9 +10,11 @@ import {
   isEmpty,
   isFunction,
   isNull,
+  isPlainObject,
   isUndefined,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { hasColumnMatcher, searchHook } from './field-search.ts';
 import { resolveFieldOptions } from './field.ts';
 import { forbidsEmpty } from './forbids-empty.ts';
 import { validateLayout } from './layout.ts';
@@ -31,6 +33,7 @@ const RESERVED_OPTIONS = new Set([
   'sanitizers',
   'validators',
   'when',
+  'search',
   'label',
   'description',
   'placeholder',
@@ -124,6 +127,8 @@ export interface ValidateFieldArgs {
  * - `writable: false` on a required column with no default, instance or type, would fail every create.
  * - `immutable` on top of `writable: false` is redundant - the wider flag already locks updates.
  * - `immutable` is top-level only: an update rewrites composite items and block instances whole.
+ * - A search hook on a relation, composite, or blocks field would never run: search follows those itself.
+ * - `search: true` needs a type that is not locked out, something to match, and a readable field.
  */
 export function validateField(args: ValidateFieldArgs): void {
   const { owner, name, nested, instance, fieldType, hint } = args;
@@ -374,6 +379,7 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
+  validateFieldSearch(where, name, instance.type, options, fieldType, hint);
   if (hasKey(options, 'default') && !isUndefined(options.default)) {
     const value = options.default;
     const valueShapeNullable =
@@ -404,6 +410,55 @@ export function validateField(args: ValidateFieldArgs): void {
         ],
       });
     }
+  }
+}
+
+/**
+ * Rejects a search setup that could never take effect.
+ * A hook on a field with a storage hint never runs, and a `search: true` may have nothing to match.
+ */
+function validateFieldSearch(
+  where: string,
+  name: string,
+  type: string,
+  options: Record<string, unknown>,
+  fieldType: FieldType,
+  hint: StorageHint | undefined,
+): void {
+  if (!isUndefined(hint) && !isUndefined(searchHook(fieldType))) {
+    throw ohneError({
+      title: `Field type \`${type}\` declares a search hook that never runs`,
+      body: [
+        `${where} is \`${type}\`, whose storage is a \`${hint.kind}\`.`,
+        'Search follows a relation, composite, or blocks field into what it holds, never through a hook.',
+        'Drop the hook from the field type.',
+      ],
+    });
+  }
+  if (options.search !== true) return;
+  if (fieldType.search === false) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot turn search on`,
+      body: [
+        `${where} is \`${type}\`, which sets \`search: false\` to keep every field of it out of search.`,
+        'Drop `search`.',
+      ],
+    });
+  }
+  if (isUndefined(hint) && !hasColumnMatcher(fieldType, hint)) {
+    throw ohneError({
+      title: `Field \`${name}\` has nothing to match words against`,
+      body: [
+        `${where} is \`${type}\`, whose \`${fieldType.columnType}\` column declares no search hook.`,
+        'Drop `search`, or give the field type a `search` hook.',
+      ],
+    });
+  }
+  if (options.readable === false) {
+    throw ohneError({
+      title: `Field \`${name}\` sets \`search\` beside \`readable: false\``,
+      body: [`${where} is write-only, so no search may match it.`, 'Drop `search`.'],
+    });
   }
 }
 
@@ -439,6 +494,7 @@ export function validateFieldTypeName(name: string, path?: string): void {
  * - `emitType` and `schema` are mutually exclusive: the framework derives value types from the hint.
  * - `jsonList` marks the stored value a JSON list, so it requires `columnType: 'json'`.
  * - `sanitizers` and `validators` are lists of functions, run in order by the write pipeline.
+ * - `search` is `false`, a hook, or `{ default: false }` with an optional `match` hook.
  * - Every declared option name must be camelCase and must not shadow a common option.
  */
 export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>(
@@ -474,6 +530,15 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       });
     }
   }
+  if (!isUndefined(type.search) && !isSearchShape(type.search)) {
+    throw ohneError({
+      title: "A field type's `search` must be `false`, a function, or `{ default: false }`",
+      body: [
+        '`false` locks the type out of search, and a function matches each search token.',
+        '`{ default: false, match? }` leaves its fields off until one opts in with `search: true`.',
+      ],
+    });
+  }
   if (!isUndefined(type.schema) && !isUndefined(type.emitType)) {
     throw ohneError({
       title: 'A field type cannot declare both `schema` and `emitType`',
@@ -504,4 +569,15 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       });
     }
   }
+}
+
+/**
+ * Whether a field type's `search` member has one of its legal shapes.
+ */
+function isSearchShape(search: unknown): boolean {
+  if (search === false || isFunction(search)) return true;
+  if (!isPlainObject(search) || search.default !== false) return false;
+  return Object.keys(search).every(
+    (key) => key === 'default' || (key === 'match' && isFunction(search.match)),
+  );
 }

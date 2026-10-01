@@ -1,8 +1,9 @@
+import type { ConditionValue } from '../../../utils/index.ts';
 import type { FieldChoice } from '../choice.ts';
 
 import { literalUnion } from '../../../utils/codegen/index.ts';
-import { isArray, isString, isUndefined, uniqueArray } from '../../../utils/index.ts';
-import { choiceValues } from '../choice.ts';
+import { isArray, isEmpty, isString, isUndefined, uniqueArray } from '../../../utils/index.ts';
+import { choiceValues, matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
@@ -15,6 +16,8 @@ import { validationMessage } from '../validation-message.ts';
  * Without, any strings are legal and the value type is `string[]`.
  * Duplicate entries collapse on write, keeping the first occurrence.
  * A create that omits the field stores `[]`, unless `min` forbids it.
+ * Search matches a list holding a choice whose value or label has a word starting with the token.
+ * Without `choices`, it matches a list holding the token itself.
  */
 export const multiSelect = defineField({
   columnType: 'json',
@@ -63,4 +66,9 @@ export const multiSelect = defineField({
       return undefined;
     },
   ],
+  search: (ctx): ConditionValue | null => {
+    if (isUndefined(ctx.options.choices)) return { includes: ctx.token };
+    const values = matchingChoices(ctx.options.choices, ctx.token, ctx.resolveMessage);
+    return isEmpty(values) ? null : { includesAny: values };
+  },
 });

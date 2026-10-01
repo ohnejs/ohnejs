@@ -1,7 +1,10 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldSearchContext } from '../../../../src/ohne/fields/define-field.ts';
+
 import { select } from '../../../../src/ohne/fields/builtin/select.ts';
+import { searchHook } from '../../../../src/ohne/fields/field-search.ts';
 
 type ValidateCtx = Parameters<NonNullable<typeof select.validators>[number]>[1];
 type EmitCtx = Parameters<NonNullable<typeof select.emitType>>[0];
@@ -47,5 +50,39 @@ describe('select emitType', () => {
 
   it('escapes a single quote inside a choice value', () => {
     strictEqual(select.emitType!(emitCtx({ choices: ["it's"] })), "'it\\'s'");
+  });
+});
+
+const selectSearch = searchHook(select)!;
+
+const search = (token: string, options: Record<string, unknown> = {}) =>
+  selectSearch({
+    name: 'field',
+    options,
+    token,
+    resolveMessage: (message) => (message === 'app.status.live' ? 'Published' : String(message)),
+  } as FieldSearchContext);
+
+describe('select search', () => {
+  const choices = ['draft', { value: 'live', label: 'app.status.live' }, 'on-hold'];
+
+  it('matches a choice value by a word prefix, ignoring case', () => {
+    deepStrictEqual(search('DRA', { choices }), { in: ['draft'] });
+    deepStrictEqual(search('hold', { choices }), { in: ['on-hold'] });
+  });
+
+  it('matches a labeled choice through its resolved label', () => {
+    deepStrictEqual(search('publ', { choices }), { in: ['live'] });
+    deepStrictEqual(search('liv', { choices }), { in: ['live'] });
+  });
+
+  it('gives every matching choice', () => {
+    deepStrictEqual(search('o', { choices: ['open', 'overdue', 'closed'] }), {
+      in: ['open', 'overdue'],
+    });
+  });
+
+  it('gives `null` when no choice matches', () => {
+    strictEqual(search('aft', { choices }), null);
   });
 });

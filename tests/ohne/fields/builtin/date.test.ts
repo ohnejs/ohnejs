@@ -1,7 +1,10 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldSearchContext } from '../../../../src/ohne/fields/define-field.ts';
+
 import { date } from '../../../../src/ohne/fields/builtin/date.ts';
+import { searchHook } from '../../../../src/ohne/fields/field-search.ts';
 
 type Ctx = Parameters<NonNullable<typeof date.validators>[number]>[1];
 
@@ -46,5 +49,29 @@ describe('date bounds', () => {
     strictEqual(bounds('2024-06-15', ctx({ min: '2024-01-01', max: '2024-12-31' })), undefined);
     strictEqual(bounds('2024-01-01', ctx({ min: '2024-01-01' })), undefined);
     strictEqual(bounds('2024-06-15', ctx()), undefined);
+  });
+});
+
+const dateSearch = searchHook(date)!;
+
+const search = (token: string, options: Record<string, unknown> = {}) =>
+  dateSearch({
+    name: 'field',
+    options,
+    token,
+    resolveMessage: (message) => (message === 'app.status.live' ? 'Published' : String(message)),
+  } as FieldSearchContext);
+
+describe('date search', () => {
+  it('matches an ISO year, month, or day prefix', () => {
+    deepStrictEqual(search('2024'), { startsWith: '2024' });
+    deepStrictEqual(search('2024-06'), { startsWith: '2024-06' });
+    deepStrictEqual(search('2024-06-15'), { startsWith: '2024-06-15' });
+  });
+
+  it('gives `null` for anything else', () => {
+    for (const token of ['24', '2024-6', '15.06.2024', 'june', '2024-06-15T10']) {
+      strictEqual(search(token), null);
+    }
   });
 });

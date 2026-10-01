@@ -1,7 +1,8 @@
 import type { FieldChoice } from '../choice.ts';
 
 import { literalUnion } from '../../../utils/codegen/index.ts';
-import { choiceValues } from '../choice.ts';
+import { isEmpty } from '../../../utils/index.ts';
+import { choiceValues, matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 
@@ -10,6 +11,7 @@ import { option } from '../option.ts';
  *
  * Stores the chosen value as text; the generated value type is the union of the choice values.
  * A value outside the list rejects, so the union is a promise the runtime keeps.
+ * Search matches the choices whose value or label has a word starting with the token.
  */
 export const select = defineField({
   columnType: 'text',
@@ -26,4 +28,8 @@ export const select = defineField({
     (value, ctx) =>
       choiceValues(ctx.options.choices).includes(value) ? undefined : 'validation.invalidChoice',
   ],
+  search: (ctx) => {
+    const values = matchingChoices(ctx.options.choices, ctx.token, ctx.resolveMessage);
+    return isEmpty(values) ? null : { in: values };
+  },
 });

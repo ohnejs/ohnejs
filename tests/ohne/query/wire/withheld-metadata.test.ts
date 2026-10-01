@@ -64,6 +64,12 @@ describe('withheldMetadata', () => {
     strictEqual(scoped.fields._translations.readable, false);
   });
 
+  it('keeps the search flag on a hidden field, beside its `readable: false`', () => {
+    const scoped = withheldMetadata(meta, ['views'], false);
+    strictEqual(scoped.fields.title.search, true);
+    strictEqual(scoped.fields.title.readable, false);
+  });
+
   it('sealed, `_translations` stays readable and admits no operator', () => {
     const scoped = withheldMetadata(meta, null, true);
     strictEqual(scoped.fields._translations.readable, undefined);

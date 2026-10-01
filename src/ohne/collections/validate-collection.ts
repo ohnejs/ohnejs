@@ -2,6 +2,7 @@ import type { FieldInstance } from '../fields/field.ts';
 import type { CollectionDefinition, CompositeIndex } from './define-collection.ts';
 
 import {
+  deepEqual,
   didYouMean,
   fillRoute,
   isArray,
@@ -37,13 +38,14 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `singleton` must be a boolean; when `true`, `api` may name `read` and `update` only.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
- * - `dashboard` must be an object holding only `icon`, `recordLabel`, `recordPath`, `table`, and `layout`.
+ * - `dashboard` is an object holding only `icon`, `recordLabel`, `recordPath`, `table`, `layout`, `search`.
  * - `dashboard.icon` must name an icon the vendored set carries.
  * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
  * - `dashboard.recordPath` must be a dashboard path holding `[uuid]` and no other param.
  * - `dashboard.table.columns` must be a non-empty list naming distinct, readable fields.
  * - A column is a declared field, `UUID`, `_updatedAt`, or `_translations` beside a translatable field.
  * - `dashboard.layout` must name declared fields, each once, in the node grammar `validateLayout` sets.
+ * - `dashboard.search` must be `false` or `{ via: false }`.
  * - A known collection name sharpens the messages; omit it before the name is known.
  */
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
@@ -60,7 +62,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateDashboard(definition.dashboard, definition.fields, collection);
 }
 
-const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'recordPath', 'table', 'layout']);
+const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'recordPath', 'table', 'layout', 'search']);
 
 /**
  * Rejects a malformed `dashboard` declaration.
@@ -88,7 +90,7 @@ function validateDashboard(
         title: `Unknown \`dashboard\` key \`${key}\``,
         body: [
           `The \`dashboard\` option${scope} names \`${key}\`.`,
-          'The keys are `icon`, `recordLabel`, `recordPath`, `table`, and `layout`.',
+          'The keys are `icon`, `recordLabel`, `recordPath`, `table`, `layout`, and `search`.',
         ],
       });
     }
@@ -98,6 +100,22 @@ function validateDashboard(
   validateRecordPath(dashboard.recordPath, collection);
   validateTable(dashboard.table, fields, collection);
   validateLayout(dashboard.layout, Object.keys(fields), 'dashboard.layout', scope);
+  validateSearch(dashboard.search, scope);
+}
+
+/**
+ * Rejects a `dashboard.search` that is neither `false` nor `{ via: false }`.
+ */
+function validateSearch(search: unknown, scope: string): void {
+  if (isUndefined(search) || search === false) return;
+  if (deepEqual(search, { via: false })) return;
+  throw ohneError({
+    title: 'Invalid `dashboard.search` declaration',
+    body: [
+      `The \`dashboard.search\` option${scope} must be \`false\` or \`{ via: false }\`.`,
+      '`false` keeps the collection out of word search; `{ via: false }` stops finds through links to it.',
+    ],
+  });
 }
 
 /**

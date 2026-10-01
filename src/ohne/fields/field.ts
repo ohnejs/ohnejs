@@ -175,6 +175,22 @@ export interface ValueOptions<
    * ```
    */
   when?: ConditionObject;
+
+  /**
+   * Whether word search matches this field.
+   * Omitted, the field type decides: a text column, a matcher, a relation, or a composite is on.
+   * An inverse `records` field and a type declaring `search: { default: false }` start off.
+   * `false` on a relation or composite stops search from following it.
+   * `true` fails at boot on a locked type, on a type with nothing to match, and on a write-only field.
+   * It governs words only: a pasted `UUID` still finds where a record is used.
+   *
+   * @example
+   * ```ts
+   * field('text', { nullable: true, search: false })
+   * field('integer', { default: 0, search: true })
+   * ```
+   */
+  search?: boolean;
 }
 
 /**

@@ -1,10 +1,11 @@
-import { isUndefined } from '../../../utils/index.ts';
+import { isInteger, isUndefined } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
 
 /**
  * The built-in `integer` field type: a whole number within JavaScript's safe integer range.
+ * Search is off until a field sets `search: true`; then an integer token matches the equal value.
  */
 export const integer = defineField({
   columnType: 'integer',
@@ -29,4 +30,9 @@ export const integer = defineField({
       return undefined;
     },
   ],
+  search: {
+    default: false,
+    match: ({ token }) =>
+      /^[+-]?\d+$/.test(token) && isInteger(Number(token)) ? { equalsTo: Number(token) } : null,
+  },
 });

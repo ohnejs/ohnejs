@@ -197,6 +197,79 @@ On a field named `address`, that failure is reported at `address.city`. A key th
 is joined without a dot, so `ctx.errors['[2]']` on a field named `labels` is reported at
 `labels[2]`.
 
+## Search
+
+`search` tells the [search palette](../dashboard/palette.md) how a typed word matches your type.
+Without it, a `text` column matches any value that contains the word, and other columns match
+nothing. A function turns each word into a condition on the field, or `null` when the word cannot
+match:
+
+```ts
+// fields/sku.ts
+import { defineField } from 'ohnejs';
+
+export default defineField({
+  columnType: 'text',
+  sanitizers: [(value) => value.toUpperCase()],
+  search: ({ token }) =>
+    /^[a-z]{2}-\d+$/i.test(token) ? { startsWith: token.toUpperCase() } : null,
+});
+```
+
+Typing `ab-10` now finds `AB-1042`, and `hello` skips the field.
+
+- `token` is one word as it was typed, or a quoted phrase. Normalize it the way your sanitizers
+  normalize a stored value, as `toUpperCase` does above.
+- The result is what you would write for the field in a [filter](./reading.md#filtering):
+  `{ startsWith: ... }`, `{ in: [...] }`, or a plain value for equality. An operator the field does
+  not accept fails the search.
+- `ctx` also carries the field's `options`, and `resolveMessage`, which renders a
+  [message](../i18n/messages.md) like a choice label in the language the search runs in.
+- The function runs once per word and field, before the query, and never sees a record. The
+  database does the matching.
+
+The object form keeps the matcher but leaves each field off until it asks with `search: true`. It
+suits a value most fields do not want searched, like a year:
+
+```ts
+// fields/year.ts
+import { defineField } from 'ohnejs';
+
+export default defineField({
+  columnType: 'integer',
+  search: {
+    default: false,
+    match: ({ token }) => (/^\d{4}$/.test(token) ? { equalsTo: Number(token) } : null),
+  },
+});
+```
+
+```ts
+// collections/Albums.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text'),
+    released: field('year', { search: true }),
+  },
+});
+```
+
+`search: false` locks the type out instead: no field of it matches, and `search: true` on one fails
+at boot. A type that stores its value through `schema` takes no function, because search follows a
+relation or composite into what it holds.
+
+The built-in types are exported from `ohnejs`, so a closer layer can override one and change only
+how it is searched:
+
+```ts
+// fields/select.ts
+import { defineField, select } from 'ohnejs';
+
+export default defineField({ ...select, search: false });
+```
+
 ## In the dashboard
 
 A type with a `text`, `integer`, `real`, or `boolean` column and no `schema` is edited in the

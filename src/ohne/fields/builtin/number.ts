@@ -1,4 +1,4 @@
-import { isUndefined } from '../../../utils/index.ts';
+import { isDecimalString, isRealNumber, isUndefined } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
@@ -7,6 +7,7 @@ import { validationMessage } from '../validation-message.ts';
  * The built-in `number` field type: a finite IEEE 754 double, exactly what a JS number holds.
  * `NaN` and the infinities fail the base-type gate; every accepted value stores bit-exact.
  * Never money: a decimal tenth has no exact binary form - use `integer` minor units instead.
+ * Search is off until a field sets `search: true`; then a numeric token matches the equal value.
  */
 export const number = defineField({
   columnType: 'real',
@@ -31,4 +32,9 @@ export const number = defineField({
       return undefined;
     },
   ],
+  search: {
+    default: false,
+    match: ({ token }) =>
+      isDecimalString(token) && isRealNumber(Number(token)) ? { equalsTo: Number(token) } : null,
+  },
 });

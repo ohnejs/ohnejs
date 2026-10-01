@@ -5,6 +5,7 @@ import { option } from '../option.ts';
 
 /**
  * The built-in `boolean` field type: a true or false value.
+ * Search has nothing to match in it, so a field of it never joins in.
  */
 export const boolean = defineField({
   columnType: 'boolean',
