@@ -27,6 +27,16 @@ declare module 'ohnejs' {
      * An ordered list of references to uploaded files.
      */
     files: typeof import('./files.ts').default;
+
+    /**
+     * A file name, stored canonical and searched by the name as typed.
+     */
+    fileName: typeof import('./file-name.ts').default;
+
+    /**
+     * A directory path, stored canonical and searched by the path as typed.
+     */
+    directoryName: typeof import('./directory-name.ts').default;
   }
 }
 

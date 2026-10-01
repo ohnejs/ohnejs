@@ -20,6 +20,8 @@ import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import UploadsCollection from '../../../src/uploads/collections/Uploads.ts';
+import directoryNameField from '../../../src/uploads/fields/directory-name.ts';
+import fileNameField from '../../../src/uploads/fields/file-name.ts';
 import imageField from '../../../src/uploads/fields/image.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
@@ -30,6 +32,8 @@ useFields().register('language', { name: 'language', fieldType: languageField })
 useFields().register('locale', { name: 'locale', fieldType: localeField });
 useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
 useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
+useFields().register('fileName', { name: 'fileName', fieldType: fileNameField });
+useFields().register('directoryName', { name: 'directoryName', fieldType: directoryNameField });
 useFields().register('image', { name: 'image', fieldType: imageField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Uploads', { name: 'Uploads', collection: UploadsCollection });

@@ -1,3 +1,4 @@
+import type { SearchResult } from '../../src/base/collections-api/search.ts';
 import type {
   CollectionAPI,
   CollectionEndpoint,
@@ -7,6 +8,7 @@ import type { AnyHandler, Route } from '../../src/ohne/routes/route.ts';
 import type { HTTPMethod } from '../../src/utils/index.ts';
 import type { MemoryStorage } from './_storage.ts';
 
+import searchPost from '../../src/base/api/search.post.ts';
 import { hashSessionToken } from '../../src/base/auth/_token.ts';
 import SessionsCollection from '../../src/base/collections/Sessions.ts';
 import UsersCollection from '../../src/base/collections/Users.ts';
@@ -28,9 +30,13 @@ import { useLayers } from '../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../src/ohne/query/query.ts';
 import { useRoles } from '../../src/ohne/roles/use-roles.ts';
+import { routeID } from '../../src/ohne/routes/route.ts';
+import { useRoutes } from '../../src/ohne/routes/use-routes.ts';
 import UploadsCollection from '../../src/uploads/collections/Uploads.ts';
 import UploadsJournalCollection from '../../src/uploads/collections/UploadsJournal.ts';
 import UploadsSessionsCollection from '../../src/uploads/collections/UploadsSessions.ts';
+import directoryNameField from '../../src/uploads/fields/directory-name.ts';
+import fileNameField from '../../src/uploads/fields/file-name.ts';
 import { useStorages } from '../../src/uploads/storage/use-storages.ts';
 import { withSessionLock } from '../../src/uploads/uploads/_session.ts';
 import { sleep } from '../../src/utils/sleep/sleep.ts';
@@ -61,6 +67,8 @@ useFields().register('language', { name: 'language', fieldType: languageField })
 useFields().register('locale', { name: 'locale', fieldType: localeField });
 useFields().register('timezone', { name: 'timezone', fieldType: timezoneField });
 useFields().register('datePattern', { name: 'datePattern', fieldType: datePatternField });
+useFields().register('fileName', { name: 'fileName', fieldType: fileNameField });
+useFields().register('directoryName', { name: 'directoryName', fieldType: directoryNameField });
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 useCollections().register('Uploads', { name: 'Uploads', collection: UploadsCollection });
@@ -75,6 +83,15 @@ useCollections().register('UploadsSessions', {
 useRoles().register('uploads-admin', {
   name: 'uploads-admin',
   role: { capabilities: ['collection.Uploads.*'] },
+});
+
+// Search reads only collections whose list query is served.
+useRoutes().register(routeID('POST', '/collections/[collection]/query'), {
+  method: 'POST',
+  pattern: '/collections/[collection]/query',
+  file: '/collections/[collection]/query.ts',
+  layer: 'ohnejs/base',
+  handler: () => null,
 });
 
 const dialect = new SQLiteDialect();
@@ -247,6 +264,16 @@ export async function call(
   } as RequestInit);
   const { response } = await dispatch(r, request, new URL(request.url), params, options);
   return response;
+}
+
+/**
+ * The `UUID`s of the `Uploads` rows `POST /search` finds for `q`, as the holder of `bearer`.
+ */
+export async function searchUploads(bearer: string, q: string): Promise<string[]> {
+  const search = route('POST', '/search', searchPost);
+  const response = await call(search, '/search', {}, { bearer, json: { q } });
+  const { results } = (await response.json()) as { results: SearchResult[] };
+  return results.filter((result) => result.collection === 'Uploads').map((result) => result.UUID);
 }
 
 /**

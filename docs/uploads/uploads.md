@@ -48,6 +48,11 @@ The sidebar row replaces the `Uploads` collection's own row, so a viewer who is 
 - `type`, `size`, `hash`, `width`, `height`, `focalX`, `focalY`, `author`, and `uploadedAt`
   describe the file.
 
+[Search](../dashboard/palette.md) finds a file by its name as you type it, accents, spaces, and
+capitals included: `Übersicht Q3` finds `ubersicht-q3-final.pdf`. The folders in `directory` work
+the same way, so `Reports 2024` finds every file under `reports-2024`. `hash` and `author` are not
+searched.
+
 Every read is decorated with extra fields:
 
 - `path` joins `directory` and `name`.

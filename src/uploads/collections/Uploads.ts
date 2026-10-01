@@ -1,7 +1,5 @@
 import { defineCollection, field } from 'ohnejs';
 
-import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
-
 /**
  * The `Uploads` collection: every file and folder of the media library, one row each.
  *
@@ -18,6 +16,7 @@ import { canonicalDirectory, canonicalName } from '../uploads/path.ts';
  * The row a `/uploads` write route names must fall in the read `access` scope, or it is a `404`.
  * Every read row is decorated with `path`, and a file row with `url`.
  * A file row gets `variants` too when an image service is configured and renders its type.
+ * Words find a row by its `name` and `directory` as typed, never by its `hash` or `author`.
  */
 const uploads = defineCollection({
   api: { read: true },
@@ -38,16 +37,14 @@ const uploads = defineCollection({
       description: 'uploads.fields.private.description',
     }),
 
-    directory: field('text', {
+    directory: field('directoryName', {
       allowEmpty: true,
       index: true,
-      sanitizers: [canonicalDirectory],
       label: 'uploads.fields.directory.label',
       description: 'uploads.fields.directory.description',
     }),
 
-    name: field('text', {
-      sanitizers: [canonicalName],
+    name: field('fileName', {
       label: 'uploads.fields.name.label',
       description: 'uploads.fields.name.description',
     }),
@@ -69,6 +66,7 @@ const uploads = defineCollection({
     hash: field('text', {
       nullable: true,
       index: true,
+      search: false,
       label: 'uploads.fields.hash.label',
       description: 'uploads.fields.hash.description',
     }),
@@ -113,6 +111,7 @@ const uploads = defineCollection({
 
     author: field('record', {
       collection: 'Users',
+      search: false,
       label: 'uploads.fields.author.label',
       description: 'uploads.fields.author.description',
     }),

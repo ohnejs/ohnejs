@@ -636,7 +636,8 @@ An IANA time zone name, like `Europe/Berlin`.
 ## Uploads layer types
 
 The [uploads layer](../uploads/uploads.md) adds types that reference files in its `Uploads`
-collection. [Media fields](../uploads/fields.md) covers how a write checks them and how you read
+collection, and the name types that collection stores its files under.
+[Media fields](../uploads/fields.md) covers how a write checks the references and how you read
 them.
 
 ### `file`
@@ -770,3 +771,14 @@ An ordered list of references to uploaded images, stored in a junction table.
 | `validators`   | -           | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -           | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`     | `true`      | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `fileName`
+
+A [`text`](#text) value stored the way the uploads layer names files: `Sunset At Sea.JPG` becomes
+`sunset-at-sea.jpg`. It takes every `text` option. Search reads a typed word the same way, so
+`Übersicht` finds `ubersicht-q3-final.pdf`.
+
+### `directoryName`
+
+A [`text`](#text) value stored as a folder path: `Photos/2024 Summer` becomes
+`photos/2024-summer`. It takes every `text` option, and search reads a typed word the same way.

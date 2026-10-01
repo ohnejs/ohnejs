@@ -14,9 +14,13 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import Uploads from '../../../src/uploads/collections/Uploads.ts';
+import directoryNameField from '../../../src/uploads/fields/directory-name.ts';
+import fileNameField from '../../../src/uploads/fields/file-name.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 useLayers().add({ path: '/uploads-collection', defaults: DEFAULTS, input: {} });
+useFields().register('fileName', { name: 'fileName', fieldType: fileNameField });
+useFields().register('directoryName', { name: 'directoryName', fieldType: directoryNameField });
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
