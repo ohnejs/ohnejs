@@ -197,7 +197,9 @@
   "palette": {
     "label": "Pretraži dashboard",
     "placeholder": "Pretraži zapise ili idi na stranicu",
-    "loadMore": "Učitaj još"
+    "loadMore": "Učitaj još",
+    "moreGroups": "Više povezanih grupa je skriveno. Dodaj riječ da suziš pretragu.",
+    "via": "{collection} preko {target}"
   },
   "record": {
     "collectionOverview": "Pregled `{collection}`",

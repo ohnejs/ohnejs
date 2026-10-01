@@ -197,7 +197,9 @@
   "palette": {
     "label": "Dashboard durchsuchen",
     "placeholder": "Datensätze suchen oder zu einer Seite springen",
-    "loadMore": "Mehr laden"
+    "loadMore": "Mehr laden",
+    "moreGroups": "Weitere verwandte Gruppen ausgeblendet. Gib ein weiteres Wort ein, um die Suche einzugrenzen.",
+    "via": "{collection} über {target}"
   },
   "record": {
     "collectionOverview": "`{collection}`-Übersicht",

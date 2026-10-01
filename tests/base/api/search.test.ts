@@ -1,7 +1,7 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { SearchResult } from '../../../src/base/collections-api/search.ts';
+import type { SearchAnswer, SearchResult } from '../../../src/base/collections-api/search.ts';
 import type { FieldTypeName } from '../../../src/ohne/fields/known-fields.ts';
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
@@ -103,7 +103,12 @@ useCollections().register('SearchItems', {
   collection: {
     api: { read: true },
     dashboard: { recordLabel: 'name' },
-    fields: { name: field('text'), tooltip: field('text', { nullable: true }) },
+    fields: {
+      name: field('text'),
+      tooltip: field('text', { nullable: true }),
+      note: field('record', { collection: 'SearchNotes' }),
+      vault: field('record', { collection: 'SearchVaults' }),
+    },
   },
 });
 useCollections().register('SearchNotes', {
@@ -215,7 +220,10 @@ useCollections().register('SearchSettings', {
   collection: {
     api: { read: true },
     singleton: true,
-    fields: { motto: field('text', { nullable: true }) },
+    fields: {
+      motto: field('text', { nullable: true }),
+      logo: field('record', { collection: 'SearchFiles' }),
+    },
   },
 });
 useCollections().register('SearchSealed', {
@@ -308,6 +316,75 @@ useCollections().register('SearchWide', {
   },
 });
 
+useCollections().register('SearchFiles', {
+  name: 'SearchFiles',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'name' },
+    fields: {
+      name: field('text'),
+      people: field('records', { collection: 'SearchPeople', inverse: 'gallery' }),
+    },
+  },
+});
+useCollections().register('SearchBadges', {
+  name: 'SearchBadges',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'code' },
+    fields: { code: field('text', { search: false }) },
+  },
+});
+useCollections().register('SearchPeople', {
+  name: 'SearchPeople',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'name' },
+    fields: {
+      name: field('text'),
+      bio: field('text', { nullable: true }),
+      portrait: field('record', { collection: 'SearchFiles' }),
+      gallery: field('records', { collection: 'SearchFiles' }),
+      sealedFile: field('record', { collection: 'SearchFiles', search: false }),
+      badge: field('record', { collection: 'SearchBadges' }),
+      tag: field('record', { collection: 'SearchTags' }),
+      links: field('repeater', {
+        fields: { file: field('record', { collection: 'SearchFiles' }) },
+      }),
+    },
+  },
+});
+useCollections().register('SearchAlbums', {
+  name: 'SearchAlbums',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'title' },
+    fields: {
+      title: field('text'),
+      photos: field('records', { collection: 'SearchFiles', translatable: true }),
+    },
+  },
+});
+useCollections().register('SearchHub', {
+  name: 'SearchHub',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'name' },
+    fields: { name: field('text') },
+  },
+});
+const SPOKES = Array.from({ length: 9 }, (_, at) => `SearchSpoke${at + 1}`);
+for (const spoke of SPOKES) {
+  useCollections().register(spoke, {
+    name: spoke,
+    collection: {
+      api: { read: true },
+      dashboard: { recordLabel: 'name' },
+      fields: { name: field('text'), hub: field('record', { collection: 'SearchHub' }) },
+    },
+  });
+}
+
 useRoutes().register(routeID('POST', '/collections/[collection]/query'), {
   method: 'POST',
   pattern: '/collections/[collection]/query',
@@ -355,6 +432,7 @@ const other = await userWith('other@example.com', ['admin']);
 const reader = await userWith('reader@example.com', ['item-reader']);
 const germanUser = await userWith('german@example.com', ['admin'], { contentLanguage: 'de' });
 
+const vault = await seed('SearchVaults', { title: 'Vault ashbringer' });
 const blade = await seed('SearchItems', { name: 'Ashbringer', tooltip: 'A corrupted blade' });
 const lore = await seed('SearchItems', {
   name: 'Tome of lore',
@@ -364,8 +442,12 @@ const helm = await seed('SearchItems', { name: 'Helm of Ashbringer' });
 const mine = await seed('SearchNotes', { title: 'Mine ashbringer', owner: admin.uuid });
 await seed('SearchNotes', { title: 'Theirs ashbringer', owner: other.uuid });
 await seed('SearchNotes', { title: 'Quiet', secret: 'ashbringer', owner: admin.uuid });
+const lighthouse = await seed('SearchNotes', { title: 'Mine lighthouse', owner: admin.uuid });
+const theirs = await seed('SearchNotes', { title: 'Theirs lighthouse', owner: other.uuid });
+const lantern = await seed('SearchItems', { name: 'Lantern', note: lighthouse });
+await seed('SearchItems', { name: 'Lamp', note: theirs });
+await seed('SearchItems', { name: 'Lockbox', vault });
 await seed('SearchBlocked', { title: 'Blocked ashbringer' });
-await seed('SearchVaults', { title: 'Vault ashbringer' });
 const unlabeled = await seed('SearchUnlabeled', { title: 'Unlabeled', note: 'ashbringer' });
 const STORED_UUID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 await seed('SearchItems', { name: 'Forge', tooltip: `Forged after ${STORED_UUID}` });
@@ -407,7 +489,31 @@ const finished = await seed('SearchTasks', {
 });
 const secret = await seed('SearchSecrets', { name: 'Hidden grove' });
 const tag = await seed('SearchTags', { name: 'Grove tag' });
-await queryUntyped('SearchSettings').updateOrThrow({ motto: 'Grove forever' });
+const ceo = await seed('SearchFiles', { name: 'ceo-portrait.webp' });
+const offsite = await seed('SearchFiles', { name: 'offsite-day.jpg' });
+const keynote = await seed('SearchFiles', { name: 'keynote-speech.mp4' });
+const plan = await seed('SearchFiles', { name: 'vault-plan.pdf' });
+const tide = await seed('SearchFiles', { name: 'tide-map.png' });
+const logo = await seed('SearchFiles', { name: 'site-logo.svg' });
+const badge = await seed('SearchBadges', { code: 'k9-alpha' });
+const benno = await seed('SearchPeople', { name: 'Benno Quade', portrait: ceo });
+const carla = await seed('SearchPeople', { name: 'Carla Ruiz', gallery: [offsite, keynote] });
+const mira = await seed('SearchPeople', { name: 'Mira Stone', bio: null, portrait: ceo });
+const dana = await seed('SearchPeople', { name: 'Dana Ceo', bio: 'Leads', portrait: ceo });
+const ezra = await seed('SearchPeople', { name: 'Ezra Cole', sealedFile: plan });
+await seed('SearchPeople', { name: 'Gus Hale', tag });
+await seed('SearchPeople', { name: 'Ivy Long', badge });
+const hana = await seed('SearchPeople', { name: 'Hana Mori', links: [{ file: tide }] });
+const album = await seed('SearchAlbums', { title: 'Summer trip', photos: [ceo] });
+await queryUntyped('SearchAlbums')
+  .locale('de')
+  .where({ UUID: album })
+  .updateOrThrow({
+    photos: [offsite],
+  });
+const hub = await seed('SearchHub', { name: 'Zephyr hub' });
+for (const spoke of SPOKES) await seed(spoke, { name: `${spoke} spoke`, hub });
+await queryUntyped('SearchSettings').updateOrThrow({ motto: 'Grove forever', logo });
 const settings = (await queryUntyped('SearchSettings').findFirst())?.UUID as string;
 await seed('SearchSealed', { name: 'Wyrmrest sealed' });
 sealed = true;
@@ -445,14 +551,14 @@ async function search(
   bearer: string | null,
   route = ROUTE,
   signal?: AbortSignal,
-): Promise<{ status: number; body: { results: SearchResult[] } }> {
+): Promise<{ status: number; body: SearchAnswer }> {
   const url = 'http://x.test/search';
   const headers = new Headers({ 'Content-Type': 'application/json' });
   if (bearer !== null) headers.set('Authorization', `Bearer ${bearer}`);
   const init = { method: 'POST', headers, body: JSON.stringify(body), signal };
   const request = new Request(url, init);
   const { response } = await dispatch(route, request, new URL(url), {});
-  return { status: response.status, body: (await response.json()) as { results: SearchResult[] } };
+  return { status: response.status, body: (await response.json()) as SearchAnswer };
 }
 
 /**
@@ -462,7 +568,7 @@ async function searchUnder(q: string, signal: AbortSignal): Promise<SearchResult
   const route: Route = {
     ...ROUTE,
     handler: (async () => ({
-      results: await searchRecords(await requireUser(), q, { limit: 5, signal }),
+      results: (await searchRecords(await requireUser(), q, { limit: 5, signal })).results,
     })) as AnyHandler,
   };
   return (await search({}, admin.token, route)).body.results;
@@ -472,7 +578,44 @@ async function found(q: string, bearer = admin.token): Promise<SearchResult[]> {
   return (await search({ q }, bearer)).body.results;
 }
 
+/**
+ * A result found through `targets`, each a `[UUID, label, path]` record of `target` it links to.
+ */
+function related(
+  collection: string,
+  UUID: string,
+  label: string,
+  target: string,
+  targets: [string, string, string][],
+): SearchResult {
+  return {
+    collection,
+    UUID,
+    label,
+    via: {
+      collection: target,
+      targets: targets.map(([id, text, path]) => ({ UUID: id, label: text, path })),
+    },
+  };
+}
+
+/**
+ * `results` in the order a search answers one group: by `UUID`, newest first.
+ */
+function newestFirst(results: SearchResult[]): SearchResult[] {
+  return results.toSorted((a, b) => b.UUID.localeCompare(a.UUID));
+}
+
+const HERO_AUTHOR = 'body.SearchStack.parts.SearchHero.author';
+const stackedVia = related('SearchPages', stacked, 'Stacked', 'SearchItems', [
+  [blade, 'Ashbringer', HERO_AUTHOR],
+]);
+
 describe('POST /search', () => {
+  it('splits words across a link nested in recursive blocks', async () => {
+    deepStrictEqual(await found('stacked ashbringer'), [stackedVia]);
+  });
+
   it('finds a record by any readable text field, the closest label first', async () => {
     const { status, body } = await search({ q: 'ASHBRINGER' }, admin.token);
     strictEqual(status, 200);
@@ -481,6 +624,7 @@ describe('POST /search', () => {
       { collection: 'SearchNotes', UUID: mine, label: 'Mine ashbringer' },
       { collection: 'SearchItems', UUID: helm, label: 'Helm of Ashbringer' },
       { collection: 'SearchItems', UUID: lore, label: 'Tome of lore' },
+      stackedVia,
     ]);
   });
 
@@ -511,11 +655,12 @@ describe('POST /search', () => {
     deepStrictEqual((await search({ q: 'a .' }, admin.token)).body, { results: [] });
   });
 
-  it('caps the records per collection at `limit`', async () => {
+  it('caps the records per collection and per related group at `limit`', async () => {
     const { body } = await search({ q: 'ashbringer', limit: 1 }, admin.token);
     deepStrictEqual(body.results.map((result) => result.collection).toSorted(), [
       'SearchItems',
       'SearchNotes',
+      'SearchPages',
     ]);
   });
 
@@ -573,7 +718,7 @@ describe('POST /search', () => {
     deepStrictEqual(body.results, [{ collection: 'SearchPages', UUID: summed, label: 'Summed' }]);
   });
 
-  it('never searches a relation target', async () => {
+  it('matches a linked record by its label fields alone', async () => {
     const { body } = await search({ q: 'corrupted' }, admin.token);
     deepStrictEqual(
       body.results.map((result) => result.collection),
@@ -593,6 +738,7 @@ describe('POST /search', () => {
   it('finds the record a pasted `UUID` names, in any letter case', async () => {
     deepStrictEqual(await found(blade), [
       { collection: 'SearchItems', UUID: blade, label: 'Ashbringer' },
+      stackedVia,
     ]);
     deepStrictEqual(await found(blade.toUpperCase()), await found(blade));
   });
@@ -612,8 +758,11 @@ describe('POST /search', () => {
   it('never matches a `UUID` inside text', async () => {
     deepStrictEqual(await found(STORED_UUID), []);
     deepStrictEqual(
-      (await found(admin.uuid)).map((result) => result.collection),
-      ['Users'],
+      (await found(admin.uuid)).map((result) => [result.collection, result.via?.collection]),
+      [
+        ['Users', undefined],
+        ['Sessions', 'Users'],
+      ],
     );
   });
 
@@ -637,6 +786,7 @@ describe('POST /search', () => {
     deepStrictEqual(await found('grove'), [
       { collection: 'SearchTags', UUID: tag, label: 'Grove tag' },
     ]);
+    deepStrictEqual(await found('gus grove'), []);
     deepStrictEqual(await found(secret), [
       { collection: 'SearchSecrets', UUID: secret, label: 'Hidden grove' },
     ]);
@@ -646,6 +796,12 @@ describe('POST /search', () => {
     deepStrictEqual(await found('forever'), []);
     deepStrictEqual(await found(settings), [
       { collection: 'SearchSettings', UUID: settings, label: 'Grove forever' },
+    ]);
+    deepStrictEqual(await found(logo), [
+      { collection: 'SearchFiles', UUID: logo, label: 'site-logo.svg' },
+      related('SearchSettings', settings, 'Grove forever', 'SearchFiles', [
+        [logo, 'site-logo.svg', 'logo'],
+      ]),
     ]);
     deepStrictEqual(await found(unlabeled), [
       { collection: 'SearchUnlabeled', UUID: unlabeled, label: '' },
@@ -713,5 +869,162 @@ describe('POST /search', () => {
     strictEqual((await search({ q: 'a', collection: 1 }, admin.token)).status, 400);
     strictEqual((await search({ q: 'a', limit: '5' }, admin.token)).status, 400);
     strictEqual((await search({ q: 'a', offset: '1' }, admin.token)).status, 400);
+  });
+});
+
+describe('POST /search related records', () => {
+  const ceoTarget: [string, string, string] = [ceo, 'ceo-portrait.webp', 'portrait'];
+
+  it('splits the words between a record and the record it links to', async () => {
+    deepStrictEqual(await found('benno ceo'), [
+      related('SearchPeople', benno, 'Benno Quade', 'SearchFiles', [ceoTarget]),
+    ]);
+  });
+
+  it('matches each word through a different record of a list relation', async () => {
+    deepStrictEqual(await found('carla offsite keynote'), [
+      related('SearchPeople', carla, 'Carla Ruiz', 'SearchFiles', [
+        [offsite, 'offsite-day.jpg', 'gallery'],
+        [keynote, 'keynote-speech.mp4', 'gallery'],
+      ]),
+    ]);
+  });
+
+  it('follows a relation nested in blocks', async () => {
+    const results = await found('ashbringer');
+    deepStrictEqual(
+      results.filter((result) => result.via !== undefined),
+      [stackedVia],
+    );
+  });
+
+  it('finds a record whose other text column is empty', async () => {
+    deepStrictEqual(await found('mira ceo'), [
+      related('SearchPeople', mira, 'Mira Stone', 'SearchFiles', [ceoTarget]),
+    ]);
+  });
+
+  it('never lists a direct hit again as related', async () => {
+    const results = await found('ceo');
+    const direct = results.filter((result) => result.via === undefined).map((r) => r.UUID);
+    const linked = results.filter((result) => result.via !== undefined).map((r) => r.UUID);
+    ok(direct.includes(dana));
+    deepStrictEqual(
+      direct.filter((UUID) => linked.includes(UUID)),
+      [],
+    );
+    deepStrictEqual(linked.toSorted(), [benno, mira, album].toSorted());
+  });
+
+  it('never follows an inverse relation', async () => {
+    deepStrictEqual(await found(carla), [
+      { collection: 'SearchPeople', UUID: carla, label: 'Carla Ruiz' },
+    ]);
+    strictEqual(
+      (await found('offsite carla')).some((result) => result.via?.collection === 'SearchPeople'),
+      false,
+    );
+  });
+
+  it('never matches a link target by a label with `search: false`', async () => {
+    deepStrictEqual(await found('ivy alpha'), []);
+  });
+
+  it('never follows a relation with `search: false` for words', async () => {
+    deepStrictEqual(await found('ezra vault'), []);
+  });
+
+  it('lists nothing through a target the caller cannot reach', async () => {
+    deepStrictEqual(await found('lantern lighthouse'), [
+      related('SearchItems', lantern, 'Lantern', 'SearchNotes', [
+        [lighthouse, 'Mine lighthouse', 'note'],
+      ]),
+    ]);
+    deepStrictEqual(await found('lamp lighthouse'), []);
+    deepStrictEqual(await found('lantern lighthouse', reader.token), []);
+  });
+
+  it('skips a target whose read access throws', async () => {
+    const { status, body } = await search({ q: 'lockbox ashbringer' }, admin.token);
+    deepStrictEqual({ status, body }, { status: 200, body: { results: [] } });
+  });
+
+  it('lists the records using a pasted `UUID` through a column, a junction, and a repeater', async () => {
+    const people = (await found(ceo)).filter((result) => result.via !== undefined);
+    deepStrictEqual(people, [
+      ...newestFirst([
+        related('SearchPeople', dana, 'Dana Ceo', 'SearchFiles', [ceoTarget]),
+        related('SearchPeople', mira, 'Mira Stone', 'SearchFiles', [ceoTarget]),
+        related('SearchPeople', benno, 'Benno Quade', 'SearchFiles', [ceoTarget]),
+      ]),
+      related('SearchAlbums', album, 'Summer trip', 'SearchFiles', [
+        [ceo, 'ceo-portrait.webp', 'photos'],
+      ]),
+    ]);
+    deepStrictEqual(await found(keynote), [
+      { collection: 'SearchFiles', UUID: keynote, label: 'keynote-speech.mp4' },
+      related('SearchPeople', carla, 'Carla Ruiz', 'SearchFiles', [
+        [keynote, 'keynote-speech.mp4', 'gallery'],
+      ]),
+    ]);
+    deepStrictEqual(await found(tide), [
+      { collection: 'SearchFiles', UUID: tide, label: 'tide-map.png' },
+      related('SearchPeople', hana, 'Hana Mori', 'SearchFiles', [
+        [tide, 'tide-map.png', 'links.file'],
+      ]),
+    ]);
+  });
+
+  it('lists a usage through a relation with `search: false`', async () => {
+    deepStrictEqual(await found(plan), [
+      { collection: 'SearchFiles', UUID: plan, label: 'vault-plan.pdf' },
+      related('SearchPeople', ezra, 'Ezra Cole', 'SearchFiles', [
+        [plan, 'vault-plan.pdf', 'sealedFile'],
+      ]),
+    ]);
+  });
+
+  it("reads a locale-scoped junction in the user's content language", async () => {
+    const albums = async (bearer: string) =>
+      (await found(offsite, bearer)).filter((result) => result.collection === 'SearchAlbums');
+    deepStrictEqual(await albums(admin.token), []);
+    deepStrictEqual(await albums(germanUser.token), [
+      related('SearchAlbums', album, 'Summer trip', 'SearchFiles', [
+        [offsite, 'offsite-day.jpg', 'photos'],
+      ]),
+    ]);
+  });
+
+  it('pages one related window with `collection` and `via`', async () => {
+    const page = async (offset: number) =>
+      (
+        await search(
+          { q: 'ceo', collection: 'SearchPeople', via: 'SearchFiles', limit: 1, offset },
+          admin.token,
+        )
+      ).body.results;
+    deepStrictEqual(
+      [...(await page(0)), ...(await page(1))],
+      newestFirst([
+        related('SearchPeople', mira, 'Mira Stone', 'SearchFiles', [ceoTarget]),
+        related('SearchPeople', benno, 'Benno Quade', 'SearchFiles', [ceoTarget]),
+      ]),
+    );
+    deepStrictEqual(await page(2), []);
+    const window = { q: 'ceo', collection: 'SearchPeople' };
+    deepStrictEqual((await search({ ...window, via: 'Nowhere' }, admin.token)).body.results, []);
+    deepStrictEqual((await search({ ...window, via: 'SearchHub' }, admin.token)).body.results, []);
+    strictEqual((await search({ ...window, via: 1 }, admin.token)).status, 400);
+    strictEqual((await search({ q: 'ceo', via: 'SearchFiles' }, admin.token)).status, 400);
+  });
+
+  it('caps the related passes of a word search, marking the answer truncated', async () => {
+    const { body } = await search({ q: 'zephyr' }, admin.token);
+    strictEqual(body.truncated, true);
+    deepStrictEqual(
+      body.results.map((result) => result.collection),
+      ['SearchHub', ...SPOKES.slice(0, 8)],
+    );
+    strictEqual('truncated' in (await search({ q: 'ceo' }, admin.token)).body, false);
   });
 });

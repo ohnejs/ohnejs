@@ -197,7 +197,9 @@
   "palette": {
     "label": "Search the dashboard",
     "placeholder": "Search records or jump to a page",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "moreGroups": "More related groups hidden. Add a word to narrow it down.",
+    "via": "{collection} via {target}"
   },
   "record": {
     "collectionOverview": "`{collection}` overview",

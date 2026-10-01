@@ -41,9 +41,12 @@ import {
   movePaletteActive,
   openPalette,
   type PaletteEntry,
+  type PaletteGroup,
   type PaletteHit,
+  type PaletteMeta,
   paletteActive,
   paletteActiveIndex,
+  paletteGroupKey,
   paletteGroups,
   paletteHits,
   paletteOpens,
@@ -56,9 +59,14 @@ import {
 import { searchInput } from './search-input.ts';
 
 /**
- * The hits a search answers per collection, and each page a "Load more" adds.
+ * The hits a search answers per group, and each page a "Load more" adds.
  */
 const PAGE = 5;
+
+/**
+ * What the palette lists from while the dashboard meta has not loaded.
+ */
+const NO_META: PaletteMeta = { collections: [], menu: [], blocks: [] };
 
 css`
   .o-palette-tab {
@@ -141,20 +149,34 @@ css`
     font-weight: inherit;
   }
 
+  /* A linked record's long name would push the row's own label out of view. */
+  .o-palette-results .ohne-vertical-menu-item-hint {
+    flex-shrink: 1;
+    max-width: 50%;
+  }
+
   .o-palette-empty {
     padding: 1.5rem 0.75rem;
     color: hsl(var(--ohne-muted-foreground));
     font-size: 0.875rem;
     text-align: center;
   }
+
+  .o-palette-truncated {
+    padding: 0 0.75rem;
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 0.75rem;
+  }
 `;
 
 /**
  * The search palette, mounted by the dashboard boot into the shell's `global` slot.
  * It renders while `paletteOpen` is set: a search input over the matching records and pages.
- * Typing searches every collection through `POST /search` after a pause, only under the search view.
- * The hits group by collection.
- * The sidebar's menu rows matching the query follow, then the rows the `row` slots list.
+ * Typing two characters or more searches every collection through `POST /search` after a pause.
+ * It searches only under the search view, and a new query aborts the request still out for the last.
+ * Direct hits group by collection, then come the sidebar's menu rows matching the query.
+ * Related hits follow, grouped by collection and the collection they link to, then the `row` slots' rows.
+ * A muted line under the results says when the search left related groups out.
  * ArrowUp and ArrowDown move the selection through every row, and Enter picks it.
  * On the first screen, Tab hands the typed words to a layer, such as the assistant, whatever row is selected.
  * A Tab key in the input shows while a layer takes them, and a click on it does the same.
@@ -173,26 +195,29 @@ export function palette(): Child {
     () => {
       const t = useT();
       const searching = ref(false);
+      const truncated = ref(false);
       const more = ref<ReadonlySet<string>>(new Set());
       const loading = new Set<string>();
-      const loadMore = async (collection: string): Promise<void> => {
-        if (loading.has(collection)) return;
-        loading.add(collection);
-        const group = `collection:${collection}`;
-        const query = untracked(paletteSearchTerm);
+      let requests = new AbortController();
+      const loadMore = async (collection: string, via?: string): Promise<void> => {
+        const group = paletteGroupKey(collection, via);
+        if (loading.has(group)) return;
+        loading.add(group);
+        const { signal } = requests;
         const offset = untracked(() => paletteHits.value).filter(
-          (hit) => hit.collection === collection,
+          (hit) => paletteGroupKey(hit.collection, hit.via?.collection) === group,
         ).length;
-        const next = await fetchHits(query, { collection, offset });
-        loading.delete(collection);
-        if (!live || untracked(paletteSearchTerm) !== query) return;
+        const window = { collection, via, offset };
+        const { hits: next } = await fetchHits(untracked(paletteSearchTerm), window, signal);
+        loading.delete(group);
+        if (!live || signal.aborted) return;
         const onMore = untracked(
           () => active.value?.key.startsWith(`${group}\n`) === true && isUndefined(active.value.to),
         );
         paletteHits.value = [...untracked(() => paletteHits.value), ...next];
         if (next.length === PAGE) return;
         const rest = new Set(untracked(() => more.value));
-        rest.delete(collection);
+        rest.delete(group);
         more.value = rest;
         const last = untracked(() =>
           groups.value.find((found) => found.key === group)?.entries.at(-1),
@@ -202,18 +227,11 @@ export function palette(): Child {
       const groups = computed(() => {
         const meta = dashboardMeta();
         const rows = paletteSlots('row').flatMap((list) => list());
-        return paletteGroups(
-          paletteQuery.value,
-          paletteHits.value,
-          meta?.collections ?? [],
-          meta?.menu ?? [],
-          rows,
-          {
-            collections: more.value,
-            label: t('dashboard.palette.loadMore'),
-            load: (collection) => void loadMore(collection),
-          },
-        );
+        return paletteGroups(paletteQuery.value, paletteHits.value, meta ?? NO_META, rows, {
+          groups: more.value,
+          label: t('dashboard.palette.loadMore'),
+          load: (collection, via) => void loadMore(collection, via),
+        });
       });
       const entries = computed(() => groups.value.flatMap((group) => group.entries));
       const active = computed(
@@ -239,28 +257,39 @@ export function palette(): Child {
       };
 
       const search = debounce(async (query: string) => {
-        const hits = await fetchHits(query);
-        if (!live || untracked(paletteSearchTerm) !== query) return;
-        paletteHits.value = hits;
+        const { signal } = requests;
+        const answer = await fetchHits(query, {}, signal);
+        if (!live || signal.aborted) return;
+        paletteHits.value = answer.hits;
+        truncated.value = answer.truncated;
         more.value = new Set(
-          Object.entries(groupBy(hits, (hit) => hit.collection))
+          Object.entries(
+            groupBy(answer.hits, (hit) => paletteGroupKey(hit.collection, hit.via?.collection)),
+          )
             .filter(([, found = []]) => found.length === PAGE)
-            .map(([name]) => name),
+            .map(([group]) => group),
         );
         searching.value = false;
       }, 200);
       onCleanup(() => {
         live = false;
         search.cancel();
+        requests.abort();
       });
 
+      let term: string | null = null;
       effect(() => {
         const query = paletteSearchTerm();
         untracked(() => {
+          if (query === term) return;
+          term = query;
+          requests.abort();
+          requests = new AbortController();
           searching.value = query !== '';
           if (query === '') {
             search.cancel();
             paletteHits.value = [];
+            truncated.value = false;
           } else {
             search(query);
           }
@@ -337,6 +366,11 @@ export function palette(): Child {
         { capture: true },
       );
 
+      const heading = (group: PaletteGroup): string =>
+        isUndefined(group.via)
+          ? group.label
+          : t('dashboard.palette.via', { collection: group.label, target: group.via });
+
       let pointerX = NaN;
       let pointerY = NaN;
       const results = h(
@@ -366,7 +400,7 @@ export function palette(): Child {
           (group) => group.key,
           (group) => {
             const menu = verticalMenu({
-              title: untracked(group).label === '' ? undefined : () => group().label,
+              title: untracked(group).label === '' ? undefined : () => heading(group()),
               items: () =>
                 group().entries.map((entry) => ({
                   to: entry.to,
@@ -374,7 +408,7 @@ export function palette(): Child {
                   label: entry.label,
                   icon: entry.more === true ? moreIcon() : entry.icon,
                   hint: isUndefined(entry.time)
-                    ? undefined
+                    ? entry.hint
                     : { text: formatRelative(entry.time), tooltip: formatDateTime(entry.time) },
                   active: entry.key === active.value?.key,
                 })),
@@ -401,6 +435,13 @@ export function palette(): Child {
             () => paletteView.value === 'search',
             () => [
               results,
+              when(
+                () => truncated.value,
+                () =>
+                  h('div', { class: 'o-palette-truncated' }, () =>
+                    t('dashboard.palette.moreGroups'),
+                  ),
+              ),
               when(
                 () =>
                   paletteQuery.value.trim() !== '' &&
@@ -491,26 +532,40 @@ function rowIndex(results: HTMLElement, target: EventTarget | null): number {
 }
 
 /**
- * The records `POST /search` finds for `query`, a page per collection.
- * Each unlabeled one is named by its short `UUID`.
- * With `collection`, only that one is searched, from `offset` on.
- * A failed request finds nothing.
+ * The records `POST /search` finds for `query`, a page per group, and whether it left related groups out.
+ * Each unlabeled record, a linked one included, is named by its short `UUID`.
+ * With `collection`, only that one is searched from `offset` on, or with `via` its related group.
+ * A failed or aborted request finds nothing.
  */
 async function fetchHits(
   query: string,
-  window: { collection?: string; offset?: number } = {},
-): Promise<PaletteHit[]> {
+  window: { collection?: string; via?: string; offset?: number },
+  signal: AbortSignal,
+): Promise<{ hits: PaletteHit[]; truncated: boolean }> {
   try {
     const response = await api('POST /search', {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ q: query, limit: PAGE, ...window }),
+      signal,
     });
-    if (!response.ok) return [];
-    const { results } = (await response.json()) as { results: PaletteHit[] };
-    return results.map((hit) =>
-      hit.label === '' ? { ...hit, label: fallbackLabel(hit.UUID) } : hit,
+    if (!response.ok) return { hits: [], truncated: false };
+    const answer = (await response.json()) as { results: PaletteHit[]; truncated?: true };
+    const hits = answer.results.map((hit) =>
+      named(
+        isUndefined(hit.via)
+          ? hit
+          : { ...hit, via: { ...hit.via, targets: hit.via.targets.map(named) } },
+      ),
     );
+    return { hits, truncated: answer.truncated === true };
   } catch {
-    return [];
+    return { hits: [], truncated: false };
   }
+}
+
+/**
+ * `record`, or a copy named by its short `UUID` when its label is empty.
+ */
+function named<T extends { UUID: string; label: string }>(record: T): T {
+  return record.label === '' ? { ...record, label: fallbackLabel(record.UUID) } : record;
 }
