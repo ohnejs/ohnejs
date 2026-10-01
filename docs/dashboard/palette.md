@@ -27,20 +27,35 @@ Picking a record opens its editor, or the page its collection's
 
 ## What is searched
 
-Each word you type must appear, in any letter case, in one of a record's text fields. Above, `name`
-and `tooltip` are searched; an `integer` field never is.
+Each word you type must match one of a record's fields, in any letter case. Each field type decides
+how a word matches it:
 
-- A collection takes part when you may read it and it has a label: its `recordLabel`, or else its
-  first text field. A singleton never does.
+- Text fields match anywhere inside, so `bring` finds Ashbringer.
+- A select matches by its choice labels as you see them, so `progress` finds the status
+  "In progress".
+- A date matches the start of its `YYYY-MM-DD` form: `2026`, `2026-03` or `2026-03-14`.
+- Number fields are skipped unless they ask to be searched.
+
+Each field can switch search on or off, and so can a whole collection. See
+[Search](../database/collections.md#search) for both switches.
+
+Paste a record's `UUID` to find that record. A `UUID` inside an object, repeater, or block item finds
+the record that holds it. A `UUID` finds its record even when the switches keep that collection or
+field out of word search.
+
+- A collection takes part in word search when you may read it and it has a label: its
+  `recordLabel`, or else its first text field. A singleton, or a collection without a label, takes
+  part only for a pasted `UUID`.
 - The search reads as the collection's own list read, so its
   [access rules](../api/collections.md#access) and read middleware apply. A field outside your
   read scope is never searched.
-- Text inside a record's own objects, repeaters, and blocks is searched too. A related record's text
-  is not.
-- A collection with very many text fields searches only as many as the query limits allow, the
-  record's own fields first.
+- Fields inside a record's own objects, repeaters, and blocks are searched too. A related record's
+  fields are not.
+- A translatable collection is searched in your content language, the one you set on your account.
+- A collection with very many fields searches only as many as the query limits allow, its label
+  fields first.
 - A collection that refuses the read is skipped, never an error.
-- Records whose label holds every word come first.
+- Records whose label fields hold every word come first.
 - Each collection shows its five newest matches. "Load more" under it shows the next five.
 - Quotes keep a phrase together: `"new york"` is one word.
 - Punctuation around a word, a lone letter, and a repeated word are ignored, and only the first ten
@@ -61,8 +76,9 @@ const { results } = await response.json();
 // [{ collection: 'Items', UUID: '...', label: 'Ashbringer' }]
 ```
 
-- `limit` caps the records per collection. Omitted, each collection answers five.
+- `limit` caps the records per collection, up to 50. Omitted, each collection answers five.
 - `collection` searches that one alone, and `offset` skips its first matches, to page through it.
+  An unknown `collection` answers no results, and paging stops past an `offset` of 1000.
 - `label` is `''` when a record's label fields are empty.
 - The route needs a signed-in user; a guest gets `401`.
 
