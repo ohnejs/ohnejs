@@ -130,6 +130,8 @@
       "list": "Pročitano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
       "listFiltered": "Pročitano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection} po filteru",
       "found": "Pronađeno {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection} za `{query}`",
+      "foundVia": "Pronađeno {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection} preko {target} za `{query}`",
+      "foundNone": "Ništa nije pronađeno za `{query}`",
       "record": "Pročitan jedan zapis iz {collection}",
       "translations": "Pročitani prijevodi jednog zapisa iz {collection}",
       "verdicts": "Provjereno šta smijete mijenjati u {collection}",

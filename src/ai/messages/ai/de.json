@@ -130,6 +130,8 @@
       "list": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} gelesen",
       "listFiltered": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} nach einem Filter gelesen",
       "found": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} zu `{query}` gefunden",
+      "foundVia": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} über {target} zu `{query}` gefunden",
+      "foundNone": "Nichts zu `{query}` gefunden",
       "record": "Einen Datensatz aus {collection} gelesen",
       "translations": "Die Übersetzungen eines Datensatzes aus {collection} gelesen",
       "verdicts": "Geprüft, was du in {collection} ändern darfst",

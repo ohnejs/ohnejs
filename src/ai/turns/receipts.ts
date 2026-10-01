@@ -28,6 +28,11 @@ import { redactRecords, SYSTEM_FIELDS } from './redact.ts';
 type Opened = ReadonlyMap<string, Pick<ReachableCollection, 'opened'>>;
 
 /**
+ * One reported search hit: its collection and id, and the collection its `via` names.
+ */
+type SearchHit = { collection: string; UUID: string; via?: string };
+
+/**
  * One verdict as a receipt carries it: the rows named, or their count.
  */
 export type ReceiptVerdict = {
@@ -48,11 +53,11 @@ export type ReceiptVerdict = {
 };
 
 /**
- * What a search found in one collection.
+ * What a search found in one collection, or through one target collection.
  */
 export type ReceiptFound = {
   /**
-   * The records found, named only where `ai.data` opens the whole collection.
+   * The records found, named only where `ai.data` opens every collection that matched their text.
    */
   UUIDs?: string[];
 
@@ -110,9 +115,15 @@ export interface Receipt {
   UUIDs?: string[];
 
   /**
-   * What a search found, by collection: a count, and the ids where `ai.data` opens the whole collection.
+   * What a search found directly, by collection: a count, and the ids where `ai.data` opens the collection.
    */
   found?: Record<string, ReceiptFound>;
+
+  /**
+   * What a search found through links, by collection, then by the target collection a word matched in.
+   * The ids are named only where `ai.data` opens both collections, since the target holds the text matched.
+   */
+  related?: Record<string, Record<string, ReceiptFound>>;
 
   /**
    * The locales a record holds, from a translations read.
@@ -130,7 +141,7 @@ export interface Receipt {
   records?: Record<string, unknown>[];
 
   /**
-   * Set when `records` was cut at `ai.limits.resultSize`.
+   * Set when `records` was cut at `ai.limits.resultSize`, or a search left related groups out.
    */
   truncated?: true;
 
@@ -235,8 +246,9 @@ const REPLAY_COUNTS = ['total', 'failed', 'unknown', 'transformed'] as const;
 /**
  * The part of a reported body a chat replays: its counts and record ids, never a value.
  * `records` keeps the first ids as `{ UUID }`; a body that is itself a record keeps its `UUID`.
- * A search keeps the first `{ collection, UUID }` pairs of each collection.
- * Its `found` counts the hits per collection.
+ * A search keeps the first `{ collection, UUID }` pairs of each collection, and of each related group.
+ * A related pair keeps its `via` as `{ collection }`, never a label or a path.
+ * Its `found` counts the direct hits per collection, and `related` the others per collection and target.
  * `undefined` when nothing is left.
  *
  * @example
@@ -266,13 +278,18 @@ export function replayBody(body: unknown): Record<string, unknown> | undefined {
       .map((UUID) => ({ UUID }));
   }
   if (isArray(body.results)) {
-    const hits = body.results
-      .filter(isPlainObject)
-      .filter((hit) => isString(hit.collection) && isUUID(hit.UUID))
-      .map((hit) => ({ collection: hit.collection as string, UUID: hit.UUID }));
-    const grouped = groupBy(hits, (hit) => hit.collection);
-    kept.results = Object.values(grouped).flatMap((group = []) => group.slice(0, REPLAY_IDS));
-    kept.found = mapValues(grouped, (_, group = []) => group.length);
+    const hits = searchHits(body.results);
+    const grouped = groupBy(hits, (hit) => `${hit.collection}\n${hit.via ?? ''}`);
+    kept.results = Object.values(grouped).flatMap((group = []) =>
+      group
+        .slice(0, REPLAY_IDS)
+        .map(({ collection, UUID, via }) =>
+          isUndefined(via) ? { collection, UUID } : { collection, UUID, via: { collection: via } },
+        ),
+    );
+    const counts = searchCounts(hits, (group) => group.length);
+    kept.found = counts.found;
+    if (!isEmpty(counts.related)) kept.related = counts.related;
   }
   return isEmpty(kept) ? undefined : kept;
 }
@@ -335,7 +352,7 @@ export async function shapeReceipt(
   } else if (result.status >= 200 && result.status < 300) {
     if (route.body === 'query') shapeList(receipt, result.body, identity);
     if (route.body === 'verdicts' && !isUndefined(body)) shapeVerdicts(receipt, body, identity);
-    if (route.body === 'search') shapeSearch(receipt, body?.results, values);
+    if (route.body === 'search') shapeSearch(receipt, body, values);
     if (route.body === 'record' && route.method === 'POST' && isString(body?.UUID)) {
       receipt.uuid = body.UUID;
     }
@@ -438,23 +455,66 @@ function shapeList(receipt: Receipt, body: unknown, identity: boolean): void {
 }
 
 /**
- * Fills a search receipt per collection: a count always, the ids only where `ai.data` opens it all.
+ * Fills a search receipt: direct hits per collection, related ones per collection and target.
+ * Each carries a count always, the ids only where `ai.data` opens every collection matched.
  * A search matches any text field, so its ids would tell a hidden field's text.
- * A collection `ai.deny` names never appears.
+ * A hit in or through a collection `ai.deny` names never appears, not even in a count.
  */
-function shapeSearch(receipt: Receipt, results: unknown, values: boolean): void {
+function shapeSearch(
+  receipt: Receipt,
+  body: Record<string, unknown> | undefined,
+  values: boolean,
+): void {
   const { data, deny } = useAIConfig();
-  const found: Record<string, ReceiptFound> = {};
-  const rows = isArray(results) ? results.filter(isPlainObject) : [];
-  for (const [collection, hits = []] of Object.entries(
-    groupBy(rows, (row) => String(row.collection)),
-  )) {
-    if (deny.collections.includes(collection)) continue;
-    const uuids = reportedUUIDs(hits.map((hit) => hit.UUID));
-    found[collection] =
-      values && data[collection] === true ? { UUIDs: uuids } : { total: uuids.length };
-  }
+  const denied = new Set(deny.collections);
+  const hits = searchHits(isArray(body?.results) ? body.results : []).filter(
+    ({ collection, via }) => !denied.has(collection) && (isUndefined(via) || !denied.has(via)),
+  );
+  const { found, related } = searchCounts(hits, (group, collection, via) => {
+    const uuids = reportedUUIDs(group.map((hit) => hit.UUID));
+    const open = values && data[collection] === true && (isUndefined(via) || data[via] === true);
+    return open ? { UUIDs: uuids } : { total: uuids.length };
+  });
   receipt.found = found;
+  if (isEmpty(related)) return;
+  receipt.related = related;
+  // Beside no kept group, a cut would hint at groups the model may not see.
+  if (body?.truncated === true) receipt.truncated = true;
+}
+
+/**
+ * The well-formed hits of a reported search, each with the collection its `via` names.
+ */
+function searchHits(results: readonly unknown[]): SearchHit[] {
+  return results.filter(isPlainObject).flatMap(({ collection, UUID, via }) => {
+    if (!isString(collection) || !isUUID(UUID)) return [];
+    if (isUndefined(via)) return [{ collection, UUID }];
+    return isPlainObject(via) && isString(via.collection)
+      ? [{ collection, UUID, via: via.collection }]
+      : [];
+  });
+}
+
+/**
+ * Tallies hits with `count`: the direct ones by collection, the related ones by collection and target.
+ */
+function searchCounts<T>(
+  hits: readonly SearchHit[],
+  count: (group: SearchHit[], collection: string, via?: string) => T,
+): { found: Record<string, T>; related: Record<string, Record<string, T>> } {
+  const found: Record<string, T> = {};
+  const related: Record<string, Record<string, T>> = {};
+  for (const [collection, group = []] of Object.entries(groupBy(hits, (hit) => hit.collection))) {
+    const direct = group.filter((hit) => isUndefined(hit.via));
+    if (!isEmpty(direct)) found[collection] = count(direct, collection);
+    const linked = groupBy(
+      group.filter((hit) => !isUndefined(hit.via)),
+      (hit) => hit.via as string,
+    );
+    if (isEmpty(linked)) continue;
+    related[collection] = mapValues(linked, (via, through = []) => count(through, collection, via));
+  }
+  return { found, related };
 }
 
 /**

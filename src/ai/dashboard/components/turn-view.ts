@@ -28,12 +28,10 @@ import {
   batchedEffect,
   type ConditionObject,
   effect,
-  groupBy,
   intersperse,
   isArray,
   isComposing,
   isEmpty,
-  isInteger,
   isNull,
   isNumber,
   isPlainObject,
@@ -58,6 +56,7 @@ import { spinner } from './_ai-spinner.ts';
 import { recordLink } from './_record-link.ts';
 import { approvalTable, proposedChanges } from './approval-table.ts';
 import { answer, ask, decline } from './assistant.ts';
+import { searchGroups } from './search-groups.ts';
 import { batchOutcome, runsUnasked, sending, turns, turnSettled } from './turn-store.ts';
 
 /**
@@ -812,34 +811,29 @@ function action(
 }
 
 /**
- * What a search found: one line per collection, naming the records it found as links.
- * A collection the discovery read does not list is left out.
+ * What a search found: one line per collection and per related group, naming the records as links.
+ * A collection the discovery read does not list is left out; an empty answer says nothing was found.
  */
 function searchLines(proposal: Proposal, result: ReadOutcome['result'], t: AITranslate): Child {
-  const body = result.body;
-  const found =
-    isPlainObject(body) && isArray(body.results) ? body.results.filter(isPlainObject) : [];
   const query = isString(proposal.body?.q) ? proposal.body.q : '';
+  const groups = searchGroups(result.body);
+  if (groups.length === 0) {
+    return line(icon('search'), t('ai.dashboard.read.foundNone', { query }).replaceAll('`', ''));
+  }
   const collections = dashboardMeta()?.collections ?? [];
-  return Object.entries(groupBy(found, (hit) => String(hit.collection))).flatMap(
-    ([name, hits = []]) => {
-      const collection = collections.find((candidate) => candidate.name === name);
-      if (isUndefined(collection)) return [];
-      for (const hit of hits) {
-        if (isString(hit.UUID) && isString(hit.label) && hit.label !== '') {
-          seedLabel(collection.name, hit.UUID, hit.label);
-        }
-      }
-      const found = isPlainObject(body) && isPlainObject(body.found) ? body.found[name] : undefined;
-      const total = isInteger(found) ? found : hits.length;
-      const text = t('ai.dashboard.read.found', {
-        count: total,
-        collection: collection.label,
-        query,
-      });
-      return [line(icon('search'), text.replaceAll('`', ''), refs(collection, hits, total))];
-    },
-  );
+  const find = (name: string) => collections.find((candidate) => candidate.name === name);
+  return groups.flatMap(({ collection: name, via, hits, total }) => {
+    const collection = find(name);
+    if (isUndefined(collection)) return [];
+    for (const { UUID, label } of hits) {
+      if (isString(label) && label !== '') seedLabel(collection.name, UUID, label);
+    }
+    const params = { count: total, collection: collection.label, query };
+    const text = isUndefined(via)
+      ? t('ai.dashboard.read.found', params)
+      : t('ai.dashboard.read.foundVia', { ...params, target: find(via)?.label ?? via });
+    return [line(icon('search'), text.replaceAll('`', ''), refs(collection, hits, total))];
+  });
 }
 
 /**

@@ -324,6 +324,10 @@ describe('renderSurface', () => {
       const { text, routes } = await surfaceFor(officer.token);
       ok(routes.includes('POST /search'));
       match(text, /`POST \/search` with `\{ q \}` finds records holding every word/);
+      match(text, /A result with `via` did not match on its own/);
+      match(text, /Page a related group with `collection` and `via`\./);
+      match(text, /A whole UUID finds that record and the records that link to it\./);
+      match(text, /`limit` \(default 5, at most 50\)/);
     });
   });
 

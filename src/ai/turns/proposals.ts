@@ -35,6 +35,7 @@ import type { Receipt } from './receipts.ts';
 import type { OfferedRoute, ReachableCollection, Surface } from './surface.ts';
 
 import { readScope } from '../../base/collections-api/gate.ts';
+import { SEARCH_MAX_LIMIT, SEARCH_MAX_OFFSET } from '../../base/collections-api/search.ts';
 import { invalidFieldError } from '../../ohne/query/wire/errors.ts';
 import { useAIConfig } from '../config.ts';
 import { identityOnly, refusal } from './receipts.ts';
@@ -134,7 +135,7 @@ const PROPOSAL_KEYS = new Set(['route', 'params', 'query', 'body', 'where', 'tra
 /**
  * The keys a `POST /search` body may carry.
  */
-const SEARCH_KEYS = new Set(['q', 'collection', 'limit', 'offset']);
+const SEARCH_KEYS = new Set(['q', 'collection', 'via', 'limit', 'offset']);
 const VERDICT_KEYS = new Set(['where', 'UUIDs', 'locale']);
 const TRANSFORM_KEYS = new Set(['fields', 'instruction']);
 const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
@@ -267,7 +268,10 @@ async function checkQuery(
 }
 
 /**
- * Checks a `POST /search` body: `q` as text, with an optional `collection`, `limit` and `offset`.
+ * Checks a `POST /search` body: `q` as text, with an optional `collection`, `via`, `limit` and `offset`.
+ * A `via` stands only beside `collection`, and neither may name a collection `ai.deny` lists.
+ * A `limit` outside 1 to `SEARCH_MAX_LIMIT`, or an `offset` outside 0 to `SEARCH_MAX_OFFSET`, is refused.
+ * The route would answer either short, and the model would read the short count as the whole.
  */
 function checkSearch(
   body: Record<string, unknown>,
@@ -276,12 +280,20 @@ function checkSearch(
     if (!SEARCH_KEYS.has(key)) return failed('unknownParam', `body.${key}`);
   }
   if (!isString(body.q)) return failed('invalidValue', 'body.q');
-  if (!isUndefined(body.collection) && !isString(body.collection)) {
+  const { deny } = useAIConfig();
+  const named = (value: unknown) => isString(value) && !deny.collections.includes(value);
+  if (!isUndefined(body.collection) && !named(body.collection)) {
     return failed('invalidValue', 'body.collection');
   }
-  for (const key of ['limit', 'offset'] as const) {
-    if (!isUndefined(body[key]) && !isInteger(body[key]))
+  if (!isUndefined(body.via) && (!named(body.via) || isUndefined(body.collection))) {
+    return failed('invalidValue', 'body.via');
+  }
+  const windows = { limit: [1, SEARCH_MAX_LIMIT], offset: [0, SEARCH_MAX_OFFSET] } as const;
+  for (const [key, [min, max]] of Object.entries(windows)) {
+    const value = body[key];
+    if (!isUndefined(value) && !(isInteger(value) && value >= min && value <= max)) {
       return failed('invalidValue', `body.${key}`);
+    }
   }
   return { ok: true, value: { body, identity: false } };
 }

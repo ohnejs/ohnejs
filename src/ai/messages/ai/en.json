@@ -130,6 +130,8 @@
       "list": "Read {count, plural, one {# record} other {# records}} of {collection}",
       "listFiltered": "Read {count, plural, one {# record} other {# records}} of {collection} matching a filter",
       "found": "Found {count, plural, one {# record} other {# records}} in {collection} for `{query}`",
+      "foundVia": "Found {count, plural, one {# record} other {# records}} in {collection} via {target} for `{query}`",
+      "foundNone": "Nothing found for `{query}`",
       "record": "Read a record of {collection}",
       "translations": "Read the translations of a record of {collection}",
       "verdicts": "Checked what you may change in {collection}",

@@ -63,6 +63,8 @@ ai: {
 
 - Omitted, it is `Users`, `Sessions` and `AITurns`.
 - A denied collection has no route, and a `has` or `populate` into it is refused.
+- A search never names it. A record found in it, or found through a link into it, is left out
+  of what the model reads, not even counted. Pasting a denied record's `UUID` tells it nothing.
 - Removing `Users` lets the model change accounts the person may change, passwords and roles
   included. Do that only on purpose.
 
@@ -86,7 +88,9 @@ ai: {
   never offered.
 - Omitted, the table offers the [collections API](../api/collections.md) routes and
   [`POST /search`](../dashboard/palette.md#searching-from-your-code). A blind model learns only how
-  many records a search found per collection, never which.
+  many records a search found per collection, never which. Records found through a link are
+  counted apart, per collection and the collection the words matched in. The model sees their ids
+  only when `ai.data` opens both, since the match tells what the linked record holds.
 - A table you set replaces the default whole, so spread `AI_DEFAULTS.routes` to extend it.
 - Routes under `/auth/` and `/ai/` are never offered, whatever the table says. A request there
   would act on the person's session or on the assistant itself.

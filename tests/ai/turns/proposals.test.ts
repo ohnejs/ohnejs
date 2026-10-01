@@ -403,6 +403,43 @@ describe('checkProposal', () => {
     );
   });
 
+  it('takes a search `via` only beside `collection`, and never a denied one', async () => {
+    const search = (body: unknown) => check({ route: 'POST /search', body });
+    strictEqual((await search({ q: 'x', collection: 'Characters', via: 'Items' })).ok, true);
+    deepStrictEqual(
+      await search({ q: 'x', via: 'Items' }),
+      refused('POST /search', 'invalidValue', 'body.via'),
+    );
+    deepStrictEqual(
+      await search({ q: 'x', collection: 'Characters', via: 1 }),
+      refused('POST /search', 'invalidValue', 'body.via'),
+    );
+    deepStrictEqual(
+      await search({ q: 'x', collection: 'Users' }),
+      refused('POST /search', 'invalidValue', 'body.collection'),
+    );
+    deepStrictEqual(
+      await search({ q: 'x', collection: 'Characters', via: 'Users' }),
+      refused('POST /search', 'invalidValue', 'body.via'),
+    );
+  });
+
+  it('refuses a search window the route would not answer as asked', async () => {
+    const search = (body: unknown) => check({ route: 'POST /search', body });
+    strictEqual((await search({ q: 'x', limit: 50, offset: 1000 })).ok, true);
+    for (const [key, value] of [
+      ['limit', 0],
+      ['limit', 51],
+      ['offset', -1],
+      ['offset', 1001],
+    ] as const) {
+      deepStrictEqual(
+        await search({ q: 'x', [key]: value }),
+        refused('POST /search', 'invalidValue', `body.${key}`),
+      );
+    }
+  });
+
   it('takes a body only where the route does, and a copy only its `source`', async () => {
     const del = 'DELETE /collections/characters/[uuid]';
     deepStrictEqual(

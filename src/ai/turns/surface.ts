@@ -46,7 +46,7 @@ import { tierOf } from './tiers.ts';
  * - `record`: a record's fields, as a create or update takes them.
  * - `copy`: an optional `source` locale.
  * - `none`: nothing.
- * - `search`: a `POST /search` body, `q` with an optional `collection`, `limit` and `offset`.
+ * - `search`: a `POST /search` body, `q` with an optional `collection`, `via`, `limit` and `offset`.
  * - `app`: any JSON object, since the route is the app's own.
  */
 export type BodyShape = 'query' | 'verdicts' | 'record' | 'copy' | 'none' | 'search' | 'app';
@@ -542,8 +542,12 @@ function routesBlock(routes: Map<string, OfferedRoute>): string {
     ? [
         '',
         `\`${SEARCH_ROUTE}\` with \`{ q }\` finds records holding every word of \`q\` in any text field; \`collection\` narrows it, \`limit\` and \`offset\` page it.`,
-        'Its receipt counts what each collection found, and names the records only where their data is open to you.',
-        'A count at `limit` (default 5) means more may match: page on with `offset`.',
+        'A result with `via` did not match on its own: some words matched a record it links to, in the collection `via` names.',
+        'Page a related group with `collection` and `via`.',
+        'A whole UUID finds that record and the records that link to it.',
+        'Its receipt counts what each collection found under `found`, and what it found through links under `related`, by collection and then by `via`.',
+        'It names the records only where their data is open to you, and is `truncated` when related groups were left out.',
+        'A count at `limit` (default 5, at most 50) means more may match: page on with `offset`.',
       ]
     : [];
   return ['# Your routes', ...(isEmpty(ids) ? ['(none)'] : ids), ...search].join('\n');
