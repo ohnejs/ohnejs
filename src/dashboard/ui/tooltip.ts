@@ -51,6 +51,14 @@ export interface TooltipOptions {
    * Omitted, the tooltip renders in the primary colors.
    */
   theme?: 'destructive';
+
+  /**
+   * Shows the content as written, for a value like a record's name, with `\n` as its only break.
+   *
+   * @default
+   * false
+   */
+  plain?: boolean;
 }
 
 const INLINE = /\*\*(.+?)\*\*|`([^`]+)`/g;
@@ -85,11 +93,16 @@ function trackTouch(): void {
 
 /**
  * Replaces `target`'s children with markdown-lite `text`: `**bold**`, backticked code, and `<br>` breaks.
+ * A `plain` text keeps every character and breaks at `\n` alone.
  */
-function renderContent(target: HTMLElement, text: string): void {
+function renderContent(target: HTMLElement, text: string, plain = false): void {
   target.textContent = '';
-  text.split('<br>').forEach((line, index) => {
+  text.split(plain ? '\n' : '<br>').forEach((line, index) => {
     if (index > 0) target.append(document.createElement('br'));
+    if (plain) {
+      target.append(line);
+      return;
+    }
     let cursor = 0;
     for (const token of line.matchAll(INLINE)) {
       if (token.index > cursor) target.append(line.slice(cursor, token.index));
@@ -150,7 +163,7 @@ export function attachTooltip(
       { class: 'ohne-tooltip-root', style: 'position: fixed; top: 0; left: 0;' },
       box,
     );
-    renderContent(contentEl, initial);
+    renderContent(contentEl, initial, options.plain);
     document.body.append(root);
     raiseToTopLayer(root);
 
@@ -197,7 +210,7 @@ export function attachTooltip(
       ? batchedEffect(() => {
           const next = content();
           if (next) {
-            renderContent(contentEl, next);
+            renderContent(contentEl, next, options.plain);
             update();
           }
         })

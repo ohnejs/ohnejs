@@ -54,7 +54,7 @@ export interface VerticalMenuItemModel {
     text: string;
 
     /**
-     * The note's tooltip.
+     * The note's tooltip, shown as written, with `\n` as its only break.
      */
     tooltip?: string;
   };
@@ -443,7 +443,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
       () => !isUndefined(item().hint),
       () => {
         const note = h('span', { class: 'ohne-vertical-menu-item-hint' }, () => item().hint?.text);
-        onCleanup(attachTooltip(note, () => item().hint?.tooltip ?? null));
+        onCleanup(attachTooltip(note, () => item().hint?.tooltip ?? null, { plain: true }));
         return note;
       },
     );
