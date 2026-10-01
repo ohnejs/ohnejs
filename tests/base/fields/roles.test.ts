@@ -1,12 +1,15 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldSearchContext } from '../../../src/ohne/fields/define-field.ts';
+
 import rolesField from '../../../src/base/fields/roles.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
+import { searchHook } from '../../../src/ohne/fields/field-search.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
@@ -84,5 +87,25 @@ describe('roles field', () => {
       .findMany()) as { name: string }[];
     ok(editors.length >= 1);
     ok(editors.every((record) => record.name !== 'Only'));
+  });
+});
+
+describe('roles search', () => {
+  const search = (token: string) =>
+    searchHook(rolesField)!({ name: 'roles', options: {}, token } as unknown as FieldSearchContext);
+
+  it('stays off until a field opts in', () => {
+    deepStrictEqual(Object.keys(rolesField.search ?? {}), ['default', 'match']);
+    strictEqual((rolesField.search as { default: false }).default, false);
+  });
+
+  it('matches a registered role name, in any case, through `includes`', () => {
+    deepStrictEqual(search('editor'), { includes: 'editor' });
+    deepStrictEqual(search('Viewer'), { includes: 'viewer' });
+  });
+
+  it('gives `null` for a prefix or an unknown name', () => {
+    strictEqual(search('edit'), null);
+    strictEqual(search('admin'), null);
   });
 });

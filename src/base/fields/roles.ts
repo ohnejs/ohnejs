@@ -1,5 +1,5 @@
 import { defineField, type Message, useRoles } from 'ohnejs';
-import { isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
+import { foldCase, isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
 
 /**
  * The `roles` field type: a list of role names, stored as a JSON list.
@@ -8,6 +8,7 @@ import { isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
  * Duplicate entries collapse on write, keeping the first occurrence.
  * The generated value type is `GeneratedRoleName[]`, so an assignment autocompletes and typechecks.
  * The `includes` operators probe the list, so a query can filter users by role.
+ * Search is off until a field sets `search: true`; then a role name, in any case, finds its holders.
  */
 export default defineField({
   columnType: 'json',
@@ -23,6 +24,15 @@ export default defineField({
       return isUndefined(unknown) ? undefined : unknownRoleMessage(unknown);
     },
   ],
+  search: {
+    default: false,
+    match: ({ token }) => {
+      const role = useRoles()
+        .keys()
+        .find((name) => foldCase(name) === foldCase(token));
+      return isUndefined(role) ? null : { includes: role };
+    },
+  },
 });
 
 /**

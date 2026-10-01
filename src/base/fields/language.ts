@@ -8,9 +8,11 @@ import { canonicalizeLanguage } from 'ohnejs/utils';
  * The validator accepts a tag only when a message catalog is registered under it.
  * Any other tag rejects with `auth.unknownLanguage`, naming the tag it checked.
  * The generated value type is `GeneratedLanguage`, the union of the catalog languages.
+ * Search is off until a field sets `search: true`; then a value containing the token matches.
  */
 export default defineField({
   columnType: 'text',
+  search: { default: false },
   emitType: (ctx) => ctx.importGenerated('messages.ts', 'GeneratedLanguage'),
   sanitizers: [(value) => canonicalizeLanguage(value) ?? value],
   validators: [(value) => (useMessages().has(value) ? undefined : unknownLanguageMessage(value))],

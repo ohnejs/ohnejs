@@ -13,9 +13,11 @@ const MAX_LENGTH = 64;
  *
  * The dashboard renders instants through the pattern's tokens; an unknown letter prints as itself.
  * A blank value rejects with `validation.emptyValue`, one over 64 characters with `validation.maxLength`.
+ * Search is off until a field sets `search: true`; then a value containing the token matches.
  */
 export default defineField({
   columnType: 'text',
+  search: { default: false },
   validators: [
     (value) => (isEmpty(value, { trim: true }) ? 'validation.emptyValue' : undefined),
     (value) =>

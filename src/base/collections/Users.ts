@@ -29,6 +29,7 @@ const users = defineCollection({
   },
   dashboard: {
     icon: 'users',
+    search: { via: false },
     layout: [
       { card: [{ row: ['email', 'password'] }, { row: ['firstName', 'lastName'] }] },
       { card: ['roles'] },

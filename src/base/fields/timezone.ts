@@ -6,9 +6,11 @@ import { isTimezone } from 'ohnejs/utils';
  *
  * Every name `Intl.DateTimeFormat` resolves passes, aliases like `US/Pacific` and `UTC` included.
  * Any other value rejects with `auth.invalidTimezone`, naming the submitted value.
+ * Search is off until a field sets `search: true`; then a value containing the token matches.
  */
 export default defineField({
   columnType: 'text',
+  search: { default: false },
   validators: [(value) => (isTimezone(value) ? undefined : invalidTimezoneMessage(value))],
 });
 
