@@ -333,7 +333,7 @@ function bucketsOf(meta: DashboardMeta, tokens: readonly string[]): Bucket[] {
   for (const collection of meta.collections) {
     if (collection.operations.read?.allowed !== true) continue;
     const own = `${collection.label} ${collection.name}`.toLowerCase();
-    const rest = tokens.filter((token) => !own.includes(token)).slice(0, 10);
+    const rest = tokens.filter((token) => !own.includes(token));
     const { singleton, labelFields } = collection;
     if (!isEmpty(rest) && (singleton || isEmpty(labelFields))) continue;
     const where = isEmpty(rest) ? undefined : keywordsCondition(rest, labelFields);

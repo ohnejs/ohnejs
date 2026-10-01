@@ -8,7 +8,7 @@ import {
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { computed, effect, isString, onCleanup, type Ref, ref } from 'ohnejs/utils';
+import { computed, effect, isString, onCleanup, type Ref, ref, searchTokens } from 'ohnejs/utils';
 
 import { overviewQuickCreate } from '../components/overview-quick-create.ts';
 import { overviewRecentEdits } from '../components/overview-recent-edits.ts';
@@ -27,12 +27,12 @@ export interface OverviewSearch {
   query: Ref<string>;
 
   /**
-   * The query's lowercased, whitespace-separated tokens; empty while the query is blank.
+   * The query's lowercased `searchTokens`; empty while none remain.
    */
   tokens: () => readonly string[];
 
   /**
-   * Whether the query holds at least one non-whitespace token.
+   * Whether the query holds at least one search token.
    */
   active: () => boolean;
 
@@ -43,7 +43,7 @@ export interface OverviewSearch {
 
   /**
    * Whether every query token appears, case-insensitively, in the joined haystacks.
-   * An empty query matches everything; nullish and empty haystacks are ignored.
+   * A query without search tokens matches everything; nullish and empty haystacks are ignored.
    */
   matches: (...haystacks: (string | null | undefined)[]) => boolean;
 
@@ -186,10 +186,7 @@ function createOverviewSearch(): OverviewSearch {
   const query = ref('');
   const counts = ref<Record<string, number>>({});
 
-  const tokens = computed(() => {
-    const trimmed = query.value.trim().toLowerCase();
-    return trimmed === '' ? [] : trimmed.split(/\s+/);
-  });
+  const tokens = computed(() => searchTokens(query.value).map((token) => token.toLowerCase()));
 
   return {
     query,

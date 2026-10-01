@@ -42,7 +42,9 @@ and `tooltip` are searched; an `integer` field never is.
 - A collection that refuses the read is skipped, never an error.
 - Records whose label holds every word come first.
 - Each collection shows its five newest matches. "Load more" under it shows the next five.
-- Only the first ten words count.
+- Quotes keep a phrase together: `"new york"` is one word.
+- Punctuation around a word, a lone letter, and a repeated word are ignored, and only the first ten
+  words count.
 - A query starting with `/` is a command for a layer's own rows, like the assistant's skills, and
   searches nothing.
 

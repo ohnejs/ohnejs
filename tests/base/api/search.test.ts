@@ -259,8 +259,23 @@ describe('POST /search', () => {
     deepStrictEqual((await search({ q: 'ashbringer frostmourne' }, admin.token)).body.results, []);
   });
 
+  it('matches a quoted run as one phrase', async () => {
+    const { body } = await search({ q: '"of the  ashbringer"' }, admin.token);
+    deepStrictEqual(body.results, [
+      { collection: 'SearchItems', UUID: lore, label: 'Tome of lore' },
+    ]);
+  });
+
+  it('ignores edge punctuation and a lone ASCII letter', async () => {
+    const { body } = await search({ q: '(helm), z' }, admin.token);
+    deepStrictEqual(body.results, [
+      { collection: 'SearchItems', UUID: helm, label: 'Helm of Ashbringer' },
+    ]);
+  });
+
   it('answers nothing for a blank query', async () => {
     deepStrictEqual((await search({ q: '   ' }, admin.token)).body, { results: [] });
+    deepStrictEqual((await search({ q: 'a .' }, admin.token)).body, { results: [] });
   });
 
   it('caps the records per collection at `limit`', async () => {
@@ -336,7 +351,8 @@ describe('POST /search', () => {
   it('drops the fields past the condition budget instead of refusing', async () => {
     const one = await search({ q: '11' }, admin.token);
     deepStrictEqual(one.body.results, [{ collection: 'SearchWide', UUID: wide, label: 'wide 1' }]);
-    const ten = await search({ q: `11 ${'wide '.repeat(9)}` }, admin.token);
+    const phrases = Array.from({ length: 9 }, (_, at) => `"wide ${at + 1}"`);
+    const ten = await search({ q: `11 ${phrases.join(' ')}` }, admin.token);
     strictEqual(ten.status, 200);
     deepStrictEqual(ten.body.results, []);
   });

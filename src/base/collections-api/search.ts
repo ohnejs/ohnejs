@@ -2,7 +2,14 @@ import type { CollectionQueryMeta, FieldQueryMeta, QueryScope } from 'ohnejs';
 import type { ConditionObject, SearchParamValue } from 'ohnejs/utils';
 
 import { parseWireQuery, queryMetadata, resolveGuards, scopedMetadata } from 'ohnejs';
-import { isEmpty, isString, isUndefined, renderLabel, searchByKeywords } from 'ohnejs/utils';
+import {
+  isEmpty,
+  isString,
+  isUndefined,
+  renderLabel,
+  searchByKeywords,
+  searchTokens,
+} from 'ohnejs/utils';
 
 import type { User } from '../auth/types.ts';
 
@@ -59,16 +66,14 @@ export interface SearchWindow {
  */
 export const SEARCH_LIMIT = 5;
 
-const MAX_TOKENS = 10;
-
 /**
- * Finds the records of every collection `user` may query whose text holds each whitespace-separated token.
+ * Finds the records of every collection `user` may query whose text holds each of the query's `searchTokens`.
  *
  * A collection takes part when its read is served and allowed, it names a label, and it is no singleton.
  * Each runs one wire query under `readReach`, so its read middleware and `access` apply as a list read's do.
  * A token matches case-insensitively in any readable text field inside the read scope.
  * That reaches into child fields and every block type a blocks field allows, never a relation's target.
- * Only the first ten tokens count, and together they stay within `maxConditions` and `maxHasDepth`.
+ * Together the tokens stay within `maxConditions` and `maxHasDepth`.
  * Plain text fields fill that budget first, then the nested ones in field order; what does not fit drops.
  * A refused read, or a scope hiding the `UUID` or every label field, skips the collection.
  * Each collection answers its most recently created matches, from `offset` on.
@@ -80,7 +85,7 @@ export async function searchRecords(
   q: string,
   { limit, collection: only, offset = 0 }: SearchWindow,
 ): Promise<SearchResult[]> {
-  const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, MAX_TOKENS);
+  const tokens = searchTokens(q);
   if (tokens.length === 0) return [];
   const guards = resolveGuards();
   const results: SearchResult[] = [];

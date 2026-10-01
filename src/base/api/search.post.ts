@@ -20,8 +20,7 @@ const BODY_KEYS = new Set(['q', 'limit', 'collection', 'offset']);
  * Searches the records of every collection the signed-in user may query, for the dashboard palette.
  * The body is `{ q, limit?, collection?, offset? }`: the text to find, and how many to answer per collection.
  * `collection` searches that one alone and `offset` skips its first matches, so the palette pages through it.
- * Every whitespace-separated token of `q` must appear in one of a record's readable text fields.
- * Only the first ten tokens count.
+ * Each of `q`'s `searchTokens` must appear in one of a record's readable text fields.
  * Each collection reads as its own list read would, so its scope and middleware decide what is found.
  * A collection that refuses the caller is skipped, never an error.
  * The URL takes no params; an unknown body key, a `q` that is not a string, or a bad window is a `400`.
