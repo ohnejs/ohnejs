@@ -1,6 +1,8 @@
 import type { CompareOperator, ConditionNode } from './operators.ts';
 
+import { foldCase } from '../case/fold-case.ts';
 import { isArray } from '../is/is-array.ts';
+import { isASCII } from '../is/is-ascii.ts';
 import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
@@ -86,8 +88,9 @@ function compareValue(op: CompareOperator, resolved: unknown, value: unknown): b
     case 'startsWith':
     case 'endsWith': {
       if (!isString(resolved) || !isString(value)) return false;
-      const haystack = resolved.toLowerCase();
-      const needle = value.toLowerCase();
+      const ascii = isASCII(value);
+      const haystack = foldCase(resolved, ascii);
+      const needle = foldCase(value, ascii);
       if (op === 'contains') return haystack.includes(needle);
       return op === 'startsWith' ? haystack.startsWith(needle) : haystack.endsWith(needle);
     }
