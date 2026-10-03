@@ -282,6 +282,17 @@ describe('keyword search', () => {
     strictEqual(searchKeyword(many), 'sun set');
   });
 
+  it('searches each word as the file name it would be stored as', () => {
+    const accented = searchWhere('Café  Übersicht.PDF');
+    deepStrictEqual(accented, {
+      kind: 'file',
+      and: [{ name: { contains: 'cafe' } }, { name: { contains: 'ubersicht.pdf' } }],
+    });
+    strictEqual(searchKeyword(accented), 'cafe ubersicht.pdf');
+    deepStrictEqual(searchWhere('(sunset) !!'), { kind: 'file', name: { contains: 'sunset' } });
+    strictEqual(searchWhere('!! --'), undefined);
+  });
+
   it('reads no keyword out of any other filter', () => {
     strictEqual(searchKeyword(undefined), '');
     strictEqual(searchKeyword({ size: { atLeast: 1 } }), '');

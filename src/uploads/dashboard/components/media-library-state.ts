@@ -11,6 +11,8 @@ import {
   longTimeout,
   onCleanup,
   ref,
+  slugify,
+  slugifyFileName,
   type ConditionObject,
   type Ref,
 } from 'ohnejs/utils';
@@ -546,22 +548,28 @@ export function scopedWhere(
 
 /**
  * The filter a keyword search applies: files whose name contains every word.
- * An empty keyword is no filter.
+ * Each word becomes the file name it would be stored as, since stored names are slugs.
+ * So `Café` finds `cafe-menu.png`, and a word with nothing to slug drops.
+ * A keyword with no word left is no filter.
  *
  * @example
  * ```ts
- * searchWhere('sunset')
- * // -> { kind: 'file', name: { contains: 'sunset' } }
+ * searchWhere('Café')
+ * // -> { kind: 'file', name: { contains: 'cafe' } }
  *
- * searchWhere('sun set')
- * // -> { kind: 'file', and: [{ name: { contains: 'sun' } }, { name: { contains: 'set' } }] }
+ * searchWhere('sun Set.JPG')
+ * // -> { kind: 'file', and: [{ name: { contains: 'sun' } }, { name: { contains: 'set.jpg' } }] }
  *
- * searchWhere('  ')
+ * searchWhere('  !! ')
  * // -> undefined
  * ```
  */
 export function searchWhere(keyword: string): ConditionObject | undefined {
-  const words = keyword.trim().split(/\s+/).filter(Boolean);
+  const words = keyword
+    .trim()
+    .split(/\s+/)
+    .filter((word) => slugify(word) !== '')
+    .map((word) => slugifyFileName(word));
   const [first] = words;
   if (isUndefined(first)) return undefined;
   if (words.length === 1) return { kind: 'file', name: { contains: first } };
@@ -570,6 +578,7 @@ export function searchWhere(keyword: string): ConditionObject | undefined {
 
 /**
  * The keyword a filter was searched with, the inverse of `searchWhere`.
+ * It reads back the stored-name words, so `Café` returns as `cafe`.
  * A filter of any other shape reads as `''`, so the search box only ever shows its own work.
  *
  * @example
