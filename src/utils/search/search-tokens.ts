@@ -1,3 +1,5 @@
+import { foldCase } from '../case/fold-case.ts';
+
 const MAX_TOKENS = 10;
 
 const MAX_TOKEN_BYTES = 256;
@@ -16,13 +18,13 @@ const encoder = new TextEncoder();
  * Each token loses its leading and trailing punctuation and symbols, while inner ones stay: `sea.jpg`, `q-3`.
  * A one-character ASCII token drops, a lone non-ASCII character like `東` stays.
  * A token over 256 UTF-8 bytes drops.
- * Duplicates drop case-insensitively, keeping the first, and only the first ten tokens count.
+ * Duplicates drop ignoring case and accents, keeping the first, and only the first ten tokens count.
  *
  * @example
  * ```ts
  * searchTokens('Mira "new  york"')     // -> ['Mira', 'new york']
  * searchTokens('(sea.jpg), a é')       // -> ['sea.jpg', 'é']
- * searchTokens('Foo foo FOO.')         // -> ['Foo']
+ * searchTokens('Café cafe CAFE.')      // -> ['Café']
  * searchTokens('o"neil "new york ."')  // -> ['o"neil', 'new york']
  * ```
  */
@@ -31,7 +33,7 @@ export function searchTokens(q: string): string[] {
   const tokens: string[] = [];
   for (const [word, phrase] of q.normalize('NFC').matchAll(PARTS)) {
     const token = (phrase ?? word).replace(/\s+/gu, ' ').trim().replace(EDGES, '').trim();
-    const key = token.toLowerCase();
+    const key = foldCase(token);
     if (token === '' || seen.has(key) || encoder.encode(token).length > MAX_TOKEN_BYTES) continue;
     if (token.length === 1 && token.charCodeAt(0) < 0x80) continue;
     seen.add(key);

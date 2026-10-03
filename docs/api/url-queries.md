@@ -314,20 +314,20 @@ use a URL to find out which fields your collection has. The full list of codes i
 The untrusted path has upper limits, so a hostile URL cannot overload the server. Each ceiling is a
 `QueryGuards` field. Its default is high enough that a real query never comes near it:
 
-| Guard              | Default | Caps                                                                 |
-| ------------------ | ------- | -------------------------------------------------------------------- |
-| `maxConditions`    | `100`   | Comparisons in one `where`, `has` and `empty` included.              |
-| `maxHasDepth`      | `8`     | How deep `has` nests.                                                |
-| `maxInLength`      | `2000`  | Elements in an `in`, `includesAll`, or `includesAny` list.           |
-| `maxBoundParams`   | `10000` | Parameters one query binds, capped at the database's own limit.      |
-| `maxSelect`        | `200`   | Fields one `select` names.                                           |
-| `maxOrder`         | `10`    | Keys in one `order`.                                                 |
-| `maxPopulate`      | `20`    | Nodes in one `populate` tree.                                        |
-| `maxPopulateDepth` | `2`     | How deep `populate` nests.                                           |
-| `maxValueBytes`    | `4096`  | Bytes in one string value.                                           |
-| `maxPatternBytes`  | `512`   | Bytes in a `contains`, `startsWith`, `endsWith`, or `like` pattern.  |
-| `maxLimit`         | `2000`  | The largest `limit`, and the default. A larger one is lowered to it. |
-| `maxPerPage`       | `500`   | The largest `perPage`. A larger one is lowered to it.                |
+| Guard              | Default | Caps                                                                                           |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------- |
+| `maxConditions`    | `100`   | Comparisons in one `where`, `has` and `empty` included.                                        |
+| `maxHasDepth`      | `8`     | How deep `has` nests.                                                                          |
+| `maxInLength`      | `2000`  | Elements in an `in`, `includesAll`, or `includesAny` list.                                     |
+| `maxBoundParams`   | `10000` | Parameters one query binds, capped at the database's own limit.                                |
+| `maxSelect`        | `200`   | Fields one `select` names.                                                                     |
+| `maxOrder`         | `10`    | Keys in one `order`.                                                                           |
+| `maxPopulate`      | `20`    | Nodes in one `populate` tree.                                                                  |
+| `maxPopulateDepth` | `2`     | How deep `populate` nests.                                                                     |
+| `maxValueBytes`    | `4096`  | Bytes in one string value.                                                                     |
+| `maxPatternBytes`  | `512`   | Bytes in a `like` pattern, or a `contains`, `startsWith`, or `endsWith` pattern once it folds. |
+| `maxLimit`         | `2000`  | The largest `limit`, and the default. A larger one is lowered to it.                           |
+| `maxPerPage`       | `500`   | The largest `perPage`. A larger one is lowered to it.                                          |
 
 The fluent builder is trusted and never checked.
 

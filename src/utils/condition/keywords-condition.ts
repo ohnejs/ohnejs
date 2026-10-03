@@ -3,7 +3,7 @@ import type { ConditionObject } from './condition-object.ts';
 /**
  * A condition that holds when every keyword appears in at least one of `fields`.
  * Each keyword becomes an `or` of `contains` over the fields, and the keywords combine with `and`.
- * `contains` matches case-insensitively, so the keywords pass through as given.
+ * `contains` ignores case and accents, so the keywords pass through as given.
  *
  * No keywords holds for every record; no fields holds for none.
  *

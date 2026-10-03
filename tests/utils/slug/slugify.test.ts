@@ -80,8 +80,8 @@ describe('slugify', () => {
       strictEqual(slugify('Đak', { replace: slugBosnian }), 'dak');
     });
 
-    it('handles đ which does not decompose under NFD', () => {
-      strictEqual(slugify('Đak'), 'ak');
+    it('handles đ, which does not decompose, with or without the map', () => {
+      strictEqual(slugify('Đak'), 'dak');
       strictEqual(slugify('Đak', { replace: slugBosnian }), 'dak');
     });
 
@@ -107,5 +107,11 @@ describe('slugify', () => {
     it('later maps see earlier maps output', () => {
       strictEqual(slugify('aaa', { replace: [{ a: 'b' }, { b: 'c' }] }), 'ccc');
     });
+  });
+});
+
+describe('slugify letters without a separable accent', () => {
+  it('spells them plainly, as search folds them', () => {
+    strictEqual(slugify('Søren Łódź Straße ﬁle'), 'soren-lodz-strasse-file');
   });
 });

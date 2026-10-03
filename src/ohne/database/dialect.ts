@@ -183,13 +183,13 @@ export abstract class Dialect {
   abstract deserialize(type: LogicalType, value: SQLValue): unknown;
 
   /**
-   * The dialect's case-insensitive text-match expression over an already-quoted column.
+   * The dialect's text-match expression over an already-quoted column.
    * Holds exactly one `?` placeholder.
    * The caller binds a pattern whose literal parts went through `escapeLike`.
    * Backslash is the escape character.
-   * Backs `contains`/`startsWith`/`endsWith` - case-insensitivity is their cross-dialect contract.
-   * `fold` lowercases the column Unicode-wide, and the caller binds the pattern lowercased.
-   * A caller folds only a pattern holding non-ASCII characters, since the plain match folds ASCII.
+   * Backs `contains`/`startsWith`/`endsWith` - ignoring case and accents is their cross-dialect contract.
+   * `fold` matches the column as `foldCase` folds it, and the caller binds the pattern folded the same way.
+   * Without `fold`, the match is the dialect's plain `LIKE`.
    *
    * @example
    * ```ts
@@ -197,7 +197,7 @@ export abstract class Dialect {
    * // -> `"title" LIKE ? ESCAPE '\'` on SQLite
    *
    * dialect.textMatch('"title"', true)
-   * // -> `ohne_lower("title") LIKE ? ESCAPE '\'` on SQLite
+   * // -> `(CASE ... ELSE ohne_fold("title") END) LIKE ? ESCAPE '\'` on SQLite
    * ```
    */
   abstract textMatch(quotedColumn: string, fold: boolean): string;

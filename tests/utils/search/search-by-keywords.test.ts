@@ -8,6 +8,11 @@ describe('searchByKeywords', () => {
     deepStrictEqual(searchByKeywords(['foo', 'bar'], 'FOO'), ['foo']);
   });
 
+  it('folds accents out of keywords and property text', () => {
+    deepStrictEqual(searchByKeywords(['cafe'], 'Café'), ['cafe']);
+    deepStrictEqual(searchByKeywords([{ name: 'Café' }], 'CAFE', 'name'), [{ name: 'Café' }]);
+  });
+
   it('matches bare items as given', () => {
     deepStrictEqual(searchByKeywords(['FOO'], 'foo'), []);
   });

@@ -355,16 +355,38 @@ describe('SQLiteDialect', () => {
       strictEqual(dialect.textMatch('"name"', false), `"name" LIKE ? ESCAPE '\\'`);
     });
 
-    it('folds the column through `ohne_lower` when asked', () => {
-      strictEqual(dialect.textMatch('"name"', true), `ohne_lower("name") LIKE ? ESCAPE '\\'`);
+    it('folds only a non-ASCII row through `ohne_fold` when asked', () => {
+      strictEqual(
+        dialect.textMatch('"name"', true),
+        `(CASE WHEN length("name") = octet_length("name") THEN "name" ELSE ohne_fold("name") END) ` +
+          `LIKE ? ESCAPE '\\'`,
+      );
     });
 
-    it('a folded match finds non-ASCII text by its lowercased pattern', async () => {
-      const db = await seed(['Émile Zola', 'ΣΟΦΙΑ', 'Привет мир', 'emile']);
-      deepStrictEqual(await match(db, '%émile%', true), [nullObj({ name: 'Émile Zola' })]);
+    it('a folded match finds text by its folded pattern across case and accents', async () => {
+      const db = await seed([
+        'Émile Zola',
+        'ΣΟΦΙΑ',
+        'Привет мир',
+        'Cafe\u0301 Noir',
+        'Straße',
+        'emile',
+      ]);
+      deepStrictEqual(await match(db, '%emile%', true), [
+        nullObj({ name: 'emile' }),
+        nullObj({ name: 'Émile Zola' }),
+      ]);
       deepStrictEqual(await match(db, 'σοφια', true), [nullObj({ name: 'ΣΟΦΙΑ' })]);
       deepStrictEqual(await match(db, '%привет%', true), [nullObj({ name: 'Привет мир' })]);
-      deepStrictEqual(await match(db, '%émile%'), []);
+      deepStrictEqual(await match(db, '%cafe%', true), [nullObj({ name: 'Cafe\u0301 Noir' })]);
+      deepStrictEqual(await match(db, '%strasse%', true), [nullObj({ name: 'Straße' })]);
+      await db.close();
+    });
+
+    it('a plain match keeps accents apart', async () => {
+      const db = await seed(['Café']);
+      deepStrictEqual(await match(db, '%cafe%'), []);
+      deepStrictEqual(await match(db, '%cafe%', true), [nullObj({ name: 'Café' })]);
       await db.close();
     });
 
@@ -407,10 +429,10 @@ describe('SQLiteDialect', () => {
       await db.close();
     });
 
-    it('`ohne_lower` lowercases text and keeps `NULL`', async () => {
+    it('`ohne_fold` folds text and keeps `NULL`', async () => {
       const db = await open();
-      deepStrictEqual(await db.query(`SELECT ohne_lower('ÄÖÜ Σ') AS v, ohne_lower(NULL) AS n`), [
-        nullObj({ v: 'äöü σ', n: null }),
+      deepStrictEqual(await db.query(`SELECT ohne_fold('ÄÖÜ Σ') AS v, ohne_fold(NULL) AS n`), [
+        nullObj({ v: 'aou σ', n: null }),
       ]);
       await db.close();
     });

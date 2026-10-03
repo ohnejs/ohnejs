@@ -2,7 +2,6 @@ import type { CompareOperator, ConditionNode } from './operators.ts';
 
 import { foldCase } from '../case/fold-case.ts';
 import { isArray } from '../is/is-array.ts';
-import { isASCII } from '../is/is-ascii.ts';
 import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
@@ -24,6 +23,13 @@ function ordinal<T extends number | string>(op: OrderingOperator, left: T, right
 }
 
 /**
+ * Lowercases an ASCII letter alone, as SQLite's plain `LIKE` does.
+ */
+function asciiLower(char: string): string {
+  return /^[A-Z]$/.test(char) ? char.toLowerCase() : char;
+}
+
+/**
  * Matches `text` against a SQL `LIKE` pattern, `%` spanning any run and `_` one character.
  * A pattern `%` is always a wildcard - the grammar has no escape - so it never matches as a literal.
  * Case-insensitive, splitting before folding so `_` consumes one original code point.
@@ -32,8 +38,8 @@ function ordinal<T extends number | string>(op: OrderingOperator, left: T, right
  * A regex with alternating `%` runs could backtrack catastrophically on hostile input.
  */
 function likeMatch(text: string, pattern: string): boolean {
-  const chars = [...text].map((char) => char.toLowerCase());
-  const parts = [...pattern].map((char) => char.toLowerCase());
+  const chars = [...text].map(asciiLower);
+  const parts = [...pattern].map(asciiLower);
   let ti = 0;
   let pi = 0;
   let star = -1;
@@ -88,9 +94,8 @@ function compareValue(op: CompareOperator, resolved: unknown, value: unknown): b
     case 'startsWith':
     case 'endsWith': {
       if (!isString(resolved) || !isString(value)) return false;
-      const ascii = isASCII(value);
-      const haystack = foldCase(resolved, ascii);
-      const needle = foldCase(value, ascii);
+      const haystack = foldCase(resolved);
+      const needle = foldCase(value);
       if (op === 'contains') return haystack.includes(needle);
       return op === 'startsWith' ? haystack.startsWith(needle) : haystack.endsWith(needle);
     }
@@ -129,7 +134,8 @@ function hasMatch(condition: ConditionNode | null, value: unknown): boolean {
  * A compare over a nullish resolved value is `false` even negated, except `isNull`.
  * That is SQL's three-valued `NOT`: `NOT (col = ?)` over `NULL` drops the row, and so does this.
  *
- * Text operators (`contains`, `startsWith`, `endsWith`, `like`) match case-insensitively.
+ * `contains`, `startsWith`, and `endsWith` ignore case and accents, folding both sides with `foldCase`.
+ * `like` ignores the case of ASCII letters alone, as SQLite's `LIKE` does.
  * `like` treats `%` as any run and `_` as one character.
  * A bare `has` wants a non-null value that is not an empty array.
  * A nested `has` condition matches an array when some item satisfies it.

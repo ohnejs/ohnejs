@@ -26,6 +26,11 @@ describe('matchesWordStart', () => {
     strictEqual(matchesWordStart('Café', 'café'), true);
   });
 
+  it('ignores accents', () => {
+    strictEqual(matchesWordStart('Café noir', 'cafe'), true);
+    strictEqual(matchesWordStart('Straße', 'strasse'), true);
+  });
+
   it('matches a phrase across words', () => {
     strictEqual(matchesWordStart('Work in progress', 'in prog'), true);
   });

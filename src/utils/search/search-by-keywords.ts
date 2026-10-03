@@ -1,17 +1,18 @@
 import { toArray } from '../array/to-array.ts';
+import { foldCase } from '../case/fold-case.ts';
 import { dotGet } from '../dot-notation/dot-get.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 
 /**
  * Filters `array` down to the items matching every keyword, sorted by descending relevance.
- * A keyword string is lowercased and split on spaces; a keyword array is only lowercased.
+ * A keyword string splits on spaces, then each keyword folds with `foldCase`; a keyword array only folds.
  * Each matched keyword adds `length / (position + 1)` to the item's score, so early hits rank higher.
  * With no keywords at all, every item is kept in its original order.
  *
- * With `props`, the searched text is the item's property values (dot paths) joined with spaces, lowercased.
+ * With `props`, the searched text is the item's property values (dot paths) joined with spaces, folded.
  * Without `props`, each item itself is the searched text, matched as given.
- * Lowercase bare string items for a case-insensitive search.
+ * Fold bare string items with `foldCase` to ignore case and accents.
  *
  * @example
  * ```ts
@@ -33,16 +34,17 @@ export function searchByKeywords<T>(
           .map((keyword) => keyword.trim())
           .filter(Boolean)
       : keywords
-  ).map((keyword) => keyword.toLowerCase());
+  ).map((keyword) => foldCase(keyword));
 
   return array
     .map((item) => {
       const text = isUndefined(props)
         ? (item as string)
-        : toArray(props)
-            .map((prop) => dotGet(item, prop))
-            .join(' ')
-            .toLowerCase();
+        : foldCase(
+            toArray(props)
+              .map((prop) => dotGet(item, prop))
+              .join(' '),
+          );
       let score = 0.1;
       if (parsed.length) {
         score = 0;

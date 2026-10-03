@@ -1,3 +1,4 @@
+import { foldCase } from '../case/fold-case.ts';
 import { isArray } from '../is/is-array.ts';
 
 /**
@@ -63,10 +64,10 @@ export const slugBosnian: Record<string, string> = {
 /**
  * Converts a string to a URL-friendly slug.
  *
- * Trims and lowercases, applies `replace` maps in order, then drops the combining marks NFD splits off.
+ * Trims and lowercases, applies `replace` maps in order, then folds accents and letters with `foldCase`.
  * Each run of characters outside `a-z0-9` becomes one `separator`, none left leading or trailing.
  *
- * `replace` runs before NFD so digraph maps stay meaningful.
+ * `replace` runs before the fold so digraph maps stay meaningful.
  *
  * Non-Latin scripts (Cyrillic, CJK, Arabic, ...) are not `a-z0-9`, so they drop out of the slug.
  * Supply a `replace` map to romanize them.
@@ -100,10 +101,7 @@ export function slugify(value: string, options?: SlugifyOptions): string {
     }
   }
 
-  const stripped = result
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, separator);
+  const stripped = foldCase(result).replace(/[^a-z0-9]+/g, separator);
 
   if (separator === '') return stripped;
 

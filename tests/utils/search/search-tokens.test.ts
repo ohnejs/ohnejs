@@ -83,6 +83,10 @@ describe('searchTokens', () => {
     deepStrictEqual(searchTokens('Foo bar FOO foo. Bar'), ['Foo', 'bar']);
   });
 
+  it('dedupes ignoring accents', () => {
+    deepStrictEqual(searchTokens('Café cafe CAFÉ'), ['Café']);
+  });
+
   it('keeps the first ten tokens', () => {
     const words = Array.from({ length: 12 }, (_, at) => `w${at}`);
     deepStrictEqual(searchTokens(words.join(' ')), words.slice(0, 10));

@@ -59,6 +59,8 @@ const seeds: [string, string | null, number | null, boolean | null, unknown[] | 
   ['p4', 'ÄPFEL Émile ΣΟΦΙΑ', -5, true, []],
   ['p5', '%wild_', 100, null, ['blue', false, -5]],
   ['p6', 'ΣΟΦΙΑΣΜΟΣ \u212A', 1, false, null],
+  ['p7', 'Café Straße Søren', 2, null, null],
+  ['p8', 'Apfel cafe\u0301 １００％', 3, null, null],
 ];
 for (const [uuid, title, views, flag, labels] of seeds) {
   await db.run(
@@ -133,7 +135,19 @@ const CORPUS: Record<string, unknown>[] = [
   { title: { endsWith: 'σοφια' } },
   { title: { contains: 'ΣΟΦΙΑΣ' } },
   { title: { contains: 'k' } },
+  { title: { contains: 'cafe' } },
+  { title: { not: { contains: 'cafe' } } },
+  { title: { contains: 'CAFÉ' } },
+  { title: { startsWith: 'apfel' } },
+  { title: { not: { startsWith: 'apfel' } } },
+  { title: { endsWith: 'soren' } },
+  { title: { not: { endsWith: 'soren' } } },
+  { title: { contains: 'strasse' } },
+  { title: { contains: '100%' } },
+  { title: { contains: 'が' } },
+  { title: { not: { contains: 'が' } } },
   { title: { like: 'alp%' } },
+  { title: { like: '%äpfel%' } },
   { title: { not: { like: '%a' } } },
   { title: { like: '%wild%' } },
   { title: { isNull: true } },
@@ -182,5 +196,14 @@ describe('condition grammar parity', () => {
         .sort();
       deepStrictEqual(js, sql, JSON.stringify(condition));
     }
+  });
+
+  it('both sides ignore accents in the text trio', async () => {
+    const found = async (condition: Record<string, unknown>) =>
+      (await queryUntyped('PARRows').where(condition).findMany()).map((row) => row.UUID).sort();
+    deepStrictEqual(await found({ title: { contains: 'cafe' } }), ['p7', 'p8']);
+    deepStrictEqual(await found({ title: { startsWith: 'apfel' } }), ['p4', 'p8']);
+    deepStrictEqual(await found({ title: { endsWith: 'soren' } }), ['p7']);
+    deepStrictEqual(await found({ title: { contains: '100%' } }), ['p8']);
   });
 });

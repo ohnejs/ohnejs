@@ -7,7 +7,6 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import {
   foldCase,
   intersection,
-  isASCII,
   isEmpty,
   isNull,
   isUndefined,
@@ -693,11 +692,11 @@ function compareFragment(
     case 'atMost':
       return { sql: `${column} <= ?`, params: [dialect.serialize(type, value)] };
     case 'contains':
-      return textMatch(column, `%${escapeLike(value as string)}%`, dialect);
+      return textMatch(column, `%${escapeLike(foldCase(value as string))}%`, dialect);
     case 'startsWith':
-      return textMatch(column, `${escapeLike(value as string)}%`, dialect);
+      return textMatch(column, `${escapeLike(foldCase(value as string))}%`, dialect);
     case 'endsWith':
-      return textMatch(column, `%${escapeLike(value as string)}`, dialect);
+      return textMatch(column, `%${escapeLike(foldCase(value as string))}`, dialect);
     case 'like':
       return { sql: `${column} LIKE ?`, params: [value as SQLValue] };
     case 'isNull':
@@ -710,10 +709,9 @@ function compareFragment(
 }
 
 /**
- * Compiles a case-insensitive text match, folding the column with `foldCase` only for a non-ASCII pattern.
- * An ASCII pattern folds ASCII letters alone, as the plain match does and the evaluator mirrors.
+ * Compiles a text match that ignores case and accents over a pattern built from a folded value.
+ * The value folds before `escapeLike`, since folding turns a full-width `％` into a wildcard `%`.
  */
 function textMatch(column: string, pattern: string, dialect: Dialect): SQLFragment {
-  const fold = !isASCII(pattern);
-  return { sql: dialect.textMatch(column, fold), params: [fold ? foldCase(pattern) : pattern] };
+  return { sql: dialect.textMatch(column, true), params: [pattern] };
 }

@@ -52,6 +52,14 @@ describe('evaluateCondition', () => {
     strictEqual(run({ v: { contains: 'oh' } }, { v: 5 }), false);
   });
 
+  it('matches the text trio ignoring accents on both sides', () => {
+    strictEqual(run({ v: { contains: 'cafe' } }, { v: 'Café' }), true);
+    strictEqual(run({ v: { contains: 'Café' } }, { v: 'CAFE' }), true);
+    strictEqual(run({ v: { startsWith: 'strasse' } }, { v: 'Straße 4' }), true);
+    strictEqual(run({ v: { endsWith: 'soren' } }, { v: 'Søren' }), true);
+    strictEqual(run({ v: { contains: 'か' } }, { v: 'がき' }), false);
+  });
+
   it('like matches % as any run and _ as one character', () => {
     strictEqual(run({ v: { like: 'a%' } }, { v: 'abc' }), true);
     strictEqual(run({ v: { like: '%ne' } }, { v: 'ohne' }), true);

@@ -228,6 +228,7 @@ export * from './route/trim-route-path.ts';
 export * from './search-params/parse-search-params.ts';
 export * from './search-params/stringify-search-params.ts';
 export * from './search/matches-word-start.ts';
+export * from './search/folded-range.ts';
 export * from './search/search-by-keywords.ts';
 export * from './search/search-tokens.ts';
 export * from './shell/shell-path.ts';

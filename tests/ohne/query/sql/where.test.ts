@@ -17,6 +17,10 @@ import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { compileWhere } from '../../../../src/ohne/query/sql/where.ts';
 import { parseCondition } from '../../../../src/utils/index.ts';
 
+const FOLDED =
+  `(CASE WHEN length("title") = octet_length("title") THEN "title" ELSE ohne_fold("title") END) ` +
+  `LIKE ? ESCAPE '\\'`;
+
 useLayers().add({
   path: '/where-compile',
   input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
@@ -192,44 +196,26 @@ describe('compileWhere', () => {
     deepStrictEqual(compile({ views: { atMost: 5 } }), { sql: '"views" <= ?', params: [5] });
   });
 
-  it('the text trio wraps an escaped pattern for the dialect match', () => {
-    deepStrictEqual(compile({ title: { contains: 'oh' } }), {
-      sql: `"title" LIKE ? ESCAPE '\\'`,
-      params: ['%oh%'],
-    });
-    deepStrictEqual(compile({ title: { startsWith: 'oh' } }), {
-      sql: `"title" LIKE ? ESCAPE '\\'`,
-      params: ['oh%'],
-    });
-    deepStrictEqual(compile({ title: { endsWith: 'oh' } }), {
-      sql: `"title" LIKE ? ESCAPE '\\'`,
-      params: ['%oh'],
-    });
-    deepStrictEqual(compile({ title: { contains: '50%' } }), {
-      sql: `"title" LIKE ? ESCAPE '\\'`,
-      params: ['%50\\%%'],
-    });
+  it('the text trio wraps an escaped, folded pattern for the folded match', () => {
+    deepStrictEqual(compile({ title: { contains: 'OH' } }), { sql: FOLDED, params: ['%oh%'] });
+    deepStrictEqual(compile({ title: { startsWith: 'oh' } }), { sql: FOLDED, params: ['oh%'] });
+    deepStrictEqual(compile({ title: { endsWith: 'oh' } }), { sql: FOLDED, params: ['%oh'] });
+    deepStrictEqual(compile({ title: { contains: '50%' } }), { sql: FOLDED, params: ['%50\\%%'] });
   });
 
-  it('a non-ASCII needle folds the column and lowercases the pattern', () => {
+  it('folds the needle across case and accents in every script', () => {
     deepStrictEqual(compile({ title: { contains: 'Émile' } }), {
-      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
-      params: ['%émile%'],
+      sql: FOLDED,
+      params: ['%emile%'],
     });
-    deepStrictEqual(compile({ title: { startsWith: 'ΣΟΦ' } }), {
-      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
-      params: ['σοφ%'],
-    });
-    deepStrictEqual(compile({ title: { endsWith: 'Мир' } }), {
-      sql: `ohne_lower("title") LIKE ? ESCAPE '\\'`,
-      params: ['%мир'],
-    });
+    deepStrictEqual(compile({ title: { startsWith: 'ΣΟΦ' } }), { sql: FOLDED, params: ['σοφ%'] });
+    deepStrictEqual(compile({ title: { endsWith: 'Мир' } }), { sql: FOLDED, params: ['%мир'] });
   });
 
-  it('an ASCII needle keeps the plain match and its case', () => {
-    deepStrictEqual(compile({ title: { contains: 'OHNE' } }), {
-      sql: `"title" LIKE ? ESCAPE '\\'`,
-      params: ['%OHNE%'],
+  it('escapes a full-width wildcard the fold unfolds', () => {
+    deepStrictEqual(compile({ title: { contains: '１００％' } }), {
+      sql: FOLDED,
+      params: ['%100\\%%'],
     });
   });
 

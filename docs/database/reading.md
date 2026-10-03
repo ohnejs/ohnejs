@@ -56,8 +56,9 @@ await query('Posts')
 An operator the field does not allow, like ordering on a boolean or `contains` on a number, does not
 compile.
 
-`contains`, `startsWith`, and `endsWith` ignore case in every script, so `contains('émile')` finds
-`Émile`. Accents still count: `cafe` does not find `Café`.
+`contains`, `startsWith`, and `endsWith` ignore case and accents in every script, so
+`contains('cafe')` finds `Café` and `contains('strasse')` finds `Straße`. A spelled-out umlaut is a
+different word: `mueller` does not find `Müller`. `equalsTo` and `like` stay exact about accents.
 
 Chained `where` calls are combined with AND. Each returns the builder, so you keep filtering.
 

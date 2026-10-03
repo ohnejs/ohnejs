@@ -61,13 +61,13 @@ export class SQLiteDialect extends Dialect {
   /**
    * Opens the database at `url` (a file path or `:memory:`) and applies the pragma set before returning.
    * A file path's parent directory is created on demand, since SQLite creates the file but not its folder.
-   * It registers `ohne_lower`, the Unicode-wide lowercasing a folded `textMatch` reads through.
+   * It registers `ohne_fold`, the `foldCase` a folded `textMatch` reads a non-ASCII row through.
    */
   async connect(url: string): Promise<DatabaseAdapter> {
     if (url !== ':memory:' && !url.startsWith('file:')) await ensureDir(dirname(url));
     const db = new DatabaseSync(url);
     applyPragmas(db);
-    db.function('ohne_lower', { deterministic: true }, lowerText);
+    db.function('ohne_fold', { deterministic: true }, foldText);
     return createAdapter(db);
   }
 
@@ -126,13 +126,18 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
-   * SQLite's default `LIKE` folds ASCII case alone, so a plain match serves an ASCII pattern exactly.
-   * A folded match lowercases the column through `ohne_lower` for a lowercased non-ASCII pattern.
+   * SQLite's default `LIKE` folds ASCII case alone, so it serves an ASCII row exactly and in C.
+   * A folded match sends only a row holding non-ASCII text through `ohne_fold`.
+   * A row is ASCII when its character and byte lengths agree.
+   * One shape serves every folded pattern, since an ASCII row can never match a non-ASCII one.
    * Backslash is declared as the escape character.
    * `PRAGMA case_sensitive_like` must never be set: it would make the text-match operators case-sensitive.
    */
   textMatch(quotedColumn: string, fold: boolean): string {
-    const column = fold ? `ohne_lower(${quotedColumn})` : quotedColumn;
+    const column = fold
+      ? `(CASE WHEN length(${quotedColumn}) = octet_length(${quotedColumn}) THEN ${quotedColumn} ` +
+        `ELSE ohne_fold(${quotedColumn}) END)`
+      : quotedColumn;
     return `${column} LIKE ? ESCAPE '\\'`;
   }
 
@@ -332,10 +337,10 @@ function needsRebuild(diff: TableAlter): boolean {
 }
 
 /**
- * The `ohne_lower` SQL function: the full `foldCase`, so SQL folds as the evaluator does.
+ * The `ohne_fold` SQL function: `foldCase`, so SQL folds as the evaluator does.
  * `NULL` and any non-text value pass through unchanged.
  */
-function lowerText(value: SQLOutputValue): SQLInputValue {
+function foldText(value: SQLOutputValue): SQLInputValue {
   return isString(value) ? foldCase(value) : value;
 }
 

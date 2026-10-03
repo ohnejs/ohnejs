@@ -10,6 +10,7 @@ import type { QueryGuards } from './guards.ts';
 import {
   canonicalizeLanguage,
   didYouMean,
+  foldCase,
   isArray,
   isBoolean,
   isInteger,
@@ -116,6 +117,8 @@ export interface ParsedQuery {
   reach?: ReadonlyMap<string, TargetReach>;
 }
 
+type Window = Pick<ParsedQuery, 'limit' | 'offset' | 'page' | 'perPage'>;
+
 const KNOWN_PARAMS = new Set([
   'where',
   'select',
@@ -164,7 +167,7 @@ export function parseQueryParams(
   }
   const window = parseWindow(params, guards);
   return Object.freeze({
-    where: parseWhere(params.where, meta, guards, windowBoundParams(window) + reserved, metaOf),
+    where: parseWhere(params.where, meta, guards, claimedBinds(window, reserved), metaOf),
     select: parseSelect(params.select, meta, guards),
     order: parseOrder(params.order, meta, guards),
     populate: parsePopulate(params.populate, meta, guards, metaOf),
@@ -176,7 +179,7 @@ export function parseQueryParams(
 /**
  * Parses the `where` condition through the shared grammar, then gates it against the collection.
  * Field applicability, the DoS ceilings, and value types are enforced in turn, each a distinct code.
- * `reserved` is the bound parameters the row window and the caller already claim, folded into the ceiling.
+ * `reserved` is the bound parameters the read claims beside its condition, folded into the ceiling.
  */
 function parseWhere(
   value: SearchParamValue | undefined,
@@ -213,13 +216,13 @@ function problemError(problem: ConditionProblem): HTTPError {
  * Enforces the DoS ceilings over a condition: clause count, `has` nesting, list length, and value size.
  * None of these depend on the field scope, so one flat walk covers the whole tree.
  * The bound-param ceiling is aggregate; the per-key ceilings never sum toward it.
- * It counts the worst-case locale binds too: one for the companion join, two per `has`/`empty`.
+ * It counts the worst-case locale binds too: two per `has`/`empty`, the companion join's in `reserved`.
  * A translatable shape thus refuses here rather than dying at the driver's own wall.
  * A fan of legal `in` lists is caught here, against a ceiling `resolveGuards` already clamped under the wall.
  */
 function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: number): void {
   let conditions = 0;
-  let boundParams = reserved + 1;
+  let boundParams = reserved;
   walkCondition(node, (child, info) => {
     if (child.kind === 'compare' || child.kind === 'has' || child.kind === 'empty') {
       conditions += 1;
@@ -245,7 +248,8 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
       child.op === 'like';
     for (const item of toArray(child.value)) {
       if (!isString(item)) continue;
-      const bytes = Buffer.byteLength(item, 'utf8');
+      const bound = isPattern && child.op !== 'like' ? foldCase(item) : item;
+      const bytes = Buffer.byteLength(bound, 'utf8');
       if (isPattern) {
         if (bytes > guards.maxPatternBytes)
           throw limitError('patternTooLarge', 'where', guards.maxPatternBytes);
@@ -254,6 +258,26 @@ function enforceGuards(node: ConditionNode, guards: QueryGuards, reserved: numbe
       }
     }
   });
+}
+
+/**
+ * The bound parameters a wire read claims beside its condition, as the bound-param ceiling counts them.
+ * That is its row window, the `reserved` binds its caller compiles, and the companion join's locale.
+ * Add `conditionBinds` of its `where` for the read's whole count.
+ * `params` must hold a valid window, since it parses as `parseQueryParams` parses it.
+ *
+ * @example
+ * ```ts
+ * readBinds({ limit: 20, offset: 40 }, resolveGuards())    // -> 3
+ * readBinds({ limit: 20, offset: 40 }, resolveGuards(), 4) // -> 7
+ * ```
+ */
+export function readBinds(
+  params: Record<string, SearchParamValue>,
+  guards: QueryGuards,
+  reserved = 0,
+): number {
+  return claimedBinds(parseWindow(params, guards), reserved);
 }
 
 /**
@@ -566,10 +590,7 @@ function countPopulateNode(budget: { nodes: number }, guards: QueryGuards): void
  * Parses the windowing params, rejecting mixed modes and clamping `limit` and `perPage` to their ceilings.
  * A read that names no page takes `maxLimit` as its `limit`.
  */
-function parseWindow(
-  params: Record<string, SearchParamValue>,
-  guards: QueryGuards,
-): { limit: number | null; offset: number | null; page: number | null; perPage: number | null } {
+function parseWindow(params: Record<string, SearchParamValue>, guards: QueryGuards): Window {
   const limit = wholeNumber(params.limit, 'limit', 0);
   const offset = wholeNumber(params.offset, 'offset', 0);
   const page = wholeNumber(params.page, 'page', 1);
@@ -587,15 +608,17 @@ function parseWindow(
 }
 
 /**
+ * The bound parameters a read claims beside its condition: the window, the caller's, and the locale's one.
+ */
+function claimedBinds(window: Window, reserved: number): number {
+  return windowBoundParams(window) + reserved + 1;
+}
+
+/**
  * The bound parameters the row window compiles to, reserved from the aggregate bound-param ceiling.
  * `LIMIT ?` binds one, an `OFFSET` a second, and a paginated read binds its page size and offset.
  */
-function windowBoundParams(window: {
-  limit: number | null;
-  offset: number | null;
-  page: number | null;
-  perPage: number | null;
-}): number {
+function windowBoundParams(window: Window): number {
   if (!isNull(window.offset)) return 2;
   if (!isNull(window.limit)) return 1;
   if (!isNull(window.page) || !isNull(window.perPage)) return 2;
