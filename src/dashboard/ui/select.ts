@@ -10,6 +10,7 @@ import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { foldedRange } from '../../utils/search/folded-range.ts';
 import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -541,13 +542,10 @@ export function select(
       const found = searchByKeywords(enabledChoices(), keyword, ['label', 'value'])[0];
       if (found) {
         highlightedChoice.value = found;
-        const keywordIndex = (found.label ?? (isString(found.value) ? found.value : ''))
-          .toLowerCase()
-          .indexOf(keyword.toLowerCase());
+        const text = found.label ?? (isString(found.value) ? found.value : '');
         scrollToHighlighted();
         mousePaused.value = true;
-        keywordHighlight.value =
-          keywordIndex > -1 ? [keywordIndex, keywordIndex + keyword.length - 1] : [-1, -1];
+        keywordHighlight.value = foldedRange(text, keyword) ?? [-1, -1];
       } else {
         keywordHighlight.value = [-1, -1];
       }

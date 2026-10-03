@@ -3,6 +3,7 @@ import type { Child } from '../render/insert.ts';
 import type { ZonedDate } from './calendar-date.ts';
 import type { IconName } from './icon.ts';
 
+import { foldCase } from '../../utils/case/fold-case.ts';
 import { withDefaults } from '../../utils/defaults/with-defaults.ts';
 import { isFunction } from '../../utils/is/is-function.ts';
 import { isNull } from '../../utils/is/is-null.ts';
@@ -537,7 +538,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
       } else if (/^0*([1-9]|[1-9][0-9]|[1-9][0-9]{2}|[1-9][0-9]{3})$/.test(entry)) {
         year = Number(entry);
       } else {
-        const months = resolvedLabels.months.map((name) => name.toLowerCase());
+        const months = resolvedLabels.months.map((name) => foldCase(name));
         const results = searchByKeywords(months, entry);
         month = results[0] ? months.indexOf(results[0]) + 1 : undefined;
       }
