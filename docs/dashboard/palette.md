@@ -27,8 +27,8 @@ Picking a record opens its editor, or the page its collection's
 
 ## What is searched
 
-Each word you type must match one of a record's fields, in any letter case. Each field type decides
-how a word matches it:
+Each word you type must match one of a record's fields, ignoring case and accents, so `cafe` finds
+Café. Each field type decides how a word matches it:
 
 - Text fields match anywhere inside, so `bring` finds Ashbringer.
 - A select matches by its choice labels as you see them, so `progress` finds the status
@@ -53,8 +53,10 @@ field out of word search. It also lists the records that use it, see
 - Fields inside a record's own objects, repeaters, and blocks are searched too. A linked record
   counts only by its label, see [Related records](#related-records).
 - A translatable collection is searched in your content language, the one you set on your account.
-- A collection with very many fields searches only as many as the query limits allow, its label
-  fields first.
+- Each word is looked for in the label fields first, then in the other fields in the order you
+  declare them, as far as the [query limits](../api/url-queries.md#guards) allow. With the default
+  limits, a two-word search checks about the first 50 text fields. Declare the fields people search
+  for first, and set `search: false` on the ones nobody does.
 - A collection that refuses the read is skipped, never an error.
 - Records whose label fields hold every word come first.
 - Records are searched from the second character you type. A single character only filters the
@@ -95,9 +97,10 @@ shows the linked record that matched at its end. Hover it to see the field that 
   for `keynote`.
 - Links inside objects, repeaters, and blocks count too, like a block's image in a page's body.
 - Only the linked record's label fields match, and only those with search on.
-- A record that matches on its own never shows again as related.
-- In a collection with very many text fields, words split across a link may not fit the query
-  limits. Words that all match on one side still find the record.
+- A record that matches on its own shows once, never again in a related group.
+- Words split across a link cost more of the query limits. With the default limits and two words,
+  the record's own word must sit in its label or its first 25 or so text fields. Words that all
+  match on one side still find the record.
 - A relation with `search: false` is never followed, and neither is the inverse side of a `records`
   relation. [A collection in search](../database/collections.md#a-collection-in-search) shows how to
   keep a whole collection from being followed.
@@ -149,6 +152,8 @@ that matched, with the path of the relation field that links it:
   `via`, or one the collection never links to, answers no results.
 - `truncated: true` on the answer means some related groups were left out.
 - `label` is `''` when a record's label fields are empty.
+- A record that matches on its own through a late text field can come back again as related. The
+  palette shows it once.
 - The route needs a signed-in user; a guest gets `401`.
 
 With the [assistant](../ai/assistant.md) installed, the last row asks it your question instead, and so

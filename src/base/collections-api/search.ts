@@ -11,6 +11,7 @@ import {
   conditionBinds,
   parseWireQuery,
   queryMetadata,
+  readBinds,
   resolveGuards,
   scopedMetadata,
   searchHook,
@@ -271,11 +272,6 @@ export const SEARCH_MAX_OFFSET = 1000;
  * The most related groups a word search reads; a pasted `UUID`'s usages are never capped.
  */
 export const RELATED_PASSES = 8;
-
-/**
- * The bound parameters a related read's window takes: its `limit` and its `offset`.
- */
-const WINDOW_BINDS = 2;
 
 /**
  * Finds the records of every collection `user` may query that hold each of the query's `searchTokens`.
@@ -622,6 +618,7 @@ function relatedPass(
   const exclusion = exclusionOf(search, from);
   const share = Math.floor((guards.maxConditions - (exclusion?.cost ?? 0)) / tokens.length);
   const reserve = reachBinds(to.reach);
+  const window = { limit: search.limit, offset: search.offset };
   for (let paths = pair.paths; ; paths = paths.slice(0, -1)) {
     const links = tokens.map((token) => linkBranches(search, pair, paths, token, share));
     if (links.every((link) => isEmpty(link.branches))) {
@@ -641,12 +638,9 @@ function relatedPass(
       ],
     };
     const crossings = links.reduce((sum, link) => sum + link.crossings, 0);
-    if (
-      WINDOW_BINDS + conditionBinds(conditionTree(where)) + crossings * reserve >
-      guards.maxBoundParams
-    ) {
-      continue;
-    }
+    const binds =
+      readBinds(window, guards, crossings * reserve) + conditionBinds(conditionTree(where));
+    if (binds > guards.maxBoundParams) continue;
     const used = paths.filter((path) => links.some((link) => link.paths.includes(path)));
     const roots = used.map((path) => first(path.steps)?.name ?? path.name);
     return { where, select: uniqueArray(['UUID', ...from.labels, ...roots]), paths: used };

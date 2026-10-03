@@ -526,6 +526,8 @@ await queryUntyped('SearchDocs').locale('de').where({ UUID: harbor }).updateOrTh
 });
 const invoice = await seed('SearchInvoices', { code: 'A-17', memo: 'Billed invoice' });
 const ledger = await seed('SearchLedgers', { name: 'Invoice ledger' });
+const cafe = await seed('SearchLedgers', { name: 'Café ledger' });
+const noir = await seed('SearchLedgers', { name: 'Noir cafe ledger' });
 for (let at = 0; at < 52; at += 1) await seed('SearchBulk', { name: 'Bulk' });
 await seed('SearchLoose', { name: 'Loose' });
 const wide = await seed(
@@ -854,6 +856,13 @@ describe('POST /search', () => {
     ]);
   });
 
+  it('finds a word without its accents and ranks the closest label first', async () => {
+    deepStrictEqual(await found('cafe'), [
+      { collection: 'SearchLedgers', UUID: cafe, label: 'Café ledger' },
+      { collection: 'SearchLedgers', UUID: noir, label: 'Noir cafe ledger' },
+    ]);
+  });
+
   it('caps `limit` at 50 records per collection', async () => {
     strictEqual((await search({ q: 'bulk', limit: 80 }, admin.token)).body.results.length, 50);
   });
@@ -1026,5 +1035,20 @@ describe('POST /search related records', () => {
       ['SearchHub', ...SPOKES.slice(0, 8)],
     );
     strictEqual('truncated' in (await search({ q: 'ceo' }, admin.token)).body, false);
+  });
+});
+
+describe('POST /search related records under a lowered `maxBoundParams`', () => {
+  it('skips a related read that does not fit instead of letting the wire refuse it', async () => {
+    for (let max = 12; max <= 24; max += 1) {
+      useLayers().add({
+        path: '/search-binds',
+        input: { query: { guards: { maxBoundParams: max } }, printer: { debug: true } },
+      });
+      printed.length = 0;
+      await found('lantern lighthouse');
+      useLayers().remove('/search-binds');
+      strictEqual(/SearchItems.*SearchNotes.*answered/.test(printed.join('')), false, `max ${max}`);
+    }
   });
 });
