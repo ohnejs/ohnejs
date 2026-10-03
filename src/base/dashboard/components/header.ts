@@ -49,6 +49,19 @@ css`
     gap: 0.5rem;
   }
 
+  .o-header-search-wrap {
+    position: relative;
+  }
+
+  .o-header-status {
+    display: flex;
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 0.5rem);
+    gap: 0.5rem;
+    transform: translateY(-50%);
+  }
+
   .o-header-logo {
     display: block;
     width: auto;
@@ -95,6 +108,7 @@ css`
  * It holds the home logo link, the under-`1024px` hamburger, and the right-side cluster.
  * The logo rests as the dot and unfolds into the wordmark while the link is hovered or focused.
  * The cluster is the search box, the content-language switcher, the `header` slots, and the kebab user menu.
+ * The `status` slots hang left of the search box without taking room, so they never shift the cluster.
  * The hamburger renders accented while the sidebar overlay is expanded, outline otherwise.
  */
 export function header(options: HeaderOptions): HTMLElement {
@@ -134,7 +148,16 @@ export function header(options: HeaderOptions): HTMLElement {
     h(
       'div',
       { class: 'o-header-right' },
-      headerSearch(),
+      h(
+        'div',
+        { class: 'o-header-search-wrap' },
+        h(
+          'div',
+          { class: 'o-header-status' },
+          shellSlots('status').map((render) => render()),
+        ),
+        headerSearch(),
+      ),
       contentLanguageSwitcher(),
       shellSlots('header').map((render) => render()),
       headerDropdownMenu(),

@@ -478,6 +478,7 @@ export function palette(): Child {
 
       // The popup autofocuses a timeout later, too late for the first keystroke after the hotkey.
       field.input.focus();
+      field.input.select();
       const refocus = (): void => {
         const active = document.activeElement;
         // A control or dropdown the click focused keeps it; the body, popup or scroll pane hand it back.
