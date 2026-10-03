@@ -52,6 +52,11 @@ export interface ChildExit {
    * Terminating signal, or `null` when the child exited on its own.
    */
   signal: NodeJS.Signals | null;
+
+  /**
+   * Milliseconds the child ran after signalling ready.
+   */
+  uptime: number;
 }
 
 /**
@@ -142,6 +147,7 @@ export function spawnServeChild(
   });
 
   let readied = false;
+  let readyAt = 0;
   let commanded = false;
   let gone = false;
   let stopping: Promise<void> | undefined;
@@ -168,6 +174,7 @@ export function spawnServeChild(
   child.on('message', (message) => {
     if (message === 'ready') {
       readied = true;
+      readyAt = Date.now();
       clearTimeout(bootTimer);
       markReady();
     }
@@ -182,7 +189,7 @@ export function spawnServeChild(
     clearTimeout(bootTimer);
     markGone();
     if (commanded) return;
-    if (readied) onExit?.({ code, signal });
+    if (readied) onExit?.({ code, signal, uptime: Date.now() - readyAt });
     else
       failBoot(
         ohneError(

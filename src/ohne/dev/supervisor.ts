@@ -12,7 +12,12 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
-import { type ServeChild, spawnServeChild } from './child-server.ts';
+import {
+  type ChildExit,
+  type ServeBackend,
+  type ServeChild,
+  spawnServeChild,
+} from './child-server.ts';
 import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
@@ -27,6 +32,7 @@ import { createSkillsTarget } from './targets/skills.ts';
 import { watchLayers } from './watch-layers.ts';
 
 const DEBOUNCE = 100;
+const REVIVE_UPTIME = 5_000;
 const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts']);
 
 /**
@@ -73,6 +79,8 @@ export interface DevOptions {
  *
  * Codegen failures and child crashes never tear the supervisor down.
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
+ * A ready child stopped from outside, by a signal or a clean exit, warns and restarts at once.
+ * One that stops within seconds of its start warns and waits for a change instead, so a crash never loops.
  * A child that never signals ready is killed after a minute and parks the supervisor the same way.
  *
  * It also serves the dashboard as a second child, unless `options.dashboard` is `false`.
@@ -132,6 +140,8 @@ export async function dev(
   let rerun = false;
   let closed = false;
   let browserReload = false;
+  let watching = false;
+  const revive = new Set<ServeBackend>();
 
   if (wantDashboard) await startDashboard();
 
@@ -163,6 +173,8 @@ export async function dev(
     schedule();
   });
   envWatch.on('error', () => envWatch.close());
+  watching = true;
+  if (revive.size > 0) schedule();
 
   let closing: Promise<void> | undefined;
   onShutdown(close);
@@ -170,7 +182,8 @@ export async function dev(
   return { close };
 
   /**
-   * Drains `pending` batch by batch until it stays empty; a call during a running cycle only flags a rerun.
+   * Drains `pending` and `revive` cycle by cycle until both stay empty.
+   * A call during a running cycle only flags a rerun.
    */
   async function tick(): Promise<void> {
     if (closed) return;
@@ -184,9 +197,9 @@ export async function dev(
         rerun = false;
         const batch = new Set(pending);
         pending.clear();
-        if (batch.size === 0) break;
+        if (batch.size === 0 && revive.size === 0) break;
         await runCycle(batch);
-      } while (!closed && (rerun || pending.size > 0));
+      } while (!closed && (rerun || pending.size > 0 || revive.size > 0));
     } finally {
       cycling = false;
     }
@@ -194,12 +207,15 @@ export async function dev(
 
   /**
    * Reloads a changed `.env`, regenerates, then restarts, reloads, or respawns only what the batch affects.
+   * A child in `revive` restarts with an empty batch too.
    * A `.env` or codegen failure is reported and parks the supervisor, leaving the children as they are.
    * The API respawns first, so a browser reload or a dashboard restart never meets a restarting API.
    * A missing dashboard starts again on any change.
    * A browser reload with no API child to serve it waits for the change that brings one back.
    */
   async function runCycle(batch: Set<string>): Promise<void> {
+    const revivesAPI = revive.delete('api');
+    revive.clear();
     const configChanged = [...batch].some((path) => config.affectedBy(path));
     const envChanged = batch.has(envFile);
     try {
@@ -213,13 +229,14 @@ export async function dev(
     if (closed) return;
     const reloadable = [...batch].filter((path) => !isDashboardPath(path));
     if (reloadable.length < batch.size) browserReload = true;
-    const reloads =
+    const changesAPI =
       envChanged ||
       reloadable.some(isSource) ||
       reloadable.some((path) => messages.affectedBy(path));
+    const reloads = changesAPI || revivesAPI;
     const startsDashboard = wantDashboard && (configChanged || envChanged || isNull(dashboard));
     if (reloads) {
-      printer.info('__Reloading API...__');
+      if (changesAPI) printer.info('__Reloading API...__');
       try {
         await respawn();
       } catch {}
@@ -327,19 +344,38 @@ export async function dev(
   }
 
   /**
-   * Drops a crashed API child and parks until a change respawns it.
+   * Drops a crashed API child, then revives or parks it.
    */
-  function onCrash(): void {
+  function onCrash(exit: ChildExit): void {
     api = null;
-    park();
+    onChildExit('api', exit);
   }
 
   /**
-   * Drops an exited dashboard child and parks until a change starts it again.
+   * Drops an exited dashboard child, then revives or parks it.
    */
-  function onDashboardExit(): void {
+  function onDashboardExit(exit: ChildExit): void {
     dashboard = null;
-    park();
+    onChildExit('dashboard', exit);
+  }
+
+  /**
+   * Queues a child stopped from outside for a restart, else parks until a change brings it back.
+   * A non-zero exit code means the child printed its own failure, so it parks without a word.
+   * An exit during shutdown is the shutdown itself, so it does nothing.
+   */
+  function onChildExit(backend: ServeBackend, { code, signal, uptime }: ChildExit): void {
+    if (closed || useShutdown().state !== 'idle') return;
+    if (code) return park();
+    const name = backend === 'api' ? 'API' : 'Dashboard';
+    const stopped = signal ? `${name} stopped by \`${signal}\`` : `${name} stopped`;
+    if (uptime < REVIVE_UPTIME) {
+      printer.warn(`${stopped} right after it started.`);
+      return park();
+    }
+    printer.warn(`${stopped}. Restarting...`);
+    revive.add(backend);
+    if (watching) schedule();
   }
 
   /**

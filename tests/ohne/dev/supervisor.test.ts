@@ -154,7 +154,8 @@ describe('dev', () => {
 
   /**
    * Runs `ohne dev` as its own process, so the output holds what each child prints too.
-   * The app config records the dashboard child's PID, for a test to stop it from outside.
+   * The app config records each child's PID, for a test to stop it from outside.
+   * It also makes `SIGUSR2` exit a child with code `3`, a crash the child reports itself.
    */
   async function startDev(
     name: string,
@@ -164,7 +165,11 @@ describe('dev', () => {
     writeFileSync(
       join(app, 'ohne.config.ts'),
       "import { writeFileSync } from 'node:fs'\n" +
-        `if (process.argv.includes('dashboard')) writeFileSync(${JSON.stringify(pidFile())}, String(process.pid))\n` +
+        "const backend = ['api', 'dashboard'].find((name) => process.argv.includes(name))\n" +
+        'if (backend) {\n' +
+        `  writeFileSync(${JSON.stringify(root)} + '/' + backend + '.pid', String(process.pid))\n` +
+        '  process.on("SIGUSR2", () => process.exit(3))\n' +
+        '}\n' +
         `export default { api: { port: 0 }, dashboard: { port: ${dashPort} } }\n`,
     );
     writeRoute(app, 'health.ts');
@@ -178,25 +183,18 @@ describe('dev', () => {
   }
 
   /**
-   * Where the dashboard child of the running test writes its PID.
+   * The PID of the running test's `backend` child.
    */
-  function pidFile(): string {
-    return join(root, 'dashboard.pid');
+  function childPID(backend: 'api' | 'dashboard'): number {
+    return Number(readFileSync(join(root, `${backend}.pid`), 'utf8'));
   }
 
   /**
-   * The PID of the running dashboard child.
-   */
-  function dashboardPID(): number {
-    return Number(readFileSync(pidFile(), 'utf8'));
-  }
-
-  /**
-   * Stops the ready dashboard child, then binds its port, so the next start cannot take it.
+   * Crashes the ready dashboard child, then binds its port, so the next start cannot take it.
    */
   async function holdDashboard(cli: DevCLI, port: number): Promise<NetServer> {
     const mark = cli.output().length;
-    process.kill(dashboardPID(), 'SIGTERM');
+    process.kill(childPID('dashboard'), 'SIGUSR2');
     await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
     const holder = createServer();
     await new Promise<void>((resolve) => holder.listen(port, resolve));
@@ -410,17 +408,57 @@ describe('dev', () => {
     strictEqual(bound, false);
   });
 
-  it('parks quietly when a ready dashboard dies, and a change revives it', TIMEOUT, async () => {
-    const { app, cli, dashPort } = await startDev('dashboard-killed');
+  it('parks quietly when a ready dashboard crashes, and a change revives it', TIMEOUT, async () => {
+    const { app, cli, dashPort } = await startDev('dashboard-crashed');
 
     const mark = cli.output().length;
-    process.kill(dashboardPID(), 'SIGTERM');
+    process.kill(childPID('dashboard'), 'SIGUSR2');
     await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
-    ok(!cli.output().includes('Dashboard server exited.'));
+    ok(!cli.output().slice(mark).includes('Dashboard stopped'));
 
     writeRoute(app, 'stormwind.get.ts');
     await waitFor(async () => cli.output().slice(mark).includes('Dashboard ready'));
     strictEqual(await get(dashPort, '/'), 200);
+  });
+
+  it('warns and restarts a dashboard stopped from outside', TIMEOUT, async () => {
+    const { cli, dashPort } = await startDev('dashboard-killed');
+    await delay(5_200);
+
+    const mark = cli.output().length;
+    process.kill(childPID('dashboard'), 'SIGKILL');
+    await waitFor(async () => cli.output().slice(mark).includes('Dashboard ready'));
+    const text = cli.output().slice(mark);
+    ok(text.includes('Dashboard stopped by SIGKILL. Restarting...'));
+    ok(/Dashboard ready[\s\S]*Waiting for changes/.test(text));
+    strictEqual(await get(dashPort, '/'), 200);
+  });
+
+  it('restarts an API stopped from outside without a reload notice', TIMEOUT, async () => {
+    const { cli, apiPort } = await startDev('api-stopped');
+    await delay(5_200);
+
+    const mark = cli.output().length;
+    process.kill(childPID('api'), 'SIGTERM');
+    await waitFor(async () => cli.output().slice(mark).includes('API ready'));
+    const text = cli.output().slice(mark);
+    ok(text.includes('API stopped. Restarting...'));
+    ok(!text.includes('Reloading API'));
+    strictEqual(await get(apiPort, '/health'), 200);
+  });
+
+  it('parks a child stopped right after it started, until a change', TIMEOUT, async () => {
+    const { app, cli, apiPort } = await startDev('api-stopped-early');
+
+    const mark = cli.output().length;
+    process.kill(childPID('api'), 'SIGTERM');
+    await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
+    ok(cli.output().slice(mark).includes('API stopped right after it started.'));
+    await delay(500);
+    strictEqual(await get(apiPort, '/health'), -1);
+
+    writeRoute(app, 'gnomeregan.get.ts');
+    await waitFor(async () => (await get(apiPort, '/gnomeregan')) === 200);
   });
 
   it('prints only the child block when the dashboard cannot bind', TIMEOUT, async () => {
