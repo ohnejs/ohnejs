@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 920" width="620" height="920" role="img" aria-labelledby="t d">
+<title id="t">The write pipeline</title>
+<desc id="d">How ohne processes a create call, in order. Inside one transaction: the record:before-change hook may edit the input, which is then frozen. Unknown keys are rejected. Each field, in parallel, is prepared (an omitted field takes your default, the type's, or null, else it is required; an explicit null needs a nullable field; values are coerced), passes its when gate, then is checked: base type, the field type's sanitizers and validators, your own sanitizers and validators, and serialize. The first message stops that field. If any field failed, the transaction still commits, no row is inserted, and the call returns every field error at once. Otherwise record:validate, uniqueness and references run one at a time, then the rows are written, read back and committed, record:committed fires, and the call returns ok: true with the record.</desc>
+<style>
+.an{animation-duration:22s;animation-iteration-count:infinite;animation-timing-function:ease}
+text{font-family:Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;fill:#260d1c}
+.m,.code,.key,.tk,.eb,.num{font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+.lbl{font-size:15px;font-weight:500}.lbl.m{font-size:14px;font-weight:400}.lbl .m{font-weight:400;font-size:14px}
+.note{font-size:13.5px;fill:#63697d}.note .m{font-size:13px;fill:#63697d}
+.key{font-size:13px;fill:#b45309}
+.eb{font-size:12px;letter-spacing:.08em;fill:#63697d}
+.num{font-size:11.5px;text-anchor:middle;font-weight:600}
+.code{font-size:13px}.sm{font-size:12.5px}
+.tk{font-size:12.5px}.tag{font-size:12px;font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+.end{text-anchor:end}.mid{text-anchor:middle}
+.cp{fill:#6d28d9}.cf{fill:#1d4ed8}.cs{fill:#1f6f5c}.ck{fill:#8b2c5a}.cn{fill:#b45309}
+.err,.key.err,.note.err,.tag.err{fill:#b45309}.ok{fill:#1f6f5c}
+.fon{fill:#ffffff}.fdim{fill:#63697d}
+.ff{fill:#1d4ed8}.ft{fill:#0e7490}.fk{fill:#8b2c5a}.fp{fill:#6d28d9}.ferr{fill:#b45309}.fs{fill:#1f6f5c}
+.fbg{fill:#f5f6f8}.fpanel{fill:#ffffff}.fstrong{fill:#c1c4cd}
+.tint{fill-opacity:0.1}
+.frame{fill:none;stroke:#c1c4cd;stroke-width:1}.frame.fpanel{fill:#ffffff;stroke:#e4e5e7}.frame.strong{stroke:#c1c4cd}
+.dash{stroke-dasharray:4 4}
+.band{fill:#e2e3e5;fill-opacity:.4}
+.hair{stroke:#e4e5e7}
+.card{fill:#ffffff;stroke:#e4e5e7}
+.okLine{fill:none;stroke:#1f6f5c;stroke-width:1.5}.errLine{fill:none;stroke:#b45309;stroke-width:1.5}
+.idle{fill:#f5f6f8;stroke:#c1c4cd}
+.spine{stroke:#c1c4cd;stroke-width:1;fill:none}
+.rail{stroke:#e2e3e5;stroke-dasharray:2 4}
+.exit{stroke:#b45309;stroke-opacity:.45;stroke-dasharray:3 4;fill:none}.ghost{fill-opacity:.45}
+.exitOn{stroke:#b45309;stroke-width:1.5;fill:none}
+.cursor{fill:#e2e3e5;fill-opacity:.55}
+.tok{fill:#ffffff;stroke:#c1c4cd}.tok.tk2{stroke:#8b2c5a}.tok.err{fill:#ffffff;stroke:#b45309}
+.h{opacity:0}
+.c{display:none}
+@media (max-width:480px){
+.w,.rn{display:none}.c{display:inline}
+.lbl{font-size:21px}.lbl.m,.lbl .m{font-size:19.5px}
+.key{font-size:17px}.note{font-size:16px}.note .m{font-size:15px}.code{font-size:16px}.sm{font-size:14px}
+.eb{font-size:15px}.tag{font-size:16px}.tk{font-size:14px}
+.num{font-size:13.5px}.bd{r:11px}
+}
+.tk.tv{fill:#1f6f5c}.tk.tk2{fill:#1f6f5c}
+@media (prefers-reduced-motion:reduce){.an{animation:none!important}}
+@keyframes k0{0%{opacity:1}75.45%{opacity:1}76.82%{opacity:0}96.36%{opacity:0}97.73%{opacity:1}100%{opacity:1}}
+@keyframes k1{0%{opacity:0}75.45%{opacity:0}76.82%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k2{0%{stroke-dashoffset:319}80.91%{stroke-dashoffset:319}83.41%{stroke-dashoffset:59}85%{stroke-dashoffset:59}86.14%{stroke-dashoffset:0}96.36%{stroke-dashoffset:0}96.41%{stroke-dashoffset:319}100%{stroke-dashoffset:319}}
+@keyframes k3{0%{opacity:0}80.91%{opacity:0}82.27%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k4{0%{opacity:0}85.68%{opacity:0}87.05%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k5{0%{transform:translateY(167px)}4.09%{transform:translateY(167px)}4.86%{transform:translateY(167px)}6.14%{transform:translateY(211px)}6.91%{transform:translateY(211px)}8.18%{transform:translateY(275px)}8.95%{transform:translateY(275px)}10.23%{transform:translateY(299px)}11%{transform:translateY(299px)}12.27%{transform:translateY(323px)}13.05%{transform:translateY(323px)}14.32%{transform:translateY(356px)}15.09%{transform:translateY(356px)}16.36%{transform:translateY(411px)}17.14%{transform:translateY(411px)}18.41%{transform:translateY(435px)}19.18%{transform:translateY(435px)}20.45%{transform:translateY(459px)}21.23%{transform:translateY(459px)}22.5%{transform:translateY(483px)}25.32%{transform:translateY(483px)}26.59%{transform:translateY(507px)}27.36%{transform:translateY(507px)}28.64%{transform:translateY(531px)}29.41%{transform:translateY(531px)}30.68%{transform:translateY(581px)}31.45%{transform:translateY(581px)}32.73%{transform:translateY(607px)}33.5%{transform:translateY(607px)}34.77%{transform:translateY(649px)}35.55%{transform:translateY(649px)}36.82%{transform:translateY(673px)}37.59%{transform:translateY(673px)}38.86%{transform:translateY(697px)}39.64%{transform:translateY(697px)}40.91%{transform:translateY(721px)}41.68%{transform:translateY(721px)}42.95%{transform:translateY(763px)}57.27%{transform:translateY(763px)}57.32%{transform:translateY(763px)}57.32%{transform:translateY(167px)}62.27%{transform:translateY(167px)}62.45%{transform:translateY(167px)}63.73%{transform:translateY(211px)}63.91%{transform:translateY(211px)}65.18%{transform:translateY(275px)}65.36%{transform:translateY(275px)}66.64%{transform:translateY(299px)}66.82%{transform:translateY(299px)}68.09%{transform:translateY(323px)}68.27%{transform:translateY(323px)}69.55%{transform:translateY(356px)}69.73%{transform:translateY(356px)}71%{transform:translateY(411px)}71.18%{transform:translateY(411px)}72.45%{transform:translateY(435px)}72.64%{transform:translateY(435px)}73.91%{transform:translateY(459px)}100%{transform:translateY(459px)}}
+@keyframes k6{0%{opacity:0}3.41%{opacity:0}4.77%{opacity:1}45%{opacity:1}46.36%{opacity:0}61.59%{opacity:0}62.95%{opacity:1}75.45%{opacity:1}76.82%{opacity:0}100%{opacity:0}}
+@keyframes k7{0%{opacity:0}82.95%{opacity:0}84.32%{opacity:1}88.86%{opacity:1}90.23%{opacity:0}100%{opacity:0}}
+@keyframes k8{0%{opacity:1}77.27%{opacity:1}78.64%{opacity:0.3}96.36%{opacity:0.3}97.73%{opacity:1}100%{opacity:1}}
+@keyframes k9{0%{opacity:1}80.45%{opacity:1}81.82%{opacity:0.3}96.36%{opacity:0.3}97.73%{opacity:1}100%{opacity:1}}
+@keyframes k10{0%{opacity:0}4.09%{opacity:0}5.45%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}62.27%{opacity:0}63.64%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k11{0%{opacity:0}6.14%{opacity:0}7.5%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}63.73%{opacity:0}65.09%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k12{0%{opacity:0}8.18%{opacity:0}9.55%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}65.18%{opacity:0}66.55%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k13{0%{opacity:0}10.23%{opacity:0}11.59%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}66.64%{opacity:0}68%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k14{0%{opacity:0}12.27%{opacity:0}13.64%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}68.09%{opacity:0}69.45%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k15{0%{opacity:0}14.32%{opacity:0}15.68%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}69.55%{opacity:0}70.91%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k16{0%{opacity:0}16.36%{opacity:0}17.73%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}71%{opacity:0}72.36%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k17{0%{opacity:0}18.41%{opacity:0}19.77%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}72.45%{opacity:0}73.82%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k18{0%{opacity:0}20.45%{opacity:0}21.82%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k19{0%{opacity:0}22.5%{opacity:0}23.86%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k20{0%{opacity:0}77.27%{opacity:0}78.64%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k21{0%{opacity:0}26.59%{opacity:0}27.95%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k22{0%{opacity:0}28.64%{opacity:0}30%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k23{0%{opacity:0}32.73%{opacity:0}34.09%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k24{0%{opacity:0}34.77%{opacity:0}36.14%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k25{0%{opacity:0}36.82%{opacity:0}38.18%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k26{0%{opacity:0}38.86%{opacity:0}40.23%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k27{0%{opacity:0}40.91%{opacity:0}42.27%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}83.41%{opacity:0}84.77%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k28{0%{opacity:0}42.95%{opacity:0}44.32%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k29{0%{opacity:0}30.68%{opacity:0}32.05%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k30{0%{opacity:0}79.09%{opacity:0}80.45%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k31{0%{transform:translateY(275px)}8.18%{transform:translateY(275px)}8.95%{transform:translateY(275px)}10.23%{transform:translateY(299px)}11%{transform:translateY(299px)}12.27%{transform:translateY(323px)}13.05%{transform:translateY(323px)}14.32%{transform:translateY(356px)}15.09%{transform:translateY(356px)}16.36%{transform:translateY(411px)}17.14%{transform:translateY(411px)}18.41%{transform:translateY(435px)}19.18%{transform:translateY(435px)}20.45%{transform:translateY(459px)}21.23%{transform:translateY(459px)}22.5%{transform:translateY(483px)}25.32%{transform:translateY(483px)}26.59%{transform:translateY(507px)}27.36%{transform:translateY(507px)}28.64%{transform:translateY(531px)}100%{transform:translateY(531px)}}
+@keyframes k32{0%{opacity:0}7.5%{opacity:0}8.86%{opacity:1}23.64%{opacity:1}25%{opacity:0}100%{opacity:0}}
+@keyframes k33{0%{opacity:0}23.64%{opacity:0}25%{opacity:1}30%{opacity:1}31.36%{opacity:0}100%{opacity:0}}
+@keyframes k34{0%{transform:translateY(275px)}65.18%{transform:translateY(275px)}65.36%{transform:translateY(275px)}66.64%{transform:translateY(299px)}66.82%{transform:translateY(299px)}68.09%{transform:translateY(323px)}68.27%{transform:translateY(323px)}69.55%{transform:translateY(356px)}69.73%{transform:translateY(356px)}71%{transform:translateY(411px)}71.18%{transform:translateY(411px)}72.45%{transform:translateY(435px)}72.64%{transform:translateY(435px)}73.91%{transform:translateY(459px)}100%{transform:translateY(459px)}}
+@keyframes k35{0%{opacity:0}64.5%{opacity:0}65.86%{opacity:1}75.45%{opacity:1}76.82%{opacity:0}100%{opacity:0}}
+@keyframes k36{0%{opacity:0}44.32%{opacity:0}45.68%{opacity:1}57.27%{opacity:1}58.64%{opacity:0}100%{opacity:0}}
+@keyframes k37{0%{opacity:0}86.14%{opacity:0}87.5%{opacity:1}96.36%{opacity:1}97.73%{opacity:0}100%{opacity:0}}
+@keyframes k38{0%{opacity:0}0.23%{opacity:0}1.59%{opacity:1}3.41%{opacity:1}4.77%{opacity:0}59.09%{opacity:0}60.45%{opacity:1}62.27%{opacity:1}63.64%{opacity:0}100%{opacity:0}}
+@keyframes k39{0%{opacity:1}58.64%{opacity:1}59.55%{opacity:0}97.73%{opacity:0}98.64%{opacity:1}100%{opacity:1}}
+@keyframes k40{0%{opacity:0}59.55%{opacity:0}60.45%{opacity:1}96.82%{opacity:1}97.73%{opacity:0}100%{opacity:0}}</style>
+<rect width="620" height="920" class="fbg"/>
+<rect x="12" y="12" width="596" height="94" rx="12" class="card"/>
+<text x="28" y="40" class="code"><tspan class="cp">title</tspan>: <tspan class="cf">field</tspan>(<tspan class="cs">'text'</tspan>, { <tspan class="cp">sanitizers</tspan>: [(v) =&gt; v.<tspan class="cf">trim</tspan>()] }),</text>
+<text x="28" y="61" class="code"><tspan class="cp">draft</tspan>: <tspan class="cf">field</tspan>(<tspan class="cs">'boolean'</tspan>, { <tspan class="cp">default</tspan>: <tspan class="ck">true</tspan> }),</text>
+<line x1="13" y1="74" x2="607" y2="74" class="hair"/>
+<rect x="16" y="78" width="588" height="24" rx="6" class="ff tint an h" style="animation-name:k38"/>
+<text x="28" y="95" class="code an" xml:space="preserve" style="animation-name:k39"><tspan class="cf">query</tspan>(<tspan class="cs">'Posts'</tspan>).<tspan class="cf">create</tspan>({ <tspan class="cp">title</tspan>: <tspan class="cs">'  Hello  '</tspan> })</text>
+<text x="28" y="95" class="code an h" style="animation-name:k40"><tspan class="cf">query</tspan>(<tspan class="cs">'Posts'</tspan>).<tspan class="cf">create</tspan>({ <tspan class="cp">title</tspan>: <tspan class="cs">''</tspan> })</text>
+<circle cx="23" cy="125" r="5" class="ff w"/>
+<text x="33" y="130" class="note w">framework</text>
+<circle cx="129" cy="125" r="5" class="ft w"/>
+<text x="139" y="130" class="note w">field type</text>
+<circle cx="227" cy="125" r="5" class="fk w"/>
+<text x="237" y="130" class="note w">your field()</text>
+<circle cx="334" cy="125" r="5" class="fp w"/>
+<text x="344" y="130" class="note w">your hooks</text>
+<circle cx="441" cy="125" r="5" class="ferr w"/>
+<text x="451" y="130" class="note w">error it returns</text>
+<circle cx="24" cy="125" r="6" class="ff c"/>
+<text x="36" y="130" class="note c">framework</text>
+<circle cx="142" cy="125" r="6" class="ft c"/>
+<text x="154" y="130" class="note c">field type</text>
+<circle cx="258" cy="125" r="6" class="fk c"/>
+<text x="270" y="130" class="note c">your field()</text>
+<circle cx="390" cy="125" r="6" class="fp c"/>
+<text x="402" y="130" class="note c">your hooks</text>
+<circle cx="516" cy="125" r="6" class="ferr c"/>
+<text x="528" y="130" class="note c">error</text>
+<rect x="12" y="146" width="596" height="596" rx="12" class="frame dash"/>
+<rect x="42" y="242" width="544" height="320" rx="9" class="frame fpanel"/>
+<rect x="37" y="237" width="544" height="320" rx="9" class="frame fpanel"/>
+<rect x="32" y="232" width="544" height="320" rx="9" class="frame strong fpanel"/>
+<rect x="26" y="139" width="134.4" height="14" class="fbg w"/><rect x="26" y="139" width="165" height="14" class="fbg c"/><text x="32" y="150" class="eb">ONE TRANSACTION</text>
+<rect x="68" y="225" width="199.68" height="7" class="fbg w"/><rect x="68" y="232" width="199.68" height="7" class="fpanel w"/><rect x="68" y="225" width="246.6" height="7" class="fbg c"/><rect x="68" y="232" width="246.6" height="7" class="fpanel c"/><text x="74" y="236" class="eb">EACH FIELD, IN PARALLEL</text>
+<text x="74" y="256" class="eb">PREPARE</text>
+<rect x="33" y="344" width="542" height="26" class="band"/>
+<text x="74" y="392" class="eb">CHECK</text>
+<text x="466" y="392" class="note end an" style="animation-name:k0">first message stops it</text>
+<text x="466" y="392" class="note end err an h" style="animation-name:k1">first message stops it</text>
+<text x="522" y="256" class="eb mid">title</text>
+<line x1="522" y1="266" x2="522" y2="541" class="rail"/>
+<line x1="56" y1="167" x2="56" y2="763" class="spine"/>
+<line x1="472" y1="581" x2="592" y2="581" class="exit"/>
+<line x1="472" y1="607" x2="592" y2="607" class="exit"/>
+<line x1="472" y1="649" x2="592" y2="649" class="exit"/>
+<line x1="472" y1="673" x2="592" y2="673" class="exit"/>
+<line x1="472" y1="721" x2="592" y2="721" class="exit"/>
+<path d="M592 581V780" class="exit"/>
+<circle cx="592" cy="721" r="2.5" class="ferr ghost"/>
+<path d="M588 779l4 6l4-6z" class="ferr ghost"/>
+<g class="an h" style="animation-name:k3"><path d="M472 581H592V780" class="exitOn" stroke-dasharray="319" style="animation:k2 22s ease infinite"/><circle cx="592" cy="721" r="2.5" class="ferr"/></g>
+<path d="M588 779l4 6l4-6z" class="ferr an h" style="animation-name:k4"/>
+<g class="an" style="animation-name:k5"><rect x="38" y="-12" width="432" height="24" rx="6" class="cursor an h" style="animation-name:k6"/></g>
+<rect x="38" y="447" width="432" height="24" rx="6" class="ferr tint an h" style="animation-name:k1"/>
+<rect x="38" y="709" width="562" height="24" rx="6" class="cursor an h" style="animation-name:k7"/>
+<g><text x="74" y="172" class="lbl m"><tspan class="m">record:before-change</tspan></text><text x="256" y="172" class="note rn">may edit input, then frozen</text><circle cx="56" cy="167" r="9" class="bd idle"/><text x="56" y="171" class="num fdim">1</text><g class="an" style="animation-name:k10"><circle cx="56" cy="167" r="9" class="bd fp"/><text x="56" y="171" class="num fon">1</text></g></g>
+<g><text x="74" y="216" class="lbl">Unknown keys</text><text x="256" y="216" class="note rn">others still run</text><text x="466" y="216" class="key end">unknownField</text><circle cx="56" cy="211" r="9" class="bd idle"/><text x="56" y="215" class="num fdim">2</text><g class="an" style="animation-name:k11"><circle cx="56" cy="211" r="9" class="bd ff"/><text x="56" y="215" class="num fon">2</text></g></g>
+<g><text x="74" y="280" class="lbl">Default if omitted</text><text x="256" y="280" class="note rn">yours, type's, or null</text><text x="466" y="280" class="key end">required</text><circle cx="56" cy="275" r="9" class="bd idle"/><text x="56" y="279" class="num fdim">3</text><g class="an" style="animation-name:k12"><circle cx="56" cy="275" r="9" class="bd ff"/><text x="56" y="279" class="num fon">3</text></g></g>
+<g><text x="74" y="304" class="lbl">Explicit <tspan class="m">null</tspan></text><text x="256" y="304" class="note rn">unless nullable</text><text x="466" y="304" class="key end">notNullable</text><circle cx="56" cy="299" r="9" class="bd idle"/><text x="56" y="303" class="num fdim">4</text><g class="an" style="animation-name:k13"><circle cx="56" cy="299" r="9" class="bd ff"/><text x="56" y="303" class="num fon">4</text></g></g>
+<g><text x="74" y="328" class="lbl">Coerce</text><text x="256" y="328" class="note rn">never fails: '42' becomes 42</text><circle cx="56" cy="323" r="9" class="bd idle"/><text x="56" y="327" class="num fdim">5</text><g class="an" style="animation-name:k14"><circle cx="56" cy="323" r="9" class="bd ff"/><text x="56" y="327" class="num fon">5</text></g></g>
+<g><text x="74" y="361" class="lbl"><tspan class="m">when</tspan> gate</text><text x="256" y="361" class="note rn">inactive: dropped, even invalid</text><circle cx="56" cy="356" r="9" class="bd idle"/><text x="56" y="360" class="num fdim">6</text><g class="an" style="animation-name:k15"><circle cx="56" cy="356" r="9" class="bd ff"/><text x="56" y="360" class="num fon">6</text></g></g>
+<g><text x="74" y="416" class="lbl">Base type</text><text x="256" y="416" class="note rn">wrong primitive</text><text x="466" y="416" class="key end">invalidValue</text><circle cx="56" cy="411" r="9" class="bd idle"/><text x="56" y="415" class="num fdim">7</text><g class="an" style="animation-name:k16"><circle cx="56" cy="411" r="9" class="bd ff"/><text x="56" y="415" class="num fon">7</text></g></g>
+<g><text x="74" y="440" class="lbl">Type sanitizers</text><text x="256" y="440" class="note rn">reshape, never reject</text><circle cx="56" cy="435" r="9" class="bd idle"/><text x="56" y="439" class="num fdim">8</text><g class="an" style="animation-name:k17"><circle cx="56" cy="435" r="9" class="bd ft"/><text x="56" y="439" class="num fon">8</text></g></g>
+<g><text x="74" y="464" class="lbl">Type validators</text><text x="256" y="464" class="note rn">min, max, choices</text><text x="466" y="464" class="key end">emptyValue</text><circle cx="56" cy="459" r="9" class="bd idle"/><text x="56" y="463" class="num fdim">9</text><g class="an" style="animation-name:k18"><circle cx="56" cy="459" r="9" class="bd ft"/><text x="56" y="463" class="num fon">9</text></g><g class="an h" style="animation-name:k1"><circle cx="56" cy="459" r="9" class="bd ferr"/><text x="56" y="463" class="num fon">9</text></g></g>
+<circle cx="56" cy="483" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k8"><text x="74" y="488" class="lbl">Your sanitizers</text><text x="256" y="488" class="note rn">output not re-checked</text><circle cx="56" cy="483" r="9" class="bd idle"/><text x="56" y="487" class="num fdim">10</text><g class="an" style="animation-name:k19"><circle cx="56" cy="483" r="9" class="bd fk"/><text x="56" y="487" class="num fon">10</text></g></g>
+<text x="522" y="487" class="tag mid err an h" style="animation-name:k20">skipped</text>
+<circle cx="56" cy="507" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k8"><text x="74" y="512" class="lbl">Your validators</text><text x="256" y="512" class="note rn">your own messages</text><circle cx="56" cy="507" r="9" class="bd idle"/><text x="56" y="511" class="num fdim">11</text><g class="an" style="animation-name:k21"><circle cx="56" cy="507" r="9" class="bd fk"/><text x="56" y="511" class="num fon">11</text></g></g>
+<text x="522" y="511" class="tag mid err an h" style="animation-name:k20">skipped</text>
+<circle cx="56" cy="531" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k8"><text x="74" y="536" class="lbl">Serialize</text><text x="256" y="536" class="note rn">password hashes here</text><circle cx="56" cy="531" r="9" class="bd idle"/><text x="56" y="535" class="num fdim">12</text><g class="an" style="animation-name:k22"><circle cx="56" cy="531" r="9" class="bd ft"/><text x="56" y="535" class="num fon">12</text></g></g>
+<text x="522" y="535" class="tag mid err an h" style="animation-name:k20">skipped</text>
+<circle cx="56" cy="607" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k9"><text x="74" y="612" class="lbl m"><tspan class="m">record:validate</tspan></text><text x="256" y="612" class="note rn">cross-field rules</text><circle cx="56" cy="607" r="9" class="bd idle"/><text x="56" y="611" class="num fdim">13</text><g class="an" style="animation-name:k23"><circle cx="56" cy="607" r="9" class="bd fp"/><text x="56" y="611" class="num fon">13</text></g></g>
+<circle cx="56" cy="649" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k9"><text x="74" y="654" class="lbl">Unique</text><text x="466" y="654" class="key end">notUnique</text><circle cx="56" cy="649" r="9" class="bd idle"/><text x="56" y="653" class="num fdim">14</text><g class="an" style="animation-name:k24"><circle cx="56" cy="649" r="9" class="bd ff"/><text x="56" y="653" class="num fon">14</text></g></g>
+<circle cx="56" cy="673" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k9"><text x="74" y="678" class="lbl">References</text><text x="256" y="678" class="note rn">links exist</text><text x="466" y="678" class="key end">invalidReference</text><circle cx="56" cy="673" r="9" class="bd idle"/><text x="56" y="677" class="num fdim">15</text><g class="an" style="animation-name:k25"><circle cx="56" cy="673" r="9" class="bd ff"/><text x="56" y="677" class="num fon">15</text></g></g>
+<circle cx="56" cy="697" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k9"><text x="74" y="702" class="lbl">Write rows, read back</text><text x="256" y="702" class="note rn"><tspan class="m">record:after-create</tspan> may reshape it</text><circle cx="56" cy="697" r="9" class="bd idle"/><text x="56" y="701" class="num fdim">16</text><g class="an" style="animation-name:k26"><circle cx="56" cy="697" r="9" class="bd ff"/><text x="56" y="701" class="num fon">16</text></g></g>
+<g><text x="74" y="726" class="lbl">Commit</text><text x="256" y="726" class="note">also on <tspan class="m">ok: false</tspan></text><circle cx="56" cy="721" r="9" class="bd idle"/><text x="56" y="725" class="num fdim">17</text><g class="an" style="animation-name:k27"><circle cx="56" cy="721" r="9" class="bd ff"/><text x="56" y="725" class="num fon">17</text></g></g>
+<circle cx="56" cy="763" r="9" class="bd fbg"/>
+<g class="an" style="animation-name:k9"><text x="74" y="768" class="lbl m"><tspan class="m">record:committed</tspan></text><text x="256" y="768" class="note rn">after commit: webhooks, caches</text><circle cx="56" cy="763" r="9" class="bd idle"/><text x="56" y="767" class="num fdim">18</text><g class="an" style="animation-name:k28"><circle cx="56" cy="763" r="9" class="bd fp"/><text x="56" y="767" class="num fon">18</text></g></g>
+<path d="M56 571l10 10l-10 10l-10-10z" class="idle"/>
+<path d="M56 571l10 10l-10 10l-10-10z" class="fs an" style="animation-name:k29"/>
+<path d="M56 571l10 10l-10 10l-10-10z" class="ferr an h" style="animation-name:k30"/>
+<text x="74" y="586" class="lbl">Any field failed?</text>
+<text x="256" y="586" class="note rn">if so, stop here</text>
+<g class="an" style="animation-name:k29"><rect x="434.4" y="571" width="31.6" height="20" rx="10" class="fs tint w"/><rect x="427.6" y="571" width="38.4" height="20" rx="10" class="fs tint c"/><text x="458" y="585" class="key end ok">no</text></g>
+<g class="an h" style="animation-name:k30"><rect x="426.6" y="571" width="39.4" height="20" rx="10" class="ferr tint w"/><rect x="417.4" y="571" width="48.599999999999994" height="20" rx="10" class="ferr tint c"/><text x="458" y="585" class="key end err">yes</text></g>
+<g class="an" style="animation-name:k31"><g class="an h" style="animation-name:k32"><rect x="473.2" y="-10" width="97.6" height="20" rx="10" class="tok tv w"/><rect x="469.8" y="-10" width="104.4" height="20" rx="10" class="tok tv c"/><text x="522" y="4" class="tk mid tv" xml:space="preserve">'  Hello  '</text></g><g class="an h" style="animation-name:k33"><rect x="488.4" y="-10" width="67.19999999999999" height="20" rx="10" class="tok tk2 w"/><rect x="486.6" y="-10" width="70.80000000000001" height="20" rx="10" class="tok tk2 c"/><text x="522" y="4" class="tk mid tk2">'Hello'</text></g></g>
+<g class="an" style="animation-name:k34"><g class="an h" style="animation-name:k35"><rect x="507.4" y="-10" width="29.2" height="20" rx="10" class="tok tv w"/><rect x="507.6" y="-10" width="28.8" height="20" rx="10" class="tok tv c"/><text x="522" y="4" class="tk mid tv">''</text></g></g>
+<g transform="translate(0 459)"><g class="an h" style="animation-name:k1"><rect x="477" y="-10" width="90" height="20" rx="10" class="tok err w"/><rect x="474" y="-10" width="96" height="20" rx="10" class="tok err c"/><text x="522" y="4" class="tk mid err">emptyValue</text></g></g>
+<path d="M56 773V780" class="spine"/><path d="M52 779l4 6l4-6z" class="fstrong"/>
+<rect x="12" y="786" width="288" height="122" rx="12" class="card"/><rect x="12" y="786" width="288" height="122" rx="12" class="card okLine an" style="animation-name:k36"/><text x="28" y="812" class="code">{ ok: <tspan class="cs">true</tspan>, record }</text><text x="28" y="836" class="code"><tspan class="cp">title</tspan>: <tspan class="cs">'Hello'</tspan></text><text x="28" y="858" class="code"><tspan class="cp">draft</tspan>: <tspan class="ck">true</tspan></text><text x="28" y="888" class="note">read back after the write</text>
+<rect x="312" y="786" width="296" height="122" rx="12" class="card"/><rect x="312" y="786" width="296" height="122" rx="12" class="card errLine an h" style="animation-name:k37"/><text x="328" y="812" class="code">{ ok: <tspan class="cn">false</tspan>, errors }</text><text x="328" y="834" class="note">Fields: every error at once</text><text x="328" y="854" class="note">Record: the first failing check</text><text x="328" y="874" class="note">No row is inserted</text>
+<text x="328" y="896" class="code sm an h" style="animation-name:k37"><tspan class="cp">title</tspan>: <tspan class="cs">'validation.emptyValue'</tspan></text>
+</svg>

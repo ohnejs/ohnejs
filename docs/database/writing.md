@@ -12,6 +12,11 @@ const result = await query('Posts').create({ title: 'Hello', body: '...' });
 The whole write runs in one transaction: validation, uniqueness, references, the insert, and the
 derived rows all commit together, or nothing does.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/writing/pipeline-dark.svg">
+  <img alt="The write pipeline in order: record:before-change, unknown keys, then each field is prepared (default, null, coerce, when gate) and checked (base type, the type's sanitizers and validators, your sanitizers and validators, serialize). If any field failed, the call returns every field error at once. Otherwise record:validate, uniqueness and references run, the rows are written, read back and committed, and record:committed fires." src="../images/writing/pipeline-light.svg">
+</picture>
+
 ## The result
 
 `create` never throws for a validation failure. It returns a result you check:
