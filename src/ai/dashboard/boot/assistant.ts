@@ -23,7 +23,7 @@ registerPaletteSlot('footer', aiNewQuestion);
 registerPaletteSlot('footer', aiModelMenu);
 registerPaletteSlot('placeholder', assistantPlaceholder);
 registerPaletteSlot('tab', assistantTab);
-registerShellSlot('header', assistantStatus);
+registerShellSlot('status', assistantStatus);
 
 // A sign-out keeps the page, so the next person must never see the last one's chats.
 const person = computed(() => sessionUser()?.UUID ?? null);

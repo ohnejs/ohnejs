@@ -9,7 +9,7 @@ import { currentTurn, sending } from './turn-store.ts';
  * The header button that keeps the assistant in sight while a turn works, sends, or waits for the person.
  * A bubble counts the requests left to send, and the button turns primary while a batch waits for approval.
  * A click reopens the palette on the turn.
- * Rendered in the shell's `header` slot, so it survives navigation and never covers a page's own actions.
+ * Rendered in the shell's `status` slot, so it survives navigation and never shifts the header.
  */
 export function assistantStatus(): Child {
   return when(busy, () => {
