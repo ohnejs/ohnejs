@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it, mock } from 'node:test';
 
+import pkg from '../../../../package.json' with { type: 'json' };
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { usePrinter } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
@@ -79,13 +80,16 @@ describe('ohne init', () => {
     strictEqual(manifest.dependencies.ohnejs.startsWith('^'), false);
   });
 
-  it('installs the types the base config requires', async () => {
+  it('pins the toolchain ohne itself is checked against', async () => {
     const dir = join(freshDir('app'), 'typed');
 
     await runCommand(ohne, ['init', dir, '--yes']);
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    strictEqual(manifest.devDependencies['@types/node'].startsWith('^'), false);
-    strictEqual(manifest.devDependencies.typescript.startsWith('^'), false);
+    deepStrictEqual(manifest.devDependencies, {
+      '@types/node': pkg.devDependencies['@types/node'],
+      typescript: pkg.devDependencies.typescript,
+    });
+    deepStrictEqual(manifest.engines, pkg.engines);
     strictEqual(manifest.scripts.typecheck, 'tsc');
   });
 
