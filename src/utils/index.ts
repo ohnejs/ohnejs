@@ -246,6 +246,7 @@ export * from './template/parse-template.ts';
 export * from './template/render-label.ts';
 export * from './template/render-template.ts';
 export * from './template/template-fields.ts';
+export * from './text/code-fences.ts';
 export * from './text/decode-text.ts';
 export * from './text/pluralize.ts';
 export * from './timeout/long-timeout.ts';
