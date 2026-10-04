@@ -231,6 +231,7 @@ export * from './search/matches-word-start.ts';
 export * from './search/folded-range.ts';
 export * from './search/search-by-keywords.ts';
 export * from './search/search-tokens.ts';
+export * from './shell/launcher-name.ts';
 export * from './shell/shell-path.ts';
 export * from './sleep/sleep.ts';
 export * from './slug/slugify-file-name.ts';
