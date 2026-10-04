@@ -25,7 +25,6 @@ import {
   useT,
 } from 'ohnejs/dashboard';
 import {
-  capitalize,
   deepEqual,
   effect,
   first,
@@ -42,7 +41,7 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
-import { localeName } from '../components/content-language-switcher.ts';
+import { languageName } from '../components/content-language-switcher.ts';
 import '../components/data-table-popup.ts';
 
 css`
@@ -292,7 +291,7 @@ registerFieldType(
 
 registerFieldType(
   'locale',
-  codeType(() => dashboardMeta()?.locales ?? [], localeName),
+  codeType(() => dashboardMeta()?.locales ?? [], languageName),
 );
 
 registerFieldType('timezone', {
@@ -549,18 +548,6 @@ function codeControl(
       routed.value = '';
     },
   };
-}
-
-/**
- * A language's name in itself, like `Deutsch` for `de`, falling back to the tag.
- * The name is capitalized, since some languages spell their own name lowercase.
- */
-function languageName(code: string): string {
-  try {
-    return capitalize(new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code);
-  } catch {
-    return code;
-  }
 }
 
 const TIMEZONE_CHOICES: DynamicSelectChoice[] = timezones.map((value) => ({ value }));

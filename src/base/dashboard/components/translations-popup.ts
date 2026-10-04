@@ -34,7 +34,7 @@ import {
   activeContentLocale,
   contentLocale,
   effectiveContentLocale,
-  localeName,
+  languageName,
 } from './content-language-switcher.ts';
 
 /**
@@ -303,7 +303,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
           'div',
           { class: 'ohne-row o-translations-locale' },
           h('div', { class: 'ohne-shrink-0' }, formatLocaleCode(code)),
-          h('span', { class: 'ohne-muted ohne-truncate' }, `(${localeName(code)})`),
+          h('span', { class: 'ohne-muted ohne-truncate' }, `(${languageName(code)})`),
           code === current
             ? h(
                 'span',

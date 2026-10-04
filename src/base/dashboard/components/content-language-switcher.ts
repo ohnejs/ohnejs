@@ -11,7 +11,6 @@ import {
   sessionUser,
   toast,
   updateSessionUser,
-  useDashboardLanguage,
   useRoute,
   useT,
   when,
@@ -154,7 +153,7 @@ function switcher(): HTMLElement {
             (dashboardMeta()?.locales ?? []).map((locale) => {
               const selected = effectiveContentLocale() === locale;
               return dropdownItem(
-                [selected ? icon('check') : null, h('span', null, localeName(locale))],
+                [selected ? icon('check') : null, h('span', null, languageName(locale))],
                 {
                   indent: !selected,
                   onClick: () => {
@@ -188,15 +187,12 @@ export function effectiveContentLocale(): string {
 }
 
 /**
- * The locale's display name in the dashboard's interface language, falling back to the code.
- * The name is capitalized, since some languages spell language names lowercase.
- * The discovery data carries only codes.
+ * A language's name in itself, like `Deutsch` for `de`, falling back to the tag.
+ * The name is capitalized, since some languages spell their own name lowercase.
  */
-export function localeName(code: string): string {
+export function languageName(code: string): string {
   try {
-    return capitalize(
-      new Intl.DisplayNames([useDashboardLanguage().value], { type: 'language' }).of(code) ?? code,
-    );
+    return capitalize(new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code);
   } catch {
     return code;
   }
