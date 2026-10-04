@@ -126,9 +126,15 @@ css`
   }
 
   .o-where-filters :where(.o-where-filters-actions) {
-    display: none;
+    display: flex;
     gap: 0.25rem;
     margin-left: auto;
+  }
+
+  @media (hover: hover) {
+    .o-where-filters :where(.o-where-filters-actions) {
+      display: none;
+    }
   }
 
   :where(.o-where-filters-item:hover, .o-where-filters-item:focus-within)

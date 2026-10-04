@@ -159,6 +159,13 @@ export interface SearchWindow {
   offset?: number;
 
   /**
+   * The collections to leave out, by their registered names.
+   * They are never searched, followed, or counted toward `RELATED_PASSES`.
+   * So they take no related group's place.
+   */
+  exclude?: readonly string[];
+
+  /**
    * Stops the search once aborted: no further collection is read, and the records found so far answer.
    */
   signal?: AbortSignal;
@@ -251,6 +258,7 @@ interface Search {
   collections: DashboardCollection[];
   targets: Map<string, Promise<Linkable | null>>;
   probes: Map<string, Promise<boolean>>;
+  scopes: Map<CollectionQueryMeta['fields'], Map<string, Branches>>;
 }
 
 /**
@@ -294,15 +302,18 @@ export const RELATED_PASSES = 8;
  * Each token matches their own fields or the label of a record a relation field links to, at any depth.
  * A pasted `UUID` lists the records linking to it, in its owner's collection only.
  * With `collection` and `via` only that related group is read, so its pages follow each other.
+ * A collection `exclude` names takes no part: no hit, no related group, no pass.
  */
 export async function searchRecords(
   user: User,
   q: string,
-  { limit, collection: only, via, offset = 0, signal }: SearchWindow,
+  { limit, collection: only, via, offset = 0, exclude = [], signal }: SearchWindow,
 ): Promise<SearchAnswer> {
   const tokens = searchTokens(q).map((token) => (isUUID(token) ? token.toLowerCase() : token));
   if (isEmpty(tokens)) return { results: [] };
-  const collections = describeCollections(user);
+  const collections = describeCollections(user).filter(
+    (collection) => !exclude.includes(collection.name),
+  );
   const search: Search = {
     user,
     tokens,
@@ -315,6 +326,7 @@ export async function searchRecords(
     collections,
     targets: new Map(),
     probes: new Map(),
+    scopes: new Map(),
   };
   if (!isUndefined(via)) return { results: await relatedPage(search, only, via) };
   const sources = collections.filter((collection) => isUndefined(only) || collection.name === only);
@@ -385,11 +397,13 @@ async function readDirect(search: Search, target: Searchable): Promise<Hit[]> {
  * The condition a direct read sends: every token in the target's own fields, or `null` when one cannot match.
  */
 function directWhere(
-  { tokens, guards }: Search,
+  { tokens, guards, scopes }: Search,
   { meta, labels }: Searchable,
   budget = Math.floor(guards.maxConditions / tokens.length),
 ): ConditionObject | null {
-  const matches = tokens.map((token) => own(meta, token, budget, guards.maxHasDepth, labels));
+  const matches = tokens.map((token) =>
+    own(scopes, meta, token, budget, guards.maxHasDepth, labels),
+  );
   if (matches.some((match) => isEmpty(match.branches))) return null;
   return { and: matches.map((match) => ({ or: match.branches })) };
 }
@@ -628,7 +642,14 @@ function relatedPass(
     }
     const matches = links.map((link, at) => [
       ...link.branches,
-      ...own(from.meta, tokens[at], share - link.cost, guards.maxHasDepth, from.labels).branches,
+      ...own(
+        search.scopes,
+        from.meta,
+        tokens[at],
+        share - link.cost,
+        guards.maxHasDepth,
+        from.labels,
+      ).branches,
     ]);
     if (matches.some((branches) => isEmpty(branches))) return null;
     const where = {
@@ -774,19 +795,30 @@ function linkedUUIDs(row: Record<string, unknown>, { steps, name }: LinkPath): s
 
 /**
  * The labels of the linked records among `ids` that matched a word or are a routed `UUID`, by `UUID`.
- * It reads under the target's reach, in slices of `maxInLength`.
+ * It reads under the target's reach, in slices that fit both `maxInLength` and `maxBoundParams`.
+ * A read where not even one `UUID` fits skips with a `DEBUG` line.
  */
 async function targetLabels(
   search: Search,
-  { to, identities }: Pair,
+  { from, to, identities }: Pair,
   ids: readonly string[],
 ): Promise<Map<string, string>> {
+  const { guards } = search;
   const matched = [
     ...search.words.flatMap((word) => labelMatch(to, word).branches),
     ...(isEmpty(identities) ? [] : [{ UUID: { in: identities } }]),
   ];
   const labels = new Map<string, string>();
-  for (const slice of chunk(ids, search.guards.maxInLength)) {
+  const room =
+    guards.maxBoundParams -
+    readBinds({ limit: 1 }, guards) -
+    conditionBinds(conditionTree({ or: matched }));
+  if (room < 1) {
+    const name = groupName(from.collection, to.collection);
+    usePrinter().debug(`Search skipped the labels of ${name}: they do not fit the query limits`);
+    return labels;
+  }
+  for (const slice of chunk(ids, Math.min(guards.maxInLength, room))) {
     const rows = await readRows(search, to, {
       select: ['UUID', ...to.labels],
       where: { and: [{ UUID: { in: slice } }, { or: matched }] },
@@ -892,8 +924,10 @@ function labelOf({ collection, labels }: Searchable, row: Record<string, unknown
  * Each child field and allowed block type follows one `has` deeper.
  * A word never enters a composite whose `search` is off; a `UUID` enters every readable one.
  * A branch that would overrun `budget` drops, and a `has` opens only while `depth` has a level left.
+ * Below the root, a scope answers each token, budget and depth once per search, from `scopes`.
  */
 function own(
+  scopes: Search['scopes'],
   scope: CollectionQueryMeta,
   token: string,
   budget: number,
@@ -928,7 +962,11 @@ function own(
     for (const [inner, head] of nestedScopes(scope, name, field)) {
       const overhead = 1 + Object.keys(head).length;
       if (found.cost + overhead >= budget) continue;
-      const nested = own(inner, token, budget - found.cost - overhead, depth - 1);
+      const share = budget - found.cost - overhead;
+      const memo = getOrSet(scopes, inner.fields, () => new Map<string, Branches>());
+      const nested = getOrSet(memo, `${token}\0${share}\0${depth - 1}`, () =>
+        own(scopes, inner, token, share, depth - 1),
+      );
       if (isEmpty(nested.branches)) continue;
       add({ [name]: { has: { ...head, or: nested.branches } } }, overhead + nested.cost);
     }

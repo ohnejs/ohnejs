@@ -405,12 +405,23 @@ describe('the palette store', () => {
     deepStrictEqual(seen, ['ash', '', 'ash']);
   });
 
-  it('searches from the second character on', () => {
+  it('searches once a word survives tokenizing', () => {
     paletteView.value = 'search';
-    paletteQuery.value = ' a ';
-    strictEqual(paletteSearchTerm(), '');
+    for (const query of [' a ', 'a b', '..', '"a"', '👍🏽']) {
+      paletteQuery.value = query;
+      strictEqual(paletteSearchTerm(), '', query);
+    }
     paletteQuery.value = 'as';
     strictEqual(paletteSearchTerm(), 'as');
+    paletteQuery.value = '';
+  });
+
+  it('searches a lone non-ASCII character as the server does', () => {
+    paletteView.value = 'search';
+    for (const query of ['東', '\u00e9', 'e\u0301', '𠀋']) {
+      paletteQuery.value = query;
+      strictEqual(paletteSearchTerm(), query, query);
+    }
     paletteQuery.value = '';
   });
 

@@ -110,7 +110,12 @@ css`
   .o-editable-field-cell-button {
     flex-shrink: 0;
     display: inline-flex;
-    opacity: 0;
+  }
+
+  @media (hover: hover) {
+    .o-editable-field-cell-button {
+      opacity: 0;
+    }
   }
 
   :where(td):hover .o-editable-field-cell-button,

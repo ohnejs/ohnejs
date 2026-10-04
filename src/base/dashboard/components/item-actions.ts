@@ -4,9 +4,15 @@ import { onCleanup } from 'ohnejs/utils';
 css`
   .o-item-actions {
     flex-shrink: 0;
-    display: none;
+    display: flex;
     gap: 0.25rem;
     margin-left: auto;
+  }
+
+  @media (hover: hover) {
+    .o-item-actions {
+      display: none;
+    }
   }
 
   :where(.ohne-card:hover, .ohne-card:focus-within) > .ohne-card-header > * > .o-item-actions {

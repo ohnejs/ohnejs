@@ -385,6 +385,38 @@ for (const spoke of SPOKES) {
   });
 }
 
+let ticks = 0;
+useFields().register('searchCounted', {
+  name: 'searchCounted' as FieldTypeName,
+  fieldType: defineField({
+    columnType: 'text',
+    search: ({ token }) => {
+      ticks += 1;
+      return token === 'deepword' ? { contains: token } : null;
+    },
+  }),
+});
+const LOOPS = ['SearchLoopA', 'SearchLoopB', 'SearchLoopC'];
+for (const name of LOOPS) {
+  useBlocks().register(name, {
+    name,
+    block: {
+      fields: {
+        tick: field('searchCounted' as FieldTypeName, { nullable: true }),
+        kids: field('blocks', { allow: LOOPS }),
+      },
+    },
+  });
+}
+useCollections().register('SearchLoops', {
+  name: 'SearchLoops',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'title' },
+    fields: { title: field('text'), body: field('blocks', { allow: LOOPS }) },
+  },
+});
+
 useRoutes().register(routeID('POST', '/collections/[collection]/query'), {
   method: 'POST',
   pattern: '/collections/[collection]/query',
@@ -513,6 +545,22 @@ await queryUntyped('SearchAlbums')
   });
 const hub = await seed('SearchHub', { name: 'Zephyr hub' });
 for (const spoke of SPOKES) await seed(spoke, { name: `${spoke} spoke`, hub });
+const looped = await seed('SearchLoops', {
+  title: 'Looped',
+  body: [
+    {
+      block: 'SearchLoopA',
+      fields: {
+        kids: [
+          {
+            block: 'SearchLoopA',
+            fields: { kids: [{ block: 'SearchLoopA', fields: { tick: 'deepword', kids: [] } }] },
+          },
+        ],
+      },
+    },
+  ],
+});
 await queryUntyped('SearchSettings').updateOrThrow({ motto: 'Grove forever', logo });
 const settings = (await queryUntyped('SearchSettings').findFirst())?.UUID as string;
 await seed('SearchSealed', { name: 'Wyrmrest sealed' });
@@ -713,6 +761,18 @@ describe('POST /search', () => {
     const { status, body } = await search({ q: 'throne frozen' }, admin.token);
     strictEqual(status, 200);
     deepStrictEqual(body.results, [{ collection: 'SearchPages', UUID: stacked, label: 'Stacked' }]);
+  });
+
+  it('walks recursive block types once per scope and depth for a word matching nothing', async () => {
+    ticks = 0;
+    deepStrictEqual(await found('qqqzz'), []);
+    ok(ticks < 100, `${ticks} hook calls`);
+  });
+
+  it('finds a word deep inside recursive block types', async () => {
+    deepStrictEqual(await found('deepword'), [
+      { collection: 'SearchLoops', UUID: looped, label: 'Looped' },
+    ]);
   });
 
   it('finds a token in a child field', async () => {
@@ -1036,6 +1096,39 @@ describe('POST /search related records', () => {
     );
     strictEqual('truncated' in (await search({ q: 'ceo' }, admin.token)).body, false);
   });
+
+  it('leaves an `exclude`d collection out of the related passes', async () => {
+    const one = (await search({ q: 'zephyr', exclude: [SPOKES[0]] }, admin.token)).body;
+    deepStrictEqual(
+      one.results.map((result) => result.collection),
+      ['SearchHub', ...SPOKES.slice(1, 9)],
+    );
+    strictEqual('truncated' in one, false);
+    const two = (await search({ q: 'zephyr', exclude: SPOKES.slice(0, 2) }, admin.token)).body;
+    deepStrictEqual(
+      two.results.map((result) => result.collection),
+      ['SearchHub', ...SPOKES.slice(2, 9)],
+    );
+    strictEqual('truncated' in two, false);
+  });
+
+  it('answers nothing from an `exclude`d collection, directly, by `collection` or by `via`', async () => {
+    const results = async (body: Record<string, unknown>) =>
+      (await search({ ...body, exclude: ['SearchHub'] }, admin.token)).body.results;
+    deepStrictEqual(await results({ q: 'zephyr', collection: 'SearchHub' }), []);
+    deepStrictEqual(await results({ q: 'zephyr', collection: SPOKES[0], via: 'SearchHub' }), []);
+    const words = await results({ q: 'zephyr' });
+    strictEqual(
+      words.some((result) => [result.collection, result.via?.collection].includes('SearchHub')),
+      false,
+    );
+    deepStrictEqual(await results({ q: hub }), []);
+  });
+
+  it('refuses an `exclude` that is not a list of names', async () => {
+    strictEqual((await search({ q: 'zephyr', exclude: 'SearchHub' }, admin.token)).status, 400);
+    strictEqual((await search({ q: 'zephyr', exclude: [1] }, admin.token)).status, 400);
+  });
 });
 
 describe('POST /search related records under a lowered `maxBoundParams`', () => {
@@ -1050,5 +1143,23 @@ describe('POST /search related records under a lowered `maxBoundParams`', () => 
       useLayers().remove('/search-binds');
       strictEqual(/SearchItems.*SearchNotes.*answered/.test(printed.join('')), false, `max ${max}`);
     }
+  });
+
+  it('keeps every linked label, reading them in slices that fit', async () => {
+    const files: string[] = [];
+    for (let at = 0; at < 40; at += 1) {
+      files.push(await seed('SearchFiles', { name: `quokka-${at}.png` }));
+    }
+    await seed('SearchPeople', { name: 'Zed Moss', gallery: files });
+    useLayers().add({
+      path: '/search-labels',
+      input: { query: { guards: { maxBoundParams: 30 } } },
+    });
+    const results = await found('zed quokka');
+    useLayers().remove('/search-labels');
+    deepStrictEqual(
+      results.map((result) => [result.label, result.via?.targets.length]),
+      [['Zed Moss', 40]],
+    );
   });
 });

@@ -172,7 +172,7 @@ css`
 /**
  * The search palette, mounted by the dashboard boot into the shell's `global` slot.
  * It renders while `paletteOpen` is set: a search input over the matching records and pages.
- * Typing two characters or more searches every collection through `POST /search` after a pause.
+ * A query holding a word searches every collection through `POST /search` after a pause.
  * It searches only under the search view, and a new query aborts the request still out for the last.
  * Direct hits group by collection, then come the sidebar's menu rows matching the query.
  * Related hits follow, grouped by collection and the collection they link to, then the `row` slots' rows.

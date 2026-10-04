@@ -1,11 +1,13 @@
 import {
   groupBy,
   type IconName,
+  isEmpty,
   isUndefined,
   recordHref,
   type Ref,
   ref,
   searchByKeywords,
+  searchTokens,
 } from 'ohnejs/utils';
 
 /**
@@ -323,11 +325,6 @@ export interface PaletteGroup {
 }
 
 /**
- * The characters a query needs before the palette searches records.
- */
-const MIN_TERM = 2;
-
-/**
  * The view the palette body shows while open.
  * `'search'` lists the results; a layer that registers a `view` slot may switch to its own.
  */
@@ -357,13 +354,13 @@ export const paletteActive: Ref<string> = ref('');
 /**
  * The text the palette searches for: the trimmed query while the search view shows, else `''`.
  * Another view owns the input, so what the person types there never reaches `POST /search`.
- * A command, a query starting with `/`, is no search either, and neither is a single character.
+ * A command, a query starting with `/`, is no search either, and neither is one `searchTokens` leaves empty.
  * Reactive.
  */
 export function paletteSearchTerm(): string {
   if (paletteView.value !== 'search') return '';
   const query = paletteQuery.value.trim();
-  return isPaletteCommand(query) || query.length < MIN_TERM ? '' : query;
+  return isPaletteCommand(query) || isEmpty(searchTokens(query)) ? '' : query;
 }
 
 /**
