@@ -13,6 +13,7 @@ import { computed, effect, isString, onCleanup, type Ref, ref, searchTokens } fr
 import { overviewQuickCreate } from '../components/overview-quick-create.ts';
 import { overviewRecentEdits } from '../components/overview-recent-edits.ts';
 import { searchInput } from '../components/search-input.ts';
+import { shellSlots } from '../components/shell-slots.ts';
 import { shell } from '../components/shell.ts';
 
 /**
@@ -119,12 +120,12 @@ css`
 
 /**
  * The overview page.
- * The search input sits over the widget sections, on the signed-in shell.
+ * The `overview` shell slot and the search input sit over the widget sections, on the signed-in shell.
  */
 export default defineDashboardPage(() => shell(() => overview()));
 
 /**
- * The page body: the search input and the Shortcuts and Activity sections.
+ * The page body: the `overview` shell slot, the search input, and the Shortcuts and Activity sections.
  * A no-results status shows while an active search matches nothing.
  */
 function overview(): Child {
@@ -153,6 +154,7 @@ function overview(): Child {
   return h(
     'div',
     { class: () => 'o-overview' + (search.active() ? ' o-overview-searching' : '') },
+    ...shellSlots('overview').map((render) => render()),
     field.box,
     h(
       'section',
