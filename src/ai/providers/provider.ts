@@ -36,7 +36,6 @@ export interface ProviderOptions {
 
   /**
    * The most tokens one answer may spend, reasoning and thinking included.
-   * Raise it for a reasoning model or a thinking budget, staying under the model's own output limit.
    *
    * @default
    * 8192
