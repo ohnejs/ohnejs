@@ -33,6 +33,10 @@
       "default": "./src/base/auth/index.ts"
     },
     "./base": "./src/base/ohne.config.ts",
+    "./create": {
+      "types": "./src/ohne/cli/create.ts",
+      "default": "./src/ohne/cli/create.ts"
+    },
     "./dashboard": {
       "types": "./src/dashboard/index.ts",
       "default": "./src/dashboard/index.ts"
