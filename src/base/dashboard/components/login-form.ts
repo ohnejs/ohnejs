@@ -13,7 +13,10 @@ import {
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { effect, ref } from 'ohnejs/utils';
+import { effect, isNull, isUndefined, ref } from 'ohnejs/utils';
+
+import { loginDefaults } from './login-defaults.ts';
+import { shellSlots } from './shell-slots.ts';
 
 /**
  * Options for `loginForm`.
@@ -38,6 +41,7 @@ export interface LoginFormOptions {
  * The password input reveals through its suffix button.
  * Enter submits from any control, including the remember-me checkbox.
  * A success updates `sessionUser`, so the page hosting the form owns the navigation.
+ * The fields start from `loginDefaults`, and the `login` shell slot renders after `footer`.
  */
 export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   const t = useT();
@@ -48,6 +52,13 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   const emailError = ref(false);
   const passwordError = ref(false);
   const busy = ref(false);
+
+  effect(() => {
+    const defaults = loginDefaults();
+    if (isNull(defaults)) return;
+    if (!isUndefined(defaults.email)) email.value = defaults.email;
+    if (!isUndefined(defaults.password)) password.value = defaults.password;
+  });
 
   // Reading the failure strings here starts their catalog fetches, so the first toast is translated.
   t('auth.invalidCredentials');
@@ -150,5 +161,6 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     field(rememberRow),
     field(button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' })),
     options.footer,
+    ...shellSlots('login').map((render) => render()),
   );
 }
