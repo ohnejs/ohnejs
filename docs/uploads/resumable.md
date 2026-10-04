@@ -168,9 +168,9 @@ export default defineConfig({
 A [backend](./storage.md#a-backend-of-your-own) resumes uploads when it implements `parts`:
 
 - `fs` has it.
-- [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) has it. Keep `chunkSize` at `5mb` or more
+- [`@ohnejs/s3`](./storage.md#storing-files-in-s3) has it. Keep `chunkSize` at `5mb` or more
   there, and give the bucket the lifecycle rule from its
-  [README](https://github.com/ohnejs/uploads-s3#bucket-setup).
+  [README](https://github.com/ohnejs/s3#bucket-setup).
 - Without it, opening a session answers `501`, and the dashboard sends every file whole.
 
 ## What goes up whole

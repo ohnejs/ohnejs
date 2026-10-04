@@ -251,7 +251,7 @@ export default defineConfig({
 Sizes take bytes or a string like `'8mb'`. Durations take milliseconds or a string like `'1h'`.
 
 - `storage` - the [backend](./storage.md), by name. The layer ships `fs`, and
-  [`@ohnejs/uploads-s3`](./storage.md#storing-files-in-s3) adds `s3`.
+  [`@ohnejs/s3`](./storage.md#storing-files-in-s3) adds `s3`.
 - `url` - where the backend keeps the files: a directory for `fs`, a bucket and prefix for
   [`s3`](./storage.md#storing-files-in-s3). `UPLOADS_URL` overrides it.
 - `maxFileSize` - the largest file that can be uploaded.

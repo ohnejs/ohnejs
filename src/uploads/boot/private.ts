@@ -22,7 +22,7 @@ hook('server:ready', async () => {
     body: [
       `The \`${storage}\` storage cannot hide an object, so anyone who knows a private file's path opens it at \`${publicURL}\`.`,
       '',
-      'Use a storage with `setPrivate`, such as `@ohnejs/uploads-s3` with tagging, or drop `uploads.publicURL`.',
+      'Use a storage with `setPrivate`, such as `@ohnejs/s3` with tagging, or drop `uploads.publicURL`.',
     ].join('\n'),
   });
 });

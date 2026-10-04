@@ -144,7 +144,7 @@ COOKIE_SECRET=zug-zug-work-work-jobs-done
 UPLOADS_SECRET=frostmourne-hungers
 ```
 
-When you store files with [`@ohnejs/uploads-s3`](../uploads/storage.md#storing-files-in-s3), also set
+When you store files with [`@ohnejs/s3`](../uploads/storage.md#storing-files-in-s3), also set
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
 Set them in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project

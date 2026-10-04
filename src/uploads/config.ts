@@ -18,7 +18,7 @@ declare module 'ohnejs' {
        * The storage backend, by the name a boot file registered it under.
        *
        * - The layer ships `fs`, which keeps files on the local filesystem.
-       * - `@ohnejs/uploads-s3` adds `s3`.
+       * - `@ohnejs/s3` adds `s3`.
        *
        * @default
        * 'fs'

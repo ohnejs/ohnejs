@@ -7,10 +7,10 @@ root. The `UPLOADS_URL` env var overrides `url`.
 ## Storing files in S3
 
 For S3 and S3-compatible services, install
-[`@ohnejs/uploads-s3`](https://github.com/ohnejs/uploads-s3).
+[`@ohnejs/s3`](https://github.com/ohnejs/s3).
 
 ```sh
-pnpm add @ohnejs/uploads-s3
+pnpm add @ohnejs/s3
 ```
 
 ```ts
@@ -18,13 +18,13 @@ pnpm add @ohnejs/uploads-s3
 import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
-  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/uploads-s3'],
+  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/s3'],
   uploads: { storage: 's3', url: 's3://my-bucket/uploads?region=eu-central-1' },
 });
 ```
 
 Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The
-[package README](https://github.com/ohnejs/uploads-s3#readme) covers bucket setup, private files,
+[package README](https://github.com/ohnejs/s3#readme) covers bucket setup, private files,
 and services such as R2 and MinIO.
 
 ## A backend of your own
@@ -59,7 +59,7 @@ A backend implements `StorageAdapter`; its JSDoc names each method. The rules it
   [private](./private-files.md). Without it, a private object stays readable at `publicURL`, and
   ohne warns at boot.
 - A backend that serves its files itself stores the `disposition` that `write` receives, as
-  `@ohnejs/uploads-s3` does. Without it, an uploaded HTML file runs as a page on that origin.
+  `@ohnejs/s3` does. Without it, an uploaded HTML file runs as a page on that origin.
 - `list` lets `ohne uploads prune` find [stray files](#stray-files). Without it, the command
   refuses.
 - `parts` lets a file go up in [resumable chunks](./resumable.md). Without it, opening a session
