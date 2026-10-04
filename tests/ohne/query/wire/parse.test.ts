@@ -709,7 +709,9 @@ describe('parseQueryParams enforces the DoS ceilings on the untrusted path', () 
   it('measures a text pattern as it folds, and a `like` pattern as written', () => {
     const roomy: QueryGuards = { ...DEFAULT_QUERY_GUARDS, maxPatternBytes: 6 };
     strictEqual(failure('where={title:{contains:%EF%B7%BA}}', roomy).code, 'patternTooLarge');
-    deepStrictEqual(parse('where={title:{like:ab}}', roomy).where, { title: { like: 'ab' } });
+    deepStrictEqual(parse('where={title:{like:%EF%B7%BA}}', roomy).where, {
+      title: { like: '\uFDFA' },
+    });
   });
 
   it('counts the worst-case locale binds toward the bound-param ceiling', () => {

@@ -3,7 +3,7 @@ import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
 
-const CLOCK_PREFIX = /^\d{2}:(?:\d{2}(?::\d{2})?)?$/;
+const CLOCK_PREFIX = /^\d{2}:\d{2}(?::\d{2})?$/;
 
 /**
  * The built-in `time` field type: a time of day, stored as `HH:MM:SS` text.
@@ -11,7 +11,7 @@ const CLOCK_PREFIX = /^\d{2}:(?:\d{2}(?::\d{2})?)?$/;
  * A wall-clock time carries no date and no timezone.
  * `HH:MM` input is accepted and stored with `:00` seconds, so every stored value compares alike.
  * The fixed-width form sorts and compares lexicographically in clock order, so range queries just work.
- * Search matches a clock prefix, `HH:` or `HH:MM`; a bare `10` is too vague to match.
+ * Search matches a clock prefix, `HH:MM` or `HH:MM:SS`; a bare `10` is too vague to match.
  */
 export const time = defineField({
   columnType: 'text',

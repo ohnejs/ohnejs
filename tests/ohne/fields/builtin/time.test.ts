@@ -5,6 +5,7 @@ import type { FieldSearchContext } from '../../../../src/ohne/fields/define-fiel
 
 import { time } from '../../../../src/ohne/fields/builtin/time.ts';
 import { searchHook } from '../../../../src/ohne/fields/field-search.ts';
+import { searchTokens } from '../../../../src/utils/index.ts';
 
 type ValidateCtx = Parameters<NonNullable<typeof time.validators>[number]>[1];
 type WriteCtx = Parameters<NonNullable<typeof time.sanitizers>[number]>[1];
@@ -84,12 +85,18 @@ const search = (token: string, options: Record<string, unknown> = {}) =>
 
 describe('time search', () => {
   it('matches a clock prefix', () => {
-    deepStrictEqual(search('10:'), { startsWith: '10:' });
     deepStrictEqual(search('10:30'), { startsWith: '10:30' });
     deepStrictEqual(search('10:30:15'), { startsWith: '10:30:15' });
   });
 
   it('gives `null` for bare digits and anything else', () => {
-    for (const token of ['10', '1:30', '10:3', 'noon']) strictEqual(search(token), null);
+    for (const token of ['10', '10:', '1:30', '10:3', 'noon']) strictEqual(search(token), null);
+  });
+
+  it('matches what a query tokenizes to', () => {
+    deepStrictEqual(
+      searchTokens('10: 10:30 10:30:15').map((token) => search(token)),
+      [null, { startsWith: '10:30' }, { startsWith: '10:30:15' }],
+    );
   });
 });
