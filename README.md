@@ -1,5 +1,13 @@
 # ohne
 
+[![npm](https://img.shields.io/npm/v/ohnejs?style=flat&colorA=18181b&colorB=2563eb)](https://www.npmjs.com/package/ohnejs)
+[![license](https://img.shields.io/npm/l/ohnejs?style=flat&colorA=18181b&colorB=2563eb)](LICENSE)
+
+**Website:** [https://ohne.dev](https://ohne.dev)<br>
+**Documentation:** [https://ohne.dev/docs](https://ohne.dev/docs)
+
+---
+
 A zero-dependency TypeScript framework for the web. "ohne" is German for "without".
 
 You get a database, an HTTP API, internationalization, and a dashboard, with no build step. The
