@@ -52,6 +52,8 @@ export interface EditableFieldCellOptions {
    * - `'absolute'` - pinned to the cell's bottom right corner.
    * - `'auto'` - `'absolute'` when the last `.o-item` leaves under `32px` of room, else `'relative'`.
    *
+   * A cell narrower than `6rem` pins the button to its right edge whatever the position.
+   *
    * @default
    * 'relative'
    */
@@ -100,6 +102,7 @@ css`
     gap: 0.5rem;
     align-items: center;
     min-height: 1.5rem;
+    container-type: inline-size;
   }
 
   .o-editable-field-cell-wrap {
@@ -131,6 +134,14 @@ css`
     padding: 0.125rem;
     background-color: hsl(var(--ohne-background));
     border-radius: var(--ohne-radius);
+  }
+
+  @container (max-width: 6rem) {
+    .o-editable-field-cell-button {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+    }
   }
 `;
 
