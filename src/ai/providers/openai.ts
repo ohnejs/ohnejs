@@ -63,6 +63,7 @@ const ANSWER = 'answer';
 export function createOpenAIProvider(options: ProviderOptions): Provider {
   const url = `${withoutTrailingSlash(options.baseURL ?? API)}/responses`;
   const headers = { ...bearer(options.key), ...options.headers };
+  const cap = options.maxOutput ?? DEFAULT_MAX_OUTPUT;
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>
     postEvents(url, {
       headers,
@@ -75,7 +76,7 @@ export function createOpenAIProvider(options: ProviderOptions): Provider {
     step(request, signal) {
       const body = {
         model: options.model,
-        max_output_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        max_output_tokens: cap,
         stream: true,
         store: false,
         include: ['reasoning.encrypted_content'],
@@ -100,7 +101,7 @@ export function createOpenAIProvider(options: ProviderOptions): Provider {
     complete(request, signal) {
       const body = {
         model: options.model,
-        max_output_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        max_output_tokens: cap,
         stream: true,
         store: false,
         instructions: toInstructions(request.system),

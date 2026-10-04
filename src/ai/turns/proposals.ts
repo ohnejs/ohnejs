@@ -272,6 +272,7 @@ async function checkQuery(
  * A `via` stands only beside `collection`, and neither may name a collection `ai.deny` lists.
  * A `limit` outside 1 to `SEARCH_MAX_LIMIT`, or an `offset` outside 0 to `SEARCH_MAX_OFFSET`, is refused.
  * The route would answer either short, and the model would read the short count as the whole.
+ * The body it returns names `ai.deny`'s collections in `exclude`, so they never take a related pass.
  */
 function checkSearch(
   body: Record<string, unknown>,
@@ -295,7 +296,7 @@ function checkSearch(
       return failed('invalidValue', `body.${key}`);
     }
   }
-  return { ok: true, value: { body, identity: false } };
+  return { ok: true, value: { body: { ...body, exclude: deny.collections }, identity: false } };
 }
 
 /**

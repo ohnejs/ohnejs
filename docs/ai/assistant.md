@@ -50,6 +50,9 @@ models: {
 - `key` names the environment variable that holds the API key. The key never leaves the server.
   `false` sends none, for a local server.
 - `headers` and `options` pass provider-specific headers and request fields through unchanged.
+- `maxOutput` caps how many tokens one answer may spend, reasoning included: 8192 unless you set
+  it. Raise it for a reasoning model such as `gpt-5`, or when you turn on thinking through
+  `options`, if answers come back cut short.
 - A person may pick another entry for a question in the palette. Omitted, `ai.model` answers.
 
 ## What a person sees

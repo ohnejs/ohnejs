@@ -64,6 +64,7 @@ const ANSWER = 'answer';
  * The assistant's turn is replayed as one message with its `tool_calls`.
  * A call's arguments arrive as fragments keyed by `index`, joined and parsed at the end.
  * Usage rides on the final chunk, which `stream_options.include_usage` asks for.
+ * OpenAI's own API takes the cap as `max_completion_tokens`, any other server as `max_tokens`.
  * The prompt is cached by prefix on the server's side, so `cache` on a block changes nothing.
  * A `429` for an exhausted quota is never rerun.
  *
@@ -77,7 +78,12 @@ const ANSWER = 'answer';
  * ```
  */
 export function createOpenAICompatibleProvider(options: ProviderOptions): Provider {
-  const url = `${withoutTrailingSlash(options.baseURL ?? API)}/chat/completions`;
+  const base = withoutTrailingSlash(options.baseURL ?? API);
+  const url = `${base}/chat/completions`;
+  const cap = {
+    [base === withoutTrailingSlash(API) ? 'max_completion_tokens' : 'max_tokens']:
+      options.maxOutput ?? DEFAULT_MAX_OUTPUT,
+  };
   const headers = { ...bearer(options.key), ...options.headers };
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>
     postEvents(url, {
@@ -91,7 +97,7 @@ export function createOpenAICompatibleProvider(options: ProviderOptions): Provid
     step(request, signal) {
       const body = {
         model: options.model,
-        max_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        ...cap,
         stream: true,
         stream_options: { include_usage: true },
         messages: [toSystem(request.system), ...request.transcript],
@@ -120,7 +126,7 @@ export function createOpenAICompatibleProvider(options: ProviderOptions): Provid
     complete(request, signal) {
       const body = {
         model: options.model,
-        max_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        ...cap,
         stream: true,
         stream_options: { include_usage: true },
         messages: [toSystem(request.system), { role: 'user', content: request.input }],

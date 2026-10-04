@@ -33,6 +33,15 @@ export interface ProviderOptions {
    * Provider-native request fields, deep-merged under the fields the adapter sets.
    */
   options?: Record<string, unknown>;
+
+  /**
+   * The most tokens one answer may spend, reasoning and thinking included.
+   * Raise it for a reasoning model or a thinking budget, staying under the model's own output limit.
+   *
+   * @default
+   * 8192
+   */
+  maxOutput?: number;
 }
 
 /**
@@ -171,7 +180,7 @@ export interface Transcript {
  *
  * - `end`: the model finished its answer.
  * - `calls`: the model made calls and waits for their results.
- * - `length`: the answer was cut at `maxOutput` or at the context window.
+ * - `length`: the answer was cut at the model's `maxOutput` or at the context window.
  * - `refusal`: the provider declined the request.
  */
 export type StopReason = 'end' | 'calls' | 'length' | 'refusal';
@@ -194,14 +203,6 @@ export interface StepRequest {
    * Every item so far, the person's words and results included, in the provider's own shape.
    */
   transcript: TranscriptItem[];
-
-  /**
-   * The most output tokens the model may produce.
-   *
-   * @default
-   * 8192
-   */
-  maxOutput?: number;
 }
 
 /**
@@ -295,14 +296,6 @@ export interface CompleteRequest {
    * Every object lists every property in `required`.
    */
   schema: Record<string, unknown>;
-
-  /**
-   * The most output tokens the model may produce.
-   *
-   * @default
-   * 8192
-   */
-  maxOutput?: number;
 }
 
 /**
@@ -403,7 +396,7 @@ export interface Provider {
 
   /**
    * Answers one request with a JSON value matching `request.schema`.
-   * A refusal throws `refusal`; an answer cut at `maxOutput` throws `truncated`.
+   * A refusal throws `refusal`; an answer cut at the model's `maxOutput` throws `truncated`.
    */
   complete(request: CompleteRequest, signal: AbortSignal): Promise<Completion>;
 
@@ -420,7 +413,7 @@ export interface Provider {
  * - `status`: the answer's status was not `2xx`; `status` carries it.
  * - `stream`: the provider accepted the request and failed while answering, or ended before the answer.
  * - `refusal`: the provider declined a `complete`.
- * - `truncated`: a `complete` was cut at `maxOutput`.
+ * - `truncated`: a `complete` was cut at the model's `maxOutput`.
  * - `malformed`: the answer was not what the wire promises, such as a call whose input is not JSON.
  */
 export type ProviderErrorCode =
@@ -492,7 +485,7 @@ export interface ProviderErrorInit {
 const PROVIDER_ERROR = Symbol('ai.providerError');
 
 /**
- * The most output tokens a step or a `complete` asks for when the request names none.
+ * The most output tokens a step or a `complete` asks for when the model's entry names none.
  */
 export const DEFAULT_MAX_OUTPUT = 8192;
 

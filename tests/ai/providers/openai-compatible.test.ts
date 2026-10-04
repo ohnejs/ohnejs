@@ -286,6 +286,44 @@ describe('createOpenAICompatibleProvider', () => {
     );
   });
 
+  it("sends max_completion_tokens, never max_tokens, to OpenAI's own API", async (t) => {
+    const forward = globalThis.fetch;
+    const urls: string[] = [];
+    t.mock.method(globalThis, 'fetch', (url: string | URL, init?: RequestInit) => {
+      urls.push(new URL(String(url)).href);
+      return forward(server.url + new URL(String(url)).pathname.replace('/v1', ''), init);
+    });
+    const structured = sse([chunk({ content: '{}' }), ...tail('stop')]) + done();
+    for (const baseURL of [undefined, 'https://api.openai.com/v1/']) {
+      const own = createOpenAICompatibleProvider({ model: 'gpt-5', key: 'k', baseURL });
+      server.answer({ body: hello() }, { body: structured });
+      await Array.fromAsync(own.step(request, signal));
+      await own.complete({ system: request.system, input: 'Translate', schema }, signal);
+    }
+    deepStrictEqual(urls, Array(4).fill('https://api.openai.com/v1/chat/completions'));
+    for (const { body } of server.requests) {
+      strictEqual(body.max_completion_tokens, 8192);
+      strictEqual('max_tokens' in body, false);
+    }
+  });
+
+  it("sends the model's maxOutput as its cap", async () => {
+    const own = createOpenAICompatibleProvider({
+      model: 'llama-test',
+      key: 'k',
+      baseURL: server.url,
+      maxOutput: 32000,
+    });
+    const structured = sse([chunk({ content: '{}' }), ...tail('stop')]) + done();
+    server.answer({ body: hello() }, { body: structured });
+    await Array.fromAsync(own.step(request, signal));
+    await own.complete({ system: request.system, input: 'Translate', schema }, signal);
+    deepStrictEqual(
+      server.requests.map(({ body }) => body.max_tokens),
+      [32000, 32000],
+    );
+  });
+
   describe('complete', () => {
     const answer = { system: request.system, input: 'Translate', schema };
 

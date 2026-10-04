@@ -68,8 +68,8 @@ export function modelOptions(name: string): { entry: AIModel; options: ProviderO
       body: [`Set \`${entry.key}\` to its API key, in the environment or in \`.env\`.`],
     });
   }
-  const { model, baseURL, headers, options } = entry;
-  return { entry, options: { model, key, baseURL, headers, options } };
+  const { model, baseURL, headers, options, maxOutput } = entry;
+  return { entry, options: { model, key, baseURL, headers, options, maxOutput } };
 }
 
 /**

@@ -152,13 +152,14 @@ describe('createAnthropicProvider', () => {
       key: 'k',
       baseURL: `${server.url}/`,
       headers: { 'anthropic-beta': 'x' },
+      maxOutput: 64,
       options: { temperature: 0, max_tokens: 1, tools: [] },
     });
     server.answer({ body: hello() });
     const tools = [
       { name: 'request', description: 'Send a request.', input: schema, strict: true },
     ];
-    await Array.fromAsync(own.step({ ...request, tools, maxOutput: 64 }, signal));
+    await Array.fromAsync(own.step({ ...request, tools }, signal));
     const [seen] = server.requests;
     strictEqual(seen?.path, '/v1/messages');
     strictEqual(seen?.headers['anthropic-beta'], 'x');
@@ -167,6 +168,22 @@ describe('createAnthropicProvider', () => {
     deepStrictEqual(seen?.body.tools, [
       { name: 'request', description: 'Send a request.', input_schema: schema, strict: true },
     ]);
+  });
+
+  it("sends the model's maxOutput as its cap, beside a thinking budget", async () => {
+    const thinking = { type: 'enabled', budget_tokens: 16000 };
+    const own = createAnthropicProvider({
+      model: 'claude-test',
+      key: 'k',
+      baseURL: server.url,
+      maxOutput: 20000,
+      options: { thinking },
+    });
+    server.answer({ body: hello() });
+    await Array.fromAsync(own.step(request, signal));
+    const [seen] = server.requests;
+    strictEqual(seen?.body.max_tokens, 20000);
+    deepStrictEqual(seen?.body.thinking, thinking);
   });
 
   it('joins a call input from its fragments and keeps thinking blocks for replay', async () => {

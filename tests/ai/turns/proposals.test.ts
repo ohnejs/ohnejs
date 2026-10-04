@@ -5,6 +5,7 @@ import type { Proposal } from '../../../src/ai/turns/proposals.ts';
 import type { Receipt } from '../../../src/ai/turns/receipts.ts';
 import type { Config } from '../../../src/ohne/layers/config.ts';
 
+import { AI_DEFAULTS } from '../../../src/ai/config.ts';
 import { checkProposal } from '../../../src/ai/turns/proposals.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
@@ -400,6 +401,20 @@ describe('checkProposal', () => {
     deepStrictEqual(
       await search({ q: 'x', where: {} }),
       refused('POST /search', 'unknownParam', 'body.where'),
+    );
+  });
+
+  it("names `ai.deny` in an accepted search body's `exclude`, and refuses one the model sends", async () => {
+    const search = (body: unknown) => check({ route: 'POST /search', body });
+    const accepted = await search({ q: 'x' });
+    strictEqual(accepted.ok, true);
+    deepStrictEqual(accepted.ok && accepted.proposal.body, {
+      q: 'x',
+      exclude: AI_DEFAULTS.deny.collections,
+    });
+    deepStrictEqual(
+      await search({ q: 'x', exclude: [] }),
+      refused('POST /search', 'unknownParam', 'body.exclude'),
     );
   });
 

@@ -494,6 +494,16 @@ export interface AIModelBase {
   context?: number;
 
   /**
+   * The most tokens one answer may spend, reasoning and thinking included.
+   * Raise it for a reasoning model or a thinking budget, staying under the model's own output limit.
+   * Jev ignores it.
+   *
+   * @default
+   * 8192
+   */
+  maxOutput?: number;
+
+  /**
    * Whether record values may reach this model.
    * `false` keeps it blind whatever `ai.data` allows, and it never runs a transform.
    *

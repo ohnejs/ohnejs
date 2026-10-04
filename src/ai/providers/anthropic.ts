@@ -100,6 +100,7 @@ export function createAnthropicProvider(options: ProviderOptions): Provider {
   const url = `${withoutTrailingSlash(options.baseURL ?? API)}/v1/messages`;
   const key: Record<string, string> = isUndefined(options.key) ? {} : { 'x-api-key': options.key };
   const headers = { ...key, 'anthropic-version': VERSION, ...options.headers };
+  const cap = options.maxOutput ?? DEFAULT_MAX_OUTPUT;
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>
     postEvents(url, { headers, body: merge(options.options, body), signal, billing });
 
@@ -107,7 +108,7 @@ export function createAnthropicProvider(options: ProviderOptions): Provider {
     step(request, signal) {
       const body = {
         model: options.model,
-        max_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        max_tokens: cap,
         stream: true,
         system: toSystem(request.system),
         tools: request.tools.map(toTool),
@@ -129,7 +130,7 @@ export function createAnthropicProvider(options: ProviderOptions): Provider {
     complete(request, signal) {
       const body = {
         model: options.model,
-        max_tokens: request.maxOutput ?? DEFAULT_MAX_OUTPUT,
+        max_tokens: cap,
         stream: true,
         system: toSystem(request.system),
         messages: [{ role: 'user', content: request.input }],

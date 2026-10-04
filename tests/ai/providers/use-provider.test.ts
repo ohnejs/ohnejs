@@ -65,6 +65,16 @@ describe('useProvider', () => {
     strictEqual(await authorization('local'), undefined);
   });
 
+  it("carries an entry's maxOutput to the wire", async () => {
+    withModels({
+      big: { provider: 'openai-compatible', model: 'm', key: false, maxOutput: 32000 },
+    });
+    server.answer({ body: answer() });
+    const request = { system: [], tools: [], transcript: [] };
+    await Array.fromAsync(useProvider('big').step(request, new AbortController().signal));
+    strictEqual(server.requests.at(-1)?.body.max_tokens, 32000);
+  });
+
   it('refuses a model whose key is unset or empty', () => {
     withModels({ gpt: { provider: 'openai-compatible', model: 'gpt-test', key: KEY } });
     for (const value of [undefined, '']) {

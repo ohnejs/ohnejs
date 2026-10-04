@@ -263,6 +263,23 @@ describe('createOpenAIProvider', () => {
     strictEqual(JSON.stringify(server.requests[1]?.body.input), JSON.stringify(transcript));
   });
 
+  it("sends the model's maxOutput as its cap", async () => {
+    const own = createOpenAIProvider({
+      model: 'gpt-test',
+      key: 'k',
+      baseURL: server.url,
+      maxOutput: 32000,
+    });
+    const structured = stream(['{}'], [message([outputText('{}')])]);
+    server.answer({ body: hello() }, { body: structured });
+    await Array.fromAsync(own.step(request, signal));
+    await own.complete({ system: request.system, input: 'Translate', schema }, signal);
+    deepStrictEqual(
+      server.requests.map(({ body }) => body.max_output_tokens),
+      [32000, 32000],
+    );
+  });
+
   describe('complete', () => {
     const answer = { system: request.system, input: 'Translate', schema };
 

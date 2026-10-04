@@ -1,13 +1,57 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { Proposal } from '../../../src/ai/turns/proposals.ts';
 import type { ReceiptSource } from '../../../src/ai/turns/receipts.ts';
 import type { ParsedQuery } from '../../../src/ohne/query/wire/parse.ts';
 
+import { AI_DEFAULTS } from '../../../src/ai/config.ts';
+import { checkProposal } from '../../../src/ai/turns/proposals.ts';
 import { identityOnly, refusal, replayBody, shapeReceipt } from '../../../src/ai/turns/receipts.ts';
-import { withAI } from '../_fixture.ts';
+import { renderSurface } from '../../../src/ai/turns/surface.ts';
+import searchPost from '../../../src/base/api/search.post.ts';
+import { requireUser } from '../../../src/base/auth/require-user.ts';
+import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
+import { field } from '../../../src/ohne/fields/field.ts';
+import { readJSONBody } from '../../../src/ohne/http/read-json-body.ts';
+import { queryUntyped } from '../../../src/ohne/query/query.ts';
+import { call, route, signIn, syncSchema, withAI } from '../_fixture.ts';
 
 const UUID = '019f3c1a-8b2d-7f4e-9a6b-1c2d3e4f5a6b';
+
+const TARGETS = Array.from({ length: 8 }, (_, at) => `Target${at + 1}`);
+for (const name of ['Secrets', ...TARGETS]) {
+  useCollections().register(name, {
+    name,
+    collection: {
+      api: { read: true },
+      dashboard: { recordLabel: 'name' },
+      fields: { name: field('text') },
+    },
+  });
+}
+useCollections().register('Sources', {
+  name: 'Sources',
+  collection: {
+    api: { read: true },
+    dashboard: { recordLabel: 'name' },
+    fields: {
+      name: field('text'),
+      secret: field('record', { collection: 'Secrets' }),
+      ...Object.fromEntries(
+        TARGETS.map((target) => [target.toLowerCase(), field('record', { collection: target })]),
+      ),
+    },
+  },
+});
+await syncSchema();
+const admin = await signIn('admin@receipts.example.com', ['admin']);
+const CHECK = route('POST', '/check', async () => {
+  const surface = await renderSurface(await requireUser(), true);
+  const checked = await checkProposal(await readJSONBody(), surface);
+  return checked.ok ? checked.accepted.proposal : checked.receipt;
+});
+const SEARCH = route('POST', '/search', searchPost);
 
 /**
  * A parsed query reduced to what the identity rule reads.
@@ -275,6 +319,41 @@ describe('shapeReceipt', () => {
       strictEqual(await answer(through('Items'), true), true);
       strictEqual(await answer(through('Users'), true), undefined);
       strictEqual(await answer(through('Items')), undefined);
+    });
+  });
+
+  it('a denied collection never costs an allowed related group', async () => {
+    const secret = await queryUntyped('Secrets').createOrThrow({ name: 'nothing here' });
+    const links: Record<string, string> = {};
+    for (const target of TARGETS) {
+      const linked = await queryUntyped(target).createOrThrow({ name: `zephyr ${target}` });
+      links[target.toLowerCase()] = linked.UUID as string;
+    }
+    await queryUntyped('Sources').createOrThrow({ name: 'source', secret: secret.UUID, ...links });
+    const receipt = async () => {
+      const proposed = { route: 'POST /search', body: { q: 'zephyr' } };
+      const checked = await call(CHECK, { path: '/check', body: proposed, token: admin.token });
+      const proposal = (await checked.response.json()) as Proposal;
+      const searched = await call(SEARCH, {
+        path: '/search',
+        body: proposal.body,
+        token: admin.token,
+      });
+      const source: ReceiptSource = {
+        route: { method: 'POST', pattern: '/search', body: 'search' },
+        proposal,
+        identity: false,
+      };
+      return shapeReceipt(source, { status: 200, body: await searched.response.json() });
+    };
+    const deny = { collections: [...AI_DEFAULTS.deny.collections, 'Secrets'] };
+    await withAI({ deny }, async () => {
+      const before = await receipt();
+      await queryUntyped('Secrets').createOrThrow({ name: 'zephyr secret' });
+      const after = await receipt();
+      deepStrictEqual(after, before);
+      deepStrictEqual(Object.keys(after.related?.Sources ?? {}), TARGETS);
+      strictEqual(after.truncated, undefined);
     });
   });
 
