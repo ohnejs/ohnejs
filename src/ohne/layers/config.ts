@@ -11,7 +11,7 @@ import type { LocaleCode } from '../collections/known-locales.ts';
 import type { DashboardMenuEntry } from '../dashboard/menu.ts';
 import type { DatabaseName } from '../database/known-databases.ts';
 import type { DialectName } from '../database/known-dialects.ts';
-import type { KnownFields } from '../fields/known-fields.ts';
+import type { FieldTypeName } from '../fields/known-fields.ts';
 import type { KnownFlows } from '../flows/known-flows.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
 import type { Message } from '../messages/known-messages.ts';
@@ -269,7 +269,7 @@ export interface Config {
      * @default
      * []
      */
-    fields?: LiteralUnion<Extract<keyof KnownFields, string>>[];
+    fields?: LiteralUnion<Extract<FieldTypeName, string>>[];
 
     /**
      * Block names to drop, matched exactly.

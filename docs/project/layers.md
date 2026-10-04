@@ -231,6 +231,11 @@ A package can ship several layers as exported subpaths. `@acme/kit/auth` resolve
 
 Subpath layers autocomplete in `layers` like any other.
 
+## Typechecking a layer
+
+A layer typechecks like an app. Its `tsconfig.json` includes the generated `.ohne` types, as in
+[the project files](../start/installation.md#the-project-files), and `ohne prepare` writes them.
+
 ## New config keys
 
 To add settings of its own, a layer augments `Config` and ships an `ohne.layer.ts`:

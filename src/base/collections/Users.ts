@@ -1,6 +1,8 @@
 import { defineCollection, field } from 'ohnejs';
 import { isEmail } from 'ohnejs/utils';
 
+import type {} from '../fields/_augment.ts';
+
 import { normalizeEmail } from '../auth/_email.ts';
 import { manageUsers } from '../auth/manage-users.ts';
 

@@ -3,7 +3,7 @@ import type { Message } from '../messages/known-messages.ts';
 import type { ColumnValue, FieldDefault, FieldSanitizer, FieldValidator } from './context.ts';
 import type { FieldType } from './define-field.ts';
 import type { KnownFieldOptions } from './known-field-options.ts';
-import type { FieldTypeName, KnownFields } from './known-fields.ts';
+import type { FieldTypeName, FieldTypes } from './known-fields.ts';
 import type { AnyOptionDef, ResolveOptions, ResolvedOptions } from './option.ts';
 
 import { hasKey, isPlainObject, isUndefined } from '../../utils/index.ts';
@@ -275,7 +275,7 @@ export type ResolvedFieldOptions = Omit<FieldOptions, keyof typeof FIELD_OPTION_
  * The options field type `K` declares via `defineField({ options })`.
  */
 type DeclaredOptions<K extends FieldTypeName> =
-  KnownFields[K] extends FieldType<infer O> ? O : Record<string, never>;
+  FieldTypes[K] extends FieldType<infer O> ? O : Record<string, never>;
 
 /**
  * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
@@ -285,12 +285,12 @@ type DeclaredOptions<K extends FieldTypeName> =
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
  */
-type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] extends false
+type CommonOptions<K extends FieldTypeName> = FieldTypes[K]['columnType'] extends false
   ? Pick<FieldOptions, 'translatable' | 'readable' | 'writable' | 'immutable'>
   : Omit<
       FieldOptions,
-      | (NonNullable<KnownFields[K]['forceNullable']> extends true ? 'nullable' : never)
-      | (NonNullable<KnownFields[K]['forceIndex']> extends true ? 'index' : never)
+      | (NonNullable<FieldTypes[K]['forceNullable']> extends true ? 'nullable' : never)
+      | (NonNullable<FieldTypes[K]['forceIndex']> extends true ? 'index' : never)
     >;
 
 /**
@@ -301,7 +301,7 @@ type CommonOptions<K extends FieldTypeName> = KnownFields[K]['columnType'] exten
  * The value and presentation options join outside that gate, so every kind carries them.
  */
 type InstanceOptions<K extends FieldTypeName> = PresentationOptions &
-  ValueOptions<DeclaredOptions<K>, ColumnValue<KnownFields[K]['columnType']>> &
+  ValueOptions<DeclaredOptions<K>, ColumnValue<FieldTypes[K]['columnType']>> &
   (K extends keyof KnownFieldOptions
     ? KnownFieldOptions[K]
     : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>);

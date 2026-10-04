@@ -1,13 +1,12 @@
 /**
- * Registers this layer's field types in `KnownFields` for the framework repo's own typecheck.
+ * Declares this layer's field types in `LayerFields`, for every program that checks the layer's source.
  *
- * An app gets this augmentation from codegen, which scans the layer's fields into `.ohne`.
- * The repo cannot consume its own `.ohne`: its tests register collections outside any generated schema.
- * The generated augmentations would narrow those names away, so this file is the one hand-kept mirror.
+ * The layer's collections import this file, so a package that imports them typechecks without codegen.
+ * An app's codegen declares the same names in `KnownFields`, which wins, so a closer override keeps its type.
  * The scanner skips `_`-prefixed files, so it contributes types alone.
  */
 declare module 'ohnejs' {
-  interface KnownFields {
+  interface LayerFields {
     /**
      * A date or time format pattern, like `YYYY-MM-DD`.
      */

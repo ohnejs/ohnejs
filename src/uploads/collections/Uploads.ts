@@ -1,5 +1,7 @@
 import { defineCollection, field } from 'ohnejs';
 
+import type {} from '../fields/_augment.ts';
+
 /**
  * The `Uploads` collection: every file and folder of the media library, one row each.
  *
