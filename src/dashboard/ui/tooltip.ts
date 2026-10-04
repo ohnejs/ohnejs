@@ -160,7 +160,10 @@ export function attachTooltip(
     );
     const root = h(
       'div',
-      { class: 'ohne-tooltip-root', style: 'position: fixed; top: 0; left: 0;' },
+      {
+        class: 'ohne-tooltip-root',
+        style: 'position: fixed; top: 0; left: 0; width: max-content;',
+      },
       box,
     );
     renderContent(contentEl, initial, options.plain);
