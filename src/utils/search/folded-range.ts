@@ -10,7 +10,6 @@ import { foldCase } from '../case/fold-case.ts';
  * ```ts
  * foldedRange('Crème brûlée', 'brul') // -> [6, 9]
  * foldedRange('Straße', 'strass')     // -> [0, 4]
- * foldedRange('Straße', 'se')         // -> [4, 5]
  * foldedRange('Café', 'tea')          // -> undefined
  * ```
  */

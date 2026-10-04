@@ -24,7 +24,6 @@ const RESTORED: Record<string, string> = { '\uE000': 'й', '\uE001': 'ї', '\uE0
  * Marks outside the Latin accents stay, so kana voicing, Hangul syllables, and Indic vowel signs still count.
  * The Cyrillic letters `й`, `ї`, and `ў` are letters of their own, so they keep their marks; `ё` reads as `е`.
  * Pure ASCII only lowercases.
- * Text folds the same whichever Unicode normalization form it arrives in.
  *
  * Lowercasing never depends on the locale, so `İ` and `ı` both fold to `i`.
  * The fold can change the length, so a position in folded text never maps back onto the original.
