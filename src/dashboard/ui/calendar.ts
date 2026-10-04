@@ -167,6 +167,12 @@ export interface CalendarOptions {
   timezone?: string;
 
   /**
+   * The instant whose day is marked as today, read in `timezone`.
+   * Omitted means now.
+   */
+  today?: number;
+
+  /**
    * Formats the selected timestamp for display in the handle.
    *
    * @default
@@ -435,9 +441,11 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   const keywordPending = ref(false);
   const focusVisible = ref(false);
 
-  const today = zonedFromTimestamp(Date.now(), zone());
+  const today = zonedFromTimestamp(options.today ?? Date.now(), zone());
   const initial = options.initial ?? null;
-  const initialDate = isNull(initial) ? null : zonedFromTimestamp(parseDateInput(initial), zone());
+  const initialDate = isNull(initial)
+    ? null
+    : zonedFromTimestamp(parseDateInput(initial, zone()), zone());
 
   const timeOfDay = (input: ZonedDate): number =>
     (input.hour * 3600 + input.minute * 60 + input.second) * 1000;
@@ -469,11 +477,11 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   const minDate = computed(() => {
     const value = minInput();
     return zonedFromTimestamp(
-      isNumber(value) ? Math.max(value, MIN_TIMESTAMP) : parseDateInput(value),
+      isNumber(value) ? Math.max(value, MIN_TIMESTAMP) : parseDateInput(value, zone()),
       zone(),
     );
   });
-  const maxDate = computed(() => zonedFromTimestamp(parseDateInput(maxInput()), zone()));
+  const maxDate = computed(() => zonedFromTimestamp(parseDateInput(maxInput(), zone()), zone()));
 
   const minTime = computed(() =>
     isSameDay(date.value, minDate.value) ? timeOfDay(minDate.value) : 0,

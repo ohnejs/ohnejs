@@ -304,12 +304,14 @@ css`
   }
 
   /* Opacity, not display, so the buttons stay tabbable and reveal on keyboard focus. */
-  .ohne-table :where(th):not(:hover) .ohne-table-sort-button:not(:focus-visible) {
-    opacity: 0;
-  }
+  @media (hover: hover) {
+    .ohne-table :where(th):not(:hover) .ohne-table-sort-button:not(:focus-visible) {
+      opacity: 0;
+    }
 
-  .ohne-table :where(tr):not(:hover) .ohne-table-action-button:not(:focus-visible) {
-    opacity: 0;
+    .ohne-table :where(tr):not(:hover) .ohne-table-action-button:not(:focus-visible) {
+      opacity: 0;
+    }
   }
 `;
 

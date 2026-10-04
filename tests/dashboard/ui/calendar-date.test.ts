@@ -289,7 +289,23 @@ describe('parseDateInput', () => {
     strictEqual(parseDateInput(1734220800000), 1734220800000);
   });
 
-  it('reads unzoned strings as local time', () => {
+  it('reads unzoned strings as wall-clock time in the given zone', () => {
+    strictEqual(parseDateInput('2024-12-15', 'UTC'), Date.UTC(2024, 11, 15));
+    strictEqual(parseDateInput('2024-12-15', 'Asia/Tokyo'), Date.UTC(2024, 11, 14, 15));
+    strictEqual(parseDateInput('2024', 'UTC'), Date.UTC(2024, 0, 1));
+    strictEqual(parseDateInput('2024/03/05', 'UTC'), Date.UTC(2024, 2, 5));
+    strictEqual(parseDateInput('2024-12-15 13:45', BERLIN), Date.UTC(2024, 11, 15, 12, 45));
+    strictEqual(
+      parseDateInput('2024-12-15T13:45:30.250', 'UTC'),
+      Date.UTC(2024, 11, 15, 13, 45, 30, 250),
+    );
+  });
+
+  it('reads Z-suffixed strings as UTC in any zone', () => {
+    strictEqual(parseDateInput('2024-12-15T00:00:00.000Z', 'Asia/Tokyo'), 1734220800000);
+  });
+
+  it('defaults to the device zone', () => {
     strictEqual(parseDateInput('2024-12-15'), new Date(2024, 11, 15).getTime());
     strictEqual(parseDateInput('2024'), new Date(2024, 0, 1).getTime());
     strictEqual(parseDateInput('2024/03/05'), new Date(2024, 2, 5).getTime());

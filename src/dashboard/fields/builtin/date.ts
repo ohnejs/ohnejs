@@ -5,8 +5,10 @@ import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
-import { formatDate } from '../../runtime/date-time.ts';
+import { dateTimePreferences, formatDate } from '../../runtime/date-time.ts';
+import { resolveTimezone, zonedFromTimestamp, zonedFromWallClock } from '../../ui/calendar-date.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
 import { describeControl } from '../field-row.ts';
@@ -41,6 +43,16 @@ function storedTimestamp(value: unknown): number | null {
   if (!isString(value)) return null;
   const timestamp = dayTimestamp(value);
   return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+/**
+ * The user's current day as its UTC-midnight timestamp, the encoding the calendar edits.
+ * The user's zone is read untracked, as in the `dateTime` control, so an account save never rebuilds it.
+ */
+function todayStamp(): number {
+  const zone = resolveTimezone(untracked(() => dateTimePreferences().timeZone));
+  const now = zonedFromTimestamp(Date.now(), zone);
+  return zonedFromWallClock('UTC', now.year, now.month, now.day).timestamp;
 }
 
 /**
@@ -83,6 +95,7 @@ export const dateType: FieldType = {
 
     const element = calendar(model, {
       timezone: 'UTC',
+      today: todayStamp(),
       formatter: formatDate,
       labels: calendarLabels(language()),
       placeholder: field.placeholder,
@@ -135,7 +148,7 @@ export const dateType: FieldType = {
   },
   filter: {
     operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
-    seed: () => dayValue(Date.now()),
+    seed: () => dayValue(todayStamp()),
     input({ value, commit, language, inputID }) {
       const model: Ref<number | null> = {
         get value() {
@@ -147,6 +160,7 @@ export const dateType: FieldType = {
       };
       return calendar(model, {
         timezone: 'UTC',
+        today: todayStamp(),
         formatter: formatDate,
         labels: calendarLabels(language()),
         clearable: false,

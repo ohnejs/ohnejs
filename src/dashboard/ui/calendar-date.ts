@@ -349,25 +349,26 @@ const REGEX_PARSE =
 /**
  * Parses a calendar `min`/`max`/`initial` input into a timestamp.
  * A number passes through.
- * A date or date-time string with no zone suffix reads as local time.
- * So `'2024-12-15'` is local midnight - unlike `Date.parse`, which reads date-only strings as UTC.
+ * A date or date-time string with no zone suffix reads as wall-clock time in `zone`.
+ * So `'2024-12-15'` in `'UTC'` is UTC midnight, wherever the device is.
  * Anything else, including `Z`-suffixed ISO strings, falls back to the `Date` parser.
  */
-export function parseDateInput(input: number | string): number {
+export function parseDateInput(input: number | string, zone = 'local'): number {
   if (isNumber(input)) return input;
   if (!/Z$/i.test(input)) {
     const match = REGEX_PARSE.exec(input);
     if (match) {
       const day = match[3] === undefined || match[3] === '' ? 1 : Number(match[3]);
-      return new Date(
+      const wall = zonedFromWallClock(
+        resolveTimezone(zone),
         Number(match[1]),
-        Number(match[2]) - 1 || 0,
+        Number(match[2]) || 1,
         day,
         Number(match[4] ?? 0),
         Number(match[5] ?? 0),
         Number(match[6] ?? 0),
-        Number((match[7] ?? '0').slice(0, 3)),
-      ).getTime();
+      );
+      return wall.timestamp + Number((match[7] ?? '0').slice(0, 3));
     }
   }
   return new Date(input).getTime();

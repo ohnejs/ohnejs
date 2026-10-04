@@ -91,10 +91,12 @@ css`
     padding-left: 0.75rem;
   }
 
-  .ohne-fields-card-collapsible:not(.ohne-fields-card-collapsed)
-    > .ohne-card-header
-    > .ohne-fields-card-toggle {
-    display: none;
+  @media (hover: hover) {
+    .ohne-fields-card-collapsible:not(.ohne-fields-card-collapsed)
+      > .ohne-card-header
+      > .ohne-fields-card-toggle {
+      display: none;
+    }
   }
 
   .ohne-fields-card-collapsible:hover > .ohne-card-header > .ohne-fields-card-toggle,

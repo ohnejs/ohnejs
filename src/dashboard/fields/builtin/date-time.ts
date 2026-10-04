@@ -3,12 +3,14 @@ import type { Ref } from '../../../utils/reactive/ref.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
+import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
 import { dateTimePreferences, formatDateTime, formatRelative } from '../../runtime/date-time.ts';
+import { parseDateTime } from '../../ui/calendar-date.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { attachTooltip } from '../../ui/tooltip.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
@@ -22,6 +24,13 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  */
 function calendarZone(pinned: string | undefined): string {
   return pinned ?? untracked(() => dateTimePreferences().timeZone) ?? 'local';
+}
+
+/**
+ * A `min` or `max` bound as the instant the server validates against, or `undefined` when unset.
+ */
+function instant(bound: unknown): number | undefined {
+  return isNumber(bound) || isString(bound) ? parseDateTime(bound) : undefined;
 }
 
 /**
@@ -76,8 +85,8 @@ export const dateTimeType: FieldType = {
       formatter: (timestamp) => formatDateTime(timestamp, zone),
       labels: calendarLabels(language()),
       placeholder: field.placeholder,
-      min: field.options?.min as number | string | undefined,
-      max: field.options?.max as number | string | undefined,
+      min: instant(field.options?.min),
+      max: instant(field.options?.max),
       clearable: field.nullable,
       disabled: () => disabled === true,
     });

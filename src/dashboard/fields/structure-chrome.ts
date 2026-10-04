@@ -102,9 +102,15 @@ export interface StructureActionsOptions {
 css`
   .ohne-item-actions {
     flex-shrink: 0;
-    display: none;
+    display: flex;
     gap: 0.25rem;
     margin-left: auto;
+  }
+
+  @media (hover: hover) {
+    .ohne-item-actions {
+      display: none;
+    }
   }
 
   .ohne-structure
