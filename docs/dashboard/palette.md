@@ -59,8 +59,7 @@ field out of word search. It also lists the records that use it, see
   for first, and set `search: false` on the ones nobody does.
 - A collection that refuses the read is skipped, never an error.
 - Records whose label fields hold every word come first.
-- Records are searched once your query holds a word. A lone ASCII letter like `a` only filters the
-  pages, while a lone `é` or `東` is searched.
+- Records are searched once your query holds a word. Until then it only filters the pages.
 - Each collection shows its five newest matches. "Load more" under it shows the next five.
 - Quotes keep a phrase together: `"new york"` is one word.
 - Punctuation around a word, a lone ASCII letter, and a repeated word are ignored, and only the first
@@ -150,8 +149,7 @@ that matched, with the path of the relation field that links it:
   An unknown `collection` answers no results, and paging stops past an `offset` of 1000.
 - `via` beside `collection` pages that collection's records found through `via` instead. An unknown
   `via`, or one the collection never links to, answers no results.
-- `exclude` lists collections to leave out entirely. They answer nothing and never push another
-  collection's related group out.
+- `exclude` lists collections to leave out.
 - `truncated: true` on the answer means some related groups were left out.
 - `label` is `''` when a record's label fields are empty.
 - A record that matches on its own through a late text field can come back again as related. The

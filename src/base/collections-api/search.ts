@@ -159,9 +159,7 @@ export interface SearchWindow {
   offset?: number;
 
   /**
-   * The collections to leave out, by their registered names.
-   * They are never searched, followed, or counted toward `RELATED_PASSES`.
-   * So they take no related group's place.
+   * The collections to leave out: never searched, followed, or counted toward `RELATED_PASSES`.
    */
   exclude?: readonly string[];
 
@@ -302,7 +300,6 @@ export const RELATED_PASSES = 8;
  * Each token matches their own fields or the label of a record a relation field links to, at any depth.
  * A pasted `UUID` lists the records linking to it, in its owner's collection only.
  * With `collection` and `via` only that related group is read, so its pages follow each other.
- * A collection `exclude` names takes no part: no hit, no related group, no pass.
  */
 export async function searchRecords(
   user: User,
@@ -796,7 +793,6 @@ function linkedUUIDs(row: Record<string, unknown>, { steps, name }: LinkPath): s
 /**
  * The labels of the linked records among `ids` that matched a word or are a routed `UUID`, by `UUID`.
  * It reads under the target's reach, in slices that fit both `maxInLength` and `maxBoundParams`.
- * A read where not even one `UUID` fits skips with a `DEBUG` line.
  */
 async function targetLabels(
   search: Search,
