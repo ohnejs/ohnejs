@@ -270,26 +270,33 @@ css`
     white-space: nowrap;
   }
 
-  .o-media-details-url-copy {
+  .o-media-details-url-actions {
     --ohne-background: var(--ohne-card);
     position: absolute;
     top: 0.5em;
     right: 0.5em;
     z-index: 1;
-    display: inline-flex;
+    display: flex;
+    gap: 0.25rem;
+    height: calc(100% - 1em);
+    background-color: hsl(var(--ohne-card));
+    box-shadow: -0.5rem 0 0.5rem hsl(var(--ohne-card));
+  }
+
+  .o-media-details-url-actions > * {
     min-width: 0;
-    max-height: calc(100% - 1em);
+    max-height: 100%;
     aspect-ratio: 1;
   }
 
   @media (hover: hover) {
-    .o-media-details-url-copy {
+    .o-media-details-url-actions {
       display: none;
     }
   }
 
-  .o-media-details-url:is(:hover, :focus-within) .o-media-details-url-copy {
-    display: inline-flex;
+  .o-media-details-url:is(:hover, :focus-within) .o-media-details-url-actions {
+    display: flex;
   }
 
   .o-media-details-variant {
@@ -766,13 +773,21 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     return copy;
   };
 
-  const urlRow = (): HTMLElement =>
-    h(
+  const urlRow = (): HTMLElement => {
+    const open = button(icon('external-link'), {
+      size: -2,
+      variant: 'outline',
+      href: url,
+      target: '_blank',
+    });
+    onCleanup(attachTooltip(open, () => t('uploads.dashboard.openInNewTab')));
+    return h(
       'div',
       { class: 'o-media-details-url' },
       h('code', { class: 'o-media-details-url-code', tabindex: '-1' }, url),
-      copyButton(url, 'o-media-details-url-copy'),
+      h('div', { class: 'o-media-details-url-actions' }, open, copyButton(url)),
     );
+  };
 
   const privateRow = (): HTMLElement => {
     const message = h('div', { class: 'ohne-prose' });
