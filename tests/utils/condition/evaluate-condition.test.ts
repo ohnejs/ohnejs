@@ -60,6 +60,10 @@ describe('evaluateCondition', () => {
     strictEqual(run({ v: { contains: 'か' } }, { v: 'がき' }), false);
   });
 
+  it('contains folds stored NFD text like NFC', () => {
+    strictEqual(run({ v: { contains: 'йога' } }, { v: 'Йога'.normalize('NFD') }), true);
+  });
+
   it('like matches % as any run and _ as one character', () => {
     strictEqual(run({ v: { like: 'a%' } }, { v: 'abc' }), true);
     strictEqual(run({ v: { like: '%ne' } }, { v: 'ohne' }), true);

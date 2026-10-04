@@ -17,6 +17,7 @@ const encoder = new TextEncoder();
  * Its inner whitespace collapses, and a `"` anywhere else is a plain character.
  * Each token loses its leading and trailing punctuation and symbols, while inner ones stay: `sea.jpg`, `q-3`.
  * A one-character ASCII token drops, a lone non-ASCII character like `東` stays.
+ * A token that folds to nothing, like a lone combining mark, drops.
  * A token over 256 UTF-8 bytes drops.
  * Duplicates drop ignoring case and accents, keeping the first, and only the first ten tokens count.
  *
@@ -34,7 +35,7 @@ export function searchTokens(q: string): string[] {
   for (const [word, phrase] of q.normalize('NFC').matchAll(PARTS)) {
     const token = (phrase ?? word).replace(/\s+/gu, ' ').trim().replace(EDGES, '').trim();
     const key = foldCase(token);
-    if (token === '' || seen.has(key) || encoder.encode(token).length > MAX_TOKEN_BYTES) continue;
+    if (key === '' || seen.has(key) || encoder.encode(token).length > MAX_TOKEN_BYTES) continue;
     if (token.length === 1 && token.charCodeAt(0) < 0x80) continue;
     seen.add(key);
     tokens.push(token);

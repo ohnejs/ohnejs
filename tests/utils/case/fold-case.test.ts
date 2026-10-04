@@ -73,4 +73,9 @@ describe('foldCase', () => {
     strictEqual(foldCase('Йод Їжак Ўзбек'), 'йод їжак ўзбек');
     strictEqual(foldCase('Ёлка'), 'елка');
   });
+
+  it('folds й, ї and ў the same in NFD as in NFC', () => {
+    strictEqual(foldCase('Йод Їжак Ўзбек'.normalize('NFD')), 'йод їжак ўзбек');
+    strictEqual(foldCase('Ёлка'.normalize('NFD')), 'елка');
+  });
 });

@@ -11,6 +11,14 @@ describe('foldedRange', () => {
 
   it('covers a letter the fold widens', () => {
     deepStrictEqual(foldedRange('Straße', 'strass'), [0, 4]);
+    deepStrictEqual(foldedRange('Straße', 'ss'), [4, 4]);
+    deepStrictEqual(foldedRange('Straße', 'stras'), [0, 4]);
+  });
+
+  it('covers the whole letter when a match starts inside it', () => {
+    deepStrictEqual(foldedRange('Straße', 'se'), [4, 5]);
+    deepStrictEqual(foldedRange('\ufb01sh', 'ish'), [0, 2]);
+    deepStrictEqual(foldedRange('þing', 'hing'), [0, 3]);
   });
 
   it('answers `undefined` for a miss or an empty needle', () => {

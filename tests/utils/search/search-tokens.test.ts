@@ -21,6 +21,10 @@ describe('searchTokens', () => {
     deepStrictEqual(searchTokens('q\u0307'), ['q\u0307']);
   });
 
+  it('drops a token that folds to nothing', () => {
+    deepStrictEqual(searchTokens('\u0301 \u0300\u0308 foo'), ['foo']);
+  });
+
   it('reads a double-quoted run as one token with inner whitespace collapsed', () => {
     deepStrictEqual(searchTokens('see "  new \t york " now'), ['see', 'new york', 'now']);
   });

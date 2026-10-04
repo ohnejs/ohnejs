@@ -41,6 +41,6 @@ describe('matchesWordStart', () => {
   });
 
   it('refuses a match after a combining mark, which belongs to the word', () => {
-    strictEqual(matchesWordStart('q\u0301t', 't'), false);
+    strictEqual(matchesWordStart('\u0915\u093f\u0924\u093e', '\u0924\u093e'), false);
   });
 });
