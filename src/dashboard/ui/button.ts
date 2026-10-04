@@ -17,8 +17,9 @@ export interface ButtonOptions {
   /**
    * The link destination; the router intercepts same-origin navigation.
    * When set, the component renders as an `<a>` unless `is` overrides the tag.
+   * A getter keeps the destination live.
    */
-  href?: string;
+  href?: string | (() => string);
 
   /**
    * The `target` attribute of the link.
