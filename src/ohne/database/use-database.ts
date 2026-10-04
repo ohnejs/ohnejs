@@ -1,13 +1,16 @@
+import type { Event } from '../http/event.ts';
 import type { DatabaseAdapter } from './adapter.ts';
 import type { Dialect } from './dialect.ts';
 import type { DatabaseName } from './known-databases.ts';
 
 import { createRegistry, isUndefined, type Registry } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { tryUseEvent, useEvent } from '../http/use-event.ts';
 
 let mainConnection: DatabaseAdapter | undefined;
 let activeDialect: Dialect | undefined;
 const helperConnections: Registry<DatabaseAdapter> = createRegistry<DatabaseAdapter>();
+const boundConnections = new WeakMap<Event, DatabaseAdapter>();
 
 /**
  * Registers an open connection: the main one when `name` is omitted, a helper under `name` otherwise.
@@ -49,9 +52,32 @@ export async function closeDatabases(): Promise<void> {
 }
 
 /**
+ * Binds `adapter` as the main database for the rest of the current request.
+ * Every `useDatabase()` without a name then answers it, however deep the call, `waitUntil` work included.
+ * Helpers and the dialect stay process-wide, so `useDatabase('cache')` and `useDialect()` are unchanged.
+ * The `response:send` and `request:complete` hooks run outside the request, so they see the main connection.
+ * The adapter must hold the synced schema, such as a file `ohne sync` built with `DATABASE` pointing at it.
+ * Throws when called outside a request.
+ *
+ * @example
+ * ```ts
+ * // middleware/global/tenant.ts
+ * import { bindDatabase, defineMiddleware } from 'ohnejs'
+ *
+ * export default defineMiddleware(async () => {
+ *   bindDatabase(await tenantDatabase())
+ * })
+ * ```
+ */
+export function bindDatabase(adapter: DatabaseAdapter): void {
+  boundConnections.set(useEvent(), adapter);
+}
+
+/**
  * Returns the main database connection, or a named helper.
  *
  * `useDatabase()` is the main connection; `useDatabase('cache')` a helper declared in `database.helpers`.
+ * Inside a request that called `bindDatabase`, `useDatabase()` answers the bound adapter instead.
  * Both expose the same `DatabaseAdapter`.
  * Throws when the database is not connected or the helper is unknown.
  *
@@ -63,6 +89,9 @@ export async function closeDatabases(): Promise<void> {
  */
 export function useDatabase(name?: DatabaseName): DatabaseAdapter {
   if (isUndefined(name)) {
+    const event = tryUseEvent();
+    const bound = isUndefined(event) ? undefined : boundConnections.get(event);
+    if (!isUndefined(bound)) return bound;
     if (isUndefined(mainConnection)) throw ohneError('The database is not connected');
     return mainConnection;
   }
