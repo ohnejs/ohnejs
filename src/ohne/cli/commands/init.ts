@@ -15,6 +15,7 @@ import {
   isPackageName,
   isUndefined,
   joinPath,
+  launcherName,
   relativePath,
   resolvePath,
   shellPath,
@@ -30,6 +31,8 @@ const run = promisify(exec);
 const CONTROL = /\p{Cc}/u;
 
 const NAME_RULE = 'Use lowercase letters, digits, and `-`, as in `my-app`.';
+
+const NPM_FLAGS = 'With npm, flags go after `--`: `npm create ohne my-app -- --yes`.';
 
 const CONFIG_FILE = `import { defineConfig } from 'ohnejs';
 
@@ -87,7 +90,7 @@ export const initCommand = defineCommand({
     pm: {
       type: 'enum',
       options: ['npm', 'pnpm'],
-      description: 'Package manager. Defaults to npm when npm runs the command, else pnpm.',
+      description: 'Package manager. Defaults to pnpm when pnpm runs the command, else npm.',
     },
     git: { type: 'boolean', description: 'Initialize a git repository.' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip prompts and take the defaults.' },
@@ -115,10 +118,10 @@ export const initCommand = defineCommand({
     }
     if (positionals.length > 1) {
       const quoted = codeSpan(shellPath(positionals.join(' ')));
-      return refuse({
-        title: `Unexpected argument ${codeSpan(positionals[1]!)}`,
-        body: `Pass one directory, and quote a name with spaces: ${quoted}.`,
-      });
+      const body = [`Pass one directory, and quote a name with spaces: ${quoted}.`];
+      // Under npm, a stray word usually means an unknown flag's value leaked or a `--` was doubled.
+      if (launcher() === 'npm') body.push('', NPM_FLAGS);
+      return refuse({ title: `Unexpected argument ${codeSpan(positionals[1]!)}`, body });
     }
     if (!isUndefined(values.name) && !isPackageName(values.name)) {
       return refuse({ title: `Invalid package name ${codeSpan(values.name)}`, body: NAME_RULE });
@@ -240,10 +243,17 @@ export const initCommand = defineCommand({
 });
 
 /**
- * The package manager to default to: `npm` when npm launched this process, else `pnpm`.
+ * The package manager that launched this process, read from `npm_config_user_agent`.
+ */
+function launcher(): string | undefined {
+  return launcherName(process.env.npm_config_user_agent);
+}
+
+/**
+ * The package manager to default to: `pnpm` when pnpm launched this process, else `npm`.
  */
 function packageManager(): 'npm' | 'pnpm' {
-  return (process.env.npm_config_user_agent ?? '').startsWith('npm/') ? 'npm' : 'pnpm';
+  return launcher() === 'pnpm' ? 'pnpm' : 'npm';
 }
 
 /**

@@ -17,12 +17,33 @@ import { after, before, describe, it, mock } from 'node:test';
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { usePrinter } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
+import { isUndefined } from '../../../../src/utils/index.ts';
 
 describe('ohne init', () => {
   let root: string;
 
   function freshDir(name: string): string {
     return mkdtempSync(join(root, `${name}-`));
+  }
+
+  async function initAs(userAgent: string | undefined, argv: string[]): Promise<string> {
+    const saved = process.env.npm_config_user_agent;
+    const output: string[] = [];
+    if (isUndefined(userAgent)) delete process.env.npm_config_user_agent;
+    else process.env.npm_config_user_agent = userAgent;
+    usePrinter().configure({
+      silent: false,
+      color: false,
+      stream: { write: (s) => output.push(s) },
+    });
+    try {
+      await runCommand(ohne, ['init', ...argv]);
+    } finally {
+      usePrinter().configure({ silent: true, stream: process.stderr });
+      if (isUndefined(saved)) delete process.env.npm_config_user_agent;
+      else process.env.npm_config_user_agent = saved;
+    }
+    return output.join('');
   }
 
   before(() => {
@@ -89,6 +110,32 @@ describe('ohne init', () => {
     usePrinter().configure({ silent: true, stream: process.stderr });
     match(output.join(''), /\bnpm install/);
     match(output.join(''), /\bnpm run dev/);
+  });
+
+  it('defaults to pnpm when pnpm launched it, else npm', async () => {
+    const cases: [string | undefined, RegExp][] = [
+      ['pnpm/11.5.1 npm/? node/v26.3.0', /\bpnpm dev$/m],
+      ['npm/11.16.0 node/v26.3.0', /\bnpm run dev$/m],
+      ['bun/1.2.19 npm/? node/v24.3.0', /\bnpm run dev$/m],
+      [undefined, /\bnpm run dev$/m],
+    ];
+    for (const [agent, step] of cases) {
+      match(await initAs(agent, [join(freshDir('pm'), 'app'), '--yes']), step, String(agent));
+    }
+  });
+
+  it('tells npm users to put flags after `--` when an argument is unexpected', async () => {
+    const argv = [join(freshDir('hint'), 'app'), 'x', '--yes'];
+    const npm = await initAs('npm/11.16.0 node/v26.3.0', argv);
+    const pnpm = await initAs('pnpm/11.5.1 npm/? node/v26.3.0', argv);
+    process.exitCode = 0;
+
+    match(
+      npm,
+      /Unexpected argument x\n[^]*\n│\n│  With npm, flags go after --: npm create ohne my-app -- --yes\./,
+    );
+    match(pnpm, /Unexpected argument x/);
+    strictEqual(pnpm.includes('With npm'), false);
   });
 
   it('quotes the directory in the `cd` step', async () => {
