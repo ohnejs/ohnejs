@@ -33,10 +33,17 @@ css`
     flex-shrink: 0;
     font-size: 1.25rem;
   }
+
+  @container (max-width: 9rem) {
+    .o-media-cell .o-media-file-name {
+      display: none;
+    }
+  }
 `;
 
 /**
  * The cell display of an `image` or `file` field: a small thumbnail or the type's glyph, then the name.
+ * A narrow cell drops the name and keeps the preview.
  * The path shows in a tooltip; the short `UUID` stands in while the record loads.
  */
 export function mediaDisplay(image: boolean): FieldType['display'] {
