@@ -170,8 +170,10 @@ css`
     pointer-events: none;
   }
 
-  .o-upload-notification-action-hide {
-    opacity: 0;
+  @media (hover: hover) {
+    .o-upload-notification-action-hide {
+      opacity: 0;
+    }
   }
 
   .o-upload-notification:hover .o-upload-notification-action-hide,

@@ -271,18 +271,24 @@ css`
   }
 
   .o-media-details-url-copy {
+    --ohne-background: var(--ohne-card);
     position: absolute;
     top: 0.5em;
     right: 0.5em;
     z-index: 1;
-    display: none;
+    display: inline-flex;
     min-width: 0;
     max-height: calc(100% - 1em);
     aspect-ratio: 1;
   }
 
-  .o-media-details-url:hover .o-media-details-url-copy {
-    --ohne-background: var(--ohne-card);
+  @media (hover: hover) {
+    .o-media-details-url-copy {
+      display: none;
+    }
+  }
+
+  .o-media-details-url:is(:hover, :focus-within) .o-media-details-url-copy {
     display: inline-flex;
   }
 
@@ -353,10 +359,16 @@ css`
   }
 
   .o-media-details-variant-copy {
-    display: none;
+    display: flex;
   }
 
-  .o-media-details-variant:hover .o-media-details-variant-copy {
+  @media (hover: hover) {
+    .o-media-details-variant-copy {
+      display: none;
+    }
+  }
+
+  .o-media-details-variant:is(:hover, :focus-within) .o-media-details-variant-copy {
     display: flex;
   }
 

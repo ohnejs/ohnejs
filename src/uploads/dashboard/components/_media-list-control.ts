@@ -109,7 +109,7 @@ css`
 
   .o-media-chips-field-image .ohne-dynamic-chips-remove {
     position: absolute;
-    display: none;
+    display: flex;
     justify-content: center;
     align-items: center;
     top: 0.375rem;
@@ -123,13 +123,23 @@ css`
     transition-property: background-color, color;
   }
 
+  .o-media-chips-field-image .ohne-dynamic-chips-dragging .ohne-dynamic-chips-remove {
+    display: none;
+  }
+
+  @media (hover: hover) {
+    .o-media-chips-field-image .ohne-dynamic-chips-remove {
+      display: none;
+    }
+  }
+
   .o-media-chips-field-image
     .ohne-dynamic-chips:not(.ohne-dynamic-chips-dragging)
     .ohne-dynamic-chips-item:hover
     .ohne-dynamic-chips-remove,
   .o-media-chips-field-image
     .ohne-dynamic-chips:not(.ohne-dynamic-chips-dragging)
-    .ohne-dynamic-chips-item:focus
+    .ohne-dynamic-chips-item:focus-within
     .ohne-dynamic-chips-remove {
     display: flex;
   }

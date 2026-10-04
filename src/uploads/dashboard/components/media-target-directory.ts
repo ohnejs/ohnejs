@@ -50,8 +50,10 @@ css`
     justify-content: flex-start;
   }
 
-  .o-media-target-directory-subdirectory-button {
-    display: none;
+  @media (hover: hover) {
+    .o-media-target-directory-subdirectory-button {
+      display: none;
+    }
   }
 
   .o-media-target-directory-buttons:hover .o-media-target-directory-subdirectory-button,

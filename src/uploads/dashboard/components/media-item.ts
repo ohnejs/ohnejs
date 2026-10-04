@@ -115,8 +115,6 @@ css`
     position: absolute;
     bottom: 0.5rem;
     left: 0.5rem;
-    opacity: 0;
-    visibility: hidden;
     transition: var(--ohne-transition);
   }
 
@@ -124,9 +122,15 @@ css`
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
-    opacity: 0;
-    visibility: hidden;
     transition: var(--ohne-transition);
+  }
+
+  @media (hover: hover) {
+    .o-media-item-checkbox,
+    .o-media-item-delete-button {
+      opacity: 0;
+      visibility: hidden;
+    }
   }
 
   .o-media-item-selected .o-media-item-checkbox,
@@ -157,11 +161,14 @@ css`
     text-decoration: none;
   }
 
-  .o-media-item-rename-button {
-    display: none;
+  @media (hover: hover) {
+    .o-media-item-rename-button {
+      display: none;
+    }
   }
 
-  .o-media-item-name:hover .o-media-item-rename-button {
+  .o-media-item-name:hover .o-media-item-rename-button,
+  .o-media-item-name:focus-within .o-media-item-rename-button {
     display: inline-flex;
   }
 
