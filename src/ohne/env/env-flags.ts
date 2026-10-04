@@ -25,11 +25,14 @@ interface EnvFlag {
 /**
  * Every registered env var that opts into a CLI flag, resolved to its kebab flag and camel arg key.
  * The CLI reads the registry before any layer loads, so only the built-in env vars resolve here.
+ * Given `only`, the env vars outside it are left out.
  */
-function envFlags(): EnvFlag[] {
+function envFlags(only?: Iterable<keyof Env & string>): EnvFlag[] {
   const env = useEnv();
+  const kept = isUndefined(only) ? undefined : new Set<string>(only);
   const flags: EnvFlag[] = [];
   for (const name of env.names()) {
+    if (kept && !kept.has(name)) continue;
     const kind = env.flag(name);
     if (isUndefined(kind)) continue;
     const kebab = toKebabCase(name);
@@ -44,15 +47,17 @@ function envFlags(): EnvFlag[] {
  * Each flagged var becomes one flag: a `'boolean'` var a switch, a `'value'` var a value flag.
  * `runCommand` uses it to recognize the flags on every subcommand and to list them in the root help.
  * The keys are the camelCase arg names; the raw values are applied by `applyEnvFlags`.
+ * Given `only`, the schema holds just those env vars' flags.
  *
  * @example
  * ```ts
  * runCommand(ohne, argv, { globals: envGlobals() })
+ * runCommand(create, argv, { globals: envGlobals(['NO_COLOR', 'SILENT']) })
  * ```
  */
-export function envGlobals(): ArgsSchema {
+export function envGlobals(only?: Iterable<keyof Env & string>): ArgsSchema {
   const schema: ArgsSchema = {};
-  for (const { env, camel, kind } of envFlags()) {
+  for (const { env, camel, kind } of envFlags(only)) {
     schema[camel] =
       kind === 'boolean'
         ? { type: 'boolean', description: `Sets ${env}` }
@@ -68,6 +73,7 @@ export function envGlobals(): ArgsSchema {
  * A flag matches its env var's kebab name in any spelling, exactly as `resolveArgs` recognizes it.
  * A boolean flag sets the value directly.
  * A value flag routes its raw string through the env parser, so `--port 99999` fails like `PORT=99999`.
+ * Given `only`, the flags of other env vars are neither parsed nor applied.
  * Meant to run once, before dispatch.
  *
  * @example
@@ -75,10 +81,10 @@ export function envGlobals(): ArgsSchema {
  * applyEnvFlags(process.argv.slice(2)) // --no-color -> NO_COLOR, --host x -> HOST, ...
  * ```
  */
-export function applyEnvFlags(argv: string[]): void {
+export function applyEnvFlags(argv: string[], only?: Iterable<keyof Env & string>): void {
   const env = useEnv();
 
-  for (const { env: name, kebab, kind, value } of presentEnvFlags(argv)) {
+  for (const { env: name, kebab, kind, value } of presentEnvFlags(argv, only)) {
     if (kind === 'boolean') {
       const bool = coerceToBoolean(value);
       if (!isBoolean(bool)) {
@@ -112,10 +118,13 @@ export function envFlagArgs(argv: string[], omit: Iterable<string> = []): string
 }
 
 /**
- * The env-var flags present in `argv`, each with its last given value.
+ * The env-var flags present in `argv`, each with its last given value, limited to `only` when given.
  */
-function presentEnvFlags(argv: string[]): Array<EnvFlag & { value: string | boolean }> {
-  const flags = envFlags();
+function presentEnvFlags(
+  argv: string[],
+  only?: Iterable<keyof Env & string>,
+): Array<EnvFlag & { value: string | boolean }> {
+  const flags = envFlags(only);
   const booleans = flags.filter((flag) => flag.kind === 'boolean').map((flag) => flag.kebab);
   const { flags: parsed } = parseArgv(argv, { booleans });
   const byKebab: Record<string, FlagValue> = Object.create(null);

@@ -54,6 +54,12 @@ describe('env flags', () => {
       throws(() => applyEnvFlags(['dev', '--host']), /`--host` needs a value/);
     });
 
+    it('leaves the flags outside `only` alone', () => {
+      applyEnvFlags(['dev', '--port', '99999', '--no-color'], ['NO_COLOR']);
+      strictEqual(useEnv().get('NO_COLOR'), true);
+      strictEqual(useEnv().has('PORT'), false);
+    });
+
     it('throws when a boolean flag is given a non-booleanish value', () => {
       throws(() => applyEnvFlags(['sync', '--force-sync=maybe']), /must be `true` or `false`/);
       throws(() => applyEnvFlags(['sync', '--force-sync=a`b']), /, got ``a`b``\.$/);
@@ -100,6 +106,13 @@ describe('env flags', () => {
       deepStrictEqual(globals['forceSync'], { type: 'boolean', description: 'Sets FORCE_SYNC' });
       deepStrictEqual(globals['noColor'], { type: 'boolean', description: 'Sets NO_COLOR' });
       strictEqual(globals['cookieSecret']?.type, 'string');
+    });
+
+    it('holds only the env vars in `only`', () => {
+      deepStrictEqual(Object.keys(envGlobals(['SILENT', 'NO_COLOR'])).sort(), [
+        'noColor',
+        'silent',
+      ]);
     });
   });
 });
