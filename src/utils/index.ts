@@ -239,6 +239,7 @@ export * from './slug/slugify.ts';
 export * from './sort/natural-compare.ts';
 export * from './sse/format-sse.ts';
 export * from './sse/parse-sse.ts';
+export * from './storage/stored.ts';
 export * from './stream/lazy-stream.ts';
 export * from './stream/limit-stream.ts';
 export * from './stream/rechunk-stream.ts';
