@@ -107,6 +107,7 @@ useMessages().register('en', {
   'dash.kinds.title.placeholder': 'Short name',
   'dash.kinds.help.text': 'Long help',
   'dash.blocks.hero.label': 'Hero section',
+  'dash.blocks.hero.description': 'A big heading over the page',
   'dash.roles.user.label': 'Dashboard user',
   'dash.roles.user.description': 'Reads owners and edits notes.',
   'dash.menu.reports': 'Reports',
@@ -215,9 +216,14 @@ useBlocks().register('DashHero', {
   name: 'DashHero',
   block: {
     label: 'dash.blocks.hero.label',
+    description: 'dash.blocks.hero.description',
     fields: {
       heading: field('text'),
       nested: field('blocks', { allow: ['DashAside'] }),
+    },
+    dashboard: {
+      icon: { field: 'heading', map: { big: 'photo' }, default: 'cube' },
+      titleField: 'heading',
     },
   },
 });
@@ -1016,6 +1022,16 @@ describe('blocks', () => {
     const { body } = await call(user);
     strictEqual(block(body, 'DashHero').label, 'Hero section');
     strictEqual(block(body, 'DashAside').label, 'Dash aside');
+  });
+
+  it('resolves a declared description and passes the icon and title field through', async () => {
+    const { body } = await call(user);
+    const hero = block(body, 'DashHero');
+    strictEqual(hero.description, 'A big heading over the page');
+    deepStrictEqual(hero.icon, { field: 'heading', map: { big: 'photo' }, default: 'cube' });
+    strictEqual(hero.titleField, 'heading');
+    const aside = block(body, 'DashAside');
+    strictEqual('description' in aside || 'icon' in aside || 'titleField' in aside, false);
   });
 
   it("describes a block's own fields, led by `UUID` and without `_updatedAt`", async () => {

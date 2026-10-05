@@ -56,6 +56,21 @@ export interface DashboardBlock {
   label: string;
 
   /**
+   * The declared `description`, resolved in the request's language; absent when the block declares none.
+   */
+  description?: string;
+
+  /**
+   * The block's icon, or the field whose value picks it; absent when the block declares none.
+   */
+  icon?: IconName | { field: string; map: Record<string, IconName>; default?: IconName };
+
+  /**
+   * The field whose value names one instance beside the label; absent when the block declares none.
+   */
+  titleField?: string;
+
+  /**
    * The block's own fields, its instance `UUID` included; a block carries no `_updatedAt`.
    */
   fields: DashboardField[];
@@ -280,8 +295,12 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     const meta = useBlocks().get(name);
     if (isUndefined(meta)) continue;
     const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
+    const { description, dashboard } = meta.block;
     const block: DashboardBlock = { name, label: declaredLabelOf(name, meta.block.label), fields };
-    const layout = resolveLayout(meta.block.dashboard?.layout, fields);
+    if (!isUndefined(description)) block.description = resolveMessage(description);
+    if (!isUndefined(dashboard?.icon)) block.icon = dashboard.icon;
+    if (!isUndefined(dashboard?.titleField)) block.titleField = dashboard.titleField;
+    const layout = resolveLayout(dashboard?.layout, fields);
     if (!isUndefined(layout)) block.layout = layout;
     described.set(name, block);
     collectAllowed(fields, pending);
