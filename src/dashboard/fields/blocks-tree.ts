@@ -45,6 +45,21 @@ import { clipboardData, copyClipboard } from './clipboard.ts';
 export type BlocksTreeRow = BlockTreeRow<BlockNode>;
 
 /**
+ * An action a blocks tree runs on blocks: the row menu's, and its keys'.
+ */
+export type BlockAction =
+  | 'moveUp'
+  | 'moveDown'
+  | 'addBefore'
+  | 'addInside'
+  | 'addAfter'
+  | 'duplicate'
+  | 'delete'
+  | 'copy'
+  | 'cut'
+  | 'paste';
+
+/**
  * Where an added or pasted block lands: a list and the index in its current nodes.
  */
 interface Destination {
@@ -87,6 +102,13 @@ export interface BlocksTree {
    * Adds a block at the end of the root list, through the block picker when the list admits several types.
    */
   addTopLevel(): void;
+
+  /**
+   * Runs `action` on the blocks with these `$key`s, as the row menu and the keys do.
+   * Adding opens the block picker when the target list admits several types; pasting lands after the blocks.
+   * A locked list runs nothing but `copy`.
+   */
+  run(action: BlockAction, keys: readonly number[]): void;
 }
 
 css`
@@ -614,6 +636,27 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     addTopLevel() {
       const root = list();
       if (!isUndefined(root)) add({ list: root, index: root.nodes().length });
+    },
+    run(action, keys) {
+      const items = flatTreeItems(model.value).filter((item) => keys.includes(item.id as number));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (isUndefined(first) || isUndefined(last)) return;
+      if (action === 'copy') copy(items);
+      if (!editable()) return;
+      if (action === 'moveUp') step(items, -1);
+      else if (action === 'moveDown') step(items, 1);
+      else if (action === 'addBefore') add(beside(first, 'before'));
+      else if (action === 'addAfter') add(beside(last, 'after'));
+      else if (action === 'addInside') {
+        const inside = beside(first, 'inside');
+        if (!isUndefined(inside)) add({ list: inside.list, index: inside.list.nodes().length });
+      } else if (action === 'duplicate') duplicate(items);
+      else if (action === 'delete') remove(items);
+      else if (action === 'cut') {
+        copy(items);
+        remove(items);
+      } else if (action === 'paste') paste(beside(last, 'after'));
     },
   };
 }
