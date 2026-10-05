@@ -169,7 +169,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "ohnejs": "^0.0.1"
+    "ohnejs": ">=0.0.1"
   }
 }
 ```
