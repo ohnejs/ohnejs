@@ -539,6 +539,17 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
  * A singleton shows the collection label alone.
  */
 export function recordEditorHeader(editor: RecordEditor): Child {
+  return h(
+    'div',
+    { class: 'o-record-editor-header' },
+    h('div', { class: 'ohne-row' }, ...recordEditorHeading(editor)),
+  );
+}
+
+/**
+ * The pieces of the record page's header, for a page that lays out a header of its own.
+ */
+export function recordEditorHeading(editor: RecordEditor): Child[] {
   const t = useT();
   const { collection } = editor;
   const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
@@ -564,7 +575,7 @@ export function recordEditorHeader(editor: RecordEditor): Child {
     );
   }
 
-  return h('div', { class: 'o-record-editor-header' }, h('div', { class: 'ohne-row' }, ...heading));
+  return heading;
 }
 
 /**

@@ -57,6 +57,9 @@ interface LayoutState {
 }
 
 const layoutState = ref<LayoutState>({ sidebarExpanded: false, sidebarScrollY: 0 });
+const transition = ref(false);
+const wide = ref(0);
+let transitionTimeout: number | undefined;
 
 /**
  * Forgets the persisted sidebar state.
@@ -66,6 +69,41 @@ export function resetLayoutState(): void {
 }
 
 const EDGE_ZONE_PX = 24;
+
+/**
+ * Whether the sidebar is expanded.
+ * Reactive.
+ */
+export function sidebarExpanded(): boolean {
+  return layoutState.value.sidebarExpanded;
+}
+
+/**
+ * Opens or closes the sidebar, animated.
+ * A page that hides the shell's own menu button, as a wide page does on a wide screen, renders one calling this.
+ */
+export function toggleSidebar(): void {
+  clearTimeout(transitionTimeout);
+  transition.value = true;
+  void nextTick().then(() => {
+    const state = untracked(() => layoutState.value);
+    layoutState.value = { ...state, sidebarExpanded: !state.sidebarExpanded };
+    transitionTimeout = window.setTimeout(() => {
+      transition.value = false;
+    }, overlayTransitionDuration());
+  });
+}
+
+/**
+ * Makes the shell wide while the calling render scope lives: full width, the sidebar an overlay at every width.
+ * A page with its own columns, like a live editor, calls it from its render.
+ */
+export function useWideShell(): void {
+  wide.value = untracked(() => wide.value) + 1;
+  onCleanup(() => {
+    wide.value = untracked(() => wide.value) - 1;
+  });
+}
 
 css`
   .o-layout {
@@ -217,6 +255,66 @@ css`
     }
   }
 
+  .o-layout-wide {
+    max-width: 100%;
+  }
+
+  @media (min-width: 1025px) {
+    .o-layout-wide {
+      grid-template-areas:
+        'header'
+        'main';
+      grid-template-columns: 1fr;
+    }
+
+    .o-layout-wide .o-sidebar {
+      position: fixed;
+      z-index: 99;
+      top: calc(3.5rem + 1px);
+      left: 0;
+      bottom: 1rem;
+      width: 18rem;
+      max-width: 100%;
+      margin: 0;
+      padding-left: 1rem;
+      background-color: hsl(var(--ohne-background));
+      visibility: hidden;
+      transform: translateX(-100%);
+    }
+
+    .o-layout-wide.o-layout-transition .o-sidebar {
+      transition: var(--ohne-transition);
+      transition-property: visibility transform;
+      transition-duration: var(--ohne-overlay-transition-duration);
+    }
+
+    .o-layout-wide.o-sidebar-expanded .o-sidebar {
+      visibility: visible;
+      transform: translateX(0);
+    }
+
+    .o-layout-wide .o-main {
+      transform-origin: right;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .o-layout-wide.o-layout-transition .o-main {
+      transition: var(--ohne-transition);
+      transition-property: opacity filter transform;
+      transition-duration: var(--ohne-overlay-transition-duration);
+    }
+
+    .o-layout-wide.o-sidebar-expanded .o-main {
+      opacity: 0.36;
+      filter: blur(1px);
+      transform: translate3d(0, 0, 0) scale(0.97);
+    }
+
+    .o-layout-wide.o-sidebar-expanded .o-main-content {
+      pointer-events: none;
+    }
+  }
+
   @media (max-width: 767px) {
     .o-layout {
       margin: 0;
@@ -277,22 +375,7 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
  * The layout grid proper: header, sidebar container, main container, and the overlay-sidebar behavior.
  */
 function layout(content: () => Child, options: ShellOptions): HTMLElement {
-  const transition = ref(false);
-  const expanded = (): boolean => layoutState.value.sidebarExpanded;
-
-  let transitionTimeout: number | undefined;
-
-  const toggleSidebar = (): void => {
-    clearTimeout(transitionTimeout);
-    transition.value = true;
-    void nextTick().then(() => {
-      const state = untracked(() => layoutState.value);
-      layoutState.value = { ...state, sidebarExpanded: !state.sidebarExpanded };
-      transitionTimeout = window.setTimeout(() => {
-        transition.value = false;
-      }, overlayTransitionDuration());
-    });
-  };
+  const expanded = sidebarExpanded;
 
   const headerEl = h(
     'div',
@@ -391,6 +474,7 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
       tabindex: '-1',
       class: () =>
         'o-layout o-layout-sm' +
+        (wide.value > 0 ? ' o-layout-wide' : '') +
         (expanded() ? ' o-sidebar-expanded' : '') +
         (transition.value ? ' o-layout-transition' : ''),
       onKeydown: (event: KeyboardEvent) => {
