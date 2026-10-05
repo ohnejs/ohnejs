@@ -1,0 +1,41 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions: {}
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+
+      - name: Check the tag names the package version
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      # npm can only stage a version of a package it has, so a package's first version is published by hand.
+      - name: Skip a first or already published version
+        id: published
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          if ! npm view "$name" name > /dev/null 2>&1 || npm view "$name@${GITHUB_REF_NAME#v}" version > /dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Staged, so nothing goes live until the maintainer approves it with 2FA.
+      - if: steps.published.outputs.skip != 'true'
+        run: npm stage publish --ignore-scripts --tag ${{ contains(github.ref_name, '-') && 'next' || 'latest' }}
