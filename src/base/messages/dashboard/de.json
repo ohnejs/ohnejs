@@ -13,6 +13,12 @@
   "addItem": "Eintrag hinzufügen",
   "apply": "Anwenden",
   "applyCount": "Anwenden ({count})",
+  "blocks": {
+    "addNested": "Verschachtelten Block hinzufügen",
+    "addTopLevel": "Block auf oberster Ebene hinzufügen",
+    "empty": "Keine Blöcke hinzugefügt",
+    "notPasted": "{count, plural, one {# Block konnte nicht eingesetzt werden} other {# Blöcke konnten nicht eingesetzt werden}}"
+  },
   "calendar": {
     "clear": "Leeren",
     "nextMonth": "Nächster Monat",
@@ -28,7 +34,8 @@
     "copy": "Kopieren",
     "cut": "Ausschneiden",
     "pasteAfter": "Danach einsetzen",
-    "pasteBefore": "Davor einsetzen"
+    "pasteBefore": "Davor einsetzen",
+    "pasteInside": "Darin einsetzen"
   },
   "close": "Schließen",
   "collections": "Sammlungen",
@@ -231,6 +238,7 @@
   "sort": {
     "addAfter": "Danach einfügen",
     "addBefore": "Davor einfügen",
+    "addInside": "Darin einfügen",
     "ascending": "Aufsteigend sortieren",
     "descending": "Absteigend sortieren",
     "moveDown": "Nach unten",

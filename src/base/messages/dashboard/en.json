@@ -13,6 +13,12 @@
   "addItem": "Add item",
   "apply": "Apply",
   "applyCount": "Apply ({count})",
+  "blocks": {
+    "addNested": "Add nested block",
+    "addTopLevel": "Add top-level block",
+    "empty": "No blocks added",
+    "notPasted": "{count, plural, one {# block could not be pasted} other {# blocks could not be pasted}}"
+  },
   "calendar": {
     "clear": "Clear",
     "nextMonth": "Next month",
@@ -28,7 +34,8 @@
     "copy": "Copy",
     "cut": "Cut",
     "pasteAfter": "Paste after",
-    "pasteBefore": "Paste before"
+    "pasteBefore": "Paste before",
+    "pasteInside": "Paste inside"
   },
   "close": "Close",
   "collections": "Collections",
@@ -231,6 +238,7 @@
   "sort": {
     "addAfter": "Add after",
     "addBefore": "Add before",
+    "addInside": "Add inside",
     "ascending": "Sort in ascending order",
     "descending": "Sort in descending order",
     "moveDown": "Move down",

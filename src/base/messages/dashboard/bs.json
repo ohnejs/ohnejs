@@ -13,6 +13,12 @@
   "addItem": "Dodaj stavku",
   "apply": "Primijeni",
   "applyCount": "Primijeni ({count})",
+  "blocks": {
+    "addNested": "Dodaj ugniježđeni blok",
+    "addTopLevel": "Dodaj blok na najvišem nivou",
+    "empty": "Nema dodanih blokova",
+    "notPasted": "{count, plural, one {# blok nije moguće zalijepiti} few {# bloka nije moguće zalijepiti} other {# blokova nije moguće zalijepiti}}"
+  },
   "calendar": {
     "clear": "Očisti",
     "nextMonth": "Sljedeći mjesec",
@@ -28,7 +34,8 @@
     "copy": "Kopiraj",
     "cut": "Izreži",
     "pasteAfter": "Zalijepi poslije",
-    "pasteBefore": "Zalijepi prije"
+    "pasteBefore": "Zalijepi prije",
+    "pasteInside": "Zalijepi unutra"
   },
   "close": "Zatvori",
   "collections": "Kolekcije",
@@ -231,6 +238,7 @@
   "sort": {
     "addAfter": "Dodaj poslije",
     "addBefore": "Dodaj prije",
+    "addInside": "Dodaj unutra",
     "ascending": "Sortiraj uzlazno",
     "descending": "Sortiraj silazno",
     "moveDown": "Pomjeri dolje",
