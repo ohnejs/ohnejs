@@ -149,6 +149,12 @@ export interface RecordEditor {
   id: () => string;
 
   /**
+   * The record as last read or saved, `{}` until the first read answers.
+   * Reactive.
+   */
+  saved: () => RecordRow;
+
+  /**
    * The live form, rebuilt on every load and every undo or redo.
    * It is `undefined` until the record is read.
    */
@@ -238,7 +244,7 @@ export function useRecordEditor(
   const t = useT();
   const create = isUndefined(uuid) && !collection.singleton;
   let id = uuid ?? '';
-  let loaded: RecordRow = {};
+  const loaded = ref<RecordRow>({});
   const listPath = `/collections/${collection.segment}`;
   const canCreate = collection.operations.create?.allowed === true;
   const canTranslate =
@@ -293,7 +299,7 @@ export function useRecordEditor(
 
   const restore = (restored: RecordRow): void => {
     form.value?.dispose();
-    form.value = buildForm({ ...loaded, ...restored });
+    form.value = buildForm({ ...untracked(() => loaded.value), ...restored });
     revise();
   };
 
@@ -322,7 +328,7 @@ export function useRecordEditor(
     }
     if (isString(row.UUID)) id = row.UUID;
     verdicts.value = await (asked ?? ask());
-    loaded = row;
+    loaded.value = row;
     seedRecordLabel(collection, row);
     form.value?.dispose();
     form.value = buildForm(row);
@@ -403,12 +409,15 @@ export function useRecordEditor(
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
       // A scoped answer omits the fields outside its `select`; the last read still holds their values.
-      loaded = { ...loaded, ...outcome.record };
-      live.rebase(loaded);
+      loaded.value = { ...untracked(() => loaded.value), ...outcome.record };
+      live.rebase(untracked(() => loaded.value));
       const settled = currentState();
       if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
       revise();
-      seedRecordLabel(collection, loaded);
+      seedRecordLabel(
+        collection,
+        untracked(() => loaded.value),
+      );
       if (create) {
         queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
         if (isString(outcome.record.UUID)) navigate(recordHref(collection, outcome.record.UUID));
@@ -469,6 +478,7 @@ export function useRecordEditor(
     collection,
     create,
     id: () => id,
+    saved: () => loaded.value,
     form,
     state,
     busy,
