@@ -42,6 +42,7 @@ import {
   onCleanup,
   parseSearchParams,
   recordHref,
+  type Ref,
   ref,
   sleep,
   stringifySearchParams,
@@ -126,10 +127,100 @@ css`
 `;
 
 /**
- * The record surface.
+ * One record editor's state and actions, without its chrome.
+ * `recordEditor` renders the default page from it.
+ * A view registered with `registerRecordView` renders its own page from the same handle.
+ */
+export interface RecordEditor {
+  /**
+   * The collection the record belongs to.
+   */
+  collection: DashboardCollection;
+
+  /**
+   * Whether the editor creates a new record rather than editing one.
+   */
+  create: boolean;
+
+  /**
+   * The record's `UUID`.
+   * It is `''` while a singleton's first read is still on its way.
+   */
+  id: () => string;
+
+  /**
+   * The live form, rebuilt on every load and every undo or redo.
+   * It is `undefined` until the record is read.
+   */
+  form: Ref<FieldForm | undefined>;
+
+  /**
+   * Whether the record is still loading, ready to edit, or failed to load.
+   */
+  state: Ref<'loading' | 'ready' | 'failed'>;
+
+  /**
+   * Whether a save or a delete is in flight.
+   */
+  busy: Ref<boolean>;
+
+  /**
+   * The undo history of the form's state.
+   */
+  history: History;
+
+  /**
+   * Goes up whenever the form's content changes: an edit, an undo or redo, a load, or a save.
+   * Reading it in an effect reruns that effect on each change.
+   */
+  revision: Ref<number>;
+
+  /**
+   * Whether the user may create records in this collection.
+   */
+  canCreate: boolean;
+
+  /**
+   * Whether the record has translations to manage.
+   */
+  canTranslate: boolean;
+
+  /**
+   * Whether the user may save the record.
+   */
+  canWrite: () => boolean;
+
+  /**
+   * Whether the user may delete the record.
+   */
+  canDelete: () => boolean;
+
+  /**
+   * Reads the record again, discarding the form's state.
+   */
+  load: () => Promise<void>;
+
+  /**
+   * Saves the form, or focuses its first error.
+   */
+  save: () => Promise<void>;
+
+  /**
+   * Asks for confirmation, then deletes the record and returns to the collection.
+   */
+  remove: () => Promise<void>;
+
+  /**
+   * Rebuilds the form from a state the history restored.
+   */
+  restore: (state: RecordRow) => void;
+}
+
+/**
+ * Creates the editor for one record and wires its behavior into the current render scope.
  *
- * Create and edit share this one page; `uuid` absent means create.
- * A singleton never creates: `uuid` absent there edits its one record, under the collection label alone.
+ * Create and edit share this one editor; `uuid` absent means create.
+ * A singleton never creates: `uuid` absent there edits its one record.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
@@ -140,7 +231,10 @@ css`
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
  * A `?locale=` on the URL switches the content locale once and strips itself, so a link opens one locale.
  */
-export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
+export function useRecordEditor(
+  collection: DashboardCollection,
+  uuid: string | undefined,
+): RecordEditor {
   const t = useT();
   const create = isUndefined(uuid) && !collection.singleton;
   let id = uuid ?? '';
@@ -163,6 +257,11 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       .map((field) => field.name),
   });
 
+  const revision = ref(0);
+  const revise = (): void => {
+    revision.value = untracked(() => revision.value) + 1;
+  };
+
   const buildForm = (initial: RecordRow | undefined): FieldForm =>
     createFieldForm(lockOutside(formFields, verdicts.value?.select), initial, {
       mode: create ? 'create' : 'edit',
@@ -172,6 +271,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       layout: collection.layout,
       language: () => useDashboardLanguage().value,
       onInput: () => {
+        revise();
         const state = currentState();
         if (!isUndefined(state)) void history.pushDebounced(state);
       },
@@ -194,6 +294,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
   const restore = (restored: RecordRow): void => {
     form.value?.dispose();
     form.value = buildForm({ ...loaded, ...restored });
+    revise();
   };
 
   const redirectGone = (): void => {
@@ -226,6 +327,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     form.value?.dispose();
     form.value = buildForm(row);
     history.push(currentState() ?? {});
+    revise();
     state.value = 'ready';
     settleHash(form.value);
   };
@@ -305,6 +407,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       live.rebase(loaded);
       const settled = currentState();
       if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
+      revise();
       seedRecordLabel(collection, loaded);
       if (create) {
         queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
@@ -332,7 +435,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     });
   };
 
-  const removeRecord = async (): Promise<void> => {
+  const remove = async (): Promise<void> => {
     if (busy.value) return;
     const action = await openDialog({
       content: t('dashboard.record.confirmDelete'),
@@ -362,31 +465,34 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     setTimeout(() => void save());
   });
 
-  const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
-  if (!collection.singleton) {
-    const backButton = button(icon('folder'), { variant: 'outline', href: listPath });
-    onCleanup(
-      attachTooltip(backButton, () =>
-        t('dashboard.record.collectionOverview', { collection: collection.label }),
-      ),
-    );
-    heading.unshift(backButton);
-    heading.push(
-      create
-        ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
-        : h(
-            'span',
-            { class: 'ohne-truncate ohne-muted' },
-            () => `(${knownLabel(collection.name, id) ?? fallbackLabel(id)})`,
-          ),
-    );
-  }
+  return {
+    collection,
+    create,
+    id: () => id,
+    form,
+    state,
+    busy,
+    history,
+    revision,
+    canCreate,
+    canTranslate,
+    canWrite,
+    canDelete,
+    load,
+    save,
+    remove,
+    restore,
+  };
+}
 
-  const headerEl = h(
-    'div',
-    { class: 'o-record-editor-header' },
-    h('div', { class: 'ohne-row' }, ...heading),
-  );
+/**
+ * The record page: the header, the form, and the footer, in one scrolling column.
+ * A singleton's page names the collection alone.
+ */
+export function recordEditor(collection: DashboardCollection, uuid: string | undefined): Child {
+  const editor = useRecordEditor(collection, uuid);
+  const t = useT();
+  const { form, state, busy } = editor;
 
   const mainEl = h('div', { class: 'o-record-editor-main' }, () => {
     if (state.value === 'failed') {
@@ -394,7 +500,10 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
         'div',
         { class: 'o-record-editor-failed' },
         () => t('dashboard.unreachable'),
-        button(() => t('dashboard.retry'), { variant: 'outline', onClick: () => void load() }),
+        button(() => t('dashboard.retry'), {
+          variant: 'outline',
+          onClick: () => void editor.load(),
+        }),
       );
     }
     if (state.value !== 'ready') return null;
@@ -403,7 +512,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     );
   });
 
-  const containerEl = container([headerEl, mainEl]);
+  const containerEl = container([recordEditorHeader(editor), mainEl]);
   containerEl.classList.add('ohne-flex-1');
 
   const scrollY = ref(0);
@@ -422,13 +531,57 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     },
   });
 
+  return h('div', { class: 'o-record-editor' }, containerEl, recordEditorFooter(editor));
+}
+
+/**
+ * The record page's header: a link back to the collection, the collection label, and the record label.
+ * A singleton shows the collection label alone.
+ */
+export function recordEditorHeader(editor: RecordEditor): Child {
+  const t = useT();
+  const { collection } = editor;
+  const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
+  if (!collection.singleton) {
+    const backButton = button(icon('folder'), {
+      variant: 'outline',
+      href: `/collections/${collection.segment}`,
+    });
+    onCleanup(
+      attachTooltip(backButton, () =>
+        t('dashboard.record.collectionOverview', { collection: collection.label }),
+      ),
+    );
+    heading.unshift(backButton);
+    heading.push(
+      editor.create
+        ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
+        : h(
+            'span',
+            { class: 'ohne-truncate ohne-muted' },
+            () => `(${knownLabel(collection.name, editor.id()) ?? fallbackLabel(editor.id())})`,
+          ),
+    );
+  }
+
+  return h('div', { class: 'o-record-editor-header' }, h('div', { class: 'ohne-row' }, ...heading));
+}
+
+/**
+ * The record page's footer: undo and redo, Save, and the record actions menu.
+ * It renders only while the user may write, create, or delete.
+ */
+export function recordEditorFooter(editor: RecordEditor): Child {
+  const t = useT();
+  const { canCreate, canTranslate, canWrite, canDelete, history } = editor;
+
   // Save takes no disabled state: `save` guards re-entry, and a static variant keeps the toggles below.
   const saveButton = button(
     [
-      h('span', null, () => t(create ? 'dashboard.create' : 'dashboard.save')),
+      h('span', null, () => t(editor.create ? 'dashboard.create' : 'dashboard.save')),
       icon('device-floppy'),
     ],
-    { variant: 'outline', onClick: () => void save() },
+    { variant: 'outline', onClick: () => void editor.save() },
   );
   effect(() => {
     const dirty = history.isDirty.value;
@@ -436,7 +589,7 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
     saveButton.classList.toggle('ohne-button-outline', !dirty);
   });
 
-  const footerEl = when(
+  return when(
     () => canWrite() || canCreate || canDelete(),
     () =>
       h(
@@ -446,111 +599,116 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
           'div',
           { class: 'ohne-justify-between ohne-w-full' },
           when(
-            () => canWrite() && !isUndefined(form.value),
-            () => historyButtons(history, restore),
+            () => canWrite() && !isUndefined(editor.form.value),
+            () => historyButtons(history, editor.restore),
           ),
           h(
             'div',
             { class: 'ohne-row ohne-ml-auto' },
             when(canWrite, () => saveButton),
-            create ? null : when(() => canCreate || canTranslate || canDelete(), recordMenu),
+            editor.create
+              ? null
+              : when(
+                  () => canCreate || canTranslate || canDelete(),
+                  () => recordMenu(editor),
+                ),
           ),
         ),
       ),
   );
+}
 
-  /**
-   * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
-   * New links to the create page, Translate opens the translations popup, Delete confirms first.
-   */
-  function recordMenu(): Child {
-    const open = ref(false);
-    const translationsOpen = ref(false);
-    const close = (): void => {
-      open.value = false;
-    };
-    const trigger = button(icon('dots-vertical'), {
-      variant: 'outline',
-      onClick: () => {
-        open.value = true;
-      },
-    });
-    effect(() => {
-      trigger.title = t('dashboard.record.moreActions');
-      trigger.classList.toggle('ohne-button-primary', open.value);
-      trigger.classList.toggle('ohne-button-outline', !open.value);
-    });
-    return h(
-      'div',
-      { class: 'ohne-flex' },
-      trigger,
-      when(
-        () => open.value,
-        () => {
-          const items: Child[] = [];
-          if (canCreate) {
-            const item = dropdownItem([icon('note'), h('span', null, () => t('dashboard.new'))], {
-              href: `${listPath}/new`,
-              onClick: close,
-            });
-            effect(() => {
-              item.title = t('dashboard.new');
-            });
-            items.push(item);
-          }
-          if (canCreate && (canTranslate || canDelete())) items.push(h('hr'));
-          if (canTranslate) {
-            const item = dropdownItem(
-              [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
-              {
-                onClick: () => {
-                  close();
-                  translationsOpen.value = true;
-                },
-              },
-            );
-            effect(() => {
-              item.title = t('dashboard.translations.translate');
-            });
-            items.push(item);
-          }
-          if (canDelete()) {
-            const item = dropdownItem(
-              [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
-              {
-                destructive: true,
-                onClick: () => {
-                  close();
-                  void removeRecord();
-                },
-              },
-            );
-            effect(() => {
-              item.title = t('dashboard.delete');
-            });
-            items.push(item);
-          }
-          return dropdown(items, { reference: trigger, onClose: close }).root;
-        },
-      ),
-      when(
-        () => translationsOpen.value,
-        () => {
-          translationsPopup({
-            collection,
-            uuid: id,
-            onClose: (closePopup) =>
-              void closePopup().then(() => {
-                translationsOpen.value = false;
-              }),
+/**
+ * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
+ * New links to the create page, Translate opens the translations popup, Delete confirms first.
+ */
+function recordMenu(editor: RecordEditor): Child {
+  const t = useT();
+  const { collection, canCreate, canTranslate, canDelete } = editor;
+  const open = ref(false);
+  const translationsOpen = ref(false);
+  const close = (): void => {
+    open.value = false;
+  };
+  const trigger = button(icon('dots-vertical'), {
+    variant: 'outline',
+    onClick: () => {
+      open.value = true;
+    },
+  });
+  effect(() => {
+    trigger.title = t('dashboard.record.moreActions');
+    trigger.classList.toggle('ohne-button-primary', open.value);
+    trigger.classList.toggle('ohne-button-outline', !open.value);
+  });
+  return h(
+    'div',
+    { class: 'ohne-flex' },
+    trigger,
+    when(
+      () => open.value,
+      () => {
+        const items: Child[] = [];
+        if (canCreate) {
+          const item = dropdownItem([icon('note'), h('span', null, () => t('dashboard.new'))], {
+            href: `/collections/${collection.segment}/new`,
+            onClick: close,
           });
-          return null;
-        },
-      ),
-    );
-  }
-
-  return h('div', { class: 'o-record-editor' }, containerEl, footerEl);
+          effect(() => {
+            item.title = t('dashboard.new');
+          });
+          items.push(item);
+        }
+        if (canCreate && (canTranslate || canDelete())) items.push(h('hr'));
+        if (canTranslate) {
+          const item = dropdownItem(
+            [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
+            {
+              onClick: () => {
+                close();
+                translationsOpen.value = true;
+              },
+            },
+          );
+          effect(() => {
+            item.title = t('dashboard.translations.translate');
+          });
+          items.push(item);
+        }
+        if (canDelete()) {
+          const item = dropdownItem(
+            [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
+            {
+              destructive: true,
+              onClick: () => {
+                close();
+                void editor.remove();
+              },
+            },
+          );
+          effect(() => {
+            item.title = t('dashboard.delete');
+          });
+          items.push(item);
+        }
+        return dropdown(items, { reference: trigger, onClose: close }).root;
+      },
+    ),
+    when(
+      () => translationsOpen.value,
+      () => {
+        translationsPopup({
+          collection,
+          uuid: editor.id(),
+          onClose: (closePopup) =>
+            void closePopup().then(() => {
+              translationsOpen.value = false;
+            }),
+        });
+        return null;
+      },
+    ),
+  );
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 import { effect, isUndefined, recordHref } from 'ohnejs/utils';
 
 import { recordEditor } from '../../../components/record-editor.ts';
+import { recordViewOf } from '../../../components/record-view.ts';
 import { shell } from '../../../components/shell.ts';
 
 css`
@@ -80,7 +81,8 @@ function pane(segment: () => string, uuid: () => string): Child {
             navigate(recordHref(collection, id), { replace: true });
             return null;
           }
-          return recordEditor(collection, id === 'new' ? undefined : id);
+          const record = id === 'new' ? undefined : id;
+          return (recordViewOf(collection) ?? recordEditor)(collection, record);
         },
         () => h('div', { class: 'o-record-page-missing' }, () => t('dashboard.notFound')),
       ),

@@ -13,6 +13,7 @@ import { effect, isUndefined } from 'ohnejs/utils';
 
 import { collectionTable } from '../../components/collection-table.ts';
 import { recordEditor } from '../../components/record-editor.ts';
+import { recordViewOf } from '../../components/record-view.ts';
 import { shell } from '../../components/shell.ts';
 
 css`
@@ -54,7 +55,7 @@ function pane(segment: () => string): Child {
           const collection = entry();
           if (isUndefined(collection)) return null;
           return collection.singleton
-            ? recordEditor(collection, undefined)
+            ? (recordViewOf(collection) ?? recordEditor)(collection, undefined)
             : collectionTable(collection);
         },
         () => h('div', { class: 'pane-missing' }, () => t('dashboard.notFound')),
