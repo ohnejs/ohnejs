@@ -27,7 +27,6 @@ jobs:
       - name: Check the tag names the package version
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
 
-      # npm can only stage a version of a package it has, so a package's first version is published by hand.
       - name: Skip a first or already published version
         id: published
         run: |
@@ -36,6 +35,5 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Staged, so nothing goes live until the maintainer approves it with 2FA.
       - if: steps.published.outputs.skip != 'true'
         run: npm stage publish --ignore-scripts --tag ${{ contains(github.ref_name, '-') && 'next' || 'latest' }}
