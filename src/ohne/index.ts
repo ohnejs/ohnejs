@@ -120,6 +120,7 @@ export * from './http/set-response-status.ts';
 export * from './http/set-signed-cookie.ts';
 export * from './http/shutdown-server.ts';
 export * from './http/to-response.ts';
+export { resolveMessage, translate } from './http/translate.ts';
 export * from './http/use-accepts-languages.ts';
 export * from './http/use-accepts.ts';
 export * from './http/use-authorization.ts';
