@@ -102,13 +102,15 @@ css`
   .ohne-block-picker-block-icon {
     display: flex;
     flex-shrink: 0;
-    height: 1.375rem;
     align-items: center;
+    height: 1.375rem;
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 1.25rem;
   }
 
   .ohne-block-picker-block-description {
-    font-size: 0.75rem;
-    opacity: 0.75;
+    color: hsl(var(--ohne-muted-foreground));
+    font-size: 0.8125rem;
   }
 
   .ohne-block-picker-block-title {
