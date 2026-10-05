@@ -106,6 +106,16 @@ describe('History', () => {
     deepStrictEqual(history.getAllStates(), [{ a: 1 }, { a: 3 }]);
   });
 
+  it('drops a pending debounced push once a direct push lands, as after a save', async () => {
+    const history = new History({ watchUnsavedChanges: false });
+    history.push({ a: 1 });
+    void history.pushDebounced({ a: 2 }, 10);
+    history.push({ a: 2, id: 'saved' }).setOriginalState({ a: 2, id: 'saved' });
+    await sleep(20);
+    deepStrictEqual(history.getAllStates(), [{ a: 1 }, { a: 2, id: 'saved' }]);
+    strictEqual(history.isDirty.value, false);
+  });
+
   it('clears everything, original and pending timer included', async () => {
     const history = new History({ watchUnsavedChanges: false });
     history.push({ a: 1 }).push({ a: 2 });

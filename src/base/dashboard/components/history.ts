@@ -106,8 +106,13 @@ export class History<T extends object = Record<string, unknown>> {
 
   /**
    * Adds a new state to the history stack and manages the maximum number of stored states.
+   * It supersedes a pending debounced push, which then never lands.
    */
   push(state: T): this {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     const current = this.getCurrentState();
     const changed =
       isUndefined(current) ||
