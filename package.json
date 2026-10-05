@@ -32,7 +32,10 @@
       "types": "./src/base/auth/index.ts",
       "default": "./src/base/auth/index.ts"
     },
-    "./base": "./src/base/ohne.config.ts",
+    "./base": {
+      "types": "./src/base/index.ts",
+      "default": "./src/base/index.ts"
+    },
     "./create": {
       "types": "./src/ohne/cli/create.ts",
       "default": "./src/ohne/cli/create.ts"

@@ -1,12 +1,6 @@
-import {
-  cors,
-  DEFAULT_DASHBOARD_PORT,
-  defineMiddleware,
-  type Middleware,
-  useConfig,
-  useEnv,
-} from 'ohnejs';
-import { listenOrigin } from 'ohnejs/utils/net';
+import { cors, defineMiddleware, type Middleware } from 'ohnejs';
+
+import { dashboardOrigin } from '../../http/dashboard-origin.ts';
 
 let middleware: Middleware | null = null;
 
@@ -28,15 +22,3 @@ export default defineMiddleware((event) => {
   });
   return middleware(event);
 });
-
-/**
- * The origin the browser reaches the dashboard at: env, then config, then the derived default.
- */
-function dashboardOrigin(): string {
-  const dashboard = useConfig().dashboard;
-  return (
-    useEnv().get('DASHBOARD_URL') ??
-    dashboard?.origin ??
-    listenOrigin(useEnv().get('HOST') ?? dashboard?.host, dashboard?.port ?? DEFAULT_DASHBOARD_PORT)
-  );
-}
