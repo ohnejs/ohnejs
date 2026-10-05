@@ -397,6 +397,21 @@ export interface DashboardBlock {
   label: string;
 
   /**
+   * The declared `description`, resolved in the request's language; absent when the block declares none.
+   */
+  description?: string;
+
+  /**
+   * The block's icon, or the field whose value picks it; absent when the block declares none.
+   */
+  icon?: IconName | { field: string; map: Record<string, IconName>; default?: IconName };
+
+  /**
+   * The field whose value names one instance beside the label; absent when the block declares none.
+   */
+  titleField?: string;
+
+  /**
    * The block's own fields, its instance `UUID` included; a block carries no `_updatedAt`.
    */
   fields: DashboardField[];

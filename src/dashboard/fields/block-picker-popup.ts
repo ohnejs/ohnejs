@@ -1,3 +1,5 @@
+import type { IconName } from '../../utils/icon/icon-name.ts';
+
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { computed } from '../../utils/reactive/computed.ts';
@@ -15,12 +17,14 @@ import { button } from '../ui/button.ts';
 import { icon } from '../ui/icon.ts';
 import { popup } from '../ui/popup-overlay.ts';
 import { textInput } from '../ui/text-input.ts';
-import { blocksOf } from './_blocks.ts';
+import { blockIcon, blocksOf } from './_blocks.ts';
 import { blockNamed } from './_items.ts';
 
 interface PickerBlock {
   name: string;
   label: string;
+  description: string | undefined;
+  icon: IconName;
   search: string;
 }
 
@@ -95,6 +99,18 @@ css`
     gap: 0.25rem;
   }
 
+  .ohne-block-picker-block-icon {
+    display: flex;
+    flex-shrink: 0;
+    height: 1.375rem;
+    align-items: center;
+  }
+
+  .ohne-block-picker-block-description {
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+
   .ohne-block-picker-block-title {
     font-weight: 500;
     line-height: 1.375rem;
@@ -141,8 +157,11 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         const registry = blocksOf();
         const names = allowed ?? registry.map((block) => block.name);
         return names.map((name) => {
-          const label = blockNamed(registry, name)?.label ?? name;
-          return { name, label, search: [label.padEnd(63), name].join(' ') };
+          const block = blockNamed(registry, name);
+          const label = block?.label ?? name;
+          const description = block?.description;
+          const search = [label.padEnd(63), name, description ?? ''].join(' ');
+          return { name, label, description, icon: blockIcon(block), search };
         });
       });
 
@@ -294,10 +313,15 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
             disabled: () => mousePaused.value,
             onClick: () => choose(block().name),
           },
+          h('span', { class: 'ohne-block-picker-block-icon' }, () => icon(block().icon)),
           h(
             'span',
             { class: 'ohne-block-picker-block-meta' },
             h('span', { class: 'ohne-block-picker-block-title' }, () => block().label),
+            () =>
+              isUndefined(block().description)
+                ? null
+                : h('span', { class: 'ohne-block-picker-block-description' }, block().description),
           ),
         );
 
