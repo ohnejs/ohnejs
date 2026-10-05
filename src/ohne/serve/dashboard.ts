@@ -139,14 +139,17 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
 
-  const renderShell = async (): Promise<string> =>
-    shellDocument(
+  // A framed dashboard could be clickjacked into a save or a delete; no page may frame it.
+  const renderShell = async (): Promise<string> => {
+    useResponse().headers.set('content-security-policy', "frame-ancestors 'none'");
+    return shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
       (await collectDashboardBoot(layers)).map((boot) => `${APP_MODULE_BASE}/${boot.module}`),
       defaultLanguage,
       reload,
     );
+  };
 
   const routes: Route[] = [
     synthetic('/', renderShell),

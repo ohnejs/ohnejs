@@ -102,6 +102,12 @@ describe('serveDashboard', () => {
     strictEqual(res.body.includes('id="app"'), true);
   });
 
+  it('refuses to be framed by any page', async () => {
+    const port = await serve('frame');
+    const res = await req(port, '/collections/pages');
+    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+  });
+
   it('serves the shell for an unknown navigation path, as a pure SPA', async () => {
     const port = await serve('spa');
     const res = await req(port, '/users/42');
