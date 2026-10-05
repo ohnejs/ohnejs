@@ -773,8 +773,10 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
 
   effect(() => updatePlaceholder(scrollHandle.y.value));
 
-  // The first run measures an unattached element, whose `offsetHeight` is 0.
-  requestAnimationFrame(() => updatePlaceholder(scrollHandle.y.value));
+  // A tree built hidden, in a closed tab or before it mounts, measures 0 until its size changes.
+  const resize = new ResizeObserver(() => updatePlaceholder(untracked(() => scrollHandle.y.value)));
+  resize.observe(scrollableEl);
+  onCleanup(() => resize.disconnect());
 
   const stopClickOutside = listenClickOutside(root, () => {
     isDragging.value = false;
