@@ -7,6 +7,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
+import { setDocumentTitle } from '../runtime/title.ts';
 import { compilePages, matchPages, type CompiledPage, type MatchedRoute } from './match-route.ts';
 
 /**
@@ -213,8 +214,10 @@ export function useRoute(): RouteContext | null {
 
 /**
  * The active page rendered for its route, or the not-found page when no route matched.
+ * The title resets to the bare `ohne` first, so a page that sets none never shows the previous page's.
  */
 function view(): Child {
+  setDocumentTitle();
   const route = active.value;
   return isNull(route) ? notFound() : route.component(route);
 }

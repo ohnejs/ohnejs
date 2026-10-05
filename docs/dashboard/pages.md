@@ -55,6 +55,29 @@ The runtime defines what the component returns and how it updates:
 - [`ref`](./reactivity.md#ref) holds state.
 - [`api`](./data.md#loading-into-a-ref) loads data from your API.
 
+## The page title
+
+Every page starts with the bare `ohne` title. To name it, call `setDocumentTitle` in the page:
+
+```ts
+// dashboard/pages/posts.ts
+import { defineDashboardPage, h, setDocumentTitle } from 'ohnejs/dashboard';
+
+export default defineDashboardPage(() => {
+  setDocumentTitle('Posts');
+  return h('h1', null, 'Posts');
+});
+```
+
+The tab now reads `Posts - ohne`. A page that sets no title shows `ohne`, however you got there.
+
+When the title comes from data that loads later, call it inside an [`effect`](./reactivity.md#effect)
+so it follows the data:
+
+```ts
+effect(() => setDocumentTitle(post.value?.title));
+```
+
 ## Navigation
 
 The dashboard is a single-page app. The server answers every path with the same shell, so a link to
