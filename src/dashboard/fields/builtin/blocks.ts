@@ -1,5 +1,6 @@
 import type { DashboardBlock } from '../../runtime/meta-types.ts';
 import type { FieldForm } from '../field-form.ts';
+import type { FieldControl } from '../field-type.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
@@ -25,15 +26,16 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { structureActions, structureErrorMark, structureItemError } from '../structure-chrome.ts';
 
 /**
- * One editable block instance, carried as a structure item.
+ * One editable block instance in a `blocks` list.
  *
  * `$key` is local and monotonic, never the instance `UUID`.
  * A fresh item has no `UUID` yet, and a reordered row must keep its DOM.
  * `uuid` absent is what inserts the item on save.
  * `$expanded` gates only rendering; the form outlives every collapse, so edits survive.
+ * Expanding replaces the node with a copy, so `$key` and `form` identify it, never the object.
  * A type literal, so the structure's `Record<string, unknown>` item constraint accepts it.
  */
-type BlockNode = {
+export type BlockNode = {
   $key: number;
   $expanded: boolean;
   block: string;
@@ -41,6 +43,61 @@ type BlockNode = {
   form: FieldForm;
   own: Ref<string>;
 };
+
+/**
+ * The live surface of one `blocks` list, for an editor that shows the list without its cards.
+ * Every change runs through the field's own input, so history and dirt follow as they do for cards.
+ */
+export interface BlocksHandle {
+  /**
+   * The block types the list admits.
+   */
+  offered: readonly string[];
+
+  /**
+   * Whether the list is locked, for a viewer who cannot write.
+   */
+  disabled: boolean;
+
+  /**
+   * The list's blocks, in order.
+   * Reactive.
+   */
+  nodes(): readonly BlockNode[];
+
+  /**
+   * Builds a block of type `name` that belongs to this list, without placing it.
+   * `fields` seeds it, as a paste or a duplicate does.
+   */
+  create(name: string, fields?: Readonly<Record<string, unknown>>): BlockNode;
+
+  /**
+   * The block's field values without any `UUID`, the shape a copy carries.
+   */
+  copy(node: BlockNode): Record<string, unknown>;
+
+  /**
+   * Replaces the list and answers the placed nodes.
+   * A block from another list is rebuilt as a new one here, so commit the receiving list first.
+   * A block left out is disposed.
+   */
+  commit(next: readonly BlockNode[]): BlockNode[];
+
+  /**
+   * Called in place of expanding a card when the field focuses a block, as after a failed save.
+   * Set it when another surface shows the blocks; the card view leaves it unset.
+   */
+  onReveal: ((node: BlockNode) => void) | undefined;
+}
+
+const handles = new WeakMap<FieldControl, BlocksHandle>();
+
+/**
+ * The handle of a `blocks` field's control, or `undefined` for any other control.
+ */
+export function blocksHandleOf(control: FieldControl | undefined): BlocksHandle | undefined {
+  return isUndefined(control) ? undefined : handles.get(control);
+}
 
 // Shared across every blocks control, so a cross-structure drop never lands a colliding `$key`.
 let nextNodeKey = 0;
@@ -212,14 +269,14 @@ export const blocksType: FieldType = {
       nodes.value = nodes.value.map((node) => ({ ...node, $expanded: expanded }));
     };
 
+    // A block from another list is rebuilt here, since its form and effects belong to that list.
+    const adopt = (item: BlockNode): BlockNode =>
+      ownForms.has(item.form)
+        ? item
+        : nodeOf({ block: item.block, fields: valueOf(item.form) }, item.$expanded);
+
     const settle = (items: BlockNode[]): void => {
-      change(
-        items.map((item) =>
-          ownForms.has(item.form)
-            ? item
-            : nodeOf({ block: item.block, fields: valueOf(item.form) }, item.$expanded),
-        ),
-      );
+      change(items.map(adopt));
     };
 
     const focusNew = (node: BlockNode): void => {
@@ -232,96 +289,118 @@ export const blocksType: FieldType = {
       });
     };
 
-    const element = h(
-      'div',
-      { tabindex: '-1' },
-      structure<BlockNode>(nodes, {
-        types: offered,
-        resolveItemType: (node) => node.block,
-        allowCrossDrop: true,
-        disabled: () => off,
-        isDraggable: !off,
-        dropItemsHereLabel: t('dashboard.dropItemsHere'),
-        expose: (handle) => {
-          surface = handle;
-        },
-        header: (node, index) => [
-          h('span', { class: 'ohne-muted ohne-truncate' }, () => labelOf(node().block, blocks)),
-          off
-            ? null
-            : structureActions({
-                index,
-                count: () => nodes.value.length,
-                expanded: () => node().$expanded,
-                allExpanded,
-                allCollapsed,
-                onToggleExpanded: () => toggleExpanded(node()),
-                onExpandAll: () => setAllExpanded(true),
-                onCollapseAll: () => setAllExpanded(false),
-                onMove: (delta) => {
-                  surface?.resumeScrollWatcher();
-                  move(node(), delta);
-                  surface?.pauseScrollWatcher();
-                },
-                onAdd:
-                  offered.length === 0
-                    ? undefined
-                    : (at) => {
-                        if (offered.length > 1) pick(at);
-                        else addAt(offered[0] as string, at);
-                      },
-                copyPayload: () => ({
-                  ohneClipboardDataType: 'blocks',
-                  data: [{ $key: node().block, ...valueOf(node().form) }],
-                }),
-                canPaste: () => {
-                  const payload = clipboardData.value;
-                  return (
-                    !isNull(payload) &&
-                    payload.ohneClipboardDataType === 'blocks' &&
-                    payload.data.every(({ $key }) => offered.includes($key))
-                  );
-                },
-                onPaste: pasteAt,
-                onDuplicate: () => duplicate(node()),
-                onRemove: () => remove(node()),
-              }),
-        ],
-        // Untracked reads keep expand-all's replacement from rebuilding the body and dropping focus.
-        item: (node) => {
-          const form = untracked(() => node().form);
-          const name = untracked(() => node().block);
-          return h(
-            'div',
-            { class: 'ohne-blocks-item' },
-            hasFields(name)
-              ? form.render()
-              : h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay')),
-          );
-        },
-        itemBefore: (node) =>
-          structureErrorMark(
-            () => node().own.value !== '' || (!node().$expanded && node().form.errored()),
-          ),
-        itemAfter: (node) => structureItemError(() => node().own.value),
-        onCommit: settle,
-      }),
+    const handle: BlocksHandle = {
+      offered,
+      disabled: off,
+      nodes: () => nodes.value,
+      create: (name, fields) => nodeOf({ block: name, fields }, true),
+      copy: (node) => valueOf(node.form),
+      commit(next) {
+        const placed = next.map(adopt);
+        const kept = new Set(placed.map((node) => node.form));
+        for (const node of nodes.value) if (!kept.has(node.form)) node.form.dispose();
+        change(placed);
+        return placed;
+      },
+      onReveal: undefined,
+    };
+
+    // Built on first read, inside the control's own scope, so a surface that never shows the cards never builds them.
+    let element: HTMLElement | undefined;
+    const buildElement = (): HTMLElement =>
       h(
         'div',
-        { class: 'ohne-blocks-add' },
-        button([icon('plus'), h('span', null, () => t('dashboard.addBlock'))], {
-          variant: 'outline',
-          disabled: off || offered.length === 0 ? (): boolean => true : undefined,
-          onClick: () => {
-            if (offered.length > 1) pick();
-            else if (offered.length === 1) focusNew(addAt(offered[0] as string));
+        { tabindex: '-1' },
+        structure<BlockNode>(nodes, {
+          types: offered,
+          resolveItemType: (node) => node.block,
+          allowCrossDrop: true,
+          disabled: () => off,
+          isDraggable: !off,
+          dropItemsHereLabel: t('dashboard.dropItemsHere'),
+          expose: (handle) => {
+            surface = handle;
           },
+          header: (node, index) => [
+            h('span', { class: 'ohne-muted ohne-truncate' }, () => labelOf(node().block, blocks)),
+            off
+              ? null
+              : structureActions({
+                  index,
+                  count: () => nodes.value.length,
+                  expanded: () => node().$expanded,
+                  allExpanded,
+                  allCollapsed,
+                  onToggleExpanded: () => toggleExpanded(node()),
+                  onExpandAll: () => setAllExpanded(true),
+                  onCollapseAll: () => setAllExpanded(false),
+                  onMove: (delta) => {
+                    surface?.resumeScrollWatcher();
+                    move(node(), delta);
+                    surface?.pauseScrollWatcher();
+                  },
+                  onAdd:
+                    offered.length === 0
+                      ? undefined
+                      : (at) => {
+                          if (offered.length > 1) pick(at);
+                          else addAt(offered[0] as string, at);
+                        },
+                  copyPayload: () => ({
+                    ohneClipboardDataType: 'blocks',
+                    data: [{ $key: node().block, ...valueOf(node().form) }],
+                  }),
+                  canPaste: () => {
+                    const payload = clipboardData.value;
+                    return (
+                      !isNull(payload) &&
+                      payload.ohneClipboardDataType === 'blocks' &&
+                      payload.data.every(({ $key }) => offered.includes($key))
+                    );
+                  },
+                  onPaste: pasteAt,
+                  onDuplicate: () => duplicate(node()),
+                  onRemove: () => remove(node()),
+                }),
+          ],
+          // Untracked reads keep expand-all's replacement from rebuilding the body and dropping focus.
+          item: (node) => {
+            const form = untracked(() => node().form);
+            const name = untracked(() => node().block);
+            return h(
+              'div',
+              { class: 'ohne-blocks-item' },
+              hasFields(name)
+                ? form.render()
+                : h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay')),
+            );
+          },
+          itemBefore: (node) =>
+            structureErrorMark(
+              () => node().own.value !== '' || (!node().$expanded && node().form.errored()),
+            ),
+          itemAfter: (node) => structureItemError(() => node().own.value),
+          onCommit: settle,
         }),
-      ),
-    );
+        h(
+          'div',
+          { class: 'ohne-blocks-add' },
+          button([icon('plus'), h('span', null, () => t('dashboard.addBlock'))], {
+            variant: 'outline',
+            disabled: off || offered.length === 0 ? (): boolean => true : undefined,
+            onClick: () => {
+              if (offered.length > 1) pick();
+              else if (offered.length === 1) focusNew(addAt(offered[0] as string));
+            },
+          }),
+        ),
+      );
 
-    return {
-      element,
+    const control: FieldControl = {
+      get element() {
+        element ??= owner.run(() => untracked(buildElement));
+        return element;
+      },
       read() {
         const live = nodes.value;
         if (!touched.value && isUndefined(base) && !live.some((node) => node.form.dirty())) {
@@ -388,6 +467,10 @@ export const blocksType: FieldType = {
       focus() {
         const target = nodes.value.find(flagged) ?? nodes.value[0];
         if (isUndefined(target)) return;
+        if (!isUndefined(handle.onReveal)) {
+          handle.onReveal(target);
+          return;
+        }
         if (!target.$expanded) {
           nodes.value = nodes.value.map((node) =>
             node === target ? { ...node, $expanded: true } : node,
@@ -423,6 +506,8 @@ export const blocksType: FieldType = {
             );
             node.own.value = '';
           });
+          // Readers of `nodes` key on the saved `UUID`s too, so the in-place update must still notify them.
+          nodes.value = [...live];
         } else {
           rebuild();
         }
@@ -430,6 +515,8 @@ export const blocksType: FieldType = {
         routed.value = '';
       },
     };
+    handles.set(control, handle);
+    return control;
   },
 };
 

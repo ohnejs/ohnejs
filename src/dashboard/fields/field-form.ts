@@ -106,8 +106,14 @@ export interface FieldFormOptions {
 export interface FieldForm {
   /**
    * The form's rows, one per rendered field, in field order.
+   * A field `hide` answers `true` for renders no row; it still reads, routes errors, and focuses.
    */
-  render(): Child;
+  render(options?: { hide?: (field: DashboardField) => boolean }): Child;
+
+  /**
+   * The control of the field `name`, locked rows included, or `undefined` when the form builds none.
+   */
+  controlOf(name: string): FieldControl | undefined;
 
   /**
    * Reads the whole value: every control's current value beside the carried fields.
@@ -310,13 +316,14 @@ export function createFieldForm(
   let reveal = (_name: string): boolean => false;
 
   return {
-    render() {
-      if (isUndefined(options.layout)) return ordered.map(rowOf);
+    render(renderOptions) {
+      const shown = (field: DashboardField): boolean => renderOptions?.hide?.(field) !== true;
+      if (isUndefined(options.layout)) return ordered.filter(shown).map(rowOf);
       const { nodes, rest } = placeLayout(options.layout, [...fieldByName.keys()]);
       const rendered = renderFieldLayout(nodes, {
         row: (name) => {
           const field = fieldByName.get(name);
-          return isUndefined(field) ? null : rowOf(field);
+          return isUndefined(field) || !shown(field) ? null : rowOf(field);
         },
         errored: (name) => {
           const row = rowByName.get(name);
@@ -326,8 +333,12 @@ export function createFieldForm(
       reveal = rendered.reveal;
       const trailing = rest
         .map((name) => fieldByName.get(name))
-        .filter((field) => !isUndefined(field));
+        .filter((field) => !isUndefined(field))
+        .filter(shown);
       return h('div', { class: 'ohne-fields' }, rendered.children, trailing.map(rowOf));
+    },
+    controlOf(name) {
+      return (rowByName.get(name) ?? lockedByName.get(name))?.control;
     },
     read() {
       return collect(rows, true);

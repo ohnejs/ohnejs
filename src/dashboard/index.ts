@@ -1,5 +1,11 @@
 import './fields/builtin/index.ts';
 
+export { blockIcon } from './fields/_blocks.ts';
+export { blocksHandleOf } from './fields/builtin/blocks.ts';
+export type { BlockNode, BlocksHandle } from './fields/builtin/blocks.ts';
+export { blocksTree } from './fields/blocks-tree.ts';
+export type { BlocksTree, BlocksTreeRow } from './fields/blocks-tree.ts';
+export { openBlockPicker } from './fields/block-picker-popup.ts';
 export { cellEditor } from './fields/cell-editor.ts';
 export type { CellEditorOptions } from './fields/cell-editor.ts';
 export { watchOSClipboard } from './fields/clipboard.ts';
