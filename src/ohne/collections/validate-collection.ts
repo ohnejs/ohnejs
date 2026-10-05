@@ -16,7 +16,7 @@ import {
   isUndefined,
   templateFields,
 } from '../../utils/index.ts';
-import { iconNames, isIconName } from '../dashboard/icon-shapes.ts';
+import { validateIcon } from '../dashboard/validate-icon.ts';
 import { validateFieldName, validateUniqueNames } from '../database/naming/validate-names.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { validateLayout } from '../fields/layout.ts';
@@ -95,7 +95,7 @@ function validateDashboard(
       });
     }
   }
-  validateIcon(dashboard.icon, collection);
+  validateIcon(dashboard.icon, 'dashboard.icon', scope);
   validateRecordLabel(dashboard.recordLabel, fields, collection);
   validateRecordPath(dashboard.recordPath, collection);
   validateTable(dashboard.table, fields, collection);
@@ -114,33 +114,6 @@ function validateSearch(search: unknown, scope: string): void {
     body: [
       `The \`dashboard.search\` option${scope} must be \`false\` or \`{ via: false }\`.`,
       '`false` keeps the collection out of word search; `{ via: false }` stops finds through links to it.',
-    ],
-  });
-}
-
-/**
- * Rejects a `dashboard.icon` the vendored Tabler set does not carry.
- * The type already narrows this for a TypeScript caller, and the check catches a plain-JS one.
- * A menu row that would silently render no icon becomes a named failure at boot.
- */
-function validateIcon(icon: unknown, collection?: string): void {
-  if (isUndefined(icon)) return;
-  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
-  if (!isString(icon)) {
-    throw ohneError({
-      title: 'Invalid `dashboard.icon` declaration',
-      body: [`The \`dashboard.icon\` option${scope} must be an icon name.`],
-    });
-  }
-  if (isIconName(icon)) return;
-  const near = didYouMean(icon, iconNames());
-  throw ohneError({
-    title: `Unknown icon \`${icon}\``,
-    body: [
-      `The \`dashboard.icon\` option${scope} names an icon the set does not carry.`,
-      isUndefined(near)
-        ? 'Every icon is a Tabler original; browse the names at `https://tabler.io/icons`.'
-        : `Did you mean \`${near}\`?`,
     ],
   });
 }

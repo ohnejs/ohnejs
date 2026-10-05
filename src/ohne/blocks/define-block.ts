@@ -1,3 +1,4 @@
+import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type { FieldLayout } from '../fields/layout.ts';
 import type { Message } from '../messages/known-messages.ts';
@@ -5,9 +6,54 @@ import type { Message } from '../messages/known-messages.ts';
 import { validateBlockDefinition } from './validate-block.ts';
 
 /**
- * How the dashboard presents a block's fields in the blocks editor.
+ * A block's icon: one Tabler icon, or one picked by the value of a field.
+ */
+export type BlockIcon<TField extends string = string> =
+  | IconName
+  | {
+      /**
+       * The field whose value picks the icon.
+       */
+      field: TField;
+
+      /**
+       * The icon for each value of `field`.
+       */
+      map: Record<string, IconName>;
+
+      /**
+       * The icon for a value `map` does not name.
+       *
+       * @default
+       * 'cube'
+       */
+      default?: IconName;
+    };
+
+/**
+ * How the dashboard presents a block in the blocks editor.
  */
 export interface BlockDashboard<TField extends string = string> {
+  /**
+   * The Tabler icon shown beside the block's label.
+   *
+   * @default
+   * 'cube'
+   *
+   * @example
+   * ```ts
+   * 'photo'
+   * { field: 'columns', map: { '2': 'columns-2', '3': 'columns-3' } }
+   * ```
+   */
+  icon?: BlockIcon<TField>;
+
+  /**
+   * A field whose value names one instance beside the block's label, like a heading.
+   * Omitted, only the label names it.
+   */
+  titleField?: TField;
+
   /**
    * How the block's form arranges its fields: rows, cards, tabs, and rules.
    * A field the layout does not name renders after it, in declaration order.
@@ -49,6 +95,12 @@ export interface BlockDefinition<
   label?: Message;
 
   /**
+   * One sentence that says what the block is for, shown under its label in the block picker.
+   * It takes a message key, a `{ key, params }` object, or a plain string, as `label` does.
+   */
+  description?: Message;
+
+  /**
    * The fields, keyed by their camelCase name.
    *
    * @example
@@ -62,11 +114,13 @@ export interface BlockDefinition<
   fields: TFields;
 
   /**
-   * How the dashboard presents the block's fields; omitted, they stack in declaration order.
+   * How the dashboard presents the block: its icon, its instance title, and its form layout.
    *
    * @example
    * ```ts
    * {
+   *   icon: 'photo',
+   *   titleField: 'title',
    *   layout: [
    *     { row: ['title', 'subtitle | 40%'] },
    *     'body',
@@ -90,12 +144,17 @@ export interface AnyBlockDefinition {
   label?: Message;
 
   /**
+   * One sentence that says what the block is for, shown under its label in the block picker.
+   */
+  description?: Message;
+
+  /**
    * The fields, keyed by their camelCase name.
    */
   fields: Record<string, FieldInstance>;
 
   /**
-   * How the dashboard presents the block's fields; omitted, they stack in declaration order.
+   * How the dashboard presents the block: its icon, its instance title, and its form layout.
    */
   dashboard?: BlockDashboard;
 }
