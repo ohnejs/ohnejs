@@ -7,7 +7,7 @@ import pkg from '../../../package.json' with { type: 'json' };
  * ```ts
  * import { version } from 'ohnejs'
  *
- * version // -> '0.0.1'
+ * console.log(`ohne v${version}`)
  * ```
  */
 export const version: string = pkg.version;
