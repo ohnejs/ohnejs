@@ -391,7 +391,8 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
   if (options.noMainPadding === true) mainEl.classList.add('o-main-no-padding');
   if (options.noMainScroll === true) mainEl.classList.add('o-main-no-scroll');
   mainEl.addEventListener('click', () => {
-    if (untracked(expanded)) toggleSidebar();
+    // A page's own menu button already toggled before its click bubbles here.
+    if (untracked(expanded) && !untracked(() => transition.value)) toggleSidebar();
   });
 
   let releaseTrap: (() => void) | undefined;
