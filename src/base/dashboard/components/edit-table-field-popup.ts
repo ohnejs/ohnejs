@@ -6,6 +6,7 @@ import {
   type DashboardCollection,
   type DashboardField,
   fallbackLabel,
+  fieldMessage,
   type FieldForm,
   h,
   icon,
@@ -17,9 +18,11 @@ import {
   useHotkeys,
   useRoute,
   useT,
+  when,
 } from 'ohnejs/dashboard';
 import {
   effect,
+  isDotPathInside,
   isNull,
   isString,
   isUndefined,
@@ -141,6 +144,7 @@ export function setEditQueryParam(value: string[] | null): void {
  * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`.
  * Cmd/Ctrl+S saves, and closing is dirty-guarded through the `unsavedChanges` prompt.
  * The save patches only this field; a `422` routes onto the control and raises the error count toast.
+ * A message for a field the popup does not show, like a translation's required slug, renders below it.
  * A save whose answer lacks the field toasts it as not saved: the update scope's `select` dropped it.
  * A vanished record toasts and closes.
  * The popup follows the `edit` query parameter: when it disappears, the popup closes.
@@ -152,6 +156,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const { collection, field, uuid } = options;
   const disabled = options.disabled ?? false;
   const busy = ref(false);
+  const unplaced = ref('');
 
   const buildForm = (initial: Record<string, unknown>): FieldForm =>
     createFieldForm([field], initial, {
@@ -193,6 +198,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       return;
     }
     const body = (reading.value ?? {}) as Record<string, unknown>;
+    unplaced.value = '';
     busy.value = true;
     const outcome = await writeField(
       collection.segment,
@@ -218,7 +224,8 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       return;
     }
     if (outcome.kind === 'invalid') {
-      form.value.setErrors(outcome.errors);
+      const leftover = form.value.setErrors(outcome.errors);
+      unplaced.value = leftover === '' ? '' : namedMessage(collection, outcome.errors, leftover);
       form.value.focusError();
       toast(t('dashboard.foundErrors', { count: Object.keys(outcome.errors).length }), {
         type: 'error',
@@ -267,8 +274,14 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   });
 
   const handle = popup(
-    h('fieldset', { class: 'o-edit-field-fields', disabled: () => busy.value }, () =>
-      form.value.render(),
+    h(
+      'fieldset',
+      { class: 'o-edit-field-fields', disabled: () => busy.value },
+      () => form.value.render(),
+      when(
+        () => unplaced.value !== '',
+        () => fieldMessage(() => unplaced.value, { error: () => true }),
+      ),
     ),
     {
       size: -1,
@@ -391,4 +404,19 @@ function overlayTransitionDuration(): number {
   if (raw.endsWith('ms')) return parseInt(raw, 10) || 300;
   if (raw.endsWith('s')) return parseFloat(raw) * 1000 || 300;
   return 300;
+}
+
+/**
+ * `message` prefixed with the label of the field it belongs to, so it never reads as the shown field's.
+ */
+function namedMessage(
+  collection: DashboardCollection,
+  errors: Readonly<Record<string, string>>,
+  message: string,
+): string {
+  const path = Object.keys(errors).find((key) => errors[key] === message);
+  const owner = isUndefined(path)
+    ? undefined
+    : collection.fields.find((field) => isDotPathInside(path, field.name));
+  return isUndefined(owner) ? message : `${owner.label}: ${message}`;
 }
