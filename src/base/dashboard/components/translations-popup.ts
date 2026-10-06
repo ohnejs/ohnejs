@@ -225,25 +225,26 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     if (code === current && !showEditCurrent) return items;
 
     if (!translated.includes(code)) {
+      const label = (): string => t('dashboard.translations.new');
       const newButton = button(icon('note'), {
         size: -2,
         variant: canWrite ? 'primary' : 'ghost',
         disabled: canWrite ? undefined : () => true,
+        ariaLabel: label(),
         onClick: () => activate(code),
       });
-      onCleanup(attachTooltip(newButton, () => t('dashboard.translations.new')));
+      onCleanup(attachTooltip(newButton, label));
       items.push(newButton);
     } else {
+      const label = (): string =>
+        t(canWrite ? 'dashboard.translations.edit' : 'dashboard.translations.view');
       const editButton = button(icon(canWrite ? 'pencil' : 'list-search'), {
         size: -2,
         variant: canWrite ? 'outline' : 'ghost',
+        ariaLabel: label(),
         onClick: () => activate(code),
       });
-      onCleanup(
-        attachTooltip(editButton, () =>
-          t(canWrite ? 'dashboard.translations.edit' : 'dashboard.translations.view'),
-        ),
-      );
+      onCleanup(attachTooltip(editButton, label));
       items.push(editButton);
     }
 
@@ -253,39 +254,35 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
       copying.value ||
       !translated.includes(current) ||
       code === current;
+    const copyLabel = (): string =>
+      t('dashboard.translations.copy', {
+        from: formatLocaleCode(current),
+        to: formatLocaleCode(code),
+      });
     const copyButton = button(icon('file-import'), {
       size: -2,
       variant: copyOff ? 'ghost' : 'outline',
       disabled: copyOff ? () => true : undefined,
+      ariaLabel: copyLabel().replaceAll('`', ''),
       onClick: () => void copy(code),
     });
     // Copying onto itself is no action, so the self row's disabled copy explains nothing.
-    if (code !== current) {
-      onCleanup(
-        attachTooltip(copyButton, () =>
-          t('dashboard.translations.copy', {
-            from: formatLocaleCode(current),
-            to: formatLocaleCode(code),
-          }),
-        ),
-      );
-    }
+    if (code !== current) onCleanup(attachTooltip(copyButton, copyLabel));
     items.push(copyButton);
 
     if (admits('deleteTranslation', code)) {
       const deleteOff = deleting.value || !translated.includes(code);
+      const deleteLabel = (): string =>
+        t('dashboard.translations.delete', { locale: formatLocaleCode(code) });
       const deleteButton = button(icon('trash-x'), {
         size: -2,
         variant: deleteOff ? 'ghost' : 'outline',
         destructiveHover: !deleteOff,
         disabled: deleteOff ? (): boolean => true : undefined,
+        ariaLabel: deleteLabel().replaceAll('`', ''),
         onClick: () => void remove(code),
       });
-      onCleanup(
-        attachTooltip(deleteButton, () =>
-          t('dashboard.translations.delete', { locale: formatLocaleCode(code) }),
-        ),
-      );
+      onCleanup(attachTooltip(deleteButton, deleteLabel));
       items.push(deleteButton);
     }
 
