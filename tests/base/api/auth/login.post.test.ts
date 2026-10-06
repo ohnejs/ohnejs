@@ -104,11 +104,11 @@ describe('POST /auth/login', () => {
     const { server } = createServer(createRouter([login]), {
       maxBodySize: DEFAULTS.api.maxBodySize,
     });
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     try {
       const response = await fetch(
-        `http://localhost:${(server.address() as AddressInfo).port}/auth/login`,
+        `http://127.0.0.1:${(server.address() as AddressInfo).port}/auth/login`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
