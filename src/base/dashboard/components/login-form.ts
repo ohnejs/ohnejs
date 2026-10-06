@@ -41,7 +41,8 @@ export interface LoginFormOptions {
  * The password input reveals through its suffix button.
  * Enter submits from any control, including the remember-me checkbox.
  * A success updates `sessionUser`, so the page hosting the form owns the navigation.
- * The fields start from `loginDefaults`, and the `login` shell slot renders after `footer`.
+ * The fields start from `loginDefaults`.
+ * The `loginFields` shell slot renders above the submit button, and the `login` slot after `footer`.
  */
 export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   const t = useT();
@@ -157,6 +158,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
       ),
     ]),
     field(rememberRow),
+    ...shellSlots('loginFields').map((render) => render()),
     field(button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' })),
     options.footer,
     ...shellSlots('login').map((render) => render()),

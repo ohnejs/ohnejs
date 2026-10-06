@@ -5,15 +5,17 @@ import type { Child } from 'ohnejs/dashboard';
  * `header` sits in the header's right cluster, between the content-language switcher and the kebab menu.
  * `status` sits just left of the header's search box, out of the layout, so appearing never moves the header.
  * `global` sits beside the page column on every signed-in page, for overlays and widgets.
- * `login` sits in the sign-in form under its submit button, on the sign-in page and in the re-login popup.
+ * `loginFields` sits in the sign-in form above its submit button, on the sign-in page and the re-login popup.
+ * `login` sits in the same form under its submit button.
  * `overview` sits at the top of the Overview page, above its search box, so a search never hides it.
  */
-export type ShellSlot = 'header' | 'status' | 'global' | 'login' | 'overview';
+export type ShellSlot = 'header' | 'status' | 'global' | 'loginFields' | 'login' | 'overview';
 
 const registry: Record<ShellSlot, (() => Child)[]> = {
   header: [],
   status: [],
   global: [],
+  loginFields: [],
   login: [],
   overview: [],
 };
