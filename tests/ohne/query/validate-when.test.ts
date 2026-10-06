@@ -1,4 +1,4 @@
-import { match, ok, throws } from 'node:assert';
+import { doesNotMatch, match, ok, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
@@ -149,6 +149,25 @@ useCollections().register('WHIsNull', {
   },
 });
 
+for (const [name, when] of [
+  ['WHHasFalse', { owner: { has: false } }],
+  ['WHContainsNumber', { status: { contains: 5 } }],
+  ['WHInScalar', { status: { in: 'a' } }],
+  ['WHEmptyFalse', { tags: { empty: false } }],
+] as const) {
+  useCollections().register(name, {
+    name,
+    collection: {
+      fields: {
+        status: field('text', { nullable: true }),
+        owner: field('record', { collection: 'WHFlag' }),
+        tags: field('repeater', { fields: { x: field('text') } }),
+        discount: field('integer', { nullable: true, when }),
+      },
+    },
+  });
+}
+
 useCollections().register('WHEmptyAnchor', {
   name: 'WHEmptyAnchor',
   collection: {
@@ -168,6 +187,16 @@ useCollections().register('WHGatedList', {
     },
   },
 });
+
+function hintOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    ok(isOhneError(error));
+    return [error.body ?? []].flat().join('\n');
+  }
+  throw new Error('expected a throw');
+}
 
 function throwsOhne(run: () => unknown, pattern: RegExp): void {
   throws(run, (error: unknown) => {
@@ -229,6 +258,24 @@ describe('validateWhen', () => {
 
   it('rejects `isNull: false` at parse time', () => {
     throwsOhne(() => queryMetadata('WHIsNull'), /Invalid `when` condition/);
+    match(
+      hintOf(() => queryMetadata('WHIsNull')),
+      /`isNull` takes only `true`/,
+    );
+  });
+
+  it('names the operator whose value has the wrong kind, and what it takes', () => {
+    const hints = {
+      WHHasFalse: /`has` takes `true` or a condition object/,
+      WHContainsNumber: /`contains` takes a string\./,
+      WHInScalar: /`in` takes a list of strings, numbers, or booleans/,
+      WHEmptyFalse: /`empty` takes only `true`/,
+    };
+    for (const [name, hint] of Object.entries(hints)) {
+      const body = hintOf(() => queryMetadata(name));
+      match(body, hint, name);
+      doesNotMatch(body, /isNull/, name);
+    }
   });
 
   it('rejects an empty body after an anchor', () => {

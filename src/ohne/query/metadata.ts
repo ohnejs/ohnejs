@@ -1,4 +1,4 @@
-import type { ConditionError, ConditionNode } from '../../utils/index.ts';
+import type { ConditionError, ConditionNode, OperatorValueKind } from '../../utils/index.ts';
 import type { CollectionMeta } from '../collections/use-collections.ts';
 import type { LogicalType } from '../database/dialect.ts';
 import type { FieldType } from '../fields/define-field.ts';
@@ -10,7 +10,13 @@ import type {
   JunctionHint,
 } from '../fields/storage-hint.ts';
 
-import { hasKey, isUndefined, parseCondition } from '../../utils/index.ts';
+import {
+  compareOperators,
+  hasKey,
+  isCompareOperator,
+  isUndefined,
+  parseCondition,
+} from '../../utils/index.ts';
 import { resolveAllowedBlocks } from '../blocks/resolve-allowed-blocks.ts';
 import { useBlocks } from '../blocks/use-blocks.ts';
 import { useCollections } from '../collections/use-collections.ts';
@@ -226,6 +232,17 @@ export interface CollectionQueryMeta {
  * Dev respawn reimports every module, so the memo lives and dies with the registries.
  */
 const cache = new Map<string, CollectionQueryMeta>();
+
+/**
+ * What a compare operator's value must be, by its value kind, for a malformed `when` hint.
+ */
+const ACCEPTED_VALUES: Readonly<Record<OperatorValueKind, string>> = {
+  none: 'only `true`',
+  scalar: 'a string, number, or boolean',
+  'scalar[]': 'a list of strings, numbers, or booleans',
+  ordinal: 'a string or number',
+  string: 'a string',
+};
 
 /**
  * Returns the query metadata of one collection, built lazily and memoized per process.
@@ -558,20 +575,25 @@ function parseFieldWhen(
     title: `Invalid \`when\` condition on \`${name}\``,
     body: [
       `Field \`${name}\` on ${home} has a malformed \`when\` condition${at}.`,
-      whenGrammarHint(result.error.code),
+      whenGrammarHint(result.error),
     ],
   });
 }
 
 /**
  * A one-line hint for a malformed `when`, keyed on the parse failure's category.
+ * A value of the wrong kind names its operator and what that operator takes.
  */
-function whenGrammarHint(code: ConditionError['code']): string {
+function whenGrammarHint({ code, key }: ConditionError): string {
   switch (code) {
     case 'unknownOperator':
       return 'The key is not a known operator.';
     case 'invalidValue':
-      return 'An operator carries a value of the wrong kind; `isNull` takes only `true`.';
+      if (key === 'has') return '`has` takes `true` or a condition object.';
+      if (!isUndefined(key) && isCompareOperator(key)) {
+        return `\`${key}\` takes ${ACCEPTED_VALUES[compareOperators[key].value]}.`;
+      }
+      return '`empty` takes only `true`.';
     case 'nullEquality':
       return '`null` is not a valid value - use `isNull` to test for it.';
     case 'tooDeep':
