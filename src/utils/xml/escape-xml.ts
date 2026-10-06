@@ -10,6 +10,7 @@ const SPECIAL = /[&<>"']/g;
 
 /**
  * Escapes the XML special characters in `value`, so it is safe as element text or an attribute value.
+ * The output is valid HTML5 too, since HTML reads every entity it emits.
  * `decodeXMLEntities` reverses it.
  *
  * @example

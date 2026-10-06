@@ -76,6 +76,7 @@ export * from './forwarded/parse-forwarded.ts';
 export * from './fuzzy/fuzzy.ts';
 export * from './gate/create-gate.ts';
 export * from './glob/compile-glob.ts';
+export * from './html/is-safe-href.ts';
 export * from './html/json-for-script.ts';
 export * from './html/sanitize-svg.ts';
 export * from './i18n/canonicalize-language.ts';
