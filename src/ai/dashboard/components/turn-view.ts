@@ -628,6 +628,7 @@ function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITransl
   }
   const { path } = parseRouteID(proposal.route);
   const body = result.body;
+  const locale = [proposal.body?.locale, proposal.query?.locale].find(isString);
   if (path.endsWith('/query')) {
     const records = isPlainObject(body) && isArray(body.records) ? body.records : [];
     const count = isPlainObject(body) && isNumber(body.total) ? body.total : records.length;
@@ -650,7 +651,7 @@ function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITransl
           icon('arrow-right'),
         ),
       ],
-      refs(collection, records, count),
+      refs(collection, records, count, locale),
     );
   }
   if (path.endsWith('/verdicts')) {
@@ -661,13 +662,13 @@ function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITransl
     return line(
       icon('eye'),
       t('ai.dashboard.read.translations', { collection: name }),
-      isUndefined(uuid) ? null : refs(collection, [{ UUID: uuid }], 1),
+      isUndefined(uuid) ? null : refs(collection, [{ UUID: uuid }], 1, locale),
     );
   }
   return line(
     icon('eye'),
     t('ai.dashboard.read.record', { collection: name }),
-    refs(collection, [body], 1),
+    refs(collection, [body], 1, locale),
   );
 }
 
@@ -832,15 +833,22 @@ function searchLines(proposal: Proposal, result: ReadOutcome['result'], t: AITra
     const text = isUndefined(via)
       ? t('ai.dashboard.read.found', params)
       : t('ai.dashboard.read.foundVia', { ...params, target: find(via)?.label ?? via });
-    return [line(icon('search'), text.replaceAll('`', ''), refs(collection, hits, total))];
+    return [
+      line(icon('search'), text.replaceAll('`', ''), refs(collection, hits, total, undefined)),
+    ];
   });
 }
 
 /**
  * The first records of an answer as links, then how many more it holds.
- * A record carrying its label seeds the label cache, so the link needs no read of its own.
+ * A record carrying its label seeds the label cache at the `locale` it was read in.
  */
-function refs(collection: DashboardCollection, records: readonly unknown[], total: number): Child {
+function refs(
+  collection: DashboardCollection,
+  records: readonly unknown[],
+  total: number,
+  locale: string | undefined,
+): Child {
   const shown = records
     .slice(0, REF_LIMIT)
     .filter(isPlainObject)
@@ -849,7 +857,7 @@ function refs(collection: DashboardCollection, records: readonly unknown[], tota
   const links = shown.map((record) => {
     const uuid = record.UUID as string;
     const label = joinLabel(record, collection);
-    if (label !== '') seedLabel(collection.name, uuid, label);
+    if (label !== '') seedLabel(collection.name, uuid, label, locale);
     return recordLink(collection, uuid);
   });
   return h(

@@ -137,6 +137,7 @@ interface TransformState {
   reached: Ref<number>;
   standing: Ref<Standing>;
   model: Ref<Primitive>;
+  locale: string | undefined;
   started: boolean;
   ticket: symbol | null;
   controller: AbortController | null;
@@ -237,7 +238,8 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
   const collection = collectionOfRoute(proposal.route) ?? null;
   const fields = proposal.transform?.fields ?? [];
   const pinned = options.pinned ?? untracked(aiMeta)?.transformModel;
-  const state = stateOf(options, pinned);
+  const locale = proposal.query?.locale;
+  const state = stateOf(options, pinned, isString(locale) ? locale : undefined);
   const { rows, selected, skipped, matched, reached, standing } = state;
   if (!state.started) queue(state, options, pinned, collection);
 
@@ -299,7 +301,6 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
       count,
       collection: collection?.label ?? proposal.route,
     });
-    const locale = proposal.query?.locale;
     return isString(locale) ? `${head} ${t('ai.dashboard.batch.locale', { locale })}` : head;
   };
 
@@ -368,9 +369,14 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
 }
 
 /**
- * The state of the run for `options`, created idle when none exists; runs of other turns are dropped.
+ * The state of the run for `options` at `locale`, created idle when none exists.
+ * Runs of other turns are dropped.
  */
-function stateOf(options: TransformTableOptions, pinned: string | undefined): TransformState {
+function stateOf(
+  options: TransformTableOptions,
+  pinned: string | undefined,
+  locale: string | undefined,
+): TransformState {
   const key = `${options.turn}:${options.batch}:${options.index}`;
   for (const other of runs.keys()) {
     if (!other.startsWith(`${options.turn}:`)) runs.delete(other);
@@ -385,6 +391,7 @@ function stateOf(options: TransformTableOptions, pinned: string | undefined): Tr
       reached: ref(0),
       standing: ref('done'),
       model: ref(pinned ?? firstTransformModel() ?? null),
+      locale,
       started: false,
       ticket: null,
       controller: null,
@@ -503,7 +510,7 @@ function apply(
         return isUndefined(row) ? [] : [row];
       });
       for (const row of added) {
-        if (!isNull(collection)) seedFrom(row, collection);
+        if (!isNull(collection)) seedFrom(row, collection, state.locale);
         if (differs(row)) state.selected.value = { ...state.selected.value, [row.id]: true };
       }
       state.rows.value = [...state.rows.value, ...added];
@@ -555,12 +562,16 @@ function differs(row: TransformRow): boolean {
 }
 
 /**
- * Seeds the record's label from the values read, when every label field is among them.
+ * Seeds the record's label from the values read at `locale`, when every label field is among them.
  */
-function seedFrom(row: TransformRow, collection: DashboardCollection): void {
+function seedFrom(
+  row: TransformRow,
+  collection: DashboardCollection,
+  locale: string | undefined,
+): void {
   if (!collection.labelFields.every((name) => hasKey(row.source, name))) return;
   const label = joinLabel(row.source, collection);
-  if (label !== '') seedLabel(collection.name, row.UUID, label);
+  if (label !== '') seedLabel(collection.name, row.UUID, label, locale);
 }
 
 /**

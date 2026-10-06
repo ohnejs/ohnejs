@@ -449,7 +449,7 @@ async function loadRows(
         continue;
       }
       for (const row of expanded) {
-        if (row.label !== '') seedLabel(collection.name, row.UUID, row.label);
+        if (row.label !== '') seedLabel(collection.name, row.UUID, row.label, locale);
         own.push({ ...base, id: `${index}:${row.UUID}`, UUID: row.UUID, mine: row.mine });
       }
     } else {
