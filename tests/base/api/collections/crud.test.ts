@@ -80,6 +80,11 @@ useCollections().register('CrudBroken', {
   },
 });
 
+useCollections().register('CrudRich', {
+  name: 'CrudRich',
+  collection: { api: { create: 'public' }, fields: { body: field('richText') } },
+});
+
 useCollections().register('CrudSettings', {
   name: 'CrudSettings',
   collection: {
@@ -161,6 +166,7 @@ function errorsOf(body: unknown): Record<string, string> {
 }
 
 const posts = { collection: 'crud-posts' };
+const rich = { collection: 'crud-rich' };
 const many = { collection: 'crud-many' };
 
 describe('create', () => {
@@ -191,6 +197,24 @@ describe('create', () => {
     const read = await call(ROUTES.list, posts, { qs: '?locale=en' });
     strictEqual(read.status, 400);
     deepStrictEqual(wireData(read.body), { code: 'localeNotApplicable', path: 'locale' });
+  });
+
+  it('rejects an unsafe link as 422 at its path inside the value', async () => {
+    const { status, body } = await call(ROUTES.create, rich, {
+      body: {
+        body: [{ kind: 'paragraph', content: [{ text: 'x', link: { url: 'javascript:x' } }] }],
+      },
+    });
+    strictEqual(status, 422);
+    deepStrictEqual(Object.keys(errorsOf(body)), ['body[0].content[0].link.url']);
+  });
+
+  it('rejects a body nested deeper than 32 levels as 400', async () => {
+    let deep: unknown = 1;
+    for (let level = 0; level < 33; level++) deep = { body: deep };
+    const { status, body } = await call(ROUTES.create, rich, { body: deep });
+    strictEqual(status, 400);
+    strictEqual((body as { message: string }).message, 'api.body.tooNested');
   });
 
   it('denies a writable: false key as 422, byte-identical to an unknown key', async () => {

@@ -79,6 +79,17 @@ useCollections().register('CpJudged', {
     fields: { title: field('text', { translatable: true }) },
   },
 });
+useCollections().register('CpTarget', {
+  name: 'CpTarget',
+  collection: { fields: { name: field('text') } },
+});
+useCollections().register('CpLinked', {
+  name: 'CpLinked',
+  collection: {
+    api: { update: 'public' },
+    fields: { body: field('richText', { translatable: true, links: ['CpTarget'] }) },
+  },
+});
 useCollections().register('CpGuarded', {
   name: 'CpGuarded',
   collection: { api: { update: true }, fields: { title: field('text', { translatable: true }) } },
@@ -111,6 +122,18 @@ const hooked = (
 ).UUID as string;
 const plain = (await queryUntyped('CpPlain').createOrThrow({ label: 'flat' })).UUID as string;
 const judged = (await queryUntyped('CpJudged').createOrThrow({ title: 'Judge' })).UUID as string;
+const gone = (await queryUntyped('CpTarget').createOrThrow({ name: 'Gone' })).UUID as string;
+const linked = (
+  await queryUntyped('CpLinked').createOrThrow({
+    body: [
+      {
+        kind: 'paragraph',
+        content: [{ text: 'a', link: { collection: 'CpTarget', record: gone } }],
+      },
+    ],
+  })
+).UUID as string;
+await db.run('DELETE FROM "CpTarget" WHERE "UUID" = ?', [gone]);
 
 const ROUTE: Route = {
   method: 'POST',
@@ -207,6 +230,18 @@ describe('POST /collections/[collection]/[uuid]/translations/copy', () => {
       (await call({ collection: 'cp-plain', uuid: plain }, {}, '?locale=de')).status,
       404,
     );
+  });
+
+  it('checks a held dead link as new and answers 422 at its path', async () => {
+    const { status, body } = await call(
+      { collection: 'cp-linked', uuid: linked },
+      {},
+      '?locale=de',
+    );
+    strictEqual(status, 422);
+    deepStrictEqual(Object.keys((body as { data: { errors: object } }).data.errors), [
+      'body[0].content[0].link',
+    ]);
   });
 
   it('401s a guarded copy without a user', async () => {

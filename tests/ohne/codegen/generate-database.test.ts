@@ -190,6 +190,31 @@ describe('generateDatabase', () => {
     ok(shared.includes('    title: string | null;'));
   });
 
+  it('types rich text and link values by the collections they may link', async () => {
+    const app = join(root, 'rich-text');
+    writePackage(app, 'rich-text');
+    write(app, 'collections/Pages.ts', 'export default { fields: {} };\n');
+    write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
+    write(
+      app,
+      'collections/Articles.ts',
+      'export default { fields: {\n' +
+        "  body: { type: 'richText', options: { links: ['Pages', 'Posts'] } },\n" +
+        "  teaser: { type: 'richText', options: { inline: true } },\n" +
+        "  cta: { type: 'link', options: { nullable: true } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes("import type { Link, RichText } from 'ohnejs/utils';"));
+    ok(shared.includes("    body: RichText<'Pages' | 'Posts'>;"));
+    ok(shared.includes('    teaser: RichText<never>;'));
+    ok(shared.includes('    cta: Link<never> | null;'));
+  });
+
   it('assembles composite record shapes from subfields, nesting and wrapping by cardinality', async () => {
     const app = join(root, 'composites');
     writePackage(app, 'composites');

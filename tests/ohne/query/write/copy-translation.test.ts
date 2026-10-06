@@ -9,6 +9,7 @@ import { copyTranslationInput } from '../../../../src/ohne/query/write/copy-tran
 const TEXT = useFields().get('text')!.fieldType;
 const INTEGER = useFields().get('integer')!.fieldType;
 const REPEATER = useFields().get('repeater')!.fieldType;
+const RICH_TEXT = useFields().get('richText')!.fieldType;
 
 const LINK_FIELDS: Record<string, FieldQueryMeta> = {
   UUID: { kind: 'column', nullable: false, logicalType: 'text', column: 'UUID', id: true },
@@ -53,6 +54,14 @@ const FIELDS: Record<string, FieldQueryMeta> = {
     companion: true,
   },
   shared: { kind: 'column', nullable: false, logicalType: 'text', column: 'shared' },
+  body: {
+    kind: 'column',
+    nullable: true,
+    logicalType: 'json',
+    column: 'body',
+    companion: true,
+    fieldType: RICH_TEXT,
+  },
   token: {
     kind: 'column',
     nullable: false,
@@ -119,6 +128,20 @@ describe('copyTranslationInput', () => {
         { heading: 'Two', links: [] },
       ],
     });
+  });
+
+  it('keeps the `record` key of a link while shedding `UUID` keys', () => {
+    const body = [
+      {
+        kind: 'paragraph',
+        content: [{ text: 'a', link: { collection: 'Y', record: 'y1' } }],
+      },
+    ];
+    const input = copyTranslationInput(FIELDS, {
+      body,
+      sections: [{ UUID: 's1', heading: 'One' }],
+    });
+    deepStrictEqual(input, { body, sections: [{ heading: 'One' }] });
   });
 
   it('strips the keys the wire denies inside composite items', () => {

@@ -11,12 +11,14 @@ describe('useFields', () => {
       'date',
       'dateTime',
       'integer',
+      'link',
       'multiSelect',
       'number',
       'object',
       'record',
       'records',
       'repeater',
+      'richText',
       'select',
       'text',
       'time',
@@ -25,6 +27,8 @@ describe('useFields', () => {
 
   it('exposes each built-in column type', () => {
     strictEqual(useFields().get('text')?.fieldType.columnType, 'text');
+    strictEqual(useFields().get('richText')?.fieldType.columnType, 'json');
+    strictEqual(useFields().get('link')?.fieldType.columnType, 'json');
     strictEqual(useFields().get('integer')?.fieldType.columnType, 'integer');
     strictEqual(useFields().get('number')?.fieldType.columnType, 'real');
     strictEqual(useFields().get('boolean')?.fieldType.columnType, 'boolean');

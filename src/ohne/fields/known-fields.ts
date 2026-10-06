@@ -3,12 +3,14 @@ import type { boolean } from './builtin/boolean.ts';
 import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
 import type { integer } from './builtin/integer.ts';
+import type { link } from './builtin/link.ts';
 import type { multiSelect } from './builtin/multi-select.ts';
 import type { number } from './builtin/number.ts';
 import type { object } from './builtin/object.ts';
 import type { record } from './builtin/record.ts';
 import type { records } from './builtin/records.ts';
 import type { repeater } from './builtin/repeater.ts';
+import type { richText } from './builtin/rich-text.ts';
 import type { select } from './builtin/select.ts';
 import type { text } from './builtin/text.ts';
 import type { time } from './builtin/time.ts';
@@ -34,6 +36,11 @@ export interface KnownFields {
    * A text value.
    */
   text: typeof text;
+
+  /**
+   * Formatted text with links, stored as a JSON tree.
+   */
+  richText: typeof richText;
 
   /**
    * A whole number, within JavaScript's safe integer range.
@@ -84,6 +91,11 @@ export interface KnownFields {
    * An ordered many-to-many relation to another collection.
    */
   records: typeof records;
+
+  /**
+   * A link to a record or to an address.
+   */
+  link: typeof link;
 
   /**
    * A nested group of fields, stored at most once per parent row.

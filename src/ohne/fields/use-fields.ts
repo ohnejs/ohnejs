@@ -7,12 +7,14 @@ import { boolean } from './builtin/boolean.ts';
 import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
 import { integer } from './builtin/integer.ts';
+import { link } from './builtin/link.ts';
 import { multiSelect } from './builtin/multi-select.ts';
 import { number } from './builtin/number.ts';
 import { object } from './builtin/object.ts';
 import { record } from './builtin/record.ts';
 import { records } from './builtin/records.ts';
 import { repeater } from './builtin/repeater.ts';
+import { richText } from './builtin/rich-text.ts';
 import { select } from './builtin/select.ts';
 import { text } from './builtin/text.ts';
 import { time } from './builtin/time.ts';
@@ -36,6 +38,7 @@ const registry: Registry<FieldTypeMeta> = createRegistry<FieldTypeMeta>();
 
 for (const [name, fieldType] of [
   ['text', text],
+  ['richText', richText],
   ['integer', integer],
   ['number', number],
   ['boolean', boolean],
@@ -46,6 +49,7 @@ for (const [name, fieldType] of [
   ['dateTime', dateTime],
   ['record', record],
   ['records', records],
+  ['link', link],
   ['object', object],
   ['repeater', repeater],
   ['blocks', blocks],

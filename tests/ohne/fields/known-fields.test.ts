@@ -2,7 +2,7 @@ import { deepStrictEqual } from 'node:assert';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import type { LayerFields } from '../../../src/ohne/index.ts';
+import type { KnownFields, LayerFields, link, richText } from '../../../src/ohne/index.ts';
 
 import { scanLayerFields } from '../../../src/ohne/index.ts';
 
@@ -23,6 +23,14 @@ const MIRRORED = [
   'roles',
   'timezone',
 ] as const;
+
+describe('KnownFields', () => {
+  it('maps `richText` and `link` to their definitions', () => {
+    const rich: Equal<KnownFields['richText'], typeof richText> = true;
+    const plain: Equal<KnownFields['link'], typeof link> = true;
+    deepStrictEqual([rich, plain], [true, true]);
+  });
+});
 
 describe('LayerFields', () => {
   it("mirrors every field type the shipped layers' fields directories hold", async () => {
