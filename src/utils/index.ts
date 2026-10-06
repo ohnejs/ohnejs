@@ -48,6 +48,7 @@ export * from './condition/evaluate-condition.ts';
 export * from './condition/keywords-condition.ts';
 export * from './condition/operators.ts';
 export * from './condition/parse-condition.ts';
+export * from './condition/resolve-condition.ts';
 export * from './condition/serialize-condition.ts';
 export * from './condition/walk-condition.ts';
 export * from './content-disposition/content-disposition.ts';
