@@ -380,13 +380,16 @@ export function createFieldForm(
 
   return {
     render(renderOptions) {
-      const shown = (field: DashboardField): boolean => renderOptions?.hide?.(field) !== true;
-      if (isUndefined(options.layout)) return ordered.filter(shown).map(gatedRowOf);
-      const { nodes, rest } = placeLayout(options.layout, [...fieldByName.keys()]);
+      const shown = ordered.filter((field) => renderOptions?.hide?.(field) !== true);
+      if (isUndefined(options.layout)) return shown.map(gatedRowOf);
+      const { nodes, rest } = placeLayout(
+        options.layout,
+        shown.map((field) => field.name),
+      );
       const rendered = renderFieldLayout(nodes, {
         row: (name) => {
           const field = fieldByName.get(name);
-          return isUndefined(field) || !shown(field) ? null : rowOf(field);
+          return isUndefined(field) ? null : rowOf(field);
         },
         errored: (name) => {
           const row = rowByName.get(name);
@@ -397,8 +400,7 @@ export function createFieldForm(
       reveal = rendered.reveal;
       const trailing = rest
         .map((name) => fieldByName.get(name))
-        .filter((field) => !isUndefined(field))
-        .filter(shown);
+        .filter((field) => !isUndefined(field));
       return h('div', { class: 'ohne-fields' }, rendered.children, trailing.map(gatedRowOf));
     },
     controlOf(name) {
