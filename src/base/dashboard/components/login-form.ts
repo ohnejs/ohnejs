@@ -130,7 +130,8 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
       fieldLabel(h('label', { for: 'email' }, () => t('dashboard.login.email'))),
       textInput(email, {
         autocomplete: 'email',
-        autofocus: true,
+        // A browser refuses autofocus in a cross-origin frame and logs the refusal.
+        autofocus: window.self === window.top,
         id: 'email',
         name: 'email',
         error: () => emailError.value,
