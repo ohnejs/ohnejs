@@ -160,6 +160,7 @@ async function afterUpdate(
  * `unscoped` skips `record:condition` and reads the rows back past `query:filter`, for framework bookkeeping.
  * `linkResolver` narrows every link the input provides to what it reaches, as `linkReach` states.
  * A link every matched record already holds under the same top-level field passes on existence alone.
+ * A held link a field type's `links` lists passes even when its target is gone.
  * `access` narrows each returned record's `_translations` to the locales where the record meets it.
  */
 export async function runUpdate(
@@ -302,14 +303,16 @@ async function attemptPlainUpdate(
   );
   if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
 
-  const refs =
-    isUndefined(reach) || !scope.refs.some((ref) => ref.provided)
-      ? scope.refs
-      : heldAside(
-          scope.refs,
-          meta.fields,
-          await readMatched(meta.collection, matched, locale, true, true),
-        );
+  const holds = scope.refs.some(
+    (ref) => ref.provided && (!isUndefined(reach) || ref.weak === true),
+  );
+  const refs = holds
+    ? heldAside(
+        scope.refs,
+        meta.fields,
+        await readMatched(meta.collection, matched, locale, true, true),
+      )
+    : scope.refs;
   const referenceErrors = await checkReferences(tx, dialect, refs, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
@@ -459,7 +462,7 @@ async function attemptGatedUpdate(
     if (!isEmpty(childUniqueErrors)) return { ok: false, errors: childUniqueErrors };
   }
 
-  const checked = isUndefined(reach) ? [...refs] : heldAside([...refs], meta.fields, records);
+  const checked = heldAside([...refs], meta.fields, records);
   const referenceErrors = await checkReferences(tx, dialect, checked, reach);
   if (!isEmpty(referenceErrors)) return { ok: false, errors: referenceErrors };
 
@@ -533,6 +536,7 @@ function heldAside(
 
 /**
  * The `UUID`s a stored field value links in `target`, walking composites and blocks down to their links.
+ * A column contributes the record links its type's `links` lists.
  */
 function linkedUUIDs(
   field: FieldQueryMeta | undefined,
@@ -541,6 +545,12 @@ function linkedUUIDs(
   links = new Set<string>(),
 ): Set<string> {
   if (isUndefined(field)) return links;
+  if (field.kind === 'column') {
+    for (const { link } of field.fieldType?.links?.(value) ?? []) {
+      if (link.collection === target) links.add(link.record);
+    }
+    return links;
+  }
   if (field.kind === 'record' || field.kind === 'records') {
     if (field.target !== target) return links;
     for (const uuid of toArray(value)) if (isString(uuid)) links.add(uuid);

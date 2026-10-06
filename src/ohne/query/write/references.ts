@@ -6,6 +6,7 @@ import type { ReachResolver } from '../wire/reach.ts';
 import type { FieldErrors } from './errors.ts';
 
 import { chunk, groupBy, isUndefined, uniqueArray } from '../../../utils/index.ts';
+import { useCollections } from '../../collections/use-collections.ts';
 import { collectionTableName } from '../../database/naming/table-names.ts';
 import { queryMetadata } from '../metadata.ts';
 import { admittedUUIDs } from '../wire/admitted.ts';
@@ -30,6 +31,8 @@ export interface LinkReach {
  *
  * References group by target, dedupe, and chunk through `chunk(_, 900)`, so a target is a few reads at most.
  * A `UUID` the probe does not return errors at its exact dot-path, so a missing link reads where it sits.
+ * A weak ref the input did not provide is dropped: no foreign key holds it, so a dead one may stay.
+ * A weak ref into an unregistered collection fails unprobed, since a custom type's `links` may name any.
  * Without `reach` existence is all a link needs.
  * With it, a `provided` link must also be one the reach admits, and a hidden one fails as a missing one.
  * The reach resolves for every target a provided link names, found or not, so a throw answers both alike.
@@ -41,11 +44,16 @@ export async function checkReferences(
   refs: readonly RelationRef[],
   reach?: LinkReach,
 ): Promise<FieldErrors> {
-  if (refs.length === 0) return {};
+  const checked = refs.filter((ref) => ref.provided || ref.weak !== true);
+  if (checked.length === 0) return {};
 
-  const byTarget = groupBy(refs, (ref) => ref.target);
+  const byTarget = groupBy(checked, (ref) => ref.target);
   const errors: FieldErrors = {};
   for (const [target, group = []] of Object.entries(byTarget)) {
+    if (!useCollections().has(target)) {
+      for (const ref of group) errors[ref.path] = 'validation.invalidReference';
+      continue;
+    }
     const table = dialect.quote(collectionTableName(target));
     const uuids = uniqueArray(group.map((ref) => ref.uuid));
     const found = new Set<string>();

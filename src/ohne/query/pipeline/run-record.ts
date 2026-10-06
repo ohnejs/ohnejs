@@ -120,7 +120,7 @@ export type Prepared =
   | { value: unknown; trusted?: true; provided?: true; snapshot?: unknown };
 
 /**
- * A reference a write must prove exists before it commits: a `record` FK or a `records`/nested link.
+ * A reference a write must prove exists before it commits: a `record` FK, a `records` link, or a type's link.
  */
 export interface RelationRef {
   /**
@@ -142,6 +142,12 @@ export interface RelationRef {
    * Whether the caller's input supplied the `UUID`; a default or a stored snapshot did not.
    */
   provided: boolean;
+
+  /**
+   * Marks a link a field type's `links` listed, which no foreign key holds.
+   * A write checks it only where its input provides it, so a held dead link never blocks a save.
+   */
+  weak?: true;
 }
 
 /**

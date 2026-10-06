@@ -15,6 +15,7 @@ import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { isValidationError } from '../../../../src/ohne/query/write/errors.ts';
+import { linksField } from './_links-field.ts';
 
 useCollections().register('CUser', {
   name: 'CUser',
@@ -53,6 +54,15 @@ useCollections().register('CNest', {
     },
   },
 });
+useCollections().register('CLinked', {
+  name: 'CLinked',
+  collection: {
+    fields: {
+      links: linksField(),
+      sections: field('repeater', { fields: { links: linksField() } }),
+    },
+  },
+});
 
 const dialect = new SQLiteDialect();
 const db = await dialect.connect(':memory:');
@@ -65,6 +75,19 @@ await db.run('INSERT INTO "CUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', 
   'u1',
   1,
   'Anduin',
+]);
+const anduin = '01900000-0000-7000-8000-00000000000a';
+const liadrin = '01900000-0000-7000-8000-00000000000b';
+const ghost = '01900000-0000-7000-8000-00000000000c';
+await db.run('INSERT INTO "CUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  anduin,
+  1,
+  'Anduin',
+]);
+await db.run('INSERT INTO "CUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+  liadrin,
+  1,
+  'Liadrin',
 ]);
 await db.run('INSERT INTO "CTag" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t1', 1, 'A']);
 await db.run('INSERT INTO "CTag" ("UUID","_updatedAt","label") VALUES (?,?,?)', ['t2', 1, 'B']);
@@ -231,5 +254,47 @@ describe('runCreate hooks', () => {
       ok(result.ok);
     });
     strictEqual(events.length, 0);
+  });
+});
+
+describe('runCreate links', () => {
+  const onlyAnduin = async () => ({ where: { name: 'Anduin' } });
+  const to = (record: string) => ({ collection: 'CUser', record });
+
+  it('stores a live link beside a URL link', async () => {
+    const result = await runCreate('CLinked', { links: [to(anduin), { url: '/a' }] }, null);
+    ok(result.ok);
+    deepStrictEqual(result.record.links, [to(anduin), { url: '/a' }]);
+  });
+
+  it('rejects a new dead link at its path', async () => {
+    const result = await runCreate('CLinked', { links: [{ url: '/a' }, to(ghost)] }, null);
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'links[1]': 'validation.invalidReference' });
+  });
+
+  it('rejects a dead link inside a repeater item at its full path', async () => {
+    const result = await runCreate('CLinked', { sections: [{ links: [to(ghost)] }] }, null);
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'sections[0].links[0]': 'validation.invalidReference' });
+  });
+
+  it('answers a hidden target exactly as a missing one', async () => {
+    const create = (record: string) =>
+      runCreate('CLinked', { links: [to(record)] }, null, undefined, false, onlyAnduin);
+    const hidden = await create(liadrin);
+    ok(!hidden.ok);
+    deepStrictEqual(hidden.errors, { 'links[0]': 'validation.invalidReference' });
+    deepStrictEqual(hidden, await create(ghost));
+    ok((await create(anduin)).ok);
+  });
+
+  it('rejects a link to an unregistered collection, with or without a reach', async () => {
+    const link = { collection: 'CNope', record: ghost };
+    for (const reach of [undefined, onlyAnduin]) {
+      const result = await runCreate('CLinked', { links: [link] }, null, undefined, false, reach);
+      ok(!result.ok);
+      deepStrictEqual(result.errors, { 'links[0]': 'validation.invalidReference' });
+    }
   });
 });

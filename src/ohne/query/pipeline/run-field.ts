@@ -189,6 +189,7 @@ export async function prepareScalar(
  * The type tier runs before the instance tier, and any type-tier error skips the instance tier.
  * A `trusted` value skips both tiers and still serializes.
  * A `record` value's reference carries `provided`, whether the input supplied it.
+ * A type with `links` adds a weak reference per listed link, at the link's own path.
  */
 export async function finishScalar(
   name: string,
@@ -219,6 +220,15 @@ export async function finishScalar(
   const output: FieldOutput = { column: { name: column, value: stored } };
   if (meta.kind === 'record' && isString(value)) {
     output.refs = [{ path: wctx.path, target: meta.target as string, uuid: value, provided }];
+  }
+  if (meta.fieldType?.links) {
+    output.refs = meta.fieldType.links(value).map(({ path, link }) => ({
+      path: prefixPath(wctx.path, path),
+      target: link.collection,
+      uuid: link.record,
+      provided,
+      weak: true,
+    }));
   }
   return output;
 }

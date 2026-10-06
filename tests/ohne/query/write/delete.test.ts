@@ -14,6 +14,7 @@ import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runDelete } from '../../../../src/ohne/query/write/delete.ts';
 import { isReferenceViolation } from '../../../../src/ohne/query/write/errors.ts';
+import { linksField } from './_links-field.ts';
 
 useCollections().register('DAuthor', {
   name: 'DAuthor',
@@ -32,6 +33,12 @@ useCollections().register('DPost', {
       tags: field('records', { collection: 'DTag' }),
       sections: field('repeater', { fields: { heading: field('text') } }),
     },
+  },
+});
+useCollections().register('DLinked', {
+  name: 'DLinked',
+  collection: {
+    fields: { links: linksField(), rows: field('repeater', { fields: { links: linksField() } }) },
   },
 });
 
@@ -131,6 +138,23 @@ describe('runDelete', () => {
 
   it('throws without a filter through the untyped builder', () => {
     throws(() => queryUntyped('DPost').delete(), /without a filter/);
+  });
+
+  it('deletes a link target without cascading or blocking', async () => {
+    const target = '01900000-0000-7000-8000-00000000000a';
+    await db.run('INSERT INTO "DAuthor" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+      target,
+      1,
+      'Jaina',
+    ]);
+    const link = { collection: 'DAuthor', record: target };
+    const created = await runCreate('DLinked', { links: [link], rows: [{ links: [link] }] }, null);
+    ok(created.ok);
+    strictEqual((await runDelete('DAuthor', uuidIs(target))).deleted, 1);
+    const record = await queryUntyped('DLinked').where({ UUID: created.record.UUID }).findFirst();
+    ok(record);
+    deepStrictEqual(record.links, [link]);
+    deepStrictEqual((record.rows as { links: unknown }[])[0].links, [link]);
   });
 });
 

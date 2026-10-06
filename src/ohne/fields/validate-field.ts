@@ -493,6 +493,7 @@ export function validateFieldTypeName(name: string, path?: string): void {
  * - A column-less type (`columnType: false`) owns no column, so it cannot force `nullable` or an index.
  * - `emitType` and `schema` are mutually exclusive: the framework derives value types from the hint.
  * - `jsonList` marks the stored value a JSON list, so it requires `columnType: 'json'`.
+ * - `links` is a function that lists the record links in a `json` value.
  * - `sanitizers` and `validators` are lists of functions, run in order by the write pipeline.
  * - `search` is `false`, a hook, or `{ default: false }` with an optional `match` hook.
  * - Every declared option name must be camelCase and must not shadow a common option.
@@ -515,6 +516,21 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       body: [
         '`jsonList` marks the stored value a JSON list the `includes*` operators probe.',
         `This type stores \`${type.columnType}\`, so set \`columnType: 'json'\` or drop the flag.`,
+      ],
+    });
+  }
+  if (!isUndefined(type.links) && !isFunction(type.links)) {
+    throw ohneError({
+      title: "A field type's `links` must be a function",
+      body: ['`links` lists the record links a value holds.', 'Set `links` to a function.'],
+    });
+  }
+  if (!isUndefined(type.links) && type.columnType !== 'json') {
+    throw ohneError({
+      title: 'A `links` field type needs a `json` column',
+      body: [
+        '`links` lists the record links inside a structured value.',
+        `This type stores \`${type.columnType}\`, so set \`columnType: 'json'\` or drop \`links\`.`,
       ],
     });
   }

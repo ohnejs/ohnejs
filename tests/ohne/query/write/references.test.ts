@@ -35,6 +35,10 @@ function ref(path: string, uuid: string, provided = true): RelationRef {
   return { path, target: 'RFTargets', uuid, provided };
 }
 
+function weak(path: string, uuid: string, provided = true): RelationRef {
+  return { ...ref(path, uuid, provided), weak: true };
+}
+
 function reach(scope: QueryScope | false) {
   return { resolve: async () => scope, locale: 'en' };
 }
@@ -85,6 +89,39 @@ describe('checkReferences', () => {
     };
     await rejects(checkReferences(db, dialect, [ref('a', theirs)], forbidden), /forbidden/);
     await rejects(checkReferences(db, dialect, [ref('a', missing)], forbidden), /forbidden/);
+  });
+
+  it('drops a weak link the input did not provide, dead or hidden', async () => {
+    const refs = [weak('a', missing, false), weak('b', theirs, false)];
+    deepStrictEqual(await checkReferences(db, dialect, refs), {});
+    deepStrictEqual(await checkReferences(db, dialect, refs, reach(false)), {});
+  });
+
+  it('still checks an unprovided strong link for existence', async () => {
+    deepStrictEqual(await checkReferences(db, dialect, [ref('a', missing, false)]), {
+      a: 'validation.invalidReference',
+    });
+  });
+
+  it('checks a provided weak link for existence and reach', async () => {
+    const refs = [weak('a', mine), weak('b', theirs), weak('c', missing)];
+    deepStrictEqual(await checkReferences(db, dialect, refs, reach({ where: { owner: 'me' } })), {
+      b: 'validation.invalidReference',
+      c: 'validation.invalidReference',
+    });
+  });
+
+  it('refuses a provided weak link into an unregistered collection without probing it', async () => {
+    const refs = [
+      { ...weak('a', mine), target: 'RFNope' },
+      { ...weak('b', mine, false), target: 'RFNope' },
+    ];
+    const expected = { a: 'validation.invalidReference' };
+    deepStrictEqual(await checkReferences(db, dialect, refs), expected);
+    deepStrictEqual(
+      await checkReferences(db, dialect, refs, reach({ select: ['owner'] })),
+      expected,
+    );
   });
 });
 

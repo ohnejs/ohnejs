@@ -199,6 +199,26 @@ describe('validateFieldType jsonList', () => {
   });
 });
 
+describe('validateFieldType links', () => {
+  it('rejects `links` on a non-json column', () => {
+    throwsTitled(
+      () => validateFieldType({ columnType: 'text', links: () => [] }),
+      'A `links` field type needs a `json` column',
+    );
+  });
+
+  it('rejects a `links` that is not a function', () => {
+    throwsTitled(
+      () => validateFieldType({ columnType: 'json', links: [] as never }),
+      "A field type's `links` must be a function",
+    );
+  });
+
+  it('accepts `links` on a `json` column', () => {
+    doesNotThrow(() => validateFieldType({ columnType: 'json', links: () => [] }));
+  });
+});
+
 describe('validateField search', () => {
   const hook = () => ({ startsWith: 'x' });
   const locked: FieldType = defineField({ columnType: 'text', search: false });

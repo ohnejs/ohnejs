@@ -1,4 +1,4 @@
-import type { ConditionValue } from '../../utils/index.ts';
+import type { ConditionValue, RecordLink } from '../../utils/index.ts';
 import type { LogicalType } from '../database/dialect.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type {
@@ -218,6 +218,40 @@ export interface FieldType<
    * ```
    */
   search?: false | FieldSearch<TOptions> | { default: false; match?: FieldSearch<TOptions> };
+
+  /**
+   * Lists the record links a value holds, each at its path inside the value.
+   *
+   * - No foreign key holds a link, so deleting a target never cascades and never blocks.
+   * - A write checks each link its input provides, for existence and for reach, at the link's own path.
+   * - A link that every matched record already holds is never checked.
+   * - It may receive an unvalidated value, such as a preview draft, and returns `[]` for what it cannot read.
+   * - It requires `columnType: 'json'`.
+   *
+   * @example
+   * ```ts
+   * defineField({
+   *   columnType: 'json',
+   *   links: (value) => (isRecordLink(value) ? [{ path: '', link: value }] : []),
+   * })
+   * ```
+   */
+  links?(value: unknown): readonly FieldLink[];
+}
+
+/**
+ * One record link inside a field's value, at the path where it sits.
+ */
+export interface FieldLink {
+  /**
+   * The link's path inside the value: `''` for the value itself, `[2].content[0].link` deeper.
+   */
+  path: string;
+
+  /**
+   * The link itself, by reference, so a read-time resolver can set its `href` in place.
+   */
+  link: RecordLink;
 }
 
 /**

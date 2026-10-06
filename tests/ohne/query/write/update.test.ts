@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { ConditionNode } from '../../../../src/utils/index.ts';
@@ -17,6 +17,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
+import { linksField } from './_links-field.ts';
 
 useLayers().add({
   path: '/update',
@@ -117,6 +118,18 @@ useCollections().register('ULinks', {
       author: field('record', { collection: 'UUser' }),
       editors: field('records', { collection: 'UUser' }),
       rows: field('repeater', { fields: { who: field('record', { collection: 'UUser' }) } }),
+    },
+  },
+});
+useCollections().register('ULinked', {
+  name: 'ULinked',
+  collection: {
+    fields: {
+      mode: field('text', { nullable: true }),
+      note: field('text', { nullable: true, when: { mode: 'on' } }),
+      body: linksField(),
+      aside: linksField(),
+      rows: field('repeater', { fields: { body: linksField() } }),
     },
   },
 });
@@ -860,6 +873,104 @@ describe('runUpdate link reach', () => {
       author: 'u2',
     });
     strictEqual(record.author, 'u2');
+  });
+});
+
+describe('runUpdate weak links', () => {
+  const anduin = '01900000-0000-7000-8000-00000000000a';
+  const liadrin = '01900000-0000-7000-8000-00000000000b';
+  const ghost = '01900000-0000-7000-8000-00000000000c';
+  const dead = '01900000-0000-7000-8000-00000000000d';
+  const onlyAnduin = async () => ({ where: { name: 'Anduin' } });
+  const to = (record: string) => ({ collection: 'UUser', record });
+
+  before(async () => {
+    for (const [uuid, name] of [
+      [anduin, 'Anduin'],
+      [liadrin, 'Liadrin'],
+    ]) {
+      await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+        uuid,
+        1,
+        name,
+      ]);
+    }
+  });
+
+  /**
+   * Creates a record while `dead` exists, then deletes `dead`, so every link to it is held and dead.
+   */
+  async function seedLinked(input: Record<string, unknown>): Promise<string> {
+    await db.run('INSERT INTO "UUser" ("UUID","_updatedAt","name") VALUES (?,?,?)', [
+      dead,
+      1,
+      'Gone',
+    ]);
+    const result = await runCreate('ULinked', input, null);
+    await db.run('DELETE FROM "UUser" WHERE "UUID" = ?', [dead]);
+    ok(result.ok);
+    return result.record.UUID as string;
+  }
+
+  function linkUpdate(input: Record<string, unknown>, condition: ConditionNode, reach = false) {
+    return runUpdate(
+      'ULinked',
+      input,
+      condition,
+      null,
+      undefined,
+      false,
+      reach ? onlyAnduin : null,
+    );
+  }
+
+  it('rejects a new dead link at its path', async () => {
+    const uuid = await seedLinked({ body: [] });
+    const result = await linkUpdate({ body: [to(anduin), to(dead)] }, uuidIs(uuid));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'body[1]': 'validation.invalidReference' });
+  });
+
+  it('passes a held dead link, both with a reach and without one', async () => {
+    const uuid = await seedLinked({ body: [to(dead)] });
+    const plain = await linkUpdate({ body: [to(dead), { url: '/a' }] }, uuidIs(uuid));
+    ok(plain.ok);
+    deepStrictEqual(plain.records[0].body, [to(dead), { url: '/a' }]);
+    ok((await linkUpdate({ body: [to(dead)] }, uuidIs(uuid), true)).ok);
+  });
+
+  it('passes a held dead link on the gated path too', async () => {
+    const uuid = await seedLinked({ mode: 'on', body: [to(dead)] });
+    ok((await linkUpdate({ body: [to(dead)], note: 'kept' }, uuidIs(uuid))).ok);
+    ok((await linkUpdate({ body: [to(dead)], note: 'kept' }, uuidIs(uuid), true)).ok);
+  });
+
+  it('passes a held dead link inside a repeater item', async () => {
+    const uuid = await seedLinked({ rows: [{ body: [to(dead)] }] });
+    ok((await linkUpdate({ rows: [{ body: [{ url: '/a' }, to(dead)] }] }, uuidIs(uuid))).ok);
+  });
+
+  it('checks a dead link only some matched records hold', async () => {
+    const a = await seedLinked({ body: [to(dead)] });
+    const b = await seedLinked({ body: [] });
+    const result = await linkUpdate({ body: [to(dead)] }, inUUIDs([a, b]));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'body[0]': 'validation.invalidReference' });
+  });
+
+  it('checks a held dead link moved to another field', async () => {
+    const uuid = await seedLinked({ body: [to(dead)] });
+    const result = await linkUpdate({ aside: [to(dead)] }, uuidIs(uuid));
+    ok(!result.ok);
+    deepStrictEqual(result.errors, { 'aside[0]': 'validation.invalidReference' });
+  });
+
+  it('answers a hidden target exactly as a missing one', async () => {
+    const uuid = await seedLinked({ body: [] });
+    const hidden = await linkUpdate({ body: [to(liadrin)] }, uuidIs(uuid), true);
+    ok(!hidden.ok);
+    deepStrictEqual(hidden.errors, { 'body[0]': 'validation.invalidReference' });
+    deepStrictEqual(hidden, await linkUpdate({ body: [to(ghost)] }, uuidIs(uuid), true));
   });
 });
 
