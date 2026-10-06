@@ -30,6 +30,7 @@ import { requireCapability } from './capabilities.ts';
  * No write narrows its input or its returned records to the scope's `select`.
  * The operation's named middleware do not run - a route of your own carries its own.
  * Valid only within a request.
+ * A literal name must be a known collection; a name built at runtime is any `string`.
  *
  * @example
  * ```ts
@@ -39,8 +40,8 @@ import { requireCapability } from './capabilities.ts';
  * })
  * ```
  */
-export async function queryScoped(
-  collection: CollectionName,
+export async function queryScoped<C extends string>(
+  collection: string extends C ? C : C extends CollectionName ? C : CollectionName,
   operation: CollectionOperation,
   input: Record<string, unknown> = {},
 ): Promise<UntypedQueryBuilder> {
