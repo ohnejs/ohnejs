@@ -153,9 +153,23 @@ describe('dev', () => {
   }
 
   /**
-   * Runs `ohne dev` as its own process, so the output holds what each child prints too.
-   * The app config records each child's PID, for a test to stop it from outside.
+   * An app config that records each child's PID, for a test to stop it from outside.
    * It also makes `SIGUSR2` exit a child with code `3`, a crash the child reports itself.
+   */
+  function pidConfig(config: string): string {
+    return (
+      "import { writeFileSync } from 'node:fs'\n" +
+      "const backend = ['api', 'dashboard'].find((name) => process.argv.includes(name))\n" +
+      'if (backend) {\n' +
+      `  writeFileSync(${JSON.stringify(root)} + '/' + backend + '.pid', String(process.pid))\n` +
+      '  process.on("SIGUSR2", () => process.exit(3))\n' +
+      '}\n' +
+      `export default ${config}\n`
+    );
+  }
+
+  /**
+   * Runs `ohne dev` as its own process, so the output holds what each child prints too.
    */
   async function startDev(
     name: string,
@@ -164,13 +178,7 @@ describe('dev', () => {
     const app = writeProject(name, 0);
     writeFileSync(
       join(app, 'ohne.config.ts'),
-      "import { writeFileSync } from 'node:fs'\n" +
-        "const backend = ['api', 'dashboard'].find((name) => process.argv.includes(name))\n" +
-        'if (backend) {\n' +
-        `  writeFileSync(${JSON.stringify(root)} + '/' + backend + '.pid', String(process.pid))\n` +
-        '  process.on("SIGUSR2", () => process.exit(3))\n' +
-        '}\n' +
-        `export default { api: { port: 0 }, dashboard: { port: ${dashPort} } }\n`,
+      pidConfig(`{ api: { port: 0 }, dashboard: { port: ${dashPort} } }`),
     );
     writeRoute(app, 'health.ts');
 
@@ -180,6 +188,33 @@ describe('dev', () => {
     strictEqual(await get(dashPort, '/'), 200);
     const apiPort = Number(cli.output().match(/API ready at http:\/\/localhost:(\d+)/)?.[1]);
     return { app, cli, dashPort, apiPort };
+  }
+
+  /**
+   * Runs `dev` in this process with `reviveUptime`, capturing what the supervisor prints.
+   */
+  async function startInProcess(
+    name: string,
+    reviveUptime: number,
+  ): Promise<{ app: string; out: () => string; dashPort: number; apiPort: number }> {
+    const [dashPort, apiPort] = [await freePort(), await freePort()];
+    const app = writeProject(name, apiPort);
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      pidConfig(
+        `{ api: { port: ${apiPort} }, dashboard: { port: ${dashPort} }, printer: { silent: true } }`,
+      ),
+    );
+    writeRoute(app, 'health.ts');
+
+    const lines: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ stream: { write: (line) => lines.push(line) } });
+    servers.push(await dev(app, { entry: BIN, reviveUptime }));
+    await waitFor(
+      async () => (await get(apiPort, '/health')) === 200 && (await get(dashPort, '/')) === 200,
+    );
+    return { app, out: () => lines.join(''), dashPort, apiPort };
   }
 
   /**
@@ -224,6 +259,7 @@ describe('dev', () => {
     useLayers().clear();
     useEnv().unset('SILENT');
     useEnv().fill({});
+    usePrinter().configure({ stream: process.stderr });
   });
 
   it('serves routes and reloads when a route file is added', TIMEOUT, async () => {
@@ -422,39 +458,33 @@ describe('dev', () => {
   });
 
   it('warns and restarts a dashboard stopped from outside', TIMEOUT, async () => {
-    const { cli, dashPort } = await startDev('dashboard-killed');
-    await delay(5_200);
+    const { out, dashPort } = await startInProcess('dashboard-killed', 0);
 
-    const mark = cli.output().length;
+    const mark = out().length;
     process.kill(childPID('dashboard'), 'SIGKILL');
-    // The supervisor prints its wait line after the child's ready line, so await both.
-    await waitFor(async () =>
-      /Dashboard ready[\s\S]*Waiting for changes/.test(cli.output().slice(mark)),
-    );
-    ok(cli.output().slice(mark).includes('Dashboard stopped by SIGKILL. Restarting...'));
+    await waitFor(async () => out().slice(mark).includes('Waiting for changes'));
+    ok(out().slice(mark).includes('Dashboard stopped by SIGKILL. Restarting...'));
     strictEqual(await get(dashPort, '/'), 200);
   });
 
   it('restarts an API stopped from outside without a reload notice', TIMEOUT, async () => {
-    const { cli, apiPort } = await startDev('api-stopped');
-    await delay(5_200);
+    const { out, apiPort } = await startInProcess('api-stopped', 0);
 
-    const mark = cli.output().length;
+    const mark = out().length;
     process.kill(childPID('api'), 'SIGTERM');
-    await waitFor(async () => cli.output().slice(mark).includes('API ready'));
-    const text = cli.output().slice(mark);
-    ok(text.includes('API stopped. Restarting...'));
-    ok(!text.includes('Reloading API'));
+    await waitFor(async () => out().slice(mark).includes('Waiting for changes'));
+    ok(out().slice(mark).includes('API stopped. Restarting...'));
+    ok(!out().slice(mark).includes('Reloading API'));
     strictEqual(await get(apiPort, '/health'), 200);
   });
 
   it('parks a child stopped right after it started, until a change', TIMEOUT, async () => {
-    const { app, cli, apiPort } = await startDev('api-stopped-early');
+    const { app, out, apiPort } = await startInProcess('api-stopped-early', 60_000);
 
-    const mark = cli.output().length;
+    const mark = out().length;
     process.kill(childPID('api'), 'SIGTERM');
-    await waitFor(async () => cli.output().slice(mark).includes('Waiting for changes'));
-    ok(cli.output().slice(mark).includes('API stopped right after it started.'));
+    await waitFor(async () => out().slice(mark).includes('Waiting for changes'));
+    ok(out().slice(mark).includes('API stopped right after it started.'));
     await delay(500);
     strictEqual(await get(apiPort, '/health'), -1);
 
