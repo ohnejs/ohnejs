@@ -20,6 +20,7 @@ import type { LinkReach } from './references.ts';
 
 import {
   chunk,
+  conditionResolver,
   evaluateCondition,
   getOrSet,
   groupBy,
@@ -39,7 +40,6 @@ import { effectiveLocale } from '../locale.ts';
 import { blockQueryMetadata, queryMetadata } from '../metadata.ts';
 import { prefixPath } from '../pipeline/prefix-errors.ts';
 import { runRecord } from '../pipeline/run-record.ts';
-import { whenResolver } from '../pipeline/when.ts';
 import { readRows } from '../read/find.ts';
 import { narrowTranslations } from '../read/loaders/translations.ts';
 import { compileFrom } from '../sql/from.ts';
@@ -658,7 +658,7 @@ function nestedGating(
           : child.meta.kind === 'blocks'
             ? `${child.path}[${index}].fields`
             : `${child.path}[${index}]`;
-      const resolve = whenResolver(item.values, ancestry);
+      const resolve = conditionResolver(item.values, ancestry);
       const dropped = new Set<FieldQueryMeta>();
       for (const [name, meta] of Object.entries(itemSubfields(child, item))) {
         if (isUndefined(meta.when)) continue;

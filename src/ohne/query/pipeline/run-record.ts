@@ -6,7 +6,13 @@ import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
 import type { LinkReach } from '../write/references.ts';
 
-import { evaluateCondition, isEmpty, isNull, isUndefined } from '../../../utils/index.ts';
+import {
+  conditionResolver,
+  evaluateCondition,
+  isEmpty,
+  isNull,
+  isUndefined,
+} from '../../../utils/index.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
 import { linkReachable } from '../write/references.ts';
@@ -19,7 +25,7 @@ import {
   prepareScalar,
   writeContext,
 } from './run-field.ts';
-import { scopeValuesOf, whenResolver, type ScopeValues } from './when.ts';
+import { scopeValuesOf, type ScopeValues } from './when.ts';
 
 /**
  * The write pipeline's per-record context, shared by the input filter and the record validator.
@@ -377,7 +383,7 @@ export async function processScope(
   const descentCtx: ScopeContext = { ...ctx, ancestors: [...ctx.ancestors, scopeValues] };
   const resolve =
     ctx.operation === 'create' && names.some((name) => !isUndefined(fields[name].when))
-      ? whenResolver(scopeValues, ctx.ancestors)
+      ? conditionResolver(scopeValues, ctx.ancestors)
       : undefined;
   const gated =
     ctx.operation === 'update' && ctx.path !== ''

@@ -3,10 +3,15 @@ import type { FieldQueryMeta } from '../metadata.ts';
 import type { ProcessedChild, ProcessedRelation, ProcessedScope } from '../pipeline/run-record.ts';
 import type { ScopeValues } from '../pipeline/when.ts';
 
-import { evaluateCondition, isDotPathInside, isEmpty, isUndefined } from '../../../utils/index.ts';
+import {
+  conditionResolver,
+  evaluateCondition,
+  isDotPathInside,
+  isEmpty,
+  isUndefined,
+} from '../../../utils/index.ts';
 import { blockQueryMetadata } from '../metadata.ts';
 import { isProvided } from '../pipeline/run-field.ts';
-import { whenResolver } from '../pipeline/when.ts';
 
 /**
  * A provided top-level field whose `when` decides, per matched record, whether the update writes it.
@@ -91,7 +96,7 @@ export function partitionActivation(
   const byKey = new Map<string, ActivationGroup>();
   for (const record of records) {
     const overlay = { ...record, ...provided };
-    const resolve = whenResolver(overlay, []);
+    const resolve = conditionResolver(overlay, []);
     const active = new Set<string>();
     for (const gate of gates) if (evaluateCondition(gate.when, resolve)) active.add(gate.name);
     const key = gates.map((gate) => (active.has(gate.name) ? '1' : '0')).join('');
@@ -195,7 +200,7 @@ export function gateNested(
   subfields: Record<string, FieldQueryMeta>,
   ancestry: readonly ScopeValues[],
 ): ProcessedScope {
-  const resolve = whenResolver(item.values, ancestry);
+  const resolve = conditionResolver(item.values, ancestry);
   let columns: Record<string, unknown> | undefined;
   let relations: ProcessedRelation[] | undefined;
   let children: ProcessedChild[] | undefined;
