@@ -1,3 +1,4 @@
+export { sessionsDefinition } from '../collections/Sessions.ts';
 export { usersDefinition } from '../collections/Users.ts';
 export * from './account-layout.ts';
 export * from './capabilities.ts';

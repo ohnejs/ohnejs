@@ -24,7 +24,7 @@ const ownSessions = async (): Promise<AccessScope<'expiresAt' | 'tokenHash' | 'u
  * Deleting a user cascades to their sessions, so a removed account cannot leave a session behind.
  * The API exposes `read` and `delete` to the session's own user alone, scoped by `access`.
  */
-export default defineCollection({
+const sessions = defineCollection({
   api: {
     read: { public: true, access: ownSessions },
     delete: { public: true, access: ownSessions },
@@ -52,3 +52,21 @@ export default defineCollection({
     }),
   },
 });
+
+/**
+ * The `Sessions` definition, for an app's own `collections/Sessions.ts` to spread.
+ * An override replaces the file whole, so spread this to keep the fields sign-in depends on.
+ * An override's own `api` replaces it, and an operation it does not mark `public` needs its capability.
+ *
+ * @example
+ * ```ts
+ * // collections/Sessions.ts
+ * import { defineCollection } from 'ohnejs'
+ * import { sessionsDefinition } from 'ohnejs/auth'
+ *
+ * export default defineCollection({ ...sessionsDefinition, api: { read: {}, delete: {} } })
+ * ```
+ */
+export const sessionsDefinition: typeof sessions = sessions;
+
+export default sessions;
