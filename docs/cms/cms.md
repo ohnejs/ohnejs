@@ -119,3 +119,33 @@ Every keystroke shows on the website before you save. Click a block on the websi
 and use its toolbar to move, add, duplicate, or delete it.
 
 The website takes part through a small client. [Your website](./website.md) shows how.
+
+## Sharing a preview
+
+The Share button makes a link to the page as it looks right now, unsaved changes included. Anyone
+with the link can see it, no account needed. Later edits do not show in it.
+
+You can share a page you may edit, once it has been saved.
+
+A link lasts as long as you pick, or until an editor of the record revokes it. `cms.share` sets
+the choices:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/cms'],
+  cms: {
+    site: 'https://example.com',
+    routes: { Pages: '/[...slug]' },
+    share: {
+      durations: ['1h', '1d', '14d'],
+      default: '1h',
+    },
+  },
+});
+```
+
+Leave out `default` and the first duration is picked. Without `cms.share`, the choices are `1h`,
+`1d`, `7d`, and `30d`, with `1d` picked first.

@@ -84,3 +84,6 @@ When the website never answers, the editor says so and lists the usual causes.
 A preview shows unsaved work, so no cache or search engine may keep it. While a token is set, send
 `ohne.previewHeaders()` with your response, and set the robots meta tag to `noindex`. The recipes
 in [Frameworks](./frameworks.md) do both.
+
+A [shared preview](./cms.md#sharing-a-preview) link carries the same `?ohne-preview=` token, so
+your website shows it with no change.
