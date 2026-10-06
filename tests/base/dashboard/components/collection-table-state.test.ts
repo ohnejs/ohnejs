@@ -18,6 +18,10 @@ import {
 
 const DEFAULT_ORDER = ['-_updatedAt'];
 
+function warnings(warn: { mock: { calls: { arguments: unknown[] }[] } }): unknown[] {
+  return warn.mock.calls.map((call) => call.arguments[0]);
+}
+
 function field(name: string, overrides: Partial<TableFieldMeta> = {}): TableFieldMeta {
   return { name, label: name, kind: 'column', logicalType: 'text', readable: true, ...overrides };
 }
@@ -265,46 +269,56 @@ describe('resolveTableColumns', () => {
     ]);
   });
 
-  it('skips unknown fields in a spec', () => {
+  it('skips unknown fields in a spec, and warns', (t) => {
+    const warn = t.mock.method(console, 'warn', () => {});
     deepStrictEqual(
       resolveTableColumns(FIELDS, ['title', 'ghost']).map((column) => column.name),
       ['title'],
     );
+    deepStrictEqual(warnings(warn), [
+      'Unable to resolve field `ghost` in the collection table columns.',
+    ]);
   });
 
-  it('falls back to the UUID column when nothing resolves', () => {
+  it('falls back to the UUID column when nothing resolves', (t) => {
+    t.mock.method(console, 'warn', () => {});
     deepStrictEqual(resolveTableColumns(FIELDS, ['ghost']), [
       { name: 'UUID', label: 'UUID', sortable: 'text' },
     ]);
   });
 
   it('skips an unreadable field named in a spec, and warns', (t) => {
-    const warn = t.mock.method(console, 'warn');
+    const warn = t.mock.method(console, 'warn', () => {});
     const fields = [...FIELDS, field('secret', { readable: false })];
     deepStrictEqual(
       resolveTableColumns(fields, ['title', 'secret']).map((column) => column.name),
       ['title'],
     );
-    strictEqual(warn.mock.callCount(), 1);
+    deepStrictEqual(warnings(warn), [
+      'Field `secret` is not readable and cannot be a collection table column.',
+    ]);
   });
 
   it('keeps the first of two entries naming the same field, and warns', (t) => {
-    const warn = t.mock.method(console, 'warn');
+    const warn = t.mock.method(console, 'warn', () => {});
     deepStrictEqual(resolveTableColumns(FIELDS, ['title|20rem', 'title']), [
       { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
     ]);
-    strictEqual(warn.mock.callCount(), 1);
+    deepStrictEqual(warnings(warn), ['Field `title` is repeated in the collection table columns.']);
   });
 
   it('drops a width slot that is not a plain CSS length, and warns', (t) => {
-    const warn = t.mock.method(console, 'warn');
+    const warn = t.mock.method(console, 'warn', () => {});
     deepStrictEqual(resolveTableColumns(FIELDS, ['title|1px;background:url(//evil.example/x)']), [
       { name: 'title', label: 'title', sortable: 'text', minWidth: '256px' },
     ]);
     deepStrictEqual(resolveTableColumns(FIELDS, ['title|20rem|calc(100%)']), [
       { name: 'title', label: 'title', sortable: 'text', width: '20rem' },
     ]);
-    strictEqual(warn.mock.callCount(), 2);
+    deepStrictEqual(warnings(warn), [
+      'Ignoring invalid width `1px;background:url(//evil.example/x)` in the collection table columns.',
+      'Ignoring invalid width `calc(100%)` in the collection table columns.',
+    ]);
   });
 });
 
@@ -375,12 +389,13 @@ describe('editableTableColumns', () => {
   });
 
   it('drops unknown, unreadable, and repeated names', (t) => {
-    t.mock.method(console, 'warn');
+    const warn = t.mock.method(console, 'warn', () => {});
     const fields = [...FIELDS, field('secret', { readable: false })];
     deepStrictEqual(
       editableTableColumns(['ghost', 'secret', 'title', 'title'], fields).map((item) => item.name),
       ['title'],
     );
+    strictEqual(warnings(warn).length, 3);
   });
 });
 
