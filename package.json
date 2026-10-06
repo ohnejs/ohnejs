@@ -1,6 +1,6 @@
 {
   "name": "ohnejs",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A zero-dependency TypeScript framework for the web.",
   "homepage": "https://ohne.dev",
   "license": "MIT",
