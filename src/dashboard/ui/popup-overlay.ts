@@ -221,6 +221,10 @@ css`
     border-top-width: 1px;
   }
 
+  .ohne-popup-footer:empty {
+    display: none;
+  }
+
   .ohne-popup-full-height .ohne-popup-footer {
     position: sticky;
     bottom: 0;
