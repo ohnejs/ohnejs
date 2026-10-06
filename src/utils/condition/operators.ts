@@ -1,3 +1,5 @@
+import { hasKey } from '../object/has-key.ts';
+
 /**
  * The closed set of comparison operators the condition grammar speaks.
  * `has` and `empty` are `ConditionNode` kinds, not compare operators.
@@ -88,3 +90,17 @@ export type ConditionNode =
   | { kind: 'empty'; path: readonly string[]; negated: boolean }
   | { kind: 'and'; nodes: readonly ConditionNode[] }
   | { kind: 'or'; nodes: readonly ConditionNode[] };
+
+/**
+ * Whether `key` is an own key of `compareOperators`, so inherited names like `toString` never count.
+ *
+ * @example
+ * ```ts
+ * isCompareOperator('atLeast')  // -> true
+ * isCompareOperator('has')      // -> false
+ * isCompareOperator('toString') // -> false
+ * ```
+ */
+export function isCompareOperator(key: string): key is CompareOperator {
+  return hasKey(compareOperators, key);
+}

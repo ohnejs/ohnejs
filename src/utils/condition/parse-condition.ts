@@ -5,8 +5,12 @@ import { isNumber } from '../is/is-number.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
-import { hasKey } from '../object/has-key.ts';
-import { compareOperators, type CompareOperator, type ConditionNode } from './operators.ts';
+import {
+  compareOperators,
+  type CompareOperator,
+  type ConditionNode,
+  isCompareOperator,
+} from './operators.ts';
 
 /**
  * Options for `parseCondition`.
@@ -83,13 +87,6 @@ function join(path: string, key: string): string {
  */
 function isScalar(value: unknown): value is string | number | boolean {
   return isString(value) || isNumber(value) || isBoolean(value);
-}
-
-/**
- * Whether `key` is an own key of `compareOperators`, so inherited names like `toString` never count.
- */
-function isCompareOperator(key: string): key is CompareOperator {
-  return hasKey(compareOperators, key);
 }
 
 /**
