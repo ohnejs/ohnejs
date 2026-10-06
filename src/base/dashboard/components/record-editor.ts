@@ -79,19 +79,6 @@ css`
     font-weight: 500;
   }
 
-  .o-record-editor-header .ohne-button {
-    margin-right: 0.25rem;
-    margin-left: 0.25rem;
-  }
-
-  .o-record-editor-header .ohne-button:first-child {
-    margin-left: 0;
-  }
-
-  .o-record-editor-header .ohne-button:last-child {
-    margin-right: 0;
-  }
-
   .o-record-editor-main {
     container-type: inline-size;
     contain: layout;
