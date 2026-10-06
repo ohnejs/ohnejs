@@ -26,8 +26,11 @@ useCollections().register('DescNotes', {
     api: { read: true, create: true, update: { access: () => true }, delete: true },
     fields: {
       title: field('text'),
-      note: field('text', { nullable: true }),
+      note: field('text', { nullable: true, when: { title: { startsWith: 'Draft' } } }),
       owner: field('record', { collection: 'DescOwners' }),
+      steps: field('repeater', {
+        fields: { tip: field('text', { nullable: true, when: { '../owner': { has: true } } }) },
+      }),
     },
   },
 });
@@ -135,9 +138,18 @@ describe('describeCollections', () => {
     strictEqual(notes.singleton, false);
     deepStrictEqual(
       notes.fields.map((entry) => entry.name),
-      ['UUID', '_updatedAt', 'title', 'note', 'owner'],
+      ['UUID', '_updatedAt', 'title', 'note', 'owner', 'steps'],
     );
     deepStrictEqual(notes.labelFields, ['title']);
+  });
+
+  it('ships a `when` gate in its condition object form, and none on an ungated field', () => {
+    const fields = collectionOf(editor, 'DescNotes').fields;
+    const named = (name: string) => fields.find((entry) => entry.name === name);
+    deepStrictEqual(named('note')?.when, { title: { startsWith: 'Draft' } });
+    strictEqual('when' in (named('title') ?? {}), false);
+    const tip = named('steps')?.subfields?.find((entry) => entry.name === 'tip');
+    deepStrictEqual(tip?.when, { '../owner': { has: true } });
   });
 
   it('resolves a declared layout against the described fields, dropping a name it lacks', () => {

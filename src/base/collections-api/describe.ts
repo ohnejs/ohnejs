@@ -9,7 +9,7 @@ import type {
   RecordLabel,
   Router,
 } from 'ohnejs';
-import type { HTTPMethod } from 'ohnejs/utils';
+import type { ConditionObject, HTTPMethod } from 'ohnejs/utils';
 
 import {
   createRouter,
@@ -28,6 +28,7 @@ import {
   isPlainObject,
   isString,
   isUndefined,
+  serializeCondition,
   templateFields,
   toKebabCase,
   toSentenceCase,
@@ -189,6 +190,11 @@ export interface DashboardField {
    * Whether the field locks after create.
    */
   immutable: boolean;
+
+  /**
+   * The field's `when` gate in condition object form; absent on an ungated field.
+   */
+  when?: ConditionObject;
 
   /**
    * The field type's declared options as resolved, reduced to plain JSON data.
@@ -576,6 +582,7 @@ function describeField(
     immutable: meta.immutable === true,
   };
   if (!isUndefined(meta.logicalType)) field.logicalType = meta.logicalType;
+  if (!isUndefined(meta.when)) field.when = serializeCondition(meta.when) as ConditionObject;
   const { description } = options;
   if (isExpandableDescription(description)) {
     field.expandable = {

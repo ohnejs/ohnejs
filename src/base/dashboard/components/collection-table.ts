@@ -487,10 +487,12 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   const mayDelete = (id: number | string): boolean => admitsRow(verdicts.value.delete, id);
 
+  // A gated field edits in the record editor, where the gate reads the whole record.
   const canEditField = (field: DashboardField, id: number | string): boolean =>
     mayUpdate(id) &&
     field.writable &&
     !field.immutable &&
+    isUndefined(field.when) &&
     (verdicts.value.select?.includes(field.name) ?? true);
 
   const grid = table<TableColumns>({
