@@ -49,6 +49,18 @@ describe('parseProse', () => {
     deepStrictEqual(parseProse('a [x](javascript:y) b', false), [paragraph(text('a x b'))]);
   });
 
+  it('parses a link with userinfo as its label', () => {
+    deepStrictEqual(parseProse('a [bank](https://bank.example@evil.example) b', true), [
+      paragraph(text('a bank b')),
+    ]);
+  });
+
+  it('parses a fragment, mailto, or tel link as its label, since only a web link opens a new tab', () => {
+    deepStrictEqual(parseProse('a [t](#top) [m](mailto:a@b.c) [p](tel:1) b', true), [
+      paragraph(text('a t m p b')),
+    ]);
+  });
+
   it('parses an image as its alt text', () => {
     deepStrictEqual(parseProse('a ![a cat](https://e.test/cat.png) b', true), [
       paragraph(text('a a cat b')),

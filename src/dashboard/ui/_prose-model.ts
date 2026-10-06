@@ -1,4 +1,5 @@
 import { last } from '../../utils/array/last.ts';
+import { isSafeHref } from '../../utils/html/is-safe-href.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -59,7 +60,7 @@ export type ProseBlock =
   | { kind: 'rule' };
 
 /**
- * Which links render: every http(s) and local link, only local paths, or none.
+ * Which links render: every web and local link `isSafeHref` admits, only local paths, or none.
  */
 type Links = boolean | 'local';
 
@@ -75,6 +76,7 @@ const INLINE = new RegExp(
   ].join('|'),
   'gu',
 );
+const WEB = /^https?:/i;
 const BLANK = /^\s*$/;
 const INDENT = /^ */;
 const FENCE_OPEN = /^ {0,3}```/;
@@ -110,7 +112,9 @@ function inlineToken(token: RegExpExecArray, links: Links): ProseInline[] {
   if (!isUndefined(label) && !isUndefined(href)) {
     const local = isLocalPath(href);
     const accepted =
-      (local || /^https?:\/\//.test(href)) && (links === true || (links === 'local' && local));
+      isSafeHref(href) &&
+      (local || WEB.test(href)) &&
+      (links === true || (links === 'local' && local));
     const content = parseLine(label, links);
     return accepted ? [{ kind: 'link', href, local, content }] : content;
   }
