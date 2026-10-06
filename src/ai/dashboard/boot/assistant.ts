@@ -52,8 +52,10 @@ const watchIdle = (id: string, deadline: number, timeout: number): void => {
 effect(() => {
   clearTimeout(idle);
   const batch = pendingBatch();
+  // Reading `aiMeta` first would fetch the discovery data on a signed-out page, which answers `401`.
+  if (isUndefined(batch)) return;
   const timeout = aiMeta()?.turnTimeout;
-  if (isUndefined(batch) || isUndefined(timeout)) return;
+  if (isUndefined(timeout)) return;
   watchIdle(batch.id, (batch.since ?? Date.now()) + timeout, timeout);
 });
 
