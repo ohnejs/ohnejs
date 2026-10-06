@@ -160,7 +160,6 @@
   "login": {
     "email": "E-mail",
     "failed": "Prijava nije uspjela",
-    "forgotPassword": "Zaboravili ste lozinku?",
     "hidePassword": "Sakrij lozinku",
     "password": "Lozinka",
     "rememberMe": "Zapamti me",

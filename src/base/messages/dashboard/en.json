@@ -160,7 +160,6 @@
   "login": {
     "email": "Email",
     "failed": "The sign-in failed",
-    "forgotPassword": "Forgot password?",
     "hidePassword": "Hide password",
     "password": "Password",
     "rememberMe": "Remember me",

@@ -141,10 +141,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
       ),
     ]),
     field([
-      fieldLabel([
-        h('label', { for: 'password' }, () => t('dashboard.login.password')),
-        h('button', { type: 'button', tabindex: '1' }, () => t('dashboard.login.forgotPassword')),
-      ]),
+      fieldLabel(h('label', { for: 'password' }, () => t('dashboard.login.password'))),
       textInput(password, {
         type: () => (revealed.value ? 'text' : 'password'),
         autocomplete: 'current-password',
