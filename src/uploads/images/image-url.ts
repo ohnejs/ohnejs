@@ -104,8 +104,8 @@ export function imageURL(
   if (isUndefined(images.url)) return uploadURL(upload);
   const type = upload.type ?? uploadType(upload.name);
   if (!isOptimizableImage(type)) return uploadURL(upload);
+  if (stringifyImageTransforms(transforms) === '') return uploadURL(upload);
   const tokens = stringifyImageTransforms(withFocalPoint(upload, transforms));
-  if (tokens === '') return uploadURL(upload);
   const [secret] = uploadSecrets();
   const signed = tokensToSign(upload, tokens, secret);
   if (isUndefined(signed)) return uploadURL(upload);

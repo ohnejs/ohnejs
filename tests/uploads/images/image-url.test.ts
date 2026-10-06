@@ -82,6 +82,7 @@ describe('imageURL', () => {
 
   it('answers the original for empty transforms and for types the service cannot render', () => {
     strictEqual(imageURL(sunset), '/uploads/photos/sunset.jpg');
+    strictEqual(imageURL({ ...sunset, focalX: 0.25, focalY: 1 }), '/uploads/photos/sunset.jpg');
     strictEqual(
       imageURL({ directory: '', name: 'report.pdf' }, { width: 800 }),
       '/uploads/report.pdf',
