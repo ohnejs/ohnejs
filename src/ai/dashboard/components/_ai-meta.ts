@@ -4,7 +4,7 @@ import { isUndefined, parseRouteID } from 'ohnejs/utils';
 declare module 'ohnejs/dashboard' {
   interface DashboardMeta {
     /**
-     * The assistant, set only for a holder of `ai.use` while the default model has its key.
+     * The assistant, set only for a holder of `ai.use` who can call the default model.
      * Absent, the palette is search only.
      */
     ai?: AIMeta;

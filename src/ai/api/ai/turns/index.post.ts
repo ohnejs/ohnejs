@@ -10,8 +10,13 @@ import type { Turn } from '../../../turns/state.ts';
 
 import { translate } from '../../../../ohne/http/translate.ts';
 import { useAIConfig } from '../../../config.ts';
-import { hasModelKey, useProvider } from '../../../providers/use-provider.ts';
-import { acquireStepPermit, enforceTurnsLimit, probeTokens } from '../../../turns/limits.ts';
+import { canUseModel, defaultModel, useProvider } from '../../../providers/use-provider.ts';
+import {
+  STREAMED,
+  acquireStepPermit,
+  enforceTurnsLimit,
+  probeTokens,
+} from '../../../turns/limits.ts';
 import { userMessage } from '../../../turns/prompt.ts';
 import { pruneTurns } from '../../../turns/prune.ts';
 import { flowModels, startableFlows } from '../../../turns/run-flow.ts';
@@ -57,10 +62,10 @@ const BODY_KEYS = new Set(['input', 'page', 'model', 'skill', 'flow', 'after']);
  * Needs `ai.use`: no user `401`, a missing capability `403`.
  * Without `ai.model` the assistant is off, a `404`.
  * `model` picks another `ai.models` entry; one unknown, or a `jev` one, is a `400`.
- * A model whose key is unset is a `503`.
+ * A model whose key is unset, or that `ai:credentials` refuses the user, is a `503`.
  * `skill` starts the turn with a skill's instructions; one the person may not start is a `400`.
  * `flow` walks a flow from its start; one the person may not start is a `400`, as is a `skill` beside it.
- * A model the flow's nodes name whose key is unset is a `503`.
+ * A model the flow's nodes name that the user cannot call is a `503`.
  * `after` names a turn the new one follows up on, which then starts from that turn's transcript.
  * A follow-up is a plain turn, so a `flow` beside `after` is a `400`.
  * It must be the person's own turn, at any age retention keeps it, or it is a `409`.
@@ -84,12 +89,14 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
   if (!isString(page) || !PAGE_RE.test(page) || page.length > MAX_PAGE) throw invalid('page');
   const config = useAIConfig();
   if (isUndefined(config.model)) throw notFound(translate('ai.api.assistantOff'));
-  const model = isUndefined(body.model) ? config.model : pickedModel(body.model, config);
-  if (!hasModelKey(model)) {
+  const model = isUndefined(body.model)
+    ? ((await defaultModel(user)) ?? config.model)
+    : pickedModel(body.model, config);
+  if (!(await canUseModel(model, user))) {
     throw new HTTPError(503, translate('ai.api.modelUnavailable', { model }));
   }
   const skill = isUndefined(body.skill) ? undefined : startingSkill(body.skill, user);
-  const flow = isUndefined(body.flow) ? undefined : startingFlow(body.flow, user, model);
+  const flow = isUndefined(body.flow) ? undefined : await startingFlow(body.flow, user, model);
   if (!isUndefined(flow) && (!isUndefined(skill) || !isUndefined(body.after))) {
     throw invalid('flow');
   }
@@ -97,8 +104,8 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
   await probeTokens(user);
   await enforceTurnsLimit(user);
   useEvent().waitUntil(pruneTurns());
-  const provider = useProvider(model);
-  const release = acquireStepPermit(user);
+  const provider = await useProvider(model, user);
+  const release = await acquireStepPermit(user);
   let turn: Turn;
   try {
     turn = await openTurn({
@@ -125,7 +132,7 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
     throw error;
   }
   return streamStep({ turn, user, provider, release }, { event: 'turn', data: { id: turn.UUID } });
-});
+}, STREAMED);
 
 /**
  * The `ai.models` entry the person picked, which must exist and be able to plan.
@@ -151,12 +158,13 @@ function startingSkill(name: unknown, user: User): { name: string; prompt: Promp
 /**
  * The flow the person starts, which must exist and be theirs to start, every model it runs on keyed.
  */
-function startingFlow(name: unknown, user: User, model: string): FlowMeta {
+async function startingFlow(name: unknown, user: User, model: string): Promise<FlowMeta> {
   const flow = startableFlows(user).find((meta) => meta.name === name);
   if (isUndefined(flow)) throw badRequest(translate('ai.api.unknownFlow', { flow: String(name) }));
-  const unkeyed = flowModels(flow.flow, model).find((entry) => !hasModelKey(entry));
-  if (!isUndefined(unkeyed)) {
-    throw new HTTPError(503, translate('ai.api.modelUnavailable', { model: unkeyed }));
+  for (const entry of flowModels(flow.flow, model)) {
+    if (!(await canUseModel(entry, user))) {
+      throw new HTTPError(503, translate('ai.api.modelUnavailable', { model: entry }));
+    }
   }
   return flow;
 }

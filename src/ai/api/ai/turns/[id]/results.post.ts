@@ -16,8 +16,8 @@ import type { OpenOutcome } from '../../../../turns/state.ts';
 
 import { translate } from '../../../../../ohne/http/translate.ts';
 import { useAIConfig } from '../../../../config.ts';
-import { hasModelKey, useProvider } from '../../../../providers/use-provider.ts';
-import { acquireStepPermit, probeTokens } from '../../../../turns/limits.ts';
+import { canUseModel, useProvider } from '../../../../providers/use-provider.ts';
+import { STREAMED, acquireStepPermit, probeTokens } from '../../../../turns/limits.ts';
 import {
   activeModel,
   batchReported,
@@ -62,7 +62,7 @@ const RESULT_KEYS = new Set(['status', 'body', 'auto', 'declined', 'note']);
  * A body that is not an object, an unknown key, a bad result, or the wrong number of them is a `400`.
  * So is a missing, unknown or unwanted `open`.
  * A person past `ai.limits.tokens`, or already streaming two steps, is a `429`.
- * A model whose key is unset is a `503`; a flow turn runs on its node's model.
+ * A model the user cannot call is a `503`; a flow turn runs on its node's model.
  * The body may hold every proposal's answer up to `ai.limits.resultSize`, so its cap is raised to fit them.
  */
 export default defineHandler(
@@ -101,12 +101,12 @@ export default defineHandler(
       throw badRequest(translate('ai.api.invalidBody', { key: 'results' }));
     }
     const model = activeModel(turn);
-    if (!hasModelKey(model)) {
+    if (!(await canUseModel(model, user))) {
       throw new HTTPError(503, translate('ai.api.modelUnavailable', { model }));
     }
     await probeTokens(user);
-    const provider = useProvider(model);
-    const release = acquireStepPermit(user);
+    const provider = await useProvider(model, user);
+    const release = await acquireStepPermit(user);
     try {
       const answers = await answerBatch(pending, results, open, provider, model);
       turn.transcript = [...turn.transcript, ...answers];
@@ -117,7 +117,7 @@ export default defineHandler(
     }
     return streamStep({ turn, user, provider, release });
   },
-  { maxBodySize: resultsBodySize() },
+  { ...STREAMED, maxBodySize: resultsBodySize() },
 );
 
 /**

@@ -6,14 +6,14 @@ import { isUndefined, parseBytes, parseDuration, toSentenceCase } from 'ohnejs/u
 
 import { resolveMessage } from '../../ohne/http/translate.ts';
 import { useAIConfig } from '../config.ts';
-import { hasModelKey } from '../providers/use-provider.ts';
-import { startableFlows } from '../turns/run-flow.ts';
+import { canUseModel, defaultModel } from '../providers/use-provider.ts';
+import { flowModels, startableFlows } from '../turns/run-flow.ts';
 import { usableSkill } from '../turns/skills.ts';
 
 declare module '../../base/api/dashboard.get.ts' {
   interface DashboardMeta {
     /**
-     * The assistant, set only for a holder of `ai.use` while the default model has its key.
+     * The assistant, set only for a holder of `ai.use` who can call the default model.
      * Absent, the palette is search only.
      */
     ai?: {
@@ -23,7 +23,7 @@ declare module '../../base/api/dashboard.get.ts' {
       model: string;
 
       /**
-       * The `ai.models` entries the person may pick for a turn, each able to plan and holding its key.
+       * The `ai.models` entries the user may pick for a turn, each able to plan and callable by them.
        */
       models: string[];
 
@@ -33,7 +33,7 @@ declare module '../../base/api/dashboard.get.ts' {
       transformModels: string[];
 
       /**
-       * The `ai.models` entry every transform runs on, when `ai.transform.model` pins one.
+       * The `ai.models` entry every transform runs on, when `ai.transform.model` pins one the user can call.
        */
       transformModel?: string;
 
@@ -100,22 +100,27 @@ interface DashboardSkill {
   description: string;
 }
 
-hook('dashboard:meta', (meta, { user }) => {
-  const { model, models, transform, limits } = useAIConfig();
-  if (isUndefined(model) || !userCan(user, 'ai.use') || !hasModelKey(model)) return;
-  const usable = Object.keys(models).filter(
-    (name) => models[name].provider !== 'jev' && hasModelKey(name),
-  );
+hook('dashboard:meta', async (meta, { user }) => {
+  if (!userCan(user, 'ai.use')) return;
+  const model = await defaultModel(user);
+  if (isUndefined(model)) return;
+  const { models, transform, limits } = useAIConfig();
+  const usable: string[] = [];
+  for (const name of Object.keys(models)) {
+    if (models[name].provider !== 'jev' && (await canUseModel(name, user))) usable.push(name);
+  }
   meta.ai = {
     model,
     models: usable,
     transformModels: usable.filter((name) => models[name].data !== false),
     skills: skillsFor(user),
-    flows: flowsFor(user),
+    flows: await flowsFor(user, model),
     resultSize: parseBytes(limits.resultSize),
     turnTimeout: parseDuration(limits.turnTimeout),
   };
-  if (!isUndefined(transform.model)) meta.ai.transformModel = transform.model;
+  if (!isUndefined(transform.model) && (await canUseModel(transform.model, user))) {
+    meta.ai.transformModel = transform.model;
+  }
 });
 
 /**
@@ -132,12 +137,20 @@ function skillsFor(user: User): DashboardSkill[] {
 }
 
 /**
- * The flows `user` may start, as `startableFlows` picks them.
+ * The flows `user` may start, as `startableFlows` picks them, every model they run on callable.
+ * A node without a model runs on `model`.
  */
-function flowsFor(user: User): DashboardFlow[] {
-  return startableFlows(user).map(({ name, flow }) => ({
-    name,
-    title: isUndefined(flow.title) ? toSentenceCase(name) : resolveMessage(flow.title),
-    description: resolveMessage(flow.description),
-  }));
+async function flowsFor(user: User, model: string): Promise<DashboardFlow[]> {
+  const flows: DashboardFlow[] = [];
+  for (const { name, flow } of startableFlows(user)) {
+    let callable = true;
+    for (const entry of flowModels(flow, model)) callable &&= await canUseModel(entry, user);
+    if (!callable) continue;
+    flows.push({
+      name,
+      title: isUndefined(flow.title) ? toSentenceCase(name) : resolveMessage(flow.title),
+      description: resolveMessage(flow.description),
+    });
+  }
+  return flows;
 }

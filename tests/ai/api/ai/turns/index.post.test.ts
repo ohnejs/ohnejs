@@ -9,6 +9,8 @@ import type { StreamedEvent } from './_stand-in.ts';
 import turnsPost from '../../../../../src/ai/api/ai/turns/index.post.ts';
 import { closeTurn, loadTurn, openTurn } from '../../../../../src/ai/turns/state.ts';
 import { useEnv } from '../../../../../src/ohne/env/use-env.ts';
+import { hook } from '../../../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 import { useSkills } from '../../../../../src/ohne/skills/use-skills.ts';
 import { call, route, signIn, withAI } from '../../../_fixture.ts';
@@ -102,6 +104,12 @@ describe('POST /ai/turns', () => {
       strictEqual((await open({ ...ask, model: 'router' })).status, 400);
       strictEqual((await open({ ...ask, skill: 'nope' })).status, 400);
       strictEqual((await open({ ...ask, skill: 'retire-characters' }, asker.token)).status, 400);
+      hook('ai:credentials', () => false);
+      try {
+        strictEqual((await open(ask)).status, 503);
+      } finally {
+        useHooks().delete('ai:credentials');
+      }
       useEnv().unset(KEY as never);
       strictEqual((await open(ask)).status, 503);
     });

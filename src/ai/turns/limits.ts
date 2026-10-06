@@ -2,10 +2,12 @@ import type { User } from 'ohnejs/auth';
 import type { RateLimiter } from 'ohnejs/utils';
 
 import {
+  applyHook,
   DEFAULT_RATE_LIMIT_STORE,
   enforceRateLimit,
   ohneError,
   tooManyRequests,
+  tryUseEvent,
   useConfig,
   useRateLimitStore,
   useRequest,
@@ -17,6 +19,19 @@ import type { Usage } from '../providers/provider.ts';
 
 import { useAIConfig } from '../config.ts';
 import { usageCost } from '../providers/provider.ts';
+
+declare module 'ohnejs' {
+  interface Hooks {
+    /**
+     * Filters the key `ai.limits` and the open-step cap count a user under.
+     * The threaded value is the user's `UUID`.
+     */
+    'ai:subject': (
+      subject: string,
+      context: { user: User },
+    ) => void | string | Promise<void | string>;
+  }
+}
 
 /**
  * The most steps one process streams at once.
@@ -33,15 +48,24 @@ interface Limiters {
   tokens: RateLimiter | false;
 }
 
+/**
+ * The route options of a route that streams a step: its `waitUntil` outlives `api.waitUntilTimeout`.
+ * Each provider call is bounded by `ai.limits.step` instead, and the step count by `ai.limits.steps`.
+ */
+export const STREAMED = { waitUntilTimeout: false } as const;
+
 const permits = createPermits(MAX_OPEN_STEPS, MAX_OPEN_STEPS_PER_USER);
 const limiters = new WeakMap<object, Limiters>();
+
+// Every limit a request touches must count under the same key, even if the hook's answer changes meanwhile.
+const subjects = new WeakMap<object, Map<string, Promise<string>>>();
 
 /**
  * Counts one turn against the person, and answers `429` past `ai.limits.turns`.
  */
 export async function enforceTurnsLimit(user: User): Promise<void> {
   const { turns } = rateLimiters();
-  if (turns !== false) await enforceRateLimit(turns, user.UUID);
+  if (turns !== false) await enforceRateLimit(turns, await limitSubject(user));
 }
 
 /**
@@ -61,7 +85,7 @@ export async function probeTokens(user: User): Promise<void> {
  */
 export async function tokenWait(user: User): Promise<number> {
   const { tokens } = rateLimiters();
-  return tokens === false ? 0 : tokens.charge(user.UUID, 0);
+  return tokens === false ? 0 : tokens.charge(await limitSubject(user), 0);
 }
 
 /**
@@ -69,15 +93,15 @@ export async function tokenWait(user: User): Promise<number> {
  */
 export async function chargeTokens(user: User, usage: Usage): Promise<void> {
   const { tokens } = rateLimiters();
-  if (tokens !== false) await tokens.charge(user.UUID, usageCost(usage));
+  if (tokens !== false) await tokens.charge(await limitSubject(user), usageCost(usage));
 }
 
 /**
  * Takes a permit to stream one step, and returns the release fn to call once the stream ends.
  * A person already streaming two steps, or a process streaming its cap, gets `429`.
  */
-export function acquireStepPermit(user: User): () => void {
-  const release = permits.acquire(user.UUID);
+export async function acquireStepPermit(user: User): Promise<() => void> {
+  const release = permits.acquire(await limitSubject(user));
   if (isNull(release)) throw tooManyRequests();
   return release;
 }
@@ -107,6 +131,26 @@ export function assertTokenStore(): void {
       'Add `charge` to the store, pick one that has it, or set `ai.limits.tokens: false`.',
     ],
   });
+}
+
+/**
+ * The key `user`'s limits count under, as `ai:subject` filters their `UUID`, kept for the request.
+ */
+export function limitSubject(user: User): Promise<string> {
+  const event = tryUseEvent();
+  if (isUndefined(event)) return resolveSubject(user);
+  let cache = subjects.get(event);
+  if (isUndefined(cache)) subjects.set(event, (cache = new Map()));
+  let pending = cache.get(user.UUID);
+  if (isUndefined(pending)) cache.set(user.UUID, (pending = resolveSubject(user)));
+  return pending;
+}
+
+/**
+ * The `ai:subject` hook's key for `user`.
+ */
+function resolveSubject(user: User): Promise<string> {
+  return applyHook('ai:subject', user.UUID, { user });
 }
 
 /**

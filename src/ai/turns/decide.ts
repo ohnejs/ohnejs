@@ -1,4 +1,5 @@
 import type { FlowDecide, FlowQuestion } from 'ohnejs';
+import type { User } from 'ohnejs/auth';
 
 import { hasKey, isNull, isNumber, isPlainObject, isString } from 'ohnejs/utils';
 
@@ -35,18 +36,21 @@ export function decideModel(decide: FlowDecide, model: string): string {
 }
 
 /**
- * Builds the decider for the `ai.models` entry `name`, reading its key from the env at this call.
+ * Builds the decider for the `ai.models` entry `name` as `user` calls it.
  * A `jev` entry answers natively; any other model answers by structured output on its `complete`.
  * Such an answer is checked against the questions and asked once more when it drifts.
  *
  * @example
  * ```ts
- * const { answers } = await useDecider('router').decide({ input, questions }, signal)
+ * const decider = await useDecider('router', user)
+ * const { answers } = await decider.decide({ input, questions }, signal)
  * ```
  */
-export function useDecider(name: string): Decider {
-  const { entry, options } = modelOptions(name);
-  return entry.provider === 'jev' ? createJevProvider(options) : structured(useProvider(name));
+export async function useDecider(name: string, user: User): Promise<Decider> {
+  const { entry, options } = await modelOptions(name, user);
+  return entry.provider === 'jev'
+    ? createJevProvider(options)
+    : structured(await useProvider(name, user));
 }
 
 /**

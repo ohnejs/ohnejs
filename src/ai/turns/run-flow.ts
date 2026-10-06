@@ -137,7 +137,7 @@ export async function enterNode(
     const node = definition.nodes[id];
     if ('act' in node) {
       const model = node.act.model ?? turn.model;
-      const provider = model === running.model ? running.provider : useProvider(model);
+      const provider = model === running.model ? running.provider : await useProvider(model, user);
       if (model !== flow.model) turn.transcript = [];
       flow.node = id;
       flow.model = model;
@@ -157,7 +157,8 @@ export async function enterNode(
     const request = { input: flow.input, questions: node.decide.questions };
     let decision: Decision;
     try {
-      decision = await useDecider(decideModel(node.decide, turn.model)).decide(request, deadline);
+      const decider = await useDecider(decideModel(node.decide, turn.model), user);
+      decision = await decider.decide(request, deadline);
     } catch (error) {
       await chargeTokens(user, estimatedUsage(request));
       throw error;

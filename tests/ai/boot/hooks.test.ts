@@ -9,6 +9,8 @@ import '../../../src/ai/boot/hooks.ts';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
 import { userWith, withAI } from '../_fixture.ts';
@@ -156,6 +158,34 @@ describe('the dashboard:meta hook', () => {
 
   it('stays absent without any `ai` config', async () => {
     strictEqual(await metaFor(userWith('admin'), undefined), undefined);
+  });
+
+  it('lists only the models `ai:credentials` lets the user call, and the default `ai:model` picks', async () => {
+    hook('ai:credentials', (resolved, { name, user }) =>
+      user.roles.includes('asker') && name !== 'local' ? false : resolved,
+    );
+    hook('ai:model', (_, { available }) => available[0]);
+    try {
+      const meta = await metaFor(userWith('asker'), ai);
+      strictEqual(meta?.model, 'local');
+      deepStrictEqual(meta?.models, ['local']);
+      deepStrictEqual((await metaFor(userWith('editor'), ai))?.models, ['smart', 'local']);
+    } finally {
+      useHooks().delete('ai:credentials');
+      useHooks().delete('ai:model');
+    }
+  });
+
+  it('hides a flow whose node runs on a model the user cannot call, and an uncallable pin', async () => {
+    const flows = { ...ai, decide: 'router', transform: { model: 'gpt' } };
+    hook('ai:credentials', (resolved, { name }) => (name === 'router' ? false : resolved));
+    try {
+      const meta = await metaFor(userWith('editor'), flows);
+      deepStrictEqual(meta?.flows, [weekly]);
+      strictEqual(meta?.transformModel, undefined);
+    } finally {
+      useHooks().delete('ai:credentials');
+    }
   });
 
   it('appears for a keyless local default model', async () => {

@@ -6,10 +6,11 @@ import type { ProviderServer } from '../providers/_server.ts';
 
 import { decideModel, useDecider } from '../../../src/ai/turns/decide.ts';
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
-import { withAI } from '../_fixture.ts';
+import { userWith, withAI } from '../_fixture.ts';
 import { sse, startProviderServer } from '../providers/_server.ts';
 
 const KEY = 'AI_DECIDE_TEST_KEY';
+const user = userWith('asker');
 useEnv().define(KEY as never, { default: undefined as never });
 useEnv().set(KEY as never, 'sk-test' as never);
 
@@ -88,7 +89,7 @@ describe('useDecider', () => {
       }),
     });
     await withAI(ai(), async () => {
-      const decision = await useDecider('router').decide(request, signal);
+      const decision = await (await useDecider('router', user)).decide(request, signal);
       deepStrictEqual(decision.answers, {
         intent: { answer: 'roster', confidence: 0.7 },
         urgency: { answer: 'low', confidence: 0.5 },
@@ -101,7 +102,7 @@ describe('useDecider', () => {
   it('asks a chat model by structured output, with the decide prompt, the questions and the message', async () => {
     server.answer({ body: completion(answer) });
     await withAI(ai(), async () => {
-      const decision = await useDecider('local').decide(request, signal);
+      const decision = await (await useDecider('local', user)).decide(request, signal);
       deepStrictEqual(decision, {
         answers: {
           intent: { answer: 'translate', confidence: 0.8 },
@@ -171,7 +172,7 @@ describe('useDecider', () => {
     });
     server.answer({ body: completion(drifted) }, { body: completion(answer) });
     await withAI(ai(), async () => {
-      const decision = await useDecider('local').decide(request, signal);
+      const decision = await (await useDecider('local', user)).decide(request, signal);
       strictEqual(decision.answers.intent.answer, 'translate');
       deepStrictEqual(decision.usage, { fresh: 20, cacheRead: 0, cacheWrite: 0, output: 10 });
     });
@@ -184,8 +185,8 @@ describe('useDecider', () => {
       locale: { probability: 0.9 },
     });
     server.answer({ body: completion(over) }, { body: completion('{"intent":{}}') });
-    await withAI(ai(), () =>
-      rejects(useDecider('local').decide(request, signal), { code: 'malformed' }),
+    await withAI(ai(), async () =>
+      rejects((await useDecider('local', user)).decide(request, signal), { code: 'malformed' }),
     );
     strictEqual(server.requests.length, 2);
   });
@@ -193,7 +194,7 @@ describe('useDecider', () => {
   it('drops the decide prompt the config empties', async () => {
     server.answer({ body: completion(answer) });
     await withAI(ai({ prompts: { decide: '' } }), async () => {
-      await useDecider('local').decide(request, signal);
+      await (await useDecider('local', user)).decide(request, signal);
     });
     const body = server.requests[0]?.body as { messages: { role: string; content: string }[] };
     strictEqual(body.messages[0].content, '');

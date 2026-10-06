@@ -17,8 +17,8 @@ import type { Turn } from '../../../../turns/state.ts';
 import { gateCollection } from '../../../../../base/collections-api/gate.ts';
 import { translate } from '../../../../../ohne/http/translate.ts';
 import { useAIConfig } from '../../../../config.ts';
-import { hasModelKey, useProvider } from '../../../../providers/use-provider.ts';
-import { acquireStepPermit, probeTokens } from '../../../../turns/limits.ts';
+import { canUseModel, useProvider } from '../../../../providers/use-provider.ts';
+import { STREAMED, acquireStepPermit, probeTokens } from '../../../../turns/limits.ts';
 import {
   batchReported,
   expireTurn,
@@ -52,7 +52,7 @@ const BODY_KEYS = new Set(['batch', 'proposal', 'model']);
  * So is any `model` while `ai.transform.model` pins one, since every transform then runs on it.
  * A flow node's own `model` pins the same way, and a blind one there is the same `400`.
  * Without `model` the turn's model runs, unless it is blind, which is the same `400`.
- * A model whose key is unset is a `503`.
+ * A model the user cannot call is a `503`.
  * A person past `ai.limits.tokens`, or already streaming two steps, is a `429`.
  */
 export default defineHandler(async ({ params }): Promise<unknown> => {
@@ -81,7 +81,7 @@ export default defineHandler(async ({ params }): Promise<unknown> => {
     throw invalid('proposal');
   }
   const model = transformModel(body.model, turn, config);
-  if (!hasModelKey(model)) {
+  if (!(await canUseModel(model, user))) {
     throw new HTTPError(503, translate('ai.api.modelUnavailable', { model }));
   }
   await probeTokens(user);
@@ -89,10 +89,10 @@ export default defineHandler(async ({ params }): Promise<unknown> => {
   if (!gate.ok) return gate.response;
   const read = await readTransformRecords(entry.proposal, gate.collection, gate.scope);
   await touchTurn(turn);
-  const provider = useProvider(model);
-  const release = acquireStepPermit(user);
+  const provider = await useProvider(model, user);
+  const release = await acquireStepPermit(user);
   return streamTransform({ user, proposal: entry.proposal, collection, read, provider, release });
-});
+}, STREAMED);
 
 /**
  * The `ai.models` entry the transform runs on: the pinned one, else the one picked, else the turn's.

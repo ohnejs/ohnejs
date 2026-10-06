@@ -15,7 +15,7 @@ import { field } from '../../../src/ohne/fields/field.ts';
 import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
 import { dispatch } from '../../../src/ohne/http/dispatch.ts';
 import { parseSSE } from '../../../src/utils/sse/parse-sse.ts';
-import { call, route, signIn, syncSchema, withAI } from '../_fixture.ts';
+import { call, route, signIn, syncSchema, userWith, withAI } from '../_fixture.ts';
 import { calls, readEvents, says } from '../api/ai/turns/_stand-in.ts';
 import { sse, startProviderServer } from '../providers/_server.ts';
 
@@ -388,7 +388,9 @@ describe('the open tool', () => {
   it('closes an open the browser never answered, for a follow-up', async () => {
     await withAI(AI, async () => {
       const { turn } = await openStep({ page: '/overview' });
-      const closed = JSON.stringify(followUpTranscript(turn, useProvider('smart')).at(-1));
+      const closed = JSON.stringify(
+        followUpTranscript(turn, await useProvider('smart', userWith('asker'))).at(-1),
+      );
       ok(closed.includes('toolu_1'));
       ok(closed.includes('turnClosed'));
     });

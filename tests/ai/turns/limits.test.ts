@@ -14,6 +14,8 @@ import {
   stepSignal,
 } from '../../../src/ai/turns/limits.ts';
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { runWithEvent } from '../../../src/ohne/http/use-event.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useRateLimitStores } from '../../../src/ohne/rate-limit/use-rate-limit-stores.ts';
@@ -84,18 +86,36 @@ describe('the turns limit', () => {
 });
 
 describe('the step permits', () => {
-  it('lets a person stream two steps at once, and refuses the third until one ends', () => {
+  it('lets a user stream two steps at once, and refuses the third until one ends', async () => {
     const user = person('permits-1');
-    const first = acquireStepPermit(user);
-    const second = acquireStepPermit(user);
-    throws(
-      () => acquireStepPermit(user),
+    const first = await acquireStepPermit(user);
+    const second = await acquireStepPermit(user);
+    await rejects(
+      acquireStepPermit(user),
       (error: unknown) => (error as { status: number }).status === 429,
     );
     first();
-    const third = acquireStepPermit(user);
+    const third = await acquireStepPermit(user);
     second();
     third();
+  });
+
+  it('counts users under the key `ai:subject` answers', async () => {
+    hook('ai:subject', (subject, { user }) => (user.UUID.startsWith('shared-') ? 'one' : subject));
+    try {
+      const first = await acquireStepPermit(person('shared-1'));
+      const second = await acquireStepPermit(person('shared-2'));
+      await rejects(
+        acquireStepPermit(person('shared-3')),
+        (error: unknown) => (error as { status: number }).status === 429,
+      );
+      const apart = await acquireStepPermit(person('apart-1'));
+      first();
+      second();
+      apart();
+    } finally {
+      useHooks().delete('ai:subject');
+    }
   });
 });
 
