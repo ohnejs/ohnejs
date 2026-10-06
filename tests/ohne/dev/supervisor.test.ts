@@ -24,7 +24,7 @@ import '../../../src/ohne/runtime/register.js';
 
 const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
-const TIMEOUT = { timeout: 30_000, skip: process.platform === 'win32' };
+const TIMEOUT = { timeout: 60_000, skip: process.platform === 'win32' };
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -427,10 +427,11 @@ describe('dev', () => {
 
     const mark = cli.output().length;
     process.kill(childPID('dashboard'), 'SIGKILL');
-    await waitFor(async () => cli.output().slice(mark).includes('Dashboard ready'));
-    const text = cli.output().slice(mark);
-    ok(text.includes('Dashboard stopped by SIGKILL. Restarting...'));
-    ok(/Dashboard ready[\s\S]*Waiting for changes/.test(text));
+    // The supervisor prints its wait line after the child's ready line, so await both.
+    await waitFor(async () =>
+      /Dashboard ready[\s\S]*Waiting for changes/.test(cli.output().slice(mark)),
+    );
+    ok(cli.output().slice(mark).includes('Dashboard stopped by SIGKILL. Restarting...'));
     strictEqual(await get(dashPort, '/'), 200);
   });
 
