@@ -294,7 +294,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
         h(
           'span',
           { class: 'ohne-muted ohne-truncate' },
-          () => `(${labelOf(collection.name, uuid) ?? fallbackLabel(uuid)})`,
+          () => `(${labelOf(collection.name, uuid, activeContentLocale()) ?? fallbackLabel(uuid)})`,
         ),
         closeButton,
       ),

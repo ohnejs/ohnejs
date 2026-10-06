@@ -116,17 +116,21 @@ export async function loadPage(
 }
 
 /**
- * Seeds the label cache from a loaded page, so relation cells naming these rows resolve free.
+ * Seeds the label cache from a page loaded at `locale`, so relation cells naming these rows resolve free.
  * A row missing a label part never seeds, so a page selecting only some parts cannot cache a partial join.
  */
-export function seedLabels(collection: DashboardCollection, records: readonly TableRecord[]): void {
+export function seedLabels(
+  collection: DashboardCollection,
+  records: readonly TableRecord[],
+  locale: string | undefined,
+): void {
   const names = collection.labelFields;
   if (isEmpty(names)) return;
   for (const row of records) {
     const uuid = row.UUID;
     if (!isString(uuid) || !names.every((name) => hasKey(row, name))) continue;
     const label = joinLabel(row, collection);
-    if (label !== '') seedLabel(collection.name, uuid, label);
+    if (label !== '') seedLabel(collection.name, uuid, label, locale);
   }
 }
 

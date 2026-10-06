@@ -316,7 +316,7 @@ export function useRecordEditor(
     if (isString(row.UUID)) id = row.UUID;
     verdicts.value = await (asked ?? ask());
     loaded.value = row;
-    seedRecordLabel(collection, row);
+    seedRecordLabel(collection, row, locale);
     form.value?.dispose();
     form.value = buildForm(row);
     history.push(currentState() ?? {});
@@ -404,6 +404,7 @@ export function useRecordEditor(
       seedRecordLabel(
         collection,
         untracked(() => loaded.value),
+        activeContentLocale(),
       );
       if (create) {
         queueToast(t('dashboard.created'), { type: 'success', showAfterRouteChange: true });
@@ -564,11 +565,10 @@ export function recordEditorHeading(editor: RecordEditor): Child[] {
     heading.push(
       editor.create
         ? h('span', { class: 'ohne-shrink-0 ohne-muted' }, () => `(${t('dashboard.new')})`)
-        : h(
-            'span',
-            { class: 'ohne-truncate ohne-muted' },
-            () => `(${knownLabel(collection.name, editor.id()) ?? fallbackLabel(editor.id())})`,
-          ),
+        : h('span', { class: 'ohne-truncate ohne-muted' }, () => {
+            const id = editor.id();
+            return `(${knownLabel(collection.name, id, activeContentLocale()) ?? fallbackLabel(id)})`;
+          }),
     );
   }
 
@@ -837,17 +837,21 @@ function lockOutside(
 }
 
 /**
- * Seeds the label cache with the record's own label, so the header, the title, and relation cells read it.
+ * Seeds the label cache with the record's own label read at `locale`, for the header and the title.
  * A row carrying every label field and still joining to nothing names the record by `fallbackLabel`.
  * A scoped answer that omits one seeds nothing: its empty join says nothing about the record.
  */
-function seedRecordLabel(collection: DashboardCollection, row: RecordRow): void {
+function seedRecordLabel(
+  collection: DashboardCollection,
+  row: RecordRow,
+  locale: string | undefined,
+): void {
   const uuid = row.UUID;
   if (!isString(uuid)) return;
   const label = joinLabel(row, collection);
-  if (label !== '') seedLabel(collection.name, uuid, label);
+  if (label !== '') seedLabel(collection.name, uuid, label, locale);
   else if (collection.labelFields.every((name) => hasKey(row, name))) {
-    seedLabel(collection.name, uuid, fallbackLabel(uuid));
+    seedLabel(collection.name, uuid, fallbackLabel(uuid), locale);
   }
 }
 

@@ -14,6 +14,7 @@ import {
 } from 'ohnejs/dashboard';
 import { effect, isUndefined, recordHref } from 'ohnejs/utils';
 
+import { activeContentLocale } from '../../../components/content-language-switcher.ts';
 import { recordEditor } from '../../../components/record-editor.ts';
 import { recordViewOf } from '../../../components/record-view.ts';
 import { shell } from '../../../components/shell.ts';
@@ -56,13 +57,15 @@ function pane(segment: () => string, uuid: () => string): Child {
   effect(() => {
     const collection = entry();
     const id = uuid();
-    setDocumentTitle(
-      isUndefined(collection)
-        ? undefined
-        : id === 'new'
-          ? `${t('dashboard.new')} - ${collection.label}`
-          : `${knownLabel(collection.name, id) ?? fallbackLabel(id)} - ${collection.label}`,
-    );
+    if (isUndefined(collection)) {
+      setDocumentTitle(undefined);
+      return;
+    }
+    const label =
+      id === 'new'
+        ? t('dashboard.new')
+        : (knownLabel(collection.name, id, activeContentLocale()) ?? fallbackLabel(id));
+    setDocumentTitle(`${label} - ${collection.label}`);
   });
   return when(
     () => !isUndefined(dashboardMeta()),

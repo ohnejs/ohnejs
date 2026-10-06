@@ -280,7 +280,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
           total: loaded.total,
         };
         verdicts.value = answered;
-        seedLabels(collection, loaded.records);
+        seedLabels(collection, loaded.records, locale);
         deselectAll();
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 }, true);
       }

@@ -249,7 +249,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
           total: loaded.total,
         };
         updatable.value = answered.update;
-        seedLabels(collection, loaded.records);
+        seedLabels(collection, loaded.records, locale);
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 });
       }
       initialized.value = true;
