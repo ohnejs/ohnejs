@@ -170,6 +170,7 @@ export const blocksType: FieldType = {
           disabled: context.disabled === true,
           layout: type?.layout,
           language: context.language,
+          ancestors: context.ancestors,
           onInput: context.onInput,
         }),
       );

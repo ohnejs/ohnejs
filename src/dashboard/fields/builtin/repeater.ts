@@ -380,6 +380,7 @@ function itemForm(
     disabled: context.disabled === true,
     layout: context.field.layout,
     language: context.language,
+    ancestors: context.ancestors,
     onInput: context.onInput,
   });
 }

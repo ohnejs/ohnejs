@@ -1,3 +1,4 @@
+import type { ConditionObject } from '../../utils/condition/condition-object.ts';
 import type { IconName } from '../../utils/icon/icon-name.ts';
 
 /**
@@ -149,6 +150,11 @@ export interface DashboardField {
    * Whether the field locks after create.
    */
   immutable: boolean;
+
+  /**
+   * The field's `when` gate in condition object form; absent on an ungated field.
+   */
+  when?: ConditionObject;
 
   /**
    * The field type's declared options as resolved, reduced to plain JSON data.

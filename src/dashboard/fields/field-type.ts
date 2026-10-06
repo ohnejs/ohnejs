@@ -110,6 +110,12 @@ export interface FieldControlContext {
   language: () => string;
 
   /**
+   * The value scopes enclosing the control, outermost first, its own form's scope last.
+   * A composite hands them to its item forms, so a nested `when` resolves `../` and `/` as the server does.
+   */
+  ancestors?: () => readonly Readonly<Record<string, unknown>>[];
+
+  /**
    * Fires on any user change, so the host can clear a stale failure line.
    */
   onInput(): void;

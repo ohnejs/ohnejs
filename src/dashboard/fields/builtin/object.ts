@@ -107,6 +107,7 @@ export const objectType: FieldType = {
           disabled: off,
           layout: context.field.layout,
           language: context.language,
+          ancestors: context.ancestors,
           onInput: context.onInput,
         }),
       );

@@ -34,6 +34,12 @@ export interface FieldLayoutRenderOptions {
    * Whether the named field's control shows a message; read reactively.
    */
   errored: (name: string) => boolean;
+
+  /**
+   * Whether the named field's `when` gate admits it; read reactively.
+   * An inactive field's cell hides, and a row, card, or tab holding only inactive fields hides with it.
+   */
+  active?: (name: string) => boolean;
 }
 
 /**
@@ -235,9 +241,16 @@ export function renderFieldLayout(
       switch (node.kind) {
         case 'field':
           revealers.set(node.name, chain);
-          return cell(node.width, options.row(node.name));
+          return cell(node.width, options.row(node.name), hiddenUnless(options, [node.name]));
         case 'row':
-          return h('div', { class: 'ohne-fields-row' }, render(node.nodes, chain));
+          return h(
+            'div',
+            {
+              class: 'ohne-fields-row',
+              hidden: hiddenUnless(options, layoutNodeNames(node.nodes)),
+            },
+            render(node.nodes, chain),
+          );
         case 'card':
           return renderCard(node, chain, options, render);
         case 'tabs':
@@ -260,16 +273,32 @@ export function renderFieldLayout(
 /**
  * A placed field's wrapper, carrying its declared width: a cap, or `auto` to size it to its content.
  */
-function cell(width: string | undefined, row: Child): HTMLElement {
+function cell(
+  width: string | undefined,
+  row: Child,
+  hidden: (() => boolean) | undefined,
+): HTMLElement {
   const auto = width === 'auto';
   return h(
     'div',
     {
       class: `ohne-fields-cell${auto ? ' ohne-fields-cell-auto' : ''}`,
       style: isUndefined(width) || auto ? undefined : `max-width: ${width}`,
+      hidden,
     },
     row,
   );
+}
+
+/**
+ * A reactive `hidden` for a node holding `names`: true once none of them is active.
+ */
+function hiddenUnless(
+  options: FieldLayoutRenderOptions,
+  names: readonly string[],
+): (() => boolean) | undefined {
+  const { active } = options;
+  return isUndefined(active) ? undefined : () => !names.some(active);
 }
 
 /**
@@ -317,6 +346,8 @@ function renderCard(
   const inner = chain.concat(node.collapsible ? [() => setExpanded(true)] : []);
   root = card(h('div', { class: 'ohne-fields-stack' }, render(node.nodes, inner)), { header });
   root.classList.add('ohne-fields-card');
+  const hidden = hiddenUnless(options, names);
+  if (!isUndefined(hidden)) batchedEffect(() => (root.hidden = hidden()));
   if (node.collapsible) root.classList.add('ohne-fields-card-collapsible');
   batchedEffect(() => {
     root.classList.toggle('ohne-fields-card-errored', names.some(options.errored));
@@ -352,6 +383,8 @@ function renderTabs(
   const active = ref(0);
   const panels: HTMLElement[] = [];
   const buttons: HTMLElement[] = [];
+  const hiders = node.tabs.map((tab) => hiddenUnless(options, layoutNodeNames(tab.nodes)));
+  const visible = (index: number): boolean => hiders[index]?.() !== true;
   const activate = (index: number): void => {
     active.value = index;
     for (const [i, panel] of panels.entries()) panel.hidden = i !== index;
@@ -368,7 +401,12 @@ function renderTabs(
   const nav = ({ setActive }: TabsNavPayload<number>): Child =>
     h(
       'div',
-      { class: 'ohne-fields-tabs-list' },
+      {
+        class: 'ohne-fields-tabs-list',
+        hidden: isUndefined(options.active)
+          ? undefined
+          : () => node.tabs.filter((_, index) => visible(index)).length < 2,
+      },
       h(
         'div',
         { class: 'ohne-fields-tabs-scrollable' },
@@ -381,6 +419,7 @@ function renderTabs(
               type: 'button',
               class: () =>
                 `ohne-fields-tab ohne-raw${active.value === index ? ' ohne-fields-tab-active' : ''}`,
+              hidden: hiders[index],
               onClick: () => setActive(index),
             },
             h('span', null, tab.label),
@@ -407,5 +446,13 @@ function renderTabs(
     nav: node.tabs.length > 1 ? nav : () => null,
   });
   root.classList.add('ohne-fields-tabs');
+  if (!isUndefined(options.active)) {
+    batchedEffect(() => {
+      root.hidden = !node.tabs.some((_, index) => visible(index));
+      if (visible(active.value)) return;
+      const first = node.tabs.findIndex((_, index) => visible(index));
+      if (first !== -1) activate(first);
+    });
+  }
   return root;
 }

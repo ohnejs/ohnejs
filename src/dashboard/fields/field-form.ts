@@ -2,9 +2,15 @@ import type { Child } from '../render/insert.ts';
 import type { DashboardField, DashboardLayoutNode } from '../runtime/meta-types.ts';
 import type { ControlReading, FieldControl } from './field-type.ts';
 
+import { first } from '../../utils/array/first.ts';
+import { evaluateCondition } from '../../utils/condition/evaluate-condition.ts';
+import { parseCondition } from '../../utils/condition/parse-condition.ts';
+import { conditionResolver } from '../../utils/condition/resolve-condition.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { hasKey } from '../../utils/object/has-key.ts';
+import { computed, type ComputedRef } from '../../utils/reactive/computed.ts';
 import { effectScope } from '../../utils/reactive/effect-scope.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
@@ -83,6 +89,12 @@ export interface FieldFormOptions {
   language: () => string;
 
   /**
+   * The value scopes enclosing the form, outermost first, for the `../` and `/` paths of its `when` gates.
+   * Omitted, the form is the outermost scope.
+   */
+  ancestors?: () => readonly Readonly<Record<string, unknown>>[];
+
+  /**
    * How the rows are arranged: rows, cards, tabs, and rules, as `GET /dashboard` resolved them.
    * A field the layout does not place renders after it, in field order.
    * Omitted, every row stacks in field order.
@@ -102,6 +114,9 @@ export interface FieldFormOptions {
  * Writable fields without one carry their stored value through unchanged.
  * A whole-item write therefore never blanks them.
  * The form is itself control-shaped, so composites nest it for their items.
+ *
+ * A field whose `when` gate fails hides and drops out of reads, dirt, and focus.
+ * A computed default never reaches the browser, so a gate reading one sees `undefined` until it is set.
  */
 export interface FieldForm {
   /**
@@ -186,6 +201,9 @@ interface ControlRow {
   control: FieldControl;
 }
 
+// While any gate evaluates, nested reads skip gating: gates read unfiltered values, as the server does.
+let gating = false;
+
 css`
   .ohne-fieldrow-static {
     display: flex;
@@ -214,6 +232,32 @@ export function createFieldForm(
   const editorless = new Set<DashboardField>();
   const showsLocked =
     options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
+  const values: Record<string, unknown> = {};
+  for (const field of fields) {
+    const value = scope.run(() => computed(() => currentValue(field)));
+    Object.defineProperty(values, field.name, { get: () => value.value, enumerable: true });
+  }
+  const ancestors = (): readonly Readonly<Record<string, unknown>>[] => options.ancestors?.() ?? [];
+  const gates = new Map<string, ComputedRef<boolean>>();
+  for (const field of fields) {
+    if (isUndefined(field.when)) continue;
+    const parsed = parseCondition(field.when);
+    if (!parsed.ok) continue;
+    const gate = (): boolean => {
+      const outer = gating;
+      gating = true;
+      try {
+        return evaluateCondition(parsed.node, conditionResolver(values, ancestors()));
+      } finally {
+        gating = outer;
+      }
+    };
+    gates.set(
+      field.name,
+      scope.run(() => computed(gate)),
+    );
+  }
+  const active = (name: string): boolean => gating || gates.get(name)?.value !== false;
 
   for (const field of fields) {
     if (field.name === 'UUID' && options.renderUUID !== true) continue;
@@ -241,6 +285,7 @@ export function createFieldForm(
                 path,
                 disabled: !settable,
                 language: options.language,
+                ancestors: () => [...ancestors(), values],
                 onInput: () => options.onInput?.(),
               }),
             ),
@@ -257,6 +302,14 @@ export function createFieldForm(
 
   const rowByName = new Map(rows.map((row) => [row.field.name, row]));
   const lockedByName = new Map(lockedRows.map((row) => [row.field.name, row]));
+  const activeRows = (): ControlRow[] => rows.filter((row) => active(row.field.name));
+
+  function currentValue(field: DashboardField): unknown {
+    const reading = rowByName.get(field.name)?.control.read();
+    if (!isUndefined(reading) && hasKey(reading, 'value')) return reading.value;
+    if (!isUndefined(seed) && hasKey(seed, field.name)) return seed[field.name];
+    return field.options?.default;
+  }
   const ordered = fields.filter(
     (field) => rowByName.has(field.name) || lockedByName.has(field.name) || statics.includes(field),
   );
@@ -267,11 +320,13 @@ export function createFieldForm(
     if (withCarry) {
       const blocks = blocksOf();
       for (const field of carried) {
+        if (!active(field.name)) continue;
         const value = carryValue(field, seed?.[field.name], blocks);
         if (!isUndefined(value)) item[field.name] = value;
       }
     }
     for (const row of selected) {
+      if (!active(row.field.name)) continue;
       const reading = row.control.read();
       if (!isUndefined(reading.errors)) {
         for (const [key, message] of Object.entries(reading.errors)) {
@@ -318,11 +373,15 @@ export function createFieldForm(
   };
   const fieldByName = new Map(ordered.map((field) => [field.name, field]));
   let reveal = (_name: string): boolean => false;
+  const gatedRowOf = (field: DashboardField): Child =>
+    gates.has(field.name)
+      ? h('div', { hidden: () => !active(field.name) }, rowOf(field))
+      : rowOf(field);
 
   return {
     render(renderOptions) {
       const shown = (field: DashboardField): boolean => renderOptions?.hide?.(field) !== true;
-      if (isUndefined(options.layout)) return ordered.filter(shown).map(rowOf);
+      if (isUndefined(options.layout)) return ordered.filter(shown).map(gatedRowOf);
       const { nodes, rest } = placeLayout(options.layout, [...fieldByName.keys()]);
       const rendered = renderFieldLayout(nodes, {
         row: (name) => {
@@ -333,13 +392,14 @@ export function createFieldForm(
           const row = rowByName.get(name);
           return !isUndefined(row) && rowErrored(row);
         },
+        active: gates.size === 0 ? undefined : active,
       });
       reveal = rendered.reveal;
       const trailing = rest
         .map((name) => fieldByName.get(name))
         .filter((field) => !isUndefined(field))
         .filter(shown);
-      return h('div', { class: 'ohne-fields' }, rendered.children, trailing.map(rowOf));
+      return h('div', { class: 'ohne-fields' }, rendered.children, trailing.map(gatedRowOf));
     },
     controlOf(name) {
       return (rowByName.get(name) ?? lockedByName.get(name))?.control;
@@ -374,16 +434,16 @@ export function createFieldForm(
       return unplaced;
     },
     errored() {
-      return rows.some((row) => rowErrored(row));
+      return activeRows().some((row) => rowErrored(row));
     },
     dirty() {
-      return rows.some((row) => row.control.dirty());
+      return activeRows().some((row) => row.control.dirty());
     },
     focus() {
-      rows[0]?.control.focus();
+      first(activeRows())?.control.focus();
     },
     focusError() {
-      const errored = rows.find((row) => rowErrored(row));
+      const errored = activeRows().find((row) => rowErrored(row));
       if (isUndefined(errored)) return false;
       reveal(errored.field.name);
       errored.control.focus();
