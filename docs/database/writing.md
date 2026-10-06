@@ -167,6 +167,11 @@ Through the collections API a link must also be one the caller can read, as
 [the scope](../api/collections.md#the-scope) describes. `query()` only checks that the `UUID`
 exists.
 
+A [record link](./rich-text.md#checking-record-links) in a `richText` or `link` value is checked
+the same way, at the link's own path, like `body[2].content[0].link`. Only the links the write
+provides are checked: a link that every matched record already holds passes, even when its target
+is gone, and a [delete](#deleting-records) never waits on a link.
+
 ## Updating records
 
 `update` changes every record a filter matches. `update` and `delete` exist only after a `where`, so

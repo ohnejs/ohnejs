@@ -41,6 +41,7 @@ you a typed query builder for reads and writes.
 - [Conditional fields](./database/conditional-fields.md) - fields that are active only when a
   condition is true.
 - [Blocks](./database/blocks.md) - ordered lists of mixed, reusable shapes.
+- [Rich text](./database/rich-text.md) - formatted text with links to addresses and records.
 - [Translations](./database/translations.md) - one value per locale.
 - [Reading records](./database/reading.md) - the fluent query builder: filter, sort, paginate,
   populate.

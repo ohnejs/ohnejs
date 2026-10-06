@@ -118,6 +118,27 @@ export default defineField({
 `emitType` checks anything at runtime. Only the validators make sure the value has the shape its
 type promises.
 
+A `json` type whose value points at records of another collection lists them with `links`. Each
+entry pairs a [record link](./rich-text.md#links) with its path inside the value, `''` for the
+value itself:
+
+```ts
+// fields/related.ts
+import { defineField } from 'ohnejs';
+import { isRecordLink } from 'ohnejs/utils';
+
+export default defineField({
+  columnType: 'json',
+  emitType: (ctx) => ctx.importType('ohnejs/utils', 'RecordLink'),
+  validators: [(value) => (isRecordLink(value) ? undefined : 'Must link a record')],
+  links: (value) => (isRecordLink(value) ? [{ path: '', link: value }] : []),
+});
+```
+
+A write then [checks each listed link](./rich-text.md#checking-record-links) its input provides,
+at the entry's path, and a delete of the target never cascades or blocks. The function may receive
+an unvalidated value, so it returns `[]` for anything it cannot read.
+
 `serialize` and `deserialize` convert between the value and what the column stores. `serialize`
 runs after the validators, so they check the value before it is encoded. The `password` type hashes
 its value there.

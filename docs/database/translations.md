@@ -190,6 +190,9 @@ translatable fields that are
 [writable and not `immutable`](./collections.md#write-only-and-locked-fields), so it never touches a
 value shared across locales.
 
+A [record link](./rich-text.md#checking-record-links) in a copied value is checked as new, since
+the target locale never held it. A dead link in the source fails the copy at the link's path.
+
 ## Deleting translations
 
 A locale-scoped chain has `deleteTranslation` instead of `delete`:

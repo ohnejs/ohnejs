@@ -63,7 +63,8 @@ export default defineHandler(async () => {
 
 - `readJSONBody<T>()` parses a JSON body. The `Content-Type` must be `application/json` or carry
   a `+json` suffix, and anything else rejects with `415`. An empty or malformed body rejects with
-  `400`. The result is typed as `T` but not checked, so validate it before you trust it.
+  `400`, and so does one nested deeper than `maxDepth`, 64 levels unless you pass another. The
+  result is typed as `T` but not checked, so validate it before you trust it.
 - `readTextBody()` reads the body as a UTF-8 string, `''` when there is none. Invalid UTF-8
   rejects with `400`.
 - `readFormBody()` reads a form into `FormData`. It accepts `multipart/form-data` and
