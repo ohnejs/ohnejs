@@ -76,7 +76,7 @@ css`
     margin: 0;
     padding: 0 0.125rem;
     color: hsl(var(--ohne-muted-foreground));
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.025em;
     text-transform: uppercase;
