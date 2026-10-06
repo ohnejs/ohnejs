@@ -22,7 +22,7 @@ const page = await ohne.resolve('/blog/hello');
 
 - `page` - render `record`. Put `seo` and `alternates` in the `<head>`.
 - `redirect` - send the visitor to `to`, with the status `code`.
-- `notFound` - answer with a `404` status. When your site has a [`404` page](./cms.md#routes),
+- `notFound` - answer with a `404` status. When your site has a [`404` page](./setup.md#routes),
   `page` holds its record.
 
 In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields }`. Upload URLs
@@ -85,5 +85,5 @@ A preview shows unsaved work, so no cache or search engine may keep it. While a 
 `ohne.previewHeaders()` with your response, and set the robots meta tag to `noindex`. The recipes
 in [Frameworks](./frameworks.md) do both.
 
-A [shared preview](./cms.md#sharing-a-preview) link carries the same `?ohne-preview=` token, so
+A [shared preview](./setup.md#sharing-a-preview) link carries the same `?ohne-preview=` token, so
 your website shows it with no change.

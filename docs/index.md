@@ -120,7 +120,7 @@ and serve routes, media fields, and the dashboard's Media page.
 An optional layer that makes your app the CMS for a website built with any framework, with a live
 editor that shows the website as you type.
 
-- [The CMS](./cms/cms.md) - install the layer, map paths to collections, and edit pages live.
+- [The CMS](./cms/setup.md) - install the layer, map paths to collections, and edit pages live.
 - [Your website](./cms/website.md) - read pages with `@ohnejs/client` and join the live preview.
 - [Frameworks](./cms/frameworks.md) - the whole loop in Nuxt, Next, React, and plain HTML.
 - [SEO and redirects](./cms/seo.md) - site settings, page SEO, redirects, sitemap, and
