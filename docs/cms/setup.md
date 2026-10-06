@@ -20,7 +20,6 @@ export default defineConfig({
     site: 'https://example.com',
     routes: {
       Pages: '/[...slug]',
-      Posts: '/blog/[slug]',
     },
   },
 });
@@ -56,9 +55,43 @@ export default defineCollection({
     ...pageFields(),
     content: field('blocks', { allow: ['Hero', 'Text'] }),
   },
-  api: { read: { public: true, access: publishedScope } },
+  api: {
+    read: { public: true, access: publishedScope },
+    create: true,
+    update: true,
+    delete: true,
+  },
 });
 ```
+
+`content` holds the page's [blocks](../database/blocks.md). Each block it allows is a file in
+`blocks/`:
+
+```ts
+// blocks/Hero.ts
+import { defineBlock, field } from 'ohnejs';
+
+export default defineBlock({
+  fields: {
+    title: field('text'),
+    subtitle: field('text', { nullable: true }),
+  },
+});
+```
+
+```ts
+// blocks/Text.ts
+import { defineBlock, field } from 'ohnejs';
+
+export default defineBlock({
+  fields: {
+    text: field('text'),
+  },
+});
+```
+
+Anyone reads published pages. Creating, saving, and deleting need the matching
+[capabilities](../auth/roles.md#the-collections-api-guard), like `collection.Pages.update`.
 
 An editor with the `cms.drafts` [capability](../auth/roles.md#capabilities) reads every record,
 drafts included.
@@ -83,7 +116,8 @@ Under `/[...slug]`, these slugs are special:
 
 ### Routes per locale
 
-With several [locales](../database/translations.md#configuring-locales), give a route per locale:
+With several [locales](../database/translations.md#configuring-locales), give a route per locale.
+Here `Posts` is a second collection with the page fields, like `Pages`:
 
 ```ts
 // ohne.config.ts
