@@ -289,7 +289,10 @@ export function createFieldForm(
   const rowOf = (field: DashboardField): Child => {
     const lockedRow = lockedByName.get(field.name);
     if (!isUndefined(lockedRow)) {
-      return fieldRow({ field, path: lockedRow.path, locked: true }, lockedRow.control.element);
+      return fieldRow(
+        { field, path: lockedRow.path, locked: true, marks: lockedRow.control.marks },
+        lockedRow.control.element,
+      );
     }
     const row = rowByName.get(field.name);
     if (isUndefined(row)) {
@@ -308,6 +311,7 @@ export function createFieldForm(
         },
         error: () => control.error(),
         onLabelClick: () => control.focus(),
+        marks: control.marks,
       },
       control.element,
     );

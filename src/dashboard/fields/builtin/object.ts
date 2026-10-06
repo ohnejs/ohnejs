@@ -20,11 +20,6 @@ import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
-  /* Hidden, not removed: the row keeps its height and the head keeps its auto margin. */
-  .ohne-fieldrow:has(> .ohne-object) > .ohne-field-label .ohne-label {
-    visibility: hidden;
-  }
-
   /* Floated so the header's ellipsis trims the label text rather than the mark. */
   .ohne-object-required::before {
     content: '*';
@@ -39,6 +34,18 @@ css`
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .ohne-object-marks {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-left: auto;
+  }
+
+  .ohne-object-marks .ohne-fieldrow-meta {
+    display: flex;
   }
 
   .ohne-object-toggle {
@@ -57,7 +64,8 @@ css`
  * Cells join the child's values into a one-line digest, nested children flattened in field order.
  * The cell title lists every carried value as a `label: value` row.
  * There is no inline cell editor: the child edits on the record page as a card holding its subform.
- * The card header carries the field label; a non-nullable child always renders its subform.
+ * The card header carries the field label and the row's marks.
+ * A non-nullable child always renders its subform.
  * A nullable child toggles through the header switch, which keeps the discarded values for re-enable.
  * An object-level error paints the card border destructive, with the message under the card.
  * The child writes whole with the record's one save.
@@ -180,8 +188,10 @@ export const objectType: FieldType = {
       });
     }
 
-    const header = (): Child =>
-      isNull(toggle) ? label() : h('div', { class: 'ohne-object-header' }, label(), toggle);
+    // Built once like the toggle, so a card rebuild keeps the marks and their tooltips.
+    const marks = h('span', { class: 'ohne-object-marks' });
+
+    const header = (): Child => h('div', { class: 'ohne-object-header' }, label(), marks, toggle);
 
     const element = h(
       'div',
@@ -201,6 +211,7 @@ export const objectType: FieldType = {
 
     return {
       element,
+      marks,
       read() {
         const form = entry.value;
         if (isNull(form)) {

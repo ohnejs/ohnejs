@@ -182,6 +182,12 @@ export interface FieldControl {
    * Re-baselines the control after a successful save, so `dirty` clears without a remount.
    */
   rebase(value: unknown): void;
+
+  /**
+   * The control's own slot for the row's marks, for a control that shows its own label.
+   * Set, the row renders no label row above the control.
+   */
+  marks?: HTMLElement;
 }
 
 /**

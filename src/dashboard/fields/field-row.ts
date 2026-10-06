@@ -7,6 +7,7 @@ import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { append } from '../render/insert.ts';
 import { when } from '../render/when.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
 import { useT } from '../runtime/use-t.ts';
@@ -62,6 +63,11 @@ export interface FieldRowOptions {
    * Overrides the locked mark's tooltip with a more specific reason.
    */
   lockedHint?: () => string;
+
+  /**
+   * Receives the metadata marks in place of the label row, for a control that shows its own label.
+   */
+  marks?: HTMLElement;
 }
 
 css`
@@ -212,6 +218,7 @@ export function describeControl(
 /**
  * One form row rendered through the field primitives: the label row, the control, the message.
  * The label carries the required mark, and a unique field pairs it with the unique chip.
+ * With `marks`, the control shows its own label and the row hands it the metadata glyphs instead.
  * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
  * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
  * The message under the control shows the description as prose, or the error destructive in its place.
@@ -274,17 +281,22 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
       )
     : label;
 
-  const head = fieldLabel(
-    [
-      name,
-      options.field.translatable
-        ? when(() => (dashboardMeta()?.locales.length ?? 0) > 1, languageMark)
-        : null,
-      options.locked === true ? lockMark() : null,
-      touchedMark(),
-    ],
-    { required: options.field.required },
-  );
+  const extras: Child[] = [
+    options.field.translatable
+      ? when(() => (dashboardMeta()?.locales.length ?? 0) > 1, languageMark)
+      : null,
+    options.locked === true ? lockMark() : null,
+    touchedMark(),
+  ];
+
+  let head: Child = null;
+  if (isUndefined(options.marks)) {
+    head = fieldLabel([name, ...extras], { required: options.field.required });
+  } else {
+    // The control outlives a form's re-render, so its slot drops the previous row's marks first.
+    options.marks.replaceChildren();
+    append(options.marks, extras);
+  }
 
   const proseBlock = (text: string, className = 'ohne-prose'): HTMLElement => {
     const flow = h('div', { class: className, id: ids.description });
