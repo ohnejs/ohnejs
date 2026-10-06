@@ -7,6 +7,7 @@ import { AI_DEFAULTS } from '../../../src/ai/config.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
+import { field } from '../../../src/ohne/fields/field.ts';
 import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { useSearchParams } from '../../../src/ohne/http/use-search-params.ts';
@@ -210,6 +211,49 @@ describe('renderSurface', () => {
       ok(askers.includes('# Skills\n- weekly-report: Sum up the week.'));
       ok(!askers.includes('retire-characters'));
     });
+  });
+
+  it('spells out the JSON shape of a rich text or link value, narrowed to its options', async () => {
+    useCollections().register('Pages', {
+      name: 'Pages',
+      collection: {
+        api: { read: true },
+        fields: {
+          body: field('richText', { links: ['Pages', 'Ghosts'], max: 500 }),
+          intro: field('richText', { inline: true, marks: [], links: false, nullable: true }),
+          aside: field('richText', { elements: ['h4', 'ol'], marks: ['del'], links: ['Ghosts'] }),
+          cta: field('link', { collections: ['Pages'], description: 'The call to action' }),
+          source: field('link', { nullable: true }),
+        },
+      },
+    });
+    const urls = 'url: https, http, mailto or tel, a /path or a #fragment';
+    const list = `List = { kind: 'list', ordered: false | true, items: { content: Run[], list?: List }[] }`;
+    const page = "{ url, newTab? } | { collection: 'Pages', record: UUID, hash?, newTab? }";
+    try {
+      await withAI(undefined, async () => {
+        const { text } = await surfaceFor(admin.token);
+        ok(
+          text.includes(
+            `- body: richText, required, at most 500 (value: ({ kind: 'paragraph' | 'quote', content: Run[] } | { kind: 'heading', level: 2 | 3, content: Run[] } | List)[]; ${list}; Run = { text, marks?: ('strong' | 'em' | 'code')[], link?: ${page} }; ${urls})\n`,
+          ),
+        );
+        ok(
+          text.includes(
+            "- intro: richText, nullable (value: [{ kind: 'paragraph', content: Run[] }]; Run = { text })\n",
+          ),
+        );
+        ok(
+          text.includes(
+            `- aside: richText, required (value: ({ kind: 'paragraph', content: Run[] } | { kind: 'heading', level: 4, content: Run[] } | List)[]; List = { kind: 'list', ordered: true, items: { content: Run[], list?: List }[] }; Run = { text, marks?: ('del')[], link?: { url, newTab? } }; ${urls})\n`,
+          ),
+        );
+        ok(text.includes(`- cta: link, required (value: ${page}; ${urls}) - The call to action\n`));
+        ok(text.includes(`- source: link, nullable (value: { url, newTab? }; ${urls})`));
+      });
+    } finally {
+      useCollections().delete('Pages');
+    }
   });
 
   it('names the opened collections and fields in the data line and per collection', async () => {

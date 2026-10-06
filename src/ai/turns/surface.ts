@@ -1,6 +1,6 @@
 import type { CollectionQueryMeta, FlowTier, QueryScope } from 'ohnejs';
 import type { User } from 'ohnejs/auth';
-import type { HTTPMethod } from 'ohnejs/utils';
+import type { HTTPMethod, RichTextOptions } from 'ohnejs/utils';
 
 import {
   queryMetadata,
@@ -16,6 +16,7 @@ import {
   capitalize,
   compileRoute,
   isArray,
+  isBoolean,
   isEmpty,
   isLocalPath,
   isNull,
@@ -23,6 +24,7 @@ import {
   isUndefined,
   uniqueArray,
 } from 'ohnejs/utils';
+import { literalUnion } from 'ohnejs/utils/codegen';
 
 import type { DashboardCollection, DashboardField } from '../../base/collections-api/describe.ts';
 import type { AIAskKind, AITier } from '../config.ts';
@@ -31,6 +33,7 @@ import { accountFields, accountLayout } from '../../base/auth/account-layout.ts'
 import { describeCollections } from '../../base/collections-api/describe.ts';
 import { readScope, writeReach } from '../../base/collections-api/gate.ts';
 import { resolveDashboardMenu } from '../../base/menu/resolve-menu.ts';
+import { registeredLinks } from '../../ohne/fields/link-collections.ts';
 import { defaultLanguage, resolveMessage, translate } from '../../ohne/http/translate.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { useAIConfig } from '../config.ts';
@@ -222,6 +225,11 @@ const CLOSED_PAGES = new Set(['/login', '/logout', '/install']);
 const OPERATION_WORDS = { read: 'query', create: 'create', update: 'update', delete: 'delete' };
 
 const LISTING = new Intl.ListFormat('en', { type: 'conjunction' });
+
+/**
+ * The addresses a link's `url` may hold, as `isSafeHref` admits them.
+ */
+const URL_FORMS = 'url: https, http, mailto or tel, a /path or a #fragment';
 
 /**
  * The words the `Limits:` line names each kind of write that always asks by.
@@ -642,7 +650,7 @@ function fieldType(field: DashboardField, meta: CollectionQueryMeta): string {
 }
 
 /**
- * What follows a field's flags: its choices, its range, or its unit.
+ * What follows a field's flags: its choices, its range, its unit, or the JSON shape of its value.
  */
 function fieldDetail(field: DashboardField): string {
   const options = field.options ?? {};
@@ -651,10 +659,66 @@ function fieldDetail(field: DashboardField): string {
     const values = choices.map((choice) => (isPlainObject(choice) ? choice.value : choice));
     return `: ${values.join(' | ')}`;
   }
-  const { min, max } = options;
+  const range = rangeOf(options);
+  if (field.type === 'richText') return `${range} (value: ${richTextShape(options)})`;
+  if (field.type === 'link') {
+    const collections = (options.collections as readonly string[] | undefined) ?? true;
+    return ` (value: ${linkShape(collections)}; ${URL_FORMS})`;
+  }
+  if (range === '' && field.type === 'dateTime') return ' (epoch ms)';
+  return range;
+}
+
+/**
+ * The bounds a field's `min` and `max` set, or `''` when it has neither.
+ */
+function rangeOf({ min, max }: Readonly<Record<string, unknown>>): string {
   if (!isUndefined(min) && !isUndefined(max)) return `, ${min} to ${max}`;
   if (!isUndefined(min)) return `, at least ${min}`;
   if (!isUndefined(max)) return `, at most ${max}`;
-  if (field.type === 'dateTime') return ' (epoch ms)';
   return '';
+}
+
+/**
+ * A `richText` value as a TypeScript-like shape, narrowed to the field's elements, marks and links.
+ * Its options arrive resolved, so each one the shape reads is present.
+ */
+function richTextShape(options: Readonly<Record<string, unknown>>): string {
+  const { inline, elements, marks, links } = options as Required<RichTextOptions>;
+  const allowed = new Set<string>(inline ? [] : elements);
+  const kinds = allowed.has('blockquote') ? "'paragraph' | 'quote'" : "'paragraph'";
+  const blocks = [`{ kind: ${kinds}, content: Run[] }`];
+  const levels = [...allowed].filter((name) => /^h\d$/.test(name)).map((name) => name.slice(1));
+  if (!isEmpty(levels)) {
+    blocks.push(`{ kind: 'heading', level: ${levels.join(' | ')}, content: Run[] }`);
+  }
+  const ordered = [allowed.has('ul') ? 'false' : '', allowed.has('ol') ? 'true' : ''].filter(
+    (value) => value !== '',
+  );
+  if (!isEmpty(ordered)) blocks.push('List');
+  const run = [
+    'text',
+    isEmpty(marks) ? '' : `marks?: (${literalUnion([...marks])})[]`,
+    links === false ? '' : `link?: ${linkShape(links)}`,
+  ];
+  return [
+    inline ? `[${blocks[0]}]` : `(${blocks.join(' | ')})[]`,
+    isEmpty(ordered)
+      ? ''
+      : `List = { kind: 'list', ordered: ${ordered.join(' | ')}, items: { content: Run[], list?: List }[] }`,
+    `Run = { ${run.filter((part) => part !== '').join(', ')} }`,
+    links === false ? '' : URL_FORMS,
+  ]
+    .filter((part) => part !== '')
+    .join('; ');
+}
+
+/**
+ * A link as a TypeScript-like shape: a URL, or a record in one of the registered `collections`.
+ */
+function linkShape(collections: boolean | readonly string[]): string {
+  const url = '{ url, newTab? }';
+  const names = registeredLinks(collections);
+  if (isBoolean(names) || isEmpty(names)) return url;
+  return `${url} | { collection: ${literalUnion([...names])}, record: UUID, hash?, newTab? }`;
 }
