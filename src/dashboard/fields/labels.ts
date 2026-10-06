@@ -10,11 +10,21 @@ import { renderLabel } from '../../utils/template/render-label.ts';
 import { shortUUID } from '../../utils/uuid/short-uuid.ts';
 import { api } from '../runtime/api.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
+import { labelBatchKey, labelKey, labelScope } from './_label-keys.ts';
 
 const CAPACITY = 2000;
 
+/**
+ * One batch of unresolved records: a target read at one locale.
+ */
+interface Batch {
+  target: string;
+  locale: string | undefined;
+  uuids: Set<string>;
+}
+
 const entries = new Map<string, Ref<string | undefined>>();
-const pending = new Map<string, Set<string>>();
+const pending = new Map<string, Batch>();
 const inFlight = new Set<string>();
 let scheduled = false;
 let awaitingMeta = false;
@@ -26,11 +36,13 @@ let basis: DashboardMeta | undefined;
  * A record without label text, a deleted record, and an unresolvable target all settle on `fallbackLabel`.
  * A failed request leaves the label `undefined` until a later read retries.
  * `target` is the collection name, as `DashboardField.target` carries it.
+ * `locale` is the content locale the label reads in; omitted, it reads the default locale.
  */
-export function labelOf(target: string, uuid: string): string | undefined {
-  const entry = entryOf(`${target}:${uuid}`);
+export function labelOf(target: string, uuid: string, locale?: string): string | undefined {
+  const scope = scopeOf(target, locale);
+  const entry = entryOf(labelKey(target, uuid, scope));
   const value = entry.value;
-  if (isUndefined(value)) enqueue(target, uuid);
+  if (isUndefined(value)) enqueue(target, uuid, scope);
   return value;
 }
 
@@ -39,30 +51,33 @@ export function labelOf(target: string, uuid: string): string | undefined {
  * The read is reactive, so the binding lands on the label the moment a seed writes one.
  * A surface reading the record itself binds this and seeds from its own row, sparing a second query.
  */
-export function knownLabel(target: string, uuid: string): string | undefined {
-  return entryOf(`${target}:${uuid}`).value;
+export function knownLabel(target: string, uuid: string, locale?: string): string | undefined {
+  return entryOf(labelKey(target, uuid, scopeOf(target, locale))).value;
 }
 
 /**
  * Requests labels ahead of display, so they resolve before their bindings first read.
- * Requests dedupe, batch per target, and flush on a microtask as one query per target.
+ * Requests dedupe, batch per target and locale, and flush on a microtask as one query per batch.
  */
-export function wantLabels(target: string, uuids: readonly string[]): void {
+export function wantLabels(target: string, uuids: readonly string[], locale?: string): void {
   sync();
+  const scope = scopeOf(target, locale);
   for (const uuid of uuids) {
-    const known = untracked(() => entries.get(`${target}:${uuid}`)?.value);
-    if (isUndefined(known)) enqueue(target, uuid);
+    const known = untracked(() => entries.get(labelKey(target, uuid, scope))?.value);
+    if (isUndefined(known)) enqueue(target, uuid, scope);
   }
 }
 
 /**
  * Seeds a label without a fetch: picker results, loaded pages, answered writes.
+ * `locale` is the content locale the label was read in, so it never stands in for another locale's.
  * A pending request for the `uuid` is dropped; a seeded label re-resolves every binding reading it.
  */
-export function seedLabel(target: string, uuid: string, label: string): void {
+export function seedLabel(target: string, uuid: string, label: string, locale?: string): void {
   sync();
-  pending.get(target)?.delete(uuid);
-  write(target, uuid, label);
+  const scope = scopeOf(target, locale);
+  pending.get(labelBatchKey(target, scope))?.uuids.delete(uuid);
+  write(labelKey(target, uuid, scope), label);
 }
 
 /**
@@ -79,6 +94,13 @@ export function fallbackLabel(uuid: string): string {
  */
 export function joinLabel(row: Record<string, unknown>, collection: DashboardCollection): string {
   return renderLabel(row, collection.labelFields, collection.labelTemplate);
+}
+
+/**
+ * The scope `target`'s labels at `locale` cache under, against the current discovery data.
+ */
+function scopeOf(target: string, locale: string | undefined): string | undefined {
+  return labelScope(untracked(dashboardMeta), target, locale);
 }
 
 /**
@@ -106,20 +128,21 @@ function evict(): void {
   for (const key of entries.keys()) {
     if (entries.size <= CAPACITY) return;
     if (inFlight.has(key)) continue;
-    const split = key.indexOf(':');
-    if (pending.get(key.slice(0, split))?.has(key.slice(split + 1)) === true) continue;
+    const split = key.lastIndexOf(':');
+    if (pending.get(key.slice(0, split))?.uuids.has(key.slice(split + 1)) === true) continue;
     entries.delete(key);
   }
 }
 
 /**
- * Adds `uuid` to its target's pending batch and schedules a flush, unless a request already carries it.
+ * Adds `uuid` to its batch and schedules a flush, unless a request already carries it.
  */
-function enqueue(target: string, uuid: string): void {
-  if (inFlight.has(`${target}:${uuid}`)) return;
-  const bucket = pending.get(target);
-  if (isUndefined(bucket)) pending.set(target, new Set([uuid]));
-  else bucket.add(uuid);
+function enqueue(target: string, uuid: string, scope: string | undefined): void {
+  if (inFlight.has(labelKey(target, uuid, scope))) return;
+  const key = labelBatchKey(target, scope);
+  const batch = pending.get(key);
+  if (isUndefined(batch)) pending.set(key, { target, locale: scope, uuids: new Set([uuid]) });
+  else batch.uuids.add(uuid);
   schedule();
 }
 
@@ -143,10 +166,10 @@ function flush(): void {
     watchMeta();
     return;
   }
-  const buckets = [...pending];
+  const batches = [...pending.values()];
   pending.clear();
-  for (const [target, uuids] of buckets) {
-    if (uuids.size > 0) void flushTarget(target, [...uuids]);
+  for (const batch of batches) {
+    if (batch.uuids.size > 0) void flushBatch(batch.target, batch.locale, [...batch.uuids]);
   }
 }
 
@@ -165,18 +188,23 @@ function watchMeta(): void {
 }
 
 /**
- * Resolves one target's batch with a single query; a `uuid` the response omits settles on the placeholder.
+ * Resolves one batch with a single query at its locale.
+ * A `uuid` the response omits settles on the placeholder.
  * A failed request leaves its refs unresolved, so a later read re-enqueues the batch.
  */
-async function flushTarget(target: string, uuids: readonly string[]): Promise<void> {
+async function flushBatch(
+  target: string,
+  locale: string | undefined,
+  uuids: readonly string[],
+): Promise<void> {
   const collection = readableCollection(target);
   if (isUndefined(collection) || isEmpty(collection.labelFields)) {
-    for (const uuid of uuids) write(target, uuid, fallbackLabel(uuid));
+    for (const uuid of uuids) write(labelKey(target, uuid, locale), fallbackLabel(uuid));
     return;
   }
   const source = basis;
   const names = collection.labelFields;
-  const keys = uuids.map((uuid) => `${target}:${uuid}`);
+  const keys = uuids.map((uuid) => labelKey(target, uuid, locale));
   for (const key of keys) inFlight.add(key);
   try {
     const response = await api(`POST /collections/${collection.segment}/query`, {
@@ -185,6 +213,7 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
         select: ['UUID', ...names],
         where: { UUID: { in: uuids } },
         limit: uuids.length,
+        ...(isUndefined(locale) ? {} : { locale }),
       }),
     });
     if (!response.ok) return;
@@ -197,11 +226,11 @@ async function flushTarget(target: string, uuids: readonly string[]): Promise<vo
       if (!isString(uuid)) continue;
       answered.add(uuid);
       const label = joinLabel(row, collection);
-      write(target, uuid, label !== '' ? label : fallbackLabel(uuid));
+      write(labelKey(target, uuid, locale), label !== '' ? label : fallbackLabel(uuid));
     }
     for (const uuid of uuids) {
       if (answered.has(uuid)) continue;
-      const entry = entryOf(`${target}:${uuid}`);
+      const entry = entryOf(labelKey(target, uuid, locale));
       if (isUndefined(entry.value)) entry.value = fallbackLabel(uuid);
     }
   } catch {
@@ -235,8 +264,8 @@ function sync(): void {
 }
 
 /**
- * Stores `label` for the record, waking every binding that reads it.
+ * Stores `label` under `key`, waking every binding that reads it.
  */
-function write(target: string, uuid: string, label: string): void {
-  entryOf(`${target}:${uuid}`).value = label;
+function write(key: string, label: string): void {
+  entryOf(key).value = label;
 }
