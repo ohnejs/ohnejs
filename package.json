@@ -103,7 +103,7 @@
     "serve:api": "node src/ohne/cli/bin.js serve api",
     "serve:dashboard": "node src/ohne/cli/bin.js serve dashboard",
     "sync:starter": "node scripts/sync-starter.ts",
-    "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test \"tests/**/*.test.ts\"",
+    "test": "NODE_COMPILE_CACHE=node_modules/.cache/node-compile node --test --test-timeout=120000 \"tests/**/*.test.ts\"",
     "typecheck": "tsc && tsc -p src/dashboard/tsconfig.json && tsc -p src/base/dashboard/tsconfig.json && tsc -p src/uploads/dashboard/tsconfig.json && tsc -p src/ai/dashboard/tsconfig.json",
     "vendor:icons": "node scripts/vendor-icons.ts"
   },
