@@ -1,10 +1,8 @@
 import { strictEqual, throws } from 'node:assert';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
-import { styleText } from 'node:util';
 
 import { createSHA256 } from '../../../src/utils/crypto/index.ts';
-import { formatBytes, formatDuration, measure } from '../../../src/utils/index.ts';
 
 /**
  * Builds `size` bytes of a pattern whose period never lines up with a block.
@@ -120,13 +118,5 @@ describe('createSHA256', () => {
     sha.update(bytes.subarray(60));
     strictEqual(sha.digest(), reference(bytes));
     strictEqual(createSHA256(sha.state()).digest(), reference(bytes));
-  });
-
-  it('prints its throughput', async () => {
-    const bytes = new Uint8Array(16 * 1024 * 1024);
-    const { ms } = await measure(() => hashed(bytes));
-    const size = formatBytes(bytes.byteLength);
-    const rate = formatBytes(bytes.byteLength / (ms / 1000));
-    console.log(styleText('dim', `createSHA256: ${size} in ${formatDuration(ms)}, ${rate}/s`));
   });
 });
