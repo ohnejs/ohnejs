@@ -23,11 +23,11 @@ async function withServer(
   run: (base: string) => Promise<void>,
 ): Promise<void> {
   const server = createServer(handler);
-  server.listen(0);
+  server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
   try {
-    await run(`http://localhost:${port}`);
+    await run(`http://127.0.0.1:${port}`);
   } finally {
     server.close();
     await once(server, 'close');

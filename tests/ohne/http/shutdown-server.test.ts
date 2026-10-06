@@ -21,13 +21,15 @@ function makeRoute(pattern: string, handler: AnyHandler): Route {
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
-  for (let i = 0; i < 200 && !condition(); i++) await sleep(5);
+  for (let i = 0; i < 2000 && !condition(); i++) await sleep(5);
+  ok(condition(), 'waitFor timed out');
 }
 
 /**
  * Resolves once `signal` aborts.
  */
 function aborted(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
   return new Promise((resolve) =>
     signal.addEventListener('abort', () => resolve(), { once: true }),
   );
@@ -47,11 +49,11 @@ describe('shutdownServer', () => {
     });
 
     const { server, gate } = createServer(createRouter([route]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const inflight = fetch(`http://localhost:${port}/slow`);
+    const inflight = fetch(`http://127.0.0.1:${port}/slow`);
     await waitFor(() => gate.pending === 1);
 
     const shutdown = shutdownServer(server, gate, { shutdownTimeout: '2s' });
@@ -70,11 +72,11 @@ describe('shutdownServer', () => {
     });
 
     const { server, gate } = createServer(createRouter([route]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const inflight = fetch(`http://localhost:${port}/hang`).catch((error) => error);
+    const inflight = fetch(`http://127.0.0.1:${port}/hang`).catch((error) => error);
     await waitFor(() => gate.pending === 1);
 
     await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
@@ -91,11 +93,11 @@ describe('shutdownServer', () => {
     });
 
     const { server, gate } = createServer(createRouter([route]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const inflight = fetch(`http://localhost:${port}/siege`).catch((error) => error);
+    const inflight = fetch(`http://127.0.0.1:${port}/siege`).catch((error) => error);
     await waitFor(() => gate.pending === 1);
 
     await shutdownServer(server, gate, { shutdownTimeout: '50ms' });
@@ -113,11 +115,11 @@ describe('shutdownServer', () => {
     });
 
     const { server, gate } = createServer(createRouter([route]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const res = await fetch(`http://localhost:${port}/ritual`);
+    const res = await fetch(`http://127.0.0.1:${port}/ritual`);
     strictEqual(await res.text(), 'Medivh');
     strictEqual(gate.pending, 1);
 
@@ -141,11 +143,11 @@ describe('shutdownServer', () => {
     });
 
     const { server, gate } = createServer(createRouter([route]), { handlerTimeout: '20ms' });
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const res = await fetch(`http://localhost:${port}/culling`);
+    const res = await fetch(`http://127.0.0.1:${port}/culling`);
     strictEqual(res.status, 503);
     await res.body?.cancel();
 
@@ -158,11 +160,11 @@ describe('shutdownServer', () => {
     const route = makeRoute('/hang', () => new Promise<string>(() => {}));
 
     const { server, gate } = createServer(createRouter([route]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
-    const inflight = fetch(`http://localhost:${port}/hang`).catch((error) => error);
+    const inflight = fetch(`http://127.0.0.1:${port}/hang`).catch((error) => error);
     await waitFor(() => gate.pending === 1);
 
     const winner = await Promise.race([
@@ -176,12 +178,12 @@ describe('shutdownServer', () => {
 
   it('keeps serving through the pre-stop delay, then drains', async () => {
     const { server, gate } = createServer(createRouter([makeRoute('/', () => 'ok')]));
-    server.listen(0);
+    server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
 
     const shutdown = shutdownServer(server, gate, { preStopDelay: '150ms', shutdownTimeout: '1s' });
-    const res = await fetch(`http://localhost:${port}/`);
+    const res = await fetch(`http://127.0.0.1:${port}/`);
     strictEqual(await res.text(), 'ok');
 
     await shutdown;

@@ -45,11 +45,11 @@ async function withServer(
   options: CreateServerOptions = {},
 ): Promise<void> {
   const { server, gate } = createServer(createRouter(routes), options);
-  server.listen(0);
+  server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
   try {
-    await run(`http://localhost:${port}`, gate, server);
+    await run(`http://127.0.0.1:${port}`, gate, server);
   } finally {
     server.close();
     server.closeAllConnections();
