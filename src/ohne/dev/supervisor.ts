@@ -65,6 +65,15 @@ export interface DevOptions {
    * true
    */
   dashboard?: boolean;
+
+  /**
+   * How long a ready child must have run, in milliseconds, for an outside stop to restart it.
+   * A child stopped sooner warns and waits for a change instead.
+   *
+   * @default
+   * 5000
+   */
+  reviveUptime?: number;
 }
 
 /**
@@ -121,6 +130,7 @@ export async function dev(
   const targets = [registry, routes, middleware, messages, database, roles, skills, flows];
 
   const wantDashboard = options.dashboard ?? true;
+  const reviveUptime = options.reviveUptime ?? REVIVE_UPTIME;
   const { dashboard: dashboardPort, api: port } = await resolveDevPorts(
     {
       base: useEnv().get('PORT'),
@@ -369,7 +379,7 @@ export async function dev(
     if (code) return park();
     const name = backend === 'api' ? 'API' : 'Dashboard';
     const stopped = signal ? `${name} stopped by \`${signal}\`` : `${name} stopped`;
-    if (uptime < REVIVE_UPTIME) {
+    if (uptime < reviveUptime) {
       printer.warn(`${stopped} right after it started.`);
       return park();
     }
