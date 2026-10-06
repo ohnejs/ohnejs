@@ -37,7 +37,7 @@ if (page.value?.kind === 'redirect') {
 }
 if (page.value?.kind !== 'page') throw createError({ status: 404 });
 
-if (token.value) {
+if (import.meta.server && token.value) {
   for (const [name, value] of Object.entries(ohne.previewHeaders())) {
     useResponseHeader(name).value = value;
   }
