@@ -420,6 +420,12 @@ A repeater repeats one shape. A [`blocks`](./field-types.md#blocks) field holds 
 mixed, reusable shapes, each defined once under `blocks/`. [Blocks](./blocks.md) covers defining,
 reading, and writing them.
 
+## Rich text
+
+A [`richText`](./field-types.md#richtext) field holds formatted text with links, as a JSON tree,
+and a [`link`](./field-types.md#link) field holds one link on its own. [Rich text](./rich-text.md)
+covers both.
+
 ## Translations
 
 Any top-level collection field takes [`translatable: true`](./translations.md#marking-fields) to

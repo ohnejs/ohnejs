@@ -180,6 +180,37 @@ A whole number within JavaScript's safe range. For money, store minor units like
 | `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `link`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/link-dark.png">
+  <img alt="The link field in the dashboard" src="../images/field-types/link-light.png">
+</picture>
+
+One link to an address or to a record, stored as JSON. [Rich text](./rich-text.md#the-link-field)
+covers its value and how a record link is checked.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `collections`     | -       | The collections whose records the field may link to. Omitted, only addresses are allowed.                                                                               |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | Locked: [search](./collections.md#search) never matches a link, and `true` fails at boot.                                                                               |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
 ### `multiSelect`
 
 <picture>
@@ -356,6 +387,44 @@ table. Every item keeps its own `UUID`.
 | `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
 | `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `richText`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/rich-text-dark.png">
+  <img alt="The richText field in the dashboard" src="../images/field-types/rich-text-light.png">
+</picture>
+
+Formatted text with links, stored as a JSON tree. [Rich text](./rich-text.md) covers its value,
+links, rendering and editing.
+
+| Option            | Default                                  | What it does                                                                                                                                                            |
+| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`      | `false`                                  | Accepts the empty value `[]`.                                                                                                                                           |
+| `default`         | -                                        | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -                                        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `elements`        | `['h2', 'h3', 'ul', 'ol', 'blockquote']` | The block elements allowed besides paragraphs: `h2` to `h6`, `ul`, `ol` and `blockquote`.                                                                               |
+| `immutable`       | `false`                                  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false`                                  | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `inline`          | `false`                                  | Holds at most one paragraph, rendered without a `<p>`. `elements` does not apply.                                                                                       |
+| `label`           | -                                        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `lineBreaks`      | `true`                                   | With `false`, each `\n` becomes a space.                                                                                                                                |
+| `links`           | `true`                                   | `false` allows no links, `true` allows addresses, and a list of collections also allows [their records](./rich-text.md#links).                                          |
+| `marks`           | `['strong', 'em', 'code']`               | The marks allowed on text. `del` is strikethrough.                                                                                                                      |
+| `max`             | -                                        | The most characters the run text may hold, counted like `String#length`.                                                                                                |
+| `min`             | -                                        | The fewest characters the run text may hold, counted the same way.                                                                                                      |
+| `nullable`        | `false`                                  | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -                                        | The hint an empty editor shows, as a string or a [message key](../i18n/messages.md).                                                                                    |
+| `readable`        | `true`                                   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -                                        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false`                                  | Locked: [search](./collections.md#search) never matches rich text, and `true` fails at boot.                                                                            |
+| `translatable`    | `false`                                  | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false`                                  | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false`                                  | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false`                                  | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -                                        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -                                        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`                                   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
 ### `select`
 

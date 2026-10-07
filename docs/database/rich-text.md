@@ -160,6 +160,72 @@ export default defineHandler(async ({ params }) => {
 
 `richTextToText` gives the plain text instead, blocks joined by a blank line.
 
+## Editing in the dashboard
+
+The dashboard edits a `richText` field in its own editor. A field of blocks gets a toolbar above the
+text, and an `inline` field gets one that floats over a selection. The toolbar and the shortcuts
+offer only what the field's options allow.
+
+Shortcuts use Cmd and Option on a Mac, and Ctrl and Alt on Windows and Linux:
+
+| Shortcut           | What it does                     |
+| ------------------ | -------------------------------- |
+| Cmd+B              | Bold                             |
+| Cmd+I              | Italic                           |
+| Cmd+E              | Code                             |
+| Cmd+Shift+X        | Strikethrough                    |
+| Cmd+K              | Inserts or edits a link          |
+| Cmd+\\             | Clears formatting, keeping links |
+| Cmd+Option+0       | Paragraph                        |
+| Cmd+Option+2 to 6  | Heading 2 to 6                   |
+| Cmd+Shift+7        | Numbered list                    |
+| Cmd+Shift+8        | Bulleted list                    |
+| Cmd+Shift+9        | Quote                            |
+| Tab or Cmd+]       | Nests a list item                |
+| Shift+Tab or Cmd+[ | Lifts a list item                |
+| Cmd+Shift+V        | Pastes as plain text             |
+| Option+F10         | Moves focus into the toolbar     |
+
+- Enter starts a new block, and Shift+Enter a line break unless `lineBreaks` is `false`.
+- Where no list item can nest, Tab moves focus on as usual.
+- Cmd+U does nothing. There is no underline, since on a website underlined text reads as a link.
+
+## Markdown shortcuts
+
+At the start of a paragraph, type a marker and a space to change the block:
+
+- `#` gives the highest allowed heading, and `##` to `######` give `h2` to `h6`.
+- `-`, `*` or `+` gives a bulleted list, and `1.` or `1)` a numbered one.
+- `>` gives a quote.
+
+Backspace right after brings the marker back as text. Inline markdown, like `**bold**`, stays text.
+
+## Pasting
+
+- Text copied from another rich text editor in the dashboard pastes with everything it holds.
+- HTML from a web page, Google Docs or Word keeps its headings, lists, quotes, marks and safe links.
+- Plain text is never read as markdown. A blank line ends a paragraph, and a single line break
+  stays one.
+- A lone `https://` address pasted over a selection links it, and at the caret inserts it as a link.
+  A record's dashboard address becomes a link to that record, when its collection is allowed.
+
+A paste always fits the field's options: a heading moves to the nearest allowed level, a disallowed
+mark is dropped, and a disallowed link keeps its text. Dropped text pastes the same way, and text
+cannot be dragged inside the editor.
+
+## Editing links
+
+Cmd+K, or the link button, opens the link popup over the selection:
+
+- "Link to" searches the allowed records, or takes an address you type.
+- At a caret outside a link, "Text" sets what is inserted. Left empty, the record's label or the
+  address is inserted.
+- A record link takes an anchor, the `hash`, and any link can open in a new tab.
+- Remove drops the link and keeps its text.
+
+A link to a missing record is drawn dashed, and its popup says so. Hover a link to see its target,
+and Cmd+click to open it.
+
 ## Limits
 
 - Lists nest at most 4 levels deep.
