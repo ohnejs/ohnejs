@@ -13,6 +13,7 @@ import type {
 import type { Pos, Selection } from './rich-text-model.ts';
 
 import { last } from '../../utils/array/last.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { mergeRuns } from '../../utils/rich-text/merge-runs.ts';
 import {
   RICH_TEXT_DEFAULT_ELEMENTS,
@@ -96,6 +97,7 @@ interface Line<C extends string> {
   ordered: boolean;
   group?: object;
   source?: object;
+  list?: object;
 }
 
 interface Point {
@@ -590,7 +592,7 @@ function listify<C extends string>(
   let start = first;
   let end = final + 1;
   const joins = (line: Line<C> | undefined, group: object | undefined) =>
-    line?.kind === 'item' && group !== undefined && line.group === group;
+    line?.kind === 'item' && !isUndefined(group) && line.group === group;
   while (joins(lines[start - 1], lines[start]!.group)) start--;
   while (joins(lines[end], lines[end - 1]!.group)) end++;
   const previous = lines[start - 1];
@@ -783,7 +785,7 @@ function pointOf(paths: readonly number[][], pos: Pos): Point {
 
 /**
  * The document as lines in document order, each with its path.
- * Every line remembers the node it came from, and an item the list at its top level as its group.
+ * Every line remembers the node it came from, and an item its list and its top-level list as its group.
  */
 function flatten<C extends string>(doc: RichText<C>): Draft<C> {
   const draft: Draft<C> = { lines: [], paths: [] };
@@ -809,7 +811,15 @@ function flattenList<C extends string>(
 ): void {
   list.items.forEach((item, index) => {
     const { content } = item;
-    draft.lines.push({ kind: 'item', content, depth, ordered: list.ordered, group, source: item });
+    draft.lines.push({
+      kind: 'item',
+      content,
+      depth,
+      ordered: list.ordered,
+      group,
+      source: item,
+      list,
+    });
     draft.paths.push([...path, index]);
     if (item.list) flattenList(item.list, group, depth + 1, [...path, index], draft);
   });
@@ -838,43 +848,49 @@ function build<C extends string>(lines: readonly Line<C>[]): Built<C> {
     const run = lines.slice(start, end);
     const depths = nestDepths(run);
     const cursor = { index: 0 };
-    const items = buildItems(run, depths, cursor, 0, [doc.length], used, (index, path) => {
+    const place = (index: number, path: number[]) => {
       paths[start + index] = path;
-    });
-    doc.push(reuseList(line.group, line.ordered, items, used));
+    };
+    doc.push(buildList(run, depths, cursor, 0, [doc.length], line.group, used, place));
     start = end;
   }
   return { doc, paths };
 }
 
 /**
- * Builds the items at `depth` from the cursor on, each with the sublist the deeper items after it form.
+ * Builds the items at `depth` from the cursor on into a list.
+ * Each item takes the sublist the deeper items after it form.
+ * The list keeps the type of its items that came from `source`, and an item that moved in adopts it.
+ * A list none of whose items came from `source` takes the type of its first item.
  */
-function buildItems<C extends string>(
+function buildList<C extends string>(
   lines: readonly Line<C>[],
   depths: readonly number[],
   cursor: { index: number },
   depth: number,
   path: readonly number[],
+  source: object | undefined,
   used: Set<object>,
   place: (index: number, path: number[]) => void,
-): RichTextListItem<C>[] {
+): RichTextList<C> {
   const items: RichTextListItem<C>[] = [];
+  const level: Line<C>[] = [];
   while (depths[cursor.index] === depth) {
     const at = cursor.index++;
     const line = lines[at]!;
+    level.push(line);
     const itemPath = [...path, items.length];
     place(at, itemPath);
-    const source = isItem<C>(line.source) ? line.source : undefined;
-    let list: RichTextList<C> | undefined;
-    if (depths[cursor.index]! > depth) {
-      const { ordered } = lines[cursor.index]!;
-      const children = buildItems(lines, depths, cursor, depth + 1, itemPath, used, place);
-      list = reuseList(source?.list, ordered, children, used);
-    }
-    items.push(reuseItem(source, line.content, list, used));
+    const item = isItem<C>(line.source) ? line.source : undefined;
+    const list =
+      depths[cursor.index]! > depth
+        ? buildList(lines, depths, cursor, depth + 1, itemPath, item?.list, used, place)
+        : undefined;
+    items.push(reuseItem(item, line.content, list, used));
   }
-  return items;
+  const { ordered } =
+    level.find((line) => !isUndefined(source) && line.list === source) ?? level[0]!;
+  return reuseList(source, ordered, items, used);
 }
 
 /**
@@ -955,5 +971,5 @@ function reuseList<C extends string>(
  * Whether a line's source is a list item.
  */
 function isItem<C extends string>(source: object | undefined): source is RichTextListItem<C> {
-  return source !== undefined && !('kind' in source);
+  return !isUndefined(source) && !('kind' in source);
 }

@@ -205,6 +205,11 @@ describe('deleteBackward', () => {
     deepStrictEqual(caretOf(result), at([0, 1], 0));
   });
 
+  it('keeps the type of a list level that a nested item moves up into', () => {
+    const doc = [ul(li('a', ol(li('b'))), li('c'))];
+    deepStrictEqual(deleteBackward(state(doc, at([0, 0], 0))).doc, [p('a'), ul(li('b'), li('c'))]);
+  });
+
   it('joins a leaf into the last and deepest item of the list before it', () => {
     const doc = [ul(li('a', ul(li('b', ul(li('c')))))), p('d')];
     const result = deleteBackward(state(doc, at([1], 0)));
@@ -241,6 +246,11 @@ describe('deleteForward', () => {
   it('joins the first item of a following list, lifting its sublist', () => {
     const doc = [p('a'), ul(li('b', ul(li('c'))))];
     deepStrictEqual(deleteForward(state(doc, at([0], 1))).doc, [p('ab'), ul(li('c'))]);
+  });
+
+  it('keeps the type of a list level that a lifted sublist moves up into', () => {
+    const doc = [p('a'), ul(li('b', ol(li('c'))), li('d'))];
+    deepStrictEqual(deleteForward(state(doc, at([0], 1))).doc, [p('ab'), ul(li('c'), li('d'))]);
   });
 
   it('lets an empty paragraph give way to the next leaf', () => {
@@ -378,6 +388,18 @@ describe('liftItem', () => {
     deepStrictEqual(result?.doc, [ul(li('a')), p('b'), ul(li('c'))]);
   });
 
+  it('keeps the type of a list level that a nested item moves up into', () => {
+    const doc = [ul(li('a', ol(li('b'))), li('c'))];
+    deepStrictEqual(liftItem(state(doc, at([0, 0], 0)))?.doc, [p('a'), ul(li('b'), li('c'))]);
+  });
+
+  it('gives a lifted item the type of the level it joins', () => {
+    const doc = [ul(li('a', ol(li('b'), li('c'))))];
+    deepStrictEqual(liftItem(state(doc, at([0, 0, 0], 0)))?.doc, [
+      ul(li('a'), li('b', ol(li('c')))),
+    ]);
+  });
+
   it('cannot lift outside a list', () => {
     strictEqual(liftItem(state([p('a')], at([0], 0))), undefined);
   });
@@ -437,6 +459,14 @@ describe('setBlockType', () => {
     const result = setBlockType(state([ul(li('a'), li('b'))], at([0, 0], 1)), 'h2');
     deepStrictEqual(result.doc, [h(2, 'a'), ul(li('b'))]);
     deepStrictEqual(caretOf(result), at([0], 1));
+  });
+
+  it('keeps the type of a list level that a nested item moves up into', () => {
+    const doc = [ul(li('a', ol(li('b'))), li('c'))];
+    deepStrictEqual(setBlockType(state(doc, at([0, 0], 0)), 'p').doc, [
+      p('a'),
+      ul(li('b'), li('c')),
+    ]);
   });
 });
 
