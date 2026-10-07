@@ -157,6 +157,24 @@
     "collapse": "Collapse",
     "expand": "Expand"
   },
+  "link": {
+    "edit": "Edit link",
+    "external": "External link",
+    "hash": "Anchor",
+    "hashDescription": "Jumps to a section of the linked page.",
+    "insert": "Insert link",
+    "invalidHash": "An anchor cannot contain spaces or a # sign.",
+    "missing": "The linked record was not found. Choose another one or remove the link.",
+    "newTab": "Open in a new tab",
+    "options": "Link options",
+    "placeholder": "Search records or enter a URL",
+    "remove": "Remove",
+    "target": "Link to",
+    "text": "Text",
+    "unsafeURL": "This URL is not allowed",
+    "urlPlaceholder": "Enter a URL",
+    "useURL": "Use URL"
+  },
   "login": {
     "email": "Email",
     "failed": "The sign-in failed",

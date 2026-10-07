@@ -157,6 +157,24 @@
     "collapse": "Einklappen",
     "expand": "Ausklappen"
   },
+  "link": {
+    "edit": "Link bearbeiten",
+    "external": "Externer Link",
+    "hash": "Anker",
+    "hashDescription": "Springt zu einem Abschnitt der verlinkten Seite.",
+    "insert": "Link einfügen",
+    "invalidHash": "Ein Anker darf keine Leerzeichen und kein #-Zeichen enthalten.",
+    "missing": "Der verlinkte Datensatz wurde nicht gefunden. Wähle einen anderen oder entferne den Link.",
+    "newTab": "In neuem Tab öffnen",
+    "options": "Link-Optionen",
+    "placeholder": "Datensätze suchen oder URL eingeben",
+    "remove": "Entfernen",
+    "target": "Link zu",
+    "text": "Text",
+    "unsafeURL": "Diese URL ist nicht erlaubt",
+    "urlPlaceholder": "URL eingeben",
+    "useURL": "URL verwenden"
+  },
   "login": {
     "email": "E-Mail",
     "failed": "Die Anmeldung ist fehlgeschlagen",

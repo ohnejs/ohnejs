@@ -157,6 +157,24 @@
     "collapse": "Skupi",
     "expand": "Proširi"
   },
+  "link": {
+    "edit": "Uredi link",
+    "external": "Vanjski link",
+    "hash": "Sidro",
+    "hashDescription": "Vodi do odjeljka povezane stranice.",
+    "insert": "Umetni link",
+    "invalidHash": "Sidro ne smije sadržavati razmake ni znak #.",
+    "missing": "Povezani zapis nije pronađen. Odaberite drugi ili uklonite link.",
+    "newTab": "Otvori u novoj kartici",
+    "options": "Opcije linka",
+    "placeholder": "Pretraži zapise ili unesi URL",
+    "remove": "Ukloni",
+    "target": "Link na",
+    "text": "Tekst",
+    "unsafeURL": "Ovaj URL nije dozvoljen",
+    "urlPlaceholder": "Unesi URL",
+    "useURL": "Koristi URL"
+  },
   "login": {
     "email": "E-mail",
     "failed": "Prijava nije uspjela",
