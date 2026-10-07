@@ -281,6 +281,12 @@ export interface FieldType {
   control?(context: FieldControlContext): FieldControl | undefined;
 
   /**
+   * The value's text in a composite cell's digest, `''` when it contributes nothing.
+   * A column type without one digests a string as it is and a number stringified.
+   */
+  summary?(value: unknown, field: DashboardField): string;
+
+  /**
    * The field's filter behaviour; a type without one never appears in the filter builder.
    */
   filter?: FieldFilter;

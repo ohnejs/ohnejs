@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok } from 'node:assert';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 const SRC = new URL('../../../src/dashboard/', import.meta.url);
@@ -22,9 +22,9 @@ function guarded(): string[] {
   const editor = readdirSync(new URL('ui/', SRC))
     .filter((name) => name.startsWith('rich-text-') && name.endsWith('.ts'))
     .map((name) => `ui/${name}`);
-  const fields = ['rich-text', 'link', '_link-popup']
-    .map((name) => `fields/builtin/${name}.ts`)
-    .filter((path) => existsSync(new URL(path, SRC)));
+  const fields = readdirSync(new URL('fields/builtin/', SRC))
+    .filter((name) => /^(rich-text|link|_link-.*)\.ts$/.test(name))
+    .map((name) => `fields/builtin/${name}`);
   return [...editor, ...fields];
 }
 

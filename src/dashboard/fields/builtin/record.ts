@@ -60,6 +60,13 @@ export interface RecordChoiceSource {
    * A `UUID` the response omits settles on a "record not found" choice.
    */
   choicesOf(uuids: readonly string[]): Promise<DynamicSelectChoice[]>;
+
+  /**
+   * Resolves which of the `UUID`s the server did not return, fetching only the unseen ones.
+   * A deleted record and an unreadable one are both missing.
+   * A failed request resolves an empty set, so a network error never reports a record as missing.
+   */
+  missing(uuids: readonly string[]): Promise<Set<string>>;
 }
 
 /**
@@ -68,7 +75,6 @@ export interface RecordChoiceSource {
  * Resolved choices are kept in a per-source cache, so re-resolving linked values never refetches.
  */
 export function recordChoiceSource(target: DashboardCollection): RecordChoiceSource {
-  const t = useT();
   const names = target.labelFields;
   const cache = new Map<string, DynamicSelectChoice>();
 
@@ -82,9 +88,9 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
     return choice;
   };
 
-  const missing = (uuid: string): DynamicSelectChoice => ({
+  const notFound = (uuid: string): DynamicSelectChoice => ({
     value: uuid,
-    label: `${t('dashboard.recordNotFound')} (${fallbackLabel(uuid)})`,
+    label: notFoundLabel(uuid),
   });
 
   const query = async (
@@ -141,7 +147,7 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
       if (!isUndefined(kept)) return kept;
       const rows = await query({ where: { UUID: uuid }, limit: 1 });
       const row = rows?.[0];
-      return isUndefined(row) ? missing(uuid) : keep(row);
+      return isUndefined(row) ? notFound(uuid) : keep(row);
     },
     async choicesOf(uuids) {
       const unseen = uuids.filter((uuid) => !cache.has(uuid));
@@ -149,9 +155,25 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
         const rows = await query({ where: { UUID: { in: unseen } }, limit: unseen.length });
         for (const row of rows ?? []) keep(row);
       }
-      return uuids.map((uuid) => cache.get(uuid) ?? missing(uuid));
+      return uuids.map((uuid) => cache.get(uuid) ?? notFound(uuid));
+    },
+    async missing(uuids) {
+      const unseen = uuids.filter((uuid) => !cache.has(uuid));
+      if (isEmpty(unseen)) return new Set();
+      const rows = await query({ where: { UUID: { in: unseen } }, limit: unseen.length });
+      if (isUndefined(rows)) return new Set();
+      for (const row of rows) keep(row);
+      return new Set(unseen.filter((uuid) => !cache.has(uuid)));
     },
   };
+}
+
+/**
+ * The label of a choice whose record is deleted or unreadable, ending in the record's `fallbackLabel`.
+ */
+export function notFoundLabel(uuid: string): string {
+  const t = useT();
+  return `${t('dashboard.recordNotFound')} (${fallbackLabel(uuid)})`;
 }
 
 /**

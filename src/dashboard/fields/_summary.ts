@@ -10,12 +10,13 @@ import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { h } from '../render/h.ts';
 import { summarizable } from './_search.ts';
-import { dimMark } from './field-type.ts';
+import { dimMark, fieldTypeFor } from './field-type.ts';
 import { labelOf } from './labels.ts';
 
 /**
  * A child item's one-line digest values, in field order.
  * Scalar columns contribute their text, `record` links their resolved label.
+ * A column type with a `summary` hook contributes what it answers.
  * A nested child's own values flatten in place.
  * Booleans, list kinds, and unresolved links contribute nothing.
  */
@@ -28,7 +29,7 @@ export function summaryParts(
     if (!summarizable(field)) continue;
     const value = item[field.name];
     if (field.kind === 'column') {
-      const text = scalarText(value);
+      const text = columnText(field, value);
       if (text !== '') parts.push(text);
     } else if (field.kind === 'record') {
       const label = linkLabel(field, value);
@@ -83,7 +84,7 @@ function titleRows(
         ? value
           ? t('dashboard.yes')
           : t('dashboard.no')
-        : scalarText(value);
+        : columnText(field, value);
       if (text !== '') rows.push(`${label}: ${text}`);
     } else if (field.kind === 'record') {
       const resolved = linkLabel(field, value);
@@ -109,9 +110,12 @@ function linkLabel(field: DashboardField, value: unknown): string {
 }
 
 /**
- * The value as digest text: a string as it is, a number stringified, anything else `''`.
+ * The column's value as digest text, as the type's `summary` hook answers it when there is one.
+ * Without one, a string reads as it is, a number stringified, and anything else `''`.
  */
-function scalarText(value: unknown): string {
+function columnText(field: DashboardField, value: unknown): string {
+  const { summary } = fieldTypeFor(field);
+  if (!isUndefined(summary)) return summary(value, field);
   if (isString(value)) return value;
   if (isNumber(value)) return String(value);
   return '';

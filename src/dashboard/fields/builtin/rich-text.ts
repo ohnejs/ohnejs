@@ -6,7 +6,9 @@ import type {
   RichTextOptions,
 } from '../../../utils/rich-text/rich-text.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
+import type { RichTextEditor } from '../../ui/rich-text-editor.ts';
 import type { Selection } from '../../ui/rich-text-model.ts';
+import type { RichTextToolbar } from '../../ui/rich-text-toolbar.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isBoolean } from '../../../utils/is/is-boolean.ts';
@@ -22,15 +24,16 @@ import { normalizeRichText } from '../../../utils/rich-text/normalize-rich-text.
 import { richTextLength } from '../../../utils/rich-text/rich-text-length.ts';
 import { richTextToText } from '../../../utils/rich-text/rich-text-to-text.ts';
 import { RICH_TEXT_ELEMENTS, RICH_TEXT_MARKS } from '../../../utils/rich-text/rich-text.ts';
-import { recordHref } from '../../../utils/route/record-href.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { richTextEditor } from '../../ui/rich-text-editor.ts';
-import { readableCollection } from '../_search.ts';
+import { richTextToolbar } from '../../ui/rich-text-toolbar.ts';
 import { describeControl } from '../field-row.ts';
 import { controlIDs, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { labelOf } from '../labels.ts';
+import { linkChoices, targetHref } from './_link-choices.ts';
+import { openLinkPopup } from './_link-popup.ts';
 
 const TITLE_LENGTH = 500;
 const BLOCK_PATH = /^\[(\d+)\]/;
@@ -58,7 +61,9 @@ css`
 /**
  * The `richText` field type: cell display and form control.
  * The cell shows the value's plain text, truncated, with its first characters as the title.
- * The control is the rich text editor, reading as the canonical form of its document.
+ * A composite cell digests the value as that plain text.
+ * The control is the rich text editor with its toolbar, reading as the canonical form of its document.
+ * Links are edited in the link popup, and a link to a missing record is drawn dashed.
  * An emptied document reads as `null` on a nullable field and as `[]` otherwise.
  * Server errors below the field mark the leaf they point into, and the first one becomes the field's line.
  * A rebuilt form hands the editor's selection to the control that takes its place.
@@ -73,6 +78,9 @@ export const richTextType: FieldType = {
       const text = richTextToText(current);
       return h('span', { class: 'ohne-truncate', title: text.slice(0, TITLE_LENGTH) }, text);
     };
+  },
+  summary(value) {
+    return isRichText(value) ? richTextToText(value) : '';
   },
   control({ field, initial, path, disabled, onInput }) {
     const t = useT();
@@ -103,6 +111,10 @@ export const richTextType: FieldType = {
         () => t('dashboard.richText.count', { count: count(), max }),
       );
 
+    const choices = options.links === false ? undefined : linkChoices(options.links);
+    const openLink = choices && ((target: RichTextEditor): void => openLinkPopup(target, choices));
+
+    let toolbar: RichTextToolbar | undefined;
     const editor = richTextEditor({
       value: doc.value,
       options,
@@ -110,8 +122,15 @@ export const richTextType: FieldType = {
       error: () => routed.value !== '',
       placeholder: field.placeholder,
       missingLabel: () => t('dashboard.richText.missingLink'),
-      links: { href: recordLinkHref, label: recordLinkLabel },
+      links: {
+        open: openLink,
+        href: targetHref,
+        label: recordLinkLabel,
+        missing: choices?.missing,
+        record: choices?.record,
+      },
       suffix: isNumber(max) ? counter(max) : undefined,
+      focusToolbar: () => toolbar?.focus(),
       onChange(next) {
         doc.value = next;
         touched.value = true;
@@ -124,6 +143,28 @@ export const richTextType: FieldType = {
     if (isNumber(max)) {
       editor.surface.setAttribute('aria-describedby', `${ids.description} ${counterID}`);
     }
+
+    toolbar = richTextToolbar(editor, {
+      options,
+      disabled: () => off,
+      onLink: openLink && (() => openLink(editor)),
+      labels: () => ({
+        toolbar: t('dashboard.richText.toolbar'),
+        blockType: t('dashboard.richText.blockType'),
+        paragraph: t('dashboard.richText.paragraph'),
+        heading: (level) => t('dashboard.richText.heading', { level }),
+        bulletList: t('dashboard.richText.bulletList'),
+        orderedList: t('dashboard.richText.orderedList'),
+        quote: t('dashboard.richText.quote'),
+        strong: t('dashboard.richText.strong'),
+        em: t('dashboard.richText.em'),
+        del: t('dashboard.richText.del'),
+        code: t('dashboard.richText.code'),
+        link: t('dashboard.richText.link'),
+        clearFormatting: t('dashboard.richText.clearFormatting'),
+      }),
+    });
+    if (toolbar) editor.element.prepend(toolbar.element);
 
     const handoff = handoffs.get(ids.input);
     if (!isUndefined(handoff)) {
@@ -223,14 +264,6 @@ function leafPathOf(key: string): number[] | undefined {
     rest = rest.slice(item[0].length);
   }
   return path;
-}
-
-/**
- * The dashboard path that opens a record link's target, when the user can read its collection.
- */
-function recordLinkHref(link: RecordLink): string | undefined {
-  const collection = readableCollection(link.collection);
-  return isUndefined(collection) ? undefined : recordHref(collection, link.record);
 }
 
 /**

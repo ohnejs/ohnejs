@@ -3,6 +3,7 @@ import './boolean.ts';
 import './date.ts';
 import './date-time.ts';
 import './integer.ts';
+import './link.ts';
 import './multi-select.ts';
 import './number.ts';
 import './object.ts';
