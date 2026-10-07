@@ -1,10 +1,12 @@
 import { deepStrictEqual, ok } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import type { NodeLike, RichText, RichTextRun } from '../../../src/utils/index.ts';
+import type { JSONNode } from '../html/_node-like.ts';
 
 import { checkRichText, htmlToRichText, isRichText } from '../../../src/utils/index.ts';
-import { comment, el, text } from '../html/_node-like.ts';
+import { comment, el, nodeOf, text } from '../html/_node-like.ts';
 import { PAGE, PERMISSIVE } from './fixtures.ts';
 
 function body(...children: NodeLike[]): NodeLike {
@@ -17,6 +19,35 @@ function p(...content: RichTextRun[]): RichText[number] {
 
 function parse(...children: NodeLike[]): RichText {
   return htmlToRichText(body(...children));
+}
+
+/**
+ * A Word list paragraph: the conditional comments, the `mso-list:Ignore` marker, the text and its `o:p`.
+ */
+function wordItem(style: string, marker: string, value: string): NodeLike {
+  return el(
+    'p',
+    { class: 'MsoListParagraph', style },
+    comment('[if !supportLists]'),
+    el(
+      'span',
+      { style: 'font-family:Symbol' },
+      el(
+        'span',
+        { style: 'mso-list:Ignore' },
+        text(marker),
+        el('span', { style: 'font:7.0pt "Times New Roman"' }, text('\u00a0\u00a0\u00a0 ')),
+      ),
+    ),
+    comment('[endif]'),
+    text(value),
+    el('o:p', {}),
+  );
+}
+
+function fixture(name: string): RichText {
+  const json = readFileSync(new URL(`fixtures/${name}.json`, import.meta.url), 'utf8');
+  return htmlToRichText(nodeOf(JSON.parse(json) as JSONNode));
 }
 
 describe('htmlToRichText', () => {
@@ -215,16 +246,159 @@ describe('htmlToRichText', () => {
       );
     });
 
-    it('skips comments and reads `o:p` and unknown elements as inline', () => {
+    it('skips comments, drops `o:p` and reads unknown elements as inline', () => {
       deepStrictEqual(
-        parse(el('p', {}, comment('[if !supportLists]'), text('a'), el('o:p', {}, text('b')))),
-        [p({ text: 'ab' })],
+        parse(
+          el(
+            'p',
+            {},
+            comment('[if !supportLists]'),
+            text('a'),
+            el('o:p', {}, text('b')),
+            el('x-y', {}, text('c')),
+          ),
+        ),
+        [p({ text: 'ac' })],
       );
     });
 
     it('reads an empty root as `[]`', () => {
       deepStrictEqual(parse(), []);
       deepStrictEqual(parse(text('  \n ')), []);
+    });
+  });
+
+  describe('Word', () => {
+    it('groups `mso-list:lN levelM` paragraphs into one list per group, nested by level', () => {
+      deepStrictEqual(
+        parse(
+          wordItem('mso-list:l0 level1 lfo1', '·', 'a'),
+          text('\n'),
+          wordItem('margin-left:1.0in;mso-list:l0 level2 lfo1', 'o', 'b'),
+          wordItem('mso-list:l0 level3 lfo1', '§', 'c'),
+          wordItem('mso-list:l0 level1 lfo1', '·', 'd'),
+          wordItem('mso-list:l1 level1 lfo2', '·', 'e'),
+        ),
+        [
+          {
+            kind: 'list',
+            ordered: false,
+            items: [
+              {
+                content: [{ text: 'a' }],
+                list: {
+                  kind: 'list',
+                  ordered: false,
+                  items: [
+                    {
+                      content: [{ text: 'b' }],
+                      list: { kind: 'list', ordered: false, items: [{ content: [{ text: 'c' }] }] },
+                    },
+                  ],
+                },
+              },
+              { content: [{ text: 'd' }] },
+            ],
+          },
+          { kind: 'list', ordered: false, items: [{ content: [{ text: 'e' }] }] },
+        ],
+      );
+    });
+
+    it('numbers a list whose marker reads like `1.`, `a)` or `iv.`, by the first item at each level', () => {
+      const ordered = (marker: string): boolean => {
+        const [list] = parse(wordItem('mso-list:l0 level1 lfo1', marker, 'a'));
+        return list?.kind === 'list' && list.ordered;
+      };
+      for (const marker of ['1.', '12)', 'a.', 'B)', 'iv.', 'IX.']) ok(ordered(marker), marker);
+      for (const marker of ['·', 'o', '§', '-', '1', 'a', 'ab.']) ok(!ordered(marker), marker);
+      deepStrictEqual(
+        parse(
+          wordItem('mso-list:l0 level1 lfo1', '1.', 'a'),
+          wordItem('mso-list:l0 level2 lfo1', '·', 'b'),
+          wordItem('mso-list:l0 level2 lfo1', 'o', 'c'),
+          wordItem('mso-list:l0 level1 lfo1', '2.', 'd'),
+        ),
+        [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [
+              {
+                content: [{ text: 'a' }],
+                list: {
+                  kind: 'list',
+                  ordered: false,
+                  items: [{ content: [{ text: 'b' }] }, { content: [{ text: 'c' }] }],
+                },
+              },
+              { content: [{ text: 'd' }] },
+            ],
+          },
+        ],
+      );
+    });
+
+    it('keeps the marker and its spacing out of the item', () => {
+      deepStrictEqual(
+        parse(
+          el(
+            'p',
+            { style: 'mso-list:l0 level1 lfo1' },
+            el('span', { style: 'mso-list:Ignore' }, text('1.'), text('\u00a0 ')),
+            el('b', {}, text('a')),
+            text(' b'),
+          ),
+        ),
+        [
+          {
+            kind: 'list',
+            ordered: true,
+            items: [{ content: [{ text: 'a', marks: ['strong'] }, { text: ' b' }] }],
+          },
+        ],
+      );
+    });
+
+    it('starts a deep first item under empty items, and lets another block end the group', () => {
+      deepStrictEqual(
+        parse(
+          wordItem('mso-list:l0 level2 lfo1', '·', 'a'),
+          el('p', {}, text('b')),
+          wordItem('mso-list:l0 level1 lfo1', '·', 'c'),
+        ),
+        [
+          {
+            kind: 'list',
+            ordered: false,
+            items: [
+              {
+                content: [],
+                list: { kind: 'list', ordered: false, items: [{ content: [{ text: 'a' }] }] },
+              },
+            ],
+          },
+          p({ text: 'b' }),
+          { kind: 'list', ordered: false, items: [{ content: [{ text: 'c' }] }] },
+        ],
+      );
+    });
+
+    it('reads `MsoTitle` as a heading and `MsoQuote` and `MsoIntenseQuote` as quotes', () => {
+      deepStrictEqual(
+        parse(
+          el('p', { class: 'MsoTitle' }, text('a'), el('o:p', {})),
+          el('p', { class: 'MsoQuote' }, text('b'), el('o:p', {})),
+          el('p', { class: 'MsoIntenseQuote' }, el('i', {}, text('c')), el('o:p', {})),
+          el('p', { class: 'MsoNormal' }, text('d'), el('o:p', {})),
+        ),
+        [
+          { kind: 'heading', level: 2, content: [{ text: 'a' }] },
+          { kind: 'quote', content: [{ text: 'b' }] },
+          { kind: 'quote', content: [{ text: 'c', marks: ['em'] }] },
+          p({ text: 'd' }),
+        ],
+      );
     });
   });
 
@@ -415,6 +589,138 @@ describe('htmlToRichText', () => {
         p({ text: 'a bc' }),
         p({ text: 'd e', marks: ['code'] }),
       ]);
+    });
+  });
+
+  describe('fixtures', () => {
+    it('reads a Google Docs clipboard', () => {
+      deepStrictEqual(fixture('google-docs'), [
+        { kind: 'heading', level: 2, content: [{ text: 'Release notes' }] },
+        p(
+          { text: 'Bold', marks: ['strong'] },
+          { text: ', ' },
+          { text: 'italic', marks: ['em'] },
+          { text: ' and ' },
+          { text: 'struck', marks: ['del'] },
+          { text: ', then ' },
+          { text: 'a link', link: { url: 'https://example.com/docs' } },
+          { text: '.' },
+        ),
+        {
+          kind: 'list',
+          ordered: false,
+          items: [
+            {
+              content: [{ text: 'First' }],
+              list: { kind: 'list', ordered: false, items: [{ content: [{ text: 'Nested' }] }] },
+            },
+            { content: [{ text: 'Second' }] },
+          ],
+        },
+        {
+          kind: 'list',
+          ordered: true,
+          items: [{ content: [{ text: 'Step one' }] }, { content: [{ text: 'Step two' }] }],
+        },
+        p({ text: 'Call' }),
+        p({ text: 'Run ' }, { text: 'build()', marks: ['code'] }, { text: ' first\nthen deploy' }),
+      ]);
+    });
+
+    it('reads a Word clipboard', () => {
+      deepStrictEqual(fixture('word'), [
+        { kind: 'heading', level: 2, content: [{ text: 'Quarterly report' }] },
+        { kind: 'heading', level: 2, content: [{ text: 'Summary' }] },
+        p(
+          { text: 'Revenue grew ' },
+          { text: '12%', marks: ['strong'] },
+          { text: ' over ' },
+          { text: 'last quarter', marks: ['em'] },
+          { text: '.' },
+        ),
+        {
+          kind: 'list',
+          ordered: false,
+          items: [
+            {
+              content: [{ text: 'Hardware' }],
+              list: { kind: 'list', ordered: false, items: [{ content: [{ text: 'Laptops' }] }] },
+            },
+            { content: [{ text: 'Services' }] },
+          ],
+        },
+        p({ text: 'Next steps:' }),
+        {
+          kind: 'list',
+          ordered: true,
+          items: [
+            {
+              content: [{ text: 'Ship' }],
+              list: { kind: 'list', ordered: true, items: [{ content: [{ text: 'Then rest' }] }] },
+            },
+            { content: [{ text: 'Repeat' }] },
+          ],
+        },
+        { kind: 'quote', content: [{ text: 'Measure twice.' }] },
+        { kind: 'quote', content: [{ text: 'Cut once.' }] },
+        p({ text: 'The full report', link: { url: 'https://example.com/report' } }),
+        p(),
+      ]);
+    });
+
+    it('reads a web page clipboard', () => {
+      deepStrictEqual(fixture('web'), [
+        { kind: 'heading', level: 2, content: [{ text: 'Getting started' }] },
+        p(
+          { text: 'Install it with ' },
+          { text: 'pnpm add ohnejs', marks: ['code'] },
+          { text: ', then read the ' },
+          { text: 'config guide', link: { url: 'https://example.com/ohne/docs/config.md' } },
+          { text: '. Jump to usage or ' },
+          { text: 'report a bug', link: { url: 'https://example.com/ohne/issues', newTab: true } },
+          { text: '.' },
+        ),
+        {
+          kind: 'list',
+          ordered: false,
+          items: [
+            { content: [{ text: 'No', marks: ['strong'] }, { text: ' runtime dependencies' }] },
+            {
+              content: [{ text: 'Typed ' }, { text: 'end to end', marks: ['em'] }],
+              list: {
+                kind: 'list',
+                ordered: false,
+                items: [
+                  {
+                    content: [
+                      { text: 'Even the ' },
+                      { text: 'build', marks: ['del'] },
+                      { text: ' config' },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        p({ text: 'pnpm dev\npnpm build', marks: ['code'] }),
+        { kind: 'quote', content: [{ text: 'Ohne means without.' }] },
+        p(
+          { text: 'Command', marks: ['strong'] },
+          { text: ' | ' },
+          { text: 'Does', marks: ['strong'] },
+        ),
+        p({ text: 'ohne dev', marks: ['code'] }, { text: ' | Serves the app' }),
+        p({ text: 'Share' }),
+      ]);
+    });
+
+    it('gives fixture values that `checkRichText` passes under permissive options', () => {
+      for (const name of ['google-docs', 'word', 'web']) {
+        const value = fixture(name);
+        ok(isRichText(value), name);
+        deepStrictEqual(checkRichText(value, PERMISSIVE), [], name);
+      }
     });
   });
 

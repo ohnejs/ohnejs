@@ -54,6 +54,19 @@ interface Sink<C extends string> {
   blocks: RichTextBlock<C>[];
   loose: Raw<C>[];
   leaf: boolean;
+  word?: WordList<C>;
+}
+
+interface WordList<C extends string> {
+  group: string;
+  list: RichTextList<C>;
+}
+
+interface WordItem<C extends string> {
+  group: string;
+  level: number;
+  ordered: boolean;
+  content: RichTextRun<C>[];
 }
 
 const ELEMENT = 1;
@@ -62,6 +75,11 @@ const ZERO_WIDTH = /[​﻿]/g;
 const SPACES = /[\t\n\f\r ]+/g;
 const MONOSPACE = /mono|courier|consolas|menlo|code/;
 const GOOGLE_HOST = /^(www\.)?google\.com$/;
+const WORD_LIST = /mso-list\s*:\s*l(\d+)\s+level(\d+)/i;
+const WORD_MARKER = /mso-list\s*:\s*ignore/i;
+const WORD_NUMBER = /^(\d+|[a-z]|[ivxlcdm]+)[.)]/i;
+const WORD_TITLE = 'msotitle';
+const WORD_QUOTES = new Set(['msoquote', 'msointensequote']);
 
 const HEADING_LEVELS = new Map<string, RichTextHeadingLevel>([
   ['h1', 2],
@@ -85,6 +103,7 @@ const MARK_OF = new Map<string, RichTextMark>([
   ['tt', 'code'],
 ]);
 const DROPPED = new Set([
+  'o:p',
   'head',
   'title',
   'meta',
@@ -163,6 +182,9 @@ const LISTS = new Set(['ul', 'ol']);
  * `code`, `kbd`, `samp`, `tt`, `pre` and a monospace first font family give `code`.
  * An `a` becomes the link `options.link` returns, else a URL link when its `href` passes `isSafeHref`.
  * A `google.com/url?q=` wrapper unwraps, `target="_blank"` sets `newTab`, and a `#fragment` keeps its text.
+ * A Word paragraph styled `mso-list:lN levelM` gives an item at level M of the list grouped by N.
+ * That list is numbered when its `mso-list:Ignore` marker reads like `1.`, `a)` or `iv.`.
+ * `MsoTitle` gives a heading, `MsoQuote` and `MsoIntenseQuote` give quotes, and `o:p` is dropped.
  * Whitespace collapses outside `pre` and `options.pre`.
  * NBSP becomes a space, and U+200B and U+FEFF are removed.
  * A `br` inside a leaf is `\n`, and one between blocks is ignored.
@@ -217,12 +239,18 @@ function walkNodes<C extends string>(
       sink.loose.push(...rawText(node, inline));
       continue;
     }
-    if (DROPPED.has(name)) continue;
+    if (DROPPED.has(name) || WORD_MARKER.test(styleOf(node))) continue;
     if (name === 'br') {
       if (sink.leaf || sink.loose.some(holdsText)) sink.loose.push({ text: '\n', inline });
       continue;
     }
     const inner = inlineOf(name, node, inline, resolve);
+    const item = wordItemOf(name, node, inner, resolve);
+    if (item) {
+      flush(sink);
+      addWordItem(sink, item);
+      continue;
+    }
     const block = blockOf(name, node, inner, resolve);
     if (block) {
       flush(sink);
@@ -254,8 +282,12 @@ function blockOf<C extends string>(
   inline: Inline<C>,
   resolve: Resolve<C>,
 ): RichTextBlock<C>[] | undefined {
-  const level = HEADING_LEVELS.get(name);
+  const classes = name === 'p' ? classesOf(node) : [];
+  const level = HEADING_LEVELS.get(name) ?? (classes.includes(WORD_TITLE) ? 2 : undefined);
   if (level) return [{ kind: 'heading', level, content: leafRuns(node, inline, resolve) }];
+  if (classes.some((token) => WORD_QUOTES.has(token))) {
+    return [{ kind: 'quote', content: leafRuns(node, inline, resolve) }];
+  }
   if (name === 'p' || name === 'pre' || name === 'li' || CELLS.has(name)) {
     return [{ kind: 'paragraph', content: leafRuns(node, inline, resolve) }];
   }
@@ -334,6 +366,87 @@ function joinLists<C extends string>(
   next: RichTextList<C>,
 ): RichTextList<C> {
   return { ...list, items: [...list.items, ...next.items] };
+}
+
+/**
+ * Reads a Word list paragraph as an item, or returns `undefined` for any other element.
+ * Its marker decides whether the item counts, and never reaches the item's runs.
+ */
+function wordItemOf<C extends string>(
+  name: string,
+  node: NodeLike,
+  inline: Inline<C>,
+  resolve: Resolve<C>,
+): WordItem<C> | undefined {
+  const match = name === 'p' ? WORD_LIST.exec(styleOf(node)) : null;
+  if (!match) return undefined;
+  return {
+    group: match[1],
+    level: Number(match[2]),
+    ordered: WORD_NUMBER.test(markerText(node).trim()),
+    content: leafRuns(node, inline, resolve),
+  };
+}
+
+/**
+ * The text of the `mso-list:Ignore` marker under `node`, `''` without one.
+ */
+function markerText(node: NodeLike): string {
+  for (const child of node.childNodes) {
+    if (isUndefined(elementName(child))) continue;
+    const text = WORD_MARKER.test(styleOf(child)) ? textOf(child) : markerText(child);
+    if (text !== '') return text;
+  }
+  return '';
+}
+
+/**
+ * The text under `node`, as written.
+ */
+function textOf(node: NodeLike): string {
+  let text = '';
+  for (const child of node.childNodes) {
+    text += child.nodeType === TEXT ? (child.nodeValue ?? '') : textOf(child);
+  }
+  return text;
+}
+
+/**
+ * Adds a Word item to the list its group is building, when that list is still the last block.
+ * Otherwise a new list starts, numbered as the item is.
+ */
+function addWordItem<C extends string>(sink: Sink<C>, item: WordItem<C>): void {
+  const { word } = sink;
+  if (word && word.group === item.group && word.list === sink.blocks.at(-1)) {
+    nestWordItem(word.list, item, item.level);
+    return;
+  }
+  const list: RichTextList<C> = { kind: 'list', ordered: item.ordered, items: [] };
+  sink.word = { group: item.group, list };
+  sink.blocks.push(list);
+  nestWordItem(list, item, item.level);
+}
+
+/**
+ * Nests an item `level` deep in `list`, under the last item of each level above it.
+ * A level without an item there yet gets an empty one.
+ */
+function nestWordItem<C extends string>(
+  list: RichTextList<C>,
+  item: WordItem<C>,
+  level: number,
+): void {
+  if (level <= 1) {
+    list.items.push({ content: item.content });
+    return;
+  }
+  let last = list.items.at(-1);
+  if (isUndefined(last)) {
+    last = { content: [] };
+    list.items.push(last);
+  }
+  last.list ??= { kind: 'list', ordered: item.ordered, items: [] };
+  nestWordItem(last.list, item, level - 1);
 }
 
 /**
@@ -526,6 +639,20 @@ function unwrapGoogle(href: string): string {
   const url = URL.parse(href);
   if (!url || !GOOGLE_HOST.test(url.hostname) || url.pathname !== '/url') return href;
   return url.searchParams.get('q') ?? href;
+}
+
+/**
+ * The element's inline `style`, `''` without one.
+ */
+function styleOf(node: NodeLike): string {
+  return node.getAttribute?.('style') ?? '';
+}
+
+/**
+ * The element's class tokens, lowercased.
+ */
+function classesOf(node: NodeLike): string[] {
+  return (node.getAttribute?.('class') ?? '').toLowerCase().split(SPACES).filter(Boolean);
 }
 
 /**

@@ -1,0 +1,675 @@
+{
+  "nodeType": 1,
+  "nodeName": "BODY",
+  "attributes": {
+    "lang": "EN-US",
+    "style": "tab-interval:.5in;word-wrap:break-word"
+  },
+  "childNodes": [
+    {
+      "nodeType": 8,
+      "nodeName": "#comment",
+      "nodeValue": "StartFragment"
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoTitle"
+      },
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Quarterly report"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "H1",
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Summary"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoNormal"
+      },
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Revenue grew "
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "B",
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "12%"
+            }
+          ]
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": " over "
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "I",
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "last\nquarter"
+            }
+          ]
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "."
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpFirst",
+        "style": "text-indent:-.25in;mso-list:l0 level1 lfo1"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "font-family:Symbol;mso-fareast-font-family:Symbol"
+          },
+          "childNodes": [
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "mso-list:Ignore"
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "·"
+                },
+                {
+                  "nodeType": 1,
+                  "nodeName": "SPAN",
+                  "attributes": {
+                    "style": "font:7.0pt \"Times New Roman\""
+                  },
+                  "childNodes": [
+                    {
+                      "nodeType": 3,
+                      "nodeName": "#text",
+                      "nodeValue": "         "
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Hardware"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpMiddle",
+        "style": "margin-left:1.0in;mso-add-space:auto;text-indent:-.25in;mso-list:l0 level2 lfo1"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "font-family:\"Courier New\";mso-fareast-font-family:\"Courier New\""
+          },
+          "childNodes": [
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "mso-list:Ignore"
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "o"
+                },
+                {
+                  "nodeType": 1,
+                  "nodeName": "SPAN",
+                  "attributes": {
+                    "style": "font:7.0pt \"Times New Roman\""
+                  },
+                  "childNodes": [
+                    {
+                      "nodeType": 3,
+                      "nodeName": "#text",
+                      "nodeValue": "    "
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Laptops"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpLast",
+        "style": "text-indent:-.25in;mso-list:l0 level1 lfo1"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "font-family:Symbol;mso-fareast-font-family:Symbol"
+          },
+          "childNodes": [
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "mso-list:Ignore"
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "·"
+                },
+                {
+                  "nodeType": 1,
+                  "nodeName": "SPAN",
+                  "attributes": {
+                    "style": "font:7.0pt \"Times New Roman\""
+                  },
+                  "childNodes": [
+                    {
+                      "nodeType": 3,
+                      "nodeName": "#text",
+                      "nodeValue": "         "
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Services"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoNormal"
+      },
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Next steps:"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpFirst",
+        "style": "text-indent:-.25in;mso-list:l1 level1 lfo2"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "mso-list:Ignore"
+          },
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "1."
+            },
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "font:7.0pt \"Times New Roman\""
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "       "
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Ship"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpMiddle",
+        "style": "margin-left:1.0in;mso-add-space:auto;text-indent:-.25in;mso-list:l1 level2 lfo2"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "mso-list:Ignore"
+          },
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "a."
+            },
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "font:7.0pt \"Times New Roman\""
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "       "
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Then rest"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoListParagraphCxSpLast",
+        "style": "text-indent:-.25in;mso-list:l1 level1 lfo2"
+      },
+      "childNodes": [
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[if !supportLists]"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "mso-list:Ignore"
+          },
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "2."
+            },
+            {
+              "nodeType": 1,
+              "nodeName": "SPAN",
+              "attributes": {
+                "style": "font:7.0pt \"Times New Roman\""
+              },
+              "childNodes": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "       "
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": 8,
+          "nodeName": "#comment",
+          "nodeValue": "[endif]"
+        },
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Repeat"
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoIntenseQuote"
+      },
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Measure twice."
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoQuote"
+      },
+      "childNodes": [
+        {
+          "nodeType": 3,
+          "nodeName": "#text",
+          "nodeValue": "Cut once."
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoNormal"
+      },
+      "childNodes": [
+        {
+          "nodeType": 1,
+          "nodeName": "SPAN",
+          "attributes": {
+            "style": "mso-spacerun:yes"
+          },
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "  "
+            }
+          ]
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "A",
+          "attributes": {
+            "href": "https://example.com/report"
+          },
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "The full report"
+            }
+          ]
+        },
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": []
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "P",
+      "attributes": {
+        "class": "MsoNormal"
+      },
+      "childNodes": [
+        {
+          "nodeType": 1,
+          "nodeName": "O:P",
+          "childNodes": [
+            {
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": " "
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeName": "#text",
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 8,
+      "nodeName": "#comment",
+      "nodeValue": "EndFragment"
+    }
+  ]
+}
