@@ -13,8 +13,12 @@ import type {
 import type { Pos, Selection } from './rich-text-model.ts';
 
 import { last } from '../../utils/array/last.ts';
-import { MAX_LIST_DEPTH } from '../../utils/rich-text/_walk.ts';
 import { mergeRuns } from '../../utils/rich-text/merge-runs.ts';
+import {
+  RICH_TEXT_DEFAULT_ELEMENTS,
+  RICH_TEXT_MAX_LIST_DEPTH,
+} from '../../utils/rich-text/rich-text.ts';
+import { sliceRuns } from '../../utils/rich-text/slice-runs.ts';
 import {
   caret,
   comparePos,
@@ -116,7 +120,6 @@ interface Opened<C extends string> extends Draft<C> {
   head: Point;
 }
 
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
 const HEADINGS = ['h2', 'h3', 'h4', 'h5', 'h6'] as const;
 const BULLETS = ['-', '*', '+'];
 const NUMBERS = ['1.', '1)'];
@@ -274,7 +277,8 @@ export function splitBlock<C extends string>(
   };
   if (from.offset === size && (line.kind === 'heading' || line.kind === 'quote'))
     reshape(next, 'p');
-  line.content = sliceRuns(line.content, 0, from.offset);
+  // A line split at its end keeps its content, so `commit` reuses its block.
+  if (from.offset < size) line.content = sliceRuns(line.content, 0, from.offset);
   lines.splice(from.line + 1, 0, next);
   return commit(lines, { line: from.line + 1, offset: 0 });
 }
@@ -306,7 +310,7 @@ export function sinkItem<C extends string>(state: RichTextState<C>): RichTextSta
     return undefined;
   }
   const region = lines.slice(from.line, subtreeEnd(lines, from.line, to.line));
-  if (region.some((item) => item.depth + 1 >= MAX_LIST_DEPTH)) return undefined;
+  if (region.some((item) => item.depth + 1 >= RICH_TEXT_MAX_LIST_DEPTH)) return undefined;
   for (const item of region) item.depth++;
   return commit(lines, anchor, head);
 }
@@ -481,7 +485,7 @@ export function markdownShortcut<C extends string>(
   state: RichTextState<C>,
   options: RichTextOptions = {},
 ): RichTextState<C> | undefined {
-  const { inline = false, elements = DEFAULT_ELEMENTS } = options;
+  const { inline = false, elements = RICH_TEXT_DEFAULT_ELEMENTS } = options;
   const { doc, selection } = state;
   const { head } = selection;
   const leaf = leafAt(doc, head.path);
@@ -740,30 +744,6 @@ function mapBetween<C extends string>(
 }
 
 /**
- * The runs between two offsets, cut at both ends, or `runs` itself when the range covers them all.
- */
-function sliceRuns<C extends string>(
-  runs: RichTextRun<C>[],
-  from: number,
-  to = Infinity,
-): RichTextRun<C>[] {
-  if (from <= 0 && to >= length(runs)) return runs;
-  const cut: RichTextRun<C>[] = [];
-  let start = 0;
-  for (const run of runs) {
-    const end = start + run.text.length;
-    if (end > from && start < to) {
-      const whole = start >= from && end <= to;
-      cut.push(
-        whole ? run : { ...run, text: run.text.slice(Math.max(from - start, 0), to - start) },
-      );
-    }
-    start = end;
-  }
-  return cut;
-}
-
-/**
  * The length of the text in a list of runs.
  */
 function length(runs: readonly RichTextRun[]): number {
@@ -906,7 +886,7 @@ function nestDepths<C extends string>(lines: readonly Line<C>[]): number[] {
   return lines.map((line) => {
     while (stack.length > 0 && last(stack)!.recorded >= line.depth) stack.pop();
     const parent = last(stack);
-    const depth = parent ? Math.min(parent.depth + 1, MAX_LIST_DEPTH - 1) : 0;
+    const depth = parent ? Math.min(parent.depth + 1, RICH_TEXT_MAX_LIST_DEPTH - 1) : 0;
     stack.push({ recorded: line.depth, depth });
     return depth;
   });

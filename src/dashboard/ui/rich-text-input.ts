@@ -3,10 +3,8 @@ import type { Link, RecordLink } from '../../utils/rich-text/link.ts';
 import type {
   RichText,
   RichTextBlock,
-  RichTextElement,
   RichTextList,
   RichTextListItem,
-  RichTextMark,
   RichTextOptions,
   RichTextRun,
 } from '../../utils/rich-text/rich-text.ts';
@@ -25,6 +23,11 @@ import { isRichText } from '../../utils/rich-text/is-rich-text.ts';
 import { normalizeRichText } from '../../utils/rich-text/normalize-rich-text.ts';
 import { richTextToHTML } from '../../utils/rich-text/rich-text-to-html.ts';
 import { richTextToText } from '../../utils/rich-text/rich-text-to-text.ts';
+import {
+  RICH_TEXT_DEFAULT_ELEMENTS,
+  RICH_TEXT_DEFAULT_MARKS,
+} from '../../utils/rich-text/rich-text.ts';
+import { sliceRuns } from '../../utils/rich-text/slice-runs.ts';
 import { textToRichText } from '../../utils/rich-text/text-to-rich-text.ts';
 import {
   clearMarks,
@@ -144,8 +147,6 @@ const MAX_JSON_DEPTH = 32;
 const LONE_URL = /^https?:\/\/\S+$/i;
 const COMPOSING = 'ohne-rich-text-composing';
 const NATIVE = new Set(['insertReplacementText', 'insertTranspose', 'insertCompositionText']);
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
-const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
 
 /**
  * The part of a document a selection covers, with its first and last leaves cut at the selection's ends.
@@ -175,7 +176,7 @@ export function sliceRichText<C extends string>(
   const inside = (path: readonly number[]) =>
     comparePos({ path, offset: 0 }, start) >= 0 && comparePos({ path, offset: 0 }, end) <= 0;
   const cut = (content: readonly RichTextRun<C>[], path: readonly number[]) =>
-    cutRuns(
+    sliceRuns(
       content,
       samePath(path, from.path) ? from.offset : 0,
       samePath(path, to.path) ? to.offset : Infinity,
@@ -208,7 +209,11 @@ export function sliceRichText<C extends string>(
 export function bindRichTextInput<C extends string>(host: RichTextInputHost<C>): void {
   const { surface, view, options } = host;
   const { ownerDocument } = surface;
-  const { inline = false, elements = DEFAULT_ELEMENTS, marks = DEFAULT_MARKS } = options;
+  const {
+    inline = false,
+    elements = RICH_TEXT_DEFAULT_ELEMENTS,
+    marks = RICH_TEXT_DEFAULT_MARKS,
+  } = options;
   const commands = new Map<string, RichTextCommand<C>>([
     ['insertParagraph', (state) => splitBlock(state, options)],
     ['insertLineBreak', (state) => insertLineBreak(state, options)],
@@ -498,23 +503,6 @@ function typesNatively(state: RichTextState, data: string): boolean {
     start = end;
   }
   return from.offset === start && to.offset === start && !last(runs)?.link;
-}
-
-/**
- * The runs between two offsets, cut at both ends.
- */
-function cutRuns<C extends string>(
-  runs: readonly RichTextRun<C>[],
-  start: number,
-  end: number,
-): RichTextRun<C>[] {
-  let at = 0;
-  return runs.flatMap((run) => {
-    const from = at;
-    at += run.text.length;
-    const text = run.text.slice(Math.max(start - from, 0), Math.max(end - from, 0));
-    return text ? [{ ...run, text }] : [];
-  });
 }
 
 /**

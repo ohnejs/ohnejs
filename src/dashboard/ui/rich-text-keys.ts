@@ -3,18 +3,18 @@ import type { ComposingEventLike } from '../../utils/keys/is-composing.ts';
 import type { KeyStroke } from '../../utils/keys/key-stroke.ts';
 import type { Platform } from '../../utils/keys/platform.ts';
 import type { KeyboardEventLike } from '../../utils/keys/stroke-from-keyboard-event.ts';
-import type {
-  RichTextElement,
-  RichTextMark,
-  RichTextOptions,
-} from '../../utils/rich-text/rich-text.ts';
+import type { RichTextMark, RichTextOptions } from '../../utils/rich-text/rich-text.ts';
 import type { RichTextBlockType } from './rich-text-commands.ts';
 
 import { createKeymap } from '../../utils/keys/create-keymap.ts';
 import { isComposing } from '../../utils/keys/is-composing.ts';
 import { detectPlatform } from '../../utils/keys/platform.ts';
 import { strokeFromKeyboardEvent } from '../../utils/keys/stroke-from-keyboard-event.ts';
-import { RICH_TEXT_MARKS } from '../../utils/rich-text/rich-text.ts';
+import {
+  RICH_TEXT_DEFAULT_ELEMENTS,
+  RICH_TEXT_DEFAULT_MARKS,
+  RICH_TEXT_MARKS,
+} from '../../utils/rich-text/rich-text.ts';
 
 /**
  * The editor's shortcuts, as `createKeymap` specs keyed by what they do.
@@ -111,8 +111,6 @@ export interface RichTextKeyEvent extends KeyboardEventLike, ComposingEventLike 
  */
 export type RichTextKeyMatcher = (event: RichTextKeyEvent) => boolean;
 
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
-const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
 const HEADINGS = ['h2', 'h3', 'h4', 'h5', 'h6'] as const;
 
 /**
@@ -132,8 +130,8 @@ export function richTextKeys(
   const platform = keymapOptions.platform ?? detectPlatform();
   const {
     inline = false,
-    elements = DEFAULT_ELEMENTS,
-    marks = DEFAULT_MARKS,
+    elements = RICH_TEXT_DEFAULT_ELEMENTS,
+    marks = RICH_TEXT_DEFAULT_MARKS,
     links = true,
   } = options;
   const keymap: Keymap = {
