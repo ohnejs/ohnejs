@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import {
@@ -107,6 +107,39 @@ describe('hotkey labels', () => {
   it('labels redo per platform', () => {
     strictEqual(hotkeyLabels(true).redo, 'Cmd + Shift + Z');
     strictEqual(hotkeyLabels(false).redo, 'Ctrl + Y');
+  });
+
+  it('labels every action per platform', () => {
+    deepStrictEqual(hotkeyLabels(true), {
+      close: 'Esc',
+      copy: 'Cmd + C',
+      cut: 'Cmd + X',
+      delete: 'Del',
+      duplicate: 'Cmd + D',
+      moveDown: 'Cmd + ↓',
+      moveUp: 'Cmd + ↑',
+      paste: 'Cmd + V',
+      redo: 'Cmd + Shift + Z',
+      save: 'Cmd + S',
+      search: 'Cmd + K',
+      selectAll: 'Cmd + A',
+      undo: 'Cmd + Z',
+    });
+    deepStrictEqual(hotkeyLabels(false), {
+      close: 'Esc',
+      copy: 'Ctrl + C',
+      cut: 'Ctrl + X',
+      delete: 'Del',
+      duplicate: 'Ctrl + D',
+      moveDown: 'Ctrl + ↓',
+      moveUp: 'Ctrl + ↑',
+      paste: 'Ctrl + V',
+      redo: 'Ctrl + Y',
+      save: 'Ctrl + S',
+      search: 'Ctrl + K',
+      selectAll: 'Ctrl + A',
+      undo: 'Ctrl + Z',
+    });
   });
 });
 

@@ -1,6 +1,7 @@
 import type { KeyStroke } from '../../utils/keys/key-stroke.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
+import { keySpecLabel } from '../../utils/keys/key-spec-label.ts';
 
 /**
  * A named keyboard shortcut the dashboard understands.
@@ -132,21 +133,22 @@ function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAc
 export function hotkeyLabels(
   mac: boolean,
 ): Record<Exclude<HotkeyAction, 'insertAfter' | 'insertBefore'>, string> {
-  const metaKey = mac ? 'Cmd' : 'Ctrl';
+  const platform = mac ? 'mac' : 'win';
+  const label = (spec: string) => keySpecLabel(spec, platform);
 
   return {
-    close: 'Esc',
-    copy: `${metaKey} + C`,
-    cut: `${metaKey} + X`,
-    delete: 'Del',
-    duplicate: `${metaKey} + D`,
-    moveDown: `${metaKey} + ↓`,
-    moveUp: `${metaKey} + ↑`,
-    paste: `${metaKey} + V`,
-    redo: mac ? `${metaKey} + Shift + Z` : `${metaKey} + Y`,
-    save: `${metaKey} + S`,
-    search: `${metaKey} + K`,
-    selectAll: `${metaKey} + A`,
-    undo: `${metaKey} + Z`,
+    close: label('esc'),
+    copy: label('mod+c'),
+    cut: label('mod+x'),
+    delete: label('delete'),
+    duplicate: label('mod+d'),
+    moveDown: label('mod+arrowdown'),
+    moveUp: label('mod+arrowup'),
+    paste: label('mod+v'),
+    redo: label(mac ? 'mod+shift+z' : 'mod+y'),
+    save: label('mod+s'),
+    search: label('mod+k'),
+    selectAll: label('mod+a'),
+    undo: label('mod+z'),
   };
 }
