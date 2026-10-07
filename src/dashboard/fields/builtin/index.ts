@@ -9,6 +9,7 @@ import './object.ts';
 import './record.ts';
 import './records.ts';
 import './repeater.ts';
+import './rich-text.ts';
 import './select.ts';
 import './text.ts';
 import './time.ts';

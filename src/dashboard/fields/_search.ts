@@ -4,12 +4,19 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
 
 /**
+ * The collection named `name`, when the discovery read lists it as readable for the user.
+ */
+export function readableCollection(name: string | undefined): DashboardCollection | undefined {
+  const collection = dashboardMeta()?.collections.find((entry) => entry.name === name);
+  if (isUndefined(collection) || collection.operations.read?.allowed !== true) return undefined;
+  return collection;
+}
+
+/**
  * The relation's target collection, when the discovery read lists it as readable for the user.
  */
 export function targetOf(field: DashboardField): DashboardCollection | undefined {
-  const target = dashboardMeta()?.collections.find((entry) => entry.name === field.target);
-  if (isUndefined(target) || target.operations.read?.allowed !== true) return undefined;
-  return target;
+  return readableCollection(field.target);
 }
 
 /**
