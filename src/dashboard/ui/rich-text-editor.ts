@@ -6,6 +6,7 @@ import type { RichTextCommand, RichTextInputHost } from './rich-text-input.ts';
 import type { Leaf, Selection } from './rich-text-model.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
@@ -252,6 +253,10 @@ css`
     outline: none;
   }
 
+  .ohne-rich-text-toolbar + .ohne-rich-text-surface {
+    padding-block: 0.625rem;
+  }
+
   .ohne-rich-text-surface a {
     text-decoration: underline;
     text-underline-offset: 0.2em;
@@ -445,7 +450,7 @@ export function richTextEditor<C extends string>(
 
     linked() {
       const { doc, selection } = current.value;
-      if (isCollapsed(selection)) return linkRangeAt(doc, selection.head) !== undefined;
+      if (isCollapsed(selection)) return !isUndefined(linkRangeAt(doc, selection.head));
       return selectedRuns().some((run) => run.link);
     },
 

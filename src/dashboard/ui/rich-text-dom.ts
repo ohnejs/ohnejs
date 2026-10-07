@@ -11,6 +11,7 @@ import { intersperse } from '../../utils/array/intersperse.ts';
 import { last } from '../../utils/array/last.ts';
 import { reconcile } from '../../utils/array/reconcile.ts';
 import { isSafeHref } from '../../utils/html/is-safe-href.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { isRecordLink } from '../../utils/rich-text/is-record-link.ts';
 import { RICH_TEXT_MARKS } from '../../utils/rich-text/rich-text.ts';
@@ -157,7 +158,7 @@ export function linkHref<C extends string>(
   href?: (link: RecordLink<C>) => string | undefined,
 ): string | undefined {
   const value = isRecordLink(link) ? href?.(link) : link.url;
-  return value !== undefined && isSafeHref(value) ? value : undefined;
+  return !isUndefined(value) && isSafeHref(value) ? value : undefined;
 }
 
 /**
