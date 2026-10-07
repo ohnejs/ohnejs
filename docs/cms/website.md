@@ -29,6 +29,36 @@ In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields
 are absolute, so they work from another origin. A related record with a route of its own carries
 its `path`, so you can link to it.
 
+## Rich text and links
+
+A [rich text](../database/rich-text.md) value is a tree of blocks, never HTML. `richTextToHTML`
+renders it, with every text and address escaped:
+
+```ts
+import { richTextToHTML, type RichText } from '@ohnejs/client';
+
+const html = richTextToHTML(page.record.body as RichText);
+```
+
+- A link to a record carries `href` when the reader can open its page: the target is published,
+  and its collection has a route in the page's locale. Otherwise the link renders as plain text,
+  and comes back once the target does.
+- A `link` field's value carries `href` by the same rule.
+- Pass `{ inline: true }` for an [`inline`](../database/rich-text.md#options) field.
+
+The rendered links are plain `<a href>` tags. To keep them inside a client-side router, let
+`interceptLinks` catch the clicks:
+
+```ts
+import { interceptLinks } from '@ohnejs/client';
+
+const dispose = interceptLinks(document, (path) => router.push(path));
+```
+
+It leaves alone links to other origins, links that open a new tab, downloads, and clicks with a
+modifier key held. Call `dispose` on unmount. [Frameworks](./frameworks.md) shows the component
+for each framework.
+
 ## Live preview
 
 The editor frames your page with a preview token in the URL, `?ohne-preview=...`. Your page:

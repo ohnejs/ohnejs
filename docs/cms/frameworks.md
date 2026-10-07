@@ -84,6 +84,31 @@ useHead({
 `onData` swaps in each new page as the editor types, with no request. `useState` keeps the token
 across renders, since the client removes it from the address bar.
 
+A [rich text](./website.md#rich-text-and-links) field renders through one component, which routes
+clicks on links to your pages through `navigateTo`:
+
+```vue
+<!-- app/components/RichText.vue -->
+<script setup lang="ts">
+import { interceptLinks, richTextToHTML, type RichText } from '@ohnejs/client';
+
+const props = defineProps<{ value: RichText }>();
+const root = useTemplateRef('root');
+const html = computed(() => richTextToHTML(props.value));
+
+onMounted(() => {
+  const dispose = interceptLinks(root.value!, (path) => navigateTo(path));
+  onBeforeUnmount(dispose);
+});
+</script>
+
+<template>
+  <div ref="root" v-html="html" />
+</template>
+```
+
+A block component renders its field with `<RichText :value="body" />`.
+
 ## Next
 
 The page renders on the server. In preview, `router.refresh()` renders it again from the URL, so
@@ -164,6 +189,27 @@ export default async function Page(props: Props) {
 }
 ```
 
+A [rich text](./website.md#rich-text-and-links) field renders through one client component, which
+routes clicks on links to your pages through `router.push`:
+
+```tsx
+// components/rich-text.tsx
+'use client';
+
+import { interceptLinks, richTextToHTML, type RichText as RichTextValue } from '@ohnejs/client';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+
+export function RichText({ value }: { value: RichTextValue }) {
+  const router = useRouter();
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => interceptLinks(root.current!, router.push), [router]);
+  return <div ref={root} dangerouslySetInnerHTML={{ __html: richTextToHTML(value) }} />;
+}
+```
+
+The server page renders a field with `<RichText value={block.fields.body} />`.
+
 ## React
 
 A page rendered in the browser fetches itself, and takes each new page from `onData`:
@@ -207,20 +253,35 @@ export function Page() {
 }
 ```
 
+A [rich text](./website.md#rich-text-and-links) field renders through one component. The recipe
+has no router, so a link to another page loads it like any other link:
+
+```jsx
+// src/rich-text.jsx
+import { richTextToHTML } from '@ohnejs/client';
+
+export function RichText({ value }) {
+  return <div dangerouslySetInnerHTML={{ __html: richTextToHTML(value) }} />;
+}
+```
+
+The page renders a field with `<RichText value={block.fields.body} />`.
+
 Search engines read a page rendered in the browser poorly. Prefer a server-rendered framework for
 a public site.
 
 ## Any server
 
-Without a framework, render the HTML on the server. `renderHead` writes the `<head>` tags.
-`previewScript` loads the client at the end of `<body>`; on each change it fetches the page again
-and swaps the `<body>` in:
+Without a framework, render the HTML on the server. `renderHead` writes the `<head>` tags, and
+`richTextToHTML` renders a [rich text](./website.md#rich-text-and-links) field. `previewScript`
+loads the client at the end of `<body>`; on each change it fetches the page again and swaps the
+`<body>` in:
 
 ```js
 // server.js
 import { createServer } from 'node:http';
 
-import { createOhne, escapeHTML } from '@ohnejs/client';
+import { createOhne, escapeHTML, richTextToHTML } from '@ohnejs/client';
 
 const ohne = createOhne({ api: process.env.OHNE_API });
 
@@ -240,7 +301,10 @@ createServer(async (request, response) => {
 
   const blocks = (page.record.content ?? []).map(
     (block) =>
-      `<section data-ohne-block="${block.UUID}">${escapeHTML(block.fields.heading)}</section>`,
+      `<section data-ohne-block="${block.UUID}">
+        <h2>${escapeHTML(block.fields.heading)}</h2>
+        ${richTextToHTML(block.fields.body)}
+      </section>`,
   );
   response.writeHead(200, {
     'content-type': 'text/html',

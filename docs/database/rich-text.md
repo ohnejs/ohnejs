@@ -91,8 +91,8 @@ A run's `link` has one of two shapes:
 - A record link names a collection and a record's `UUID`. It follows the record wherever its page
   moves, and pins no locale.
 - `newTab` opens the link in a new tab, and `hash` adds a fragment to the target's page.
-- `href` is never stored: a write drops it, and a layer that serves the record's pages sets it on
-  read.
+- `href` is never stored: a write drops it, and a layer that serves the record's pages, like the
+  [CMS](../cms/website.md#rich-text-and-links), sets it on read.
 
 Record links need the `links` option to name their collections:
 
