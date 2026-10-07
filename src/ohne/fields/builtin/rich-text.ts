@@ -7,6 +7,8 @@ import {
   isRichText,
   isUndefined,
   normalizeRichText,
+  RICH_TEXT_DEFAULT_ELEMENTS,
+  RICH_TEXT_DEFAULT_MARKS,
   richTextLength,
   richTextLinks,
 } from '../../../utils/index.ts';
@@ -15,9 +17,6 @@ import { linksParameter, registeredLinks } from '../link-collections.ts';
 import { option } from '../option.ts';
 import { reportIssues } from '../report-issues.ts';
 import { validationMessage } from '../validation-message.ts';
-
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
-const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
 
 /**
  * The built-in `richText` field type: formatted text with links, stored as a JSON tree.
@@ -50,7 +49,7 @@ export const richText = defineField({
      * @default
      * ['h2', 'h3', 'ul', 'ol', 'blockquote']
      */
-    elements: option<readonly RichTextElement[]>({ default: DEFAULT_ELEMENTS }),
+    elements: option<readonly RichTextElement[]>({ default: RICH_TEXT_DEFAULT_ELEMENTS }),
 
     /**
      * The marks allowed on text, by HTML name.
@@ -58,7 +57,7 @@ export const richText = defineField({
      * @default
      * ['strong', 'em', 'code']
      */
-    marks: option<readonly RichTextMark[]>({ default: DEFAULT_MARKS }),
+    marks: option<readonly RichTextMark[]>({ default: RICH_TEXT_DEFAULT_MARKS }),
 
     /**
      * The links allowed on text.
