@@ -25,8 +25,17 @@ export function reportIssues(
   let own: Message | undefined;
   for (const { path, key, params } of issues) {
     const message = isUndefined(params) ? key : validationMessage(key, params);
-    if (path === '') own = message;
-    else errors[path] = message;
+    if (path === '') {
+      own = message;
+      continue;
+    }
+    // A plain assignment to a `__proto__` path would hit the prototype setter and vanish.
+    Object.defineProperty(errors, path, {
+      value: message,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return own;
 }

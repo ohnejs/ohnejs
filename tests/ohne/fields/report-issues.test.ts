@@ -49,4 +49,10 @@ describe('reportIssues', () => {
     strictEqual(reportIssues([], errors), undefined);
     deepStrictEqual(errors, {});
   });
+
+  it('lands an issue at a `__proto__` path as an own key', () => {
+    const errors: Record<string, Message> = {};
+    reportIssues([{ path: '__proto__', key: 'validation.unknownField' }], errors);
+    deepStrictEqual(Object.entries(errors), [['__proto__', 'validation.unknownField']]);
+  });
 });
