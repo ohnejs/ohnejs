@@ -230,6 +230,7 @@ export * from './rich-text/rich-text-links.ts';
 export * from './rich-text/rich-text-to-html.ts';
 export * from './rich-text/rich-text-to-text.ts';
 export * from './rich-text/rich-text.ts';
+export * from './rich-text/slice-runs.ts';
 export * from './rich-text/text-to-rich-text.ts';
 export * from './route/compile-route.ts';
 export * from './route/decode-route-params.ts';

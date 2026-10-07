@@ -9,6 +9,7 @@ import type {
 
 import { mergeRuns } from './merge-runs.ts';
 import { normalizeLink } from './normalize-link.ts';
+import { sliceRuns } from './slice-runs.ts';
 
 const CARRIAGE_RETURN = /\r\n?/g;
 const CONTROL = /(?![\n\t])\p{Cc}/gu;
@@ -103,24 +104,6 @@ function normalizeRuns<C extends string>(
 function cleanText(text: string, lineBreaks: boolean): string {
   const clean = text.toWellFormed().replace(CARRIAGE_RETURN, '\n').replace(CONTROL, '');
   return lineBreaks ? clean : clean.replaceAll('\n', ' ');
-}
-
-/**
- * Keeps the text between two leaf offsets, dropping runs left empty.
- */
-function sliceRuns<C extends string>(
-  runs: readonly RichTextRun<C>[],
-  start: number,
-  end: number,
-): RichTextRun<C>[] {
-  const sliced: RichTextRun<C>[] = [];
-  let offset = 0;
-  for (const run of runs) {
-    const text = run.text.slice(Math.max(start - offset, 0), Math.max(end - offset, 0));
-    offset += run.text.length;
-    if (text !== '') sliced.push({ ...run, text });
-  }
-  return sliced;
 }
 
 /**

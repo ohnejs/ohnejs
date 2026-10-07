@@ -7,7 +7,7 @@ import { isPlainObject } from '../is/is-plain-object.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 import { isUUID } from '../uuid/is-uuid.ts';
-import { RICH_TEXT_MARKS } from './rich-text.ts';
+import { RICH_TEXT_MARKS, RICH_TEXT_MAX_LIST_DEPTH } from './rich-text.ts';
 
 /**
  * Receives each issue a walk finds, in document order.
@@ -54,11 +54,6 @@ interface Walk {
   policy: Policy | undefined;
   report: Report;
 }
-
-/**
- * How many lists may nest inside each other, the outermost counted as one.
- */
-export const MAX_LIST_DEPTH = 4;
 
 const INVALID = 'validation.invalidValue';
 const REQUIRED = 'validation.required';
@@ -198,8 +193,8 @@ function walkURLTarget(
  */
 function walkBlock(node: unknown, path: string, depth: number, walk: Walk): void {
   if (!isPlainObject(node)) return walk.report(path, INVALID);
-  if (depth >= MAX_LIST_DEPTH) {
-    return walk.report(path, 'validation.maxDepth', { max: MAX_LIST_DEPTH });
+  if (depth >= RICH_TEXT_MAX_LIST_DEPTH) {
+    return walk.report(path, 'validation.maxDepth', { max: RICH_TEXT_MAX_LIST_DEPTH });
   }
   const { kind } = node;
   const keys = depth === 0 || kind === 'list' ? BLOCK_KEYS.get(kind) : undefined;

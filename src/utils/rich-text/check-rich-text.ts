@@ -1,9 +1,7 @@
-import type { RichTextElement, RichTextIssue, RichTextMark, RichTextOptions } from './rich-text.ts';
+import type { RichTextIssue, RichTextOptions } from './rich-text.ts';
 
 import { collectIssues, linkPolicy, walkRichText } from './_walk.ts';
-
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
-const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
+import { RICH_TEXT_DEFAULT_ELEMENTS, RICH_TEXT_DEFAULT_MARKS } from './rich-text.ts';
 
 /**
  * Lists every problem with a rich text value under `options`, at most one per path, in document order.
@@ -23,8 +21,8 @@ const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
 export function checkRichText(value: unknown, options: RichTextOptions = {}): RichTextIssue[] {
   const {
     inline = false,
-    elements = DEFAULT_ELEMENTS,
-    marks = DEFAULT_MARKS,
+    elements = RICH_TEXT_DEFAULT_ELEMENTS,
+    marks = RICH_TEXT_DEFAULT_MARKS,
     links = true,
   } = options;
   const policy = {

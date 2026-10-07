@@ -239,3 +239,40 @@ export const RICH_TEXT_MARKS = ['strong', 'em', 'del', 'code'] as const;
  * ```
  */
 export const RICH_TEXT_ELEMENTS = ['h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote'] as const;
+
+/**
+ * The block elements a value allows when its options name none.
+ *
+ * @example
+ * ```ts
+ * RICH_TEXT_DEFAULT_ELEMENTS.includes('h4') // -> false
+ * ```
+ */
+export const RICH_TEXT_DEFAULT_ELEMENTS: readonly RichTextElement[] = [
+  'h2',
+  'h3',
+  'ul',
+  'ol',
+  'blockquote',
+];
+
+/**
+ * The marks a value allows when its options name none.
+ * Strikethrough is rare in published copy, so a value opts in to `del`.
+ *
+ * @example
+ * ```ts
+ * RICH_TEXT_DEFAULT_MARKS.includes('del') // -> false
+ * ```
+ */
+export const RICH_TEXT_DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
+
+/**
+ * How many lists may nest inside each other, the outermost counted as one.
+ *
+ * @example
+ * ```ts
+ * RICH_TEXT_MAX_LIST_DEPTH // -> 4
+ * ```
+ */
+export const RICH_TEXT_MAX_LIST_DEPTH = 4;

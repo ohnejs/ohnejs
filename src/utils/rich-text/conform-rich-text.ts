@@ -11,9 +11,13 @@ import type {
 } from './rich-text.ts';
 
 import { flattenRichText } from './_flatten.ts';
-import { MAX_LIST_DEPTH } from './_walk.ts';
 import { checkLink } from './check-link.ts';
 import { mergeRuns } from './merge-runs.ts';
+import {
+  RICH_TEXT_DEFAULT_ELEMENTS,
+  RICH_TEXT_DEFAULT_MARKS,
+  RICH_TEXT_MAX_LIST_DEPTH,
+} from './rich-text.ts';
 
 interface Allowed {
   elements: ReadonlySet<RichTextElement>;
@@ -21,8 +25,6 @@ interface Allowed {
   links: boolean | readonly string[];
 }
 
-const DEFAULT_ELEMENTS: readonly RichTextElement[] = ['h2', 'h3', 'ul', 'ol', 'blockquote'];
-const DEFAULT_MARKS: readonly RichTextMark[] = ['strong', 'em', 'code'];
 const LEVELS: readonly RichTextHeadingLevel[] = [2, 3, 4, 5, 6];
 
 /**
@@ -48,8 +50,8 @@ export function conformRichText<C extends string>(
 ): RichText<C> {
   const {
     inline = false,
-    elements = DEFAULT_ELEMENTS,
-    marks = DEFAULT_MARKS,
+    elements = RICH_TEXT_DEFAULT_ELEMENTS,
+    marks = RICH_TEXT_DEFAULT_MARKS,
     links = true,
     lineBreaks = true,
   } = options;
@@ -107,7 +109,7 @@ function conformItems<C extends string>(
   return items.flatMap((item) => {
     const own: RichTextListItem<C> = { content: conformRuns(item.content, allowed) };
     if (!item.list) return [own];
-    if (depth + 1 >= MAX_LIST_DEPTH) {
+    if (depth + 1 >= RICH_TEXT_MAX_LIST_DEPTH) {
       return [own, ...conformItems(flattenItems(item.list), depth, allowed)];
     }
     const list = conformList(item.list, depth + 1, allowed);

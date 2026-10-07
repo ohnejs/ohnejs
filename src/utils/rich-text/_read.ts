@@ -3,8 +3,7 @@ import type { RichTextMark } from './rich-text.ts';
 import { isArray } from '../is/is-array.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
 import { isString } from '../is/is-string.ts';
-import { MAX_LIST_DEPTH } from './_walk.ts';
-import { RICH_TEXT_MARKS } from './rich-text.ts';
+import { RICH_TEXT_MARKS, RICH_TEXT_MAX_LIST_DEPTH } from './rich-text.ts';
 
 /**
  * A node of a value that may be malformed, read one key at a time.
@@ -94,7 +93,7 @@ export function readRuns(content: unknown): ReadRun[] {
 
 /**
  * Reads a list that `depth` lists already enclose, or returns `undefined` when it cannot be read.
- * A list is unreadable past `MAX_LIST_DEPTH`, or without `kind: 'list'` and an `items` array.
+ * A list is unreadable past `RICH_TEXT_MAX_LIST_DEPTH`, or without `kind: 'list'` and an `items` array.
  *
  * @example
  * ```ts
@@ -105,7 +104,8 @@ export function readRuns(content: unknown): ReadRun[] {
  * ```
  */
 export function readList(node: unknown, depth: number): ReadList | undefined {
-  if (!isPlainObject(node) || node.kind !== 'list' || depth >= MAX_LIST_DEPTH) return undefined;
+  if (!isPlainObject(node) || node.kind !== 'list' || depth >= RICH_TEXT_MAX_LIST_DEPTH)
+    return undefined;
   if (!isArray(node.items)) return undefined;
   return { ordered: node.ordered === true, items: node.items };
 }
