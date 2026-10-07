@@ -10,6 +10,7 @@ import type {
   RichTextRun,
 } from './rich-text.ts';
 
+import { isUndefined } from '../is/is-undefined.ts';
 import { flattenRichText } from './_flatten.ts';
 import { checkLink } from './check-link.ts';
 import { mergeRuns } from './merge-runs.ts';
@@ -93,7 +94,7 @@ function conformList<C extends string>(
   allowed: Allowed,
 ): RichTextList<C> | undefined {
   const ordered = listType(list.ordered, allowed.elements);
-  if (ordered === undefined) return undefined;
+  if (isUndefined(ordered)) return undefined;
   return { kind: 'list', ordered, items: conformItems(list.items, depth, allowed) };
 }
 
@@ -163,7 +164,7 @@ function nearestLevel(
   let nearest: RichTextHeadingLevel | undefined;
   for (const candidate of LEVELS) {
     if (!elements.has(`h${candidate}`)) continue;
-    if (nearest === undefined || Math.abs(candidate - level) < Math.abs(nearest - level)) {
+    if (isUndefined(nearest) || Math.abs(candidate - level) < Math.abs(nearest - level)) {
       nearest = candidate;
     }
   }

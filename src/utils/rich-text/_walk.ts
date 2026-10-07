@@ -164,12 +164,12 @@ function walkRecordTarget(
   report: Report,
 ): void {
   if (!isString(link.collection)) report(at(path, 'collection'), INVALID);
-  else if (links !== undefined && (isBoolean(links) || !links.has(link.collection))) {
+  else if (!isUndefined(links) && (isBoolean(links) || !links.has(link.collection))) {
     report(at(path, 'collection'), CHOICE);
   }
   required(link, 'record', isUUID, path, report);
   optional(link, 'hash', isString, path, report);
-  if (links !== undefined && isString(link.hash) && REFUSED_HASH.test(link.hash)) {
+  if (!isUndefined(links) && isString(link.hash) && REFUSED_HASH.test(link.hash)) {
     report(at(path, 'hash'), INVALID);
   }
 }
@@ -184,7 +184,7 @@ function walkURLTarget(
   report: Report,
 ): void {
   if (!isString(link.url)) report(at(path, 'url'), INVALID);
-  else if (links !== undefined && !isSafeHref(link.url))
+  else if (!isUndefined(links) && !isSafeHref(link.url))
     report(at(path, 'url'), 'validation.invalidLink');
 }
 
