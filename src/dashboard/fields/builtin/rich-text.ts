@@ -12,6 +12,7 @@ import type { RichTextToolbar } from '../../ui/rich-text-toolbar.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isBoolean } from '../../../utils/is/is-boolean.ts';
+import { isNull } from '../../../utils/is/is-null.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -28,6 +29,7 @@ import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { richTextEditor } from '../../ui/rich-text-editor.ts';
+import { denormalizePath } from '../../ui/rich-text-model.ts';
 import { richTextToolbar } from '../../ui/rich-text-toolbar.ts';
 import { describeControl } from '../field-row.ts';
 import { controlIDs, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -191,7 +193,9 @@ export const richTextType: FieldType = {
           if (key === '') continue;
           if (first === '') first = message;
           const leaf = leafPathOf(key);
-          if (!isUndefined(leaf)) paths.push(leaf);
+          if (isUndefined(leaf)) continue;
+          const marked = denormalizePath(doc.value, leaf, options);
+          if (!isUndefined(marked)) paths.push(marked);
         }
         routed.value = errors[''] ?? first;
         editor.markErrors(paths);
@@ -252,14 +256,15 @@ function isMark(value: unknown): value is RichTextMark {
 
 /**
  * The path of the leaf an error path points into: the block index, then each list item on the way.
- * `[2].items[0].list.items[1].content[0].link.url` gives `[2, 0, 1]`, and a path without a block gives nothing.
+ * `[2].items[0].list.items[1].content[0].link.url` gives `[2, 0, 1]`.
+ * A path without a block gives nothing.
  */
 function leafPathOf(key: string): number[] | undefined {
   const block = BLOCK_PATH.exec(key);
-  if (block === null) return undefined;
+  if (isNull(block)) return undefined;
   const path = [Number(block[1])];
   let rest = key.slice(block[0].length);
-  for (let item = ITEM_PATH.exec(rest); item !== null; item = ITEM_PATH.exec(rest)) {
+  for (let item = ITEM_PATH.exec(rest); !isNull(item); item = ITEM_PATH.exec(rest)) {
     path.push(Number(item[1]));
     rest = rest.slice(item[0].length);
   }

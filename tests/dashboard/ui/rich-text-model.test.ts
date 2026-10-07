@@ -1,11 +1,17 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { NodeLike, RichText, RichTextRun } from '../../../src/utils/index.ts';
+import type {
+  NodeLike,
+  RichText,
+  RichTextListItem,
+  RichTextRun,
+} from '../../../src/utils/index.ts';
 
 import {
   clampPos,
   comparePos,
+  denormalizePath,
   diffText,
   domText,
   formatPath,
@@ -167,6 +173,42 @@ describe('clampPos', () => {
 
   it('falls back to the first leaf before every leaf', () => {
     deepStrictEqual(clampPos(DOC.slice(1), { path: [0], offset: 4 }), { path: [0, 0], offset: 0 });
+  });
+});
+
+describe('denormalizePath', () => {
+  const li = (text: string, ...items: RichTextListItem[]): RichTextListItem =>
+    items.length > 0
+      ? { content: [{ text }], list: { kind: 'list', ordered: false, items } }
+      : { content: [{ text }] };
+
+  it('maps a path past the empty items normalizing drops', () => {
+    const doc: RichText = [{ kind: 'list', ordered: false, items: [li('a'), li(''), li('b')] }];
+    deepStrictEqual(denormalizePath(doc, [0, 1]), [0, 2]);
+  });
+
+  it('maps a path past empty lists and sublists, keeping an empty item with a sublist', () => {
+    const doc: RichText = [
+      { kind: 'list', ordered: false, items: [li('\n')] },
+      { kind: 'paragraph', content: [] },
+      { kind: 'list', ordered: true, items: [li('a', li('')), li('', li('')), li('', li('b'))] },
+    ];
+    deepStrictEqual(denormalizePath(doc, [0]), [1]);
+    deepStrictEqual(denormalizePath(doc, [1, 1]), [2, 2]);
+    deepStrictEqual(denormalizePath(doc, [1, 1, 0]), [2, 2, 0]);
+  });
+
+  it('keeps a line break item that becomes a space without line breaks', () => {
+    const doc: RichText = [{ kind: 'list', ordered: false, items: [li('\n'), li('a')] }];
+    deepStrictEqual(denormalizePath(doc, [0, 0]), [0, 1]);
+    deepStrictEqual(denormalizePath(doc, [0, 0], { lineBreaks: false }), [0, 0]);
+  });
+
+  it('gives nothing for a path past the normalized value', () => {
+    const doc: RichText = [{ kind: 'list', ordered: false, items: [li('a'), li('')] }];
+    strictEqual(denormalizePath(doc, [0, 1]), undefined);
+    strictEqual(denormalizePath(doc, [0, 0, 0]), undefined);
+    strictEqual(denormalizePath(doc, [1]), undefined);
   });
 });
 

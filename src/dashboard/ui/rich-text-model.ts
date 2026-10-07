@@ -3,16 +3,21 @@ import type { Link } from '../../utils/rich-text/link.ts';
 import type {
   RichText,
   RichTextHeading,
+  RichTextList,
   RichTextListItem,
   RichTextMark,
+  RichTextOptions,
   RichTextParagraph,
   RichTextQuote,
   RichTextRun,
 } from '../../utils/rich-text/rich-text.ts';
 
 import { last } from '../../utils/array/last.ts';
+import { isNull } from '../../utils/is/is-null.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
+import { normalizeRichText } from '../../utils/rich-text/normalize-rich-text.ts';
 
 /**
  * A caret position: the path of a leaf and a UTF-16 offset into the leaf's run text.
@@ -172,6 +177,40 @@ export function leafAt<C extends string>(
 }
 
 /**
+ * The path in `doc` of the leaf at `path` in `normalizeRichText(doc, options)`.
+ * Normalizing drops empty items, sublists and lists, so that leaf can sit further on in `doc`.
+ * Returns `undefined` when the normalized value has no leaf at `path`.
+ *
+ * Empty blocks at the end are dropped too, but nothing follows them, so they shift no path.
+ */
+export function denormalizePath<C extends string>(
+  doc: RichText<C>,
+  path: readonly number[],
+  options: RichTextOptions = {},
+): number[] | undefined {
+  const kept = (list: RichTextList<C>) => normalizeRichText([list], options).length > 0;
+  const [first = -1, ...rest] = path;
+  const blocks = doc.flatMap((block, at) => (block.kind !== 'list' || kept(block) ? [at] : []));
+  const block = blocks[first];
+  if (isUndefined(block)) return undefined;
+  const found = [block];
+  const node = doc[block]!;
+  let list = node.kind === 'list' ? node : undefined;
+  for (const index of rest) {
+    if (isUndefined(list)) return undefined;
+    const { ordered, items } = list;
+    const survivors = items.flatMap((item, at) =>
+      kept({ kind: 'list', ordered, items: [item] }) ? [at] : [],
+    );
+    const item = survivors[index];
+    if (isUndefined(item)) return undefined;
+    found.push(item);
+    list = items[item]!.list;
+  }
+  return found;
+}
+
+/**
  * The run text of a leaf.
  */
 export function leafText(leaf: Leaf): string {
@@ -274,7 +313,7 @@ export function formatPath(path: readonly number[]): string {
  * Reads a leaf element's `data-path` attribute, or returns `undefined` when it is not a path.
  */
 export function parsePath(value: string | null): number[] | undefined {
-  return value !== null && PATH.test(value) ? value.split('.').map(Number) : undefined;
+  return !isNull(value) && PATH.test(value) ? value.split('.').map(Number) : undefined;
 }
 
 /**
