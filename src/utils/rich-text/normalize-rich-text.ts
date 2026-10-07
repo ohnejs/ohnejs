@@ -91,11 +91,11 @@ function normalizeRuns<C extends string>(
   );
   const composed = cleaned.map((run) => ({ ...run, text: run.text.normalize('NFC') }));
   const text = composed.map((run) => run.text).join('');
-  return sliceRuns(
-    composed,
-    text.length - text.replace(/^\n+/, '').length,
-    text.replace(/\n+$/, '').length,
-  );
+  let start = 0;
+  let end = text.length;
+  while (text[start] === '\n') start++;
+  while (end > start && text[end - 1] === '\n') end--;
+  return sliceRuns(composed, start, end);
 }
 
 /**

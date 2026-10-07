@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, ok } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { RichText, RichTextRun } from '../../../src/utils/index.ts';
@@ -242,5 +242,14 @@ describe('normalizeRichText', () => {
         },
       ],
     );
+  });
+
+  it('trims a long run of `\\n` in linear time', () => {
+    const text = `${'\n'.repeat(200_000)}x${'\n'.repeat(200_000)}`;
+    const start = performance.now();
+    deepStrictEqual(normalizeRichText([{ kind: 'paragraph', content: [{ text }] }]), [
+      { kind: 'paragraph', content: [{ text: 'x' }] },
+    ]);
+    ok(performance.now() - start < 1000);
   });
 });
