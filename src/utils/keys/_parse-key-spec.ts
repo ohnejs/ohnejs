@@ -6,6 +6,12 @@ import type { Platform } from './platform.ts';
  * `mod` becomes Command on macOS and Control elsewhere, and the key comes back through `normalizeKey`.
  * A bare trailing `+` is the plus key itself.
  * Throws if a spec contains an unrecognized modifier.
+ *
+ * @example
+ * ```ts
+ * parseKeySpec('mod+b', 'mac')  // -> { key: 'b', ctrl: false, alt: false, shift: false, meta: true }
+ * parseKeySpec('ctrl++', 'win') // -> { key: '+', ctrl: true, alt: false, shift: false, meta: false }
+ * ```
  */
 export function parseKeySpec(spec: string, platform: Platform): KeyStroke {
   const parts = spec.split('+').map((part) => part.trim());
@@ -39,6 +45,13 @@ export function parseKeySpec(spec: string, platform: Platform): KeyStroke {
 
 /**
  * Lowercases a key and maps the aliases `space` and `esc` to the values a stroke carries.
+ *
+ * @example
+ * ```ts
+ * normalizeKey('Esc')   // -> 'escape'
+ * normalizeKey('Space') // -> ' '
+ * normalizeKey('K')     // -> 'k'
+ * ```
  */
 export function normalizeKey(key: string): string {
   const lower = key.toLowerCase();
