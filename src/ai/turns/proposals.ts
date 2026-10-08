@@ -129,15 +129,29 @@ export type Checked = { ok: true; accepted: Accepted } | { ok: false; receipt: R
 
 type Attempt<T> = { ok: true; value: T } | { ok: false; code: string; path: string };
 
-// `auto` is left out: the model never tags its own proposal.
-const PROPOSAL_KEYS = new Set(['route', 'params', 'query', 'body', 'where', 'transform']);
+/**
+ * The keys a proposal may carry, as the `request` tool offers them.
+ * `auto` is left out: the model never tags its own proposal.
+ */
+export const PROPOSAL_KEYS: ReadonlySet<string> = new Set([
+  'route',
+  'params',
+  'query',
+  'body',
+  'where',
+  'transform',
+]);
+
+/**
+ * The keys a proposal's `transform` may carry.
+ */
+export const TRANSFORM_KEYS: ReadonlySet<string> = new Set(['fields', 'instruction']);
 
 /**
  * The keys a `POST /search` body may carry.
  */
 const SEARCH_KEYS = new Set(['q', 'collection', 'via', 'limit', 'offset']);
 const VERDICT_KEYS = new Set(['where', 'UUIDs', 'locale']);
-const TRANSFORM_KEYS = new Set(['fields', 'instruction']);
 const WINDOW_KEYS = ['limit', 'offset', 'page', 'perPage'];
 
 /**

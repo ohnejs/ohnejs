@@ -25,6 +25,24 @@ const PROPOSAL_SCHEMA = {
       type: 'object',
       description: 'A write by set: the filter of the records to write, in place of `params`.',
     },
+    transform: {
+      type: 'object',
+      description:
+        'In place of `body` on an update: the server rewrites `fields` by `instruction`.',
+      properties: {
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields "Rewritable" lists for the collection.',
+        },
+        instruction: {
+          type: 'string',
+          description: 'Stands alone: the language, the tone and what to keep.',
+        },
+      },
+      required: ['fields', 'instruction'],
+      additionalProperties: false,
+    },
   },
   required: ['route'],
   additionalProperties: false,
