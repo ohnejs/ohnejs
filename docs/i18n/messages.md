@@ -138,6 +138,9 @@ Put backticks around an interpolated value:
 The backticks stay in the string, so a client can highlight the dynamic part, separate from the
 static text. The framework's shipped catalogs all follow this convention.
 
+If the value itself holds a backtick, ohne fences it with more backticks, so it still reads as one
+highlighted span.
+
 A key's parameters must be the same in every language that defines it. If `en` writes `{count}` and
 `de` spells it `{total}`, codegen fails, naming the key, both languages, and both files. A
 translation always takes the same parameters the code passes. How it uses them may differ: `en`

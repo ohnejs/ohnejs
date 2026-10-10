@@ -139,6 +139,9 @@ field('text', {
 });
 ```
 
+The dashboard shows the message under the field as markdown, like a field's `description`, with any
+link as plain text.
+
 They run in this order, and the first message stops the run for that field:
 
 1. The field type's sanitizers.
