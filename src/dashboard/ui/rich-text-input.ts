@@ -15,6 +15,7 @@ import type { Leaf, Pos, Selection } from './rich-text-model.ts';
 import { last } from '../../utils/array/last.ts';
 import { jsonDepthWithin } from '../../utils/json/json-depth-within.ts';
 import { jsonDeserialize } from '../../utils/json/json-deserialize.ts';
+import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { checkLink } from '../../utils/rich-text/check-link.ts';
 import { conformRichText } from '../../utils/rich-text/conform-rich-text.ts';
 import { htmlToRichText } from '../../utils/rich-text/html-to-rich-text.ts';
@@ -146,6 +147,7 @@ const MAX_HTML = 2 * 1024 * 1024;
 const MAX_JSON_DEPTH = 32;
 const LONE_URL = /^https?:\/\/\S+$/i;
 const COMPOSING = 'ohne-rich-text-composing';
+const FOLLOWING = 'ohne-rich-text-following';
 const NATIVE = new Set(['insertReplacementText', 'insertTranspose', 'insertCompositionText']);
 
 /**
@@ -450,6 +452,17 @@ export function bindRichTextInput<C extends string>(host: RichTextInputHost<C>):
     if (host.disabled() || !(event.metaKey || event.ctrlKey) || !anchor) return;
     event.preventDefault();
     window.open(anchor.getAttribute('href')!, '_blank', 'noopener,noreferrer');
+  });
+
+  const following = (event: KeyboardEvent | PointerEvent): void => {
+    surface.classList.toggle(FOLLOWING, !host.disabled() && (event.metaKey || event.ctrlKey));
+  };
+  surface.addEventListener('pointermove', following);
+  ownerDocument.addEventListener('keydown', following);
+  ownerDocument.addEventListener('keyup', following);
+  onCleanup(() => {
+    ownerDocument.removeEventListener('keydown', following);
+    ownerDocument.removeEventListener('keyup', following);
   });
 
   surface.addEventListener('copy', (event) => {

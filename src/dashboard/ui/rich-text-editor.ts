@@ -283,6 +283,10 @@ css`
     content: none;
   }
 
+  .ohne-rich-text-following a[href] {
+    cursor: pointer;
+  }
+
   .ohne-rich-text-leaf-error::after {
     content: '';
     position: absolute;
