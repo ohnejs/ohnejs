@@ -31,7 +31,7 @@ export interface SortingPopupOptions {
   order: readonly string[];
 
   /**
-   * The default order entries the restore button returns to.
+   * The default order entries the restore button applies.
    */
   defaults: readonly string[];
 
@@ -57,7 +57,7 @@ css`
  * The table sorting popup: the `orderBy` builder inside the apply-or-discard shell.
  * Every change pushes onto a `History`; undo and redo step through it by button or hotkey.
  * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
- * A restore button reverts to the defaults; Apply hands the current entries either way.
+ * A restore button applies the defaults at once; Apply hands the current entries.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function sortingPopup(options: SortingPopupOptions): Popup {
@@ -102,7 +102,10 @@ export function sortingPopup(options: SortingPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: () => commit([...options.defaults]),
+        onClick: () => {
+          options.onApply([...options.defaults]);
+          options.onClose(handle.close);
+        },
       }),
   );
 

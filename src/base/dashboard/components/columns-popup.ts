@@ -31,7 +31,7 @@ export interface ColumnsPopupOptions {
   current: readonly string[];
 
   /**
-   * The default column entries the restore button returns to.
+   * The default column entries the restore button applies.
    */
   defaults: readonly string[];
 
@@ -57,7 +57,7 @@ css`
  * The table columns popup: the `tableColumnsConfigurator` inside the apply-or-discard shell.
  * Every change pushes onto a `History`; undo and redo step through it by button or hotkey.
  * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
- * A restore button reverts to the defaults; Apply hands `undefined` when the edit equals them.
+ * A restore button applies the defaults at once; Apply hands `undefined` when the edit equals them.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function columnsPopup(options: ColumnsPopupOptions): Popup {
@@ -102,7 +102,10 @@ export function columnsPopup(options: ColumnsPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: () => commit([...options.defaults]),
+        onClick: () => {
+          options.onApply(undefined);
+          options.onClose(handle.close);
+        },
       }),
   );
 

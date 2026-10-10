@@ -203,7 +203,7 @@ css`
  * The rows read their nodes through `each`'s accessors, so a restored tree updates them in place.
  * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`.
  * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
- * A restore button clears every condition, the default; Apply then hands `undefined`.
+ * A restore button clears every condition, the default, and applies at once, handing `undefined`.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
 export function filterPopup(options: FilterPopupOptions): Popup {
@@ -235,9 +235,9 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     version.value += 1;
   };
 
-  const clear = (): void => {
+  const restoreDefaults = (): void => {
     Object.assign(root, filterFromWhere(undefined));
-    commit();
+    apply();
   };
 
   const filterOf = (field: DashboardField): FieldFilter | undefined =>
@@ -598,7 +598,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     () =>
       button([icon('history'), h('span', null, () => t('dashboard.restoreDefaults'))], {
         variant: 'outline',
-        onClick: clear,
+        onClick: restoreDefaults,
       }),
   );
 
