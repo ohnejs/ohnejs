@@ -508,9 +508,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   onCleanup(() => edits.clear());
 
   const currentState = (): DetailsState | undefined => {
-    const reading = form.value?.read();
-    if (!isUndefined(reading?.errors)) return undefined;
-    const value = (reading?.value ?? {}) as Partial<DetailsState>;
+    const value = (form.value?.snapshot(edits.getCurrentState()) ?? {}) as Partial<DetailsState>;
     return {
       description: hasKey(value, 'description')
         ? (value.description ?? null)
