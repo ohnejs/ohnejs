@@ -12,7 +12,16 @@ import {
   navigate,
   when,
 } from 'ohnejs/dashboard';
-import { effect, formatBytes, isNull, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
+import {
+  effect,
+  formatBytes,
+  isNull,
+  isUndefined,
+  onCleanup,
+  ref,
+  stripCodeSpans,
+  untracked,
+} from 'ohnejs/utils';
 
 import type { RememberedUpload } from './_remembered-uploads.ts';
 import type { UploadStatus, UploadTask } from './upload-queue-state.ts';
@@ -309,7 +318,9 @@ function bell(): HTMLElement {
     const detail = (): string => {
       const current = task();
       if (current.status === 'failed') {
-        return current.error?.replaceAll('`', '') ?? t('uploads.dashboard.failed');
+        return isUndefined(current.error)
+          ? t('uploads.dashboard.failed')
+          : stripCodeSpans(current.error);
       }
       if (current.status === 'aborted') return t('uploads.dashboard.aborted');
       if (isNull(current.size)) return current.host ?? '';
@@ -382,7 +393,7 @@ function bell(): HTMLElement {
         { class: 'o-upload-notification-content' },
         fileName(() => entry().name),
         h('span', { class: 'o-upload-notification-detail' }, () =>
-          t('uploads.dashboard.pickToResume', { name: entry().name }).replaceAll('`', ''),
+          stripCodeSpans(t('uploads.dashboard.pickToResume', { name: entry().name })),
         ),
       ),
       h(
