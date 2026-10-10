@@ -142,6 +142,12 @@ export interface FieldForm {
   readPatch(): ControlReading;
 
   /**
+   * Reads the whole value as far as it parses: a control that fails to parse keeps its `fallback` value.
+   * An undo history passes its current state, so one field mid-edit never stalls the rest.
+   */
+  snapshot(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
+
+  /**
    * Routes server messages onto the form's controls, keyed relative to the form.
    * Each call replaces the previous routing, so `{}` clears every routed message.
    * Returns the first message that matched no control, or `''` when every message placed.
@@ -314,7 +320,11 @@ export function createFieldForm(
     (field) => rowByName.has(field.name) || lockedByName.has(field.name) || statics.includes(field),
   );
 
-  const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
+  const gather = (
+    selected: readonly ControlRow[],
+    withCarry: boolean,
+    fallback: Readonly<Record<string, unknown>> = {},
+  ): { item: Record<string, unknown>; errors: Record<string, string> } => {
     const item: Record<string, unknown> = {};
     const errors: Record<string, string> = blank();
     if (withCarry) {
@@ -332,13 +342,17 @@ export function createFieldForm(
         for (const [key, message] of Object.entries(reading.errors)) {
           errors[joinPath(row.field.name, key)] = message;
         }
+        if (hasKey(fallback, row.field.name)) item[row.field.name] = fallback[row.field.name];
       } else if (!isUndefined(reading.value)) {
         item[row.field.name] = reading.value;
       }
     }
-    if (!isEmpty(errors)) return { errors };
     if (options.attachUUID === true && isString(seed?.UUID)) item.UUID = seed.UUID;
-    return { value: item };
+    return { item, errors };
+  };
+  const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
+    const { item, errors } = gather(selected, withCarry);
+    return isEmpty(errors) ? { value: item } : { errors };
   };
 
   const rowOf = (field: DashboardField): Child => {
@@ -414,6 +428,9 @@ export function createFieldForm(
         rows.filter((row) => row.control.dirty()),
         false,
       );
+    },
+    snapshot(fallback) {
+      return gather(rows, true, fallback).item;
     },
     setErrors(errors) {
       let unplaced = '';
