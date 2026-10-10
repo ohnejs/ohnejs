@@ -120,6 +120,7 @@ export * from './is/is-null.ts';
 export * from './is/is-nullish.ts';
 export * from './is/is-number.ts';
 export * from './is/is-object.ts';
+export * from './is/is-origin.ts';
 export * from './is/is-package-name.ts';
 export * from './is/is-plain-object.ts';
 export * from './is/is-port.ts';
