@@ -265,6 +265,24 @@ describe('serveDashboard', () => {
     strictEqual((await req(port, '/')).body.includes('"defaultLanguage":"de-AT"'), true);
   });
 
+  it('injects every enabled message group once', async () => {
+    const dir = makeApp('groups');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { disable: { messages: ['draft.**'] } }\n",
+    );
+    mkdirSync(join(dir, 'messages', 'api'), { recursive: true });
+    writeFileSync(
+      join(dir, 'messages', 'en.json'),
+      JSON.stringify({ nav: { home: 'Home' }, draft: { note: 'Note' } }),
+    );
+    writeFileSync(join(dir, 'messages', 'de.json'), JSON.stringify({ nav: { home: 'Start' } }));
+    writeFileSync(join(dir, 'messages', 'api', 'de.json'), JSON.stringify({ gone: 'Weg' }));
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    strictEqual((await req(port, '/')).body.includes('"messageGroups":["api","nav"]'), true);
+  });
+
   it('rejects an invalid `messages.defaultLanguage`', async () => {
     const dir = makeApp('badlanguage');
     writeFileSync(

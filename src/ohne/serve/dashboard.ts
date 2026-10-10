@@ -1,3 +1,4 @@
+import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { etag } from '../../utils/etag/etag.ts';
@@ -13,11 +14,13 @@ import {
   jsonForScript,
   last,
   MAX_PORT,
+  messageGroup,
   normalizeBasePath,
   type PageRoute,
   relativePath,
   resolvePath,
   safeResolve,
+  uniqueArray,
 } from '../../utils/index.ts';
 import { listenOrigin } from '../../utils/net/index.ts';
 import { codegenDir } from '../codegen/codegen-dir.ts';
@@ -43,6 +46,7 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
+import { collectMessages } from '../messages/collect-messages.ts';
 import { SRC_ROOT } from '../meta/src-root.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
@@ -148,6 +152,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
       (await collectDashboardBoot(layers)).map((boot) => `${APP_MODULE_BASE}/${boot.module}`),
       defaultLanguage,
+      await collectMessageGroups(layers),
       reload,
     );
   };
@@ -307,6 +312,14 @@ function resolveDefaultLanguage(): string {
 }
 
 /**
+ * Every message group the stack defines, so the dashboard can load a language's catalogs before it renders.
+ */
+async function collectMessageGroups(layers: readonly OhneLayer[]): Promise<string[]> {
+  const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
+  return uniqueArray(messages.map((message) => messageGroup(message.key)));
+}
+
+/**
  * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
  */
 function shellDocument(
@@ -314,9 +327,10 @@ function shellDocument(
   pages: PageRoute[],
   boot: string[],
   defaultLanguage: string,
+  messageGroups: string[],
   reload: boolean,
 ): string {
-  const config = jsonForScript({ apiURL, pages, boot, defaultLanguage });
+  const config = jsonForScript({ apiURL, pages, boot, defaultLanguage, messageGroups });
   const reloadClient = reload
     ? `\n    <script type="module" src="${MODULE_BASE}/dashboard/runtime/reload-client.ts"></script>`
     : '';
