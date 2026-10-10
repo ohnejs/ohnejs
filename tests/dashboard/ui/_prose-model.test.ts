@@ -1,12 +1,26 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, ok } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { ProseInline } from '../../../src/dashboard/ui/_prose-model.ts';
+import type { ProseBlock, ProseInline } from '../../../src/dashboard/ui/_prose-model.ts';
 
 import { parseProse } from '../../../src/dashboard/ui/_prose-model.ts';
+import { escapeControls } from '../../../src/utils/ansi/escape-controls.ts';
+import { formatMessage } from '../../../src/utils/i18n/format-message.ts';
 
 const text = (value: string): ProseInline => ({ kind: 'text', text: value });
 const paragraph = (...content: ProseInline[]) => ({ kind: 'paragraph', content });
+
+const inlineCodes = (runs: ProseInline[]): string[] =>
+  runs.flatMap((run) => {
+    if (run.kind === 'code') return [run.text];
+    return 'content' in run ? inlineCodes(run.content) : [];
+  });
+const codeRuns = (blocks: ProseBlock[]): string[] =>
+  blocks.flatMap((block) => {
+    if (block.kind === 'table')
+      return [...(block.head ?? []), ...block.rows.flat()].flatMap(inlineCodes);
+    return 'content' in block ? inlineCodes(block.content) : [];
+  });
 
 describe('parseProse', () => {
   it('parses bold, code, and an http link inside a paragraph', () => {
@@ -222,6 +236,16 @@ describe('parseProse', () => {
     ]);
   });
 
+  it('nests quotes 100 deep and reads deeper markers as text', () => {
+    let blocks = parseProse(`${'>'.repeat(20_000)} a`, true);
+    for (let depth = 0; depth < 100; depth++) {
+      const [quote] = blocks;
+      if (quote?.kind !== 'quote') throw new Error(`no quote at depth ${depth}`);
+      blocks = quote.blocks;
+    }
+    deepStrictEqual(blocks, [paragraph(text(`${'>'.repeat(19_900)} a`))]);
+  });
+
   it('ends a quote at a line without a marker', () => {
     deepStrictEqual(parseProse('> a\nb', true), [
       { kind: 'quote', blocks: [paragraph(text('a'))] },
@@ -234,6 +258,20 @@ describe('parseProse', () => {
       paragraph(text('a')),
       { kind: 'code', text: '**[x](https://e.test)**' },
       paragraph(text('b')),
+    ]);
+  });
+
+  it('closes a code fence only at a bare backtick run at least as long as its opener', () => {
+    deepStrictEqual(parseProse('a\n\n````\n# b\n*c*\n````', true), [
+      paragraph(text('a')),
+      { kind: 'code', text: '# b\n*c*' },
+    ]);
+    deepStrictEqual(parseProse('````md\n```js\nx\n```\n````', true), [
+      { kind: 'code', text: '```js\nx\n```' },
+    ]);
+    deepStrictEqual(parseProse('```\nx\n`````\ny', true), [
+      { kind: 'code', text: 'x' },
+      paragraph(text('y')),
     ]);
   });
 
@@ -255,9 +293,124 @@ describe('parseProse', () => {
     ]);
   });
 
+  it('closes a code span only at a backtick run of its own length', () => {
+    deepStrictEqual(parseProse('a ``b`c`` d', true), [
+      paragraph(text('a '), { kind: 'code', text: 'b`c' }, text(' d')),
+    ]);
+    deepStrictEqual(parseProse('``a` b', true), [paragraph(text('``a` b'))]);
+  });
+
+  it('drops one padding space per side of a code span, never from a blank one', () => {
+    deepStrictEqual(parseProse('`` `x ``', true), [paragraph({ kind: 'code', text: '`x' })]);
+    deepStrictEqual(parseProse('a ` ` b', true), [
+      paragraph(text('a '), { kind: 'code', text: ' ' }, text(' b')),
+    ]);
+  });
+
+  it('keeps a code span across a line separator', () => {
+    deepStrictEqual(parseProse('`a\u2028b`', true), [
+      paragraph({ kind: 'code', text: 'a\u2028b' }),
+    ]);
+  });
+
+  it('closes no emphasis or link inside a code span', () => {
+    deepStrictEqual(parseProse('Pattern *.txt in `a*b`', true), [
+      paragraph(text('Pattern *.txt in '), { kind: 'code', text: 'a*b' }),
+    ]);
+    deepStrictEqual(parseProse('**`a** b`**', true), [
+      paragraph({ kind: 'strong', content: [{ kind: 'code', text: 'a** b' }] }),
+    ]);
+    deepStrictEqual(parseProse('[`a]b`](/x)', true), [
+      paragraph({
+        kind: 'link',
+        href: '/x',
+        local: true,
+        content: [{ kind: 'code', text: 'a]b' }],
+      }),
+    ]);
+  });
+
+  it('makes an escaped backtick literal and lets the rest of its run open a span', () => {
+    deepStrictEqual(parseProse('x \\``a` y', true), [
+      paragraph(text('x `'), { kind: 'code', text: 'a' }, text(' y')),
+    ]);
+    deepStrictEqual(parseProse('| a |\n|-|\n| \\``b` |', true), [
+      {
+        kind: 'table',
+        head: [[text('a')]],
+        align: ['start'],
+        rows: [[[text('`'), { kind: 'code', text: 'b' }]]],
+      },
+    ]);
+  });
+
+  it('keeps a backslash inside a code span literal', () => {
+    deepStrictEqual(parseProse('`a\\` b', true), [
+      paragraph({ kind: 'code', text: 'a\\' }, text(' b')),
+    ]);
+  });
+
+  it('reads a line opening with a code span that holds backticks as a paragraph, not a fence', () => {
+    deepStrictEqual(parseProse('```a`b``c``` is required', true), [
+      paragraph({ kind: 'code', text: 'a`b``c' }, text(' is required')),
+    ]);
+  });
+
+  it('keeps a pipe inside a code span of any fence length in its cell', () => {
+    deepStrictEqual(parseProse('| a | b |\n|-|-|\n| ``x|`y`` | `` ` |', true), [
+      {
+        kind: 'table',
+        head: [[text('a')], [text('b')]],
+        align: ['start', 'start'],
+        rows: [[[{ kind: 'code', text: 'x|`y' }], [text('`` `')]]],
+      },
+    ]);
+  });
+
+  it('reads any formatted backticked value back as exactly one code span', () => {
+    for (const template of [
+      'Unknown block `{v}`',
+      '`{v}` is required',
+      '**Bad** `{v}` and *more*',
+      'Pattern *.txt in `{v}`',
+      '**`{v}`**',
+      '| `{v}` | b |\n|-|-|',
+    ]) {
+      for (const v of [
+        'my`file.pdf',
+        '`',
+        '``',
+        '`x',
+        'x`',
+        'a`b``c',
+        ' a ',
+        '',
+        'a\nb',
+        'a\u2028b',
+        '*_[]()|',
+        'a** b',
+        '[l](/x)',
+        '# h',
+        '\\',
+        'x'.repeat(5000),
+      ]) {
+        const codes = codeRuns(parseProse(formatMessage(template, { v }, 'en'), true));
+        deepStrictEqual(codes, [v === '' ? ' ' : escapeControls(v)], `${template} ${v}`);
+      }
+    }
+  });
+
   it('reads pipe lines without a separator row as a paragraph', () => {
     deepStrictEqual(parseProse('| a |\n| b |', true), [
       paragraph(text('| a |'), { kind: 'break' }, text('| b |')),
     ]);
+  });
+
+  it('stays linear on inline markers that never close', () => {
+    const started = performance.now();
+    for (const unit of ['[``', '[`', ' _`', '[', '[x](', ' __a', '**a', '~~a', '![', '\\`']) {
+      parseProse(unit.repeat(50_000), true);
+    }
+    ok(performance.now() - started < 1000);
   });
 });

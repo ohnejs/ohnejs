@@ -13,6 +13,7 @@ import { dropdownItem } from '../ui/dropdown-item.ts';
 import { dropdown } from '../ui/dropdown.ts';
 import { fieldMessage } from '../ui/field-message.ts';
 import { icon, type IconName } from '../ui/icon.ts';
+import { renderProse } from '../ui/prose.ts';
 import { toast } from '../ui/toaster.ts';
 import { attachTooltip } from '../ui/tooltip.ts';
 import { type ClipboardData, copyClipboard } from './clipboard.ts';
@@ -363,8 +364,13 @@ export function structureErrorMark(errored: () => boolean): Child {
  * Renders nothing while `message` is empty.
  */
 export function structureItemError(message: () => string): Child {
+  const errorProse = (): HTMLElement => {
+    const flow = h('div', { class: 'ohne-prose' });
+    renderProse(flow, message(), { links: false });
+    return flow;
+  };
   return when(
     () => message() !== '',
-    () => h('div', { class: 'ohne-item-error' }, fieldMessage(message, { error: () => true })),
+    () => h('div', { class: 'ohne-item-error' }, fieldMessage(errorProse, { error: () => true })),
   );
 }

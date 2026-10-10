@@ -221,7 +221,7 @@ export function describeControl(
  * With `marks`, the control shows its own label and the row hands it the metadata glyphs instead.
  * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
  * With `onRevert`, the dot is a button that morphs into an undo mark on hover or focus.
- * The message under the control shows the description as prose, or the error destructive in its place.
+ * The message under the control shows the description, or the error destructive in its place, both as prose.
  * An expandable description sits behind a chevron toggle that reads its show or hide label.
  * The row's root carries `field-<path>` as its id, so a `#field-<name>` hash can land on it.
  */
@@ -298,9 +298,9 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     append(options.marks, extras);
   }
 
-  const proseBlock = (text: string, className = 'ohne-prose'): HTMLElement => {
+  const proseBlock = (text: string, className = 'ohne-prose', links = true): HTMLElement => {
     const flow = h('div', { class: className, id: ids.description });
-    renderProse(flow, text);
+    renderProse(flow, text, { links });
     return flow;
   };
 
@@ -337,7 +337,8 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
             fieldMessage(
               () => {
                 const current = failure();
-                if (current !== '') return h('p', { id: ids.description }, current);
+                // An error can echo a submitted value, so a link in it renders as plain text.
+                if (current !== '') return proseBlock(current, 'ohne-prose', false);
                 const { description, expandable } = options.field;
                 if (!isUndefined(expandable)) return expandableDescription(expandable);
                 if (!isUndefined(description)) return proseBlock(description);

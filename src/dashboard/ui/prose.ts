@@ -185,7 +185,7 @@ function blockElement(block: ProseBlock): HTMLElement {
 /**
  * Renders markdown-lite `text` into `target` as constructed DOM nodes.
  * Blocks are paragraphs, `#` headings, `-` and `1.` lists with nesting and `[x]` tasks, and `---` rules.
- * Blocks also include ```` ``` ```` code fences, `>` blockquotes, and `|` pipe tables.
+ * Blocks also include code fences of three or more backticks, `>` blockquotes, and `|` pipe tables.
  * Inline, it reads `**bold**`, `*italic*`, `~~struck~~`, backticked code, `[label](url)` links, and breaks.
  * A `\` escapes a punctuation mark, and an image renders as its alt text.
  * A pipe table needs a `|-|-|` separator as its second line, whose colons align its columns.

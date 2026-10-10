@@ -1,5 +1,7 @@
 import type { Placement } from './floater-place.ts';
 
+import { codeSpanText } from '../../utils/ansi/code-span-text.ts';
+import { codeSpans } from '../../utils/ansi/code-spans.ts';
 import { isFunction } from '../../utils/is/is-function.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
@@ -61,7 +63,7 @@ export interface TooltipOptions {
   plain?: boolean;
 }
 
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`/g;
+const INLINE = /\*\*(.+?)\*\*|`+/g;
 
 let touchTracked = false;
 let usingTouch = false;
@@ -103,13 +105,18 @@ function renderContent(target: HTMLElement, text: string, plain = false): void {
       target.append(line);
       return;
     }
+    const { ends, masked } = codeSpans(line);
     let cursor = 0;
-    for (const token of line.matchAll(INLINE)) {
+    for (const token of masked.matchAll(INLINE)) {
+      const code = token[0].startsWith('`');
+      const end = code ? ends.get(token.index) : token.index + token[0].length;
+      if (token.index < cursor || isUndefined(end)) continue;
       if (token.index > cursor) target.append(line.slice(cursor, token.index));
-      const inline = document.createElement(isUndefined(token[1]) ? 'code' : 'strong');
-      inline.textContent = token[1] ?? token[2]!;
+      const inline = document.createElement(code ? 'code' : 'strong');
+      const content = line.slice(token.index, end);
+      inline.textContent = code ? codeSpanText(content) : content.slice(2, -2);
       target.append(inline);
-      cursor = token.index + token[0].length;
+      cursor = end;
     }
     if (cursor < line.length) target.append(line.slice(cursor));
   });
