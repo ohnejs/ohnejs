@@ -49,7 +49,7 @@ npm create ohne my-app -- --yes --git
 pnpm hands the flags on as they are, so they need no `--`:
 
 ```sh
-pnpm create ohne my-app --yes --git
+pnpm create ohne@latest my-app --yes --git
 ```
 
 - `--yes` (`-y`) skips the prompts and the install, taking the defaults.
