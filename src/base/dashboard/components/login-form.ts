@@ -61,12 +61,6 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     if (!isUndefined(defaults.password)) password.value = defaults.password;
   });
 
-  // Reading the failure strings here starts their catalog fetches, so the first toast is translated.
-  t('auth.invalidCredentials');
-  t('dashboard.login.unreachable');
-  t('dashboard.login.failed');
-  t('dashboard.login.throttled', { seconds: 0 });
-
   const submit = async (): Promise<void> => {
     if (busy.value) return;
     emailError.value = email.value === '';

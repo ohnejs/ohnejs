@@ -110,8 +110,6 @@ export function accountEditor(): Child {
     if (isEmpty(patch)) return;
     const focused = document.activeElement;
     const localeBefore = sessionUser()?.contentLanguage ?? null;
-    // Read before the write: a language change swaps the catalog, and a toast holds a static string.
-    const savedLabel = t('dashboard.saved');
     busy.value = true;
     const outcome = await updateSessionUser(patch);
     busy.value = false;
@@ -125,7 +123,7 @@ export function accountEditor(): Child {
       if (outcome.user.contentLanguage !== localeBefore) {
         contentLocale.value = outcome.user.contentLanguage ?? undefined;
       }
-      toast(savedLabel, { type: 'success' });
+      toast(t('dashboard.saved'), { type: 'success' });
       return;
     }
     if (outcome.kind === 'invalid') {
