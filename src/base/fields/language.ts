@@ -1,4 +1,4 @@
-import { defineField, type Message, useMessages } from 'ohnejs';
+import { defineField, type UncheckedMessage, useMessages } from 'ohnejs';
 import { canonicalizeLanguage } from 'ohnejs/utils';
 
 /**
@@ -20,9 +20,8 @@ export default defineField({
 
 /**
  * The `unknownLanguage` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function unknownLanguageMessage(language: string): Message {
-  return { key: 'auth.unknownLanguage', params: { language } } as unknown as Message;
+function unknownLanguageMessage(language: string): UncheckedMessage {
+  return { key: 'auth.unknownLanguage', params: { language } } as unknown as UncheckedMessage;
 }

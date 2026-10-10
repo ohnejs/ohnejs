@@ -53,11 +53,42 @@ export type MessageObject = [keyof KnownMessages] extends [never]
         }[keyof KnownMessages];
 
 /**
+ * Brands `UncheckedMessage`, so only a cast produces one.
+ */
+declare const unchecked: unique symbol;
+
+/**
+ * A `{ key, params }` message whose key the compiler cannot check against `KnownMessages`.
+ * The framework builds one for a key in a catalog the app may disable, or in a layer outside the program.
+ * Its brand exists only in the type, so app code keeps the checked `MessageObject` form.
+ *
+ * It is one type, not a union per key.
+ * A function returning it on several paths, or a ternary choosing it, stays cheap to type-check.
+ */
+export interface UncheckedMessage {
+  /**
+   * Marks the message as cast, never written as a literal.
+   */
+  readonly [unchecked]: true;
+
+  /**
+   * The message key, resolved against whichever catalog is loaded at runtime.
+   */
+  key: string;
+
+  /**
+   * The values the key's template interpolates.
+   */
+  params?: Record<string, unknown>;
+}
+
+/**
  * A message to translate or show: a param-free key, a `{ key, params }` object, or a plain string.
  *
  * A param-free key is suggested for autocomplete, and any string is still allowed.
  * A `{ key, params }` object names any known key.
  * Its `params` member is required exactly when the key's template interpolates.
  * A plain string is shown as-is, or resolved when it matches a message key.
+ * An `UncheckedMessage` carries a key the framework cannot check.
  */
-export type Message = LiteralUnion<ParamlessMessageKey & string> | MessageObject;
+export type Message = LiteralUnion<ParamlessMessageKey & string> | MessageObject | UncheckedMessage;

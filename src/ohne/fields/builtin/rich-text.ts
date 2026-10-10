@@ -1,5 +1,6 @@
 import type { RichText, RichTextElement, RichTextMark } from '../../../utils/index.ts';
 import type { CollectionName } from '../../collections/known-collections.ts';
+import type { Message } from '../../messages/known-messages.ts';
 
 import {
   checkRichText,
@@ -101,7 +102,7 @@ export const richText = defineField({
     `${ctx.importType('ohnejs/utils', 'RichText')}<${linksParameter(ctx.options.links)}>`,
   sanitizers: [(value, ctx) => (isRichText(value) ? normalizeRichText(value, ctx.options) : value)],
   validators: [
-    (value, ctx) => {
+    (value, ctx): Message | undefined => {
       const { links, allowEmpty, min, max } = ctx.options;
       const issues = checkRichText(value, { ...ctx.options, links: registeredLinks(links) });
       if (issues.length > 0) return reportIssues(issues, ctx.errors);

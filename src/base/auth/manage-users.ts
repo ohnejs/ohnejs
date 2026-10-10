@@ -1,4 +1,4 @@
-import type { AccessContext, AccessScope, FieldErrors, Message } from 'ohnejs';
+import type { AccessContext, AccessScope, FieldErrors, UncheckedMessage } from 'ohnejs';
 
 import { isArray, isEmpty, isNull, isString } from 'ohnejs/utils';
 
@@ -52,9 +52,8 @@ export async function manageUsers(
 
 /**
  * The `roleNotGrantable` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function roleNotGrantableMessage(role: string): Message {
-  return { key: 'auth.roleNotGrantable', params: { role } } as unknown as Message;
+function roleNotGrantableMessage(role: string): UncheckedMessage {
+  return { key: 'auth.roleNotGrantable', params: { role } } as unknown as UncheckedMessage;
 }

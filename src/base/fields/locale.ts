@@ -1,4 +1,4 @@
-import { defineField, type Message } from 'ohnejs';
+import { defineField, type UncheckedMessage } from 'ohnejs';
 
 import { queryLocales } from '../../ohne/query/locale.ts';
 
@@ -20,9 +20,8 @@ export default defineField({
 
 /**
  * The `unknownLocale` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function unknownLocaleMessage(locale: string): Message {
-  return { key: 'auth.unknownLocale', params: { locale } } as unknown as Message;
+function unknownLocaleMessage(locale: string): UncheckedMessage {
+  return { key: 'auth.unknownLocale', params: { locale } } as unknown as UncheckedMessage;
 }

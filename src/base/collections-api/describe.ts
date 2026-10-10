@@ -585,11 +585,16 @@ function describeField(
   if (!isUndefined(meta.when)) field.when = serializeCondition(meta.when) as ConditionObject;
   const { description } = options;
   if (isExpandableDescription(description)) {
+    const { text, showLabel, hideLabel, expanded = false } = description;
     field.expandable = {
-      text: resolveMessage(description.text),
-      showLabel: resolveMessage(description.showLabel ?? 'dashboard.field.showDescription'),
-      hideLabel: resolveMessage(description.hideLabel ?? 'dashboard.field.hideDescription'),
-      expanded: description.expanded ?? false,
+      text: resolveMessage(text),
+      showLabel: isUndefined(showLabel)
+        ? translate('dashboard.field.showDescription')
+        : resolveMessage(showLabel),
+      hideLabel: isUndefined(hideLabel)
+        ? translate('dashboard.field.hideDescription')
+        : resolveMessage(hideLabel),
+      expanded,
     };
   } else if (!isUndefined(description)) {
     field.description = resolveMessage(description as Message);

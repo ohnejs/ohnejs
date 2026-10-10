@@ -1,5 +1,5 @@
 import type { LogicalType } from '../../database/dialect.ts';
-import type { Message } from '../../messages/known-messages.ts';
+import type { UncheckedMessage } from '../../messages/known-messages.ts';
 import type { FieldQueryMeta } from '../metadata.ts';
 import type { FieldErrors } from '../write/errors.ts';
 import type {
@@ -382,11 +382,13 @@ function blockEnvelope(
 
 /**
  * The `unknownBlock` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function unknownBlockMessage(block: unknown): Message {
-  return { key: 'validation.unknownBlock', params: { block: String(block) } } as unknown as Message;
+function unknownBlockMessage(block: unknown): UncheckedMessage {
+  return {
+    key: 'validation.unknownBlock',
+    params: { block: String(block) },
+  } as unknown as UncheckedMessage;
 }
 
 /**

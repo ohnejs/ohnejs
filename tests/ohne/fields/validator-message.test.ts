@@ -46,7 +46,8 @@ describe('validator message typing', () => {
     const missingParams: Message = { key: 'validatorTest.ranged' };
     // @ts-expect-error a param-free key takes no `params`
     const paramlessParams: Message = { key: 'validatorTest.plain', params: {} };
-    ok([wrongParams, missingParams, paramlessParams].every((m) => typeof m === 'object'));
+    ok(typeof wrongParams === 'object' && typeof missingParams === 'object');
+    ok(typeof paramlessParams === 'object');
   });
 
   it('accepts every form on a field() validator', () => {

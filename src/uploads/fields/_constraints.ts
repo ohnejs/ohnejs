@@ -1,4 +1,10 @@
-import type { FieldWriteContext, Message, ResolvedOptions, Transaction } from 'ohnejs';
+import type {
+  FieldWriteContext,
+  Message,
+  ResolvedOptions,
+  Transaction,
+  UncheckedMessage,
+} from 'ohnejs';
 
 import { option, queryUntyped } from 'ohnejs';
 import {
@@ -161,11 +167,10 @@ export const listOptions = {
 
 /**
  * An `uploads.errors.*` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function uploadsMessage(name: string, params: Record<string, unknown>): Message {
-  return { key: `uploads.errors.${name}`, params } as unknown as Message;
+function uploadsMessage(name: string, params: Record<string, unknown>): UncheckedMessage {
+  return { key: `uploads.errors.${name}`, params } as UncheckedMessage;
 }
 
 /**
@@ -199,7 +204,7 @@ function checkRow(
   row: UploadRow,
   constraints: UploadConstraints,
   image: boolean,
-): Message | undefined {
+): string | UncheckedMessage | undefined {
   if (row.kind === 'folder') return 'uploads.errors.notAFile';
   const { types, minSize, maxSize, minWidth, maxWidth, minHeight, maxHeight } = constraints;
   if (image && mediaCategory(row.type) !== 'image') return 'uploads.errors.notAnImage';
@@ -246,7 +251,7 @@ export async function checkUpload(
   uuid: string,
   ctx: UploadCheckContext,
   image: boolean,
-): Promise<Message | undefined> {
+): Promise<string | UncheckedMessage | undefined> {
   const row = (await readUploads(ctx, [uuid])).get(uuid);
   return isUndefined(row) ? undefined : checkRow(row, ctx.options, image);
 }
@@ -292,7 +297,10 @@ export async function checkUploadList(
  * // -> { key: 'validation.minItems', params: { min: 2 } }
  * ```
  */
-export function checkListSize(value: unknown, bounds: ListBounds): Message | undefined {
+export function checkListSize(
+  value: unknown,
+  bounds: ListBounds,
+): string | UncheckedMessage | undefined {
   if (!isArray(value)) return undefined;
   if (!bounds.allowEmpty && value.length === 0) return 'validation.emptyValue';
   const { min, max } = bounds;

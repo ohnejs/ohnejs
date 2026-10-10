@@ -1,4 +1,4 @@
-import { defineField, type Message, useRoles } from 'ohnejs';
+import { defineField, type UncheckedMessage, useRoles } from 'ohnejs';
 import { foldCase, isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
 
 /**
@@ -37,9 +37,8 @@ export default defineField({
 
 /**
  * The `unknownRole` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function unknownRoleMessage(role: string): Message {
-  return { key: 'auth.unknownRole', params: { role } } as unknown as Message;
+function unknownRoleMessage(role: string): UncheckedMessage {
+  return { key: 'auth.unknownRole', params: { role } } as unknown as UncheckedMessage;
 }

@@ -975,10 +975,11 @@ function fieldDocOf(
   const { fieldType } = registeredType(owner, instance.type, context);
   const { options, kind } = resolveFieldStorage(name, instance, fieldType);
   const { description } = instance.options;
+  const text = isExpandableDescription(description)
+    ? context.resolveText(description.text)
+    : context.resolveText(description);
   const headline = withPeriod(
-    context.resolveText(isExpandableDescription(description) ? description.text : description) ??
-      context.resolveText(instance.options.label) ??
-      toSentenceCase(name),
+    text ?? context.resolveText(instance.options.label) ?? toSentenceCase(name),
   );
   const bullets = fieldBullets(instance, fieldType, options, kind, nested);
   return jsdocBlock([headline, '', '---', '', ...bullets].join('\n'));

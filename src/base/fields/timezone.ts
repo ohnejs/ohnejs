@@ -1,4 +1,4 @@
-import { defineField, type Message } from 'ohnejs';
+import { defineField, type UncheckedMessage } from 'ohnejs';
 import { isTimezone } from 'ohnejs/utils';
 
 /**
@@ -16,9 +16,8 @@ export default defineField({
 
 /**
  * The `invalidTimezone` failure as its `{ key, params }` message object.
- * Once `KnownMessages` has keys, the object must name one of them.
- * In this repo's typecheck only test fixtures supply those keys, so the cast bridges it.
+ * An app can drop the catalog that defines the key, so the cast brands it unchecked.
  */
-function invalidTimezoneMessage(timezone: string): Message {
-  return { key: 'auth.invalidTimezone', params: { timezone } } as unknown as Message;
+function invalidTimezoneMessage(timezone: string): UncheckedMessage {
+  return { key: 'auth.invalidTimezone', params: { timezone } } as unknown as UncheckedMessage;
 }
