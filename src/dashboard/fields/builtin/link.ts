@@ -36,7 +36,7 @@ import { openLinkOptions } from './_link-popup.ts';
 
 /**
  * The `link` field type: cell display and form control.
- * The cell shows the record's label or the address, linked to open in a new tab, titled with its destination.
+ * The cell shows the record's label or the address as plain text, titled with its destination.
  * A composite cell digests the value as that label or address.
  * The control picks the target in one select over the allowed records and typed addresses.
  * Without `collections`, it is a text input read as an address, and an unsafe one is a local error.
@@ -51,13 +51,7 @@ export const linkType: FieldType = {
       const current = value();
       if (!isLink(current)) return dimMark('-');
       const text = linkText(current);
-      const href = targetHref(current);
-      if (isUndefined(href)) return h('span', { class: 'ohne-truncate', title: text }, text);
-      return h(
-        'a',
-        { class: 'ohne-truncate', href, target: '_blank', rel: 'noopener noreferrer', title: href },
-        text,
-      );
+      return h('span', { class: 'ohne-truncate', title: targetHref(current) ?? text }, text);
     };
   },
   summary(value) {
