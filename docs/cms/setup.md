@@ -35,7 +35,8 @@ which come next.
 
 `pageFields()` adds the fields a collection with a route needs:
 
-- `slug` - the part of the path that finds the record. No two records share one.
+- `slug` - the part of the path that finds the record. No two records share one. See the
+  [`slug`](../database/field-types.md#slug) type.
 - `status` - `draft` or `published`.
 - `publishedAt` and `expiresAt` - an optional window the page shows in.
 - `seo` - the page's title, description, and image for search engines. See

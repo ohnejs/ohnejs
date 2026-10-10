@@ -851,3 +851,41 @@ A [`text`](#text) value stored the way the uploads layer names files: `Sunset At
 
 A [`text`](#text) value stored as a folder path: `Photos/2024 Summer` becomes
 `photos/2024-summer`. It takes every `text` option, and search reads a typed word the same way.
+
+## CMS layer types
+
+The [CMS layer](../cms/setup.md) adds the type its page paths are made of. Add `@ohnejs/cms` to
+`layers` to use it.
+
+### `slug`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/slug-dark.png">
+  <img alt="The slug field in the dashboard" src="../images/field-types/slug-light.png">
+</picture>
+
+The part of a page's path that names it, like `about` or `docs/install`. A write slugifies each
+`/`-separated segment, so `Über uns` stores as `uber-uns`. A slug holds `/` only in a collection
+whose [route](../cms/setup.md#routes) ends in `[...slug]`.
+
+[`pageFields()`](../cms/setup.md#pages) declares one for you.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match any value that contains the typed word.                                                                                    |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
