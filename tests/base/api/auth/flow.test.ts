@@ -209,6 +209,7 @@ describe('auth flow', () => {
     const logout = await call(ROUTES.logout, { cookie: pair });
     strictEqual(logout.status, 200);
     strictEqual(((await logout.json()) as { ok: boolean }).ok, true);
+    match(sessionCookie(logout), /^session=; Max-Age=0;.*Secure/);
 
     strictEqual((await call(ROUTES.me, { cookie: pair })).status, 401);
   });

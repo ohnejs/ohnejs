@@ -1,4 +1,4 @@
-import { deleteCookie, setCookie, useAuthorization, useCookies } from 'ohnejs';
+import { setCookie, useAuthorization, useCookies } from 'ohnejs';
 import { isNull, isUndefined } from 'ohnejs/utils';
 
 import { assertCookieOrigin } from './_origin.ts';
@@ -36,8 +36,9 @@ export function writeSessionCookie(token: string, maxAge?: number): void {
 }
 
 /**
- * Clears the session cookie, scoped to the same root path it was set with.
+ * Clears the session cookie with the profile it was written with.
+ * Browsers ignore a clear without `Secure` for a `__Host-` or `__Secure-` cookie name.
  */
 export function clearSessionCookie(): void {
-  deleteCookie(useAuthConfig().cookieName, { path: '/' });
+  writeSessionCookie('', 0);
 }
