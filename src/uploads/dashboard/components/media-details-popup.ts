@@ -884,7 +884,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const descriptionPanel = (): Child => [
-    form.value?.render(),
+    () => form.value?.render(),
     image ? focalRow() : null,
     when(
       () => unplaced.value !== '',
@@ -982,10 +982,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const variantsPanel = (): Child => [
-    ...Object.entries(current.value.variants ?? {})
-      .sort(([a], [b]) => naturalCompare(a, b))
-      .map(([name, variantURL]) => variantRow(name, variantURL)),
-    expiryNote(),
+    () =>
+      Object.entries(current.value.variants ?? {})
+        .sort(([a], [b]) => naturalCompare(a, b))
+        .map(([name, variantURL]) => variantRow(name, variantURL)),
+    expiryNote,
   ];
 
   const errorBubble = (on: boolean): TabsListItem<DetailsTab>['bubble'] =>
