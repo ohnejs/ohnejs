@@ -1,4 +1,4 @@
-import { searchByKeywords } from 'ohnejs/utils';
+import { searchByKeywords, stripCodeSpans } from 'ohnejs/utils';
 
 /**
  * One row the assistant adds to the palette.
@@ -138,9 +138,7 @@ export function askRows(options: AskRowsOptions): AskRowGroup[] {
   const { query, t } = options;
   if (!query.startsWith('/')) {
     const label =
-      query === ''
-        ? t('ai.dashboard.assistant')
-        : t('ai.dashboard.ask', { query }).replaceAll('`', '');
+      query === '' ? t('ai.dashboard.assistant') : stripCodeSpans(t('ai.dashboard.ask', { query }));
     const onSelect = (): void => {
       if (!options.settled) options.view();
       else if (query === '') options.fresh();

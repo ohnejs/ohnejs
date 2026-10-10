@@ -26,7 +26,6 @@ import {
 } from 'ohnejs/dashboard';
 import {
   batchedEffect,
-  type ConditionObject,
   effect,
   intersperse,
   isArray,
@@ -43,6 +42,8 @@ import {
   parseRouteID,
   recordHref,
   ref,
+  stripCodeSpans,
+  type ConditionObject,
   untracked,
   uuidv7Time,
 } from 'ohnejs/utils';
@@ -613,10 +614,7 @@ function autoWrite(proposal: Proposal): Child {
 function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITranslate): HTMLElement {
   const collection = collectionOfRoute(proposal.route);
   if (isUndefined(collection)) {
-    return line(
-      icon('eye'),
-      t('ai.dashboard.read.app', { route: proposal.route }).replaceAll('`', ''),
-    );
+    return line(icon('eye'), stripCodeSpans(t('ai.dashboard.read.app', { route: proposal.route })));
   }
   const name = collection.label;
   if (result.status < 200 || result.status >= 300) {
@@ -819,7 +817,7 @@ function searchLines(proposal: Proposal, result: ReadOutcome['result'], t: AITra
   const query = isString(proposal.body?.q) ? proposal.body.q : '';
   const groups = searchGroups(result.body);
   if (groups.length === 0) {
-    return line(icon('search'), t('ai.dashboard.read.foundNone', { query }).replaceAll('`', ''));
+    return line(icon('search'), stripCodeSpans(t('ai.dashboard.read.foundNone', { query })));
   }
   const collections = dashboardMeta()?.collections ?? [];
   const find = (name: string) => collections.find((candidate) => candidate.name === name);
@@ -833,9 +831,7 @@ function searchLines(proposal: Proposal, result: ReadOutcome['result'], t: AITra
     const text = isUndefined(via)
       ? t('ai.dashboard.read.found', params)
       : t('ai.dashboard.read.foundVia', { ...params, target: find(via)?.label ?? via });
-    return [
-      line(icon('search'), text.replaceAll('`', ''), refs(collection, hits, total, undefined)),
-    ];
+    return [line(icon('search'), stripCodeSpans(text), refs(collection, hits, total, undefined))];
   });
 }
 

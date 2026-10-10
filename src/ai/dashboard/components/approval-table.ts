@@ -24,6 +24,7 @@ import {
   isUndefined,
   parseRouteID,
   ref,
+  stripCodeSpans,
   untracked,
 } from 'ohnejs/utils';
 
@@ -378,7 +379,7 @@ function headerLine(
     (rows.value ?? []).filter((row) => indexes.includes(row.proposal)).length;
   const words = (): string => {
     if (isUndefined(collection)) {
-      return t('ai.dashboard.batch.request', { route: proposal.route }).replaceAll('`', '');
+      return stripCodeSpans(t('ai.dashboard.batch.request', { route: proposal.route }));
     }
     const head = t(`ai.dashboard.batch.${verb}`, { count: count(), collection: collection.label });
     return isString(locale) ? `${head} ${t('ai.dashboard.batch.locale', { locale })}` : head;
@@ -391,7 +392,7 @@ function headerLine(
     });
     return described === ''
       ? ''
-      : t('ai.dashboard.batch.every', { filter: described }).replaceAll('`', '');
+      : stripCodeSpans(t('ai.dashboard.batch.every', { filter: described }));
   };
   return h(
     'div',
