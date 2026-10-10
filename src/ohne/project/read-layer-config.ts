@@ -5,6 +5,7 @@ import type { LayerCodegen, LayerDefinition } from '../layers/define-layer.ts';
 import { exists, importDefault } from '../../utils/fs/index.ts';
 import { joinPath } from '../../utils/index.ts';
 import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
+import { validateFrameAncestors } from '../layers/validate-frame-ancestors.ts';
 
 /**
  * A directory's config, split by ownership.
@@ -73,6 +74,8 @@ export async function readLayerConfig(
   if (!(await exists(configFile))) return null;
   const input = (await importDefault<Config>(configFile, { fresh })) ?? {};
   if (input.dirs) validateConfigDirs(input.dirs, configFile);
+  const frameAncestors = input.dashboard?.frameAncestors;
+  if (frameAncestors) validateFrameAncestors(frameAncestors, configFile);
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');
   const layer = (await exists(layerFile))

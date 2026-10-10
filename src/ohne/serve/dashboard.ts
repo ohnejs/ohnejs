@@ -138,10 +138,11 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const apiURL = resolveAPIURL();
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
+  const framing = `frame-ancestors ${config?.frameAncestors?.join(' ') || "'none'"}`;
 
-  // A framed dashboard could be clickjacked into a save or a delete; no page may frame it.
+  // A framed dashboard could be clickjacked into a save or a delete; only listed pages may frame it.
   const renderShell = async (): Promise<string> => {
-    useResponse().headers.set('content-security-policy', "frame-ancestors 'none'");
+    useResponse().headers.set('content-security-policy', framing);
     return shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),

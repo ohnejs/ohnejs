@@ -147,6 +147,7 @@ export * from './layers/stacked-layers.ts';
 export * from './layers/use-config.ts';
 export * from './layers/use-layers.ts';
 export * from './layers/validate-config-dirs.ts';
+export * from './layers/validate-frame-ancestors.ts';
 export * from './lifecycle/on-shutdown.ts';
 export * from './lifecycle/use-shutdown.ts';
 export * from './messages/collect-messages.ts';

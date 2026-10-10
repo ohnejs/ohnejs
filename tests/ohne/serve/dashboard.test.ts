@@ -108,6 +108,58 @@ describe('serveDashboard', () => {
     strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
   });
 
+  it('lets only the listed origins frame it', async () => {
+    const dir = makeApp('frame-allow');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dashboard: { frameAncestors: ['https://ohne.dev', 'http://localhost:3000'] } };",
+    );
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const policy = 'frame-ancestors https://ohne.dev http://localhost:3000';
+    strictEqual((await req(port, '/')).headers['content-security-policy'], policy);
+    strictEqual((await req(port, '/collections/pages')).headers['content-security-policy'], policy);
+  });
+
+  it('refuses framing when the list is empty', async () => {
+    const dir = makeApp('frame-empty');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      'export default { dashboard: { frameAncestors: [] } };',
+    );
+    http = await serveDashboard(dir);
+    const res = await req((http.server.address() as AddressInfo).port, '/');
+    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+  });
+
+  it("never inherits a stacked layer's frame ancestors", async () => {
+    const base = makeApp('frame-base');
+    writeFileSync(
+      join(base, 'ohne.config.ts'),
+      "export default { dashboard: { frameAncestors: ['https://evil.example'] } };",
+    );
+    const dir = makeApp('frame-app');
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'app', type: 'module', dependencies: { base: '*' } }),
+    );
+    writeFileSync(join(dir, 'ohne.config.ts'), "export default { layers: ['base'] }\n");
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
+    http = await serveDashboard(dir);
+    const res = await req((http.server.address() as AddressInfo).port, '/');
+    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+  });
+
+  it('refuses to boot with an invalid frame ancestor', async () => {
+    const dir = makeApp('frame-invalid');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dashboard: { frameAncestors: ['https://*.ohne.dev'] } };",
+    );
+    await rejects(serveDashboard(dir), /Invalid frame ancestor/);
+  });
+
   it('serves the shell for an unknown navigation path, as a pure SPA', async () => {
     const port = await serve('spa');
     const res = await req(port, '/users/42');

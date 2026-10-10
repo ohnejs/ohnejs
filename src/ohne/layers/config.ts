@@ -666,6 +666,16 @@ export interface Config {
     origin?: string;
 
     /**
+     * Origins of the pages allowed to frame the dashboard, such as `https://example.com`.
+     * Each entry is a bare http(s) origin, exactly as a browser serializes it.
+     * Omitted or empty, no page may frame the dashboard, so it cannot be clickjacked into a save or a delete.
+     * A listed page can overlay the dashboard, so list only pages you trust as much as the dashboard itself.
+     * Sign-in works inside a frame only when the framing page is on the same site as the dashboard.
+     * A stacked layer's list never reaches the app; only the app's own config opens framing.
+     */
+    frameAncestors?: string[];
+
+    /**
      * Menu groups for the dashboard sidebar, in order.
      * Each group holds collection names and page links; a group left with no row drops.
      * A collection the viewer cannot reach drops from its group.
@@ -949,6 +959,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.host': 'own',
   'dashboard.apiURL': 'own',
   'dashboard.origin': 'own',
+  'dashboard.frameAncestors': 'own',
   'dashboard.menu': 'own',
   'database.dialect': 'own',
   'database.url': 'own',

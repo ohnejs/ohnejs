@@ -224,13 +224,14 @@ export default defineConfig({
 });
 ```
 
-| Key      | Default | What it does                                                                                                                                                                          |
-| -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `port`   | `9000`  | The port the dashboard listens on.                                                                                                                                                    |
-| `host`   | -       | The host to bind. Unset binds every interface.                                                                                                                                        |
-| `apiURL` | -       | Absolute base URL of the API the browser calls, including any `api.basePath`. Unset, it is derived from `api`.                                                                        |
-| `origin` | -       | Absolute origin the browser reaches the dashboard at. The API's [CORS](../api/middleware.md#cors) accepts credentialed requests from it. Unset, it is derived from `host` and `port`. |
-| `menu`   | -       | The [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Unset, the sidebar starts with the overview row, then lists every accessible collection in one unlabeled group.    |
+| Key              | Default | What it does                                                                                                                                                                          |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port`           | `9000`  | The port the dashboard listens on.                                                                                                                                                    |
+| `host`           | -       | The host to bind. Unset binds every interface.                                                                                                                                        |
+| `apiURL`         | -       | Absolute base URL of the API the browser calls, including any `api.basePath`. Unset, it is derived from `api`.                                                                        |
+| `origin`         | -       | Absolute origin the browser reaches the dashboard at. The API's [CORS](../api/middleware.md#cors) accepts credentialed requests from it. Unset, it is derived from `host` and `port`. |
+| `frameAncestors` | -       | Origins of the pages allowed to show the dashboard in an iframe. Unset, no page may frame it.                                                                                         |
+| `menu`           | -       | The [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Unset, the sidebar starts with the overview row, then lists every accessible collection in one unlabeled group.    |
 
 The defaults fit local development, where the browser reaches both servers directly. In production,
 give `apiURL` and `origin` the public URLs instead.
@@ -347,7 +348,8 @@ Some keys resolve differently:
 - **Own** - never inherited. A layer's value applies to that layer alone. An own key you leave unset
   takes the framework default, even if a layer sets it. These are `dirs`, `printer`, `api.port`,
   `api.host`, `dashboard.port`, `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`,
-  `dashboard.menu`, `database.dialect`, `database.url`, and `database.sync.force`.
+  `dashboard.frameAncestors`, `dashboard.menu`, `database.dialect`, `database.url`, and
+  `database.sync.force`.
 
 A base layer and your project both set `api`:
 
