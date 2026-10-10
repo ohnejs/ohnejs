@@ -154,8 +154,7 @@ export async function login(
   }
   if (!response.ok) return loginRefusal(response);
   startSession();
-  apply((await response.json()) as SessionUser);
-  invalidateDashboardMeta();
+  apply((await response.json()) as SessionUser, true);
   return { kind: 'signed-in' };
 }
 
@@ -205,7 +204,6 @@ export async function logout(): Promise<void> {
 /**
  * Resolves the session once from `GET /auth/me`; a `204` or any failure reads as signed out.
  * The answer fills only the still-unresolved state, so it never overwrites a login that beat it.
- * The discovery store resets only when the user's language differs from the default it started on.
  */
 async function resolve(): Promise<void> {
   let answer: SessionUser | null = null;
@@ -214,19 +212,25 @@ async function resolve(): Promise<void> {
     if (response.status === 200) answer = (await response.json()) as SessionUser;
   } catch {}
   if (!isUndefined(user.value)) return;
-  if (!isNull(answer)) startSession();
-  if (apply(answer)) invalidateDashboardMeta();
+  if (isNull(answer)) {
+    apply(null);
+    return;
+  }
+  startSession();
+  apply(answer, true);
 }
 
 /**
  * Stores a user and applies their dashboard language, the app's default for a signed-out or unset one.
  * Answers whether the language changed, since the discovery store's labels are baked in one language.
+ * With `refresh`, the discovery store resets between the two, so it refetches once, in the new language.
  */
-function apply(next: SessionUser | null): boolean {
+function apply(next: SessionUser | null, refresh = false): boolean {
   const language = useDashboardLanguage();
   const tag = next?.dashboardLanguage ?? dashboardConfig().defaultLanguage;
   const changed = language.value !== tag;
   language.value = tag;
+  if (refresh) invalidateDashboardMeta();
   user.value = next;
   return changed;
 }
