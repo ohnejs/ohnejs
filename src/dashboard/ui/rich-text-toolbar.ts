@@ -393,11 +393,7 @@ export function richTextToolbar<C extends string>(
       const current = untracked(() => editor.blockType());
       const items = kinds.map((kind) => {
         const item = dropdownItem(
-          [
-            icon(BLOCK_ICONS[kind]),
-            h('span', null, () => kindLabel(kind)),
-            h('kbd', null, h('span', null, keySpecLabel(RICH_TEXT_KEYS[kind]))),
-          ],
+          [icon(BLOCK_ICONS[kind]), h('span', null, () => kindLabel(kind))],
           {
             onClick: () => {
               close();
@@ -405,6 +401,7 @@ export function richTextToolbar<C extends string>(
             },
           },
         );
+        item.setAttribute('aria-keyshortcuts', ariaKeyShortcut(RICH_TEXT_KEYS[kind]));
         if (kind === current) item.classList.add('ohne-rich-text-block-active');
         return item;
       });
