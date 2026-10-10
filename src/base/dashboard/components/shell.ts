@@ -386,7 +386,7 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
   const sidebarEl = container(h('div', { class: 'o-sidebar-content' }, sidebar()));
   sidebarEl.classList.add('o-sidebar');
 
-  const mainEl = container(h('div', { class: 'o-main-content' }, content));
+  const mainEl = container(h('div', { class: 'o-main-content' }, content()));
   mainEl.classList.add('o-main');
   if (options.noMainPadding === true) mainEl.classList.add('o-main-no-padding');
   if (options.noMainScroll === true) mainEl.classList.add('o-main-no-scroll');
