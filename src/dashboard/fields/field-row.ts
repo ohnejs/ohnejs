@@ -97,6 +97,18 @@ css`
     text-transform: uppercase;
   }
 
+  .ohne-field-label .ohne-fieldrow-marks {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5em;
+    gap: round(0.5em, 1px);
+    font-size: 1em;
+  }
+
+  .ohne-fieldrow-marks:not(:has(> :not(.ohne-fieldrow-pristine))) {
+    display: none;
+  }
+
   .ohne-field-label .ohne-fieldrow-meta {
     display: flex;
     font-size: 1em;
@@ -291,7 +303,9 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
 
   let head: Child = null;
   if (isUndefined(options.marks)) {
-    head = fieldLabel([name, ...extras], { required: options.field.required });
+    head = fieldLabel([name, h('span', { class: 'ohne-fieldrow-marks' }, extras)], {
+      required: options.field.required,
+    });
   } else {
     // The control outlives a form's re-render, so its slot drops the previous row's marks first.
     options.marks.replaceChildren();

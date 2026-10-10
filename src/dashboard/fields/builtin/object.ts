@@ -40,7 +40,7 @@ css`
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 1em;
+    gap: 0.5em;
     margin-left: auto;
   }
 
