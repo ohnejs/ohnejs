@@ -203,7 +203,7 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Resolves the session once from `GET /auth/me`; any failure reads as signed out.
+ * Resolves the session once from `GET /auth/me`; a `204` or any failure reads as signed out.
  * The answer fills only the still-unresolved state, so it never overwrites a login that beat it.
  * The discovery store resets only when the user's language differs from the default it started on.
  */
@@ -211,7 +211,7 @@ async function resolve(): Promise<void> {
   let answer: SessionUser | null = null;
   try {
     const response = await api('GET /auth/me');
-    if (response.ok) answer = (await response.json()) as SessionUser;
+    if (response.status === 200) answer = (await response.json()) as SessionUser;
   } catch {}
   if (!isUndefined(user.value)) return;
   if (!isNull(answer)) startSession();

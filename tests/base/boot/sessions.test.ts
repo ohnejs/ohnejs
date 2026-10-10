@@ -104,7 +104,7 @@ describe('the sessions boot file', () => {
     strictEqual((await call(ROUTES.patch, phone, { password: 'new horse' })).status, 200);
 
     strictEqual(await status(phone), 200);
-    strictEqual(await status(laptop), 401);
+    strictEqual(await status(laptop), 204);
     strictEqual(await status(bystander), 200);
   });
 
@@ -117,8 +117,8 @@ describe('the sessions boot file', () => {
       .where({ email: 'reset@example.com' })
       .updateOrThrow({ password: 'new horse' });
 
-    strictEqual(await status(phone), 401);
-    strictEqual(await status(laptop), 401);
+    strictEqual(await status(phone), 204);
+    strictEqual(await status(laptop), 204);
     await login('reset@example.com', 'new horse');
   });
 

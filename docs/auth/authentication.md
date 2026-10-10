@@ -28,9 +28,9 @@ POST  /auth/logout
 POST  /auth/logout/others
 # -> 200 { "ok": true }, or 401 when signed out
 
-# The signed-in user, read from the session cookie.
+# The signed-in user, read from the session cookie or a Bearer token.
 GET   /auth/me
-# -> 200 the user, or 401 when signed out
+# -> 200 the user, 204 when signed out, or 401 for a Bearer token that opens no session
 
 # Update the signed-in user's own settings. A partial body; unknown keys are a 422.
 PATCH /auth/me      { "timezone": "Europe/Berlin", "dateFormat": "DD.MM.YYYY" }

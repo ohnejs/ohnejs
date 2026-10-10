@@ -21,6 +21,15 @@ export function readSessionToken(): string | null {
 }
 
 /**
+ * Whether the request's session token is a `Bearer` token: one is sent and no session cookie overrides it.
+ * An API client sends a token on purpose, while a browser sends its cookie on its own.
+ */
+export function isBearerRequest(): boolean {
+  if (!isUndefined(useCookies()[useAuthConfig().cookieName])) return false;
+  return useAuthorization()?.scheme === 'bearer';
+}
+
+/**
  * Writes the session cookie with the safe session profile: `HttpOnly`, `Secure`, `SameSite=Lax`, root path.
  * `maxAge` is the cookie's lifetime in milliseconds, rounded down to the seconds the header carries.
  * Omitting it writes a cookie without `Max-Age`, one that ends with the browser session.

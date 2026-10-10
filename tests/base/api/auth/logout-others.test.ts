@@ -117,7 +117,7 @@ describe('POST /auth/logout/others', () => {
     deepStrictEqual(await response.json(), { ok: true });
 
     strictEqual(await status(ROUTES.me, phone), 200);
-    strictEqual(await status(ROUTES.me, laptop), 401);
+    strictEqual(await status(ROUTES.me, laptop), 204);
     strictEqual(await status(ROUTES.me, bystander), 200);
   });
 
@@ -134,7 +134,7 @@ describe('POST /auth/logout/others', () => {
     strictEqual(await status(ROUTES.me, laptop), 200);
 
     strictEqual((await call(ROUTES.others, phone, undefined, 'http://localhost:9000')).status, 200);
-    strictEqual(await status(ROUTES.me, laptop), 401);
+    strictEqual(await status(ROUTES.me, laptop), 204);
   });
 
   it('answers 401 without a session', async () => {
@@ -156,7 +156,7 @@ describe('POST /auth/logout/others', () => {
     try {
       strictEqual((await call(ROUTES.others, phone)).status, 200);
       strictEqual(await status(ROUTES.me, phone), 200);
-      strictEqual(await status(ROUTES.me, laptop), 401);
+      strictEqual(await status(ROUTES.me, laptop), 204);
     } finally {
       useHooks().clear();
     }

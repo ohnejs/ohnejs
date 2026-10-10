@@ -188,7 +188,7 @@ describe('auth flow', () => {
     strictEqual((await call(ROUTES.login, { json: null })).status, 400);
   });
 
-  it('resolves the current user from a cookie and a bearer token, and 401 without one', async () => {
+  it('resolves the current user from a cookie and a bearer token, and nobody without one', async () => {
     await createUser('mesh@example.com', 'correct horse');
     const session = await login('mesh@example.com', 'correct horse');
     const pair = cookiePair(session);
@@ -199,7 +199,7 @@ describe('auth flow', () => {
     strictEqual(me.status, 200);
     deepStrictEqual(await me.json(), defaults(UUID, 'mesh@example.com'));
     strictEqual((await call(ROUTES.me, { bearer: token })).status, 200);
-    strictEqual((await call(ROUTES.me)).status, 401);
+    strictEqual((await call(ROUTES.me)).status, 204);
   });
 
   it('logs out, revoking the session server-side', async () => {
@@ -211,7 +211,7 @@ describe('auth flow', () => {
     strictEqual(((await logout.json()) as { ok: boolean }).ok, true);
     match(sessionCookie(logout), /^session=; Max-Age=0;.*Secure/);
 
-    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 401);
+    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 204);
   });
 
   it('refuses a logout forged from a same-site page, and logs out from the dashboard', async () => {
@@ -225,7 +225,7 @@ describe('auth flow', () => {
 
     const logout = await call(ROUTES.logout, { cookie: pair, sameSite: 'http://localhost:9000' });
     strictEqual(logout.status, 200);
-    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 401);
+    strictEqual((await call(ROUTES.me, { cookie: pair })).status, 204);
   });
 
   it('stores passwords and session tokens hashed, never in the clear', async () => {

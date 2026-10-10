@@ -89,6 +89,7 @@ const ROUTES = {
 interface CallOptions {
   json?: unknown;
   cookie?: string;
+  bearer?: string;
 }
 
 async function call(r: Route, options: CallOptions = {}): Promise<Response> {
@@ -96,6 +97,7 @@ async function call(r: Route, options: CallOptions = {}): Promise<Response> {
   const sendBody = 'json' in options;
   if (sendBody) headers.set('Content-Type', 'application/json');
   if (options.cookie !== undefined) headers.set('Cookie', options.cookie);
+  if (options.bearer !== undefined) headers.set('Authorization', `Bearer ${options.bearer}`);
   const request = new Request(`http://localhost${r.pattern}`, {
     method: r.method ?? 'GET',
     headers,
@@ -152,8 +154,25 @@ describe('GET /auth/me', () => {
     deepStrictEqual(user, defaults(user));
   });
 
-  it('answers 401 without a session', async () => {
-    strictEqual((await call(ROUTES.get)).status, 401);
+  it('answers 204 uncached without a credential', async () => {
+    const response = await call(ROUTES.get);
+    strictEqual(response.status, 204);
+    strictEqual(response.headers.get('cache-control'), 'no-store');
+  });
+
+  it('answers 204 for a dead session cookie and leaves it in place', async () => {
+    const response = await call(ROUTES.get, { cookie: 'session=dead' });
+    strictEqual(response.status, 204);
+    deepStrictEqual(response.headers.getSetCookie(), []);
+  });
+
+  it('answers 401 for a dead bearer token', async () => {
+    strictEqual((await call(ROUTES.get, { bearer: 'dead' })).status, 401);
+  });
+
+  it('answers 204 for a dead session cookie over a live bearer token, as the cookie wins', async () => {
+    const token = (await signIn('both@example.com')).slice('session='.length);
+    strictEqual((await call(ROUTES.get, { cookie: 'session=dead', bearer: token })).status, 204);
   });
 });
 
