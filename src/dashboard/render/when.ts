@@ -2,18 +2,22 @@ import type { Child } from './insert.ts';
 
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 
 /**
  * A reactive conditional child.
  *
  * `then` renders while `condition` is truthy; `otherwise`, when given, renders while it is falsy.
  * The branch swaps only when the truthiness flips, not on every value `condition` reads.
+ * Each branch builds untracked: a ref it reads while building never rebuilds it.
+ * Wrap a live value in a function child instead.
  *
  * @example
  * ```ts
  * const open = ref(false)
+ * const label = ref('visible')
  *
- * h('aside', null, when(() => open.value, () => h('p', null, 'visible')))
+ * h('aside', null, when(() => open.value, () => h('p', null, () => label.value)))
  * ```
  */
 export function when(
@@ -25,5 +29,5 @@ export function when(
   effect(() => {
     active.value = Boolean(condition());
   });
-  return () => (active.value ? then() : otherwise?.());
+  return () => (active.value ? untracked(then) : otherwise && untracked(otherwise));
 }

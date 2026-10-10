@@ -146,6 +146,24 @@ The branch rebuilds only when the condition changes between truthy and falsy. A 
 truthy value to another keeps the branch's DOM, and bindings inside it keep updating on their own.
 `when` returns a function child, so you can use it wherever a child goes.
 
+A branch builds once and does not track what it reads. A ref read while the branch builds is read once,
+so its later changes do not reach the DOM. Wrap a live value in a function child:
+
+```ts
+import { h, when } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
+
+const open = ref(true);
+const count = ref(0);
+
+when(
+  () => open.value,
+  () => h('p', null, () => `Clicked ${count.value} times`),
+);
+```
+
+Written as `` `Clicked ${count.value} times` `` without the arrow, the text would stay at `0`.
+
 ## Mounting
 
 `mount(view, container)` clears the container and renders a view into it. The router mounts your

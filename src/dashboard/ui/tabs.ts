@@ -295,6 +295,7 @@ export function tabs<T extends number | string>(
  * It unmounts otherwise, so panel-local state resets on switch.
  * Must be called inside the content function of a `tabs` - anywhere else it renders nothing.
  * Pass the content as a function so each activation rebuilds it fresh.
+ * It builds untracked, as a `when` branch does, so a ref it reads while building never rebuilds it.
  *
  * @example
  * ```ts
@@ -306,6 +307,6 @@ export function tab(name: number | string, content: Child | (() => Child)): Chil
   if (active === null) return null;
   return when(
     () => active.value === name,
-    () => content,
+    () => (isFunction(content) ? content() : content),
   );
 }
