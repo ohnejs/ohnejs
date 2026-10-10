@@ -480,7 +480,7 @@ function batchBlock(turn: () => Turn, batch: () => TurnBatch, t: AITranslate): C
       { class: 'o-turn-log' },
       when(
         () => !isNull(batch().results),
-        () => outcomeLines(batch(), t),
+        () => () => outcomeLines(batch(), t),
         () =>
           when(
             () => answering() && !asking(),
