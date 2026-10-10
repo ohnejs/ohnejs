@@ -212,6 +212,18 @@ describe('resolveArgs', () => {
     });
   });
 
+  it('fences a typed value or flag holding a backtick as one span', () => {
+    const number = resolveArgs({ port: { type: 'number' } }, ['--port', 'a`b']);
+    if (!number.ok)
+      strictEqual(number.errors[0]!.message, 'Flag `--port` expects a number, got ``a`b``');
+    const boolean = resolveArgs({ dry: { type: 'boolean' } }, ['--dry=m`y']);
+    if (!boolean.ok)
+      strictEqual(boolean.errors[0]!.message, 'Flag `--dry` expects a boolean, got ``m`y``');
+    const unknown = resolveArgs({ port: { type: 'number' } }, ['--a`b']);
+    if (!unknown.ok) strictEqual(unknown.errors[0]!.message, 'Unknown flag ``--a`b``');
+    deepStrictEqual([number.ok, boolean.ok, unknown.ok], [false, false, false]);
+  });
+
   it('reports an unknown short flag with one dash', () => {
     const result = resolveArgs({ port: { type: 'number' } }, ['-x']);
     strictEqual(result.ok, false);

@@ -10,6 +10,17 @@ describe('codeSpan', () => {
     strictEqual(codeSpan('a.txt'), '`a.txt`');
   });
 
+  it('spans an empty value with one space, so it still shows', () => {
+    strictEqual(codeSpan(''), '` `');
+    strictEqual(applyANSIMarkup(`got ${codeSpan('')}.`, false, plain), 'got  .');
+  });
+
+  it('fences at least as long as `minimum`', () => {
+    strictEqual(codeSpan('a', 2), '``a``');
+    strictEqual(codeSpan('a``b', 2), '```a``b```');
+    strictEqual(codeSpan('', 2), '`` ``');
+  });
+
   it('prints any value exactly through the markup, beside other markup', () => {
     for (const value of [
       'a`b`c.txt',
@@ -22,7 +33,6 @@ describe('codeSpan', () => {
       '__init__.py',
       '**x**',
       '`',
-      '',
       ' ',
       'a b.txt',
     ]) {

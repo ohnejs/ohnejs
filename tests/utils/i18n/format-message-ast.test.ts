@@ -1,6 +1,7 @@
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { applyANSIMarkup, escapeControls, pickANSIColors } from '../../../src/utils/ansi/index.ts';
 import { formatMessageAST } from '../../../src/utils/i18n/format-message-ast.ts';
 import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
 import { parseMessage } from '../../../src/utils/i18n/parse-message.ts';
@@ -62,6 +63,105 @@ describe('formatMessageAST - apostrophe escapes via parseMessage', () => {
 
   it('keeps a lone apostrophe before non-syntax text', () => {
     strictEqual(render("don't"), "don't");
+  });
+});
+
+describe('formatMessageAST - backticked arguments', () => {
+  const plain = pickANSIColors(false);
+  const hostile = [
+    'my`file.pdf',
+    '`',
+    '``',
+    '`x',
+    'x`',
+    'a``b',
+    'a`b``c',
+    ' a ',
+    ' ',
+    '',
+    'a\nb',
+    '\x1b[2J',
+    '*_[]()|',
+    'a** b',
+    '__x__',
+    '\\',
+    'x'.repeat(5000),
+  ];
+
+  it('keeps a plain value byte for byte', () => {
+    strictEqual(render('Unknown block `{block}`', { block: 'a.txt' }), 'Unknown block `a.txt`');
+    strictEqual(render('`{n}` left', { n: 3 }), '`3` left');
+  });
+
+  it('fences a value holding backticks with a longer run', () => {
+    strictEqual(
+      render('Unknown block `{block}`', { block: 'my`file.pdf' }),
+      'Unknown block ``my`file.pdf``',
+    );
+    strictEqual(render('Unknown `{v}`', { v: '`x' }), 'Unknown `` `x ``');
+  });
+
+  it('pads a value with edge spaces, fences an empty one, and spells out control characters', () => {
+    strictEqual(render('Name `{v}`', { v: ' a ' }), 'Name `  a  `');
+    strictEqual(render('Name `{v}`', { v: '' }), 'Name ` `');
+    strictEqual(render('Name `{v}`', { v: 'a\nb' }), 'Name `a\\nb`');
+  });
+
+  it('prints any value exactly through the ANSI markup', () => {
+    for (const template of ['Unknown `{v}`', '`{v}` is required', '**Bad** `{v}` __dim__']) {
+      for (const v of hostile) {
+        const shown = v === '' ? ' ' : escapeControls(v);
+        const expected = template.replace(/\*\*|__/g, '').replace('`{v}`', () => shown);
+        strictEqual(applyANSIMarkup(render(template, { v }), false, plain), expected);
+      }
+    }
+  });
+
+  it('keeps the placeholder of a missing value', () => {
+    strictEqual(render('Unknown `{v}`', {}), 'Unknown `{v}`');
+  });
+
+  it('fences a value inside a plural or select case', () => {
+    strictEqual(render('{n, plural, other {`{v}`}}', { n: 2, v: 'a`b' }), '``a`b``');
+    strictEqual(render('{k, select, other {`{v}`}}', { k: 'x', v: 'a`b' }), '``a`b``');
+  });
+
+  it('fences a whole plural or select that fills a span alone', () => {
+    strictEqual(render('`{n, plural, other {{v}}}`', { n: 1, v: 'x`' }), '`` x` ``');
+    strictEqual(render('`{k, select, other {{v}}}`', { k: 'y', v: 'x`' }), '`` x` ``');
+    strictEqual(render('`{n, plural, one {# item} other {# items}}`', { n: 3 }), '`3 items`');
+  });
+
+  it('leaves an argument raw outside backticks or beside other text in a span', () => {
+    strictEqual(render('{v}', { v: 'a`b' }), 'a`b');
+    strictEqual(render('`a {v}`', { v: 'b`c' }), '`a b`c`');
+    strictEqual(render('`{v}{w}`', { v: 'a`', w: 'b' }), '`a`b`');
+    strictEqual(render('`{v}``', { v: 'a`b' }), '`a`b``');
+  });
+
+  it('leaves a placeholder raw inside a longer span that holds other text', () => {
+    strictEqual(render('Run ``a `{v}` b`` now', { v: 'p`q' }), 'Run ``a `p`q` b`` now');
+  });
+
+  it('keeps the template fence when it is longer than the value needs', () => {
+    strictEqual(render('`a ``{v}``', { v: 'x' }), '`a ``x``');
+    strictEqual(render('``{v}``', { v: 'a`b' }), '``a`b``');
+    strictEqual(render('``{v}``', { v: 'a``b' }), '```a``b```');
+  });
+
+  it('lets one backtick close one span only', () => {
+    strictEqual(render('`{v}`{w}`', { v: 'a`b', w: 'c' }), '``a`b``c`');
+  });
+
+  it('leaves an argument between two closed spans raw', () => {
+    strictEqual(render('Use `a`{v}`b` here', { v: ' p ' }), 'Use `a` p `b` here');
+    strictEqual(render('Use `a`{v}`b` here', { v: 'p`q' }), 'Use `a`p`q`b` here');
+    strictEqual(render('`a {w}`{v}`', { v: 'p`q', w: 'b' }), '`a b`p`q`');
+  });
+
+  it('leaves a formatted number or pound inside backticks as is', () => {
+    strictEqual(render('`{n, number}`', { n: 1234 }), '`1,234`');
+    strictEqual(render('{n, plural, other {in `#` s}}', { n: 5 }), 'in `5` s');
   });
 });
 

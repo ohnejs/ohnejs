@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { applyANSIMarkup, pickANSIColors } from '../../../src/utils/ansi/index.ts';
@@ -55,6 +55,18 @@ describe('applyANSIMarkup', () => {
     strictEqual(applyANSIMarkup('`  `', false, color), '\x1b[96m  \x1b[39m');
   });
 
+  it('closes no bold or dim inside a backtick span', () => {
+    strictEqual(
+      applyANSIMarkup('**`a** b`**', false, color),
+      '\x1b[1m\x1b[96ma** b\x1b[39m\x1b[22m',
+    );
+    strictEqual(applyANSIMarkup('a **b `c** d`', false, color), 'a **b \x1b[96mc** d\x1b[39m');
+    strictEqual(
+      applyANSIMarkup('__in `x__ y`__', false, color),
+      '\x1b[2min \x1b[96mx__ y\x1b[39m\x1b[22m',
+    );
+  });
+
   it('styles nothing inside a backtick span', () => {
     strictEqual(applyANSIMarkup('`__init__.py`', false, color), '\x1b[96m__init__.py\x1b[39m');
   });
@@ -72,5 +84,17 @@ describe('applyANSIMarkup', () => {
 
   it('strips markers but adds no codes when disabled', () => {
     strictEqual(applyANSIMarkup('use `x` **y**', false, pickANSIColors(false)), 'use x y');
+  });
+
+  it('stays linear on markers that never close or nest deep', () => {
+    const started = performance.now();
+    for (const unit of ['**a ', ' __a', ' **a__']) {
+      const text = unit.repeat(50_000);
+      strictEqual(applyANSIMarkup(text, false, pickANSIColors(false)), text);
+    }
+    const deep = `${'**'.repeat(100_000)}a${'**'.repeat(100_000)}`;
+    strictEqual(applyANSIMarkup(deep, false, pickANSIColors(false)), 'a');
+    strictEqual(applyANSIMarkup('*'.repeat(200_000), false, pickANSIColors(false)), '****');
+    ok(performance.now() - started < 1000);
   });
 });

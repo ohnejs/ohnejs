@@ -11,6 +11,8 @@ import type {
   MessageTimeNode,
 } from './message-ast.ts';
 
+import { codeSpan } from '../ansi/code-span.ts';
+import { codeSpans } from '../ansi/code-spans.ts';
 import { coerceToDate } from '../coerce/coerce-to-date.ts';
 import { coerceToNumber } from '../coerce/coerce-to-number.ts';
 import { isDate } from '../is/is-date.ts';
@@ -44,6 +46,8 @@ export interface FormatMessageOptions {
 }
 
 const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium', 'long', 'full']);
+const SLOT = '\uE000';
+const NO_SPANS: ReadonlyMap<number, number> = new Map();
 
 /**
  * Renders a parsed `MessageAST` against `params` in `language`.
@@ -54,6 +58,10 @@ const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium',
  * `plural` renders the value `0`, so an `=0` exact or the locale's category case wins before `other`.
  *
  * Hard failures (unsupported skeleton stem, bare `currency` style) throw `MessageFormatError`.
+ *
+ * A placeholder that fills a backtick span alone, as in `` `{name}` ``, renders through `codeSpan`.
+ * Its value then reads back as exactly one span, whatever backticks, spaces, or control characters it holds.
+ * An empty value spans one space, so the slot stays visible.
  *
  * `Intl.NumberFormat`, `Intl.DateTimeFormat`, and `Intl.PluralRules` are constructed per call.
  * This module holds no internal cache.
@@ -69,6 +77,9 @@ const DATETIME_STYLE_KEYWORDS: ReadonlySet<string> = new Set(['short', 'medium',
  *   'en',
  * )
  * // -> '3 items'
+ *
+ * formatMessageAST(parseMessage('Unknown block `{block}`'), { block: 'a`b' }, 'en')
+ * // -> 'Unknown block ``a`b``'
  * ```
  */
 export function formatMessageAST(
@@ -87,11 +98,41 @@ export function formatMessageAST(
 
 /**
  * Renders a node sequence into one string under one shared context.
+ * A placeholder that is the whole content of a code span replaces the span's fences with its own `codeSpan`.
+ * The spans come from the template's own text, each placeholder a `SLOT`, so a value never changes them.
  */
 function renderNodes(nodes: MessageAST, ctx: Context): string {
+  const fenced = nodes.some((node) => node.kind === 'literal' && node.value.includes('`'));
+  const template = fenced
+    ? nodes.map((node) => (node.kind === 'literal' ? node.value : SLOT)).join('')
+    : '';
+  const ends = fenced ? codeSpans(template).ends : NO_SPANS;
   let out = '';
-  for (const node of nodes) out += renderNode(node, ctx);
+  let at = 0;
+  let fence = 0;
+  for (const node of nodes) {
+    if (node.kind === 'literal') {
+      out += node.value.slice(fence);
+      at += node.value.length;
+      fence = 0;
+      continue;
+    }
+    fence = spanFence(template, ends, at);
+    const text = renderNode(node, ctx);
+    out = fence > 0 ? out.slice(0, -fence) + codeSpan(text, fence) : out + text;
+    at += SLOT.length;
+  }
   return out;
+}
+
+/**
+ * The fence length of the code span whose whole content is the slot at `slot`, or `0` when there is none.
+ */
+function spanFence(template: string, ends: ReadonlyMap<number, number>, slot: number): number {
+  let start = slot;
+  while (template[start - 1] === '`') start--;
+  const fence = slot - start;
+  return fence > 0 && ends.get(start) === slot + SLOT.length + fence ? fence : 0;
 }
 
 /**

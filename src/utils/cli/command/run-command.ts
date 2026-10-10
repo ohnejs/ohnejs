@@ -1,6 +1,7 @@
 import type { ArgsSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
+import { codeSpan } from '../../ansi/code-span.ts';
 import { isColorStream } from '../../ansi/is-color-stream.ts';
 import { pickANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import { didYouMean } from '../../did-you-mean/did-you-mean.ts';
@@ -103,13 +104,15 @@ async function dispatch(
 
   if (sub && isCommandToken && !command.run) {
     const hint = didYouMean(first, Object.keys(sub));
-    stderr.write(`Unknown command \`${first}\`${hint ? `. Did you mean \`${hint}\`?` : ''}\n`);
+    stderr.write(
+      `Unknown command ${codeSpan(first)}${hint ? `. Did you mean \`${hint}\`?` : ''}\n`,
+    );
     return 1;
   }
 
   const flagsFirst = sub && !command.run && first?.startsWith('-');
   if (flagsFirst && resolveArgs({}, argv, options.globals).positionals.length > 0) {
-    stderr.write(`Missing command before \`${first}\`\n`);
+    stderr.write(`Missing command before ${codeSpan(first)}\n`);
     return 1;
   }
 

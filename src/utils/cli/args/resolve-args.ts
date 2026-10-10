@@ -1,5 +1,6 @@
 import type { ArgSchema, ArgsSchema, ResolvedArgs } from './define-args.ts';
 
+import { codeSpan } from '../../ansi/code-span.ts';
 import { first } from '../../array/first.ts';
 import { last } from '../../array/last.ts';
 import { toArray } from '../../array/to-array.ts';
@@ -113,7 +114,7 @@ export function resolveArgs<const S extends ArgsSchema>(
     errors.push({
       kind: 'unknown',
       name: flag,
-      message: `Unknown flag \`${typed}\`${suggestion ? `. Did you mean \`--${suggestion}\`?` : ''}`,
+      message: `Unknown flag ${codeSpan(typed)}${suggestion ? `. Did you mean \`--${suggestion}\`?` : ''}`,
       ...(suggestion ? { suggestion } : {}),
     });
   }
@@ -180,13 +181,13 @@ function coerceValue(
       if (!isString(raw)) return { error: `Flag \`--${flag}\` expects a number` };
       const parsed = def.integer ? coerceToInteger(raw) : coerceToNumber(raw);
       if (isNumber(parsed)) return { value: parsed };
-      return { error: `Flag \`--${flag}\` expects a number, got \`${raw}\`` };
+      return { error: `Flag \`--${flag}\` expects a number, got ${codeSpan(raw)}` };
     }
 
     case 'boolean': {
       const parsed = coerceToBoolean(raw);
       if (isBoolean(parsed)) return { value: parsed };
-      return { error: `Flag \`--${flag}\` expects a boolean, got \`${raw}\`` };
+      return { error: `Flag \`--${flag}\` expects a boolean, got ${codeSpan(`${raw}`)}` };
     }
 
     case 'enum': {

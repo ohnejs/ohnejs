@@ -76,6 +76,26 @@ describe('runCommand', () => {
     deepStrictEqual(err, ['Unknown command `biuld`. Did you mean `build`?\n']);
   });
 
+  it('fences an unknown command holding a backtick as one span', async () => {
+    const cli = defineCommand({
+      meta: { name: 'app' },
+      subCommands: { build: defineCommand({ meta: { name: 'build' }, run() {} }) },
+    });
+    const { err, options } = capture();
+    strictEqual(await runCommand(cli, ['x`y'], options), 1);
+    deepStrictEqual(err, ['Unknown command ``x`y``\n']);
+  });
+
+  it('shows an empty unknown command as an empty span', async () => {
+    const cli = defineCommand({
+      meta: { name: 'app' },
+      subCommands: { build: defineCommand({ meta: { name: 'build' }, run() {} }) },
+    });
+    const { err, options } = capture();
+    strictEqual(await runCommand(cli, [''], options), 1);
+    deepStrictEqual(err, ['Unknown command ` `\n']);
+  });
+
   it('reports a flag in place of the command and exits 1', async () => {
     const build = defineCommand({ meta: { name: 'build' }, run() {} });
     const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
@@ -83,6 +103,14 @@ describe('runCommand', () => {
     strictEqual(await runCommand(cli, ['--cwd', 'x', 'build'], options), 1);
     deepStrictEqual(out, []);
     deepStrictEqual(err, ['Missing command before `--cwd`\n']);
+  });
+
+  it('fences a flag holding a backtick in place of the command', async () => {
+    const build = defineCommand({ meta: { name: 'build' }, run() {} });
+    const cli = defineCommand({ meta: { name: 'app' }, subCommands: { build } });
+    const { err, options } = capture();
+    strictEqual(await runCommand(cli, ['--c`d', 'x', 'build'], options), 1);
+    deepStrictEqual(err, ['Missing command before ``--c`d``\n']);
   });
 
   it('prints the group help for flags with no command after them', async () => {

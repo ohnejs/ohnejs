@@ -1,5 +1,6 @@
 import { codeSpan } from '../ansi/code-span.ts';
 import { escapeControls } from '../ansi/escape-controls.ts';
+import { isEmpty } from '../is/is-empty.ts';
 import { clamp } from '../number/clamp.ts';
 
 /**
@@ -41,7 +42,7 @@ export class MessageSyntaxError extends Error {
 
   constructor(message: string, template: string, position: number) {
     const { line, column, source, caret } = locate(template, position);
-    super(`${message} (${line}:${column})\n${codeSpan(source)}\n${caret}`);
+    super(`${message} (${line}:${column})\n${isEmpty(source) ? '' : codeSpan(source)}\n${caret}`);
     this.name = 'MessageSyntaxError';
     this.position = position;
     this.line = line;

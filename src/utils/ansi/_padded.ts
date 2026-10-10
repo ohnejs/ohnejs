@@ -2,7 +2,7 @@
  * Whether span content starts and ends with a space and holds more than spaces.
  * Such content drops one space per side when printed, as in Markdown.
  *
- * Shared by `codeSpan` and `applyANSIMarkup` so fencing and printing never diverge.
+ * Shared by `codeSpan` and `codeSpanText` so fencing and reading never diverge.
  *
  * @example
  * ```ts
