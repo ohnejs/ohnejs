@@ -106,6 +106,7 @@ useMessages().register('en', {
   'dash.owners.name.label': 'Owner name',
   'dash.kinds.title.placeholder': 'Short name',
   'dash.kinds.help.text': 'Long help',
+  'dash.kinds.guide.show': 'Read the guide',
   'dash.blocks.hero.label': 'Hero section',
   'dash.blocks.hero.description': 'A big heading over the page',
   'dash.roles.user.label': 'Dashboard user',
@@ -280,6 +281,15 @@ useCollections().register('DashKinds', {
       when: field('dateTime', { nullable: true }),
       flag: field('boolean', { display: 'switch' }),
       help: field('text', { nullable: true, description: { text: 'dash.kinds.help.text' } }),
+      guide: field('text', {
+        nullable: true,
+        description: {
+          text: 'Plain guide',
+          showLabel: 'dash.kinds.guide.show',
+          hideLabel: 'Fold it away',
+          expanded: true,
+        },
+      }),
     },
   },
 });
@@ -670,6 +680,17 @@ describe('fields', () => {
     });
     strictEqual(kinds.help?.description, undefined);
     strictEqual(kinds.title?.expandable, undefined);
+  });
+
+  it('resolves custom toggle labels on an expandable description', async () => {
+    const { body } = await call(user);
+    const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
+    deepStrictEqual(kinds.guide?.expandable, {
+      text: 'Plain guide',
+      showLabel: 'Read the guide',
+      hideLabel: 'Fold it away',
+      expanded: true,
+    });
   });
 
   it('describes composite subfields, the item UUID included', async () => {
