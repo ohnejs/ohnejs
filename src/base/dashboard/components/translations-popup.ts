@@ -27,6 +27,7 @@ import {
   ref,
   sleep,
   stringifySearchParams,
+  stripCodeSpans,
   untracked,
 } from 'ohnejs/utils';
 
@@ -263,7 +264,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
       size: -2,
       variant: copyOff ? 'ghost' : 'outline',
       disabled: copyOff ? () => true : undefined,
-      ariaLabel: copyLabel().replaceAll('`', ''),
+      ariaLabel: stripCodeSpans(copyLabel()),
       onClick: () => void copy(code),
     });
     // Copying onto itself is no action, so the self row's disabled copy explains nothing.
@@ -279,7 +280,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
         variant: deleteOff ? 'ghost' : 'outline',
         destructiveHover: !deleteOff,
         disabled: deleteOff ? (): boolean => true : undefined,
-        ariaLabel: deleteLabel().replaceAll('`', ''),
+        ariaLabel: stripCodeSpans(deleteLabel()),
         onClick: () => void remove(code),
       });
       onCleanup(attachTooltip(deleteButton, deleteLabel));
