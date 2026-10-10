@@ -320,7 +320,7 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
           { class: 'ohne-row ohne-shrink-0' },
           when(
             () => !isUndefined(existing.value) && !isUndefined(verdicts.value),
-            () => actions(code),
+            () => () => actions(code),
           ),
         ),
       ),
