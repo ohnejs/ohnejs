@@ -88,12 +88,8 @@ export function accountEditor(): Child {
   const form = ref<FieldForm | undefined>(undefined);
   const busy = ref(false);
 
-  const stateOf = (live: FieldForm): AccountState | undefined => {
-    const reading = live.read();
-    return isUndefined(reading.errors) ? ((reading.value ?? {}) as AccountState) : undefined;
-  };
   const currentState = (): AccountState | undefined =>
-    isUndefined(form.value) ? undefined : stateOf(form.value);
+    form.value?.snapshot(history.getCurrentState()) as AccountState | undefined;
 
   // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
   setNavigationGuard(() =>
@@ -124,8 +120,8 @@ export function accountEditor(): Child {
     if (outcome.kind === 'saved') {
       // A language change has already torn `live` down; its controls still answer the settled state.
       live.rebase({ ...outcome.user });
-      const settled = stateOf(live);
-      if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
+      const settled = live.snapshot(history.getCurrentState()) as AccountState;
+      history.push(settled).setOriginalState(settled);
       if (outcome.user.contentLanguage !== localeBefore) {
         contentLocale.value = outcome.user.contentLanguage ?? undefined;
       }

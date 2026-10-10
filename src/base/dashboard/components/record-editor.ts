@@ -278,11 +278,8 @@ export function useRecordEditor(
   const busy = ref(false);
   onCleanup(() => form.value?.dispose());
 
-  const currentState = (): RecordRow | undefined => {
-    const reading = form.value?.read();
-    if (isUndefined(reading) || !isUndefined(reading.errors)) return undefined;
-    return (reading.value ?? {}) as RecordRow;
-  };
+  const currentState = (): RecordRow | undefined =>
+    form.value?.snapshot(history.getCurrentState()) as RecordRow | undefined;
 
   const restore = (restored: RecordRow): void => {
     form.value?.dispose();

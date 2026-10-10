@@ -177,12 +177,8 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const form = ref<FieldForm>(buildForm(seed));
   onCleanup(() => form.value.dispose());
 
-  const currentState = (): Record<string, unknown> | undefined => {
-    const reading = form.value.read();
-    return isUndefined(reading.errors)
-      ? ((reading.value ?? {}) as Record<string, unknown>)
-      : undefined;
-  };
+  const currentState = (): Record<string, unknown> =>
+    form.value.snapshot(history.getCurrentState());
 
   const restore = (state: Record<string, unknown> | undefined): void => {
     if (isUndefined(state)) return;
