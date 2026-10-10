@@ -4,10 +4,14 @@ import type { Child } from '../render/insert.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
+import { loadMessages, messageRepairs } from '../runtime/messages.ts';
 import { setDocumentTitle } from '../runtime/title.ts';
+import { useDashboardLanguage } from '../runtime/use-dashboard-language.ts';
 import { compilePages, matchPages, type CompiledPage, type MatchedRoute } from './match-route.ts';
 
 /**
@@ -49,6 +53,8 @@ export type NavigationGuard = (target: string) => boolean | Promise<boolean>;
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 let token = 0;
+let published = 0;
+let builtIn = '';
 let guard: NavigationGuard | null = null;
 let rendered = '';
 let at = 0;
@@ -61,6 +67,8 @@ let cause: NavigationCause = 'load';
  *
  * Navigation re-renders in place, without a full reload.
  * A same-origin left-click on a link, a `navigate` call, or the back and forward buttons swap the page.
+ * The first page builds once its module has loaded and the dashboard language's catalogs have settled.
+ * A catalog that failed to load does not hold it back; the page rebuilds once its retry succeeds.
  */
 export async function startRouter(
   manifest: readonly PageRoute[],
@@ -69,8 +77,9 @@ export async function startRouter(
   pages = compilePages(manifest);
   window.addEventListener('popstate', traverse);
   document.addEventListener('click', interceptLink);
-  await render();
+  await Promise.all([render(), loadMessages(useDashboardLanguage().value)]);
   mount(() => view(), container);
+  batchedEffect(relocalize);
 }
 
 /**
@@ -215,11 +224,31 @@ export function useRoute(): RouteContext | null {
 /**
  * The active page rendered for its route, or the not-found page when no route matched.
  * The title resets to the bare `ohne` first, so a page that sets none never shows the previous page's.
+ * A page rebuilds on navigation and through `relocalize`, never on a ref it reads while building.
  */
 function view(): Child {
   setDocumentTitle();
   const route = active.value;
-  return isNull(route) ? notFound() : route.component(route);
+  builtIn = untracked(translation);
+  return isNull(route) ? notFound() : untracked(() => route.component(route));
+}
+
+/**
+ * Rebuilds the active page on a language switch, and when a late catalog repairs the language.
+ * A navigation still rendering builds its own page instead, since the old one would read the new URL.
+ */
+function relocalize(): void {
+  const now = translation();
+  const route = untracked(() => active.value);
+  if (now === builtIn || published !== token || isNull(route)) return;
+  active.value = { ...route };
+}
+
+/**
+ * The language a page builds in, with the count of its repairs, as one comparable key.
+ */
+function translation(): string {
+  return `${useDashboardLanguage().value}\t${messageRepairs()}`;
 }
 
 /**
@@ -239,7 +268,7 @@ async function render(): Promise<void> {
   at = entryIndex() ?? 0;
   const match = matchPages(pages, location.pathname);
   if (isNull(match)) {
-    active.value = null;
+    publish(mine, null);
     return;
   }
   let module: { default: DashboardPage };
@@ -248,11 +277,19 @@ async function render(): Promise<void> {
   } catch (error) {
     if (mine !== token) return;
     console.error(error);
-    active.value = null;
+    publish(mine, null);
     return;
   }
   if (mine !== token) return;
-  active.value = { ...match, component: module.default };
+  publish(mine, { ...match, component: module.default });
+}
+
+/**
+ * Makes `route` the active route on behalf of render `mine`, the latest one.
+ */
+function publish(mine: number, route: Active | null): void {
+  published = mine;
+  active.value = route;
 }
 
 /**

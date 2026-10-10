@@ -29,6 +29,12 @@ export interface DashboardConfig {
    * Narrows to the generated language union once codegen has run.
    */
   defaultLanguage: DashboardLanguage;
+
+  /**
+   * Every message group the stack defines, the first segment of each key.
+   * `loadMessages` fetches each of them before a language renders.
+   */
+  messageGroups: string[];
 }
 
 let cached: DashboardConfig | undefined;

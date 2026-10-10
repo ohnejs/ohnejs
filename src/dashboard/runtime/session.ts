@@ -8,7 +8,9 @@ import { endSession, startSession } from './_request.ts';
 import { loginRefusal } from './_session.ts';
 import { api } from './api.ts';
 import { dashboardConfig } from './config.ts';
+import { loadMessages } from './messages.ts';
 import { invalidateDashboardMeta } from './meta.ts';
+import { writeDashboardLanguage } from './set-dashboard-language.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
 
 export type { LoginOutcome };
@@ -153,8 +155,10 @@ export async function login(
     return { kind: 'unreachable' };
   }
   if (!response.ok) return loginRefusal(response);
+  const answer = (await response.json()) as SessionUser;
+  await loadMessages(languageOf(answer));
   startSession();
-  apply((await response.json()) as SessionUser, true);
+  apply(answer, true);
   return { kind: 'signed-in' };
 }
 
@@ -172,6 +176,7 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
     });
     if (response.ok) {
       const answer = (await response.json()) as SessionUser;
+      await loadMessages(languageOf(answer));
       if (apply(answer)) invalidateDashboardMeta();
       return { kind: 'saved', user: answer };
     }
@@ -197,6 +202,7 @@ export async function logout(): Promise<void> {
   try {
     await api('POST /auth/logout');
   } catch {}
+  await loadMessages(languageOf(null));
   apply(null);
   invalidateDashboardMeta();
 }
@@ -211,6 +217,7 @@ async function resolve(): Promise<void> {
     const response = await api('GET /auth/me');
     if (response.status === 200) answer = (await response.json()) as SessionUser;
   } catch {}
+  await loadMessages(languageOf(answer));
   if (!isUndefined(user.value)) return;
   if (isNull(answer)) {
     apply(null);
@@ -221,15 +228,22 @@ async function resolve(): Promise<void> {
 }
 
 /**
+ * The dashboard language `user` renders in: their own, or the app's default when signed out or unset.
+ */
+function languageOf(user: SessionUser | null): DashboardLanguage {
+  return user?.dashboardLanguage ?? dashboardConfig().defaultLanguage;
+}
+
+/**
  * Stores a user and applies their dashboard language, the app's default for a signed-out or unset one.
+ * Its catalogs must have loaded first, through `loadMessages`, so the page rebuilds with every message ready.
  * Answers whether the language changed, since the discovery store's labels are baked in one language.
  * With `refresh`, the discovery store resets between the two, so it refetches once, in the new language.
  */
 function apply(next: SessionUser | null, refresh = false): boolean {
-  const language = useDashboardLanguage();
-  const tag = next?.dashboardLanguage ?? dashboardConfig().defaultLanguage;
-  const changed = language.value !== tag;
-  language.value = tag;
+  const tag = languageOf(next);
+  const changed = useDashboardLanguage().value !== tag;
+  writeDashboardLanguage(tag);
   if (refresh) invalidateDashboardMeta();
   user.value = next;
   return changed;

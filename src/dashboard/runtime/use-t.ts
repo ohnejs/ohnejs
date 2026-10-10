@@ -33,9 +33,11 @@ const cache = new Map<string, MessageAST>();
  * Returns a translator bound to the dashboard's reactive language.
  *
  * The returned `t` reads `useDashboardLanguage` and the message store on every call.
- * Calling it inside a reactive render keeps the string live.
- * It re-renders when the language changes or when the key's catalog finishes loading.
- * The catalog is fetched from the API on demand, once per group and language.
+ * Inside a function child the string stays live, following the language and a catalog that loads late.
+ * Anywhere else a call is a snapshot, taken when it runs.
+ * A snapshot in a page is safe: the dashboard language's catalogs load before the page builds.
+ * The page also rebuilds on a language switch, and when a catalog that failed to load arrives on retry.
+ * Any other language's catalog is fetched from the API on demand, once per group and language.
  *
  * A key whose catalog has not loaded yet, or that no language defines, renders as the key itself.
  * Templates are parsed once and cached.

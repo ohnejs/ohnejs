@@ -34,15 +34,15 @@ let current: Ref<DashboardLanguage> | undefined;
  * Returns the reactive language the dashboard renders messages in, a process-wide singleton.
  *
  * Reading `.value` inside a reactive render subscribes to it.
- * Writing a new tag re-renders every `useT` string in place.
+ * When it changes, the page rebuilds and every `useT` string renders in the new language.
+ * Switch it through `setDashboardLanguage`, which loads the new language's catalogs first.
+ * A direct write rebuilds the page before they load, so its messages render as raw keys.
  * It starts at the app's `messages.defaultLanguage`.
  *
  * @example
  * ```ts
- * const language = useDashboardLanguage()
- *
- * h('p', null, () => useT()('nav.home')) // renders in the active language
- * language.value = 'de'                  // every message re-renders in German
+ * h('p', null, () => useDashboardLanguage().value) // renders the active tag, like 'en'
+ * h('p', null, () => useT()('nav.home'))          // renders in the active language
  * ```
  */
 export function useDashboardLanguage(): Ref<DashboardLanguage> {

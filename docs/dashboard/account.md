@@ -6,7 +6,7 @@ for that one user. Nothing here changes the data your app stores, only how the d
 
 The settings are fields on the `Users` collection, so they are saved with the account and follow the
 user across devices. A save takes effect at once. When you switch the dashboard language, every
-label re-renders in place. When you change the time zone, every date on the page changes with it. No
+label switches with it. When you change the time zone, every date on the page changes with it. No
 reload is needed.
 
 ## The settings

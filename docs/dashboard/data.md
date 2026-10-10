@@ -3,7 +3,7 @@
 A dashboard page runs in the browser, so its data comes over HTTP from your API. `api` is the
 fetch for that: it knows every route id your project registers, prefixes the API's base URL, and
 returns the plain `Response`. Messages arrive the same way: `useT` translates against catalogs
-fetched from the API on demand.
+the dashboard loads from the API.
 
 ## Fetching from the API
 
@@ -146,22 +146,33 @@ async function send(file: File): Promise<void> {
 
 `useT` returns a translator with the same typed keys as the server's. Codegen copies
 [`KnownMessages`](../i18n/messages.md#typed-keys) into the browser, so an unknown key or a wrong
-parameter is a compile error. Call `t` inside a reactive child so the string stays up to date:
+parameter is a compile error:
 
 ```ts
-import { h, useT } from 'ohnejs/dashboard';
+// dashboard/pages/index.ts
+import { defineDashboardPage, h, useT } from 'ohnejs/dashboard';
 
 const t = useT();
 
-h('h1', null, () => t('page.title'));
-h('p', null, () => t('field.minLength', { min: 3 }));
+export default defineDashboardPage(() => [
+  h('h1', null, t('page.title')),
+  h('p', null, t('field.minLength', { min: 3 })),
+]);
 ```
 
-Groups load on demand through the [catalog endpoint](../i18n/messages.md#the-catalog-endpoint):
-the first `t('page.title')` fetches the `page` group for the active language, once, and caches it.
-Until the group arrives, the key itself renders. The same happens for a key that no catalog defines.
-When a key is missing in the active language, the server fills it from the
-[fallback chain](../i18n/messages.md#translating-with-uset).
+The dashboard loads every catalog of its language through the
+[catalog endpoint](../i18n/messages.md#the-catalog-endpoint) before the first page renders. A language
+switch loads the new catalogs first, then rebuilds the page. So `t` is ready inside your page, and a
+plain `t('page.title')` there renders translated.
+
+Keep each `t` call inside the page function. A call at the top level of a module runs once, when the
+module loads, which can be before the catalogs arrive, and it never follows a language switch.
+
+If the API cannot answer, the page renders anyway, with the key itself in place of each missing message.
+The dashboard keeps retrying, and rebuilds the page once the catalogs arrive.
+
+A key that no catalog defines renders as the key itself. When a key is missing in the active language,
+the server fills it from the [fallback chain](../i18n/messages.md#translating-with-uset).
 
 ## Switching the language
 
@@ -171,18 +182,20 @@ The whole page shares one ref:
 - It starts at the configured [default language](../project/config.md#messages).
 - It switches to the signed-in user's [dashboard language](./account.md#the-settings) once the
   session has loaded.
-- Writing a new language tag re-renders every `useT` string in place.
 
-`api()` sends the active language as `Accept-Language`, so labels and messages that the server
-resolves arrive in the same language:
+To switch it yourself, call `setDashboardLanguage`. It loads the new language's catalogs, then writes
+the ref. The page rebuilds in the new language, and the menu and field labels refetch in it:
 
 ```ts
-import { h, useDashboardLanguage } from 'ohnejs/dashboard';
+import { h, setDashboardLanguage } from 'ohnejs/dashboard';
 
-const language = useDashboardLanguage();
-
-h('button', { onClick: () => (language.value = 'de') }, 'Deutsch');
+h('button', { onClick: () => void setDashboardLanguage('de') }, 'Deutsch');
 ```
+
+Do not write the ref yourself. The page would rebuild before the new catalogs arrive, and show raw keys.
+
+`api()` sends the active language as `Accept-Language`, so labels and messages that the server
+resolves arrive in the same language.
 
 Codegen types the ref to the languages your catalogs define, so `'de'` compiles only when a `de`
 catalog exists somewhere in the stack.

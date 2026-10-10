@@ -277,6 +277,7 @@ export type {
 } from './ui/vertical-menu.ts';
 export type { KnownMessages, MessageKey } from './runtime/known-messages.ts';
 export type { MessageCatalog, MessageEntry } from './runtime/messages.ts';
+export { setDashboardLanguage } from './runtime/set-dashboard-language.ts';
 export type { DashboardLanguage, DashboardLanguages } from './runtime/use-dashboard-language.ts';
 export { useDashboardLanguage } from './runtime/use-dashboard-language.ts';
 export type { MessageParams, Translate } from './runtime/use-t.ts';

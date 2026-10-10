@@ -264,6 +264,7 @@ curl http://localhost:9001/messages/inbox/de
 - The client formats each entry with the plural rules of the language it came from.
 - A malformed language tag is a `400`, and a group with no keys a `404`.
 
-The dashboard uses this endpoint: its
-[browser-side `useT`](../dashboard/data.md#translations-in-the-browser) fetches each group on
-demand, once per language, and renders the same keys your handlers use.
+The dashboard uses this endpoint: it fetches every group of its language before the first page renders,
+and again before a language switch. Its
+[browser-side `useT`](../dashboard/data.md#translations-in-the-browser) then renders the same keys your
+handlers use.
