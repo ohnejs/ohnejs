@@ -24,6 +24,20 @@ export function runWithEvent<R>(event: Event, fn: () => R): R {
 }
 
 /**
+ * Runs `fn` with no event bound, however deep inside a request the caller sits.
+ * The composables then answer as outside a request: `tryUseEvent` is `undefined`, `useUser` resolves `null`.
+ * Work `fn` starts keeps the unbound context; the caller's event is back once `fn` returns.
+ *
+ * @example
+ * ```ts
+ * await runWithoutEvent(() => readScope('Posts')) // -> the read scope of a visitor without a session
+ * ```
+ */
+export function runWithoutEvent<R>(fn: () => R): R {
+  return store.exit(fn);
+}
+
+/**
  * Returns the current request's `Event`, or `undefined` outside a request.
  * The non-throwing counterpart to `useEvent`, for code that runs with or without a bound event.
  *

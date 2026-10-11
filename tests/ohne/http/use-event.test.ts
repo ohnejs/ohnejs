@@ -1,7 +1,13 @@
 import { strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { type Event, runWithEvent, useEvent } from '../../../src/ohne/index.ts';
+import {
+  type Event,
+  runWithEvent,
+  runWithoutEvent,
+  tryUseEvent,
+  useEvent,
+} from '../../../src/ohne/index.ts';
 
 function makeEvent(url = 'http://localhost/'): Event {
   return {
@@ -51,5 +57,26 @@ describe('useEvent', () => {
       runWithEvent(makeEvent(), () => 42),
       42,
     );
+  });
+
+  it('unbinds the event under runWithoutEvent and binds it again after', () => {
+    const event = makeEvent();
+    runWithEvent(event, () => {
+      strictEqual(
+        runWithoutEvent(() => tryUseEvent()),
+        undefined,
+      );
+      strictEqual(useEvent(), event);
+    });
+  });
+
+  it('keeps async work started under runWithoutEvent unbound', async () => {
+    const seen = await runWithEvent(makeEvent(), () =>
+      runWithoutEvent(async () => {
+        await Promise.resolve();
+        return tryUseEvent();
+      }),
+    );
+    strictEqual(seen, undefined);
   });
 });
