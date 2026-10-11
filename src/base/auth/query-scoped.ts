@@ -15,6 +15,7 @@ import {
 } from 'ohnejs';
 import { isUndefined } from 'ohnejs/utils';
 
+import { collectionScope } from '../collections-api/gate.ts';
 import { requireCapability } from './capabilities.ts';
 
 /**
@@ -27,6 +28,7 @@ import { requireCapability } from './capabilities.ts';
  * A create or update hands the resolver `input`, the write the caller intends.
  * Omitted, the resolver judges an empty write.
  * A read carries the whole scope; an update or delete only its `where`, and a create none.
+ * A read scope's `locale` is only a default, so it does nothing on a collection with no translatable field.
  * No write narrows its input or its returned records to the scope's `select`.
  * The operation's named middleware do not run - a route of your own carries its own.
  * Valid only within a request.
@@ -54,7 +56,7 @@ export async function queryScoped<C extends string>(
   const scope = await resolveAccess(endpoint, context);
   if (scope === false) throw notFound();
   const builder = queryUntyped(collection);
-  if (operation === 'read') return applyScope(builder, scope);
+  if (operation === 'read') return applyScope(builder, collectionScope(collection, scope));
   if (operation !== 'create' && !isUndefined(scope.where)) builder.access(scope.where);
   return builder;
 }

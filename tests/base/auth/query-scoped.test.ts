@@ -105,6 +105,13 @@ useCollections().register('ScopedRefused', {
     fields: { title: field('text') },
   },
 });
+useCollections().register('ScopedAuthors', {
+  name: 'ScopedAuthors',
+  collection: {
+    api: { read: { public: true, access: () => ({ locale: 'de' }) } },
+    fields: { name: field('text') },
+  },
+});
 useCollections().register('ScopedClosed', {
   name: 'ScopedClosed',
   collection: { fields: { title: field('text') } },
@@ -140,6 +147,7 @@ await queryUntyped('ScopedNotes').createOrThrow({
 
 const post = (await queryUntyped('ScopedPosts').createOrThrow({ title: 'Open', published: true }))
   .UUID as string;
+await queryUntyped('ScopedAuthors').createOrThrow({ name: 'Ada' });
 await queryUntyped('ScopedPosts')
   .locale('de')
   .where({ UUID: post })
@@ -187,6 +195,15 @@ describe('queryScoped', () => {
     strictEqual((await call(null, { collection: 'ScopedNotes', operation: 'read' })).status, 401);
     const denied = await call(stranger.token, { collection: 'ScopedNotes', operation: 'read' });
     strictEqual(denied.status, 403);
+  });
+
+  it('ignores a read scope locale on a collection with no translatable field', async () => {
+    const { status, body } = await call(null, { collection: 'ScopedAuthors', operation: 'read' });
+    strictEqual(status, 200);
+    deepStrictEqual(
+      (body as Record<string, unknown>[]).map((record) => record.name),
+      ['Ada'],
+    );
   });
 
   it('composes the resolved scope onto the builder', async () => {

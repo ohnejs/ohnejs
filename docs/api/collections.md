@@ -227,7 +227,7 @@ A scope object carries these keys:
   takes its size from `perPage` instead, which the [`maxPerPage` guard](./url-queries.md#guards)
   limits.
 - `locale` - the locale a read uses when the request names none. It is only a default, so a request
-  can still name another locale.
+  can still name another locale. On a collection with no translatable field, it does nothing.
 
 A field outside `select` is refused in `where`, `order`, `select`, and `populate` exactly as a field
 that does not exist. That includes `UUID`, so name it when clients address rows.

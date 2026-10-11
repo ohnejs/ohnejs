@@ -16,6 +16,7 @@ import {
   applyQuery,
   endpointOf,
   parseLocaleParam,
+  queryMetadata,
   queryUntyped,
   readRecordBody,
   resolveAccess,
@@ -24,7 +25,7 @@ import {
   useMiddleware,
   useSearchParams,
 } from 'ohnejs';
-import { isNull, isUndefined, pick, toKebabCase } from 'ohnejs/utils';
+import { isNull, isUndefined, omit, pick, toKebabCase } from 'ohnejs/utils';
 
 import { ohneError } from '../../ohne/error/ohne-error.ts';
 import { HTTPError, notFound } from '../../ohne/http/http-error.ts';
@@ -115,7 +116,10 @@ export async function gateCollection(
 ): Promise<CollectionGate> {
   const admitted = await admitCollection(segment, operation);
   if (!admitted.ok) return admitted;
-  const scope = await accessScope(admitted.endpoint, { operation });
+  const scope = collectionScope(
+    admitted.collection,
+    await accessScope(admitted.endpoint, { operation }),
+  );
   if (operation === 'read') requestReaches().set(admitted.collection, Promise.resolve(scope));
   return { ok: true, collection: admitted.collection, scope };
 }
@@ -186,7 +190,23 @@ export async function writeReach(
 export async function readScope(collection: string): Promise<QueryScope | false> {
   const endpoint = await reachedEndpoint(collection, 'read');
   if (isUndefined(endpoint)) return false;
-  return verdictScope(endpoint, { operation: 'read' });
+  const scope = await verdictScope(endpoint, { operation: 'read' });
+  return scope === false ? false : collectionScope(collection, scope);
+}
+
+/**
+ * The scope as it applies to `collection`.
+ * A `locale` is only a default, so it drops on a collection with no translatable field.
+ *
+ * @example
+ * ```ts
+ * collectionScope('Authors', { locale: 'de', where: { active: true } }) // -> { where: { active: true } }
+ * collectionScope('Posts', { locale: 'de' })                            // -> { locale: 'de' }
+ * ```
+ */
+export function collectionScope(collection: string, scope: QueryScope): QueryScope {
+  if (isUndefined(scope.locale) || queryMetadata(collection).translatable === true) return scope;
+  return omit(scope, ['locale']);
 }
 
 /**
@@ -331,7 +351,8 @@ async function resolveReadReach(collection: string): Promise<QueryScope | false>
   const endpoint = await reachedEndpoint(collection, 'read');
   if (isUndefined(endpoint)) return false;
   if (!isUndefined(await runMiddleware(endpoint, collection))) return false;
-  return resolveAccess(endpoint, { operation: 'read' });
+  const scope = await resolveAccess(endpoint, { operation: 'read' });
+  return scope === false ? false : collectionScope(collection, scope);
 }
 
 /**

@@ -153,6 +153,14 @@ useCollections().register('AccessPosts', {
   },
 });
 
+useCollections().register('AccessAuthors', {
+  name: 'AccessAuthors',
+  collection: {
+    api: { read: { public: true, access: () => ({ locale: 'de' }) } },
+    fields: { name: field('text') },
+  },
+});
+
 useCollections().register('AccessSecrets', {
   name: 'AccessSecrets',
   collection: { fields: { secret: field('text') } },
@@ -253,6 +261,7 @@ const link = await seed('AccessLinks', {
 const outer = await seed('AccessLinks', { label: 'Outer', self: link });
 const blockedRow = await seed('AccessBlocked', { title: 'Blocked' });
 const gated = await seed('AccessLinks', { label: 'Gated', blocked: blockedRow });
+const author = await seed('AccessAuthors', { name: 'Ada' });
 const writerPost = await seed('AccessPosts', {
   title: 'Post',
   author: writer.uuid,
@@ -367,6 +376,24 @@ describe('row scoping', () => {
     });
     strictEqual(status, 201);
     strictEqual((body as Record<string, unknown>).owner, writer.uuid);
+  });
+});
+
+describe('scope locale', () => {
+  const authors = { collection: 'access-authors' };
+
+  it('ignores a default locale on a collection with no translatable field', async () => {
+    const list = await call(ROUTES.list, authors, anonymous);
+    strictEqual(list.status, 200);
+    deepStrictEqual(
+      (list.body as Record<string, unknown>[]).map((record) => record.name),
+      ['Ada'],
+    );
+    strictEqual((await call(ROUTES.query, authors, anonymous, { body: {} })).status, 200);
+    strictEqual((await call(ROUTES.list, authors, anonymous, { qs: '?page=1' })).status, 200);
+    const record = await call(ROUTES.read, { ...authors, uuid: author }, anonymous);
+    strictEqual(record.status, 200);
+    strictEqual((record.body as Record<string, unknown>).name, 'Ada');
   });
 });
 
