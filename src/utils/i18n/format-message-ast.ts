@@ -19,10 +19,9 @@ import { isDate } from '../is/is-date.ts';
 import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
-import { isUndefined } from '../is/is-undefined.ts';
 import { hasKey } from '../object/has-key.ts';
 import { dateOptionsFromSkeleton } from './date-options-from-skeleton.ts';
-import { intlData } from './intl-data.ts';
+import { formatNumberIn } from './format-number-in.ts';
 import { intlLanguage } from './intl-language.ts';
 import { MessageFormatError } from './message-errors.ts';
 import { numberOptionsFromSkeleton } from './number-options-from-skeleton.ts';
@@ -308,22 +307,10 @@ function notify(ctx: Context, message: string): void {
 
 /**
  * Builds the number formatter for no style, `integer`, `percent`, or a `::` skeleton; other styles throw.
- * A language the engine lacks formats in English, its separators swapped for the registered `IntlData`'s.
  */
 function numberFormat(style: string | null, language: string): Pick<Intl.NumberFormat, 'format'> {
-  const tag = intlLanguage(language);
-  const separators = isUndefined(tag) ? intlData(language)?.number : undefined;
-  const format = new Intl.NumberFormat(isUndefined(separators) ? tag : 'en', numberOptions(style));
-  if (isUndefined(separators)) return format;
-  return {
-    format: (value: number | bigint) =>
-      format
-        .formatToParts(value)
-        .map(({ type, value: text }) =>
-          type === 'group' ? separators.group : type === 'decimal' ? separators.decimal : text,
-        )
-        .join(''),
-  };
+  const options = numberOptions(style);
+  return { format: (value: number | bigint) => formatNumberIn(value, language, options) };
 }
 
 /**
