@@ -5,6 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { setImmediate } from 'node:timers/promises';
 
 import type { StorageAdapter, StoragePart } from '../../../src/uploads/storage/adapter.ts';
 
@@ -65,6 +66,26 @@ function pruneBefore(
     }
     return original.apply(fsPromises, args);
   });
+  syncBuiltinESMExports();
+  return {
+    calls: () => mocked.mock.callCount(),
+    restore() {
+      mocked.mock.restore();
+      syncBuiltinESMExports();
+    },
+  };
+}
+
+function failOnce(
+  name: 'open' | 'rename' | 'mkdir',
+  code: string,
+): { calls: () => number; restore: () => void } {
+  const original = fsPromises[name] as (...args: unknown[]) => Promise<unknown>;
+  const mocked = mock.method(fsPromises, name, (...args: unknown[]) =>
+    mocked.mock.callCount() === 0
+      ? Promise.reject(Object.assign(new Error(code), { code }))
+      : original.apply(fsPromises, args),
+  );
   syncBuiltinESMExports();
   return {
     calls: () => mocked.mock.callCount(),
@@ -208,6 +229,42 @@ describe('createFSStorage', () => {
     strictEqual(readFileSync(join(dir, 'deep/nested/a.txt'), 'utf8'), 'moved');
   });
 
+  it('retries a temp file opening that overlapped the prune of its directory', async () => {
+    const opening = failOnce('open', 'EINVAL');
+    try {
+      await storage.write('photos/a.jpg', streamOf('survived'), { type: 'image/jpeg' });
+    } finally {
+      opening.restore();
+    }
+
+    strictEqual(opening.calls(), 2);
+    strictEqual(readFileSync(join(dir, 'photos/a.jpg'), 'utf8'), 'survived');
+  });
+
+  it('retries a move whose landing overlapped the prune of its directory', async () => {
+    await storage.write('a.txt', streamOf('moved'), { type: 'text/plain' });
+
+    const renaming = failOnce('rename', 'EINVAL');
+    try {
+      await storage.move('a.txt', 'deep/a.txt');
+    } finally {
+      renaming.restore();
+    }
+
+    strictEqual(readFileSync(join(dir, 'deep/a.txt'), 'utf8'), 'moved');
+  });
+
+  it('retries a directory creation the prune raced', async () => {
+    const creating = failOnce('mkdir', 'ENOENT');
+    try {
+      await storage.write('photos/a.jpg', streamOf('survived'), { type: 'image/jpeg' });
+    } finally {
+      creating.restore();
+    }
+
+    strictEqual(readFileSync(join(dir, 'photos/a.jpg'), 'utf8'), 'survived');
+  });
+
   it('moves a file, creating the parent of the target', async () => {
     await storage.write('a.txt', streamOf('moved'), { type: 'text/plain' });
 
@@ -328,6 +385,9 @@ describe('createFSStorage', () => {
     const { body, pulled, release } = stalledStream('pdf');
     const writing = storage.write('docs/report.pdf', body, { type: 'application/pdf' });
     await pulled;
+    while (!readdirSync(join(dir, 'docs')).some((name) => name.startsWith('.report.pdf.'))) {
+      await setImmediate();
+    }
 
     await storage.delete('docs/report');
     release();

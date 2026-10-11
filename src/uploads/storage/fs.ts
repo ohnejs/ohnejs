@@ -23,6 +23,8 @@ const WRITE_TEMP = /^\.(.+)\.[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]
 
 const REPLACEABLE = new Set(['EXDEV', 'ENOTEMPTY', 'EEXIST', 'EISDIR', 'ENOTDIR']);
 
+const PRUNED = new Set(['ENOENT', 'EINVAL']);
+
 /**
  * Builds the `fs` storage backend, which keeps every object as a file under `root`.
  * `root` is the configured `uploads.url`, resolved against the app root.
@@ -145,15 +147,16 @@ function locate(base: string, path: string): string {
 
 /**
  * Creates `dir`, then runs `action`, which places something inside it.
- * A concurrent `delete` may prune `dir` between the two, failing the action with `ENOENT`.
- * That one failure creates `dir` again and runs the action once more.
+ * A concurrent `delete` may prune `dir` meanwhile, failing either step with `ENOENT`.
+ * On APFS, an `open` or `rename` that overlaps the prune fails with `EINVAL` instead.
+ * Either failure creates `dir` again and runs the action once more.
  */
 async function inDir<T>(dir: string, action: () => Promise<T>): Promise<T> {
-  await ensureDir(dir);
   try {
+    await ensureDir(dir);
     return await action();
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    if (!PRUNED.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
     await ensureDir(dir);
     return action();
   }
