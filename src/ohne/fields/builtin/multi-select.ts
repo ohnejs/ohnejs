@@ -1,12 +1,21 @@
-import type { ConditionValue } from '../../../utils/index.ts';
-import type { FieldChoice } from '../choice.ts';
+import type { ConditionValue, FieldChoice } from '../../../utils/index.ts';
+import type { Message } from '../../messages/known-messages.ts';
 
 import { literalUnion } from '../../../utils/codegen/index.ts';
-import { isArray, isEmpty, isString, isUndefined, uniqueArray } from '../../../utils/index.ts';
-import { choiceValues, matchingChoices } from '../choice.ts';
+import {
+  checkChoice,
+  checkCount,
+  choiceValues,
+  isArray,
+  isEmpty,
+  isString,
+  isUndefined,
+  uniqueArray,
+} from '../../../utils/index.ts';
+import { matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
-import { validationMessage } from '../validation-message.ts';
+import { failureMessage } from '../validation-message.ts';
 
 /**
  * The built-in `multiSelect` field type: an ordered list of distinct string values.
@@ -29,7 +38,7 @@ export const multiSelect = defineField({
      * A plain string is both the stored value and its display text.
      * The object form pairs the stored value with a translatable display label.
      */
-    choices: option<readonly FieldChoice[]>(),
+    choices: option<readonly FieldChoice<Message>[]>(),
 
     /**
      * The fewest entries a stored list may hold.
@@ -49,22 +58,15 @@ export const multiSelect = defineField({
   validators: [
     (value) => (isArray(value) && value.every(isString) ? undefined : 'validation.invalidValue'),
     (value, ctx) => {
-      if (isUndefined(ctx.options.choices)) return undefined;
-      const legal = choiceValues(ctx.options.choices);
+      const { choices } = ctx.options;
+      if (isUndefined(choices)) return undefined;
       for (const [index, entry] of (value as string[]).entries()) {
-        if (!legal.includes(entry)) ctx.errors[`[${index}]`] = 'validation.invalidChoice';
+        const failure = failureMessage(checkChoice(entry, choices));
+        if (!isUndefined(failure)) ctx.errors[`[${index}]`] = failure;
       }
       return undefined;
     },
-    (value, ctx) => {
-      const { min, max } = ctx.options;
-      const count = (value as string[]).length;
-      if (!isUndefined(min) && count < min)
-        return validationMessage('validation.minItems', { min });
-      if (!isUndefined(max) && count > max)
-        return validationMessage('validation.maxItems', { max });
-      return undefined;
-    },
+    (value, ctx) => failureMessage(checkCount((value as string[]).length, ctx.options)),
   ],
   search: (ctx): ConditionValue | null => {
     if (isUndefined(ctx.options.choices)) return { includes: ctx.token };

@@ -66,6 +66,17 @@ describe('scanLayerAugmentations', () => {
     deepStrictEqual(await scanLayerAugmentations(join(root, 'plain')), [hooks]);
   });
 
+  it('tells the server and the browser module apart', async () => {
+    const hooks = write('split/hooks.ts', "declare module 'ohnejs' { interface Hooks {} }\n");
+    const meta = write(
+      'split/dashboard/meta.ts',
+      "declare module 'ohnejs/dashboard' { interface DashboardMeta {} }\n",
+    );
+
+    deepStrictEqual(await scanLayerAugmentations(join(root, 'split')), [hooks]);
+    deepStrictEqual(await scanLayerAugmentations(join(root, 'split'), 'ohnejs/dashboard'), [meta]);
+  });
+
   it('throws for an augmenting file whose path holds an unimportable character', async () => {
     write('bad/aug#weird.ts', "declare module 'ohnejs' {}\n");
     await rejects(scanLayerAugmentations(join(root, 'bad')), /Unsupported character `#`/);

@@ -32,6 +32,7 @@ export interface GenerateRolesOptions {
  * It is import-free, so both type programs load it; with no roles the union falls back to `string`.
  * Emits `node/roles.ts`, which extends `KnownRoles` from it and registers each role into `useRoles`.
  * Each role is statically imported from its source file by relative path.
+ * Emits `browser/roles.ts`, which extends `ohnejs/dashboard`'s `KnownRoles`, so browser code can name roles.
  *
  * Roles are read from each layer's `Config.dirs.roles` directory and combined.
  * Layers come from the registered stack, so `loadLayers` must have run first.
@@ -39,7 +40,7 @@ export interface GenerateRolesOptions {
  * Names in `Config.disable.roles` drop before emission.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
- * Output lands in the `shared` and `node` buckets of the app's `dirs.codegen` (default `.ohne`).
+ * Output lands in the `shared`, `node`, and `browser` buckets of the app's `dirs.codegen` (default `.ohne`).
  *
  * A file is rewritten only when its contents change.
  * Returns the absolute paths written, or `null` when no `package.json` is found.
@@ -50,7 +51,8 @@ export async function generateRoles(
 ): Promise<string[] | null> {
   const sharedDir = await codegenBucket(from, 'shared');
   const nodeDir = await codegenBucket(from, 'node');
-  if (isNull(sharedDir) || isNull(nodeDir)) return null;
+  const browserDir = await codegenBucket(from, 'browser');
+  if (isNull(sharedDir) || isNull(nodeDir) || isNull(browserDir)) return null;
 
   const { fresh = false } = options;
   const roles = await collectRoles(stackedLayers(), {
@@ -96,9 +98,21 @@ export async function generateRoles(
     });
   }
 
+  const browser = createCodeBuilder();
+  browser.line("import type {} from 'ohnejs/dashboard';");
+  browser.line("import type { GeneratedRoles } from '../shared/roles.ts';");
+  browser.line();
+  browser.line("declare module 'ohnejs/dashboard' {");
+  browser.indent(() => {
+    browser.line('interface KnownRoles extends GeneratedRoles {}');
+  });
+  browser.line('}');
+
   const sharedGen = createCodeGenerator({ dir: sharedDir, banner: BANNER });
   await sharedGen.write('roles.ts', shared.toString());
   const nodeGen = createCodeGenerator({ dir: nodeDir, banner: BANNER });
   await nodeGen.write('roles.ts', code.toString());
-  return [sharedGen.path('roles.ts'), nodeGen.path('roles.ts')];
+  const browserGen = createCodeGenerator({ dir: browserDir, banner: BANNER });
+  await browserGen.write('roles.ts', browser.toString());
+  return [sharedGen.path('roles.ts'), nodeGen.path('roles.ts'), browserGen.path('roles.ts')];
 }

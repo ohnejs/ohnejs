@@ -3,10 +3,10 @@ import type { CollectionName } from '../../collections/known-collections.ts';
 import type { Message } from '../../messages/known-messages.ts';
 
 import {
+  checkLength,
   checkRichText,
   isRecordLink,
   isRichText,
-  isUndefined,
   normalizeRichText,
   RICH_TEXT_DEFAULT_ELEMENTS,
   RICH_TEXT_DEFAULT_MARKS,
@@ -17,7 +17,7 @@ import { defineField } from '../define-field.ts';
 import { linksParameter, registeredLinks } from '../link-collections.ts';
 import { option } from '../option.ts';
 import { reportIssues } from '../report-issues.ts';
-import { validationMessage } from '../validation-message.ts';
+import { failureMessage } from '../validation-message.ts';
 
 /**
  * The built-in `richText` field type: formatted text with links, stored as a JSON tree.
@@ -108,14 +108,7 @@ export const richText = defineField({
       if (issues.length > 0) return reportIssues(issues, ctx.errors);
       const tree = value as RichText;
       if (!allowEmpty && tree.length === 0) return 'validation.emptyValue';
-      const length = richTextLength(tree);
-      if (!isUndefined(min) && length < min) {
-        return validationMessage('validation.minLength', { min });
-      }
-      if (!isUndefined(max) && length > max) {
-        return validationMessage('validation.maxLength', { max });
-      }
-      return undefined;
+      return failureMessage(checkLength(richTextLength(tree), { min, max }));
     },
   ],
   links: (value) =>

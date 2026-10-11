@@ -1,4 +1,5 @@
 import { isString } from '../../utils/index.ts';
+import { generateBrowserLayers } from './generate-browser-layers.ts';
 import { generateBrowserTSConfig } from './generate-browser-tsconfig.ts';
 import { generateDatabase } from './generate-database.ts';
 import { generateFlows } from './generate-flows.ts';
@@ -31,6 +32,7 @@ export async function generateProject(from: string = process.cwd()): Promise<str
       generateLayerName(from),
       generateResolvedConfig(from),
       generateBrowserTSConfig(from),
+      generateBrowserLayers(from),
       generateRoutes(from),
       generateMiddleware(from),
       generateMessages(from),

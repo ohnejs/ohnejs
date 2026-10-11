@@ -9,9 +9,11 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
 const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
 
 const OHNE_FILES = new Set([
+  'collections.ts',
   'database.ts',
   'flows.ts',
   'layer-name.ts',
+  'layers.ts',
   'messages.ts',
   'middleware.ts',
   'resolved-config.ts',

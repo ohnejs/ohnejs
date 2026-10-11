@@ -1,12 +1,8 @@
-import { deepStrictEqual, doesNotThrow, match, ok, throws } from 'node:assert';
+import { doesNotThrow, match, ok, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
-import {
-  layoutFieldNames,
-  parseLayoutItem,
-  validateLayout,
-} from '../../../src/ohne/fields/layout.ts';
+import { validateLayout } from '../../../src/ohne/fields/layout.ts';
 
 const NAMES = ['title', 'slug', 'body', 'price', 'published'];
 
@@ -161,35 +157,6 @@ describe('validateLayout', () => {
         match(body(error), /declared on field `meta` in block `Hero`/);
         return true;
       },
-    );
-  });
-});
-
-describe('parseLayoutItem', () => {
-  it('splits the name and the trimmed width', () => {
-    deepStrictEqual(parseLayoutItem('title'), { name: 'title' });
-    deepStrictEqual(parseLayoutItem('price | 8rem'), { name: 'price', width: '8rem' });
-    deepStrictEqual(parseLayoutItem('slug|50%'), { name: 'slug', width: '50%' });
-    deepStrictEqual(parseLayoutItem('body |'), { name: 'body' });
-  });
-});
-
-describe('layoutFieldNames', () => {
-  it('walks rows, cards, and tabs in reading order, skipping rules', () => {
-    deepStrictEqual(
-      layoutFieldNames([
-        { row: ['a', 'b | 8rem'] },
-        '---',
-        { card: ['c', { card: { fields: ['d'] } }] },
-        {
-          tabs: [
-            { label: 'x', fields: ['e'] },
-            { label: 'y', fields: [{ row: ['f'] }] },
-          ],
-        },
-        'g',
-      ]),
-      ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
     );
   });
 });

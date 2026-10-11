@@ -6,6 +6,7 @@ export * from './blocks/use-blocks.ts';
 export * from './boot/boot-layers.ts';
 export * from './boot/boot-project.ts';
 export * from './boot/scan-layer-boot.ts';
+export * from './codegen/generate-browser-layers.ts';
 export * from './codegen/generate-browser-tsconfig.ts';
 export * from './codegen/generate-database.ts';
 export * from './codegen/generate-flows.ts';

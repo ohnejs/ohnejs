@@ -38,7 +38,7 @@ describe('generateRoles', () => {
     return readFileSync(paths!.find((path) => path.endsWith(`/.ohne/${name}/roles.ts`))!, 'utf8');
   }
 
-  it('emits the shared name table, the `KnownRoles` extension, and registrations', async () => {
+  it('emits the shared name table, both `KnownRoles` extensions, and registrations', async () => {
     const app = join(root, 'app');
     writePackage(app, 'app');
     writeRole(app, 'admin.ts', ['*']);
@@ -59,6 +59,7 @@ describe('generateRoles', () => {
     strictEqual(node.includes("import r1 from '../../roles/shop/manager.ts';"), true);
     strictEqual(node.includes('interface KnownRoles extends GeneratedRoles {}'), true);
     strictEqual(node.includes('const roles = useRoles();'), true);
+    strictEqual(bucket(paths, 'browser').includes("declare module 'ohnejs/dashboard' {"), true);
     strictEqual(node.includes("roles.register('admin', { name: 'admin', role: r0 });"), true);
     strictEqual(
       node.includes("roles.register('shop-manager', { name: 'shop-manager', role: r1 });"),
@@ -101,6 +102,16 @@ describe('generateRoles', () => {
         "import type { GeneratedRoles } from '../shared/roles.ts';\n" +
         '\n' +
         "declare module 'ohnejs' {\n" +
+        '  interface KnownRoles extends GeneratedRoles {}\n' +
+        '}\n',
+    );
+    strictEqual(
+      bucket(paths, 'browser'),
+      `${BANNER}\n` +
+        "import type {} from 'ohnejs/dashboard';\n" +
+        "import type { GeneratedRoles } from '../shared/roles.ts';\n" +
+        '\n' +
+        "declare module 'ohnejs/dashboard' {\n" +
         '  interface KnownRoles extends GeneratedRoles {}\n' +
         '}\n',
     );

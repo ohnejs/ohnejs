@@ -51,7 +51,10 @@ describe('generateProject', () => {
     const written = await generateProject(app);
 
     const expected = [
+      'browser/collections.ts',
+      'browser/layers.ts',
       'browser/messages.ts',
+      'browser/roles.ts',
       'browser/routes.ts',
       'browser/tsconfig.json',
       'node/database.ts',

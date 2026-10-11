@@ -1,6 +1,7 @@
 import type { SetTarget } from './set-target.ts';
 
 import { isString } from '../../../utils/index.ts';
+import { generateBrowserLayers } from '../../codegen/generate-browser-layers.ts';
 import { generateBrowserTSConfig } from '../../codegen/generate-browser-tsconfig.ts';
 import { generateLayerCodegen } from '../../codegen/generate-layer-codegen.ts';
 import { generateLayerName } from '../../codegen/generate-layer-name.ts';
@@ -9,7 +10,7 @@ import { generateResolvedConfig } from '../../codegen/generate-resolved-config.t
 /**
  * The registry-derived types target.
  *
- * `layer-name.ts`, `resolved-config.ts`, and each layer's `codegen` files derive from the layer registry.
+ * `layer-name.ts`, `resolved-config.ts`, `layers.ts`, and each layer's `codegen` files read the registry.
  * None of them maps to a watched directory.
  * The static `browser/tsconfig.json` rides along, since no watched directory maps to it either.
  * `affectedBy` never matches: only the initial full build and the config barrier reach it.
@@ -26,6 +27,7 @@ export function createRegistryTarget(from: string): SetTarget {
         generateLayerName(from),
         generateResolvedConfig(from),
         generateBrowserTSConfig(from),
+        generateBrowserLayers(from),
         generateLayerCodegen(from),
       ]);
       return written.flat().filter(isString);

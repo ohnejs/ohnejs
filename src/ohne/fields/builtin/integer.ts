@@ -1,7 +1,7 @@
-import { isInteger, isUndefined } from '../../../utils/index.ts';
+import { checkRange, isInteger } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
-import { validationMessage } from '../validation-message.ts';
+import { failureMessage } from '../validation-message.ts';
 
 /**
  * The built-in `integer` field type: a whole number within JavaScript's safe integer range.
@@ -20,16 +20,7 @@ export const integer = defineField({
      */
     max: option<number>(),
   },
-  validators: [
-    (value, ctx) => {
-      const { min, max } = ctx.options;
-      if (!isUndefined(min) && value < min)
-        return validationMessage('validation.minValue', { min });
-      if (!isUndefined(max) && value > max)
-        return validationMessage('validation.maxValue', { max });
-      return undefined;
-    },
-  ],
+  validators: [(value, ctx) => failureMessage(checkRange(value, ctx.options))],
   search: {
     default: false,
     match: ({ token }) =>

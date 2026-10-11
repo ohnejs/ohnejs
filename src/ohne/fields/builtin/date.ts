@@ -1,7 +1,7 @@
-import { isISODate, isUndefined } from '../../../utils/index.ts';
+import { checkRange, isISODate } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
-import { validationMessage } from '../validation-message.ts';
+import { failureMessage } from '../validation-message.ts';
 
 const ISO_PREFIX = /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/;
 
@@ -27,14 +27,7 @@ export const date = defineField({
   },
   validators: [
     (value) => (isISODate(value) ? undefined : 'validation.invalidDate'),
-    (value, ctx) => {
-      const { min, max } = ctx.options;
-      if (!isUndefined(min) && value < min)
-        return validationMessage('validation.minValue', { min });
-      if (!isUndefined(max) && value > max)
-        return validationMessage('validation.maxValue', { max });
-      return undefined;
-    },
+    (value, ctx) => failureMessage(checkRange(value, ctx.options)),
   ],
   search: ({ token }) => (ISO_PREFIX.test(token) ? { startsWith: token } : null),
 });

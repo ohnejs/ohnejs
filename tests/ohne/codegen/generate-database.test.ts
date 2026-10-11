@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
 import { generateDatabase, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
@@ -79,7 +80,7 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    strictEqual(paths.length, 2);
+    strictEqual(paths.length, 3);
     const out = readFileSync(paths[1] ?? '', 'utf8');
 
     ok(out.includes("import { useMigrations } from 'ohnejs';"));
@@ -94,7 +95,7 @@ describe('generateDatabase', () => {
     writePackage(app, 'empty');
     await loadLayers(app);
     const paths = await generateDatabase(app);
-    strictEqual(paths.length, 2);
+    strictEqual(paths.length, 3);
     const shared = readFileSync(paths[0] ?? '', 'utf8');
     const node = readFileSync(paths[1] ?? '', 'utf8');
     ok(shared.includes('export interface GeneratedCollections {}'));
@@ -112,6 +113,17 @@ describe('generateDatabase', () => {
     ok(node.includes('interface KnownFields {}'));
     ok(!node.includes('useMigrations'));
     ok(!node.includes('register('));
+    strictEqual(
+      readFileSync(paths[2] ?? '', 'utf8'),
+      `${BANNER}\n` +
+        "import type {} from 'ohnejs/dashboard';\n" +
+        "import type { GeneratedCollections } from '../shared/database.ts';\n" +
+        '\n' +
+        "declare module 'ohnejs/dashboard' {\n" +
+        '  interface KnownCollections extends GeneratedCollections {}\n' +
+        '}\n',
+    );
+    strictEqual(paths[2], join(app, '.ohne', 'browser', 'collections.ts'));
   });
 
   it('types every helper-database name', async () => {

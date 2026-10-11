@@ -1,7 +1,7 @@
-import { isUndefined } from '../../../utils/index.ts';
+import { checkText } from '../../../utils/index.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
-import { validationMessage } from '../validation-message.ts';
+import { failureMessage } from '../validation-message.ts';
 
 /**
  * The built-in `text` field type: a text value.
@@ -42,17 +42,5 @@ export const text = defineField({
      */
     multiline: option({ default: false }),
   },
-  validators: [
-    (value, ctx) => (ctx.options.allowEmpty || value !== '' ? undefined : 'validation.emptyValue'),
-    (value, ctx) => {
-      const { min, max } = ctx.options;
-      if (!isUndefined(min) && value.length < min) {
-        return validationMessage('validation.minLength', { min });
-      }
-      if (!isUndefined(max) && value.length > max) {
-        return validationMessage('validation.maxLength', { max });
-      }
-      return undefined;
-    },
-  ],
+  validators: [(value, ctx) => failureMessage(checkText(value, ctx.options))],
 });

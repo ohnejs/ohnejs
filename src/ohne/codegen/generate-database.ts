@@ -176,8 +176,9 @@ const BLOCK_ARM_DOCS = {
  * `node/database.ts` imports every collection, block, field-type, and migration definition.
  * Importing it registers them all.
  * It also augments each `Known*` that `shared/database.ts` backs, and `KnownFields` per custom field type.
+ * `browser/collections.ts` extends `ohnejs/dashboard`'s `KnownCollections`, so the browser knows the names.
  * Migration registration order is the execution order: furthest layer first, name order within a layer.
- * Both files are written even when empty, so a stale one never imports deleted files.
+ * Every file is written even when empty, so a stale one never imports deleted files.
  *
  * Definitions are read from each layer's `Config.dirs` directories and combined closer-wins.
  * Layers come from the registered stack, so `loadLayers` must have run first.
@@ -222,6 +223,7 @@ export async function generateDatabase(
       resolveText,
     ),
     writeNode(joinPath(dir, 'node'), collections, fields, blocks, migrations, disable.fields),
+    writeBrowser(joinPath(dir, 'browser')),
   ]);
 }
 
@@ -755,6 +757,25 @@ async function writeNode(
     });
   }
   return write(dir, code);
+}
+
+/**
+ * Writes `browser/collections.ts`: augments `ohnejs/dashboard` so `CollectionName` narrows to known names.
+ * Its shape is constant; it only wires the shared type onto the browser's interface.
+ */
+async function writeBrowser(dir: string): Promise<string> {
+  const code = createCodeBuilder();
+  code.line("import type {} from 'ohnejs/dashboard';");
+  code.line("import type { GeneratedCollections } from '../shared/database.ts';");
+  code.line();
+  code.line("declare module 'ohnejs/dashboard' {");
+  code.indent(() => {
+    code.line('interface KnownCollections extends GeneratedCollections {}');
+  });
+  code.line('}');
+  const gen = createCodeGenerator({ dir, banner: BANNER });
+  await gen.write('collections.ts', code.toString());
+  return gen.path('collections.ts');
 }
 
 /**
