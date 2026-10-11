@@ -232,6 +232,7 @@ export * from './reactive/to-value.ts';
 export * from './reactive/untracked.ts';
 export * from './registry/create-layer-registry.ts';
 export * from './registry/create-registry.ts';
+export * from './registry/swap-registry.ts';
 export * from './retry-after/parse-retry-after.ts';
 export * from './rich-text/check-link.ts';
 export * from './rich-text/check-rich-text.ts';

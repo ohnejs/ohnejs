@@ -36,7 +36,7 @@ export interface TypeImports {
    * Records a reference and returns the local name to use in the generated source.
    *
    * The same export from the same module always returns the same local name.
-   * A name that would collide with a different module's export is aliased (`Name`, `Name2`, ...).
+   * A name that would collide with a reserved name or a different module's export is aliased (`Name2`, ...).
    */
   reference(request: TypeImportRequest): string;
 
@@ -52,6 +52,7 @@ export interface TypeImports {
  * `reference` deduplicates by (module, export) and returns the local name to emit.
  * `statements` renders one `import type { ... } from '...'` line per module.
  * Relative paths are re-expressed relative to `outputDir`; package specifiers pass through.
+ * `reserved` names the file's own declarations, so an import named like one is aliased.
  *
  * @example
  * ```ts
@@ -70,9 +71,9 @@ export interface TypeImports {
  * //    ]
  * ```
  */
-export function createTypeImports(outputDir: string): TypeImports {
+export function createTypeImports(outputDir: string, reserved: Iterable<string> = []): TypeImports {
   const entries: { specifier: string; exportName: string; local: string }[] = [];
-  const locals = new Set<string>();
+  const locals = new Set(reserved);
 
   const specifierOf = (fromDir: string, path: string): string =>
     path.startsWith('.') ? importSpecifier(outputDir, resolvePath(path, fromDir)) : path;

@@ -44,6 +44,15 @@ describe('createTypeImports', () => {
     ]);
   });
 
+  it('aliases an export named like a declaration of the generated file', () => {
+    const imports = createTypeImports('/app/.ohne', ['Locale']);
+    strictEqual(
+      imports.reference({ fromDir: '/app/fields', path: 'i18n-kit', exportName: 'Locale' }),
+      'Locale2',
+    );
+    deepStrictEqual(imports.statements(), ["import type { Locale as Locale2 } from 'i18n-kit';"]);
+  });
+
   it('groups multiple exports from one module onto a single line', () => {
     const imports = createTypeImports('/app/.ohne');
     imports.reference({ fromDir: '/app/fields', path: './geo.ts', exportName: 'LatLng' });
