@@ -1,6 +1,7 @@
 import type { Child } from '../render/insert.ts';
 import type { DashboardField } from '../runtime/meta-types.ts';
 import type { FilterOperator, FilterValue } from './filter.ts';
+import type { FieldTypeName, KnownFieldTypes } from './known-field-types.ts';
 
 import { isArray } from '../../utils/is/is-array.ts';
 import { isNull } from '../../utils/is/is-null.ts';
@@ -13,17 +14,17 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { useT } from '../runtime/use-t.ts';
 import { alert } from '../ui/alert.ts';
-import { icon } from '../ui/icon.ts';
 import { prose, renderProse } from '../ui/prose.ts';
 
 /**
  * What a cell's display renderer receives.
+ * `O` types the field's options, as the field type declares them.
  */
-export interface FieldCellContext {
+export interface FieldCellContext<O = Record<string, unknown>> {
   /**
    * The field, as the discovery read describes it.
    */
-  field: DashboardField;
+  field: DashboardField<O>;
 
   /**
    * The cell's live value; read it inside a nested function child to follow row updates.
@@ -56,7 +57,7 @@ export interface CommitLanding {
 /**
  * What a cell's editor receives on top of the display context.
  */
-export interface FieldEditorContext extends FieldCellContext {
+export interface FieldEditorContext<O = Record<string, unknown>> extends FieldCellContext<O> {
   /**
    * Requests the write, resolving how it landed.
    * A rejected or failed write keeps the editor open with the cell marked.
@@ -71,12 +72,13 @@ export interface FieldEditorContext extends FieldCellContext {
 
 /**
  * What a field's form control receives.
+ * `O` types the field's options, as the field type declares them.
  */
-export interface FieldControlContext {
+export interface FieldControlContext<O = Record<string, unknown>> {
   /**
    * The field, as the discovery read describes it.
    */
-  field: DashboardField;
+  field: DashboardField<O>;
 
   /**
    * The value the control starts from; `undefined` when there is none, as on a fresh record or item.
@@ -91,7 +93,8 @@ export interface FieldControlContext {
 
   /**
    * The field's dot-and-bracket path from the record root, like `sections[2].heading`.
-   * Seeds element ids and scopes error routing.
+   * Seeds element ids and input names, and the paths of nested forms.
+   * A page form prefixes it with its own id scope, like `form-3-heading`, so never read it as a data address.
    */
   path: string;
 
@@ -200,11 +203,11 @@ export interface FieldControl {
  * What a field type's filter `input` receives.
  * The hosting builder owns the condition; the input reads and writes it through this handle.
  */
-export interface FieldFilterContext {
+export interface FieldFilterContext<O = Record<string, unknown>> {
   /**
    * The field, as the discovery read describes it.
    */
-  field: DashboardField;
+  field: DashboardField<O>;
 
   /**
    * The condition's active operator; read it reactively to follow operator switches.
@@ -242,54 +245,55 @@ export interface FieldFilterContext {
  * One field type's filter behaviour: the operators it compares with and the value input it renders.
  * A field type without one never appears in the filter builder.
  */
-export interface FieldFilter {
+export interface FieldFilter<O = Record<string, unknown>> {
   /**
    * The operators the field admits, first one seeding a fresh condition.
    */
-  operators(field: DashboardField): FilterOperator[];
+  operators(field: DashboardField<O>): FilterOperator[];
 
   /**
    * The value a fresh condition on the field starts with.
    */
-  seed(field: DashboardField): FilterValue;
+  seed(field: DashboardField<O>): FilterValue;
 
   /**
    * Renders the condition's value input.
    */
-  input(context: FieldFilterContext): Child;
+  input(context: FieldFilterContext<O>): Child;
 }
 
 /**
  * One field type's dashboard behaviour: how it displays in a cell, edits in place, and edits in a form.
+ * `O` types `field.options` in every context, as the type's `KnownFieldTypes` entry declares them.
  */
-export interface FieldType {
+export interface FieldType<O = Record<string, unknown>> {
   /**
    * Renders the cell's display content.
    */
-  display(context: FieldCellContext): Child;
+  display(context: FieldCellContext<O>): Child;
 
   /**
    * Renders the cell's inline editor; a cell without one is not editable in place.
    */
-  editor?(context: FieldEditorContext): Child;
+  editor?(context: FieldEditorContext<O>): Child;
 
   /**
    * Creates the field's form control; a type without one renders read-only in forms.
    * Yielding `undefined` refuses one instance, like a composite whose subfields cannot round-trip.
    * The hosting form then carries the stored value through unchanged.
    */
-  control?(context: FieldControlContext): FieldControl | undefined;
+  control?(context: FieldControlContext<O>): FieldControl | undefined;
 
   /**
    * The value's text in a composite cell's digest, `''` when it contributes nothing.
    * A column type without one digests a string as it is and a number stringified.
    */
-  summary?(value: unknown, field: DashboardField): string;
+  summary?(value: unknown, field: DashboardField<O>): string;
 
   /**
    * The field's filter behaviour; a type without one never appears in the filter builder.
    */
-  filter?: FieldFilter;
+  filter?: FieldFilter<O>;
 }
 
 const registry = new Map<string, FieldType>();
@@ -311,15 +315,34 @@ css`
 
 /**
  * Registers the dashboard behaviour for a field type, by its registered type name.
+ * The name must be a `KnownFieldTypes` member: declare a new type's entry beside the call.
+ * Its options then type `field.options` in every context the behaviour receives.
  * A name that already exists is overridden, so an app replaces a builtin by re-registering it.
  * Cell and control override together: the sheet and the form never disagree about one type.
  *
  * @example
  * ```ts
+ * declare module 'ohnejs/dashboard' {
+ *   interface KnownFieldTypes {
+ *     rating: { options: { max?: number }; value: number }
+ *   }
+ * }
+ *
  * registerFieldType('rating', { display: ({ value }) => () => '★'.repeat(Number(value() ?? 0)) })
  * ```
  */
-export function registerFieldType(type: string, fieldType: FieldType): void {
+export function registerFieldType<K extends FieldTypeName>(
+  type: K,
+  fieldType: FieldType<KnownFieldTypes[K]['options']>,
+): void {
+  registry.set(type, fieldType as FieldType);
+}
+
+/**
+ * Registers the behaviour of a type `KnownFieldTypes` leaves out, like `blocks`, by any name.
+ * `ohnejs/dashboard` keeps it internal, so every public registration stays typed.
+ */
+export function registerUntypedFieldType(type: string, fieldType: FieldType): void {
   registry.set(type, fieldType);
 }
 
@@ -421,7 +444,7 @@ const FALLBACK: FieldType = {
     content.classList.add('ohne-field-missing');
     const element = alert(content, {
       title: () => t('dashboard.field.missing.title'),
-      icon: icon('barrier-block'),
+      icon: 'barrier-block',
     });
     element.tabIndex = -1;
 

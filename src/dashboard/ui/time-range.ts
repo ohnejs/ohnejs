@@ -3,6 +3,7 @@ import type { TimeSpanValue } from './time-model.ts';
 import type { TimeLabels } from './time.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -58,12 +59,6 @@ export interface TimeRangeOptions {
    * 86399000
    */
   maxRange?: TimeSpanValue | (() => TimeSpanValue);
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the borders and the focus rings turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the inputs reactively while it returns `true`.
@@ -125,6 +120,12 @@ css`
 
   .ohne-time-range > .ohne-time:nth-child(2) {
     margin-top: 0.5em;
+  }
+
+  /* A field wires its first input, so the range marks both ends from it. */
+  :where(.ohne-time-range:has([aria-invalid='true'])) .ohne-number {
+    --ohne-ring: var(--ohne-destructive);
+    border-color: hsl(var(--ohne-destructive));
   }
 
   .ohne-time-range-decorator {
@@ -196,11 +197,10 @@ export function timeRange(
     'div',
     {
       class: `ohne-time-range ohne-time-range-decorator-${options.decorator ?? 'left'}`,
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
     time(side(0), {
       disabled: options.disabled,
-      error: options.error,
       id: options.id ? `${options.id}--1` : undefined,
       labels: options.labels,
       min: () => bounds.value.minFrom,
@@ -211,7 +211,6 @@ export function timeRange(
     }),
     time(side(1), {
       disabled: options.disabled,
-      error: options.error,
       id: options.id ? `${options.id}--2` : undefined,
       labels: options.labels,
       min: () => bounds.value.minTo,

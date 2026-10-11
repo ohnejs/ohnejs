@@ -1,4 +1,5 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
+import type { DateTimeFieldOptions } from '../known-field-types.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -43,9 +44,9 @@ function instant(bound: unknown): number | undefined {
  * The control stays pristine until touched.
  * A cleared control writes `null` on a nullable field and omits the field otherwise.
  */
-export const dateTimeType: FieldType = {
+export const dateTimeType: FieldType<DateTimeFieldOptions> = {
   display({ field, value }) {
-    const zone = field.options?.timezone as string | undefined;
+    const zone = field.options?.timezone;
     const relativeTime = field.options?.relativeTime === true;
     return () => {
       const current = value();
@@ -60,7 +61,7 @@ export const dateTimeType: FieldType = {
     };
   },
   control({ field, initial, path, disabled, language, onInput }) {
-    const zone = field.options?.timezone as string | undefined;
+    const zone = field.options?.timezone;
     let base = initial;
     const stamp = ref(isNumber(base) ? base : null);
     const touched = ref(false);
@@ -133,7 +134,7 @@ export const dateTimeType: FieldType = {
     operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
     seed: () => Date.now(),
     input({ field, value, commit, language, inputID }) {
-      const zone = field.options?.timezone as string | undefined;
+      const zone = field.options?.timezone;
       const model: Ref<number | null> = {
         get value() {
           return Number(value());

@@ -1,8 +1,14 @@
 import type { Child } from '../render/insert.ts';
+import type { Text } from '../runtime/text.ts';
+import type { IconName } from './icon.ts';
+import type { Tone } from './tone.ts';
 
-import { ref } from '../../utils/reactive/ref.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { textChild } from './_text-child.ts';
+import { icon } from './icon.ts';
+import './_tones.ts';
 import './tokens.ts';
 
 /**
@@ -10,19 +16,33 @@ import './tokens.ts';
  */
 export interface BadgeOptions {
   /**
-   * The background color of the badge.
-   * Accepts a predefined UI color name or any valid CSS color value.
+   * The meaning the badge's color carries.
    *
    * @default
    * 'primary'
    */
-  color?: 'primary' | 'secondary' | 'accent' | 'destructive' | (string & {});
+  tone?: Tone;
 
   /**
-   * The text color of the badge.
-   * If not provided, the text color is automatically determined from the background color.
+   * How strongly the tone paints: a filled pill, a tinted pill, or an outlined one.
+   *
+   * @default
+   * 'solid'
    */
-  textColor?: string;
+  variant?: 'solid' | 'soft' | 'outline';
+
+  /**
+   * Leads the label with a small dot in the label's color.
+   *
+   * @default
+   * false
+   */
+  dot?: boolean;
+
+  /**
+   * An icon leading the label.
+   */
+  icon?: IconName;
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
@@ -31,78 +51,79 @@ export interface BadgeOptions {
   size?: number;
 }
 
-const TOKENS = ['primary', 'secondary', 'accent', 'destructive'];
-
 css`
   .ohne-badge {
     flex-shrink: 0;
     display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
     max-width: 100%;
     padding: 0.140625rem 0.5rem;
     overflow: hidden;
     border-radius: calc(var(--ohne-radius) - 0.125rem);
     font-size: calc(1rem + var(--ohne-size) * 0.125rem - 0.0625rem);
     font-weight: 500;
-    text-overflow: ellipsis;
     white-space: nowrap;
     user-select: none;
+  }
+
+  .ohne-badge-solid {
+    background-color: hsl(var(--ohne-tone));
+    color: hsl(var(--ohne-tone-foreground));
+  }
+
+  .ohne-badge-soft {
+    background-color: hsl(var(--ohne-tone-soft));
+    color: hsl(var(--ohne-tone-ink));
+  }
+
+  /* An inset ring instead of a border keeps the outline pill as tall as the others. */
+  .ohne-badge-outline {
+    box-shadow: inset 0 0 0 1px hsl(var(--ohne-tone-line));
+    color: hsl(var(--ohne-tone-ink));
+  }
+
+  .ohne-badge > svg {
+    font-size: calc(1em + 0.125rem);
+    margin-left: -0.125em;
+  }
+
+  .ohne-badge-dot {
+    flex-shrink: 0;
+    width: 0.4375em;
+    height: 0.4375em;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+
+  .ohne-badge-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 `;
 
 /**
- * An inline pill label with an arbitrary background color and automatic contrast text color.
- * A token color name pairs with its foreground token.
- * Any other CSS color is measured after attachment.
- * The text turns white when the WCAG relative luminance lands below `0.5`.
+ * An inline pill label colored by meaning.
+ * A `solid` badge fills with its tone, a `soft` one tints, and an `outline` one rings.
+ * A long label truncates with an ellipsis at the badge's maximum width.
  *
  * @example
  * ```ts
- * badge('Draft')
- * badge('Live', { color: '#16a34a' })
+ * badge('Draft', { tone: 'neutral' })
+ * badge('Deployed', { tone: 'success', variant: 'soft', icon: 'circle-check' })
  * ```
  */
-export function badge(content: Child | (() => Child), options: BadgeOptions = {}): HTMLElement {
-  const color = options.color ?? 'primary';
-  const backgroundColor = TOKENS.includes(color) ? `hsl(var(--ohne-${color}))` : color;
-  const textColor =
-    options.textColor ?? (TOKENS.includes(color) ? `hsl(var(--ohne-${color}-foreground))` : null);
-  const isDark = ref(false);
-  const root = h(
+export function badge(content: Text | Child, options: BadgeOptions = {}): HTMLElement {
+  const { tone = 'primary', variant = 'solid', size } = options;
+  return h(
     'span',
     {
-      class: 'ohne-badge',
-      style: () =>
-        (options.size === undefined ? '' : `--ohne-size: ${options.size}; `) +
-        `background-color: ${backgroundColor}; ` +
-        `color: ${textColor ?? (isDark.value ? 'white' : 'black')}`,
+      class: `ohne-badge ohne-badge-${variant} ohne-tone-${tone}`,
+      style: isUndefined(size) ? undefined : `--ohne-size: ${size}`,
     },
-    content,
+    options.dot ? h('span', { class: 'ohne-badge-dot', 'aria-hidden': 'true' }) : null,
+    isUndefined(options.icon) ? null : icon(options.icon),
+    h('span', { class: 'ohne-badge-label' }, textChild(content)),
   );
-  // Deferred a microtask so the badge is attached and `getComputedStyle` resolves the token vars.
-  if (textColor === null) {
-    queueMicrotask(() => {
-      const resolved = getComputedStyle(root).getPropertyValue('background-color');
-      const channels = resolved.match(/\d+/g);
-      if (channels) {
-        const [r, g, b] = channels.map(Number);
-        if (r !== undefined && g !== undefined && b !== undefined) {
-          isDark.value = luminance(r, g, b) < 0.5;
-        }
-      }
-    });
-  }
-  return root;
-}
-
-/**
- * The WCAG relative luminance of 0-255 sRGB channels, from `0` for black to `1` for white.
- */
-function luminance(r: number, g: number, b: number): number {
-  const rr = r / 255;
-  const gg = g / 255;
-  const bb = b / 255;
-  const rsRGB = rr <= 0.03928 ? rr / 12.92 : Math.pow((rr + 0.055) / 1.055, 2.4);
-  const gsRGB = gg <= 0.03928 ? gg / 12.92 : Math.pow((gg + 0.055) / 1.055, 2.4);
-  const bsRGB = bb <= 0.03928 ? bb / 12.92 : Math.pow((bb + 0.055) / 1.055, 2.4);
-  return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
 }

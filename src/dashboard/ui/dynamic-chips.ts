@@ -13,6 +13,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { defaultText } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -168,12 +169,6 @@ export interface DynamicChipsOptions {
   touchDuration?: number;
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Indices of items with errors, read reactively; those chips render destructive.
    * The marks clear whenever the model changes.
    */
@@ -247,7 +242,7 @@ css`
     outline: none;
   }
 
-  .ohne-dynamic-chips-has-errors {
+  .ohne-dynamic-chips:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -479,7 +474,6 @@ function labelOrDash(choice: DynamicChipsChoice): string {
  * ```
  */
 export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptions): HTMLElement {
-  const error = options.error ?? ((): boolean => false);
   const disabled = options.disabled ?? ((): boolean => false);
   const filteredChoices = ref<DynamicChipsChoice[]>([]);
   const selectedChoices = ref<DynamicChipsChoice[]>([]);
@@ -773,7 +767,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     {
       class: () =>
         'ohne-dynamic-chips' +
-        (error() ? ' ohne-dynamic-chips-has-errors' : '') +
         (disabled() ? ' ohne-dynamic-chips-disabled' : '') +
         (isFocused.value ? ' ohne-dynamic-chips-focused' : '') +
         (isDropdownVisible.value ? ' ohne-dynamic-chips-dropdown-visible' : '') +
@@ -829,6 +822,10 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
                     class: 'ohne-dynamic-chips-remove ohne-raw',
                     disabled: () => draggingIndex.value !== null,
                     title: options.removeItemLabel ?? 'Remove',
+                    'aria-label': () =>
+                      defaultText('dashboard.removeChip', 'Remove {label}', {
+                        label: choice().label ?? String(choice().value),
+                      }),
                     onClick: () => {
                       const at = index();
                       model.value = model.value.filter((_, i) => i !== at);

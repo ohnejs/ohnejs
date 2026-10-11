@@ -6,6 +6,7 @@ import type {
   DynamicSelectChoice,
   DynamicSelectPaginatedChoices,
 } from '../../ui/dynamic-select.ts';
+import type { RecordFieldOptions } from '../known-field-types.ts';
 
 import { keywordsCondition } from '../../../utils/condition/keywords-condition.ts';
 import { isEmpty } from '../../../utils/is/is-empty.ts';
@@ -13,7 +14,6 @@ import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
-import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
@@ -26,9 +26,7 @@ import { useT } from '../../runtime/use-t.ts';
 import { loadVerdicts } from '../../runtime/verdicts.ts';
 import { button } from '../../ui/button.ts';
 import { dynamicSelect } from '../../ui/dynamic-select.ts';
-import { icon } from '../../ui/icon.ts';
 import { textInput } from '../../ui/text-input.ts';
-import { attachTooltip } from '../../ui/tooltip.ts';
 import { targetOf } from '../_search.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
@@ -194,7 +192,7 @@ function emptyPage(): DynamicSelectPaginatedChoices {
  * The filter compares by identity through the same combobox, with the same picker beside it.
  * When the target is unreadable or has no label field, the mono `UUID` input stands in everywhere.
  */
-export const recordType: FieldType = {
+export const recordType: FieldType<RecordFieldOptions> = {
   display({ field, value }) {
     return () => {
       const current = value();
@@ -251,7 +249,6 @@ export const recordType: FieldType = {
         choicesResolver: source.choicesResolver,
         selectedChoiceResolver: (value) =>
           isString(value) ? source.choiceOf(value) : Promise.resolve(null),
-        error: () => routed.value !== '',
         name: context.path,
         searchLabel: () => t('dashboard.searchPlaceholder'),
         noResultsLabel: () => t('dashboard.noResultsFound'),
@@ -292,24 +289,24 @@ export const recordType: FieldType = {
         const value = current();
         if (isNull(value)) return null;
         const canUpdate = updatable.value.has(value);
-        const open = button(icon(canUpdate ? 'pencil' : 'list-search'), {
+        const open = button(() => t(canUpdate ? 'dashboard.edit' : 'dashboard.view'), {
+          icon: canUpdate ? 'pencil' : 'list-search',
+          iconOnly: true,
           variant: 'outline',
           href: recordHref(target, value),
           target: '_blank',
-          ariaLabel: () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view'),
         });
-        onCleanup(attachTooltip(open, () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view')));
         if (!context.field.nullable) return open;
-        const clear = button(icon('x'), {
+        const clear = button(() => t('dashboard.clearSelection'), {
+          icon: 'x',
+          iconOnly: true,
           variant: 'outline',
           disabled: off ? (): boolean => true : undefined,
-          ariaLabel: () => t('dashboard.clearSelection'),
           onClick: () => {
             model.value = null;
             change();
           },
         });
-        onCleanup(attachTooltip(clear, () => t('dashboard.clearSelection')));
         return [open, clear];
       });
       focusControl = () => combobox?.focus();
@@ -416,7 +413,7 @@ function fallbackInput(
   disabled: boolean,
 ): { element: HTMLElement; focus(): void; sync(): void } {
   const raw = ref(untracked(current) ?? '');
-  const control = textInput(raw, { error: () => error() !== '', disabled: () => disabled });
+  const control = textInput(raw, { disabled: () => disabled });
   const input = control.querySelector('input') as HTMLInputElement;
   input.classList.add('cell-mono');
   input.addEventListener('input', () => {

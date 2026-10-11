@@ -22,7 +22,7 @@ import { blockNamed, itemFormSupports } from '../_items.ts';
 import { openBlockPicker } from '../block-picker-popup.ts';
 import { clipboardData, stripUUIDs } from '../clipboard.ts';
 import { createFieldForm } from '../field-form.ts';
-import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { dimMark, type FieldType, registerUntypedFieldType } from '../field-type.ts';
 import { structureActions, structureErrorMark, structureItemError } from '../structure-chrome.ts';
 
 /**
@@ -216,7 +216,7 @@ export const blocksType: FieldType = {
     };
 
     const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripUUIDs(form.read().value);
+      const value = stripUUIDs(form.snapshot());
       return isPlainObject<Record<string, unknown>>(value) ? value : {};
     };
 
@@ -306,7 +306,7 @@ export const blocksType: FieldType = {
       onReveal: undefined,
     };
 
-    // Built on first read, inside the control's own scope, so a surface that never shows the cards never builds them.
+    // Built on first read, in the control's scope, so a surface that never shows the cards never builds them.
     let element: HTMLElement | undefined;
     const buildElement = (): HTMLElement =>
       h(
@@ -564,4 +564,4 @@ function blank(): Record<string, string> {
   return Object.create(null) as Record<string, string>;
 }
 
-registerFieldType('blocks', blocksType);
+registerUntypedFieldType('blocks', blocksType);

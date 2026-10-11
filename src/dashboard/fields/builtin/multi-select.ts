@@ -1,25 +1,29 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
-import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { Primitive } from '../../ui/button-group.ts';
+import type { MultiSelectFieldOptions } from '../known-field-types.ts';
 
 import { first } from '../../../utils/array/first.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
+import { isEmpty } from '../../../utils/is/is-empty.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
-import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../../utils/object/deep-equal.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { checkChoice } from '../../../utils/validate/check-choice.ts';
+import { checkCount } from '../../../utils/validate/check-count.ts';
 import { h } from '../../render/h.ts';
 import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { type ChipsChoice, chips } from '../../ui/chips.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
 import { textInput } from '../../ui/text-input.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
-import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { type ControlReading, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { choicesOf } from './_choices.ts';
 
 /**
  * The `multiSelect` field type: cell display, form control, and filter.
@@ -30,8 +34,9 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * Server errors keyed `[n]` mark the offending chips.
  * The edit popup owns editing, so the cell offers no inline editor.
  * The filter probes entries by `includes`, through the choices or free text.
+ * A changed list is checked entry by entry against the choices, then against `min` and `max`.
  */
-export const multiSelectType: FieldType = {
+export const multiSelectType: FieldType<MultiSelectFieldOptions> = {
   display({ field, value }) {
     return () => {
       const current = value();
@@ -87,7 +92,6 @@ export const multiSelectType: FieldType = {
         : undefined,
       maxItems: isNumber(max) ? max : undefined,
       placeholder: fieldPlaceholder(context.field),
-      error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
       noResultsLabel: () => t('dashboard.noResultsFound'),
@@ -96,11 +100,15 @@ export const multiSelectType: FieldType = {
     const input = element.querySelector<HTMLInputElement>('.ohne-chips-input');
     if (!isNull(input)) describeControl(input, context.field, context.path, () => routed.value);
 
+    const dirty = (): boolean => touched.value && !deepEqual(model.value, base);
+
     return {
       element,
       read() {
         if (!touched.value && isUndefined(context.initial)) return {};
-        return { value: model.value };
+        return dirty()
+          ? checkedList(model.value, context.field.options ?? {})
+          : { value: model.value };
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -120,7 +128,7 @@ export const multiSelectType: FieldType = {
       },
       error: () => routed.value,
       errored: () => erroredIndices.value.length > 0,
-      dirty: () => touched.value && !deepEqual(model.value, base),
+      dirty,
       focus: () => input?.focus(),
       revert() {
         reset(base);
@@ -169,22 +177,22 @@ export const multiSelectType: FieldType = {
 };
 
 /**
- * The declared `choices` option as resolved `value`/`label` pairs.
- * A plain string choice is its own display text; a declared label translates as a message.
- * A malformed or absent option resolves to no choices.
+ * The reading of `list`: each entry outside the declared choices keyed `[n]`, then the count bounds.
  */
-function choicesOf(field: DashboardField): { value: string; label: string }[] {
-  const declared = field.options?.choices;
-  if (!isArray(declared)) return [];
-  const pairs: { value: string; label: string }[] = [];
-  for (const entry of declared) {
-    if (isString(entry)) {
-      pairs.push({ value: entry, label: entry });
-    } else if (isPlainObject(entry) && isString(entry.value)) {
-      pairs.push({ value: entry.value, label: translateMessage(entry.label) ?? entry.value });
-    }
+function checkedList(
+  list: readonly string[],
+  options: Readonly<Partial<MultiSelectFieldOptions>>,
+): ControlReading {
+  const errors: Record<string, string> = {};
+  const { choices } = options;
+  if (isArray(choices)) {
+    list.forEach((entry, index) => {
+      const failure = checkChoice(entry, choices);
+      if (!isUndefined(failure)) errors[`[${index}]`] = translateMessage(failure);
+    });
   }
-  return pairs;
+  if (!isEmpty(errors)) return { errors };
+  return checkedReading(list, checkCount(list.length, options));
 }
 
 /**

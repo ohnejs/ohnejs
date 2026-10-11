@@ -25,9 +25,9 @@ import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
 /**
- * One choice a `select` offers.
+ * One choice a `select` offers, typed by the model's value.
  */
-export interface SelectChoice {
+export interface SelectChoice<T extends Primitive = Primitive> {
   /**
    * An optional label to display for the choice in the select field.
    * If not provided, the `value` is displayed instead.
@@ -38,7 +38,7 @@ export interface SelectChoice {
    * The value of the choice in the select field.
    * It must be unique across all choices and groups.
    */
-  value: Primitive;
+  value: T;
 
   /**
    * Indicates whether the choice is disabled.
@@ -58,9 +58,9 @@ export interface SelectChoice {
 }
 
 /**
- * A labeled group of `select` choices.
+ * A labeled group of `select` choices, typed by the model's value.
  */
-export interface SelectChoiceGroup {
+export interface SelectChoiceGroup<T extends Primitive = Primitive> {
   /**
    * Text that describes a group of selectable options.
    * The label renders as a sticky row above the group's choices.
@@ -71,13 +71,13 @@ export interface SelectChoiceGroup {
    * The choices shown in the group.
    * Each choice requires a `value` distinct across all groups and choices.
    */
-  choices: SelectChoice[];
+  choices: readonly SelectChoice<T>[];
 }
 
 /**
- * Options for `select`.
+ * Options for `select`, typed by the model's value.
  */
-export interface SelectOptions {
+export interface SelectOptions<T extends Primitive = Primitive> {
   /**
    * Adjusts the size of the component, from -2 (very small) to 2 (very large).
    * Omitted, the value is inherited as `--ohne-size` from the parent element.
@@ -89,12 +89,6 @@ export interface SelectOptions {
    * A getter reads reactively.
    */
   placeholder?: string | (() => string);
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the select reactively while it returns `true`.
@@ -121,7 +115,7 @@ export interface SelectOptions {
   /**
    * Called with the picked value right before the model updates.
    */
-  onCommit?: (value: Primitive) => void;
+  onCommit?: (value: T) => void;
 }
 
 css`
@@ -154,7 +148,7 @@ css`
     cursor: default;
   }
 
-  .ohne-select-has-errors {
+  .ohne-select:where([aria-invalid='true']) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -299,7 +293,7 @@ function toDisplay(value: Primitive): string {
 }
 
 /**
- * The static single-select combobox.
+ * The static single-select combobox, typed by the model's value.
  *
  * The choices expand in place: an absolutely positioned overlay grows over the field, capped at 12 rows.
  * It translates upward just enough to fit, clamped to the window or `scrollContainer`.
@@ -310,22 +304,21 @@ function toDisplay(value: Primitive): string {
  *
  * @example
  * ```ts
- * const timezone = ref<Primitive>('utc')
+ * const timezone = ref<'utc' | 'cet'>('utc')
  * select(timezone, () => [
  *   { label: 'UTC', value: 'utc' },
  *   { group: 'Europe', choices: [{ label: 'Central European Time', value: 'cet' }] },
  * ])
  * ```
  */
-export function select(
-  model: Ref<Primitive>,
-  choices: () => (SelectChoice | SelectChoiceGroup)[],
-  options: SelectOptions = {},
+export function select<T extends Primitive>(
+  model: Ref<T>,
+  choices: () => readonly (SelectChoice<NoInfer<T>> | SelectChoiceGroup<NoInfer<T>>)[],
+  options: SelectOptions<NoInfer<T>> = {},
 ): HTMLElement {
-  const error = options.error ?? ((): boolean => false);
   const disabled = options.disabled ?? ((): boolean => false);
   const isExpanded = ref(false);
-  const highlightedChoice = ref<SelectChoice | undefined>(undefined);
+  const highlightedChoice = ref<SelectChoice<T> | undefined>(undefined);
   const choicesHeight = ref<number | undefined>(undefined);
   const choicesTopOffset = ref(0);
   const mousePaused = ref(false);
@@ -342,10 +335,11 @@ export function select(
   let unlockWindow: (() => void) | undefined;
   let unlockContainer: (() => void) | undefined;
 
-  const flatChoices = (): SelectChoice[] =>
+  const flatChoices = (): SelectChoice<T>[] =>
     choices().flatMap((choice) => ('group' in choice ? choice.choices : choice));
 
-  const enabledChoices = (): SelectChoice[] => flatChoices().filter((choice) => !choice.disabled);
+  const enabledChoices = (): SelectChoice<T>[] =>
+    flatChoices().filter((choice) => !choice.disabled);
 
   const selectedChoice = computed(() =>
     flatChoices().find((choice) => choice.value === model.value),
@@ -492,7 +486,7 @@ export function select(
     else toggle(event);
   };
 
-  const emitValue = (value: Primitive): void => {
+  const emitValue = (value: T): void => {
     options.onCommit?.(value);
     model.value = value;
   };
@@ -563,7 +557,7 @@ export function select(
     }
   };
 
-  const choiceRow = (choice: SelectChoice): HTMLElement =>
+  const choiceRow = (choice: SelectChoice<T>): HTMLElement =>
     h(
       'button',
       {
@@ -666,7 +660,6 @@ export function select(
       tabindex: () => (disabled() ? -1 : 0),
       class: () =>
         'ohne-select' +
-        (error() ? ' ohne-select-has-errors' : '') +
         (disabled() ? ' ohne-select-disabled' : '') +
         (isExpanded.value ? ' ohne-select-expanded' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,

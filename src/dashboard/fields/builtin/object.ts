@@ -1,5 +1,6 @@
 import type { Child } from '../../render/insert.ts';
 import type { FieldForm } from '../field-form.ts';
+import type { ObjectFieldOptions } from '../known-field-types.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -70,7 +71,7 @@ css`
  * An object-level error paints the card border destructive, with the message under the card.
  * The child writes whole with the record's one save.
  */
-export const objectType: FieldType = {
+export const objectType: FieldType<ObjectFieldOptions> = {
   display({ field, value }) {
     const t = useT();
     const subfields = field.subfields ?? [];
@@ -132,11 +133,6 @@ export const objectType: FieldType = {
     const touched = ref(false);
     const routed = ref('');
 
-    const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = form.read().value;
-      return isPlainObject<Record<string, unknown>>(value) ? value : {};
-    };
-
     const setForm = (next: FieldForm | null): void => {
       entry.value?.dispose();
       entry.value = next;
@@ -158,7 +154,7 @@ export const objectType: FieldType = {
         }
         // A pristine base form stashes the base itself, so toggling back reads clean.
         const pristine = seed === baseObject() && !isUndefined(seed) && !form.dirty();
-        stash = pristine ? baseObject() : valueOf(form);
+        stash = pristine ? baseObject() : form.snapshot();
         seed = undefined;
         setForm(null);
       },

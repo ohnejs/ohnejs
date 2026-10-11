@@ -1,129 +1,68 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
-import type { Primitive } from './button-group.ts';
+import type { IconName } from './icon.ts';
 
-import { deepEqual } from '../../utils/object/deep-equal.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
-import { toValue } from '../../utils/reactive/to-value.ts';
+import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { keyed } from '../render/keyed.ts';
 import { when } from '../render/when.ts';
-import { bubble } from './bubble.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { buttonGroup } from './button-group.ts';
-import { attachTooltip } from './tooltip.ts';
+import { icon } from './icon.ts';
 import './tokens.ts';
 
 /**
- * The bubble displayed next to a tab label.
+ * One tab of `tabs`, typed by its name.
  */
-export interface TabsBubble {
+export interface TabItem<T extends string | number> {
   /**
-   * The content of the bubble; a getter reads reactively.
-   */
-  content: string | (() => string);
-
-  /**
-   * Defines the visual style variant of the bubble.
-   *
-   * @default
-   * 'primary'
-   */
-  variant?: 'primary' | 'secondary' | 'accent' | 'destructive';
-
-  /**
-   * A tooltip to display when hovering over the bubble.
-   */
-  tooltip?: string;
-}
-
-/**
- * One entry in a `tabs` list.
- */
-export interface TabsListItem<T extends number | string> {
-  /**
-   * Unique identifier for the tab item.
+   * The tab's identity, unique among the tabs; the `active` ref holds it.
    */
   name: T;
 
   /**
-   * Text content displayed as the tab label; a getter reads reactively.
-   * If not provided, the `name` is used instead.
+   * The tab label.
    */
-  label?: string | (() => string);
+  label: Text;
 
   /**
-   * An optional bubble to display next to the tab label.
+   * An icon before the label.
    */
-  bubble?: TabsBubble;
+  icon?: IconName;
+
+  /**
+   * Content after the label, usually a `bubble` with a count.
+   */
+  bubble?: Child;
+
+  /**
+   * Builds the panel each time the tab activates; switching away disposes it.
+   */
+  content: () => Child;
 }
 
 /**
- * The payload a custom `tabs` nav renderer receives.
+ * Options for `tabs`, typed by the tab names.
  */
-export interface TabsNavPayload<T extends number | string> {
+export interface TabsOptions<T extends string | number> {
   /**
-   * The active tab name, read reactively.
+   * The active tab's name, read and written by the tabs.
+   * A name no tab carries shows the first tab.
+   * Omitted, the tabs keep their own state and start on the first tab.
    */
-  active: () => T | undefined;
-
-  /**
-   * The nav choices derived from the list, read reactively.
-   */
-  choices: () => { label: string; value: T }[];
-
-  /**
-   * The id the default nav puts on its hidden input, for external label linkage.
-   */
-  id: string;
-
-  /**
-   * Activates a tab and reports the change.
-   */
-  setActive: (tab: T) => void;
-}
-
-/**
- * Options for `tabs`.
- */
-export interface TabsOptions<T extends number | string> {
-  /**
-   * The tab list, read reactively.
-   * A re-read with the same tab names does not reset the active tab.
-   */
-  list: () => TabsListItem<T>[];
-
-  /**
-   * The name of the active tab, read reactively.
-   * If not provided, the first tab in the list is selected.
-   */
-  active?: () => T | undefined;
-
-  /**
-   * Defines the visual style variant of the tab buttons.
-   *
-   * @default
-   * 'accent'
-   */
-  variant?: 'primary' | 'accent';
+  active?: Ref<T>;
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
    * Omitted inherits `--ohne-size` from the nearest ancestor.
    */
   size?: number;
-
-  /**
-   * Called when the user activates a tab; never fires from a list or `active` change.
-   */
-  onChange?: (tab: T) => void;
-
-  /**
-   * Renders the nav in place of the default button group.
-   */
-  nav?: (payload: TabsNavPayload<T>) => Child;
 }
 
 css`
@@ -136,6 +75,11 @@ css`
     justify-content: center;
   }
 
+  .ohne-tabs-list .ohne-button-group-item > svg {
+    flex-shrink: 0;
+    font-size: calc(1em + 0.125rem);
+  }
+
   .ohne-tabs-list .ohne-bubble {
     border: none;
   }
@@ -145,72 +89,75 @@ css`
   }
 `;
 
-let sequence = 0;
-let activeContext: Ref<number | string | undefined> | null = null;
-
 /**
- * The tab controller.
- * It owns the active-tab state and renders a nav, by default an equal-width button group.
- * The nav appears only when there is more than one tab.
- * It also renders a content area whose min-height is pinned for 250ms during tab switches.
- * The layout therefore never jumps while the incoming panel mounts.
- * The content is a function, called once during construction.
- * `tab` calls inside it bind to this instance.
+ * A row of equal-width tabs over the active tab's panel, typed by the tab names.
+ * With an `active` ref the names are typed by the ref, so every tab must carry one of its values.
+ * Only the active panel is mounted; switching tabs disposes the old one and builds the new one fresh.
+ * The panel area keeps the outgoing height for 250ms, so the layout never jumps while the next one mounts.
+ * The tab row appears only when there is more than one tab.
  *
  * @example
  * ```ts
- * tabs(() => [tab('general', () => generalPanel()), tab('seo', () => seoPanel())], {
- *   list: () => [{ name: 'general' }, { name: 'seo' }],
- * })
+ * const view = ref<'roster' | 'loot'>('roster')
+ * tabs(
+ *   [
+ *     { name: 'roster', label: 'Roster', icon: 'users', content: () => roster() },
+ *     { name: 'loot', label: 'Loot', bubble: bubble('3'), content: () => loot() },
+ *   ],
+ *   { active: view },
+ * )
  * ```
  */
-export function tabs<T extends number | string>(
-  content: () => Child,
-  options: TabsOptions<T>,
+export function tabs<const T extends string | number>(
+  items: MaybeGetter<readonly TabItem<NoInfer<T>>[]>,
+  options: TabsOptions<T> & { active: Ref<T> },
+): HTMLElement;
+export function tabs<const T extends string | number>(
+  items: MaybeGetter<readonly TabItem<T>[]>,
+  options?: Omit<TabsOptions<T>, 'active'>,
+): HTMLElement;
+export function tabs<T extends string | number>(
+  items: MaybeGetter<readonly TabItem<T>[]>,
+  options: TabsOptions<T> = {},
 ): HTMLElement {
-  const listId = `ohne-tabs-${++sequence}`;
-  const active = ref<T | undefined>(undefined);
-  const variant = options.variant ?? 'accent';
-  const choices = computed(() =>
-    options.list().map(({ name, label }) => ({
-      label: toValue(label) ?? String(name),
-      value: name,
-    })),
-  );
-
-  let previous: [T[], T | undefined] | undefined;
-  effect(() => {
-    const next: [T[], T | undefined] = [options.list().map(({ name }) => name), options.active?.()];
-    if (previous === undefined || !deepEqual(next, previous)) {
-      previous = next;
-      active.value = next[1] ?? next[0][0];
-    }
+  const list = (): readonly TabItem<T>[] => toValue(items);
+  const chosen: Ref<T | undefined> = options.active ?? ref<T | undefined>(undefined);
+  const active = computed(() => {
+    const names = list().map((item) => item.name);
+    const name = chosen.value;
+    return !isUndefined(name) && names.includes(name) ? name : names[0];
   });
-
-  const setActive = (tab: T): void => {
-    active.value = tab;
-    options.onChange?.(tab);
+  const model: Ref<T | undefined> = {
+    get value(): T | undefined {
+      return active.value;
+    },
+    set value(name: T | undefined) {
+      chosen.value = name;
+    },
   };
 
-  const contentMinHeight = ref<number | undefined>(undefined);
+  const minHeight = ref<number | undefined>(undefined);
   let minHeightTimeout: ReturnType<typeof setTimeout> | undefined;
-  const setContentMinHeight = (minHeight: number | undefined): void => {
+  const pinHeight = (height: number): void => {
     clearTimeout(minHeightTimeout);
-    contentMinHeight.value = minHeight;
+    minHeight.value = height;
     minHeightTimeout = setTimeout(() => {
-      contentMinHeight.value = undefined;
+      minHeight.value = undefined;
     }, 250);
   };
   onCleanup(() => clearTimeout(minHeightTimeout));
 
-  const previousContext = activeContext;
-  activeContext = active as Ref<number | string | undefined>;
-  let inner: HTMLElement;
-  try {
-    inner = h('div', null, content());
-  } finally {
-    activeContext = previousContext;
-  }
+  const panel = h(
+    'div',
+    null,
+    keyed(
+      () => active.value,
+      () =>
+        list()
+          .find((item) => item.name === active.value)
+          ?.content() ?? null,
+    ),
+  );
 
   let first = true;
   effect(() => {
@@ -219,94 +166,55 @@ export function tabs<T extends number | string>(
       first = false;
       return;
     }
-    // Runs on the write, before panels rebuild on their microtask, so this measures the outgoing panel.
-    setContentMinHeight(inner.offsetHeight);
+    // Runs on the write, before the panel rebuilds on its microtask, so this measures the outgoing panel.
+    pinHeight(panel.offsetHeight);
   });
 
   const observer = new ResizeObserver(() => {
-    const height = inner.offsetHeight;
-    if (height > 24) setContentMinHeight(height);
+    const height = panel.offsetHeight;
+    if (height > 24) pinHeight(height);
   });
-  observer.observe(inner);
+  observer.observe(panel);
   onCleanup(() => observer.disconnect());
-
-  const groupModel: Ref<Primitive> = {
-    get value(): Primitive {
-      return active.value;
-    },
-    set value(next: Primitive) {
-      setActive(next as T);
-    },
-  };
-
-  const renderTab = (index: number, label: string | undefined): Child => {
-    const item = options.list()[index];
-    const children: Child[] = [h('span', null, label)];
-    if (item?.bubble) {
-      const badge = bubble(item.bubble.content, { variant: item.bubble.variant });
-      if (item.bubble.tooltip) onCleanup(attachTooltip(badge, item.bubble.tooltip));
-      children.push(badge);
-    }
-    return children;
-  };
-
-  const defaultNav = (): Child =>
-    when(
-      () => choices.value.length > 1,
-      () => {
-        const group = buttonGroup(groupModel, {
-          choices: () => choices.value,
-          variant,
-          id: listId,
-          renderChoice: ({ index, label }) => renderTab(index, label),
-        });
-        group.classList.add('ohne-tabs-list');
-        return group;
-      },
-    );
 
   return h(
     'div',
     {
       class: 'ohne-tabs',
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
-    options.nav
-      ? options.nav({
-          active: () => active.value,
-          choices: () => choices.value,
-          id: listId,
-          setActive,
-        })
-      : defaultNav(),
+    when(
+      () => list().length > 1,
+      () => {
+        const group = buttonGroup(model, {
+          choices: () => list().map((item) => ({ value: item.name })),
+          variant: 'accent',
+          renderChoice: ({ value }) => tabLabel(list().find((item) => item.name === value)),
+        });
+        group.classList.add('ohne-tabs-list');
+        return group;
+      },
+    ),
     h(
       'div',
       {
         class: 'ohne-tabs-content',
-        style: () => (contentMinHeight.value ? `min-height: ${contentMinHeight.value}px` : null),
+        style: () => (minHeight.value ? `min-height: ${minHeight.value}px` : null),
       },
-      inner,
+      panel,
     ),
   );
 }
 
 /**
- * One conditional tab panel: its content renders only while the enclosing `tabs` has `name` active.
- * It unmounts otherwise, so panel-local state resets on switch.
- * Must be called inside the content function of a `tabs` - anywhere else it renders nothing.
- * Pass the content as a function so each activation rebuilds it fresh.
- * It builds untracked, as a `when` branch does, so a ref it reads while building never rebuilds it.
- *
- * @example
- * ```ts
- * tab('general', () => generalPanel())
- * ```
+ * One tab's face in the row: its icon, its live label, and its bubble.
  */
-export function tab(name: number | string, content: Child | (() => Child)): Child {
-  const active = activeContext;
-  if (active === null) return null;
-  return when(
-    () => active.value === name,
-    () => toValue(content),
-  );
+function tabLabel<T extends string | number>(item: TabItem<T> | undefined): Child {
+  if (isUndefined(item)) return null;
+  const { label } = item;
+  return [
+    isUndefined(item.icon) ? null : icon(item.icon),
+    h('span', null, () => resolveText(label)),
+    item.bubble,
+  ];
 }

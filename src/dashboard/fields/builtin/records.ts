@@ -1,4 +1,5 @@
 import type { Primitive } from '../../ui/button-group.ts';
+import type { RecordsFieldOptions } from '../known-field-types.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isEmpty } from '../../../utils/is/is-empty.ts';
@@ -11,10 +12,12 @@ import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { recordHref } from '../../../utils/route/record-href.ts';
 import { shortUUID } from '../../../utils/uuid/short-uuid.ts';
+import { checkCount } from '../../../utils/validate/check-count.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { dynamicChips } from '../../ui/dynamic-chips.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { targetOf } from '../_search.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -37,8 +40,9 @@ css`
  * A leading table-overview button opens the record picker over the target's full data table.
  * Chips remove and drag-reorder, the dropdown searches and paginates, a double-click opens the record.
  * Server messages keyed by index mark their chips destructive.
+ * A changed list is checked against `min` and `max`, with the server's messages.
  */
-export const recordsType: FieldType = {
+export const recordsType: FieldType<RecordsFieldOptions> = {
   display({ field, value }) {
     return () => {
       const current = value();
@@ -93,7 +97,6 @@ export const recordsType: FieldType = {
       disabled: () => context.disabled === true,
       choicesResolver: source.choicesResolver,
       selectedChoicesResolver: (values) => source.choicesOf(values.map(String)),
-      error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
       noResultsLabel: () => t('dashboard.noResultsFound'),
@@ -116,6 +119,8 @@ export const recordsType: FieldType = {
       },
     });
 
+    const dirty = (): boolean => touched.value && !deepEqual(model.value, base);
+
     return {
       element: h(
         'div',
@@ -126,7 +131,10 @@ export const recordsType: FieldType = {
       ),
       read() {
         if (!touched.value && isUndefined(context.initial)) return {};
-        return { value: model.value };
+        const count = dirty()
+          ? checkCount(model.value.length, context.field.options ?? {})
+          : undefined;
+        return checkedReading(model.value, count);
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -146,7 +154,7 @@ export const recordsType: FieldType = {
       },
       error: () => routed.value,
       errored: () => !isEmpty(erroredIndices.value),
-      dirty: () => touched.value && !deepEqual(model.value, base),
+      dirty,
       focus: () => input?.focus(),
       revert() {
         reset(base);

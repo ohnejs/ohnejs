@@ -1,6 +1,8 @@
 import type { ConditionObject } from '../../utils/condition/condition-object.ts';
+import type { ResolvedLayoutNode } from '../../utils/field-layout/resolve-layout-nodes.ts';
 import type { MessageData } from '../../utils/i18n/message-data.ts';
 import type { IconName } from '../../utils/icon/icon-name.ts';
+import type { Text } from './text-type.ts';
 
 /**
  * One exposed collections-API operation, as the signed-in user sees it.
@@ -51,8 +53,10 @@ export interface DashboardOperations {
 
 /**
  * One field of a collection, described for the dashboard's sheet view.
+ * A page form's `field` spec describes itself in the same shape, so one renderer serves both.
+ * `O` types `options`, as a field type's own controls read them.
  */
-export interface DashboardField {
+export interface DashboardField<O = Record<string, unknown>> {
   /**
    * The field name, as records carry it.
    */
@@ -75,37 +79,37 @@ export interface DashboardField {
   logicalType?: 'text' | 'integer' | 'real' | 'boolean' | 'json';
 
   /**
-   * The display label: a message the dashboard translates where it renders, through `translateMessage`.
+   * The display label, translated where it renders through `translateMessage`.
    * A system field's label is its catalog key; an undeclared one is the sentence-cased name.
    */
-  label: MessageData;
+  label: Text;
 
   /**
-   * The field's plain description, a message the dashboard translates where it renders.
+   * The field's plain description, translated where it renders.
    * Absent when none is declared, or when the declared one is expandable.
    */
-  description?: MessageData;
+  description?: Text;
 
   /**
    * The field's description when it starts collapsed behind a toggle; absent for the plain form.
-   * Each text is a message the dashboard translates; an omitted toggle label is the catalog's key.
+   * Each text is translated where it renders; an omitted toggle label is the catalog's key.
    */
   expandable?: {
     /**
      * The content, shown once expanded.
      * Markdown is supported.
      */
-    text: MessageData;
+    text: Text;
 
     /**
      * The toggle's label while the content is collapsed.
      */
-    showLabel: MessageData;
+    showLabel: Text;
 
     /**
      * The toggle's label while the content is expanded.
      */
-    hideLabel: MessageData;
+    hideLabel: Text;
 
     /**
      * Whether the content starts expanded.
@@ -114,9 +118,9 @@ export interface DashboardField {
   };
 
   /**
-   * The empty-input hint, a message the dashboard translates; absent when none is declared.
+   * The empty-input hint, translated where it renders; absent when none is declared.
    */
-  placeholder?: MessageData;
+  placeholder?: Text;
 
   /**
    * Whether the field's value admits `null`.
@@ -162,8 +166,9 @@ export interface DashboardField {
    * The field type's declared options as resolved, reduced to plain JSON data.
    * Structural options other members already describe, like a composite's `fields`, stay out.
    * Absent when nothing ships, so a plain field carries no empty object.
+   * A shipped option may still be missing, since non-JSON values stay home: hence `Partial`.
    */
-  options?: Readonly<Record<string, unknown>>;
+  options?: Readonly<Partial<O>>;
 
   /**
    * The target collection name; relation kinds (`record`, `records`) only.
@@ -198,117 +203,11 @@ export interface DashboardTable {
 }
 
 /**
- * A field the layout places, by name.
- * Mirrors the `GET /dashboard` response.
- */
-export interface DashboardLayoutField {
-  /**
-   * The node kind.
-   */
-  kind: 'field';
-
-  /**
-   * The field name, one of the host's described fields.
-   */
-  name: string;
-
-  /**
-   * The declared width: a plain CSS length, a percentage, or `auto`; absent when the item declares none.
-   */
-  width?: string;
-}
-
-/**
- * Nodes side by side, sharing the container's width.
- */
-export interface DashboardLayoutRow {
-  /**
-   * The node kind.
-   */
-  kind: 'row';
-
-  /**
-   * The entries, left to right; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A bordered group of nodes.
- */
-export interface DashboardLayoutCard {
-  /**
-   * The node kind.
-   */
-  kind: 'card';
-
-  /**
-   * The header label, a message the dashboard translates; absent when the card declares none.
-   */
-  label?: MessageData;
-
-  /**
-   * Whether the viewer can collapse the card.
-   */
-  collapsible: boolean;
-
-  /**
-   * The nodes, top to bottom; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A set of tabs, one panel of nodes per tab.
- */
-export interface DashboardLayoutTabs {
-  /**
-   * The node kind.
-   */
-  kind: 'tabs';
-
-  /**
-   * The tabs, left to right; never empty.
-   */
-  tabs: DashboardLayoutTab[];
-}
-
-/**
- * One tab of a `DashboardLayoutTabs` node.
- */
-export interface DashboardLayoutTab {
-  /**
-   * The tab label, a message the dashboard translates.
-   */
-  label: MessageData;
-
-  /**
-   * The panel's nodes, top to bottom; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A horizontal rule between stacked nodes.
- */
-export interface DashboardLayoutRule {
-  /**
-   * The node kind.
-   */
-  kind: 'rule';
-}
-
-/**
  * One node of a resolved field layout, as the dashboard renders it.
- * Labels arrive as messages and widths split from their names, so the client parses nothing.
+ * Labels stay as declared and widths split from their names, so the client parses nothing.
  * A name the host does not describe is already dropped, and so is any container that left empty.
  */
-export type DashboardLayoutNode =
-  | DashboardLayoutField
-  | DashboardLayoutRow
-  | DashboardLayoutCard
-  | DashboardLayoutTabs
-  | DashboardLayoutRule;
+export type DashboardLayoutNode = ResolvedLayoutNode<Text>;
 
 /**
  * One collection the signed-in user may work with over the collections API.

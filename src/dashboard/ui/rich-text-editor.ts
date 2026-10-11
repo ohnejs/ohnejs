@@ -84,11 +84,6 @@ export interface RichTextEditorOptions<C extends string = string> {
   disabled?: () => boolean;
 
   /**
-   * Turns the frame destructive while it returns `true`.
-   */
-  error?: () => boolean;
-
-  /**
    * The text the single empty leaf shows.
    * A getter reads reactively, so a translated placeholder resolves when its catalog lands.
    */
@@ -233,7 +228,7 @@ css`
     outline: none;
   }
 
-  .ohne-rich-text-has-errors {
+  .ohne-rich-text:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -340,10 +335,7 @@ export function richTextEditor<C extends string>(
   const element = h(
     'div',
     {
-      class: () =>
-        'ohne-rich-text' +
-        (config.error?.() ? ' ohne-rich-text-has-errors' : '') +
-        (disabled() ? ' ohne-rich-text-disabled' : ''),
+      class: () => 'ohne-rich-text' + (disabled() ? ' ohne-rich-text-disabled' : ''),
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
     },
     config.prefix,

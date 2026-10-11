@@ -31,4 +31,11 @@ describe('numberInput', () => {
     flush();
     strictEqual(button?.getAttribute('aria-label'), 'Ziehen zum Anpassen');
   });
+
+  it('hides the mouse-only steppers from assistive tech', () => {
+    const root = numberInput(ref(1), { showSteppers: true }) as unknown as FakeElement;
+    flush();
+    const steppers = findElement(root, (element) => hasClass(element, 'ohne-number-steppers'));
+    strictEqual(steppers?.getAttribute('aria-hidden'), 'true');
+  });
 });

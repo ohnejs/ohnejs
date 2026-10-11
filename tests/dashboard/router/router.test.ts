@@ -1,6 +1,11 @@
 import { strictEqual } from 'node:assert';
 import { after, before, describe, it, mock } from 'node:test';
 
+import type { RouteContext } from '../../../src/dashboard/router/router.ts';
+
+import { h } from '../../../src/dashboard/render/h.ts';
+import { defineDashboardPage } from '../../../src/dashboard/router/define-dashboard-page.ts';
+import { registerPageFrame, useFrame } from '../../../src/dashboard/router/page-frame.ts';
 import { navigate, startRouter } from '../../../src/dashboard/router/router.ts';
 import { loadLanguage } from '../../../src/dashboard/runtime/messages.ts';
 import {
@@ -9,22 +14,14 @@ import {
 } from '../../../src/dashboard/runtime/set-dashboard-language.ts';
 import { useDashboardLanguage } from '../../../src/dashboard/runtime/use-dashboard-language.ts';
 import { translateMessage } from '../../../src/dashboard/runtime/use-t.ts';
-import { flush } from '../../../src/utils/reactive/_scheduler.ts';
-import { FakeElement, FakeText } from '../_fake-dom.ts';
+import { FakeElement, FakeText, findElement } from '../_fake-dom.ts';
+import { fakeBrowser, pageModule, settle, type FakeBrowser } from './_browser.ts';
 
 const WORDS: Record<string, [home: string, required: string]> = {
   en: ['Home', 'Required'],
   de: ['Start', 'Pflichtfeld'],
   bs: ['Početna', 'Obavezno'],
 };
-
-/**
- * Lets pending fetches and their continuations settle, then runs every queued effect.
- */
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setImmediate(resolve));
-  flush();
-}
 
 describe('startRouter', () => {
   let builds = 0;
@@ -124,5 +121,155 @@ describe('startRouter', () => {
     strictEqual(nextBuilds, 1);
     strictEqual(container.textContent, 'next');
     strictEqual(useDashboardLanguage().value, 'bs');
+  });
+});
+
+describe('startRouter with a page frame', () => {
+  const container = new FakeElement('div');
+  const counts = { frames: 0, home: 0, b: 0, logout: 0, slow: 0, guard: 0 };
+  let router!: typeof import('../../../src/dashboard/router/router.ts');
+  let browser!: FakeBrowser;
+  let home!: RouteContext;
+  let release!: () => void;
+
+  /**
+   * The frame's root element, which carries the merged options as its class.
+   */
+  const frameRoot = () => findElement(container, (element) => element.tagName === 'DIV');
+
+  before(async () => {
+    browser = fakeBrowser('/');
+    router = (await import(
+      new URL('../../../src/dashboard/router/router.ts?frame', import.meta.url).href
+    )) as typeof router;
+    registerPageFrame(({ content, options }) => {
+      counts.frames++;
+      return h('div', { class: () => (options().fill ? 'fill' : 'plain') }, '[', content, ']');
+    });
+    Object.assign(globalThis, {
+      gate: new Promise<void>((resolve) => (release = resolve)),
+      testPages: {
+        home: defineDashboardPage((route) => {
+          counts.home++;
+          home = route;
+          useFrame({ fill: true });
+          return 'home';
+        }),
+        b: defineDashboardPage(() => {
+          counts.b++;
+          return 'b';
+        }),
+        logout: defineDashboardPage(
+          () => {
+            counts.logout++;
+            return 'logout';
+          },
+          { frame: false },
+        ),
+        plain: () => 'plain',
+        slow: defineDashboardPage(() => {
+          counts.slow++;
+          return 'slow';
+        }),
+      },
+    });
+    const slow = 'await globalThis.gate; export default globalThis.testPages.slow;';
+    await router.startRouter(
+      [
+        { pattern: '/', url: pageModule('home') },
+        { pattern: '/b', url: pageModule('b') },
+        { pattern: '/logout', url: pageModule('logout') },
+        { pattern: '/plain', url: pageModule('plain') },
+        { pattern: '/slow', url: `data:text/javascript,${encodeURIComponent(slow)}` },
+      ],
+      container as unknown as Element,
+    );
+    await settle();
+  });
+
+  it('mounts the frame once across framed pages, following their options', async () => {
+    strictEqual(container.textContent, '[home]');
+    strictEqual(frameRoot()?.getAttribute('class'), 'fill');
+    await router.navigate('/b');
+    await settle();
+    strictEqual(container.textContent, '[b]');
+    strictEqual(frameRoot()?.getAttribute('class'), 'plain');
+    strictEqual(counts.frames, 1);
+    strictEqual(counts.home, 1);
+    strictEqual(counts.b, 1);
+  });
+
+  it('builds each page once on a swap between framed and bare', async () => {
+    await router.navigate('/logout');
+    await settle();
+    strictEqual(container.textContent, 'logout');
+    strictEqual(counts.logout, 1);
+    strictEqual(counts.b, 1);
+    await router.navigate('/');
+    await settle();
+    strictEqual(container.textContent, '[home]');
+    strictEqual(counts.home, 2);
+    strictEqual(counts.frames, 2);
+    strictEqual(counts.logout, 1);
+  });
+
+  it('renders a page without a `frame` flag framed', async () => {
+    await router.navigate('/plain');
+    await settle();
+    strictEqual(container.textContent, '[plain]');
+  });
+
+  it('renders an unmatched location framed', async () => {
+    await router.navigate('/nope');
+    await settle();
+    strictEqual(container.textContent, '[Not found]');
+    strictEqual(router.useRoute(), null);
+  });
+
+  it('keeps the page on a query step and updates `query` synchronously', async () => {
+    await router.navigate('/');
+    await settle();
+    const builds = counts.home;
+    const route = router.useRoute();
+    void router.navigate('/?tab=2', { replace: true });
+    strictEqual(home.query.tab, 2);
+    strictEqual(router.lastNavigation(), 'navigate');
+    void router.navigate('/?tab=2#top');
+    strictEqual(home.query.tab, 2);
+    await settle();
+    strictEqual(counts.home, builds);
+    strictEqual(router.useRoute(), route);
+    strictEqual(container.textContent, '[home]');
+  });
+
+  it('skips the guard on a same-pathname step, by `navigate` and by `popstate`', async () => {
+    router.setNavigationGuard(() => {
+      counts.guard++;
+      return false;
+    });
+    strictEqual(await router.navigate('/?tab=3'), true);
+    strictEqual(home.query.tab, 3);
+    browser.popstate('/?tab=2');
+    strictEqual(home.query.tab, 2);
+    strictEqual(router.lastNavigation(), 'popstate');
+    strictEqual(counts.guard, 0);
+    strictEqual(await router.navigate('/b'), false);
+    strictEqual(counts.guard, 1);
+    strictEqual(location.pathname, '/');
+    router.setNavigationGuard(null);
+  });
+
+  it('renders in full on a query step while a render is pending', async () => {
+    const builds = counts.home;
+    void router.navigate('/slow');
+    await settle();
+    void router.navigate('/?tab=9');
+    await settle();
+    strictEqual(counts.home, builds + 1);
+    strictEqual(home.query.tab, 9);
+    release();
+    await settle();
+    strictEqual(counts.slow, 0);
+    strictEqual(container.textContent, '[home]');
   });
 });

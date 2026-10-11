@@ -1,5 +1,6 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { Primitive } from '../../ui/button-group.ts';
+import type { BooleanFieldOptions } from '../known-field-types.ts';
 
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -22,7 +23,7 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * It stays pristine until touched; once touched it reads binary.
  * A stored `null` therefore returns to `null` only through the row's revert.
  */
-export const booleanType: FieldType = {
+export const booleanType: FieldType<BooleanFieldOptions> = {
   display({ value }) {
     const t = useT();
     return () => {
@@ -30,8 +31,7 @@ export const booleanType: FieldType = {
       if (isNullish(current)) return dimMark('-');
       const yes = current === true;
       return badge(() => (yes ? t('dashboard.yes') : t('dashboard.no')), {
-        color: 'secondary',
-        textColor: yes ? undefined : 'inherit',
+        tone: yes ? 'secondary' : 'neutral',
       });
     };
   },

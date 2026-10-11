@@ -1,18 +1,36 @@
+import type { Ref } from '../../utils/reactive/ref.ts';
+import type { Child } from '../render/insert.ts';
+import type { Text } from '../runtime/text.ts';
+
+import { isNullish } from '../../utils/is/is-nullish.ts';
+import { isNumber } from '../../utils/is/is-number.ts';
+import { naturalCompare } from '../../utils/sort/natural-compare.ts';
+
 /**
- * One column definition for `table`.
+ * One column of a `table`, typed by the row it reads.
  */
-export interface TableColumn<T = unknown> {
+export interface TableColumn<T> {
   /**
-   * The column label.
-   * If not provided, the column key is used.
-   * A getter reads reactively.
+   * The header text.
+   * Omitted leaves the header empty, as a column of buttons wants.
    */
-  label?: string | (() => string);
+  label?: Text;
 
   /**
-   * Controls if the column can be sorted.
-   * Accepts a boolean to enable/disable sorting.
-   * A string specifies the data type for proper sort icons.
+   * The row's value in this column: the sort key, and the cell text when there is no `render`.
+   * Numbers show in the dashboard language with tabular digits; `null` and `undefined` show nothing.
+   */
+  value?: (row: T) => string | number | null | undefined;
+
+  /**
+   * The cell content, in place of the `value` text.
+   * It re-runs when the row changes or when anything it reads changes.
+   */
+  render?: (row: T) => Child;
+
+  /**
+   * Whether the header sorts the rows; `'text'` and `'numeric'` pick the matching sort icon.
+   * A client-sorted column needs a `value` to sort by, or the header offers no sort.
    *
    * @default
    * false
@@ -20,113 +38,103 @@ export interface TableColumn<T = unknown> {
   sortable?: boolean | 'text' | 'numeric';
 
   /**
-   * Sets the width of a table column using CSS values like `100px`, `20rem`, `50%`, `auto`, etc.
+   * Which side the header and the cells align to.
+   *
+   * @default
+   * 'start'
+   */
+  align?: 'start' | 'end';
+
+  /**
+   * A tooltip on the header that explains the column.
+   */
+  help?: Text;
+
+  /**
+   * Lets the cells wrap onto more lines, at least `minWidth` wide.
+   * Without it, an auto-layout cell stays on one line.
+   *
+   * @default
+   * false
+   */
+  wrap?: boolean;
+
+  /**
+   * The column width as a CSS length, like `8rem` or `30%`.
    */
   width?: string;
 
   /**
-   * Sets the minimum width of a table column using CSS values like `100px`, `20rem`, etc.
-   * It is useful when `width` is a percentage.
+   * The narrowest the column gets, as a CSS length.
+   * A wrapping column falls back to `16rem`.
    */
   minWidth?: string;
-
-  /**
-   * The data type for values in this column.
-   *
-   * Note: This is a TypeScript type assertion and does not involve any runtime logic or data.
-   */
-  TType: T;
 }
 
 /**
- * The column definitions of a `table`, keyed by column key.
- * Insertion order defines the column order.
+ * The column a `table` sorts by, and which way.
  */
-export interface TableColumns {
-  [key: string]: TableColumn;
-}
-
-type InferColumnType<T> = T extends { TType: infer U } ? U : unknown;
-
-/**
- * One data row of a `table`: a unique `id` plus a value per column key.
- */
-export type TableRow<T extends TableColumns> = {
+export interface TableSort<C extends string = string> {
   /**
-   * A unique identifier for this record.
+   * The key of the sorted column in `columns`.
    */
-  id: number | string;
-} & Partial<{
-  [K in keyof T]: InferColumnType<T[K]>;
-}>;
-
-/**
- * The payload a `table` cell renderer receives.
- */
-export interface TableCell<T extends TableColumns> {
-  /**
-   * The row data object containing values for each column.
-   */
-  row: TableRow<T>;
+  column: C;
 
   /**
-   * The zero-based index of the current row in the table data array.
-   */
-  rowIndex: number;
-
-  /**
-   * The column definition object containing configuration like label, width, etc.
-   */
-  column: TableColumn;
-
-  /**
-   * The column key/identifier for the current cell.
-   */
-  key: string | number;
-
-  /**
-   * The zero-based index of the current column in the table.
-   */
-  columnIndex: number;
-}
-
-/**
- * The sorting state of a `table`.
- * When `null`, no sorting is applied.
- */
-export type TableSort<TColumns extends TableColumns> = {
-  /**
-   * The key of the column to sort by.
-   */
-  column: keyof TColumns;
-
-  /**
-   * The direction to sort the column.
+   * The sort direction.
    */
   direction: 'asc' | 'desc';
-} | null;
-
-/**
- * Helper for creating a column definition for use in the `table` component.
- * An identity cast whose only job is carrying the `TType` value-type inference.
- *
- * @example
- * ```ts
- * const columns = {
- *   id: tableColumn<number>({ label: 'ID', width: '64px' }),
- *   name: tableColumn<string>({ label: 'Name', minWidth: '128px' }),
- * }
- * ```
- */
-export function tableColumn<T = unknown>(
-  definition: Omit<TableColumn<T>, 'TType'>,
-): TableColumn<T> {
-  return definition as TableColumn<T>;
 }
 
 /**
- * The next sorting state after a click on a column's sort button.
- * The same column flips its direction; a different column starts ascending.
+ * The row selection of a `table`: checkboxes, shift ranges, and the select-all box.
+ */
+export interface TableSelection<T, K> {
+  /**
+   * The selected row keys, two-way.
+   * Every write is a new `Set`: kept keys keep their place, and new keys append in row order.
+   * Keys of rows that are not shown are never dropped, so a selection survives paging.
+   */
+  selected: Ref<ReadonlySet<K>>;
+
+  /**
+   * Whether a row may be selected.
+   * A refused row shows a disabled checkbox, and shift ranges and select-all skip it.
+   * Omitted admits every row.
+   */
+  selectable?: (row: T) => boolean;
+
+  /**
+   * Whether the checkbox column shows, read reactively.
+   * Omitted always shows it.
+   */
+  checkboxes?: () => boolean;
+
+  /**
+   * Replaces the select-all box's state and toggle.
+   * Omitted, the box covers the selectable rows of the current page.
+   */
+  all?: {
+    /**
+     * The box state, read reactively.
+     */
+    state: () => boolean | 'indeterminate';
+
+    /**
+     * Called with the box's new value when the reader toggles it.
+     */
+    toggle: (value: boolean) => void | Promise<void>;
+
+    /**
+     * A tooltip on the box.
+     */
+    label?: Text;
+  };
+}
+
+/**
+ * The next sort after a click on a column header.
+ * The same column flips its direction; another column starts ascending.
  * There is no third click that clears the sort.
  *
  * @example
@@ -136,52 +144,85 @@ export function tableColumn<T = unknown>(
  * toggleSort({ column: 'name', direction: 'asc' }, 'id')   // -> { column: 'id', direction: 'asc' }
  * ```
  */
-export function toggleSort<T extends TableColumns>(
-  sort: TableSort<T>,
-  column: keyof T,
-): TableSort<T> {
-  return sort && sort.column === column
+export function toggleSort<C extends string>(sort: TableSort<C> | null, column: C): TableSort<C> {
+  return sort?.column === column
     ? { column, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
     : { column, direction: 'asc' };
 }
 
 /**
- * The selection map after a shift-click that ranges from the anchor row to the target row.
- * Every row in the inclusive index range takes `value` on a copy of `selected`.
- * The anchor row takes `true` instead, so a deselecting range never drops its own anchor.
+ * The selection after a shift-click that ranges from the anchor row to the target row.
+ * Every row in the inclusive range takes `value`, except the anchor, which stays selected.
  * A row `selectable` refuses keeps its state.
- * Both ids must be present in `rows`; the anchor row does not move.
+ * Kept keys keep their place and new keys append in row order.
+ * Both keys must belong to `rows`.
  *
  * @example
  * ```ts
- * rangeSelect([{ id: 1 }, { id: 2 }, { id: 3 }], {}, 1, 3, true)
- * // -> { 1: true, 2: true, 3: true }
+ * const rows = [{ id: 1 }, { id: 2 }, { id: 3 }]
+ * const key = (row: { id: number }) => row.id
  *
- * rangeSelect([{ id: 1 }, { id: 2 }, { id: 3 }], { 1: true, 2: true, 3: true }, 1, 2, false)
- * // -> { 1: true, 2: false, 3: true }
+ * rangeSelect(rows, key, new Set([3]), 1, 3, true)
+ * // -> Set { 3, 1, 2 }
  *
- * rangeSelect([{ id: 1 }, { id: 2 }, { id: 3 }], {}, 1, 3, true, (row) => row.id !== 2)
- * // -> { 1: true, 3: true }
+ * rangeSelect(rows, key, new Set([1, 2, 3]), 1, 3, false)
+ * // -> Set { 1 }
+ *
+ * rangeSelect(rows, key, new Set(), 1, 3, true, (row) => row.id !== 2)
+ * // -> Set { 1, 3 }
  * ```
  */
-export function rangeSelect<T extends TableColumns>(
-  rows: readonly TableRow<T>[],
-  selected: Record<number | string, boolean>,
-  origin: number | string,
-  target: number | string,
+export function rangeSelect<T, K>(
+  rows: readonly T[],
+  key: (row: T, index: number) => K,
+  selected: ReadonlySet<K>,
+  origin: K,
+  target: K,
   value: boolean,
-  selectable: (row: TableRow<T>) => boolean = () => true,
-): Record<number | string, boolean> {
-  const originIndex = rows.findIndex((row) => row.id === origin);
-  const targetIndex = rows.findIndex((row) => row.id === target);
-  const [start, end] =
-    originIndex < targetIndex ? [originIndex, targetIndex] : [targetIndex, originIndex];
-  const next = { ...selected };
-
-  for (let i = start; i <= end; i++) {
-    const row = rows[i]!;
-    if (selectable(row)) next[row.id] = row.id === origin || value;
+  selectable: (row: T) => boolean = () => true,
+): Set<K> {
+  const keys = rows.map(key);
+  const from = keys.indexOf(origin);
+  const to = keys.indexOf(target);
+  const next = new Set(selected);
+  for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
+    if (!selectable(rows[i]!)) continue;
+    if (value || keys[i] === origin) next.add(keys[i]!);
+    else next.delete(keys[i]!);
   }
-
   return next;
+}
+
+/**
+ * A sorted copy of `rows`, by the key `value` reads.
+ * Numbers compare as numbers and anything else in natural order, so `'2'` comes before `'11'`.
+ * `null`, `undefined`, and `NaN` sort last in both directions, and equal keys keep their order.
+ *
+ * @example
+ * ```ts
+ * sortRows([{ n: 'b' }, { n: null }, { n: 'a' }], (row) => row.n, 'asc')
+ * // -> [{ n: 'a' }, { n: 'b' }, { n: null }]
+ *
+ * sortRows([{ n: 2 }, { n: 11 }, { n: NaN }], (row) => row.n, 'desc')
+ * // -> [{ n: 11 }, { n: 2 }, { n: NaN }]
+ * ```
+ */
+export function sortRows<T>(
+  rows: readonly T[],
+  value: (row: T) => string | number | null | undefined,
+  direction: 'asc' | 'desc',
+): T[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  const keyed = rows.map((row) => ({ row, key: value(row) }));
+  const missing = (key: unknown): boolean => isNullish(key) || Number.isNaN(key);
+  keyed.sort((a, b) => {
+    if (missing(a.key) || missing(b.key)) return Number(missing(a.key)) - Number(missing(b.key));
+    return (
+      sign *
+      (isNumber(a.key) && isNumber(b.key)
+        ? a.key - b.key
+        : naturalCompare(String(a.key), String(b.key)))
+    );
+  });
+  return keyed.map(({ row }) => row);
 }

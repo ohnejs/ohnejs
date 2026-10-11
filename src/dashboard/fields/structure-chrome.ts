@@ -1,5 +1,6 @@
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { nextTick } from '../../utils/reactive/next-tick.ts';
@@ -182,19 +183,15 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
   };
 
   const moveButton = (delta: -1 | 1): HTMLElement => {
-    const el = button(icon(delta === -1 ? 'chevron-up' : 'chevron-down'), {
+    return button(() => t(delta === -1 ? 'dashboard.sort.moveUp' : 'dashboard.sort.moveDown'), {
+      icon: delta === -1 ? 'chevron-up' : 'chevron-down',
+      iconOnly: true,
       size: -2,
       variant: 'ghost',
       disabled: () =>
         delta === -1 ? options.index() === 0 : options.index() === options.count() - 1,
       onClick: () => options.onMove(delta),
     });
-    onCleanup(
-      attachTooltip(el, () =>
-        t(delta === -1 ? 'dashboard.sort.moveUp' : 'dashboard.sort.moveDown'),
-      ),
-    );
-    return el;
   };
 
   const toggle = button(() => icon(options.expanded() ? 'maximize' : 'minimize'), {
@@ -214,15 +211,14 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
     ),
   );
 
-  const dots = button(icon('dots-vertical'), {
+  const dots = button(() => t('dashboard.record.moreActions'), {
+    icon: 'dots-vertical',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     onClick: () => {
       open.value = !open.value;
     },
-  });
-  effect(() => {
-    dots.title = t('dashboard.record.moreActions');
   });
   effect(() => {
     dots.classList.toggle('ohne-button-ghost', !open.value);
@@ -232,7 +228,7 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
   const menu = (): Child => {
     const handle = dropdown(
       [
-        options.onAdd === undefined
+        isUndefined(options.onAdd)
           ? null
           : [
               action(

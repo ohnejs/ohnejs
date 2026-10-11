@@ -24,9 +24,9 @@ import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
 /**
- * One choice a `dynamicSelect` resolver returns.
+ * One choice a `dynamicSelect` resolver returns, typed by the model's value.
  */
-export interface DynamicSelectChoice {
+export interface DynamicSelectChoice<T extends Primitive = Primitive> {
   /**
    * An optional label to display for the choice in the select field.
    * If not provided, the `value` is displayed instead.
@@ -47,7 +47,7 @@ export interface DynamicSelectChoice {
   /**
    * The value of the choice in the select field.
    */
-  value: Primitive;
+  value: T;
 
   /**
    * Indicates whether the choice is disabled.
@@ -59,13 +59,13 @@ export interface DynamicSelectChoice {
 }
 
 /**
- * One page of resolved `dynamicSelect` choices.
+ * One page of resolved `dynamicSelect` choices, typed by the model's value.
  */
-export interface DynamicSelectPaginatedChoices {
+export interface DynamicSelectPaginatedChoices<T extends Primitive = Primitive> {
   /**
    * The choices of this page.
    */
-  choices: DynamicSelectChoice[];
+  choices: DynamicSelectChoice<T>[];
 
   /**
    * The current page number.
@@ -89,19 +89,19 @@ export interface DynamicSelectPaginatedChoices {
 }
 
 /**
- * Options for `dynamicSelect`.
+ * Options for `dynamicSelect`, typed by the model's value.
  */
-export interface DynamicSelectOptions {
+export interface DynamicSelectOptions<T extends Primitive = Primitive> {
   /**
    * Resolves the choices for the select field.
    * It receives the 1-based `page` and the search `keyword`.
    */
-  choicesResolver: (page: number, keyword: string) => Promise<DynamicSelectPaginatedChoices>;
+  choicesResolver: (page: number, keyword: string) => Promise<DynamicSelectPaginatedChoices<T>>;
 
   /**
    * Resolves the selected choice based on its value.
    */
-  selectedChoiceResolver: (value: Primitive) => Promise<DynamicSelectChoice | null>;
+  selectedChoiceResolver: (value: T) => Promise<DynamicSelectChoice<T> | null>;
 
   /**
    * Adjusts the size of the component, from -2 (very small) to 2 (very large).
@@ -114,12 +114,6 @@ export interface DynamicSelectOptions {
    * A getter reads reactively.
    */
   placeholder?: string | (() => string);
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the select reactively while it returns `true`.
@@ -174,7 +168,7 @@ export interface DynamicSelectOptions {
   /**
    * Called with the picked value right before the model updates.
    */
-  onCommit?: (value: Primitive) => void;
+  onCommit?: (value: T) => void;
 }
 
 css`
@@ -207,7 +201,7 @@ css`
     cursor: default;
   }
 
-  .ohne-dynamic-select-has-errors {
+  .ohne-dynamic-select:where([aria-invalid='true']) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -409,7 +403,7 @@ function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
 /**
  * Returns the choice's `label`, else its `value`, as text; any falsy result, `0` included, shows `-`.
  */
-function labelOrDash(choice: DynamicSelectChoice): string {
+function labelOrDash(choice: DynamicSelectChoice<Primitive>): string {
   return String((choice.label ?? choice.value) || '-');
 }
 
@@ -425,21 +419,23 @@ function labelOrDash(choice: DynamicSelectChoice): string {
  *
  * @example
  * ```ts
- * const author = ref<Primitive>(null)
+ * const author = ref<number | null>(null)
  * dynamicSelect(author, {
  *   choicesResolver: (page, keyword) => api.searchUsers(page, keyword),
  *   selectedChoiceResolver: (value) => api.resolveUser(value),
  * })
  * ```
  */
-export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptions): HTMLElement {
-  const error = options.error ?? ((): boolean => false);
+export function dynamicSelect<T extends Primitive>(
+  model: Ref<T>,
+  options: DynamicSelectOptions<NoInfer<T>>,
+): HTMLElement {
   const disabled = options.disabled ?? ((): boolean => false);
   const isExpanded = ref(false);
-  const choices = ref<DynamicSelectChoice[]>([]);
+  const choices = ref<DynamicSelectChoice<T>[]>([]);
   const hasDetails = computed(() => !isUndefined(choices.value[0]?.detail));
-  const selectedChoice = ref<DynamicSelectChoice | null>(null);
-  const highlightedChoice = ref<DynamicSelectChoice | undefined>(undefined);
+  const selectedChoice = ref<DynamicSelectChoice<T> | null>(null);
+  const highlightedChoice = ref<DynamicSelectChoice<T> | undefined>(undefined);
   const choicesHeight = ref<number | undefined>(undefined);
   const choicesTopOffset = ref(0);
   const keyword = ref('');
@@ -459,7 +455,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
   let unlockWindow: (() => void) | undefined;
   let unlockContainer: (() => void) | undefined;
 
-  const enabledChoices = (): DynamicSelectChoice[] =>
+  const enabledChoices = (): DynamicSelectChoice<T>[] =>
     choices.value.filter((choice) => !choice.disabled);
 
   const calcItemSizes = (): {
@@ -596,7 +592,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     else toggle(event);
   };
 
-  const emitChoice = (choice: DynamicSelectChoice): void => {
+  const emitChoice = (choice: DynamicSelectChoice<T>): void => {
     selectedChoice.value = choice;
     options.onCommit?.(choice.value);
     model.value = choice.value;
@@ -710,7 +706,7 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
     choicesTopOffset.value = topOffset;
   };
 
-  const choiceRow = (choice: DynamicSelectChoice): HTMLElement =>
+  const choiceRow = (choice: DynamicSelectChoice<T>): HTMLElement =>
     h(
       'button',
       {
@@ -828,7 +824,6 @@ export function dynamicSelect(model: Ref<Primitive>, options: DynamicSelectOptio
       tabindex: () => (disabled() ? -1 : 0),
       class: () =>
         'ohne-dynamic-select' +
-        (error() ? ' ohne-dynamic-select-has-errors' : '') +
         (disabled() ? ' ohne-dynamic-select-disabled' : '') +
         (isExpanded.value ? ' ohne-dynamic-select-expanded' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,

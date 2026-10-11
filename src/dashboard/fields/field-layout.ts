@@ -1,9 +1,10 @@
-import type { Child } from '../render/insert.ts';
 import type {
-  DashboardLayoutCard,
-  DashboardLayoutNode,
-  DashboardLayoutTabs,
-} from '../runtime/meta-types.ts';
+  ResolvedLayoutCard,
+  ResolvedLayoutTabs,
+} from '../../utils/field-layout/resolve-layout-nodes.ts';
+import type { Child } from '../render/insert.ts';
+import type { DashboardLayoutNode } from '../runtime/meta-types.ts';
+import type { Text } from '../runtime/text-type.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
@@ -16,8 +17,6 @@ import { translateMessage, useT } from '../runtime/use-t.ts';
 import { bubble } from '../ui/bubble.ts';
 import { button } from '../ui/button.ts';
 import { card } from '../ui/card.ts';
-import { icon } from '../ui/icon.ts';
-import { tabs, type TabsNavPayload } from '../ui/tabs.ts';
 import { attachTooltip } from '../ui/tooltip.ts';
 import { layoutNodeNames } from './place-layout.ts';
 
@@ -118,13 +117,12 @@ css`
     border-color: hsl(var(--ohne-destructive));
   }
 
-  .ohne-fields-tabs .ohne-tabs-content:not(:first-child) {
+  .ohne-fields-tabs-list:not([hidden]) + .ohne-fields-tabs-content {
     margin-top: 1rem;
   }
 
-  .ohne-fields-tabs
-    .ohne-tabs-content:not(:first-child)
-    > div
+  .ohne-fields-tabs-list:not([hidden])
+    + .ohne-fields-tabs-content
     > .ohne-fields-stack
     > .ohne-fields-card:first-child {
     margin-top: calc(-1rem + 0.5em);
@@ -306,7 +304,7 @@ function hiddenUnless(
  * Expansion toggles a class in place, so a reveal can focus into the body in the same tick.
  */
 function renderCard(
-  node: DashboardLayoutCard,
+  node: ResolvedLayoutCard<Text>,
   chain: (() => void)[],
   options: FieldLayoutRenderOptions,
   render: (list: readonly DashboardLayoutNode[], chain: (() => void)[]) => Child[],
@@ -364,9 +362,14 @@ function collapseToggle(
   label: () => string,
   onClick: () => void,
 ): HTMLElement {
-  const el = button(icon(glyph), { size: -2, variant, class: 'ohne-fields-card-toggle', onClick });
-  onCleanup(attachTooltip(el, label));
-  return el;
+  return button(label, {
+    icon: glyph,
+    iconOnly: true,
+    size: -2,
+    variant,
+    class: 'ohne-fields-card-toggle',
+    onClick,
+  });
 }
 
 /**
@@ -374,7 +377,7 @@ function collapseToggle(
  * Activation toggles `hidden` synchronously, so a reveal can focus into the panel in the same tick.
  */
 function renderTabs(
-  node: DashboardLayoutTabs,
+  node: ResolvedLayoutTabs<Text>,
   chain: (() => void)[],
   options: FieldLayoutRenderOptions,
   render: (list: readonly DashboardLayoutNode[], chain: (() => void)[]) => Child[],
@@ -398,55 +401,55 @@ function renderTabs(
     );
     panels.push(panel);
   }
-  const nav = ({ setActive }: TabsNavPayload<number>): Child =>
-    h(
-      'div',
-      {
-        class: 'ohne-fields-tabs-list',
-        hidden: isUndefined(options.active)
-          ? undefined
-          : () => node.tabs.filter((_, index) => visible(index)).length < 2,
-      },
-      h(
-        'div',
-        { class: 'ohne-fields-tabs-scrollable' },
-        node.tabs.map((tab, index) => {
-          const names = layoutNodeNames(tab.nodes);
-          const count = (): number => names.filter(options.errored).length;
-          const el = h(
-            'button',
-            {
-              type: 'button',
-              class: () =>
-                `ohne-fields-tab ohne-raw${active.value === index ? ' ohne-fields-tab-active' : ''}`,
-              hidden: hiders[index],
-              onClick: () => setActive(index),
-            },
-            h('span', null, () => translateMessage(tab.label)),
-            when(
-              () => count() > 0,
-              () => {
-                const mark = bubble(() => count(), { variant: 'destructive' });
-                onCleanup(
-                  attachTooltip(mark, () => t('dashboard.foundErrors', { count: count() })),
-                );
-                return mark;
-              },
-            ),
-          );
-          buttons.push(el);
-          return el;
-        }),
-      ),
-    );
-  const root = tabs(() => panels, {
-    list: () =>
-      node.tabs.map((tab, index) => ({ name: index, label: () => translateMessage(tab.label) })),
-    active: () => active.value,
-    onChange: activate,
-    nav: node.tabs.length > 1 ? nav : () => null,
-  });
-  root.classList.add('ohne-fields-tabs');
+  const nav =
+    node.tabs.length < 2
+      ? null
+      : h(
+          'div',
+          {
+            class: 'ohne-fields-tabs-list',
+            hidden: isUndefined(options.active)
+              ? undefined
+              : () => node.tabs.filter((_, index) => visible(index)).length < 2,
+          },
+          h(
+            'div',
+            { class: 'ohne-fields-tabs-scrollable' },
+            node.tabs.map((tab, index) => {
+              const names = layoutNodeNames(tab.nodes);
+              const count = (): number => names.filter(options.errored).length;
+              const el = h(
+                'button',
+                {
+                  type: 'button',
+                  class: () =>
+                    `ohne-fields-tab ohne-raw${active.value === index ? ' ohne-fields-tab-active' : ''}`,
+                  hidden: hiders[index],
+                  onClick: () => activate(index),
+                },
+                h('span', null, () => translateMessage(tab.label)),
+                when(
+                  () => count() > 0,
+                  () => {
+                    const mark = bubble(() => count(), { variant: 'destructive' });
+                    onCleanup(
+                      attachTooltip(mark, () => t('dashboard.foundErrors', { count: count() })),
+                    );
+                    return mark;
+                  },
+                ),
+              );
+              buttons.push(el);
+              return el;
+            }),
+          ),
+        );
+  const root = h(
+    'div',
+    { class: 'ohne-fields-tabs' },
+    nav,
+    h('div', { class: 'ohne-fields-tabs-content' }, panels),
+  );
   if (!isUndefined(options.active)) {
     batchedEffect(() => {
       root.hidden = !node.tabs.some((_, index) => visible(index));

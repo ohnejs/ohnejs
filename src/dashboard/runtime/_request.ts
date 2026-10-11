@@ -1,5 +1,6 @@
 import { isNull } from '../../utils/is/is-null.ts';
 import { parseRouteID } from '../../utils/route/parse-route-id.ts';
+import { clearResourceCache } from './_resource-cache.ts';
 
 /**
  * Where a route id sends a request.
@@ -60,16 +61,20 @@ export function isSessionExpiry(status: number, path: string): boolean {
 /**
  * Opens a fresh session for the requests sent from now on, once a sign-in succeeds.
  * A `401` answers for the session its request was sent under, so one from an earlier session is no expiry.
+ * Cached reads are dropped, so nothing loaded for the previous user shows.
  */
 export function startSession(): void {
   session = Symbol('session');
+  clearResourceCache();
 }
 
 /**
  * Closes the session as a sign-out begins, so no `401` counts as an expiry until the next sign-in.
+ * Cached reads are dropped with it.
  */
 export function endSession(): void {
   session = null;
+  clearResourceCache();
 }
 
 /**

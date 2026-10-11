@@ -16,9 +16,9 @@ import './tokens.ts';
 export type Primitive = boolean | null | number | string | undefined;
 
 /**
- * One choice in a `buttonGroup`.
+ * One choice in a `buttonGroup`, typed by the model's value.
  */
-export interface ButtonGroupChoice {
+export interface ButtonGroupChoice<T extends Primitive = Primitive> {
   /**
    * An optional label to display for the button (choice) in the group.
    * If not provided, the `value` is displayed instead.
@@ -29,17 +29,17 @@ export interface ButtonGroupChoice {
    * The value of the button (choice).
    * It must be unique among the choices in the group.
    */
-  value: Primitive;
+  value: T;
 }
 
 /**
- * Options for `buttonGroup`.
+ * Options for `buttonGroup`, typed by the model's value.
  */
-export interface ButtonGroupOptions {
+export interface ButtonGroupOptions<T extends Primitive = Primitive> {
   /**
    * The choices to display in the button group, read reactively.
    */
-  choices: () => ButtonGroupChoice[];
+  choices: () => readonly ButtonGroupChoice<T>[];
 
   /**
    * The visual style variant of the buttons.
@@ -54,12 +54,6 @@ export interface ButtonGroupOptions {
    * Omitted inherits `--ohne-size` from the nearest ancestor.
    */
   size?: number;
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the active item turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the button group reactively while it returns `true`.
@@ -80,7 +74,7 @@ export interface ButtonGroupOptions {
   /**
    * Renders one choice's content in place of the default `label || value` text.
    */
-  renderChoice?: (payload: { index: number; label: string | undefined; value: Primitive }) => Child;
+  renderChoice?: (payload: { index: number; label: string | undefined; value: T }) => Child;
 }
 
 css`
@@ -104,7 +98,7 @@ css`
     transition-property: border-color, box-shadow;
   }
 
-  .ohne-button-group-has-errors {
+  .ohne-button-group:where([aria-invalid='true']) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -159,7 +153,7 @@ css`
     color: hsl(var(--ohne-secondary-foreground));
   }
 
-  .ohne-button-group-has-errors .ohne-button-group-item-active {
+  .ohne-button-group:where([aria-invalid='true']) .ohne-button-group-item-active {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
@@ -176,14 +170,14 @@ css`
 `;
 
 /**
- * A segmented single-select control in the shape of a radio group.
+ * A segmented single-select control in the shape of a radio group, typed by the model's value.
  * Arrow keys step through the choices and clamp at the edges; Space cycles with wraparound.
  * A trailing hidden input carries `id` and `name`, so label linkage and form serialization work.
  * A `focus:<id>` trigger focuses the group and shows the ring.
  *
  * @example
  * ```ts
- * const mode = ref<Primitive>('draft')
+ * const mode = ref<'draft' | 'published'>('draft')
  * buttonGroup(mode, {
  *   choices: () => [
  *     { label: 'Draft', value: 'draft' },
@@ -192,7 +186,10 @@ css`
  * })
  * ```
  */
-export function buttonGroup(model: Ref<Primitive>, options: ButtonGroupOptions): HTMLElement {
+export function buttonGroup<T extends Primitive>(
+  model: Ref<T>,
+  options: ButtonGroupOptions<NoInfer<T>>,
+): HTMLElement {
   const focusVisible = ref(false);
 
   const step = (offset: number, loop: boolean): void => {
@@ -216,7 +213,6 @@ export function buttonGroup(model: Ref<Primitive>, options: ButtonGroupOptions):
       tabindex: () => (options.disabled?.() ? -1 : 0),
       class: () =>
         `ohne-button-group ohne-button-group-${options.variant ?? 'primary'}` +
-        (options.error?.() ? ' ohne-button-group-has-errors' : '') +
         (options.disabled?.() ? ' ohne-button-group-disabled' : '') +
         (focusVisible.value ? ' ohne-button-group-focus-visible' : ''),
       style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
@@ -280,7 +276,7 @@ export function buttonGroup(model: Ref<Primitive>, options: ButtonGroupOptions):
 /**
  * The default text of a choice: its `label`, else its stringified `value`, or `''` for a nullish value.
  */
-function displayChoice(choice: ButtonGroupChoice): string {
+function displayChoice(choice: ButtonGroupChoice<Primitive>): string {
   const shown = choice.label || choice.value;
   return isNullish(shown) ? '' : String(shown);
 }

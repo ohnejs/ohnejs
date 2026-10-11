@@ -5,6 +5,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { icon } from './icon.ts';
 import './tokens.ts';
 
@@ -33,12 +34,6 @@ export interface CheckboxOptions {
   size?: number;
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the box border, fill, and focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the checkbox reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -53,6 +48,12 @@ export interface CheckboxOptions {
    * The `name` attribute of the hidden input.
    */
   name?: string;
+
+  /**
+   * The accessible name, for a checkbox without a visible label.
+   * A visible label names the box itself, so this applies only when `label` is omitted.
+   */
+  ariaLabel?: Text;
 
   /**
    * Muted description text rendered under the label.
@@ -114,12 +115,14 @@ css`
     color: hsl(var(--ohne-accent-foreground));
   }
 
-  .ohne-checkbox-has-errors .ohne-checkbox-button {
+  .ohne-checkbox:where(:has([aria-invalid='true'])) .ohne-checkbox-button {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
 
-  .ohne-checkbox-has-errors .ohne-checkbox-control[data-checked='true'] + .ohne-checkbox-button {
+  .ohne-checkbox:where(:has([aria-invalid='true']))
+    .ohne-checkbox-control[data-checked='true']
+    + .ohne-checkbox-button {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
@@ -197,7 +200,9 @@ export function checkbox(
 ): HTMLElement {
   const variant = options.variant ?? 'primary';
   const localId = options.id ?? `ohne-checkbox-${++sequence}`;
+  const labelId = `${localId}-label`;
   const hasContent = !isUndefined(label) || !isUndefined(options.description);
+  const { ariaLabel } = options;
   const input = h('input', {
     'data-checked': () => String(model.value),
     id: localId,
@@ -219,7 +224,6 @@ export function checkbox(
       class: () =>
         `ohne-checkbox ohne-checkbox-${variant}` +
         (hasContent ? ' ohne-checkbox-has-content' : '') +
-        (options.error?.() ? ' ohne-checkbox-has-errors' : '') +
         (options.disabled?.() ? ' ohne-checkbox-disabled' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
@@ -229,6 +233,9 @@ export function checkbox(
       'button',
       {
         'aria-checked': () => String(model.value),
+        'aria-labelledby': isUndefined(label) ? undefined : labelId,
+        'aria-label':
+          isUndefined(label) && !isUndefined(ariaLabel) ? () => resolveText(ariaLabel) : undefined,
         disabled: options.disabled,
         role: 'checkbox',
         type: 'button',
@@ -246,6 +253,7 @@ export function checkbox(
             : h(
                 'label',
                 {
+                  id: labelId,
                   for: localId,
                   class: 'ohne-checkbox-label',
                   onClick: (event: MouseEvent) => {

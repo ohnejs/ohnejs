@@ -44,4 +44,12 @@ describe('translateMessage', () => {
     strictEqual(translateMessage('app.title.label'), 'Title');
     strictEqual(translateMessage({ key: 'app.count', params: { n: 2 } }), '2 posts');
   });
+
+  it('answers a getter with its own string, and anything else with `undefined`', () => {
+    strictEqual(
+      translateMessage(() => 'Lok-tar'),
+      'Lok-tar',
+    );
+    strictEqual(translateMessage(42), undefined);
+  });
 });

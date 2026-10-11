@@ -146,11 +146,6 @@ export interface CalendarRangeOptions {
     | null;
 
   /**
-   * Reports the error state of both inputs reactively.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables both inputs reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -210,6 +205,12 @@ css`
 
   .ohne-calendar-range > .ohne-calendar:nth-child(2) {
     margin-top: 0.5em;
+  }
+
+  /* A field wires its first handle, so the range marks both ends from it. */
+  :where(.ohne-calendar-range:has([aria-invalid='true'])) .ohne-floater-handle {
+    --ohne-ring: var(--ohne-destructive);
+    border-color: hsl(var(--ohne-destructive));
   }
 
   .ohne-calendar-range-decorator {
@@ -296,7 +297,6 @@ export function calendarRange(
   const shared = {
     clearable: options.clearable,
     disabled: options.disabled,
-    error: options.error,
     formatter: options.formatter,
     initial: options.initial,
     labels: options.labels,

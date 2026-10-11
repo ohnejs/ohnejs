@@ -1,21 +1,22 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
-import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { Primitive } from '../../ui/button-group.ts';
+import type { SelectFieldOptions } from '../known-field-types.ts';
 
 import { first } from '../../../utils/array/first.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
-import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { checkChoice } from '../../../utils/validate/check-choice.ts';
 import { h } from '../../render/h.ts';
-import { translateMessage } from '../../runtime/use-t.ts';
 import { buttonGroup } from '../../ui/button-group.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { choicesOf } from './_choices.ts';
 
 /**
  * The `select` field type: cell display, form control, and filter.
@@ -26,8 +27,9 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * It stays pristine until touched, so an untouched control reads back the stored value unchanged.
  * The edit popup owns editing, so the cell offers no inline editor.
  * The filter compares by identity over the same choices.
+ * A changed value is checked against the choices, with the server's message.
  */
-export const selectType: FieldType = {
+export const selectType: FieldType<SelectFieldOptions> = {
   display({ field, value }) {
     return () => {
       const current = value();
@@ -72,14 +74,12 @@ export const selectType: FieldType = {
         choices: entries,
         variant: 'accent',
         disabled: () => disabled === true,
-        error: () => routed.value !== '',
         name: path,
       });
       proxy = element;
     } else {
       element = select(model, entries, {
         disabled: () => disabled === true,
-        error: () => routed.value !== '',
         name: path,
         placeholder: fieldPlaceholder(field),
         // `onCommit` runs before the select writes the model; writing here lets the history push see it.
@@ -94,11 +94,19 @@ export const selectType: FieldType = {
       return field.nullable ? value : (value ?? '');
     };
 
+    const dirty = (): boolean =>
+      touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
+
     return {
       element,
       read() {
         if (!touched.value && isUndefined(base)) return {};
-        return { value: wire() };
+        const value = wire();
+        const choices = field.options?.choices;
+        return checkedReading(
+          value,
+          isString(value) && isArray(choices) && dirty() ? checkChoice(value, choices) : undefined,
+        );
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -108,9 +116,7 @@ export const selectType: FieldType = {
         return '';
       },
       error,
-      dirty() {
-        return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
-      },
+      dirty,
       focus() {
         proxy?.focus();
       },
@@ -146,24 +152,5 @@ export const selectType: FieldType = {
     },
   },
 };
-
-/**
- * The declared `choices` option as resolved `value`/`label` pairs.
- * A plain string choice is its own display text; a declared label translates as a message.
- * A malformed or absent option resolves to no choices.
- */
-function choicesOf(field: DashboardField): { value: string; label: string }[] {
-  const declared = field.options?.choices;
-  if (!isArray(declared)) return [];
-  const pairs: { value: string; label: string }[] = [];
-  for (const entry of declared) {
-    if (isString(entry)) {
-      pairs.push({ value: entry, label: entry });
-    } else if (isPlainObject(entry) && isString(entry.value)) {
-      pairs.push({ value: entry.value, label: translateMessage(entry.label) ?? entry.value });
-    }
-  }
-  return pairs;
-}
 
 registerFieldType('select', selectType);

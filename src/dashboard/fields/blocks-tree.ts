@@ -1,6 +1,8 @@
 import type { TreeItemModel, TreeModel } from '../ui/tree-model.ts';
 import type { BlockNode, BlocksHandle } from './builtin/blocks.ts';
 
+import { first } from '../../utils/array/first.ts';
+import { last } from '../../utils/array/last.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isNumber } from '../../utils/is/is-number.ts';
 import { isString } from '../../utils/is/is-string.ts';
@@ -22,7 +24,6 @@ import { dropdown } from '../ui/dropdown.ts';
 import { useHotkeys } from '../ui/hotkeys.ts';
 import { icon } from '../ui/icon.ts';
 import { toast } from '../ui/toaster.ts';
-import { attachTooltip } from '../ui/tooltip.ts';
 import { flatTreeItems } from '../ui/tree-model.ts';
 import { tree, type TreeHandle } from '../ui/tree.ts';
 import {
@@ -233,8 +234,8 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     queueMicrotask(() => {
       const items = flatTreeItems(model.value).filter((item) => keys.includes(item.id as number));
       selectedItems.value = items;
-      const first = items[0];
-      if (!isUndefined(first)) handle?.scrollToItem(first);
+      const head = first(items);
+      if (!isUndefined(head)) handle?.scrollToItem(head);
     });
   };
 
@@ -365,7 +366,7 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     for (const stop of stops.splice(0)) stop();
     if (handle?.focused.value !== true) return;
     const selection = selectedItems.value;
-    const last = selection[selection.length - 1];
+    const lastSelected = last(selection);
     stops.push(
       hotkeys.listen('close', (event) => {
         if (selection.length === 0) return;
@@ -379,11 +380,11 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
         );
       }),
     );
-    if (!editable() || isUndefined(last)) return;
+    if (!editable() || isUndefined(lastSelected)) return;
     stops.push(
       hotkeys.listen('insertAfter', (event) => {
         event.preventDefault();
-        add(beside(last, 'after'));
+        add(beside(lastSelected, 'after'));
       }),
       hotkeys.listen('insertBefore', (event) => {
         event.preventDefault();
@@ -391,7 +392,7 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
       }),
       hotkeys.listen('paste', (event) => {
         event.preventDefault();
-        paste(beside(last, 'after'));
+        paste(beside(lastSelected, 'after'));
       }),
     );
   });
@@ -436,12 +437,14 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
   }
 
   /**
-   * The `+` that adds a block at the end of the row's one nested list, or nothing when it holds none or several.
+   * The `+` that adds a block at the end of the row's nested list, or nothing when it holds none or several.
    */
   function plusButton(item: TreeItemModel<BlocksTreeRow>): HTMLElement | null {
     const destination = beside(item, 'inside');
     if (isUndefined(destination) || destination.list.offered.length === 0) return null;
-    const plus = button(icon('plus'), {
+    const plus = button(() => t('dashboard.blocks.addNested'), {
+      icon: 'plus',
+      iconOnly: true,
       size: -3,
       variant: 'ghost',
       onClick: (event) => {
@@ -450,7 +453,6 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
       },
     });
     plus.tabIndex = -1;
-    onCleanup(attachTooltip(plus, () => t('dashboard.blocks.addNested')));
     return plus;
   }
 
@@ -459,7 +461,9 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
    */
   function rowActions(item: TreeItemModel<BlocksTreeRow>): HTMLElement {
     const key = item.id as number;
-    const dots = button(icon('dots'), {
+    const dots = button(() => t('dashboard.record.moreActions'), {
+      icon: 'dots',
+      iconOnly: true,
       size: -3,
       variant: 'ghost',
       onClick: () => {
@@ -468,7 +472,6 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     });
     dots.tabIndex = -1;
     effect(() => {
-      dots.title = t('dashboard.record.moreActions');
       dots.classList.toggle('ohne-button-ghost', menuOpen.value !== key);
       dots.classList.toggle('ohne-button-primary', menuOpen.value === key);
     });
@@ -641,24 +644,24 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     },
     run(action, keys) {
       const items = flatTreeItems(model.value).filter((item) => keys.includes(item.id as number));
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (isUndefined(first) || isUndefined(last)) return;
+      const head = first(items);
+      const tail = last(items);
+      if (isUndefined(head) || isUndefined(tail)) return;
       if (action === 'copy') copy(items);
       if (!editable()) return;
       if (action === 'moveUp') step(items, -1);
       else if (action === 'moveDown') step(items, 1);
-      else if (action === 'addBefore') add(beside(first, 'before'));
-      else if (action === 'addAfter') add(beside(last, 'after'));
+      else if (action === 'addBefore') add(beside(head, 'before'));
+      else if (action === 'addAfter') add(beside(tail, 'after'));
       else if (action === 'addInside') {
-        const inside = beside(first, 'inside');
+        const inside = beside(head, 'inside');
         if (!isUndefined(inside)) add({ list: inside.list, index: inside.list.nodes().length });
       } else if (action === 'duplicate') duplicate(items);
       else if (action === 'delete') remove(items);
       else if (action === 'cut') {
         copy(items);
         remove(items);
-      } else if (action === 'paste') paste(beside(last, 'after'));
+      } else if (action === 'paste') paste(beside(tail, 'after'));
     },
   };
 }

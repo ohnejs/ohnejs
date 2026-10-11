@@ -9,6 +9,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { defaultText } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
@@ -17,9 +18,9 @@ import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
 
 /**
- * One choice in a `chips` field running in select mode.
+ * One choice in a `chips` field running in select mode, typed by the model's item value.
  */
-export interface ChipsChoice {
+export interface ChipsChoice<T extends string = string> {
   /**
    * An optional label to display for the choice.
    * If not provided, the `value` is displayed instead.
@@ -30,7 +31,7 @@ export interface ChipsChoice {
    * The value of the choice.
    * It must be unique among the choices.
    */
-  value: string;
+  value: T;
 
   /**
    * An optional tooltip text to display for the choice.
@@ -39,15 +40,15 @@ export interface ChipsChoice {
 }
 
 /**
- * Options for `chips`.
+ * Options for `chips`, typed by the model's item value.
  */
-export interface ChipsOptions {
+export interface ChipsOptions<T extends string = string> {
   /**
    * The available choices, read reactively.
    * When given, the input behaves like a select dropdown and only listed values are addable.
    * Omitted, any text can be entered.
    */
-  choices?: () => ChipsChoice[];
+  choices?: () => readonly ChipsChoice<T>[];
 
   /**
    * Trims and collapses whitespace in the typed value.
@@ -121,12 +122,6 @@ export interface ChipsOptions {
   touchDuration?: number;
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Indices of items with errors, read reactively; those chips render destructive.
    * The marks clear whenever the model changes.
    */
@@ -180,7 +175,7 @@ css`
     outline: none;
   }
 
-  .ohne-chips-has-errors {
+  .ohne-chips:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -369,6 +364,7 @@ css`
 
 /**
  * A tag input: free text, or choice-restricted with a filtering dropdown when `choices` is given.
+ * With `choices` the model is typed by their values; free text keeps it `string[]`.
  * Chips reorder by mouse drag or touch long-press.
  * Backspace deletes in two steps: the first press previews the last chip destructively, the second removes.
  * In select mode the dropdown filters by keywords and carries the focus ring on the field's behalf.
@@ -379,8 +375,16 @@ css`
  * ```ts
  * const tags = ref<string[]>([])
  * chips(tags, { placeholder: 'Add a tag' })
+ *
+ * const roles = ref<('tank' | 'healer')[]>([])
+ * chips(roles, { choices: () => [{ value: 'tank' }, { value: 'healer' }] })
  * ```
  */
+export function chips<T extends string>(
+  model: Ref<T[]>,
+  options: ChipsOptions<NoInfer<T>> & Required<Pick<ChipsOptions<NoInfer<T>>, 'choices'>>,
+): HTMLElement;
+export function chips(model: Ref<string[]>, options?: ChipsOptions): HTMLElement;
 export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLElement {
   const choicesOf = options.choices;
   const isFocused = ref(false);
@@ -687,7 +691,6 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     {
       class: () =>
         'ohne-chips' +
-        (options.error?.() ? ' ohne-chips-has-errors' : '') +
         (options.disabled?.() ? ' ohne-chips-disabled' : '') +
         (isFocused.value ? ' ohne-chips-focused' : '') +
         (isDropdownVisible.value && choicesOf ? ' ohne-chips-dropdown-visible' : '') +
@@ -749,6 +752,10 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
                       class: 'ohne-chips-remove ohne-raw',
                       disabled: () => draggingIndex.value !== null,
                       title: options.removeItemLabel ?? 'Remove',
+                      'aria-label': () =>
+                        defaultText('dashboard.removeChip', 'Remove {label}', {
+                          label: displayLabel(item()),
+                        }),
                       onClick: () => {
                         const at = index();
                         model.value = model.value.filter((_, i) => i !== at);

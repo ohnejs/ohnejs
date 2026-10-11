@@ -1,7 +1,14 @@
 import type { Child } from '../render/insert.ts';
+import type { IconName } from './icon.ts';
+import type { Tone } from './tone.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
+import { proseChild } from './_text-child.ts';
+import { icon } from './icon.ts';
+import './_tones.ts';
 import './tokens.ts';
 
 /**
@@ -9,22 +16,29 @@ import './tokens.ts';
  */
 export interface AlertOptions {
   /**
-   * The visual style variant of the alert.
+   * The meaning the alert carries.
+   * `primary` is the plain card; a status tone rings and inks the box in its color.
+   * `destructive` and `warning` announce as `role="alert"`, every other tone is a quiet `note`.
    *
    * @default
    * 'primary'
    */
-  variant?: 'primary' | 'destructive';
+  tone?: Tone;
 
   /**
-   * The title of the alert, rendered bold above the content; a getter reads reactively.
+   * The title, rendered bold above the content.
    */
-  title?: string | (() => string);
+  title?: Text;
 
   /**
-   * An icon rendered in front of the content, at `1.5em`.
+   * An icon in front of the content, at `1.5em`.
    */
-  icon?: Child | (() => Child);
+  icon?: IconName;
+
+  /**
+   * Controls under the content, usually buttons.
+   */
+  actions?: Child;
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
@@ -32,6 +46,8 @@ export interface AlertOptions {
    */
   size?: number;
 }
+
+const STATUS_TONES = new Set<Tone>(['destructive', 'success', 'warning', 'info']);
 
 css`
   .ohne-alert {
@@ -48,17 +64,25 @@ css`
     font-size: calc(1rem + var(--ohne-size) * 0.125rem);
   }
 
-  .ohne-alert-destructive {
-    --ohne-foreground: var(--ohne-destructive);
-    --ohne-accent: var(--ohne-destructive) / 0.15;
-    --ohne-accent-foreground: var(--ohne-destructive);
-    --ohne-ring: var(--ohne-destructive);
-    border-color: hsl(var(--ohne-destructive));
-    color: hsl(var(--ohne-destructive));
+  .ohne-alert-status {
+    --ohne-foreground: var(--ohne-tone);
+    --ohne-accent: var(--ohne-tone) / 0.15;
+    --ohne-accent-foreground: var(--ohne-tone);
+    --ohne-ring: var(--ohne-tone);
+    border-color: hsl(var(--ohne-tone));
+    color: hsl(var(--ohne-tone));
   }
 
-  .dark .ohne-alert-destructive {
+  .dark .ohne-alert-status {
     background-color: hsl(var(--ohne-background));
+  }
+
+  .ohne-alert-surface {
+    --ohne-background: var(--ohne-tone);
+    --ohne-foreground: var(--ohne-tone-foreground);
+    background-color: hsl(var(--ohne-tone));
+    border-color: transparent;
+    color: hsl(var(--ohne-tone-foreground));
   }
 
   .ohne-alert-icon {
@@ -68,6 +92,7 @@ css`
 
   .ohne-alert-main {
     flex: 1;
+    min-width: 0;
   }
 
   .ohne-alert-title {
@@ -78,36 +103,47 @@ css`
   .ohne-alert-content {
     font-size: calc(1em - 0.0625rem);
   }
+
+  .ohne-alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    margin-top: 0.75em;
+  }
 `;
 
 /**
- * A static callout box with an optional icon and title, announced as `role="alert"`.
- * The destructive variant retheming bakes a `0.15` alpha into `--ohne-accent`.
- * Nested accent surfaces therefore wash to 15% destructive.
+ * A static callout box with an optional icon, title, and actions.
+ * A status tone rethemes `--ohne-accent` to a `0.15` wash of its color.
+ * Nested ghost and outline buttons therefore hover in the alert's own color.
  *
  * @example
  * ```ts
  * alert('The record is locked by another editor.', {
- *   variant: 'destructive',
+ *   tone: 'destructive',
  *   title: 'Locked',
- *   icon: icon('lock'),
+ *   icon: 'lock',
+ *   actions: button('Request access', { variant: 'outline', size: -1 }),
  * })
  * ```
  */
-export function alert(content: Child | (() => Child), options: AlertOptions = {}): HTMLElement {
+export function alert(content: Text | Child, options: AlertOptions = {}): HTMLElement {
+  const { actions, size, title, tone = 'primary' } = options;
+  const look = STATUS_TONES.has(tone) ? 'status' : tone === 'primary' ? 'plain' : 'surface';
   return h(
     'div',
     {
-      role: 'alert',
-      class: `ohne-alert ohne-alert-${options.variant ?? 'primary'}`,
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      role: tone === 'destructive' || tone === 'warning' ? 'alert' : 'note',
+      class: `ohne-alert ohne-alert-${look} ohne-tone-${tone}`,
+      style: isUndefined(size) ? undefined : `--ohne-size: ${size}`,
     },
-    options.icon === undefined ? null : h('div', { class: 'ohne-alert-icon' }, options.icon),
+    isUndefined(options.icon) ? null : h('div', { class: 'ohne-alert-icon' }, icon(options.icon)),
     h(
       'div',
       { class: 'ohne-alert-main' },
-      options.title === undefined ? null : h('p', { class: 'ohne-alert-title' }, options.title),
-      h('div', { class: 'ohne-alert-content' }, content),
+      isUndefined(title) ? null : h('p', { class: 'ohne-alert-title' }, () => resolveText(title)),
+      h('div', { class: 'ohne-alert-content' }, proseChild(content)),
+      isUndefined(actions) ? null : h('div', { class: 'ohne-alert-actions' }, actions),
     ),
   );
 }

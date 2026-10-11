@@ -1,5 +1,6 @@
 import type { IconName } from '../../utils/icon/icon-name.ts';
 
+import { last } from '../../utils/array/last.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { computed } from '../../utils/reactive/computed.ts';
@@ -175,8 +176,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
 
       const getFirstFilteredBlock = (): string | null => filteredBlocks.value[0]?.name ?? null;
 
-      const getLastFilteredBlock = (): string | null =>
-        filteredBlocks.value[filteredBlocks.value.length - 1]?.name ?? null;
+      const getLastFilteredBlock = (): string | null => last(filteredBlocks.value)?.name ?? null;
 
       const focusFirstFilteredBlock = (): void => {
         if (!isNull(getFirstFilteredBlock())) {
@@ -364,14 +364,13 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
             )
           : h('p', { class: 'ohne-muted' }, () => t('dashboard.noBlocksAllowed'));
 
-      const closeButton = button(icon('x'), {
+      const closeButton = button(() => t('dashboard.close'), {
+        icon: 'x',
+        iconOnly: true,
         size: -2,
         variant: 'ghost',
         class: 'ohne-ml-auto',
         onClick: () => settle(picked),
-      });
-      effect(() => {
-        closeButton.title = t('dashboard.close');
       });
 
       const handle = popup(body, {

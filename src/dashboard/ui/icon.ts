@@ -1,11 +1,30 @@
 import type { IconName } from '../../utils/icon/icon-name.ts';
+import type { Tone } from './tone.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
+import './_tones.ts';
 import './tokens.ts';
 
 export type { IconName };
+
+/**
+ * Options for `icon`.
+ */
+export interface IconOptions {
+  /**
+   * The meaning the icon's color carries.
+   * Omitted keeps the current text color.
+   */
+  tone?: Tone;
+
+  /**
+   * Size step of the icon: -2 very small, -1 small, 0 default, 1 large, 2 very large.
+   * Omitted sizes the icon to the surrounding text.
+   */
+  size?: number;
+}
 
 /**
  * The icons the dashboard's own chrome draws, inlined so they paint with the first frame.
@@ -72,6 +91,8 @@ const INLINE: Partial<Record<IconName, string>> = {
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2m1 9h4m-2-2v4"/></g>',
   clock:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0"/><path d="M12 7v5l3 3"/></g>',
+  'cloud-off':
+    '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.58 5.548q.361-.166.752-.286c1.88-.572 3.956-.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 .957-.383 1.824-1.003 2.454M18 18.004H6.657C4.085 18 2 15.993 2 13.517s2.085-4.482 4.657-4.482c.13-.582.37-1.128.7-1.62M3 3l18 18"/>',
   'cloud-upload':
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M7 18a4.6 4.4 0 0 1 0-9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1"/><path d="m9 15l3-3l3 3m-3-3v9"/></g>',
   code: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m7 8l-4 4l4 4m10-8l4 4l-4 4M14 4l-4 16"/>',
@@ -124,6 +145,8 @@ const INLINE: Partial<Record<IconName, string>> = {
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 14a2 2 0 1 0 0 4a2 2 0 0 0 0-4"/><path d="M21 12a2 2 0 1 0-4 0v4M4 6v12m8-12v12m-1 0h2M3 18h2m-1-6h8M3 6h2m6 0h2"/></g>',
   history:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 8v4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></g>',
+  inbox:
+    '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h3l3 3h4l3-3h3"/></g>',
   'info-circle':
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0m9-3h.01"/><path d="M11 12h1v4h1"/></g>',
   italic:
@@ -139,6 +162,8 @@ const INLINE: Partial<Record<IconName, string>> = {
   'list-search':
     '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15a4 4 0 1 0 8 0a4 4 0 1 0-8 0m7.5 3.5L21 21M4 6h16M4 12h4m-4 6h4"/>',
   lock: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0-2 0m-3-5V7a4 4 0 1 1 8 0v4"/></g>',
+  'loader-2':
+    '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 9 9"/>',
   logout:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2"/><path d="M9 12h12l-3-3m0 6l3-3"/></g>',
   maximize:
@@ -210,6 +235,14 @@ css`
   .ohne-icon {
     flex-shrink: 0;
   }
+
+  .ohne-icon-toned {
+    color: hsl(var(--ohne-tone-ink));
+  }
+
+  .ohne-icon-sized {
+    font-size: calc(1rem + var(--ohne-size) * 0.125rem);
+  }
 `;
 
 /**
@@ -251,17 +284,26 @@ function shapeOf(name: IconName): Promise<string | null> {
  * The markup is never anything a caller supplied.
  * It is a module constant, or a vendored shape the server found by name.
  * Width and height are `1em`, so an icon sizes with the local font size.
+ * A `size` pins the font size from `--ohne-size` instead; a `tone` paints the icon in that tone's ink.
  * Shapes carry `stroke-width` 2; the base stylesheet thins every icon to 1.5.
  * `ohne-stroke-2` reverts where emphasis calls for it.
  *
  * @example
  * ```ts
  * h('button', { class: 'toggle' }, icon('chevron-left'))
+ * icon('circle-check', { tone: 'success', size: 2 })
  * ```
  */
-export function icon(name: IconName): SVGSVGElement {
+export function icon(name: IconName, options: IconOptions = {}): SVGSVGElement {
+  const { size, tone } = options;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'ohne-icon');
+  svg.setAttribute(
+    'class',
+    'ohne-icon' +
+      (isUndefined(tone) ? '' : ` ohne-icon-toned ohne-tone-${tone}`) +
+      (isUndefined(size) ? '' : ' ohne-icon-sized'),
+  );
+  if (!isUndefined(size)) svg.setAttribute('style', `--ohne-size: ${size}`);
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('width', '1em');
   svg.setAttribute('height', '1em');

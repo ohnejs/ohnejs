@@ -13,9 +13,10 @@ import { hasKey } from '../../utils/object/has-key.ts';
 import { computed, type ComputedRef } from '../../utils/reactive/computed.ts';
 import { effectScope } from '../../utils/reactive/effect-scope.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
+import { checkRequired } from '../../utils/validate/check-required.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
-import { useT } from '../runtime/use-t.ts';
+import { translateMessage, useT } from '../runtime/use-t.ts';
 import { blocksOf } from './_blocks.ts';
 import { carriedField, carryValue } from './_items.ts';
 import { renderFieldLayout } from './field-layout.ts';
@@ -36,6 +37,13 @@ export interface FieldFormOptions {
    * The path the form's fields scope under, like `sections[2].fields`; `''` at the record root.
    */
   path: string;
+
+  /**
+   * Prefixes the path each control and row derive their element ids and input names from.
+   * Two forms over the same field names on one page then never share an id.
+   * Error routing and the form's own `path` are unaffected.
+   */
+  idScope?: string;
 
   /**
    * Attaches an existing item's `UUID` to the read value, keeping its row on a list write.
@@ -132,18 +140,22 @@ export interface FieldForm {
 
   /**
    * Reads the whole value: every control's current value beside the carried fields.
-   * Any control that fails to parse blocks the read with its messages instead.
+   * Any control that fails to parse blocks the read with its messages instead, shown on their rows.
+   * So does a required field left without a value, with `validation.required`, as the server would.
+   * A top-level edit form skips that check, since an update leaves an omitted field as it is.
    */
   read(): ControlReading;
 
   /**
    * Reads only the dirty fields, for a partial `PATCH`; carried fields never appear.
+   * Failures block it and show exactly as they do for `read`.
    */
   readPatch(): ControlReading;
 
   /**
    * Reads the whole value as far as it parses: a control that fails to parse keeps its `fallback` value.
    * An undo history passes its current state, so one field mid-edit never stalls the rest.
+   * Nothing is checked or shown, so a copy of an item mid-edit reads quietly too.
    */
   snapshot(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
 
@@ -189,6 +201,7 @@ export interface FieldForm {
 
   /**
    * Re-baselines the whole form from a saved item, so `dirty` clears without a remount.
+   * A field the item holds no value for re-baselines to its `options.default`, as it was seeded.
    */
   rebase(item: Readonly<Record<string, unknown>> | undefined): void;
 
@@ -221,6 +234,7 @@ css`
 
 /**
  * Builds a `FieldForm` over `fields`, seeded from `initial`, an existing item or `undefined`.
+ * A field `initial` holds no value for starts from its `options.default`, as a page form's spec declares.
  * The item `UUID` renders as a row only under `renderUUID`.
  * `attachUUID` decides whether it rides the read value.
  */
@@ -238,11 +252,16 @@ export function createFieldForm(
   const editorless = new Set<DashboardField>();
   const showsLocked =
     options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
+  const checksRequired = options.mode === 'create' || options.path !== '';
   const values: Record<string, unknown> = {};
   for (const field of fields) {
     const value = scope.run(() => computed(() => currentValue(field)));
     Object.defineProperty(values, field.name, { get: () => value.value, enumerable: true });
   }
+  const pathOf = (field: DashboardField): string => {
+    const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
+    return isUndefined(options.idScope) ? path : `${options.idScope}-${path}`;
+  };
   const ancestors = (): readonly Readonly<Record<string, unknown>>[] => options.ancestors?.() ?? [];
   const gates = new Map<string, ComputedRef<boolean>>();
   for (const field of fields) {
@@ -267,7 +286,7 @@ export function createFieldForm(
 
   for (const field of fields) {
     if (field.name === 'UUID' && options.renderUUID !== true) continue;
-    const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
+    const path = pathOf(field);
     // Create mode always qualifies, so an undo-restored create form does not lock the field.
     const settable =
       options.disabled !== true &&
@@ -286,7 +305,7 @@ export function createFieldForm(
             untracked(() =>
               fieldTypeFor(field).control?.({
                 field,
-                initial: initial?.[field.name],
+                initial: seedOf(field, initial),
                 mode: options.mode,
                 path,
                 disabled: !settable,
@@ -320,10 +339,12 @@ export function createFieldForm(
     (field) => rowByName.has(field.name) || lockedByName.has(field.name) || statics.includes(field),
   );
 
+  // A checked gather is a real read: required rows are enforced and every failure shows on its row.
   const gather = (
     selected: readonly ControlRow[],
     withCarry: boolean,
     fallback: Readonly<Record<string, unknown>> = {},
+    checked = false,
   ): { item: Record<string, unknown>; errors: Record<string, string> } => {
     const item: Record<string, unknown> = {};
     const errors: Record<string, string> = blank();
@@ -338,8 +359,14 @@ export function createFieldForm(
     for (const row of selected) {
       if (!active(row.field.name)) continue;
       const reading = row.control.read();
-      if (!isUndefined(reading.errors)) {
-        for (const [key, message] of Object.entries(reading.errors)) {
+      const failure =
+        checked && checksRequired && row.field.required && isUndefined(reading.errors)
+          ? checkRequired(reading.value)
+          : undefined;
+      const failed = isUndefined(failure) ? reading.errors : { '': translateMessage(failure) };
+      if (!isUndefined(failed)) {
+        if (checked) row.control.setErrors(failed);
+        for (const [key, message] of Object.entries(failed)) {
           errors[joinPath(row.field.name, key)] = message;
         }
         if (hasKey(fallback, row.field.name)) item[row.field.name] = fallback[row.field.name];
@@ -351,7 +378,7 @@ export function createFieldForm(
     return { item, errors };
   };
   const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
-    const { item, errors } = gather(selected, withCarry);
+    const { item, errors } = gather(selected, withCarry, {}, true);
     return isEmpty(errors) ? { value: item } : { errors };
   };
 
@@ -365,7 +392,13 @@ export function createFieldForm(
     }
     const row = rowByName.get(field.name);
     if (isUndefined(row)) {
-      return staticRow(field, options, () => seed?.[field.name], editorless.has(field));
+      return staticRow(
+        field,
+        pathOf(field),
+        options,
+        () => seed?.[field.name],
+        editorless.has(field),
+      );
     }
     const { control } = row;
     return fieldRow(
@@ -389,7 +422,7 @@ export function createFieldForm(
   let reveal = (_name: string): boolean => false;
   const gatedRowOf = (field: DashboardField): Child =>
     gates.has(field.name)
-      ? h('div', { hidden: () => !active(field.name) }, rowOf(field))
+      ? h('div', { class: 'ohne-field-gate', hidden: () => !active(field.name) }, rowOf(field))
       : rowOf(field);
 
   return {
@@ -476,13 +509,23 @@ export function createFieldForm(
     },
     rebase(item) {
       seed = item;
-      for (const row of rows) row.control.rebase(item?.[row.field.name]);
-      for (const row of lockedRows) row.control.rebase(item?.[row.field.name]);
+      for (const row of [...rows, ...lockedRows]) row.control.rebase(seedOf(row.field, item));
     },
     dispose() {
       scope.dispose();
     },
   };
+}
+
+/**
+ * The value a field's control starts from: `initial`'s own, or the field's declared default.
+ */
+function seedOf(
+  field: DashboardField,
+  initial: Readonly<Record<string, unknown>> | undefined,
+): unknown {
+  const value = initial?.[field.name];
+  return isUndefined(value) ? field.options?.default : value;
 }
 
 /**
@@ -505,12 +548,12 @@ export function scopedErrors(
  */
 function staticRow(
   field: DashboardField,
+  path: string,
   options: FieldFormOptions,
   value: () => unknown,
   editorless: boolean,
 ): Child {
   const t = useT();
-  const path = options.path === '' ? field.name : `${options.path}.${field.name}`;
   return fieldRow(
     {
       field,

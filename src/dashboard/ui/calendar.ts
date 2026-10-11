@@ -226,12 +226,6 @@ export interface CalendarOptions {
   max?: number | string | (() => number | string);
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the calendar reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -421,7 +415,6 @@ css`
  * ```
  */
 export function calendar(model: Ref<number | null>, options: CalendarOptions = {}): HTMLElement {
-  const error = options.error ?? ((): boolean => false);
   const disabled = options.disabled ?? ((): boolean => false);
   const clearable = options.clearable ?? true;
   const withTime = options.withTime ?? false;
@@ -626,7 +619,9 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   };
 
   const header = (): HTMLElement => {
-    const previousButton = button(icon('chevron-left'), {
+    const previousButton = button(() => labels.value.previousMonth, {
+      icon: 'chevron-left',
+      iconOnly: true,
       variant: 'ghost',
       size: headerSize,
       disabled: () =>
@@ -636,10 +631,9 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         else prevMonth();
       },
     });
-    effect(() => {
-      previousButton.title = labels.value.previousMonth;
-    });
-    const nextButton = button(icon('chevron-right'), {
+    const nextButton = button(() => labels.value.nextMonth, {
+      icon: 'chevron-right',
+      iconOnly: true,
       variant: 'ghost',
       size: headerSize,
       disabled: () =>
@@ -648,9 +642,6 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         if (event.shiftKey) nextYear();
         else nextMonth();
       },
-    });
-    effect(() => {
-      nextButton.title = labels.value.nextMonth;
     });
     return h(
       'div',
@@ -890,7 +881,6 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
       hidden: true,
     }),
     size: options.size,
-    error,
     disabled,
     onEscapeKey: (event) => {
       event.preventDefault();

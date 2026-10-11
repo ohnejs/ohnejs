@@ -1,14 +1,18 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
+import type { TextFieldOptions } from '../known-field-types.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
+import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { checkText } from '../../../utils/validate/check-text.ts';
 import { h } from '../../render/h.ts';
 import { when } from '../../render/when.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { textArea } from '../../ui/text-area.ts';
 import { textInput } from '../../ui/text-input.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -20,8 +24,9 @@ import { parseTextValue } from '../parse.ts';
  * An emptied editor or control writes `null` on a nullable field, the empty string otherwise.
  * The control starts single-line, or as a textarea when the field declares `multiline`.
  * Shift+Enter or a stored newline upgrades it to an auto-growing textarea; once multiline it stays.
+ * A changed value is checked against `allowEmpty`, `min`, and `max`, with the server's messages.
  */
-export const textType: FieldType = {
+export const textType: FieldType<TextFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -95,6 +100,10 @@ export const textType: FieldType = {
       if (raw.value !== '') return raw.value;
       return base.value === '' ? '' : parseTextValue(field, '');
     };
+    const dirty = (): boolean => {
+      if (isUndefined(base.value)) return raw.value !== '';
+      return wire() !== (isNull(base.value) ? null : String(base.value as string));
+    };
 
     return {
       element: h(
@@ -104,7 +113,11 @@ export const textType: FieldType = {
       ),
       read() {
         if (isUndefined(base.value) && raw.value === '') return {};
-        return { value: wire() };
+        const value = wire();
+        return checkedReading(
+          value,
+          isString(value) && dirty() ? checkText(value, field.options) : undefined,
+        );
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -114,10 +127,7 @@ export const textType: FieldType = {
         return '';
       },
       error,
-      dirty() {
-        if (isUndefined(base.value)) return raw.value !== '';
-        return wire() !== (isNull(base.value) ? null : String(base.value as string));
-      },
+      dirty,
       focus() {
         element?.focus();
       },

@@ -1,7 +1,18 @@
 import type { Child } from '../render/insert.ts';
+import type { IconName } from './icon.ts';
+import type { Step } from './layout.ts';
 
+import { isFunction } from '../../utils/is/is-function.ts';
+import { isPlainObject } from '../../utils/is/is-plain-object.ts';
+import { isString } from '../../utils/is/is-string.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
+import { icon } from './icon.ts';
+import { STEP_WIDTHS } from './layout.ts';
+import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
 
 /**
@@ -50,9 +61,28 @@ export interface ButtonOptions {
 
   /**
    * Disables the button reactively while it returns `true`.
-   * Interaction is blocked purely via CSS and `tabindex`, so links disable the same way.
+   * A `<button>` gets the real `disabled` attribute.
+   * A link or span gets `aria-disabled` and leaves the tab order.
    */
   disabled?: () => boolean;
+
+  /**
+   * Shows a spinner in place of the icon while it returns `true`.
+   * The button is disabled and `aria-busy` meanwhile, but keeps its variant colors.
+   */
+  loading?: () => boolean;
+
+  /**
+   * A leading icon before the label.
+   */
+  icon?: IconName;
+
+  /**
+   * Hides the label and leaves the icon in a square button.
+   * The label becomes the accessible name and a hover tooltip.
+   * A step hides it only while the nearest container is narrower than that step; `true` always hides it.
+   */
+  iconOnly?: Step | true;
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
@@ -72,9 +102,9 @@ export interface ButtonOptions {
 
   /**
    * The accessible name, for a button whose visible content is only an icon.
-   * A getter reads reactively.
+   * With `iconOnly`, a `Text` label names the button by itself.
    */
-  ariaLabel?: string | (() => string);
+  ariaLabel?: Text;
 
   /**
    * Click handler; a `submit` button inside a form submits through the form as well.
@@ -229,6 +259,10 @@ css`
     text-overflow: ellipsis;
   }
 
+  .ohne-button-loading {
+    pointer-events: none;
+  }
+
   .ohne-button-bubble {
     position: absolute;
     z-index: 1;
@@ -237,41 +271,117 @@ css`
     display: flex;
     transform: translate(50%, -50%);
   }
+
+  ${Object.entries(STEP_WIDTHS)
+    .map(
+      ([step, width]) => `
+        @container (width < ${width}) {
+          .ohne-button-icon-only-${step} {
+            width: calc(2em + 0.25rem);
+          }
+
+          .ohne-button-icon-only-${step} > .ohne-button-inner {
+            padding: 0;
+          }
+
+          .ohne-button-icon-only-${step} > .ohne-button-inner > svg {
+            margin: 0;
+          }
+
+          .ohne-button-icon-only-${step} .ohne-button-label {
+            display: none;
+          }
+        }
+      `,
+    )
+    .join('')}
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ohne-button-spinner {
+      animation: ohne-button-spin 1s linear infinite;
+    }
+  }
+
+  @keyframes ohne-button-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 `;
 
 /**
  * The button primitive: a variant matrix, an icon-aware inner layout, and an optional corner bubble.
- * An icon-only content centers absolutely in a guaranteed square; edge icons pull inward.
+ * The label is `Text`, resolved live, or any `Child`; an icon-only content centers in a guaranteed square.
  * `href` renders an `<a>` the router intercepts.
- * `disabled` never sets the attribute; links and buttons disable through CSS `pointer-events` and `tabindex`.
+ * `disabled` and `loading` set the real `disabled` on a `<button>`, and `aria-disabled` on a link or span.
  *
  * @example
  * ```ts
- * button('Save', { type: 'submit' })
- * button(icon('trash'), { variant: 'ghost', destructiveHover: true })
+ * button('Save', { type: 'submit', icon: 'device-floppy', loading: () => saving.value })
+ * button('Delete', { icon: 'trash', iconOnly: true, variant: 'ghost', destructiveHover: true })
  * ```
  */
-export function button(label: Child | (() => Child), options: ButtonOptions = {}): HTMLElement {
+export function button(label: Text | Child, options: ButtonOptions = {}): HTMLElement {
   const tag = options.is ?? (options.href ? 'a' : 'button');
-  return h(
+  const { disabled, loading, iconOnly, ariaLabel } = options;
+  const blocked = (): boolean => disabled?.() === true || loading?.() === true;
+  const guarded = !isUndefined(disabled) || !isUndefined(loading);
+  const text =
+    isString(label) || isPlainObject(label) || (!isUndefined(iconOnly) && isFunction(label))
+      ? (label as Text)
+      : undefined;
+  const leading =
+    isUndefined(loading) && isUndefined(options.icon)
+      ? null
+      : (): Child =>
+          loading?.() ? spinnerIcon() : isUndefined(options.icon) ? null : icon(options.icon);
+  const labelEl =
+    isUndefined(text) || iconOnly === true
+      ? null
+      : h('span', { class: 'ohne-button-label' }, () => resolveText(text));
+  const content = iconOnly === true || !isUndefined(text) ? labelEl : (label as Child);
+  const name = ariaLabel ?? (isUndefined(iconOnly) ? undefined : text);
+  const el = h(
     tag,
     {
-      tabindex: options.disabled ? () => (options.disabled?.() ? -1 : null) : undefined,
+      disabled: tag === 'button' && guarded ? blocked : undefined,
+      'aria-disabled': tag !== 'button' && guarded ? () => (blocked() ? 'true' : null) : undefined,
+      'aria-busy': isUndefined(loading) ? undefined : () => (loading() ? 'true' : null),
+      tabindex: tag !== 'button' && guarded ? () => (blocked() ? -1 : null) : undefined,
       target: options.target,
       href: tag === 'a' ? options.href : undefined,
       type: options.type ?? (tag === 'button' ? 'button' : undefined),
       class: () =>
         `ohne-button ohne-raw ohne-button-${options.variant ?? 'primary'}` +
         (options.destructiveHover ? ' ohne-button-destructive-hover' : '') +
-        (options.disabled?.() ? ' ohne-button-disabled' : '') +
+        (disabled?.() ? ' ohne-button-disabled' : '') +
+        (loading?.() ? ' ohne-button-loading' : '') +
+        (isString(iconOnly) ? ` ohne-button-icon-only-${iconOnly}` : '') +
         (options.class ? ` ${options.class}` : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
-      'aria-label': options.ariaLabel,
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
+      'aria-label': isUndefined(name) ? undefined : () => resolveText(name),
       onClick: options.onClick,
     },
-    h('span', { class: 'ohne-button-inner' }, label),
-    options.bubble === undefined
-      ? null
-      : h('span', { class: 'ohne-button-bubble' }, options.bubble),
+    h('span', { class: 'ohne-button-inner' }, leading, content),
+    isUndefined(options.bubble) ? null : h('span', { class: 'ohne-button-bubble' }, options.bubble),
   );
+  if (!isUndefined(iconOnly) && !isUndefined(text)) {
+    onCleanup(
+      attachTooltip(el, () =>
+        iconOnly === true || (labelEl && getComputedStyle(labelEl).display === 'none')
+          ? resolveText(text)
+          : null,
+      ),
+    );
+  }
+  return el;
+}
+
+/**
+ * The rotating loader that stands in for the leading icon while the button loads.
+ */
+function spinnerIcon(): SVGSVGElement {
+  const svg = icon('loader-2');
+  svg.classList.add('ohne-button-spinner');
+  return svg;
 }

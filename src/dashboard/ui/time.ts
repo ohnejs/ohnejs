@@ -2,6 +2,7 @@ import type { ComputedRef } from '../../utils/reactive/computed.ts';
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
@@ -72,12 +73,6 @@ export interface TimeOptions {
   max?: number | string | (() => number | string);
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the borders and the focus rings turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the inputs reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -130,6 +125,12 @@ css`
     flex-shrink: 0;
     color: hsl(var(--ohne-muted-foreground));
   }
+
+  /* One invalid segment marks the whole time, as one value. */
+  :where(.ohne-time:has([aria-invalid='true'])) .ohne-number {
+    --ohne-ring: var(--ohne-destructive);
+    border-color: hsl(var(--ohne-destructive));
+  }
 `;
 
 /**
@@ -176,11 +177,8 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
   const root = h(
     'div',
     {
-      class: () =>
-        'ohne-time' +
-        (options.error?.() ? ' ohne-time-has-errors' : '') +
-        (disabled() ? ' ohne-time-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      class: () => 'ohne-time' + (disabled() ? ' ohne-time-disabled' : ''),
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },
     h(
       'div',
@@ -189,7 +187,6 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
         segment(hours, (value) => toModelValue(value, minutes.value, seconds.value)),
         {
           disabled: options.disabled,
-          error: options.error,
           id: options.id ? `${options.id}--hours` : undefined,
           get min() {
             return bounds.value.minHours;
@@ -209,7 +206,6 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
         segment(minutes, (value) => toModelValue(hours.value, value, seconds.value)),
         {
           disabled: options.disabled,
-          error: options.error,
           id: options.id ? `${options.id}--minutes` : undefined,
           get min() {
             return bounds.value.minMinutes;
@@ -230,7 +226,6 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
             segment(seconds, (value) => toModelValue(hours.value, minutes.value, value)),
             {
               disabled: options.disabled,
-              error: options.error,
               id: options.id ? `${options.id}--seconds` : undefined,
               get min() {
                 return bounds.value.minSeconds;

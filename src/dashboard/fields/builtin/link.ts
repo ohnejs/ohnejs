@@ -3,6 +3,7 @@ import type { Link } from '../../../utils/rich-text/link.ts';
 import type { Child } from '../../render/insert.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { Primitive } from '../../ui/button-group.ts';
+import type { LinkFieldOptions } from '../known-field-types.ts';
 
 import { isSafeHref } from '../../../utils/html/is-safe-href.ts';
 import { isArray } from '../../../utils/is/is-array.ts';
@@ -10,7 +11,6 @@ import { isNull } from '../../../utils/is/is-null.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../../utils/object/deep-equal.ts';
-import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { isLink } from '../../../utils/rich-text/is-link.ts';
@@ -22,9 +22,7 @@ import { useT } from '../../runtime/use-t.ts';
 import { loadVerdicts } from '../../runtime/verdicts.ts';
 import { button } from '../../ui/button.ts';
 import { dynamicSelect } from '../../ui/dynamic-select.ts';
-import { icon } from '../../ui/icon.ts';
 import { textInput } from '../../ui/text-input.ts';
-import { attachTooltip } from '../../ui/tooltip.ts';
 import { choiceKeyword, linkChoiceValue, linkOf, linkTargetOf } from '../_link-model.ts';
 import { readableCollection } from '../_search.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
@@ -45,7 +43,7 @@ import { openLinkOptions } from './_link-popup.ts';
  * Picking another target keeps the new tab choice and drops the anchor.
  * The edit popup owns editing, so the cell offers no inline editor.
  */
-export const linkType: FieldType = {
+export const linkType: FieldType<LinkFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -82,7 +80,7 @@ export const linkType: FieldType = {
     let address: AddressInput | undefined;
 
     if (declared.length === 0) {
-      address = addressInput(current, change, invalid, () => error() !== '', off);
+      address = addressInput(current, change, invalid, off);
       describeControl(address.input, field, path, error);
       target = address.element;
       focusTarget = () => address?.input.focus();
@@ -103,7 +101,6 @@ export const linkType: FieldType = {
         disabled: () => off,
         choicesResolver: choices.choicesResolver,
         selectedChoiceResolver: choices.selectedChoiceResolver,
-        error: () => error() !== '',
         name: path,
         placeholder: fieldPlaceholder(field) ?? (() => t('dashboard.link.placeholder')),
         searchLabel: () => t('dashboard.searchPlaceholder'),
@@ -140,25 +137,25 @@ export const linkType: FieldType = {
     const tools = (): Child => {
       const link = current.value;
       if (isNull(link)) return null;
-      const settings = button(icon('settings'), {
+      const settings = button(() => t('dashboard.link.options'), {
+        icon: 'settings',
+        iconOnly: true,
         variant: 'outline',
         disabled: off ? (): boolean => true : undefined,
-        ariaLabel: () => t('dashboard.link.options'),
         onClick: () => openLinkOptions(link, change),
       });
-      onCleanup(attachTooltip(settings, () => t('dashboard.link.options')));
       const clear = field.nullable
-        ? button(icon('x'), {
+        ? button(() => t('dashboard.clearSelection'), {
+            icon: 'x',
+            iconOnly: true,
             variant: 'outline',
             disabled: off ? (): boolean => true : undefined,
-            ariaLabel: () => t('dashboard.clearSelection'),
             onClick: () => {
               change(null);
               address?.sync();
             },
           })
         : null;
-      if (clear) onCleanup(attachTooltip(clear, () => t('dashboard.clearSelection')));
       return [openButton(link), settings, clear];
     };
 
@@ -228,7 +225,6 @@ function addressInput(
   current: Ref<Link | null>,
   change: (next: Link | null) => void,
   invalid: Ref<string>,
-  error: () => boolean,
   disabled: boolean,
 ): AddressInput {
   const t = useT();
@@ -249,7 +245,6 @@ function addressInput(
     return invalid.value;
   };
   const element = textInput(raw, {
-    error,
     disabled: () => disabled,
     placeholder: () => t('dashboard.link.urlPlaceholder'),
   });
@@ -280,14 +275,13 @@ function openButton(link: Link): Child {
   const href = targetHref(link);
   if (isUndefined(href)) return null;
   if (!isRecordLink(link)) {
-    const open = button(icon('external-link'), {
+    return button(() => t('dashboard.open'), {
+      icon: 'external-link',
+      iconOnly: true,
       variant: 'outline',
       href,
       target: '_blank',
-      ariaLabel: () => t('dashboard.open'),
     });
-    onCleanup(attachTooltip(open, () => t('dashboard.open')));
-    return open;
   }
   const updatable = ref(false);
   const collection = readableCollection(link.collection);
@@ -298,14 +292,13 @@ function openButton(link: Link): Child {
   }
   return () => {
     const label = t(updatable.value ? 'dashboard.edit' : 'dashboard.view');
-    const open = button(icon(updatable.value ? 'pencil' : 'list-search'), {
+    return button(() => label, {
+      icon: updatable.value ? 'pencil' : 'list-search',
+      iconOnly: true,
       variant: 'outline',
       href,
       target: '_blank',
-      ariaLabel: label,
     });
-    onCleanup(attachTooltip(open, () => label));
-    return open;
   };
 }
 

@@ -46,12 +46,6 @@ export interface TextInputOptions {
   maxLength?: number;
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the input reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -141,7 +135,7 @@ css`
     outline: none;
   }
 
-  .ohne-input-has-errors {
+  .ohne-input:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -271,7 +265,6 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
       class: () =>
         'ohne-input' +
         (options.autoWidth ? ' ohne-input-auto-width' : '') +
-        (options.error?.() ? ' ohne-input-has-errors' : '') +
         (options.disabled?.() ? ' ohne-input-disabled' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),

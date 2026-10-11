@@ -12,6 +12,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { useRoute } from '../router/router.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { icon, type IconName } from './icon.ts';
 import { raiseToTopLayer } from './overlay.ts';
 import { renderProse } from './prose.ts';
@@ -24,7 +25,7 @@ export interface ToastAction {
   /**
    * The button label.
    */
-  label: string;
+  label: Text;
 
   /**
    * Called on click; the toast dismisses afterwards unless the handler calls `preventDefault`.
@@ -67,7 +68,7 @@ export interface ToastOptions {
   /**
    * A secondary line rendered under the message in a slightly smaller size.
    */
-  description?: string;
+  description?: Text;
 
   /**
    * An action button rendered after the content.
@@ -112,10 +113,10 @@ export interface ToastOptions {
 
 interface ToastRecord {
   id: string | number;
-  message: string;
+  message: Text;
   type: NonNullable<ToastOptions['type']>;
   markdown: boolean;
-  description: string | undefined;
+  description: Text | undefined;
   action: ToastAction | undefined;
   duration: number;
   closeButton: boolean;
@@ -133,7 +134,7 @@ const SWIPE_THRESHOLD = 20;
 const toasts = ref<ToastRecord[]>([]);
 const dismissers = new Map<string | number, () => void>();
 const heights = ref<{ toastId: string | number; height: number }[]>([]);
-const queue = ref<{ message: string; options?: ToastOptions }[]>([]);
+const queue = ref<{ message: Text; options?: ToastOptions }[]>([]);
 
 let counter = 0;
 let outlet: HTMLElement | undefined;
@@ -692,16 +693,17 @@ function closeIcon(): SVGSVGElement {
 
 /**
  * Shows a toast notification; `toaster` renders it.
+ * The message is `Text`, resolved live, so a message key follows the dashboard language.
  * The message and a `description` speak markdown-lite, exactly like dialog content.
  * Returns the toast id; calling again with the same `id` updates the showing toast in place.
  *
  * @example
  * ```ts
  * toast('Saved', { type: 'success' })
- * toast('Could not save `title`', { type: 'error' })
+ * toast({ key: 'dashboard.foundErrors', params: { count: 2 } }, { type: 'error' })
  * ```
  */
-export function toast(message: string, options: ToastOptions = {}): string | number {
+export function toast(message: Text, options: ToastOptions = {}): string | number {
   const id = options.id ?? ++counter;
   const record: ToastRecord = {
     id,
@@ -758,7 +760,7 @@ export function dismissToast(id: string | number): void {
  * navigate('/login')
  * ```
  */
-export function queueToast(message: string, options?: ToastOptions): void {
+export function queueToast(message: Text, options?: ToastOptions): void {
   queue.value = [...queue.value, { message, options }];
 }
 
@@ -984,14 +986,14 @@ function createToaster(): HTMLElement {
         h('div', { 'data-title': '' }, () => {
           const current = item();
           const prose = h('div', { class: 'ohne-prose' });
-          renderProse(prose, current.message, { markdown: current.markdown });
+          renderProse(prose, resolveText(current.message), { markdown: current.markdown });
           return prose;
         }),
         () => {
           const current = item();
           if (isUndefined(current.description)) return null;
           const prose = h('div', { class: 'ohne-prose' });
-          renderProse(prose, current.description, { markdown: current.markdown });
+          renderProse(prose, resolveText(current.description), { markdown: current.markdown });
           return h('div', { 'data-description': '' }, prose);
         },
       ),
@@ -1010,7 +1012,7 @@ function createToaster(): HTMLElement {
                   if (!event.defaultPrevented) deleteToast();
                 },
               },
-              action.label,
+              () => resolveText(action.label),
             )
           : null;
       },

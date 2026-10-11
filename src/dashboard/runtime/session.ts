@@ -123,7 +123,7 @@ let requested = false;
  *
  * @example
  * ```ts
- * when(() => sessionUser(), () => shell())
+ * when(() => sessionUser(), () => h('p', null, () => sessionUser()?.email))
  * ```
  */
 export function sessionUser(): SessionUser | null | undefined {

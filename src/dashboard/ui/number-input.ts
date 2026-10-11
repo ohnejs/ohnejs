@@ -79,12 +79,6 @@ export interface NumberInputOptions {
   suffix?: string | (() => string);
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the input reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -170,7 +164,7 @@ css`
     outline: none;
   }
 
-  .ohne-number-has-errors {
+  .ohne-number:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -480,7 +474,8 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   const steppers = (): HTMLElement =>
     h(
       'span',
-      { class: 'ohne-number-steppers' },
+      // Mouse-only twins of the arrow keys the input already takes, so assistive tech skips them.
+      { 'aria-hidden': 'true', class: 'ohne-number-steppers' },
       h(
         'button',
         {
@@ -512,7 +507,6 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
         'ohne-number' +
         (options.showDragButton && !disabled() ? ' ohne-number-has-drag-button' : '') +
         (options.autoWidth ? ' ohne-number-auto-width' : '') +
-        (options.error?.() ? ' ohne-number-has-errors' : '') +
         (disabled() ? ' ohne-number-disabled' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),

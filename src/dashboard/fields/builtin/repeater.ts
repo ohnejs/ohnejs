@@ -1,5 +1,6 @@
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { FieldForm } from '../field-form.ts';
+import type { RepeaterFieldOptions } from '../known-field-types.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
@@ -9,6 +10,7 @@ import { omit } from '../../../utils/object/omit.ts';
 import { effectScope } from '../../../utils/reactive/effect-scope.ts';
 import { type Ref, ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { checkCount } from '../../../utils/validate/check-count.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
@@ -16,6 +18,7 @@ import { button } from '../../ui/button.ts';
 import { icon } from '../../ui/icon.ts';
 import { structure } from '../../ui/structure.ts';
 import { blocksOf } from '../_blocks.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { itemFormSupports } from '../_items.ts';
 import { summaryParts, summarySpan, summaryTitle } from '../_summary.ts';
 import { clipboardData, stripUUIDs } from '../clipboard.ts';
@@ -62,8 +65,9 @@ css`
  * Kept items ride their `UUID`.
  * A pasted, duplicated, or cross-dropped item sheds every `UUID` and inserts as a new row.
  * The record's one save writes the list whole.
+ * A changed list is checked against `min` and `max`, with the server's messages.
  */
-export const repeaterType: FieldType = {
+export const repeaterType: FieldType<RepeaterFieldOptions> = {
   display({ field, value }) {
     const t = useT();
     const subfields = field.subfields ?? [];
@@ -138,7 +142,7 @@ export const repeaterType: FieldType = {
     };
 
     const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripUUIDs(form.read().value);
+      const value = stripUUIDs(form.snapshot());
       return isPlainObject<Record<string, unknown>>(value) ? value : {};
     };
 
@@ -265,6 +269,8 @@ export const repeaterType: FieldType = {
       ),
     );
 
+    const dirty = (): boolean => touched.value || entries.value.some((entry) => entry.form.dirty());
+
     return {
       element,
       read() {
@@ -285,7 +291,8 @@ export const repeaterType: FieldType = {
           }
         });
         if (Object.keys(errors).length > 0) return { errors };
-        return { value: items };
+        const options = context.field.options ?? {};
+        return checkedReading(items, dirty() ? checkCount(items.length, options) : undefined);
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -326,7 +333,7 @@ export const repeaterType: FieldType = {
       },
       error: () => routed.value,
       errored: () => entries.value.some(flagged),
-      dirty: () => touched.value || entries.value.some((entry) => entry.form.dirty()),
+      dirty,
       focus() {
         const target = entries.value.find(flagged) ?? entries.value[0];
         if (isUndefined(target)) return;

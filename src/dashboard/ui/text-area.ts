@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
@@ -40,12 +41,6 @@ export interface TextAreaOptions {
    * 'auto'
    */
   resize?: false | 'manual' | 'auto';
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the focus ring turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the textarea reactively while it returns `true`.
@@ -120,7 +115,7 @@ css`
     outline: none;
   }
 
-  .ohne-text-area-has-errors {
+  .ohne-text-area:where(:has([aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -229,11 +224,8 @@ export function textArea(model: Ref<string>, options: TextAreaOptions = {}): HTM
   return h(
     'div',
     {
-      class: () =>
-        'ohne-text-area' +
-        (options.error?.() ? ' ohne-text-area-has-errors' : '') +
-        (options.disabled?.() ? ' ohne-text-area-disabled' : ''),
-      style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,
+      class: () => 'ohne-text-area' + (options.disabled?.() ? ' ohne-text-area-disabled' : ''),
+      style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
       onDblclick: (event: MouseEvent) => event.stopPropagation(),
     },
     options.prefix,

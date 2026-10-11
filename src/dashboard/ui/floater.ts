@@ -41,11 +41,6 @@ export interface FloaterOptions {
   size?: number;
 
   /**
-   * Whether the input has errors, rendered as the destructive ring and border.
-   */
-  error?: () => boolean;
-
-  /**
    * Whether the input is disabled: the handle leaves the tab order and clicks are no-ops.
    */
   disabled?: () => boolean;
@@ -148,7 +143,7 @@ css`
     font-size: calc(1rem + var(--ohne-size) * 0.125rem);
   }
 
-  .ohne-floater-has-errors {
+  .ohne-floater:where(:has(> .ohne-floater-handle[aria-invalid='true'])) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -172,7 +167,7 @@ css`
     transition-property: border-color, box-shadow;
   }
 
-  .ohne-floater-has-errors .ohne-floater-handle {
+  .ohne-floater:where(:has(> .ohne-floater-handle[aria-invalid='true'])) .ohne-floater-handle {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -240,7 +235,6 @@ css`
  * ```
  */
 export function floater(content: Child | (() => Child), options: FloaterOptions = {}): Floater {
-  const error = options.error ?? ((): boolean => false);
   const disabled = options.disabled ?? ((): boolean => false);
   const isActive = ref(false);
   const isVisible = ref(false);
@@ -450,7 +444,6 @@ export function floater(content: Child | (() => Child), options: FloaterOptions 
       class: () => {
         let classes = 'ohne-floater';
         if (isVisible.value) classes += ' ohne-floater-visible';
-        if (error()) classes += ' ohne-floater-has-errors';
         if (disabled()) classes += ' ohne-floater-disabled';
         return classes;
       },

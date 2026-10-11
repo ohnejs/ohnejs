@@ -1,4 +1,5 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
+import type { DateFieldOptions } from '../known-field-types.ts';
 
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
@@ -49,7 +50,7 @@ function storedClock(value: unknown): number | null {
  * The input has no empty state, so the model seeds `00:00:00` when the stored value is nullish.
  * The control stays pristine until touched; an untouched nullish base wires `null` on a nullable field.
  */
-export const timeType: FieldType = {
+export const timeType: FieldType<DateFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -82,8 +83,8 @@ export const timeType: FieldType = {
 
     const element = timeInput(model, {
       labels: timeLabels(),
-      min: field.options?.min as string | undefined,
-      max: field.options?.max as string | undefined,
+      min: field.options?.min,
+      max: field.options?.max,
       disabled: () => disabled === true,
     });
     const input = element.querySelector('input.ohne-number-input') as HTMLInputElement;

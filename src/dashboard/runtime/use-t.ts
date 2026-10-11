@@ -1,10 +1,11 @@
 import type { MessageAST } from '../../utils/i18n/message-ast.ts';
-import type { MessageData } from '../../utils/i18n/message-data.ts';
 import type { KnownMessages } from './known-messages.ts';
+import type { Text } from './text-type.ts';
 
 import { formatMessageAST } from '../../utils/i18n/format-message-ast.ts';
 import { messageGroup } from '../../utils/i18n/message-group.ts';
 import { parseMessage } from '../../utils/i18n/parse-message.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -57,10 +58,10 @@ export function useT(): Translate {
 }
 
 /**
- * Translates a `Message` that reached the client as plain data, like a discovery label.
+ * Translates a `Text`, like a discovery label that reached the client as plain data or a spec's own label.
  * A string resolves as a key, or stays itself when no catalog defines it.
  * A string outside every message group, like `Blog posts`, answers at once and fetches nothing.
- * A `{ key, params }` object formats.
+ * A `{ key, params }` object formats, and a getter answers its own string.
  * Anything else answers `undefined`, so a caller can fall back.
  * The read is reactive, exactly as `useT` is, so call it inside a function child to stay live.
  *
@@ -72,14 +73,18 @@ export function useT(): Translate {
  * translateMessage({ key: 'dashboard.foundErrors', params: { count: 2 } })
  * // -> 'Found 2 errors'
  *
+ * translateMessage(() => `${count.value} selected`)
+ * // -> '3 selected'
+ *
  * translateMessage(42)
  * // -> undefined
  * ```
  */
-export function translateMessage(message: MessageData): string;
+export function translateMessage(message: Text): string;
 export function translateMessage(message: unknown): string | undefined;
 export function translateMessage(message: unknown): string | undefined {
   if (isString(message)) return translate(message, undefined);
+  if (isFunction<() => string>(message)) return message();
   if (isPlainObject(message) && isString(message.key)) {
     return translate(message.key, message.params as MessageParams | undefined);
   }

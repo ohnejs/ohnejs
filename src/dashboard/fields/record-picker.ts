@@ -2,15 +2,11 @@ import type { Child } from '../render/insert.ts';
 import type { DashboardCollection, DashboardField } from '../runtime/meta-types.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
-import { onCleanup } from '../../utils/reactive/effect-scope.ts';
-import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { when } from '../render/when.ts';
 import { useT } from '../runtime/use-t.ts';
 import { button } from '../ui/button.ts';
-import { icon } from '../ui/icon.ts';
-import { attachTooltip } from '../ui/tooltip.ts';
 
 /**
  * The request a `record` or `records` control opens the record picker with.
@@ -119,17 +115,15 @@ export function pickerTrigger(
   if (isUndefined(open)) return undefined;
   const t = useT();
   const pickerOpen = ref(false);
-  const trigger = button(icon('table'), {
+  const trigger = button(() => t('dashboard.tableOverview'), {
+    icon: 'table',
+    iconOnly: true,
     variant: 'outline',
     disabled: options.disabled,
     onClick: () => {
       pickerOpen.value = true;
     },
   });
-  effect(() => {
-    trigger.setAttribute('aria-label', t('dashboard.tableOverview'));
-  });
-  onCleanup(attachTooltip(trigger, () => t('dashboard.tableOverview')));
   const host = when(
     () => pickerOpen.value,
     () => {

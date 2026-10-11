@@ -1,4 +1,5 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
+import type { DateFieldOptions } from '../known-field-types.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -6,11 +7,13 @@ import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
+import { checkRange } from '../../../utils/validate/check-range.ts';
 import { h } from '../../render/h.ts';
 import { dateTimePreferences, formatDate } from '../../runtime/date-time.ts';
 import { resolveTimezone, zonedFromTimestamp, zonedFromWallClock } from '../../ui/calendar-date.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
@@ -61,8 +64,9 @@ function todayStamp(): number {
  * The cell formats the day in the user's date format; a malformed value shows as its raw text, dim.
  * The control stays pristine until touched.
  * A cleared control writes `null` on a nullable field and omits the field otherwise.
+ * A changed day is checked against `min` and `max`, with the server's messages.
  */
-export const dateType: FieldType = {
+export const dateType: FieldType<DateFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -99,8 +103,8 @@ export const dateType: FieldType = {
       formatter: formatDate,
       labels: () => calendarLabels(language()),
       placeholder: fieldPlaceholder(field),
-      min: field.options?.min as string | undefined,
-      max: field.options?.max as string | undefined,
+      min: field.options?.min,
+      max: field.options?.max,
       clearable: field.nullable,
       disabled: () => disabled === true,
     });
@@ -112,12 +116,19 @@ export const dateType: FieldType = {
       return isNull(stamp.value) ? null : dayValue(stamp.value);
     };
 
+    const dirty = (): boolean =>
+      touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
+
     return {
       element,
       read() {
         if (!touched.value && isUndefined(base)) return {};
         const value = wire();
-        return isNull(value) && !field.nullable ? {} : { value };
+        if (isNull(value) && !field.nullable) return {};
+        return checkedReading(
+          value,
+          isString(value) && dirty() ? checkRange(value, field.options ?? {}) : undefined,
+        );
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -127,9 +138,7 @@ export const dateType: FieldType = {
         return '';
       },
       error,
-      dirty() {
-        return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
-      },
+      dirty,
       focus() {
         handle.focus();
       },

@@ -4,7 +4,6 @@ import type { DashboardField } from '../runtime/meta-types.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
-import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
@@ -12,11 +11,8 @@ import { append } from '../render/insert.ts';
 import { when } from '../render/when.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
 import { translateMessage, useT } from '../runtime/use-t.ts';
-import { fieldLabel } from '../ui/field-label.ts';
-import { fieldMessage } from '../ui/field-message.ts';
-import { field } from '../ui/field.ts';
+import { fieldFrame, fieldProse } from '../ui/form-field.ts';
 import { icon } from '../ui/icon.ts';
-import { renderProse } from '../ui/prose.ts';
 import { attachTooltip } from '../ui/tooltip.ts';
 import { controlIDs } from './field-type.ts';
 
@@ -72,10 +68,6 @@ export interface FieldRowOptions {
 }
 
 css`
-  .ohne-fieldrow .ohne-label {
-    cursor: default;
-  }
-
   .ohne-field-label .ohne-fieldrow-name {
     flex: 1 1 0;
     display: flex;
@@ -243,7 +235,7 @@ export function describeControl(
 }
 
 /**
- * One form row rendered through the field primitives: the label row, the control, the message.
+ * One form row: the label row, the control, and the message, stacked by `fieldFrame` as `formField` stacks.
  * The label carries the required mark, and a unique field pairs it with the unique chip.
  * With `marks`, the control shows its own label and the row hands it the metadata glyphs instead.
  * The metadata glyphs sit at the row's right edge, and a dirty row's touched dot takes it from them.
@@ -255,7 +247,6 @@ export function describeControl(
 export function fieldRow(options: FieldRowOptions, control: Child): Child {
   const t = useT();
   const ids = controlIDs(options.path);
-  const failure = (): string => options.error?.() ?? '';
   // Declared outside the message region, so an error swap keeps the toggle's state.
   const expanded = ref(options.field.expandable?.expanded ?? false);
 
@@ -316,22 +307,11 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     touchedMark(),
   ];
 
-  let head: Child = null;
-  if (isUndefined(options.marks)) {
-    head = fieldLabel([name, h('span', { class: 'ohne-fieldrow-marks' }, extras)], {
-      required: options.field.required,
-    });
-  } else {
+  if (!isUndefined(options.marks)) {
     // The control outlives a form's re-render, so its slot drops the previous row's marks first.
     options.marks.replaceChildren();
     append(options.marks, extras);
   }
-
-  const proseBlock = (text: () => string, className = 'ohne-prose', links = true): HTMLElement => {
-    const flow = h('div', { class: className, id: ids.description });
-    effect(() => renderProse(flow, text(), { links }));
-    return flow;
-  };
 
   const expandableDescription = (expandable: NonNullable<DashboardField['expandable']>): Child => [
     h(
@@ -353,38 +333,27 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     when(
       () => expanded.value,
       () =>
-        proseBlock(
-          () => translateMessage(expandable.text),
-          'ohne-prose ohne-field-description-content',
-        ),
+        fieldProse(() => translateMessage(expandable.text), ids.description, {
+          class: 'ohne-prose ohne-field-description-content',
+        }),
     ),
   ];
 
-  const described =
-    !isUndefined(options.field.description) || !isUndefined(options.field.expandable);
-
-  const message =
-    isUndefined(options.error) && !described
-      ? null
-      : when(
-          () => failure() !== '' || described,
-          () =>
-            fieldMessage(
-              () => {
-                const current = failure();
-                // An error can echo a submitted value, so a link in it renders as plain text.
-                if (current !== '') return proseBlock(() => current, 'ohne-prose', false);
-                const { description, expandable } = options.field;
-                if (!isUndefined(expandable)) return expandableDescription(expandable);
-                if (!isUndefined(description))
-                  return proseBlock(() => translateMessage(description));
-                return null;
-              },
-              { error: () => failure() !== '' },
-            ),
-        );
-
-  const row = field([head, control, message], { class: 'ohne-fieldrow' });
+  const { description, expandable } = options.field;
+  const row = fieldFrame(control, {
+    head: isUndefined(options.marks)
+      ? [name, h('span', { class: 'ohne-fieldrow-marks' }, extras)]
+      : undefined,
+    required: options.field.required,
+    description: !isUndefined(expandable)
+      ? () => expandableDescription(expandable)
+      : isUndefined(description)
+        ? undefined
+        : () => fieldProse(() => translateMessage(description), ids.description),
+    error: options.error,
+    messageID: ids.description,
+    class: 'ohne-fieldrow',
+  });
   row.id = ids.row;
   return row;
 }

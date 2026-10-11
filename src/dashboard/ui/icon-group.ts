@@ -16,14 +16,14 @@ import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
 /**
- * One choice in an `iconGroup`.
+ * One choice in an `iconGroup`, typed by the model's value.
  */
-export interface IconGroupChoice {
+export interface IconGroupChoice<T extends Primitive = Primitive> {
   /**
    * The value of the choice in the icon group.
    * It must be unique among the choices in the group.
    */
-  value: Primitive;
+  value: T;
 
   /**
    * The icon to display for the choice: a Tabler icon name, or a ready node.
@@ -66,13 +66,13 @@ export interface IconGroupBubble {
 }
 
 /**
- * Options for `iconGroup`.
+ * Options for `iconGroup`, typed by the model's value.
  */
-export interface IconGroupOptions {
+export interface IconGroupOptions<T extends Primitive = Primitive> {
   /**
    * The choices to display in the icon group, read reactively.
    */
-  choices: () => IconGroupChoice[];
+  choices: () => readonly IconGroupChoice<T>[];
 
   /**
    * The visual style variant of the buttons.
@@ -95,12 +95,6 @@ export interface IconGroupOptions {
    * false
    */
   showTooltips?: boolean;
-
-  /**
-   * Reports the error state reactively.
-   * While it returns `true` the border and the active item turn destructive.
-   */
-  error?: () => boolean;
 
   /**
    * Disables the icon group reactively while it returns `true`.
@@ -136,7 +130,7 @@ css`
     transition-property: border-color, box-shadow;
   }
 
-  .ohne-icon-group-has-errors {
+  .ohne-icon-group:where([aria-invalid='true']) {
     --ohne-ring: var(--ohne-destructive);
     border-color: hsl(var(--ohne-destructive));
   }
@@ -187,7 +181,7 @@ css`
     color: hsl(var(--ohne-secondary-foreground));
   }
 
-  .ohne-icon-group-has-errors .ohne-icon-group-item-active {
+  .ohne-icon-group:where([aria-invalid='true']) .ohne-icon-group-item-active {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
@@ -223,7 +217,7 @@ css`
  *
  * @example
  * ```ts
- * const device = ref<Primitive>('desktop')
+ * const device = ref<'desktop' | 'clock'>('desktop')
  * iconGroup(device, {
  *   choices: () => [
  *     { value: 'desktop', icon: 'device-desktop', title: 'Desktop' },
@@ -232,7 +226,10 @@ css`
  * })
  * ```
  */
-export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTMLElement {
+export function iconGroup<T extends Primitive>(
+  model: Ref<T>,
+  options: IconGroupOptions<NoInfer<T>>,
+): HTMLElement {
   const focusVisible = ref(false);
 
   const step = (offset: number, loop: boolean): void => {
@@ -256,7 +253,6 @@ export function iconGroup(model: Ref<Primitive>, options: IconGroupOptions): HTM
       tabindex: () => (options.disabled?.() ? -1 : 0),
       class: () =>
         `ohne-icon-group ohne-icon-group-${options.variant ?? 'primary'}` +
-        (options.error?.() ? ' ohne-icon-group-has-errors' : '') +
         (options.disabled?.() ? ' ohne-icon-group-disabled' : '') +
         (focusVisible.value ? ' ohne-icon-group-focus-visible' : ''),
       style: options.size === undefined ? undefined : `--ohne-size: ${options.size}`,

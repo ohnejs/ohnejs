@@ -4,7 +4,9 @@ import { before, describe, it, mock } from 'node:test';
 import type { DashboardField } from '../../../src/dashboard/runtime/meta-types.ts';
 
 import { flush } from '../../../src/utils/reactive/_scheduler.ts';
+import { ref } from '../../../src/utils/reactive/ref.ts';
 import { type FakeElement, findElement, hasClass } from '../_fake-dom.ts';
+import '../ui/_events.ts';
 
 const { fieldRow } = await import('../../../src/dashboard/fields/field-row.ts');
 const { loadLanguage } = await import('../../../src/dashboard/runtime/messages.ts');
@@ -63,5 +65,34 @@ describe('fieldRow', () => {
       label,
     );
     strictEqual(label?.textContent, 'Titel');
+  });
+
+  it('shows the description, the error in its place, and the required mark through one frame', () => {
+    const error = ref('');
+    const row = fieldRow(
+      {
+        field: { ...FIELD, required: true, description: 'Shown on the roster' },
+        path: 'title',
+        error: () => error.value,
+      },
+      null,
+    ) as unknown as FakeElement;
+    const part = (name: string) => findElement(row, (element) => hasClass(element, name));
+    strictEqual((row as unknown as HTMLElement).id, 'field-title');
+    strictEqual(hasClass(row, 'ohne-field'), true);
+    strictEqual(
+      hasClass(part('ohne-field-label') as FakeElement, 'ohne-field-label-required'),
+      true,
+    );
+    strictEqual(part('ohne-prose')?.getAttribute('id'), 'field-title-desc');
+    strictEqual(part('ohne-prose')?.textContent, 'Shown on the roster');
+    error.value = 'Too long for a war banner';
+    flush();
+    strictEqual(part('ohne-prose')?.textContent, 'Too long for a war banner');
+    strictEqual(part('ohne-prose')?.getAttribute('id'), 'field-title-desc');
+    strictEqual(
+      hasClass(part('ohne-field-message') as FakeElement, 'ohne-field-message-has-errors'),
+      true,
+    );
   });
 });

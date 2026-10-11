@@ -5,10 +5,12 @@ import type {
   RichTextMark,
   RichTextOptions,
 } from '../../../utils/rich-text/rich-text.ts';
+import type { ValidationFailure } from '../../../utils/validate/validation-failure.ts';
 import type { DashboardField } from '../../runtime/meta-types.ts';
 import type { RichTextEditor } from '../../ui/rich-text-editor.ts';
 import type { Selection } from '../../ui/rich-text-model.ts';
 import type { RichTextToolbar } from '../../ui/rich-text-toolbar.ts';
+import type { RichTextFieldOptions } from '../known-field-types.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isBoolean } from '../../../utils/is/is-boolean.ts';
@@ -25,12 +27,14 @@ import { normalizeRichText } from '../../../utils/rich-text/normalize-rich-text.
 import { richTextLength } from '../../../utils/rich-text/rich-text-length.ts';
 import { richTextToText } from '../../../utils/rich-text/rich-text-to-text.ts';
 import { RICH_TEXT_ELEMENTS, RICH_TEXT_MARKS } from '../../../utils/rich-text/rich-text.ts';
+import { checkLength } from '../../../utils/validate/check-length.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { richTextEditor } from '../../ui/rich-text-editor.ts';
 import { denormalizePath } from '../../ui/rich-text-model.ts';
 import { richTextToolbar } from '../../ui/rich-text-toolbar.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { controlIDs, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { labelOf } from '../labels.ts';
@@ -71,8 +75,9 @@ css`
  * A rebuilt form hands the editor's selection to the control that takes its place.
  * A declared `max` shows a counter that never blocks typing.
  * The edit popup owns editing, so the cell offers no inline editor.
+ * A changed value is checked against `allowEmpty`, `min`, and `max`, with the server's messages.
  */
-export const richTextType: FieldType = {
+export const richTextType: FieldType<RichTextFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -121,7 +126,6 @@ export const richTextType: FieldType = {
       value: doc.value,
       options,
       disabled: () => off,
-      error: () => routed.value !== '',
       placeholder: fieldPlaceholder(field),
       missingLabel: () => t('dashboard.richText.missingLink'),
       links: {
@@ -179,12 +183,15 @@ export const richTextType: FieldType = {
       }
     });
 
+    const dirty = (): boolean => !deepEqual(canonical.value, baseline.value);
+
     return {
       element: editor.element,
       read() {
         if (!touched.value && isUndefined(initial)) return {};
         const value = canonical.value;
-        return { value: value.length === 0 && field.nullable ? null : value };
+        if (value.length === 0 && field.nullable) return { value: null };
+        return checkedReading(value, dirty() ? checkTree(value, field.options ?? {}) : undefined);
       },
       setErrors(errors) {
         let first = '';
@@ -202,7 +209,7 @@ export const richTextType: FieldType = {
         return '';
       },
       error,
-      dirty: () => !deepEqual(canonical.value, baseline.value),
+      dirty,
       focus: () => editor.focus(),
       revert() {
         doc.value = docOf(base.value);
@@ -218,6 +225,17 @@ export const richTextType: FieldType = {
     };
   },
 };
+
+/**
+ * The server's checks on a canonical document: emptiness, then its text length.
+ */
+function checkTree(
+  value: RichText,
+  options: Readonly<Partial<RichTextFieldOptions>>,
+): ValidationFailure | undefined {
+  if (value.length === 0 && options.allowEmpty !== true) return 'validation.emptyValue';
+  return checkLength(richTextLength(value), options);
+}
 
 /**
  * The stored value as a document, or an empty one when it is not rich text.

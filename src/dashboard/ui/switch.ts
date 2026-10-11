@@ -26,12 +26,6 @@ export interface SwitchOptions {
   size?: number;
 
   /**
-   * Reports the error state reactively.
-   * While it returns `true` the track and the focus ring turn destructive, in both states.
-   */
-  error?: () => boolean;
-
-  /**
    * Disables the switch reactively while it returns `true`.
    */
   disabled?: () => boolean;
@@ -100,11 +94,13 @@ css`
     transform: translateX(100%);
   }
 
-  .ohne-switch-has-errors .ohne-switch-button {
+  .ohne-switch:where(:has([aria-invalid='true'])) .ohne-switch-button {
     --ohne-ring: var(--ohne-destructive);
   }
 
-  .ohne-switch-has-errors .ohne-switch-control[data-checked] + .ohne-switch-button {
+  .ohne-switch:where(:has([aria-invalid='true']))
+    .ohne-switch-control[data-checked]
+    + .ohne-switch-button {
     background-color: hsl(var(--ohne-destructive));
   }
 
@@ -173,7 +169,6 @@ export function switchInput(
     {
       class: () =>
         `ohne-switch ohne-switch-${variant}` +
-        (options.error?.() ? ' ohne-switch-has-errors' : '') +
         (options.disabled?.() ? ' ohne-switch-disabled' : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
     },

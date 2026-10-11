@@ -14,6 +14,11 @@ export class FakeNode {
     return this.childNodes.map((node) => node.textContent).join('');
   }
 
+  set textContent(text: string) {
+    this.replaceChildren();
+    if (text !== '') this.appendChild(new FakeText(text));
+  }
+
   appendChild(node: FakeNode): FakeNode {
     return this.insertBefore(node, null);
   }
@@ -141,6 +146,10 @@ Object.assign(globalThis, {
     replaceSync(): void {}
   },
   ResizeObserver: class {
+    observe(): void {}
+    disconnect(): void {}
+  },
+  MutationObserver: class {
     observe(): void {}
     disconnect(): void {}
   },

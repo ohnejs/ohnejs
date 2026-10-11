@@ -1,12 +1,16 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
+import type { NumberFieldOptions } from '../known-field-types.ts';
 
 import { isNullish } from '../../../utils/is/is-nullish.ts';
+import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { checkRange } from '../../../utils/validate/check-range.ts';
 import { h } from '../../render/h.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { numberInput } from '../../ui/number-input.ts';
 import { textInput } from '../../ui/text-input.ts';
+import { checkedReading } from '../_checked-reading.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -16,9 +20,9 @@ import { parseRealValue } from '../parse.ts';
  * The `number` field type: cell display, inline cell editor, form control, and filter.
  * The editor and control parse entry strictly to a finite double.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
- * The control validates on blur and on read.
+ * The control validates on blur and on read; a changed value is checked against `min` and `max` too.
  */
-export const numberType: FieldType = {
+export const numberType: FieldType<NumberFieldOptions> = {
   display({ value }) {
     return () => {
       const current = value();
@@ -65,18 +69,25 @@ export const numberType: FieldType = {
     });
     describeControl(input, field, path, error);
 
+    const dirty = (): boolean => {
+      if (isUndefined(base.value)) return raw.value.trim() !== '';
+      const parsed = parseRealValue(field, raw.value);
+      return !isUndefined(parsed.error) || parsed.value !== base.value;
+    };
+
     return {
       element: control,
       read() {
         if (isUndefined(base.value) && raw.value.trim() === '') return {};
         const parsed = parseRealValue(field, raw.value);
-        if (!isUndefined(parsed.error)) {
-          const message = t(parsed.error);
-          local.value = message;
-          return { errors: { '': message } };
-        }
-        local.value = '';
-        return isUndefined(parsed.value) ? {} : { value: parsed.value };
+        if (!isUndefined(parsed.error)) return { errors: { '': t(parsed.error) } };
+        if (isUndefined(parsed.value)) return {};
+        return checkedReading(
+          parsed.value,
+          isNumber(parsed.value) && dirty()
+            ? checkRange(parsed.value, field.options ?? {})
+            : undefined,
+        );
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -86,11 +97,7 @@ export const numberType: FieldType = {
         return '';
       },
       error,
-      dirty() {
-        if (isUndefined(base.value)) return raw.value.trim() !== '';
-        const parsed = parseRealValue(field, raw.value);
-        return !isUndefined(parsed.error) || parsed.value !== base.value;
-      },
+      dirty,
       focus() {
         input.focus();
       },

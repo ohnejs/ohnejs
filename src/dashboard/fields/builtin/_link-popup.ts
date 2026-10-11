@@ -10,7 +10,6 @@ import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../../utils/object/deep-equal.ts';
 import { computed } from '../../../utils/reactive/computed.ts';
 import { effectScope } from '../../../utils/reactive/effect-scope.ts';
-import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { checkLink } from '../../../utils/rich-text/check-link.ts';
@@ -22,9 +21,7 @@ import { when } from '../../render/when.ts';
 import { useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
 import { dynamicSelect } from '../../ui/dynamic-select.ts';
-import { fieldLabel } from '../../ui/field-label.ts';
-import { fieldMessage } from '../../ui/field-message.ts';
-import { field } from '../../ui/field.ts';
+import { formField } from '../../ui/form-field.ts';
 import { useHotkeys } from '../../ui/hotkeys.ts';
 import { icon } from '../../ui/icon.ts';
 import { popup } from '../../ui/popup-overlay.ts';
@@ -166,33 +163,26 @@ export function openLinkPopup(editor: RichTextEditor, choices: LinkChoices): voi
       );
     };
 
-    const closeButton = button(icon('x'), {
+    const closeButton = button(() => t('dashboard.close'), {
+      icon: 'x',
+      iconOnly: true,
       size: -2,
       variant: 'ghost',
       class: 'ohne-ml-auto',
       onClick: () => settle(),
     });
-    effect(() => {
-      closeButton.title = t('dashboard.close');
-    });
 
     const body = h(
       'div',
       { onKeydown: (event: KeyboardEvent) => applyOnEnter(event, apply) },
-      field([
-        fieldLabel(h('label', { for: id }, () => t('dashboard.link.target'))),
-        select,
-        resolved,
-        when(
-          () => broken.value,
-          () => fieldMessage(() => t('dashboard.link.missing'), { error: () => true }),
-        ),
-      ]),
+      formField([select, resolved], {
+        label: 'dashboard.link.target',
+        error: () => (broken.value ? t('dashboard.link.missing') : ''),
+      }),
       inserting
-        ? field([
-            fieldLabel(h('label', { for: `${id}-text` }, () => t('dashboard.link.text'))),
-            textInput(text, { id: `${id}-text`, placeholder: insertText }),
-          ])
+        ? formField(textInput(text, { id: `${id}-text`, placeholder: insertText }), {
+            label: 'dashboard.link.text',
+          })
         : null,
       when(
         () => !isUndefined(record.value),
@@ -276,14 +266,13 @@ export function openLinkOptions(link: Link, onApply: (link: Link) => void): void
       });
     };
 
-    const closeButton = button(icon('x'), {
+    const closeButton = button(() => t('dashboard.close'), {
+      icon: 'x',
+      iconOnly: true,
       size: -2,
       variant: 'ghost',
       class: 'ohne-ml-auto',
       onClick: () => settle(false),
-    });
-    effect(() => {
-      closeButton.title = t('dashboard.close');
     });
 
     const handle = popup(
@@ -328,19 +317,14 @@ export function openLinkOptions(link: Link, onApply: (link: Link) => void): void
  */
 function hashField(hash: Ref<string>, id: string, invalid: () => boolean): HTMLElement {
   const t = useT();
-  return field([
-    fieldLabel(h('label', { for: id }, () => t('dashboard.link.hash'))),
-    textInput(hash, {
-      id,
-      prefix: h('span', { class: 'ohne-muted' }, '#'),
-      autocomplete: 'off',
-      error: invalid,
-    }),
-    fieldMessage(
-      () => t(invalid() ? 'dashboard.link.invalidHash' : 'dashboard.link.hashDescription'),
-      { error: invalid },
-    ),
-  ]);
+  return formField(
+    textInput(hash, { id, prefix: h('span', { class: 'ohne-muted' }, '#'), autocomplete: 'off' }),
+    {
+      label: 'dashboard.link.hash',
+      description: 'dashboard.link.hashDescription',
+      error: () => (invalid() ? t('dashboard.link.invalidHash') : ''),
+    },
+  );
 }
 
 /**
@@ -348,7 +332,7 @@ function hashField(hash: Ref<string>, id: string, invalid: () => boolean): HTMLE
  */
 function newTabField(newTab: Ref<boolean>): HTMLElement {
   const t = useT();
-  return field(switchInput(newTab, () => t('dashboard.link.newTab')));
+  return formField(switchInput(newTab, () => t('dashboard.link.newTab')));
 }
 
 /**

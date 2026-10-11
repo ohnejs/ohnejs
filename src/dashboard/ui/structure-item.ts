@@ -1,10 +1,12 @@
 import type { Child } from '../render/insert.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { defaultText } from '../runtime/text.ts';
 import { card } from './card.ts';
 import { structureDraggable } from './container.ts';
 import { icon } from './icon.ts';
@@ -267,7 +269,7 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
   const root = card(
     [
       zone('before'),
-      options.body === undefined
+      isUndefined(options.body)
         ? null
         : when(
             () => options.item().$expanded !== false,
@@ -276,32 +278,32 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
       zone('after'),
     ],
     {
-      header:
-        options.header === undefined
-          ? undefined
-          : h(
-              'div',
-              { class: 'ohne-structure-item-header ohne-row' },
-              when(
-                () => isDraggable && !disabled(),
-                () =>
-                  h(
-                    'button',
-                    {
-                      tabindex: '-1',
-                      type: 'button',
-                      class: 'ohne-structure-drag-handle ohne-raw',
-                      onMousedown: handleDrag,
-                      onTouchstart: (event: TouchEvent) => {
-                        event.preventDefault();
-                        onTouchStart();
-                      },
+      header: isUndefined(options.header)
+        ? undefined
+        : h(
+            'div',
+            { class: 'ohne-structure-item-header ohne-row' },
+            when(
+              () => isDraggable && !disabled(),
+              () =>
+                h(
+                  'button',
+                  {
+                    'aria-label': () => defaultText('dashboard.dragToReorder', 'Drag to reorder'),
+                    tabindex: '-1',
+                    type: 'button',
+                    class: 'ohne-structure-drag-handle ohne-raw',
+                    onMousedown: handleDrag,
+                    onTouchstart: (event: TouchEvent) => {
+                      event.preventDefault();
+                      onTouchStart();
                     },
-                    icon('grip-vertical'),
-                  ),
-              ),
-              options.header,
+                  },
+                  icon('grip-vertical'),
+                ),
             ),
+            options.header,
+          ),
     },
   );
 
