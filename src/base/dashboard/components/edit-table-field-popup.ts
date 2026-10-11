@@ -104,6 +104,10 @@ css`
     padding: 0;
     min-inline-size: auto;
   }
+
+  .o-edit-field-fields > .ohne-field-message {
+    margin-top: 0.5em;
+  }
 `;
 
 const editSignal = ref(0);
