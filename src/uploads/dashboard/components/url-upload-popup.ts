@@ -1,20 +1,15 @@
 import {
   button,
   css,
-  field,
-  fieldLabel,
-  fieldMessage,
+  formField,
   h,
-  icon,
   popup,
   type Popup,
   type PopupClose,
-  renderProse,
   textInput,
   useHotkeys,
-  when,
 } from 'ohnejs/dashboard';
-import { effect, isFetchableURL, isNull, ref } from 'ohnejs/utils';
+import { isFetchableURL, isNull, ref } from 'ohnejs/utils';
 
 import { useUploadsT } from './_messages.ts';
 
@@ -69,26 +64,18 @@ export function urlUploadPopup(options: URLUploadPopupOptions): Popup {
     options.onClose(handle.close);
   };
 
-  const message = h('div', { class: 'ohne-prose' });
-  effect(() => renderProse(message, t('uploads.errors.urlInvalid')));
-
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
   });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
-  });
 
   const handle = popup(
     [
-      field([
-        fieldLabel(
-          h('label', { for: INPUT_ID }, () => t('uploads.dashboard.url')),
-          { required: true },
-        ),
+      formField(
         textInput(input, {
           id: INPUT_ID,
           name: 'url',
@@ -96,11 +83,12 @@ export function urlUploadPopup(options: URLUploadPopupOptions): Popup {
           autofocus: true,
           placeholder: () => t('uploads.dashboard.urlPlaceholder'),
         }),
-        when(
-          () => invalid.value,
-          () => fieldMessage(message, { error: () => true }),
-        ),
-      ]),
+        {
+          label: 'uploads.dashboard.url',
+          error: () => (invalid.value ? t('uploads.errors.urlInvalid') : ''),
+          required: true,
+        },
+      ),
       h(
         'div',
         { class: 'o-media-url-upload-buttons ohne-row' },

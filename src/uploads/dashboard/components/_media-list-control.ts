@@ -366,7 +366,6 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
       disabled: () => off,
       choicesResolver,
       selectedChoicesResolver,
-      error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       maxItems: isNumber(max) ? max : false,
       name: context.path,

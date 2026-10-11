@@ -1,4 +1,4 @@
-import { attachTooltip, button, type Child, css, h, icon, when } from 'ohnejs/dashboard';
+import { attachTooltip, button, type Child, css, h, when } from 'ohnejs/dashboard';
 import { onCleanup, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -121,7 +121,9 @@ function newSubfolder(directory: TargetDirectory, options: MediaTargetDirectoryO
   const t = useUploadsT();
   const open = ref(false);
 
-  const el = button(icon('folder-plus'), {
+  const el = button(() => t('uploads.dashboard.subfolder'), {
+    icon: 'folder-plus',
+    iconOnly: true,
     variant: 'outline',
     class: 'o-media-target-directory-subdirectory-button',
     onClick: (event) => {
@@ -129,7 +131,6 @@ function newSubfolder(directory: TargetDirectory, options: MediaTargetDirectoryO
       open.value = true;
     },
   });
-  onCleanup(attachTooltip(el, () => t('uploads.dashboard.subfolder')));
 
   const host = when(
     () => open.value,

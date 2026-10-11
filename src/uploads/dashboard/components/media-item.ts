@@ -1,4 +1,4 @@
-import { attachTooltip, button, checkbox, css, h, icon, when } from 'ohnejs/dashboard';
+import { attachTooltip, button, checkbox, css, h, when } from 'ohnejs/dashboard';
 import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -234,7 +234,9 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
         });
 
   const checkboxEl = (): HTMLElement => {
-    const el = checkbox(selectedModel);
+    const el = checkbox(selectedModel, undefined, {
+      ariaLabel: () => t('uploads.dashboard.selectItem', { name: record().name }),
+    });
     el.classList.add('o-media-item-checkbox');
     if (mode !== 'multiple') {
       onCleanup(attachTooltip(el, () => t(selected() ? 'dashboard.deselect' : 'dashboard.select')));
@@ -243,18 +245,20 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
   };
 
   const deleteButton = (): HTMLElement => {
-    const el = button(icon('trash-x'), {
+    return button(() => t('dashboard.delete'), {
+      icon: 'trash-x',
+      iconOnly: true,
       size: -3,
       variant: 'destructive',
       class: 'o-media-item-delete-button',
       onClick: () => void confirmDeleteUploads([record()]),
     });
-    onCleanup(attachTooltip(el, () => t('dashboard.delete')));
-    return el;
   };
 
   const renameButton = (): HTMLElement => {
-    const el = button(icon('pencil'), {
+    return button(() => t('uploads.dashboard.rename'), {
+      icon: 'pencil',
+      iconOnly: true,
       size: -3,
       variant: 'outline',
       class: 'o-media-item-rename-button',
@@ -263,8 +267,6 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
         options.actions?.onRename?.(record());
       },
     });
-    onCleanup(attachTooltip(el, () => t('uploads.dashboard.rename')));
-    return el;
   };
 
   const nameText =

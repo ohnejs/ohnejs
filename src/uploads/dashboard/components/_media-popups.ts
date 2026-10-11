@@ -1,6 +1,6 @@
 import { activeContentLocale } from 'app/components/content-language-switcher.ts';
-import { type Child, navigate, toast, when } from 'ohnejs/dashboard';
-import { isNull, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
+import { type Child, navigate, toast, useSearchParam, when } from 'ohnejs/dashboard';
+import { isNull, isNullish, isUndefined, onCleanup, ref, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { UploadsTranslate } from './_messages.ts';
@@ -10,12 +10,7 @@ import type { MediaActions } from './media-library.ts';
 
 import { useUploadsT } from './_messages.ts';
 import { createFolderPopup } from './create-folder-popup.ts';
-import {
-  detailsQueryParam,
-  loadUpload,
-  mediaDetailsPopup,
-  setDetailsQueryParam,
-} from './media-details-popup.ts';
+import { loadUpload, mediaDetailsPopup } from './media-details-popup.ts';
 import { mediaPath } from './media-library-state.ts';
 import { loadTargetTree, movePopup } from './move-popup.ts';
 import { renamePopup } from './rename-popup.ts';
@@ -44,6 +39,7 @@ interface PendingMove {
  * Wires the media popups to a page's view.
  * The create-folder, rename, and move popups open from their actions.
  * The details popup follows the `details` query parameter, so a deep link opens it and closing clears it.
+ * Opening and closing it push history, so back closes and forward reopens it.
  * A record already on the page opens without a read; any other is fetched.
  * With a content locale chosen, the read always happens, so the description arrives at that locale.
  */
@@ -52,6 +48,7 @@ export function mediaPopups(view: MediaView): MediaPopups {
   const folderTarget = ref<string | null>(null);
   const renaming = ref<UploadRecord | null>(null);
   const moving = ref<PendingMove | null>(null);
+  const details = useSearchParam('details', { fallback: '', history: 'push' });
 
   const hosts: Child = [
     when(
@@ -97,7 +94,7 @@ export function mediaPopups(view: MediaView): MediaPopups {
         return null;
       },
     ),
-    detailsHost(view, t),
+    detailsHost(view, details, t),
   ];
 
   return {
@@ -113,7 +110,9 @@ export function mediaPopups(view: MediaView): MediaPopups {
           moving.value = { records, tree };
         });
       },
-      onDetails: (record) => setDetailsQueryParam(record.UUID),
+      onDetails: (record) => {
+        details.value = record.UUID;
+      },
     },
     hosts,
   };
@@ -124,11 +123,11 @@ export function mediaPopups(view: MediaView): MediaPopups {
  * A file the read cannot find toasts and clears the parameter.
  * A folder has no details, so naming one opens the folder instead.
  */
-function detailsHost(view: MediaView, t: UploadsTranslate): Child {
+function detailsHost(view: MediaView, details: Ref<string>, t: UploadsTranslate): Child {
   return when(
-    () => !isUndefined(detailsQueryParam()),
+    () => details.value !== '',
     () => {
-      const uuid = untracked(detailsQueryParam) ?? '';
+      const uuid = untracked(() => details.value);
       const locale = untracked(activeContentLocale);
       const known = untracked(() => view.uploads.value).find((record) => record.UUID === uuid);
       const seed = !isUndefined(known) && isUndefined(locale) ? known : null;
@@ -144,7 +143,7 @@ function detailsHost(view: MediaView, t: UploadsTranslate): Child {
             toast(t(isNull(loaded) ? 'dashboard.recordNotFound' : 'dashboard.unreachable'), {
               type: 'error',
             });
-            setDetailsQueryParam(null);
+            details.value = '';
           } else {
             record.value = loaded;
           }
@@ -160,7 +159,10 @@ function detailsHost(view: MediaView, t: UploadsTranslate): Child {
             return null;
           }
           mediaDetailsPopup(loaded, {
-            onClose: (close) => void close().then(() => setDetailsQueryParam(null)),
+            onClose: (close) =>
+              void close().then(() => {
+                details.value = '';
+              }),
           });
           return null;
         },

@@ -7,11 +7,9 @@ import {
   bubble,
   button,
   css,
-  field,
-  fieldLabel,
+  formField,
   h,
   hasModifierKey,
-  icon,
   type IconName,
   isEditingText,
   overlayCount,
@@ -193,7 +191,9 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
     onClick: () => void,
     extras: { variant?: 'accent' | 'destructive' | 'outline'; dirty?: () => boolean } = {},
   ): HTMLElement => {
-    const el = button(icon(glyph), {
+    const el = button(tooltip, {
+      icon: glyph,
+      iconOnly: true,
       variant: extras.variant ?? 'outline',
       bubble: extras.dirty ? () => (extras.dirty?.() ? bubble() : null) : undefined,
       onClick,
@@ -206,7 +206,6 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
         el.classList.toggle('ohne-button-outline', !changed);
       });
     }
-    onCleanup(attachTooltip(el, tooltip));
     return el;
   };
 
@@ -317,26 +316,25 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
           searchOpen.value = false;
         });
       };
-      const closeButton = button(icon('x'), {
+      const closeButton = button(() => t('dashboard.close'), {
+        icon: 'x',
+        iconOnly: true,
         size: -2,
         variant: 'ghost',
         class: 'ohne-ml-auto',
         onClick: close,
       });
-      effect(() => {
-        closeButton.title = t('dashboard.close');
-      });
       const handle = popup(
         [
-          field([
-            fieldLabel(h('label', { for: 'o-media-search' }, () => t('dashboard.search'))),
+          formField(
             textInput(input, {
               id: 'o-media-search',
               name: 'keyword',
               autofocus: true,
               placeholder: () => t('uploads.dashboard.searchByName'),
             }),
-          ]),
+            { label: 'dashboard.search' },
+          ),
           h(
             'div',
             { class: 'o-media-footer-search-buttons ohne-row' },

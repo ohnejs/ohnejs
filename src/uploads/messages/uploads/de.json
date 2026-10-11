@@ -17,6 +17,7 @@
     "download": "Herunterladen",
     "dropToUpload": "Dateien zum Hochladen irgendwo ablegen",
     "failed": "Fehlgeschlagen",
+    "selectItem": "{name} auswählen",
     "uploadFailed": "Upload fehlgeschlagen",
     "file": "Datei",
     "fileName": "Dateiname",

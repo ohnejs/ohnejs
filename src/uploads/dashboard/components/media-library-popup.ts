@@ -3,7 +3,6 @@ import {
   css,
   h,
   hasModifierKey,
-  icon,
   isEditingText,
   overlayCount,
   popup,
@@ -170,14 +169,13 @@ export function mediaLibraryPopup(options: MediaLibraryPopupOptions): Popup {
     else if (!multiple) finish([record.UUID]);
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => finish(),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const onArrowKey = (event: KeyboardEvent): void => {

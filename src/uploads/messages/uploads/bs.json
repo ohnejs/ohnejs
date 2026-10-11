@@ -17,6 +17,7 @@
     "download": "Preuzmi",
     "dropToUpload": "Ispustite datoteke bilo gdje da ih postavite",
     "failed": "Neuspješno",
+    "selectItem": "Odaberi {name}",
     "uploadFailed": "Otpremanje nije uspjelo",
     "file": "Datoteka",
     "fileName": "Naziv datoteke",

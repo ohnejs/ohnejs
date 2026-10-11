@@ -239,7 +239,9 @@ function bell(): HTMLElement {
     open.value = false;
   };
 
-  const trigger = button(icon('upload'), {
+  const trigger = button(() => t('uploads.dashboard.uploadHistory'), {
+    icon: 'upload',
+    iconOnly: true,
     variant: 'outline',
     bubble: when(
       () => active() > 0,
@@ -248,9 +250,6 @@ function bell(): HTMLElement {
     onClick: () => {
       open.value = true;
     },
-  });
-  effect(() => {
-    trigger.title = t('uploads.dashboard.uploadHistory');
   });
   effect(() => {
     trigger.classList.toggle('ohne-button-primary', open.value);

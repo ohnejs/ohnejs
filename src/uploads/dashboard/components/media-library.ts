@@ -11,12 +11,13 @@ import {
   type HotkeysOptions,
   icon,
   type IconName,
+  keyed,
   lastNavigation,
   listenTrigger,
   navigate,
   type RouteContext,
-  setDocumentTitle,
   signInCount,
+  useDocumentTitle,
   useHotkeys,
   when,
 } from 'ohnejs/dashboard';
@@ -24,6 +25,7 @@ import {
   debounce,
   effect,
   hasKey,
+  isEmpty,
   isNull,
   isUndefined,
   onCleanup,
@@ -51,7 +53,6 @@ import {
   resolveUploadURL,
   serializeMediaQuery,
   setUploadsPrivate,
-  stripDetailsParam,
   uploadsCollection,
   uploadsPermissions,
 } from './media-library-data.ts';
@@ -66,6 +67,7 @@ import {
   mediaGroupField,
   mediaPath,
   type MediaQuery,
+  mediaSearch,
   type MediaSelectionMode,
   type MediaView,
   pageFolderHidden,
@@ -529,7 +531,8 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
  * The media page body: the breadcrumb header, the grid, and the footer, for the route's folder.
  *
  * The grid state rides in the URL as `page`, `order`, and `where`, exactly as a collection table's does.
- * The last query string per folder is remembered and restored when the folder is revisited bare.
+ * The view rebuilds when that state changes; the `details` deep link opens its popup over the live view.
+ * The last query string per folder is remembered and restored whenever the folder's query arrives bare.
  * Back and forward never restore, so a bare history entry stays bare.
  * A folder with neither a visible row nor a visible child sends the page to the root.
  * A viewer without read access to `Uploads` sees the no-permission line instead.
@@ -540,29 +543,36 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
 export function mediaLibraryPage(route: RouteContext, actions?: MediaActions): Child {
   const t = useUploadsT();
   const directory = directoryFromParam(route.params.path);
-  effect(() => setDocumentTitle(t('uploads.dashboard.media')));
+  useDocumentTitle(() => t('uploads.dashboard.media'));
   return when(
     () => !isUndefined(dashboardMeta()),
-    () =>
-      isUndefined(uploadsCollection())
-        ? h('div', { class: 'o-media-page-missing' }, () => t('uploads.dashboard.noPermission'))
-        : mediaPage(directory, actions ?? registered),
+    () => {
+      if (isUndefined(uploadsCollection())) {
+        return h('div', { class: 'o-media-page-missing' }, () =>
+          t('uploads.dashboard.noPermission'),
+        );
+      }
+      const search = (): string => {
+        const remembered = mediaMemory.get(directory) ?? '';
+        // Restoring here, before the key settles, keeps a bare step from rebuilding the view.
+        if (isEmpty(route.query) && remembered !== '' && lastNavigation() !== 'popstate') {
+          navigate(mediaPath(directory, remembered), { replace: true });
+        }
+        return mediaSearch(route.query);
+      };
+      return keyed(search, () => mediaPage(route, directory, actions ?? registered));
+    },
   );
 }
 
 /**
  * The page frame around a folder: view state from the URL, the memory hand-off, header, grid, and footer.
  */
-function mediaPage(directory: string, actions: MediaActions): Child {
-  const remembered = mediaMemory.get(directory) ?? '';
-  const redirected = location.search === '' && remembered !== '' && lastNavigation() !== 'popstate';
-  if (redirected) {
-    queueMicrotask(() => navigate(mediaPath(directory, remembered), { replace: true }));
-    return null;
-  }
-  mediaMemory.set(directory, stripDetailsParam(location.search));
+function mediaPage(route: RouteContext, directory: string, actions: MediaActions): Child {
+  const search = mediaSearch(route.query);
+  mediaMemory.set(directory, search);
 
-  const query = parseMediaQuery(location.search);
+  const query = parseMediaQuery(search);
   const view = createMediaView({
     directory,
     query,
@@ -572,10 +582,10 @@ function mediaPage(directory: string, actions: MediaActions): Child {
         order: patch.order ?? query.order,
         where: hasKey(patch, 'where') ? patch.where : query.where,
       };
-      const serialized = serializeMediaQuery(next, location.search);
-      const search = serialized === '' ? '' : `?${serialized}`;
-      mediaMemory.set(directory, stripDetailsParam(search));
-      navigate(location.pathname + search, { replace });
+      const params = untracked(() => route.query);
+      const serialized = serializeMediaQuery(next, stringifySearchParams(params));
+      mediaMemory.set(directory, mediaSearch(parseSearchParams(serialized)));
+      navigate(location.pathname + (serialized === '' ? '' : `?${serialized}`), { replace });
     },
   });
   effect(() => {
@@ -594,10 +604,7 @@ function mediaPage(directory: string, actions: MediaActions): Child {
   const merged: MediaActions = { ...popups.actions, ...actions };
 
   const crumbSearch = (): string => {
-    const params = stringifySearchParams({
-      ...parseSearchParams(location.search),
-      page: undefined,
-    });
+    const params = stringifySearchParams({ ...route.query, page: undefined });
     return params === '' ? '' : `?${params}`;
   };
 

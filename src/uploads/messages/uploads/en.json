@@ -17,6 +17,7 @@
     "download": "Download",
     "dropToUpload": "Drop files anywhere to upload",
     "failed": "Failed",
+    "selectItem": "Select {name}",
     "uploadFailed": "Upload failed",
     "file": "File",
     "fileName": "File name",

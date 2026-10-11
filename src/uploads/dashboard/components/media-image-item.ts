@@ -1,12 +1,5 @@
-import { attachTooltip, button, css, h, icon, when } from 'ohnejs/dashboard';
-import {
-  formatBytes,
-  isNull,
-  isUndefined,
-  onCleanup,
-  parseSearchParams,
-  stringifySearchParams,
-} from 'ohnejs/utils';
+import { attachTooltip, button, css, h, icon, useRoute, when } from 'ohnejs/dashboard';
+import { formatBytes, isNull, isUndefined, onCleanup, stringifySearchParams } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -250,10 +243,10 @@ css`
 
 /**
  * The details link of a file: the folder's path with `details` set to the record.
- * On the page the current view carries over; inside a picker the link opens bare in a new tab.
+ * On the page the current view carries over, read live; inside a picker the link opens bare in a new tab.
  */
 export function detailsHref(record: UploadRecord, bare: boolean): string {
-  const params = bare ? {} : parseSearchParams(location.search);
+  const params = bare ? {} : useRoute()?.query;
   return mediaPath(
     record.directory,
     `?${stringifySearchParams({ ...params, details: record.UUID })}`,
@@ -289,9 +282,14 @@ export function fileTileClick(
  * The corner glyph of a disabled tile, its reason in a tooltip.
  */
 export function disabledIndicator(className: string, reason: () => string): HTMLElement {
-  const el = button(icon('forbid'), { is: 'span', size: -3, variant: 'ghost', class: className });
-  onCleanup(attachTooltip(el, reason));
-  return el;
+  return button(reason, {
+    icon: 'forbid',
+    iconOnly: true,
+    is: 'span',
+    size: -3,
+    variant: 'ghost',
+    class: className,
+  });
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   isDisplayableImage,
   mediaGroupField,
   mediaPath,
+  mediaSearch,
   movePlan,
   PER_PAGE,
   pinned,
@@ -203,6 +204,16 @@ describe('paths', () => {
     strictEqual(mediaPath(''), '/media');
     strictEqual(mediaPath('photos/2024'), '/media/photos/2024');
     strictEqual(mediaPath('photos', '?page=2'), '/media/photos?page=2');
+  });
+
+  it('writes the view part of a query, leaving out the details deep link', () => {
+    strictEqual(mediaSearch({}), '');
+    strictEqual(mediaSearch({ details: 'a1' }), '');
+    strictEqual(mediaSearch({ page: 2, details: 'a1' }), '?page=2');
+    strictEqual(
+      mediaSearch({ order: ['name'], where: { kind: 'file' } }),
+      '?order=[name]&where={kind:file}',
+    );
   });
 
   it('splits a directory into breadcrumbs', () => {

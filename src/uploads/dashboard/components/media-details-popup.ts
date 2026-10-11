@@ -1,24 +1,26 @@
 import { loadPage } from 'app/components/collection-table-data.ts';
 import { activeContentLocale } from 'app/components/content-language-switcher.ts';
 import { historyButtons } from 'app/components/history-buttons.ts';
-import { History, unsavedChanges } from 'app/components/history.ts';
+import { History } from 'app/components/history.ts';
 import {
   api,
   apiUpload,
   attachTooltip,
+  bubble,
   button,
   type ButtonOptions,
   type Child,
+  confirmLeave,
   createFieldForm,
   css,
   dashboardMeta,
   dropdown,
   dropdownItem,
   fallbackLabel,
-  field,
   type FieldForm,
   fieldLabel,
   fieldMessage,
+  formField,
   formatDateTime,
   formatRelative,
   h,
@@ -32,14 +34,12 @@ import {
   type Props,
   renderProse,
   switchInput,
-  tab,
+  type TabItem,
   tabs,
-  type TabsListItem,
   textInput,
   toast,
   useDashboardLanguage,
   useHotkeys,
-  useRoute,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -52,11 +52,9 @@ import {
   isEmpty,
   isNull,
   isNumber,
-  isString,
   isUndefined,
   naturalCompare,
   onCleanup,
-  parseSearchParams,
   recordHref,
   ref,
   type Ref,
@@ -146,8 +144,6 @@ const CHECKER_LIGHT =
 
 const CHECKER_DARK =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA/SURBVHgB7dOhEQAgDAPAwGFrmAEGYP+dMB0AVoio6PUSnXuTS1v7PBBxv0wNHcERKDADONgHmE2qp1EElgQ/ufgHd9nZw0oAAAAASUVORK5CYII=';
-
-const detailsSignal = ref(0);
 
 css`
   .o-media-details-fieldset {
@@ -396,34 +392,6 @@ css`
 `;
 
 /**
- * Reads the `details` query parameter, reactively: the deep-linked file's `UUID`, or `undefined`.
- * Both `setDetailsQueryParam` writes and full navigations refresh the read.
- */
-export function detailsQueryParam(): string | undefined {
-  useRoute();
-  void detailsSignal.value;
-  const value = parseSearchParams(location.search).details;
-  return isString(value) ? value : undefined;
-}
-
-/**
- * Writes the `details` query parameter into history, or removes it when `uuid` is `null`.
- * It deliberately bypasses the router: the popup opens over the LIVE page, and the grid is not rebuilt.
- * Removing an absent parameter is a no-op, so a stale close never pushes an entry.
- */
-export function setDetailsQueryParam(uuid: string | null): void {
-  const params = parseSearchParams(location.search);
-  if (isNull(uuid) && isUndefined(params.details)) return;
-  const query = stringifySearchParams({ ...params, details: uuid ?? undefined });
-  history.pushState(
-    null,
-    '',
-    location.pathname + (isEmpty(query) ? '' : `?${query}`) + location.hash,
-  );
-  detailsSignal.value += 1;
-}
-
-/**
  * Loads one upload by `UUID`, its `description` read at `locale`.
  * Resolves `null` when no such row exists and `undefined` when the read failed.
  */
@@ -453,7 +421,7 @@ export async function loadUpload(
  * Pressing or dragging on an image preview places the focal point.
  * The point and the switch show in place and save with the description.
  * Cmd/Ctrl+S saves and closes; a `422` lands on the control and raises the tab's error bubble.
- * Closing is dirty-guarded through the `unsavedChanges` prompt.
+ * Closing is dirty-guarded through the leave prompt.
  * The footer deletes after confirmation and replaces the file's bytes through a hidden file input.
  * On a private file it also copies a temporary link that anyone can open for a chosen duration.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
@@ -648,7 +616,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const close = async (force = false): Promise<void> => {
-    if (force || !edits.isDirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+    if (force || !edits.isDirty.value || (await confirmLeave())) {
       edits.clear();
       options.onClose(handle.close);
     }
@@ -776,13 +744,14 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const urlRow = (): HTMLElement => {
-    const open = button(icon('external-link'), {
+    const open = button(() => t('uploads.dashboard.openInNewTab'), {
+      icon: 'external-link',
+      iconOnly: true,
       size: -2,
       variant: 'outline',
       href: url,
       target: '_blank',
     });
-    onCleanup(attachTooltip(open, () => t('uploads.dashboard.openInNewTab')));
     return h(
       'div',
       { class: 'o-media-details-url' },
@@ -792,20 +761,19 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const privateRow = (): HTMLElement => {
-    const message = h('div', { class: 'ohne-prose' });
-    effect(() => {
-      const hint = locked()
-        ? t('uploads.dashboard.privateFolderHint', { folder: current.value.directory })
-        : t('uploads.dashboard.privateHint');
-      renderProse(message, refused.value === '' ? hint : refused.value);
-    });
-    return field([
-      fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.private'))),
+    return formField(
       switchInput(privateModel, undefined, {
         disabled: () => !canEdit || busy.value || locked(),
       }),
-      fieldMessage(message, { error: () => refused.value !== '' }),
-    ]);
+      {
+        label: 'uploads.dashboard.private',
+        description: () =>
+          locked()
+            ? t('uploads.dashboard.privateFolderHint', { folder: current.value.directory })
+            : t('uploads.dashboard.privateHint'),
+        error: () => refused.value,
+      },
+    );
   };
 
   const detailsPanel = (): Child => [
@@ -845,11 +813,12 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   ];
 
   const focalRow = (): HTMLElement => {
-    const clear = button(icon('x'), {
+    const clear = button(() => t('dashboard.clear'), {
+      icon: 'x',
+      iconOnly: true,
       variant: 'outline',
       onClick: () => setFocal(null, null),
     });
-    onCleanup(attachTooltip(clear, () => t('dashboard.clear')));
     const percentX = ref(0);
     const percentY = ref(0);
     effect(() => {
@@ -868,8 +837,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     const blank = (): HTMLElement =>
       textInput(ref(''), { placeholder: '-', autoWidth: true, disabled: () => true });
     const times = (): HTMLElement => h('span', { class: 'ohne-muted ohne-shrink-0' }, '×');
-    return field([
-      fieldLabel(h('span', { class: 'ohne-label' }, () => t('uploads.dashboard.focalPoint'))),
+    return formField(
       h(
         'div',
         { class: 'o-media-details-focal ohne-row' },
@@ -883,8 +851,11 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
           () => clear,
         ),
       ),
-      canEdit ? fieldMessage(() => t('uploads.dashboard.focalPointHint')) : null,
-    ]);
+      {
+        label: 'uploads.dashboard.focalPoint',
+        description: canEdit ? 'uploads.dashboard.focalPointHint' : undefined,
+      },
+    );
   };
 
   const descriptionPanel = (): Child => [
@@ -993,47 +964,51 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     expiryNote,
   ];
 
-  const errorBubble = (on: boolean): TabsListItem<DetailsTab>['bubble'] =>
-    on
-      ? { content: '1', tooltip: t('dashboard.foundErrors', { count: 1 }), variant: 'destructive' }
-      : undefined;
-  const detailsLabel = (): string => t('uploads.dashboard.details');
-  const descriptionLabel = (): string => t('uploads.dashboard.description');
-  const variantsLabel = (): string => t('uploads.dashboard.variants');
-  const tabsEl = tabs<DetailsTab>(
-    () => [
-      tab('details', detailsPanel),
-      tab('description', descriptionPanel),
-      tab('variants', variantsPanel),
-    ],
-    {
-      list: () => {
-        const items: TabsListItem<DetailsTab>[] = [
-          { name: 'details', label: detailsLabel, bubble: errorBubble(refused.value !== '') },
-          { name: 'description', label: descriptionLabel, bubble: errorBubble(errored()) },
-        ];
-        if (!isUndefined(current.value.variants)) {
-          items.push({ name: 'variants', label: variantsLabel });
-        }
-        return items;
-      },
-      active: () => activeTab.value,
-      onChange: (next) => {
-        activeTab.value = next;
-      },
+  const errorBubble = (on: () => boolean): Child =>
+    when(on, () => {
+      const el = bubble('1', { variant: 'destructive' });
+      onCleanup(attachTooltip(el, () => t('dashboard.foundErrors', { count: 1 })));
+      return el;
+    });
+  const detailsBubble = errorBubble(() => refused.value !== '');
+  const descriptionBubble = errorBubble(errored);
+  const tabsEl = tabs(
+    () => {
+      const items: TabItem<DetailsTab>[] = [
+        {
+          name: 'details',
+          label: () => t('uploads.dashboard.details'),
+          bubble: detailsBubble,
+          content: detailsPanel,
+        },
+        {
+          name: 'description',
+          label: () => t('uploads.dashboard.description'),
+          bubble: descriptionBubble,
+          content: descriptionPanel,
+        },
+      ];
+      if (!isUndefined(current.value.variants)) {
+        items.push({
+          name: 'variants',
+          label: () => t('uploads.dashboard.variants'),
+          content: variantsPanel,
+        });
+      }
+      return items;
     },
+    { active: activeTab },
   );
 
   const title = mediaFileName(() => current.value.name, { title: true });
   title.classList.add('ohne-medium');
-  const headerClose = button(icon('x'), {
+  const headerClose = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => void close(),
-  });
-  effect(() => {
-    headerClose.title = t('dashboard.close');
   });
 
   const compact = ref(false);
@@ -1042,9 +1017,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     label: () => string,
     options: ButtonOptions,
   ): HTMLElement => {
-    const el = button(icon(glyph), options);
-    onCleanup(attachTooltip(el, label));
-    return el;
+    return button(label, { ...options, icon: glyph, iconOnly: true });
   };
   const footerButton = (glyph: IconName, label: () => string, options: ButtonOptions): Child =>
     when(

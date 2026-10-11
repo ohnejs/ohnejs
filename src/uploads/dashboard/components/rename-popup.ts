@@ -2,20 +2,16 @@ import {
   api,
   button,
   css,
-  field,
-  fieldLabel,
-  fieldMessage,
+  formField,
   h,
-  icon,
   popup,
   type Popup,
   type PopupClose,
-  renderProse,
   textInput,
   toast,
   useHotkeys,
 } from 'ohnejs/dashboard';
-import { effect, ref } from 'ohnejs/utils';
+import { ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -99,37 +95,18 @@ export function renamePopup(record: UploadRecord, options: RenamePopupOptions): 
     }
   };
 
-  const message = h('div', { class: 'ohne-prose' });
-  effect(() => {
-    const next = stored();
-    const text =
-      error.value !== ''
-        ? error.value
-        : next === '' || typed() === next
-          ? t(folder ? 'uploads.dashboard.folderNameHint' : 'uploads.dashboard.fileNameHint')
-          : `-> \`${next}\``;
-    renderProse(message, text);
-  });
-
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
   });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
-  });
 
   const handle = popup(
     [
-      field([
-        fieldLabel(
-          h('label', { for: INPUT_ID }, () =>
-            t(folder ? 'uploads.dashboard.folderName' : 'uploads.dashboard.fileName'),
-          ),
-          { required: true },
-        ),
+      formField(
         textInput(input, {
           id: INPUT_ID,
           name: 'name',
@@ -143,8 +120,18 @@ export function renamePopup(record: UploadRecord, options: RenamePopupOptions): 
           suffix:
             extension === '' ? undefined : h('span', { class: 'ohne-muted' }, `.${extension}`),
         }),
-        fieldMessage(message, { error: () => error.value !== '' }),
-      ]),
+        {
+          label: folder ? 'uploads.dashboard.folderName' : 'uploads.dashboard.fileName',
+          description: () => {
+            const next = stored();
+            return next === '' || typed() === next
+              ? t(folder ? 'uploads.dashboard.folderNameHint' : 'uploads.dashboard.fileNameHint')
+              : `-> \`${next}\``;
+          },
+          error: () => error.value,
+          required: true,
+        },
+      ),
       h(
         'div',
         { class: 'o-media-rename-buttons ohne-row' },

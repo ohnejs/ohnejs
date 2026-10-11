@@ -2,20 +2,16 @@ import {
   api,
   button,
   css,
-  field,
-  fieldLabel,
-  fieldMessage,
+  formField,
   h,
-  icon,
   popup,
   type Popup,
   type PopupClose,
-  renderProse,
   textInput,
   toast,
   useHotkeys,
 } from 'ohnejs/dashboard';
-import { effect, ref } from 'ohnejs/utils';
+import { ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -100,45 +96,36 @@ export function createFolderPopup(options: CreateFolderPopupOptions): Popup {
     }
   };
 
-  const message = h('div', { class: 'ohne-prose' });
-  effect(() => {
-    const slug = stored();
-    const text =
-      error.value !== ''
-        ? error.value
-        : slug === '' || name.value === slug
-          ? t('uploads.dashboard.folderNameHint')
-          : `-> \`${slug}\``;
-    renderProse(message, text);
-  });
-
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
   });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
-  });
 
   const handle = popup(
     [
-      field([
-        fieldLabel(
-          h('label', { for: INPUT_ID }, () => t('uploads.dashboard.folderName')),
-          {
-            required: true,
-          },
-        ),
+      formField(
         textInput(name, {
           id: INPUT_ID,
           name: 'name',
           autofocus: true,
           placeholder: () => t('uploads.dashboard.folderNamePlaceholder'),
         }),
-        fieldMessage(message, { error: () => error.value !== '' }),
-      ]),
+        {
+          label: 'uploads.dashboard.folderName',
+          description: () => {
+            const slug = stored();
+            return slug === '' || name.value === slug
+              ? t('uploads.dashboard.folderNameHint')
+              : `-> \`${slug}\``;
+          },
+          error: () => error.value,
+          required: true,
+        },
+      ),
       h(
         'div',
         { class: 'o-media-create-folder-buttons ohne-row' },

@@ -7,7 +7,6 @@ import {
   type FieldControlContext,
   fallbackLabel,
   h,
-  icon,
   type IconName,
   toast,
   when,
@@ -138,9 +137,7 @@ export function iconButton(
   onClick: (event: MouseEvent) => void,
   disabled?: () => boolean,
 ): HTMLElement {
-  const el = button(icon(glyph), { variant: 'outline', disabled, onClick });
-  onCleanup(attachTooltip(el, tooltip));
-  return el;
+  return button(tooltip, { icon: glyph, iconOnly: true, variant: 'outline', disabled, onClick });
 }
 
 /**

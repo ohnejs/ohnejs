@@ -1,15 +1,6 @@
 import { loadPage } from 'app/components/collection-table-data.ts';
-import {
-  button,
-  h,
-  icon,
-  openDialog,
-  popup,
-  type Popup,
-  type PopupClose,
-  toast,
-} from 'ohnejs/dashboard';
-import { effect, isEmpty, isUndefined, joinPath, ref } from 'ohnejs/utils';
+import { button, h, openDialog, popup, type Popup, type PopupClose, toast } from 'ohnejs/dashboard';
+import { isEmpty, isUndefined, joinPath, ref } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -105,14 +96,13 @@ export function movePopup(options: MovePopupOptions): Popup {
     void moveTo(target.path);
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const handle = popup(

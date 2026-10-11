@@ -13,8 +13,10 @@ import {
   ref,
   slugify,
   slugifyFileName,
+  stringifySearchParams,
   type ConditionObject,
   type Ref,
+  type SearchParamValue,
 } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -285,9 +287,9 @@ const SLASHES = /^\/+|\/+$/g;
  * ```ts
  * const view = createMediaView({ directory: 'photos' })
  *
- * view.select(sunset)        // selection: [sunset], origin: sunset
- * view.select(dusk, true)    // selection: everything from sunset to dusk
- * view.deselect(sunset)      // selection without sunset, origin: null
+ * view.select(sunset)     // selection: [sunset], origin: sunset
+ * view.select(dusk, true) // selection: everything from sunset to dusk
+ * view.deselect(sunset)   // selection without sunset, origin: null
  * ```
  */
 export function createMediaView(options: MediaViewOptions = {}): MediaView {
@@ -391,13 +393,29 @@ export function directoryFromParam(param: string | undefined): string {
  *
  * @example
  * ```ts
- * mediaPath('')                   // -> '/media'
- * mediaPath('photos/2024')        // -> '/media/photos/2024'
- * mediaPath('photos', '?page=2')  // -> '/media/photos?page=2'
+ * mediaPath('')                  // -> '/media'
+ * mediaPath('photos/2024')       // -> '/media/photos/2024'
+ * mediaPath('photos', '?page=2') // -> '/media/photos?page=2'
  * ```
  */
 export function mediaPath(directory: string, search = ''): string {
   return (directory === '' ? '/media' : `/media/${directory}`) + search;
+}
+
+/**
+ * The view a media page's query asks for, as a search string with its `?`, or `''` when it asks for none.
+ * The `details` deep link is left out, so the per-folder memory never reopens a details popup.
+ *
+ * @example
+ * ```ts
+ * mediaSearch({})                         // -> ''
+ * mediaSearch({ details: 'a1' })          // -> ''
+ * mediaSearch({ page: 2, details: 'a1' }) // -> '?page=2'
+ * ```
+ */
+export function mediaSearch(query: { readonly [key: string]: SearchParamValue }): string {
+  const search = stringifySearchParams({ ...query, details: undefined });
+  return search === '' ? '' : `?${search}`;
 }
 
 /**
@@ -622,8 +640,8 @@ export function pruneDescendants(records: readonly UploadRecord[]): UploadRecord
  *
  * @example
  * ```ts
- * movePlan([sunset, photos], 'archive')  // -> [sunset, photos], deepest path first
- * movePlan([photos], 'photos/2024')      // -> []
+ * movePlan([sunset, photos], 'archive') // -> [sunset, photos], deepest path first
+ * movePlan([photos], 'photos/2024')     // -> []
  * ```
  */
 export function movePlan(records: readonly UploadRecord[], directory: string): UploadRecord[] {
@@ -691,9 +709,9 @@ export function expiryRenewal(reload: () => void): (records: readonly UploadReco
  *
  * @example
  * ```ts
- * splitFileName('sunset.jpg')      // -> { stem: 'sunset', extension: 'jpg' }
- * splitFileName('archive.tar.gz')  // -> { stem: 'archive.tar', extension: 'gz' }
- * splitFileName('notes')           // -> { stem: 'notes', extension: '' }
+ * splitFileName('sunset.jpg')     // -> { stem: 'sunset', extension: 'jpg' }
+ * splitFileName('archive.tar.gz') // -> { stem: 'archive.tar', extension: 'gz' }
+ * splitFileName('notes')          // -> { stem: 'notes', extension: '' }
  * ```
  */
 export function splitFileName(name: string): { stem: string; extension: string } {

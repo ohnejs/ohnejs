@@ -1,13 +1,5 @@
-import {
-  attachTooltip,
-  button,
-  type ButtonOptions,
-  type Child,
-  h,
-  icon,
-  when,
-} from 'ohnejs/dashboard';
-import { onCleanup, ref } from 'ohnejs/utils';
+import { button, type ButtonOptions, type Child, h, icon, when } from 'ohnejs/dashboard';
+import { ref } from 'ohnejs/utils';
 
 import { useUploadsT } from './_messages.ts';
 import { uploadsPermissions } from './media-library-data.ts';
@@ -64,15 +56,15 @@ export function mediaActions(options: MediaActionsOptions = {}): HTMLElement | n
  */
 function newFolder(options: MediaActionsOptions): HTMLElement {
   const t = useUploadsT();
-  const el = button(icon('folder-plus'), {
+  return button(() => t('uploads.dashboard.newFolder'), {
+    icon: 'folder-plus',
+    iconOnly: true,
     variant: 'outline',
     onClick: (event) => {
       event.stopPropagation();
       options.onCreateFolder?.();
     },
   });
-  onCleanup(attachTooltip(el, () => t('uploads.dashboard.newFolder')));
-  return el;
 }
 
 /**
@@ -100,11 +92,12 @@ function upload(options: MediaActionsOptions): Child {
   };
   const el = when(
     () => options.compact?.() ?? false,
-    () => {
-      const compact = button(icon('upload'), uploadOptions);
-      onCleanup(attachTooltip(compact, () => t('uploads.dashboard.upload')));
-      return compact;
-    },
+    () =>
+      button(() => t('uploads.dashboard.upload'), {
+        ...uploadOptions,
+        icon: 'upload',
+        iconOnly: true,
+      }),
     () =>
       button([h('span', null, () => t('uploads.dashboard.upload')), icon('upload')], uploadOptions),
   );
@@ -119,14 +112,15 @@ function uploadFromURL(options: MediaActionsOptions): Child {
   const t = useUploadsT();
   const open = ref(false);
 
-  const el = button(icon('link'), {
+  const el = button(() => t('uploads.dashboard.uploadFromURL'), {
+    icon: 'link',
+    iconOnly: true,
     variant: 'outline',
     onClick: (event) => {
       event.stopPropagation();
       open.value = true;
     },
   });
-  onCleanup(attachTooltip(el, () => t('uploads.dashboard.uploadFromURL')));
 
   const host = when(
     () => open.value,

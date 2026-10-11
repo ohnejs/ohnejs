@@ -11,15 +11,7 @@ import {
   openDialog,
   toast,
 } from 'ohnejs/dashboard';
-import {
-  type ConditionObject,
-  isEmpty,
-  isUndefined,
-  parseSearchParams,
-  stringifySearchParams,
-  uniqueArray,
-  untracked,
-} from 'ohnejs/utils';
+import { type ConditionObject, isEmpty, isUndefined, uniqueArray, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 
@@ -126,15 +118,6 @@ export function parseMediaQuery(search: string): MediaQuery {
  */
 export function serializeMediaQuery(query: MediaQuery, search = ''): string {
   return serializeTableState({ ...query, columns: undefined }, DEFAULT_ORDER, search);
-}
-
-/**
- * A search string without the `details` deep-link param, in `location.search` form.
- * The per-folder memory stores this, so returning to a folder never reopens a details popup.
- */
-export function stripDetailsParam(search: string): string {
-  const query = stringifySearchParams({ ...parseSearchParams(search), details: undefined });
-  return query === '' ? '' : `?${query}`;
 }
 
 /**
