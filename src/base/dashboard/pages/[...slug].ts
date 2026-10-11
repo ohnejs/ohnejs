@@ -5,12 +5,10 @@ import {
   defineDashboardPage,
   h,
   icon,
-  setDocumentTitle,
+  useDocumentTitle,
+  useFrame,
   useT,
 } from 'ohnejs/dashboard';
-import { effect } from 'ohnejs/utils';
-
-import { shell } from '../components/shell.ts';
 
 css`
   .o-404 {
@@ -38,21 +36,19 @@ css`
 
 /**
  * The catch-all page.
- * It claims every URL no other page matches, so an unknown path lands on the shell instead of a bare heading.
- * A signed-out visitor never reaches it: the shell redirects to the login page, carrying `next`.
+ * It claims every URL no other page matches, so an unknown path lands in the frame instead of a bare heading.
+ * A signed-out visitor never reaches it: the frame redirects to the login page, carrying `next`.
  */
-export default defineDashboardPage(() =>
-  shell(() => notFound(), { noMainPadding: true, noMainScroll: true }),
-);
+export default defineDashboardPage(() => notFound());
 
 /**
  * The page body: the dim code over the message, and one link back to the dashboard home.
- * Its `min-height: 100%` resolves against the shell's `.o-main-content`, which wraps it with nothing between.
+ * Its `min-height: 100%` resolves against the frame's `.o-main-content`, which wraps it with nothing between.
  */
 function notFound(): Child {
   const t = useT();
-
-  effect(() => setDocumentTitle(t('dashboard.pageNotFound')));
+  useFrame({ fill: true });
+  useDocumentTitle('dashboard.pageNotFound');
 
   return h(
     'div',

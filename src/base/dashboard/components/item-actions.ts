@@ -1,5 +1,4 @@
-import { attachTooltip, button, css, icon, type IconName } from 'ohnejs/dashboard';
-import { onCleanup } from 'ohnejs/utils';
+import { button, css, type IconName } from 'ohnejs/dashboard';
 
 css`
   .o-item-actions {
@@ -30,13 +29,13 @@ export function actionButton(
   onClick: () => void,
   extras: { disabled?: () => boolean; destructiveHover?: boolean } = {},
 ): HTMLElement {
-  const control = button(icon(glyph), {
+  return button(tooltip, {
+    icon: glyph,
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     destructiveHover: extras.destructiveHover,
     disabled: extras.disabled,
     onClick,
   });
-  onCleanup(attachTooltip(control, tooltip));
-  return control;
 }

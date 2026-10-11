@@ -15,18 +15,17 @@ import {
   type Popup,
   type RowVerdicts,
   toast,
+  useAction,
   useT,
   when,
 } from 'ohnejs/dashboard';
 import {
-  effect,
   formatLocaleCode,
   isUndefined,
   onCleanup,
   recordHref,
+  isPlainObject,
   ref,
-  sleep,
-  stringifySearchParams,
   stripCodeSpans,
   untracked,
 } from 'ohnejs/utils';
@@ -85,11 +84,6 @@ export interface TranslationsPopupOptions {
   onClose(close: () => Promise<void>): void;
 }
 
-type CopyOutcome =
-  | { kind: 'saved' }
-  | { kind: 'invalid'; errors: Readonly<Record<string, string>> }
-  | { kind: 'failed' };
-
 css`
   .o-translations-title {
     font-weight: 500;
@@ -127,8 +121,27 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
   const showEditCurrent = options.showEditCurrent ?? false;
   const existing = ref<string[] | undefined>(undefined);
   const verdicts = ref<ReadonlyMap<string, RowVerdicts> | undefined>(undefined);
-  const copying = ref(false);
-  const deleting = ref(false);
+  const route = { collection: collection.segment, uuid };
+  const copyAction = useAction('POST /collections/[collection]/[uuid]/translations/copy', {
+    params: route,
+    onError: (error) => {
+      const errors = isPlainObject(error.data) ? error.data.errors : undefined;
+      if (error.status !== 422 || !isPlainObject(errors)) {
+        toast(t('dashboard.translations.copyFailed'), { type: 'error' });
+        return;
+      }
+      toast(t('dashboard.foundErrors', { count: Object.keys(errors).length }), {
+        type: 'error',
+        description: Object.entries(errors)
+          .map(([path, message]) => `\`${path}\`: ${String(message)}`)
+          .join('\n'),
+      });
+    },
+  });
+  const deleteAction = useAction('DELETE /collections/[collection]/[uuid]/translations', {
+    params: route,
+    onError: () => toast(t('dashboard.translations.deleteFailed'), { type: 'error' }),
+  });
 
   const refresh = async (): Promise<boolean> => {
     const locales = untracked(dashboardMeta)?.locales ?? [];
@@ -174,30 +187,20 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
   };
 
   const copy = async (code: string): Promise<void> => {
-    if (copying.value) return;
-    copying.value = true;
-    const outcome = await requestCopy(collection.segment, uuid, code);
-    copying.value = false;
-    if (outcome.kind === 'saved') {
-      toast(t('dashboard.translations.copied'), { type: 'success' });
-      void refresh();
-      options.onCopied?.(code);
-      return;
-    }
-    if (outcome.kind === 'invalid') {
-      toast(t('dashboard.foundErrors', { count: Object.keys(outcome.errors).length }), {
-        type: 'error',
-        description: Object.entries(outcome.errors)
-          .map(([path, message]) => `\`${path}\`: ${message}`)
-          .join('\n'),
-      });
-      return;
-    }
-    toast(t('dashboard.translations.copyFailed'), { type: 'error' });
+    if (copyAction.busy()) return;
+    const source = activeContentLocale();
+    const copied = await copyAction.run({
+      query: { locale: code },
+      body: isUndefined(source) ? {} : { source },
+    });
+    if (!copied) return;
+    toast(t('dashboard.translations.copied'), { type: 'success' });
+    void refresh();
+    options.onCopied?.(code);
   };
 
   const remove = async (code: string): Promise<void> => {
-    if (deleting.value) return;
+    if (deleteAction.busy()) return;
     const action = await openDialog({
       content: t('dashboard.translations.confirmDelete', { locale: formatLocaleCode(code) }),
       actions: [
@@ -206,14 +209,9 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
       ],
     });
     if (action !== 'delete') return;
-    deleting.value = true;
-    const gone = await requestDelete(collection.segment, uuid, code);
-    deleting.value = false;
-    if (gone) {
+    if (await deleteAction.run({ query: { locale: code } })) {
       toast(t('dashboard.translations.deleted'), { type: 'success' });
       options.onDeleted?.(code);
-    } else {
-      toast(t('dashboard.translations.deleteFailed'), { type: 'error' });
     }
     void refresh();
   };
@@ -227,32 +225,32 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
 
     if (!translated.includes(code)) {
       const label = (): string => t('dashboard.translations.new');
-      const newButton = button(icon('note'), {
+      const newButton = button(label, {
+        icon: 'note',
+        iconOnly: true,
         size: -2,
         variant: canWrite ? 'primary' : 'ghost',
         disabled: canWrite ? undefined : () => true,
-        ariaLabel: label(),
         onClick: () => activate(code),
       });
-      onCleanup(attachTooltip(newButton, label));
       items.push(newButton);
     } else {
       const label = (): string =>
         t(canWrite ? 'dashboard.translations.edit' : 'dashboard.translations.view');
-      const editButton = button(icon(canWrite ? 'pencil' : 'list-search'), {
+      const editButton = button(label, {
+        icon: canWrite ? 'pencil' : 'list-search',
+        iconOnly: true,
         size: -2,
         variant: canWrite ? 'outline' : 'ghost',
-        ariaLabel: label(),
         onClick: () => activate(code),
       });
-      onCleanup(attachTooltip(editButton, label));
       items.push(editButton);
     }
 
     const copyOff =
       !canWrite ||
       !admits('update', current) ||
-      copying.value ||
+      copyAction.busy() ||
       !translated.includes(current) ||
       code === current;
     const copyLabel = (): string =>
@@ -272,18 +270,19 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     items.push(copyButton);
 
     if (admits('deleteTranslation', code)) {
-      const deleteOff = deleting.value || !translated.includes(code);
+      const deleteOff = deleteAction.busy() || !translated.includes(code);
       const deleteLabel = (): string =>
         t('dashboard.translations.delete', { locale: formatLocaleCode(code) });
-      const deleteButton = button(icon('trash-x'), {
+      const deleteButton = button(deleteLabel, {
+        icon: 'trash-x',
+        iconOnly: true,
         size: -2,
         variant: deleteOff ? 'ghost' : 'outline',
         destructiveHover: !deleteOff,
         disabled: deleteOff ? (): boolean => true : undefined,
-        ariaLabel: stripCodeSpans(deleteLabel()),
+        ariaLabel: () => stripCodeSpans(deleteLabel()),
         onClick: () => void remove(code),
       });
-      onCleanup(attachTooltip(deleteButton, deleteLabel));
       items.push(deleteButton);
     }
 
@@ -327,14 +326,13 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
     ]);
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const handle = popup(h('div', { class: 'o-translations' }, rows), {
@@ -349,57 +347,4 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
   });
 
   return handle;
-}
-
-/**
- * Requests the server-side copy of the active locale's translation into `locale`.
- * The source rides the body; absent, the server copies from the default locale.
- * Retries once on a busy `503`.
- */
-async function requestCopy(segment: string, uuid: string, locale: string): Promise<CopyOutcome> {
-  const source = activeContentLocale();
-  const send = (): Promise<Response> =>
-    api(
-      `POST /collections/${segment}/${uuid}/translations/copy?${stringifySearchParams({ locale })}`,
-      {
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(isUndefined(source) ? {} : { source }),
-      },
-    );
-  try {
-    let response = await send();
-    if (response.status === 503) {
-      await sleep(1000);
-      response = await send();
-    }
-    if (response.ok) return { kind: 'saved' };
-    if (response.status === 422) {
-      const answer = (await response.json()) as { data?: { errors?: Record<string, string> } };
-      const errors = Object.create(null) as Record<string, string>;
-      Object.assign(errors, answer.data?.errors ?? {});
-      return { kind: 'invalid', errors };
-    }
-    return { kind: 'failed' };
-  } catch {
-    return { kind: 'failed' };
-  }
-}
-
-/**
- * Requests the server-side delete of the record's translation at `locale`, retrying once on a busy `503`.
- * Resolves whether the delete landed; a `404` is a locale outside the caller's scope as often as a gone one.
- */
-async function requestDelete(segment: string, uuid: string, locale: string): Promise<boolean> {
-  const send = (): Promise<Response> =>
-    api(`DELETE /collections/${segment}/${uuid}/translations?${stringifySearchParams({ locale })}`);
-  try {
-    let response = await send();
-    if (response.status === 503) {
-      await sleep(1000);
-      response = await send();
-    }
-    return response.ok;
-  } catch {
-    return false;
-  }
 }

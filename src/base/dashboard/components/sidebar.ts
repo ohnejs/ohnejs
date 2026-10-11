@@ -26,7 +26,7 @@ css`
  * The sidebar menu column.
  * Each discovery menu group renders one `verticalMenu`, the group label as its uppercase title.
  * An empty label renders the list without one, and each group row contributes one link.
- * A row is active while the route sits under its target, so record pages highlight their collection.
+ * The row whose target sits closest above the route is active, so record pages highlight their collection.
  * A row's icon renders before its label.
  * The discovery data carries no submenus, so the menu stays flat.
  */
@@ -60,19 +60,38 @@ function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
 }
 
 /**
- * The group's rows as menu models, active while the route sits at or under the row's target.
+ * The group's rows as menu models, the one row whose target holds the route most closely active.
  */
 function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
-  const path = withTrailingSlash(useRoute()?.path ?? '/');
+  const active = activeTarget(dashboardMeta()?.menu ?? [], useRoute()?.path ?? '/');
   return group.items.map((entry) => {
-    const to = withTrailingSlash(entry.to);
     const item: VerticalMenuItemModel = {
       to: entry.to,
       label: translateMessage(entry.label),
-      // Every path sits under the root, so a row targeting it matches exactly instead.
-      active: to === '/' ? path === '/' : path.startsWith(to),
+      active: entry.to === active,
     };
     if (!isUndefined(entry.icon)) item.icon = icon(entry.icon);
     return item;
   });
+}
+
+/**
+ * The target across every menu group that sits closest above `path`: an exact match, else the longest prefix.
+ * `/kit/charts` lights `/kit/charts` over `/kit`, and a record page lights its collection.
+ */
+export function activeTarget(
+  menu: readonly DashboardMenuGroup[],
+  path: string,
+): string | undefined {
+  const here = withTrailingSlash(path);
+  let best: string | undefined;
+  for (const group of menu) {
+    for (const { to } of group.items) {
+      const target = withTrailingSlash(to);
+      // Every path sits under the root, so a row targeting it matches exactly instead.
+      const holds = target === '/' ? here === '/' : here.startsWith(target);
+      if (holds && to.length > (best?.length ?? -1)) best = to;
+    }
+  }
+  return best;
 }

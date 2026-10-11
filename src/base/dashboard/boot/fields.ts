@@ -19,6 +19,7 @@ import {
   icon,
   type Primitive,
   registerFieldType,
+  type RoleName,
   select,
   type SelectChoice,
   textInput,
@@ -45,6 +46,40 @@ import {
 
 import { languageName } from '../components/content-language-switcher.ts';
 import '../components/data-table-popup.ts';
+
+declare module 'ohnejs/dashboard' {
+  interface KnownFieldTypes {
+    /**
+     * A password, written but never read back; an emptied field keeps the stored hash.
+     */
+    password: { options: {}; value: string };
+
+    /**
+     * The roles a user holds.
+     */
+    roles: { options: {}; value: RoleName[] };
+
+    /**
+     * A dashboard language tag, one of the languages the message catalogs define.
+     */
+    language: { options: {}; value: string };
+
+    /**
+     * A content locale code, one of the locales the app declares.
+     */
+    locale: { options: {}; value: string };
+
+    /**
+     * An IANA timezone name.
+     */
+    timezone: { options: {}; value: string };
+
+    /**
+     * A date format pattern, like `DD.MM.YYYY`.
+     */
+    datePattern: { options: {}; value: string };
+  }
+}
 
 css`
   .ohne-roles-field {
@@ -119,6 +154,8 @@ registerFieldType('password', {
       reveal.title = t(
         revealed.value ? 'dashboard.field.hidePassword' : 'dashboard.field.showPassword',
       );
+      reveal.setAttribute('aria-label', reveal.title);
+      reveal.setAttribute('aria-pressed', String(revealed.value));
     });
 
     const root = textInput(raw, {
@@ -220,7 +257,6 @@ registerFieldType('roles', {
             tooltip: isUndefined(description) ? undefined : translateMessage(description),
           }),
         ),
-      error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
       noResultsLabel: () => t('dashboard.noResultsFound'),
@@ -319,7 +355,6 @@ registerFieldType('timezone', {
         searchLabel: () => t('dashboard.searchPlaceholder'),
         noResultsLabel: () => t('dashboard.noResultsFound'),
         disabled: () => context.disabled === true,
-        error: () => error() !== '',
         name: context.path,
         onCommit: commit,
       });
@@ -457,7 +492,6 @@ function codeType(list: () => string[], label: (code: string) => string): FieldT
           ],
           {
             disabled: () => context.disabled === true,
-            error: () => error() !== '',
             name: context.path,
             placeholder: fieldPlaceholder(context.field),
             onCommit: commit,

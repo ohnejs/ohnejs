@@ -1,6 +1,5 @@
 import {
   api,
-  attachTooltip,
   button,
   type Child,
   container,
@@ -15,11 +14,10 @@ import {
   overlayCount,
   queueToast,
   sessionUser,
-  setDocumentTitle,
-  setNavigationGuard,
   toast,
   updateSessionUser,
   useDashboardLanguage,
+  useDocumentTitle,
   useHotkeys,
   useT,
   when,
@@ -29,7 +27,7 @@ import { effect, isEmpty, isNullish, isUndefined, onCleanup, ref, untracked } fr
 import { contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
-import { History, unsavedChanges } from './history.ts';
+import { History } from './history.ts';
 
 /**
  * The account form's values, as the form reads them.
@@ -74,14 +72,14 @@ css`
  *
  * The discovery data lists the fields; an empty list redirects to the overview with a toast.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
+ * Leaving dirty edits asks first, in-app and on tab close, through the history's unsaved-changes guard.
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
  * A saved language change keeps the form: its labels follow the language in place.
  */
 export function accountEditor(): Child {
   const t = useT();
-  effect(() => setDocumentTitle(t('dashboard.account.title')));
+  useDocumentTitle('dashboard.account.title');
 
   const history = new History();
   const form = ref<FieldForm | undefined>(undefined);
@@ -89,12 +87,6 @@ export function accountEditor(): Child {
 
   const currentState = (): AccountState | undefined =>
     form.value?.snapshot(history.getCurrentState()) as AccountState | undefined;
-
-  // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
-  setNavigationGuard(() =>
-    !history.isDirty.value || isUndefined(unsavedChanges.prompt) ? true : unsavedChanges.prompt(),
-  );
-  onCleanup(() => setNavigationGuard(null));
 
   const save = async (): Promise<void> => {
     const live = form.value;
@@ -252,11 +244,12 @@ export function accountEditor(): Child {
       },
     });
 
-    const signOutButton = button(icon('plug-connected-x'), {
+    const signOutButton = button(() => t('dashboard.account.signOutOtherDevices'), {
+      icon: 'plug-connected-x',
+      iconOnly: true,
       variant: 'outline',
       onClick: () => void signOutOthers(),
     });
-    onCleanup(attachTooltip(signOutButton, () => t('dashboard.account.signOutOtherDevices')));
 
     // Save takes no disabled state: `save` guards re-entry, and a static variant keeps the toggles below.
     const saveButton = button([h('span', null, () => t('dashboard.save')), icon('device-floppy')], {

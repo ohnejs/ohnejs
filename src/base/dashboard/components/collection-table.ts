@@ -3,34 +3,35 @@ import {
   attachTooltip,
   bubble,
   button,
+  type Child,
   countVerdicts,
   css,
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
-  dropdown,
-  dropdownItem,
   h,
   hasModifierKey,
   icon,
   isEditingText,
+  keyed,
   lastNavigation,
   loadVerdicts,
+  type MenuItem,
   navigate,
   openDialog,
   overlayCount,
   pagination,
   queueToast,
+  type RouteContext,
   type RowVerdicts,
   signInCount,
   table,
-  tableColumn,
-  type TableColumns,
-  type TableRow,
+  type TableColumn,
   type TableSort,
   toast,
   translateMessage,
   useHotkeys,
+  useRoute,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -49,6 +50,7 @@ import {
   type Ref,
   ref,
   sleep,
+  stringifySearchParams,
   uniqueArray,
   untracked,
 } from 'ohnejs/utils';
@@ -105,16 +107,6 @@ css`
     height: 100%;
   }
 
-  .o-collection-table-scroller {
-    overflow: auto;
-    outline: none;
-    flex: 1;
-  }
-
-  .o-collection-table-empty .ohne-table {
-    min-height: 100%;
-  }
-
   .o-collection-table-footer {
     container-type: inline-size;
     position: sticky;
@@ -156,14 +148,32 @@ css`
  *
  * The state lives in the URL: `page`, `order`, `where`, and `columns` are query params.
  * A reload or back and forward re-renders the same view.
- * The last query string per segment is remembered and restored when the collection is revisited bare.
+ * The table rebuilds whenever the query changes, except for the `edit` param its cell popups own.
+ * The last query string per segment is remembered.
+ * It is restored whenever the query arrives bare, unless back or forward brought it.
  * Every cell renders its field's display inside an editable cell whose popup patches only that field.
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
  * Rows select with shift ranges into the batch delete.
  * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
  * Each page loads with its row verdicts, so a row offers only what the `access` scopes admit for it.
  */
-export function collectionTable(collection: DashboardCollection): HTMLElement {
+export function collectionTable(collection: DashboardCollection): Child {
+  const route = untracked(useRoute);
+  const query = (): RouteContext['query'] => route?.query ?? {};
+  effect(() => {
+    const remembered = tableMemory.get(collection.segment) ?? '';
+    if (isEmpty(query()) && remembered !== '' && lastNavigation() !== 'popstate') {
+      navigate(location.pathname + remembered, { replace: true });
+    }
+  });
+  const search = (): string => stripEditParam(`?${stringifySearchParams(query())}`);
+  return keyed(search, () => tableView(collection, search()));
+}
+
+/**
+ * The table for `search`, the query without `edit`, with its toolbar, footer, and popups.
+ */
+function tableView(collection: DashboardCollection, search: string): HTMLElement {
   const t = useT();
   const segment = collection.segment;
   const canCreate = collection.operations.create?.allowed === true;
@@ -171,15 +181,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const canTranslate =
     collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
 
-  const remembered = tableMemory.get(segment) ?? '';
-  const redirected = location.search === '' && remembered !== '' && lastNavigation() !== 'popstate';
-  if (redirected) {
-    queueMicrotask(() => navigate(location.pathname + remembered, { replace: true }));
-  } else {
-    tableMemory.set(segment, stripEditParam(location.search));
-  }
+  tableMemory.set(segment, search);
 
-  const state = parseTableState(location.search, DEFAULT_ORDER);
+  const state = parseTableState(search, DEFAULT_ORDER);
   const whereDirty = !isUndefined(state.where);
   const orderDirty = state.order.join(',') !== DEFAULT_ORDER.join(',');
 
@@ -190,10 +194,10 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
       where: hasKey(patch, 'where') ? patch.where : state.where,
       columns: hasKey(patch, 'columns') ? patch.columns : state.columns,
     };
-    const query = serializeTableState(next, DEFAULT_ORDER, location.search);
-    const search = query === '' ? '' : `?${query}`;
-    tableMemory.set(segment, stripEditParam(search));
-    navigate(location.pathname + search, { replace });
+    const query = serializeTableState(next, DEFAULT_ORDER, search);
+    const target = query === '' ? '' : `?${query}`;
+    tableMemory.set(segment, target);
+    navigate(location.pathname + target, { replace });
   };
 
   const declared = collection.table?.columns;
@@ -203,30 +207,14 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const defaultEntries = serializeTableColumns(resolveTableColumns(fields, declared));
   const currentEntries = serializeTableColumns(specs);
   const columnsDirty = !deepEqual(currentEntries, defaultEntries);
-  const columns: TableColumns = {};
-  for (const spec of specs) {
-    const definition: Parameters<typeof tableColumn>[0] = {
-      label: () => translateMessage(spec.label),
-      sortable: spec.sortable,
-    };
-    if (!isUndefined(spec.width)) definition.width = spec.width;
-    if (!isUndefined(spec.minWidth)) definition.minWidth = spec.minWidth;
-    columns[spec.name] = tableColumn(definition);
-  }
 
-  const fieldByName = (name: string): DashboardField | undefined =>
-    fields.find((field) => field.name === name);
-
-  const data = ref<TableRow<TableColumns>[]>([]);
+  const data = ref<TableRecord[] | undefined>(undefined);
   const verdicts = ref(NO_VERDICTS);
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
-  const initialized = ref(false);
   const reload = ref(0);
-  const selectable = ref(false);
-  const selected = ref<Record<number | string, boolean>>({});
+  const selected = ref<ReadonlySet<number | string>>(new Set());
   const allSelected = ref(false);
   const allCount = ref(0);
-  const selectAllState = ref<boolean | 'indeterminate'>(false);
   const selectedCount = computed(() =>
     selectedCountOf(selected.value, allSelected.value, allCount.value),
   );
@@ -262,21 +250,17 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     void reload.value;
     // A sign-in in place refetches the page an expired session failed to load.
     void signInCount();
-    if (redirected) return;
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
     const locale = activeLocale();
     void loadPage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
-      if (!isUndefined(loaded)) {
+      if (isUndefined(loaded)) {
+        data.value ??= [];
+      } else {
         const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);
         if (generation !== mine) return;
-        data.value = loaded.records.map(
-          (record, index): TableRow<TableColumns> => ({
-            ...record,
-            id: isString(record.UUID) ? record.UUID : index,
-          }),
-        );
+        data.value = loaded.records;
         paginated.value = {
           currentPage: loaded.page,
           lastPage: loaded.lastPage,
@@ -288,7 +272,6 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         deselectAll();
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 }, true);
       }
-      initialized.value = true;
     });
   });
 
@@ -298,66 +281,50 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   });
 
   const sortValue = sortFromOrder(state.order);
-  const sort: Ref<TableSort<TableColumns>> = {
+  const sort: Ref<TableSort | null> = {
     get value() {
-      return sortValue as TableSort<TableColumns>;
+      return sortValue;
     },
     set value(next) {
       if (isNull(next)) return;
-      const column = String(next.column);
-      push({ page: 1, order: [next.direction === 'desc' ? `-${column}` : column] });
+      push({ page: 1, order: [next.direction === 'desc' ? `-${next.column}` : next.column] });
     },
   };
 
-  const selectedBridge: Ref<Record<number | string, boolean>> = {
+  const deletable = (): TableRecord[] => deletableRows(data.value ?? [], verdicts.value.delete);
+
+  const selectAllState = computed(() =>
+    selectAllStateOf(deletable(), selected.value, allSelected.value, paginated.value.lastPage),
+  );
+
+  /**
+   * Writes the selection the `deletable` verdict admits, and leaves every-page mode once a page row drops.
+   */
+  const setSelected = (next: ReadonlySet<number | string>): void => {
+    selected.value = deletableSelection(next, verdicts.value.delete);
+    allSelected.value = allSelected.value && selectAllState.value === true;
+  };
+
+  const selectedBridge: Ref<ReadonlySet<number | string>> = {
     get value() {
       return selected.value;
     },
     set value(next) {
-      selected.value = deletableSelection(next, verdicts.value.delete);
-      refreshSelectable();
+      setSelected(next);
     },
   };
 
-  const deletable = (): TableRow<TableColumns>[] =>
-    deletableRows(data.value, verdicts.value.delete);
+  const select = (uuid: string): void => setSelected(new Set(selected.value).add(uuid));
 
-  /**
-   * Rederives selection mode and the select-all state from `selected`.
-   */
-  function refreshSelectable(): void {
-    const state = selectAllStateOf(
-      deletable(),
-      selected.value,
-      allSelected.value,
-      paginated.value.lastPage,
-    );
-    selectable.value = Object.values(selected.value).some((value) => value);
-    allSelected.value = allSelected.value && state === true;
-    selectAllState.value = state;
-  }
-
-  const select = (id: number | string): void => {
-    selected.value = { ...selected.value, [id]: true };
-    grid.selectOrigin.value = id;
-    refreshSelectable();
+  const deselect = (uuid: string): void => {
+    const next = new Set(selected.value);
+    next.delete(uuid);
+    setSelected(next);
   };
 
-  const deselect = (id: number | string): void => {
-    const next = { ...selected.value };
-    delete next[id];
-    selected.value = next;
-    refreshSelectable();
-  };
+  const deselectAll = (): void => setSelected(new Set());
 
-  const deselectAll = (): void => {
-    selected.value = {};
-    refreshSelectable();
-  };
-
-  const selectPage = (): void => {
-    selected.value = Object.fromEntries(deletable().map((row) => [row.id, true]));
-  };
+  const selectPage = (): void => setSelected(new Set(pageUUIDs(deletable())));
 
   const deletableTotal = async (): Promise<number> => {
     const counts = deleteScoped
@@ -370,9 +337,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     const perPage = deletable().length;
     if (perPage === 0 || countBusy) return;
     if (selectAllState.value) {
-      selected.value = {};
       allSelected.value = false;
-      refreshSelectable();
+      deselectAll();
     } else if (paginated.value.lastPage > 1) {
       const mine = generation;
       countBusy = true;
@@ -396,24 +362,21 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         ],
       });
       if (action === 'page') {
-        selectPage();
         allSelected.value = false;
-        refreshSelectable();
+        selectPage();
       } else if (action === 'all') {
         selectPage();
         allCount.value = total;
         allSelected.value = true;
-        refreshSelectable();
       }
     } else {
       selectPage();
       allCount.value = perPage;
       allSelected.value = true;
-      refreshSelectable();
     }
   };
 
-  const onDelete = async (id: number | string): Promise<void> => {
+  const onDelete = async (uuid: string): Promise<void> => {
     if (deleteBusy) return;
     const action = await openDialog({
       content: t('dashboard.table.confirmDeleteOne'),
@@ -424,7 +387,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     });
     if (action !== 'delete') return;
     deleteBusy = true;
-    const gone = await deleteRecord(segment, String(id));
+    const gone = await deleteRecord(segment, uuid);
     deleteBusy = false;
     if (gone) {
       queueToast(t('dashboard.deleted', { count: 1 }), { type: 'success' });
@@ -463,9 +426,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     });
     if (action !== 'delete') return;
     deleteBusy = true;
-    const uuids = allSelected.value
-      ? await allUUIDs()
-      : Object.keys(selected.value).filter((id) => selected.value[id]);
+    const uuids = allSelected.value ? await allUUIDs() : [...selected.value].filter(isString);
     let lost = 0;
     for (const uuid of uuids) {
       if (!(await deleteRecord(segment, uuid))) lost += 1;
@@ -481,170 +442,135 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     refresh();
   };
 
-  const replaceRow = (id: number | string, record: TableRecord): void => {
-    data.value = data.value.map((row) => (row.id === id ? { ...row, ...record, id } : row));
+  const replaceRow = (uuid: string, record: TableRecord): void => {
+    data.value = data.value?.map((row) => (row.UUID === uuid ? { ...row, ...record } : row));
   };
 
-  const rowHref = (id: number | string): string => recordHref(collection, String(id));
+  const rowHref = (uuid: unknown): string => recordHref(collection, String(uuid));
 
-  const mayUpdate = (id: number | string): boolean => admitsRow(verdicts.value.update, id);
+  const mayUpdate = (uuid: unknown): boolean => admitsRow(verdicts.value.update, uuid);
 
-  const mayDelete = (id: number | string): boolean => admitsRow(verdicts.value.delete, id);
+  const mayDelete = (uuid: unknown): boolean => admitsRow(verdicts.value.delete, uuid);
 
   // A gated field edits in the record editor, where the gate reads the whole record.
-  const canEditField = (field: DashboardField, id: number | string): boolean =>
-    mayUpdate(id) &&
+  const canEditField = (field: DashboardField, uuid: unknown): boolean =>
+    mayUpdate(uuid) &&
     field.writable &&
     !field.immutable &&
     isUndefined(field.when) &&
     (verdicts.value.select?.includes(field.name) ?? true);
 
-  const grid = table<TableColumns>({
-    columns,
-    data: () => data.value,
-    sort,
-    selectable: () => selectable.value,
-    rowSelectable: (row) => mayDelete(row.id),
-    selected: selectedBridge,
-    selectAllState: () => selectAllState.value,
-    showEmptyState: () => initialized.value,
-    labels: () => ({
-      actions: t('dashboard.actions'),
-      sortInAscendingOrder: t('dashboard.sort.ascending'),
-      sortInDescendingOrder: t('dashboard.sort.descending'),
-      selectAll:
-        paginated.value.lastPage === 1
-          ? t('dashboard.table.selectedCount', { count: selectedCount.value })
-          : t('dashboard.table.selectedAcrossPages', {
-              entryCount: selectedCount.value,
-              pageCount: paginated.value.lastPage,
-            }),
-      selectAllIndeterminate: t('dashboard.table.selectedOnPage', {
-        count: selectedCount.value,
-      }),
-      noData: t('dashboard.table.noData'),
-    }),
-    onSelectAll: () => void onSelectAll(),
-    onDoubleClick: (row, event) => {
-      const href = rowHref(row.id);
-      if (event.ctrlKey || event.metaKey || event.shiftKey) window.open(href, '_blank');
-      else navigate(href);
-    },
-    cell: (payload) => {
-      const field = fieldByName(String(payload.key));
-      if (isUndefined(field)) return h('div');
-      const row = payload.row as TableRecord;
-      if (field.name === '_translations') {
-        const rowID = String(payload.row.id);
-        const chips: TranslationsCellOptions = { canUpdate: mayUpdate(payload.row.id) };
-        if (isString(payload.row.id)) {
-          chips.href = (code) => recordHref(collection, rowID, { locale: code });
-        }
-        return editableFieldCell(translationsCell(row, chips), {
-          cell: payload,
-          collection,
-          field,
-          editable: false,
-          action: {
-            icon: 'language',
-            tooltip: () => t('dashboard.translations.translate'),
-            onClick: () => {
-              translationsUUID.value = rowID;
-            },
-          },
-        });
-      }
-      return editableFieldCell(displayFor(field, row), {
-        cell: payload,
+  const fieldCell = (field: DashboardField, row: TableRecord): HTMLElement => {
+    const rowID = String(row.UUID);
+    if (field.name === '_translations') {
+      const chips: TranslationsCellOptions = { canUpdate: mayUpdate(row.UUID) };
+      if (isString(row.UUID))
+        chips.href = (code) => recordHref(collection, rowID, { locale: code });
+      return editableFieldCell(translationsCell(row, chips), {
+        record: row,
+        rowID,
         collection,
         field,
-        editable: canEditField(field, payload.row.id),
-        onUpdated: (record) => replaceRow(payload.row.id, record),
+        editable: false,
+        action: {
+          icon: 'language',
+          tooltip: () => t('dashboard.translations.translate'),
+          onClick: () => {
+            translationsUUID.value = rowID;
+          },
+        },
       });
-    },
-    actions: ({ row, reference, close }) => {
-      const href = rowHref(row.id);
-      const canUpdate = mayUpdate(row.id);
-      const canDelete = mayDelete(row.id);
-      const openItem = canUpdate
-        ? dropdownItem([icon('pencil'), h('span', null, () => t('dashboard.edit'))], {
-            href,
-            onClick: () => close(),
-          })
-        : dropdownItem([icon('list-search'), h('span', null, () => t('dashboard.view'))], {
-            href,
-            onClick: () => close(),
-          });
-      const translateItem = canTranslate
-        ? dropdownItem(
-            [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
-            {
-              onClick: () => {
-                close();
-                translationsUUID.value = String(row.id);
-              },
-            },
-          )
-        : null;
-      const deleteItem = canDelete
-        ? dropdownItem([icon('trash-x'), h('span', null, () => t('dashboard.delete'))], {
-            destructive: true,
-            onClick: () => {
-              close();
-              void onDelete(row.id);
-            },
-          })
-        : null;
-      effect(() => {
-        openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
-        if (translateItem) translateItem.title = t('dashboard.translations.translate');
-        if (deleteItem) deleteItem.title = t('dashboard.delete');
+    }
+    return editableFieldCell(displayFor(field, row), {
+      record: row,
+      rowID,
+      collection,
+      field,
+      editable: canEditField(field, row.UUID),
+      onUpdated: (record) => replaceRow(rowID, record),
+    });
+  };
+
+  const columns: Record<string, TableColumn<TableRecord>> = {};
+  for (const spec of specs) {
+    const field = fields.find((entry) => entry.name === spec.name);
+    columns[spec.name] = {
+      label: () => translateMessage(spec.label),
+      sortable: spec.sortable,
+      width: spec.width,
+      minWidth: spec.minWidth,
+      render: (row) => (isUndefined(field) ? null : fieldCell(field, row)),
+    };
+  }
+
+  const rowActions = (row: TableRecord): MenuItem[] => {
+    const uuid = String(row.UUID);
+    const canDelete = mayDelete(row.UUID);
+    const items: MenuItem[] = [
+      mayUpdate(row.UUID)
+        ? { label: 'dashboard.edit', icon: 'pencil', href: rowHref(uuid) }
+        : { label: 'dashboard.view', icon: 'list-search', href: rowHref(uuid) },
+    ];
+    if (canTranslate) {
+      items.push({
+        label: 'dashboard.translations.translate',
+        icon: 'language',
+        onSelect: () => {
+          translationsUUID.value = uuid;
+        },
       });
-      const menu = dropdown(
-        [
-          openItem,
-          translateItem,
-          deleteItem,
-          h('hr'),
-          when(
-            () => selected.value[row.id] === true,
-            () => {
-              const item = dropdownItem(
-                [icon('square-off'), h('span', null, () => t('dashboard.deselect'))],
-                {
-                  onClick: () => {
-                    close();
-                    deselect(row.id);
-                  },
-                },
-              );
-              effect(() => {
-                item.title = t('dashboard.deselect');
+    }
+    if (canDelete) {
+      items.push({
+        label: 'dashboard.delete',
+        icon: 'trash-x',
+        destructive: true,
+        onSelect: () => void onDelete(uuid),
+      });
+    }
+    items.push('---');
+    if (selected.value.has(uuid)) {
+      items.push({
+        label: 'dashboard.deselect',
+        icon: 'square-off',
+        onSelect: () => deselect(uuid),
+      });
+    } else if (canDelete) {
+      items.push({ label: 'dashboard.select', icon: 'checkbox', onSelect: () => select(uuid) });
+    }
+    return items;
+  };
+
+  const grid = table(() => data.value, {
+    key: (row, index) => (isString(row.UUID) ? row.UUID : index),
+    columns,
+    sort,
+    serverSort: true,
+    fixed: true,
+    selection: {
+      selected: selectedBridge,
+      selectable: (row) => mayDelete(row.UUID),
+      checkboxes: () => selected.value.size > 0,
+      all: {
+        state: () => selectAllState.value,
+        toggle: () => onSelectAll(),
+        label: () => {
+          const state = selectAllState.value;
+          if (state === false) return '';
+          if (state === 'indeterminate') {
+            return t('dashboard.table.selectedOnPage', { count: selectedCount.value });
+          }
+          return paginated.value.lastPage === 1
+            ? t('dashboard.table.selectedCount', { count: selectedCount.value })
+            : t('dashboard.table.selectedAcrossPages', {
+                entryCount: selectedCount.value,
+                pageCount: paginated.value.lastPage,
               });
-              return item;
-            },
-            () => {
-              if (!canDelete) return null;
-              const item = dropdownItem(
-                [icon('checkbox'), h('span', null, () => t('dashboard.select'))],
-                {
-                  onClick: () => {
-                    close();
-                    select(row.id);
-                  },
-                },
-              );
-              effect(() => {
-                item.title = t('dashboard.select');
-              });
-              return item;
-            },
-          ),
-        ],
-        { reference, placement: 'end', size: -1, onClose: close },
-      );
-      return menu.root;
+        },
+      },
     },
+    href: (row) => rowHref(row.UUID),
+    actions: rowActions,
   });
 
   const paginationEl = pagination({
@@ -678,46 +604,46 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     },
   });
 
-  const deleteButton = (): HTMLElement => {
-    const el = button(icon('trash-x'), {
+  const deleteButton = (): HTMLElement =>
+    button(() => t('dashboard.table.deleteCount', { count: selectedCount.value }), {
+      icon: 'trash-x',
+      iconOnly: true,
       variant: 'destructive',
       onClick: () => void onDeleteSelection(),
     });
-    onCleanup(
-      attachTooltip(el, () => t('dashboard.table.deleteCount', { count: selectedCount.value })),
-    );
-    return el;
-  };
 
   const clearButton = (): HTMLElement =>
     clearSelectionButton(() => selectedCount.value, deselectAll);
 
-  const filterButton = button(icon('adjustments'), {
+  const filterButton = button(() => t('dashboard.filter.title'), {
+    icon: 'adjustments',
+    iconOnly: true,
     variant: whereDirty ? 'accent' : 'outline',
     bubble: whereDirty ? bubble() : undefined,
     onClick: () => {
       filterOpen.value = true;
     },
   });
-  onCleanup(attachTooltip(filterButton, () => t('dashboard.filter.title')));
 
-  const columnsButton = button(icon('layout-columns'), {
+  const columnsButton = button(() => t('dashboard.columns.title'), {
+    icon: 'layout-columns',
+    iconOnly: true,
     variant: columnsDirty ? 'accent' : 'outline',
     bubble: columnsDirty ? bubble() : undefined,
     onClick: () => {
       columnsOpen.value = true;
     },
   });
-  onCleanup(attachTooltip(columnsButton, () => t('dashboard.columns.title')));
 
-  const sortingButton = button(icon('arrows-sort'), {
+  const sortingButton = button(() => t('dashboard.sort.title'), {
+    icon: 'arrows-sort',
+    iconOnly: true,
     variant: orderDirty ? 'accent' : 'outline',
     bubble: orderDirty ? bubble() : undefined,
     onClick: () => {
       sortingOpen.value = true;
     },
   });
-  onCleanup(attachTooltip(sortingButton, () => t('dashboard.sort.title')));
 
   const newButton = canCreate
     ? button([h('span', null, () => t('dashboard.new')), icon('note')], {
@@ -737,7 +663,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
         'div',
         { class: 'ohne-row ohne-ml-auto' },
         when(
-          () => selectable.value,
+          () => selected.value.size > 0,
           () => [deleteButton(), clearButton()],
         ),
         filterButton,
@@ -846,7 +772,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
     }
   });
   listen('delete', () => {
-    if (selectable.value) void onDeleteSelection();
+    if (selected.value.size > 0) void onDeleteSelection();
   });
 
   const onArrowKey = (event: KeyboardEvent): void => {
@@ -866,11 +792,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   return h(
     'div',
-    {
-      class: () =>
-        'o-collection-table' + (paginated.value.total === 0 ? ' o-collection-table-empty' : ''),
-    },
-    h('div', { tabindex: '-1', class: 'o-collection-table-scroller o-scrollbar' }, grid.root),
+    { class: 'o-collection-table' },
+    grid,
     footer,
     filterHost,
     columnsHost,

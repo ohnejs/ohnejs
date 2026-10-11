@@ -2,11 +2,11 @@ import {
   card,
   defineDashboardPage,
   navigate,
+  type RouteContext,
   sessionUser,
-  setDocumentTitle,
-  useT,
+  useDocumentTitle,
 } from 'ohnejs/dashboard';
-import { effect, isLocalPath, isNullish, isString, parseSearchParams } from 'ohnejs/utils';
+import { effect, isLocalPath, isNullish, isString } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { loginForm } from '../components/login-form.ts';
@@ -19,28 +19,30 @@ import { installRequired } from './install.ts';
  * A signing-in success and a signed-in visitor both land there through the session effect.
  * While the first-user setup is pending, the page yields to the install page.
  */
-export default defineDashboardPage(() => {
-  const t = useT();
-  const destination = nextPath();
+export default defineDashboardPage(
+  (route) => {
+    const destination = nextPath(route);
 
-  effect(() => setDocumentTitle(t('dashboard.login.title')));
+    useDocumentTitle('dashboard.login.title');
 
-  effect(() => {
-    if (!isNullish(sessionUser())) navigate(destination);
-  });
+    effect(() => {
+      if (!isNullish(sessionUser())) navigate(destination);
+    });
 
-  void installRequired().then((required) => {
-    if (required) navigate('/install', { replace: true });
-  });
+    void installRequired().then((required) => {
+      if (required) navigate('/install', { replace: true });
+    });
 
-  return authLayout(authLogo(), card(loginForm()));
-});
+    return authLayout(authLogo(), card(loginForm()));
+  },
+  { frame: false },
+);
 
 /**
  * The post-login destination: the `next` query param when it is a safe same-origin path, else home.
  * A protocol-relative (`//`) or backslashed (`/\`) value is not safe and falls back to home.
  */
-function nextPath(): string {
-  const next = parseSearchParams(location.search).next;
+function nextPath(route: RouteContext): string {
+  const next = route.query.next;
   return isString(next) && isLocalPath(next) ? next : '/';
 }

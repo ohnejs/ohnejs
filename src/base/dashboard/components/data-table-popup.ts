@@ -4,24 +4,19 @@ import {
   button,
   css,
   type DashboardCollection,
-  dropdown,
-  dropdownItem,
   h,
   hasModifierKey,
-  icon,
   type IconName,
   isEditingText,
   loadVerdicts,
+  type MenuItem,
   overlayCount,
   pagination,
   popup,
   type Popup,
   registerRecordPicker,
-  type Table,
   table,
-  tableColumn,
-  type TableColumns,
-  type TableRow,
+  type TableColumn,
   type TableSort,
   translateMessage,
   useHotkeys,
@@ -60,7 +55,6 @@ import {
 } from './collection-table-data.ts';
 import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
 import {
-  orderedSelection,
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -124,19 +118,13 @@ css`
   }
 
   .o-data-table-popup-body {
+    display: flex;
+    flex-direction: column;
     height: 100%;
-  }
-
-  .o-data-table-popup-empty .ohne-table {
-    min-height: 100%;
   }
 
   .o-data-table-popup .ohne-table-select-all {
     display: none;
-  }
-
-  .o-data-table-popup .ohne-table-cell-active-actions .ohne-dropdown {
-    max-width: none;
   }
 
   .o-data-table-popup-cell {
@@ -204,10 +192,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     return !deepEqual(serializeTableColumns(specs()), defaultEntries);
   });
 
-  const data = ref<TableRow<TableColumns>[]>([]);
+  const data = ref<TableRecord[] | undefined>(undefined);
   const updatable = ref<ReadonlySet<string>>(new Set());
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
-  const initialized = ref(false);
   const filterOpen = ref(false);
   const columnsOpen = ref(false);
   const sortingOpen = ref(false);
@@ -233,15 +220,12 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     const locale = collection.translatable ? activeContentLocale() : undefined;
     void loadPage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
-      if (!isUndefined(loaded)) {
+      if (isUndefined(loaded)) {
+        data.value ??= [];
+      } else {
         const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);
         if (generation !== mine) return;
-        data.value = loaded.records.map(
-          (record, index): TableRow<TableColumns> => ({
-            ...record,
-            id: isString(record.UUID) ? record.UUID : index,
-          }),
-        );
+        data.value = loaded.records;
         paginated.value = {
           currentPage: loaded.page,
           lastPage: loaded.lastPage,
@@ -252,178 +236,107 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
         seedLabels(collection, loaded.records, locale);
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 });
       }
-      initialized.value = true;
       if (scrollTop) {
         scrollTop = false;
-        handle.content.scrollTo({ top: 0, behavior: 'instant' });
+        body.querySelector('.ohne-table-scroller')?.scrollTo({ top: 0, behavior: 'instant' });
       }
     });
   });
 
-  const sort: Ref<TableSort<TableColumns>> = {
+  const sort: Ref<TableSort | null> = {
     get value() {
       void revision.value;
-      return sortFromOrder(state.order) as TableSort<TableColumns>;
+      return sortFromOrder(state.order);
     },
     set value(next) {
       if (isNull(next)) return;
-      const column = String(next.column);
-      push({ page: 1, order: [next.direction === 'desc' ? `-${column}` : column] });
+      push({ page: 1, order: [next.direction === 'desc' ? `-${next.column}` : next.column] });
     },
   };
 
-  const selected = ref<Record<number | string, boolean>>(
-    Object.fromEntries(options.values.map((uuid) => [uuid, true])),
+  const selected = ref<ReadonlySet<number | string>>(new Set(options.values));
+  const selectedCount = computed(() => selected.value.size);
+  const selectionChanged = computed(
+    () => !deepEqual([...selected.value].map(String).sort(), [...options.values].sort()),
   );
-  let ordered: string[] = [...options.values];
-  const selectedBridge: Ref<Record<number | string, boolean>> = {
-    get value() {
-      return selected.value;
-    },
-    set value(next) {
-      ordered = orderedSelection(ordered, next);
-      selected.value = next;
-    },
-  };
-  const selectedCount = computed(() => Object.values(selected.value).filter(Boolean).length);
-  const selectionChanged = computed(() => {
-    const current = Object.entries(selected.value)
-      .filter(([, on]) => on)
-      .map(([uuid]) => uuid)
-      .sort();
-    return !deepEqual(current, [...options.values].sort());
-  });
 
-  const select = (id: number | string): void => {
-    selectedBridge.value = { ...selected.value, [id]: true };
-    if (!isUndefined(grid)) grid.selectOrigin.value = id;
+  const select = (uuid: string): void => {
+    selected.value = new Set(selected.value).add(uuid);
   };
 
-  const deselect = (id: number | string): void => {
-    const next = { ...selected.value };
-    delete next[id];
-    selectedBridge.value = next;
+  const deselect = (uuid: string): void => {
+    const next = new Set(selected.value);
+    next.delete(uuid);
+    selected.value = next;
   };
 
   const togglePage = (): void => {
-    const rows = data.value;
-    const all = rows.every((row) => selected.value[row.id] === true);
-    const next = { ...selected.value };
-    for (const row of rows) {
-      if (all) delete next[row.id];
-      else next[row.id] = true;
+    const uuids = pageUUIDs(data.value ?? []);
+    const all = uuids.every((uuid) => selected.value.has(uuid));
+    const next = new Set(selected.value);
+    for (const uuid of uuids) {
+      if (all) next.delete(uuid);
+      else next.add(uuid);
     }
-    selectedBridge.value = next;
+    selected.value = next;
   };
 
-  const pick = (id: number | string): void => {
-    options.onApply([String(id)]);
+  const pick = (uuid: string): void => {
+    options.onApply([uuid]);
     options.onClose(handle.close);
   };
 
   const applySelection = (): void => {
-    options.onApply([...ordered]);
+    options.onApply([...selected.value].filter(isString));
     options.onClose(handle.close);
   };
 
-  let grid: Table | undefined;
+  const rowActions = (row: TableRecord): MenuItem[] => {
+    const uuid = String(row.UUID);
+    const canUpdate = admitsRow(updatable.value, row.UUID);
+    return [
+      multiple && selected.value.has(uuid)
+        ? { label: 'dashboard.deselect', icon: 'square-off', onSelect: () => deselect(uuid) }
+        : {
+            label: 'dashboard.select',
+            icon: 'checkbox',
+            onSelect: () => (multiple ? select(uuid) : pick(uuid)),
+          },
+      '---',
+      {
+        label: canUpdate ? 'dashboard.edit' : 'dashboard.view',
+        icon: canUpdate ? 'pencil' : 'list-search',
+        href: recordHref(collection, uuid),
+        target: '_blank',
+      },
+    ];
+  };
 
   const buildGrid = (): HTMLElement => {
-    const columns: TableColumns = {};
+    const columns: Record<string, TableColumn<TableRecord>> = {};
     for (const spec of specs()) {
-      const definition: Parameters<typeof tableColumn>[0] = {
+      const field = collection.fields.find((entry) => entry.name === spec.name);
+      columns[spec.name] = {
         label: () => translateMessage(spec.label),
         sortable: spec.sortable,
+        width: spec.width,
+        minWidth: spec.minWidth,
+        render: (row) =>
+          isUndefined(field)
+            ? null
+            : h('div', { class: 'o-data-table-popup-cell' }, displayFor(field, row)),
       };
-      if (!isUndefined(spec.width)) definition.width = spec.width;
-      if (!isUndefined(spec.minWidth)) definition.minWidth = spec.minWidth;
-      columns[spec.name] = tableColumn(definition);
     }
-    grid = table<TableColumns>({
+    return table(() => data.value, {
+      key: (row, index) => (isString(row.UUID) ? row.UUID : index),
       columns,
-      data: () => data.value,
       sort,
-      selectable: () => multiple,
-      selected: selectedBridge,
-      showEmptyState: () => initialized.value,
-      labels: () => ({
-        actions: t('dashboard.actions'),
-        sortInAscendingOrder: t('dashboard.sort.ascending'),
-        sortInDescendingOrder: t('dashboard.sort.descending'),
-        noData: t('dashboard.table.noData'),
-      }),
-      onDoubleClick: (row) => {
-        if (multiple) select(row.id);
-        else pick(row.id);
-      },
-      cell: (payload) => {
-        const field = collection.fields.find((entry) => entry.name === String(payload.key));
-        if (isUndefined(field)) return h('div');
-        return h(
-          'div',
-          { class: 'o-data-table-popup-cell' },
-          displayFor(field, payload.row as TableRecord),
-        );
-      },
-      actions: ({ row, reference, close }) => {
-        const selectItem = (): HTMLElement => {
-          const item = dropdownItem(
-            [icon('checkbox'), h('span', null, () => t('dashboard.select'))],
-            {
-              onClick: () => {
-                close();
-                if (multiple) select(row.id);
-                else pick(row.id);
-              },
-            },
-          );
-          effect(() => {
-            item.title = t('dashboard.select');
-          });
-          return item;
-        };
-        const deselectItem = (): HTMLElement => {
-          const item = dropdownItem(
-            [icon('square-off'), h('span', null, () => t('dashboard.deselect'))],
-            {
-              onClick: () => {
-                close();
-                deselect(row.id);
-              },
-            },
-          );
-          effect(() => {
-            item.title = t('dashboard.deselect');
-          });
-          return item;
-        };
-        const canUpdate = admitsRow(updatable.value, row.id);
-        const openItem = dropdownItem(
-          [
-            icon(canUpdate ? 'pencil' : 'list-search'),
-            h('span', null, () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view')),
-          ],
-          {
-            href: recordHref(collection, String(row.id)),
-            target: '_blank',
-            onClick: () => close(),
-          },
-        );
-        effect(() => {
-          openItem.title = t(canUpdate ? 'dashboard.edit' : 'dashboard.view');
-        });
-        const menu = dropdown(
-          [
-            when(() => multiple && selected.value[row.id] === true, deselectItem, selectItem),
-            h('hr'),
-            openItem,
-          ],
-          { reference, placement: 'end', size: -1, onClose: close },
-        );
-        return menu.root;
-      },
+      serverSort: true,
+      fixed: true,
+      selection: { selected, checkboxes: () => multiple },
+      onOpen: (row) => (multiple ? select(String(row.UUID)) : pick(String(row.UUID))),
+      actions: rowActions,
     });
-    return grid.root;
   };
 
   const paginationEl = pagination({
@@ -463,7 +376,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     tooltip: () => string,
     onClick: () => void,
   ): HTMLElement => {
-    const el = button(icon(glyph), {
+    const el = button(tooltip, {
+      icon: glyph,
+      iconOnly: true,
       variant: 'outline',
       bubble: () => (dirty() ? bubble() : null),
       onClick,
@@ -473,7 +388,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       el.classList.toggle('ohne-button-accent', changed);
       el.classList.toggle('ohne-button-outline', !changed);
     });
-    onCleanup(attachTooltip(el, tooltip));
     return el;
   };
 
@@ -519,14 +433,13 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     });
   }
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => options.onClose(handle.close),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const filterHost = when(
@@ -600,11 +513,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
 
   const body = h(
     'div',
-    {
-      class: () =>
-        'o-data-table-popup-body' +
-        (initialized.value && paginated.value.total === 0 ? ' o-data-table-popup-empty' : ''),
-    },
+    { class: 'o-data-table-popup-body' },
     () => {
       void columnsRevision.value;
       return buildGrid();

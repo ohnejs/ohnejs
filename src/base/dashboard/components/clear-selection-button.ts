@@ -1,5 +1,4 @@
-import { attachTooltip, bubble, button, icon, useT } from 'ohnejs/dashboard';
-import { onCleanup } from 'ohnejs/utils';
+import { bubble, button, useT } from 'ohnejs/dashboard';
 
 /**
  * The footer button that clears a selection: a `square-off` icon carrying the count in its bubble.
@@ -7,11 +6,11 @@ import { onCleanup } from 'ohnejs/utils';
  */
 export function clearSelectionButton(count: () => number, onClear: () => void): HTMLElement {
   const t = useT();
-  const el = button(icon('square-off'), {
+  return button(() => t('dashboard.clearSelection'), {
+    icon: 'square-off',
+    iconOnly: true,
     variant: 'accent',
     bubble: bubble(count),
     onClick: onClear,
   });
-  onCleanup(attachTooltip(el, () => t('dashboard.clearSelection')));
-  return el;
 }

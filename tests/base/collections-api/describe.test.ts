@@ -46,7 +46,11 @@ useCollections().register('DescPublic', {
   name: 'DescPublic',
   collection: {
     api: { read: 'public', delete: 'public' },
-    fields: { title: field('text') },
+    fields: {
+      title: field('text'),
+      stage: field('select', { choices: ['open', 'shut'], default: 'open' }),
+      stamp: field('text', { default: () => 'now' }),
+    },
   },
 });
 useCollections().register('DescClosed', {
@@ -150,6 +154,13 @@ describe('describeCollections', () => {
     strictEqual('when' in (named('title') ?? {}), false);
     const tip = named('steps')?.subfields?.find((entry) => entry.name === 'tip');
     deepStrictEqual(tip?.when, { '../owner': { has: true } });
+  });
+
+  it('ships a static default for the editor to seed, and never a computed one', () => {
+    const fields = collectionOf(guest, 'DescPublic').fields;
+    const named = (name: string) => fields.find((entry) => entry.name === name);
+    strictEqual(named('stage')?.options?.default, 'open');
+    strictEqual('default' in (named('stamp')?.options ?? {}), false);
   });
 
   it('resolves a declared layout against the described fields, dropping a name it lacks', () => {

@@ -1,4 +1,5 @@
-import { isUndefined, jsonClone, omit, onCleanup, ref } from 'ohnejs/utils';
+import { useUnsavedChanges } from 'ohnejs/dashboard';
+import { isUndefined, jsonClone, omit, ref } from 'ohnejs/utils';
 
 /**
  * Options for `History`.
@@ -21,36 +22,15 @@ export interface HistoryOptions {
   maxStates?: number;
 
   /**
-   * Whether to register the instance on the `unsavedChanges` global.
-   * The unsaved-changes surface consults it before the user closes the tab on dirty edits.
-   * The registration lasts until the reactive scope that built the instance is disposed.
+   * Whether to guard the instance's dirty state through `useUnsavedChanges`.
+   * Leaving the page or closing the tab then asks before it discards the edits.
+   * The guard lasts until the reactive scope that built the instance is disposed.
    *
    * @default
    * true
    */
   watchUnsavedChanges?: boolean;
 }
-
-/**
- * The module-global unsaved-changes registration.
- */
-export interface UnsavedChanges {
-  /**
-   * Every live watching `History`; closing the tab prompts while any of them is dirty.
-   */
-  histories: Set<History>;
-
-  /**
-   * Asks the user to confirm leaving dirty edits; resolves whether leaving is allowed.
-   * The unsaved-changes surface installs it; while absent, consumers treat consent as given.
-   */
-  prompt?: () => Promise<boolean>;
-}
-
-/**
- * Global registry of the watching `History` instances and the unsaved changes dialog `prompt` trigger.
- */
-export const unsavedChanges: UnsavedChanges = { histories: new Set(), prompt: undefined };
 
 /**
  * Data history manager with undo and redo functionality.
@@ -97,11 +77,7 @@ export class History<T extends object = Record<string, unknown>> {
   constructor(options?: HistoryOptions) {
     this.omit = options?.omit ?? [];
     this.maxStates = options?.maxStates ?? 100;
-    if (options?.watchUnsavedChanges ?? true) {
-      const self = this as unknown as History;
-      unsavedChanges.histories.add(self);
-      onCleanup(() => unsavedChanges.histories.delete(self));
-    }
+    if (options?.watchUnsavedChanges ?? true) useUnsavedChanges(() => this.isDirty.value);
   }
 
   /**

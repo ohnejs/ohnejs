@@ -3,21 +3,19 @@ import {
   button,
   card,
   defineDashboardPage,
-  field,
-  fieldLabel,
-  fieldMessage,
+  formField,
   h,
   icon,
   navigate,
   prose,
   sessionUser,
-  setDocumentTitle,
   textInput,
   toast,
+  useAction,
+  useDocumentTitle,
   useT,
-  when,
 } from 'ohnejs/dashboard';
-import { effect, isNullish, ref } from 'ohnejs/utils';
+import { effect, isNullish, isPlainObject, ref } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
 import { authLogo } from '../components/logo.ts';
@@ -28,21 +26,22 @@ import { authLogo } from '../components/logo.ts';
  * The server signs the new account in; success lands on home through a full document load.
  * An installed system redirects to the login page; a signed-in visitor goes home.
  */
-export default defineDashboardPage(() => {
-  const t = useT();
+export default defineDashboardPage(
+  () => {
+    useDocumentTitle('dashboard.install.title');
 
-  effect(() => setDocumentTitle(t('dashboard.install.title')));
+    effect(() => {
+      if (!isNullish(sessionUser())) navigate('/');
+    });
 
-  effect(() => {
-    if (!isNullish(sessionUser())) navigate('/');
-  });
+    void installRequired().then((required) => {
+      if (!required) navigate('/login', { replace: true });
+    });
 
-  void installRequired().then((required) => {
-    if (!required) navigate('/login', { replace: true });
-  });
-
-  return authLayout(authLogo(), card(installForm()));
-});
+    return authLayout(authLogo(), card(installForm()));
+  },
+  { frame: false },
+);
 
 /**
  * Asks `GET /auth/install` whether the first-user setup is still pending.
@@ -58,24 +57,11 @@ export async function installRequired(): Promise<boolean> {
   }
 }
 
-interface InstallInput {
-  firstName: string | null;
-  lastName: string | null;
-  email: string;
-  password: string;
-}
-
-type InstallOutcome =
-  | { kind: 'installed' }
-  | { kind: 'invalid'; errors: Record<string, string> }
-  | { kind: 'refused' }
-  | { kind: 'unreachable' };
-
 /**
  * The first-user form: the welcome note, the name, email, and password over a full-width submit.
  * The name is optional; an emptied input sends `null`.
  * A `422` routes its per-field messages under the inputs; a `403` yields to the login page.
- * An unreachable server raises a toast.
+ * Any other failure raises a toast.
  */
 function installForm(): HTMLElement {
   const t = useT();
@@ -88,35 +74,34 @@ function installForm(): HTMLElement {
   const lastNameError = ref('');
   const emailError = ref('');
   const passwordError = ref('');
-  const busy = ref(false);
 
-  const submit = async (): Promise<void> => {
-    if (busy.value) return;
-    busy.value = true;
-    firstNameError.value = '';
-    lastNameError.value = '';
-    emailError.value = '';
-    passwordError.value = '';
-    const outcome = await install({
-      firstName: firstName.value === '' ? null : firstName.value,
-      lastName: lastName.value === '' ? null : lastName.value,
-      email: email.value,
-      password: password.value,
+  const showErrors = (errors: Readonly<Record<string, string>>): void => {
+    firstNameError.value = errors.firstName ?? '';
+    lastNameError.value = errors.lastName ?? '';
+    emailError.value = errors.email ?? '';
+    passwordError.value = errors.password ?? '';
+  };
+
+  const install = useAction('POST /auth/install', {
+    // `sessionUser` resolves once per document, so the fresh cookie needs a full load to count.
+    onDone: () => location.assign('/'),
+    onError: (error) => {
+      if (error.status === 403) navigate('/login', { replace: true });
+      else if (error.status === 422) showErrors(fieldErrors(error.data));
+      else toast(error.message, { type: 'error' });
+    },
+  });
+
+  const submit = (): void => {
+    showErrors({});
+    void install.run({
+      body: {
+        firstName: firstName.value === '' ? null : firstName.value,
+        lastName: lastName.value === '' ? null : lastName.value,
+        email: email.value,
+        password: password.value,
+      },
     });
-    busy.value = false;
-    if (outcome.kind === 'installed') {
-      // `sessionUser` resolves once per document, so the fresh cookie needs a full load to count.
-      location.assign('/');
-    } else if (outcome.kind === 'invalid') {
-      firstNameError.value = outcome.errors.firstName ?? '';
-      lastNameError.value = outcome.errors.lastName ?? '';
-      emailError.value = outcome.errors.email ?? '';
-      passwordError.value = outcome.errors.password ?? '';
-    } else if (outcome.kind === 'refused') {
-      navigate('/login', { replace: true });
-    } else {
-      toast(t('dashboard.unreachable'), { type: 'error' });
-    }
   };
 
   const reveal = (): HTMLElement => {
@@ -143,89 +128,60 @@ function installForm(): HTMLElement {
     {
       onSubmit: (event: SubmitEvent) => {
         event.preventDefault();
-        void submit();
+        submit();
       },
     },
-    field(prose(h('p', { class: 'ohne-muted' }, () => t('dashboard.install.welcomeMessage')))),
-    field([
-      fieldLabel(h('label', { for: 'firstName' }, () => t('dashboard.install.firstName'))),
+    formField(prose(h('p', { class: 'ohne-muted' }, () => t('dashboard.install.welcomeMessage')))),
+    formField(
       textInput(firstName, {
         autocomplete: 'given-name',
         autofocus: true,
         id: 'firstName',
         name: 'firstName',
-        error: () => firstNameError.value !== '',
       }),
-      when(
-        () => firstNameError.value !== '',
-        () => fieldMessage(() => firstNameError.value, { error: () => true }),
-      ),
-    ]),
-    field([
-      fieldLabel(h('label', { for: 'lastName' }, () => t('dashboard.install.lastName'))),
+      { label: 'dashboard.install.firstName', error: () => firstNameError.value },
+    ),
+    formField(
       textInput(lastName, {
         autocomplete: 'family-name',
         id: 'lastName',
         name: 'lastName',
-        error: () => lastNameError.value !== '',
       }),
-      when(
-        () => lastNameError.value !== '',
-        () => fieldMessage(() => lastNameError.value, { error: () => true }),
-      ),
-    ]),
-    field([
-      fieldLabel(h('label', { for: 'email' }, () => t('dashboard.login.email'))),
+      { label: 'dashboard.install.lastName', error: () => lastNameError.value },
+    ),
+    formField(
       textInput(email, {
         autocomplete: 'email',
         id: 'email',
         name: 'email',
-        error: () => emailError.value !== '',
       }),
-      when(
-        () => emailError.value !== '',
-        () => fieldMessage(() => emailError.value, { error: () => true }),
-      ),
-    ]),
-    field([
-      fieldLabel(h('label', { for: 'password' }, () => t('dashboard.login.password'))),
+      { label: 'dashboard.login.email', error: () => emailError.value },
+    ),
+    formField(
       textInput(password, {
         type: () => (revealed.value ? 'text' : 'password'),
         autocomplete: 'new-password',
         id: 'password',
         name: 'password',
-        error: () => passwordError.value !== '',
         suffix: reveal,
       }),
-      when(
-        () => passwordError.value !== '',
-        () => fieldMessage(() => passwordError.value, { error: () => true }),
-      ),
-    ]),
-    field(button(() => t('dashboard.install.submit'), { type: 'submit', class: 'ohne-w-full' })),
+      { label: 'dashboard.login.password', error: () => passwordError.value },
+    ),
+    formField(
+      button(() => t('dashboard.install.submit'), {
+        type: 'submit',
+        class: 'ohne-w-full',
+        loading: () => install.busy(),
+      }),
+    ),
   );
 }
 
 /**
- * Sends the setup to `POST /auth/install` and names how the attempt ended.
- * `installed` set the session cookie.
- * `invalid` carries the `422` per-field messages.
- * `refused` is the `403` of an already installed system; anything else is `unreachable`.
+ * The per-field messages a `422` carries under `data.errors`.
  */
-async function install(input: InstallInput): Promise<InstallOutcome> {
-  try {
-    const response = await api('POST /auth/install', {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (response.ok) return { kind: 'installed' };
-    if (response.status === 422) {
-      const answer = (await response.json()) as { data?: { errors?: Record<string, string> } };
-      return { kind: 'invalid', errors: answer.data?.errors ?? {} };
-    }
-    if (response.status === 403) return { kind: 'refused' };
-    return { kind: 'unreachable' };
-  } catch {
-    return { kind: 'unreachable' };
-  }
+function fieldErrors(data: unknown): Readonly<Record<string, string>> {
+  return isPlainObject(data) && isPlainObject<Record<string, string>>(data.errors)
+    ? data.errors
+    : {};
 }

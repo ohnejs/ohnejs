@@ -3,6 +3,7 @@ import {
   button,
   card,
   type Child,
+  confirmLeave,
   css,
   type DashboardField,
   each,
@@ -45,7 +46,7 @@ import {
 } from 'ohnejs/utils';
 
 import { historyButtons } from './history-buttons.ts';
-import { History, unsavedChanges } from './history.ts';
+import { History } from './history.ts';
 import { actionButton } from './item-actions.ts';
 import { translationsFilter } from './translations-filter.ts';
 
@@ -203,7 +204,7 @@ css`
  * Every committed change pushes the tree onto a `History`; undo and redo step through it.
  * The rows read their nodes through `each`'s accessors, so a restored tree updates them in place.
  * Apply serializes the tree through `filterToWhere` and hands the result to `onApply`.
- * A dirty tree guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * A dirty tree guards Escape and the overlay click through the leave prompt.
  * A restore button clears every condition, the default, and applies at once, handing `undefined`.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
@@ -420,16 +421,15 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     glyph: IconName,
     tooltip: () => string,
     onClick: () => void,
-  ): HTMLElement => {
-    const control = button(icon(glyph), {
+  ): HTMLElement =>
+    button(tooltip, {
+      icon: glyph,
+      iconOnly: true,
       variant: 'outline',
       class: 'o-where-filters-small-button',
       disabled: () => fieldChoices().length === 0,
       onClick,
     });
-    onCleanup(attachTooltip(control, tooltip));
-    return control;
-  };
 
   const addButtons = (group: () => FilterGroup): Child =>
     h(
@@ -577,7 +577,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     );
 
   const guardedClose = async (): Promise<void> => {
-    if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+    if (!dirty.value || (await confirmLeave())) {
       options.onClose(handle.close);
     }
   };
@@ -587,14 +587,13 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     options.onClose(handle.close);
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => void guardedClose(),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const restoreButton = when(

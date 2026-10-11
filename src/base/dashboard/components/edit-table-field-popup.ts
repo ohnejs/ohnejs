@@ -1,6 +1,6 @@
 import {
-  api,
   button,
+  confirmLeave,
   createFieldForm,
   css,
   type DashboardCollection,
@@ -9,12 +9,14 @@ import {
   type FieldForm,
   fieldMessage,
   h,
-  icon,
   labelOf,
+  navigate,
   popup,
   type Popup,
+  type RouteContext,
   toast,
   translateMessage,
+  useAction,
   useDashboardLanguage,
   useHotkeys,
   useRoute,
@@ -25,20 +27,20 @@ import {
   effect,
   isDotPathInside,
   isNull,
+  isPlainObject,
   isString,
   isUndefined,
   onCleanup,
-  parseSearchParams,
   ref,
   type SearchParamValue,
-  sleep,
   stringifySearchParams,
   toArray,
+  untracked,
 } from 'ohnejs/utils';
 
 import { activeContentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
-import { History, unsavedChanges } from './history.ts';
+import { History } from './history.ts';
 
 /**
  * Options for `editTableFieldPopup`.
@@ -110,44 +112,37 @@ css`
   }
 `;
 
-const editSignal = ref(0);
-
 /**
  * Reads the `edit` query parameter, reactively.
  * It carries `[field, uuid]` while a cell edit is deep-linked, and is empty otherwise.
- * Both `setEditQueryParam` writes and full navigations refresh the read.
  */
 export function editQueryParam(): string[] {
-  useRoute();
-  void editSignal.value;
-  const edit = parseSearchParams(location.search).edit;
-  return toArray<SearchParamValue | undefined>(edit).filter(isString);
+  return toArray<SearchParamValue | undefined>(useRoute()?.query.edit).filter(isString);
 }
 
 /**
- * Writes the `edit` query parameter into history, or removes it when `value` is `null`.
- * It deliberately bypasses the router: a deep-linked cell edit opens over the LIVE page.
- * The popup animates and the table is not rebuilt.
- * The back button still closes the popup: the pushed entry re-renders through the router.
+ * Writes the `edit` query parameter, pushing history, or removes it when `value` is `null`.
+ * The step keeps the page, so the popup opens over the live table and back closes it.
+ * A write is a no-op unless `route` is still the active route, so a teardown never lands on the next page.
+ * Capture `route` when the binding is created; a query-only step keeps it, a page swap replaces it.
  */
-export function setEditQueryParam(value: string[] | null): void {
+export function setEditQueryParam(
+  value: string[] | null,
+  route: RouteContext | null = untracked(useRoute),
+): void {
+  if (isNull(route) || untracked(useRoute) !== route) return;
   const query = stringifySearchParams({
-    ...parseSearchParams(location.search),
+    ...untracked(() => route.query),
     edit: isNull(value) ? undefined : value,
   });
-  history.pushState(
-    null,
-    '',
-    location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
-  );
-  editSignal.value += 1;
+  void navigate(location.pathname + (query === '' ? '' : `?${query}`) + location.hash);
 }
 
 /**
  * The single-field edit popup.
  *
  * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`.
- * Cmd/Ctrl+S saves, and closing is dirty-guarded through the `unsavedChanges` prompt.
+ * Cmd/Ctrl+S saves, and closing is dirty-guarded through the leave prompt.
  * The save patches only this field; a `422` routes onto the control and raises the error count toast.
  * A message for a field the popup does not show, like a translation's required slug, renders below it.
  * A save whose answer lacks the field toasts it as not saved: the update scope's `select` dropped it.
@@ -160,7 +155,6 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const t = useT();
   const { collection, field, uuid } = options;
   const disabled = options.disabled ?? false;
-  const busy = ref(false);
   const unplaced = ref('');
 
   const buildForm = (initial: Record<string, unknown>): FieldForm =>
@@ -191,67 +185,65 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     form.value = buildForm(state);
   };
 
+  const write = useAction<Record<string, unknown>>('PATCH /collections/[collection]/[uuid]', {
+    params: { collection: collection.segment, uuid },
+    onDone: (saved) => {
+      // A scoped answer omits a field outside its `select`; the seed still holds its value.
+      const record = { ...seed, ...saved };
+      const state = { [field.name]: record[field.name] };
+      form.value.rebase(record);
+      history.push(state).setOriginalState(state);
+      toast(t('dashboard.saved'), { type: 'success', description: translateMessage(field.label) });
+      options.onUpdated?.(saved);
+      options.onClose(handle.close);
+    },
+    onError: (error) => {
+      if (error.status === 404) {
+        toast(t('dashboard.record.gone'), { type: 'error' });
+        options.onClose(handle.close);
+        return;
+      }
+      const errors = isPlainObject(error.data) ? error.data.errors : undefined;
+      if (error.status !== 422 || !isPlainObject<Readonly<Record<string, string>>>(errors)) {
+        toast(error.message, { type: 'error' });
+        return;
+      }
+      const leftover = form.value.setErrors(errors);
+      unplaced.value = leftover === '' ? '' : namedMessage(collection, errors, leftover);
+      form.value.focusError();
+      toast(t('dashboard.foundErrors', { count: Object.keys(errors).length }), {
+        type: 'error',
+      });
+    },
+  });
+
   const save = async (): Promise<void> => {
-    if (busy.value || disabled) return;
+    if (write.busy() || disabled) return;
     const reading = form.value.read();
     if (!isUndefined(reading.errors)) {
       form.value.focusError();
       return;
     }
-    const body = (reading.value ?? {}) as Record<string, unknown>;
     unplaced.value = '';
-    busy.value = true;
-    const outcome = await writeField(
-      collection.segment,
-      uuid,
-      body,
-      collection.translatable ? activeContentLocale() : undefined,
-    );
-    busy.value = false;
-    if (outcome.kind === 'saved') {
-      // A scoped answer omits a field outside its `select`; the seed still holds its value.
-      const record = { ...seed, ...outcome.record };
-      const state = { [field.name]: record[field.name] };
-      form.value.rebase(record);
-      history.push(state).setOriginalState(state);
-      toast(t('dashboard.saved'), { type: 'success', description: translateMessage(field.label) });
-      options.onUpdated?.(outcome.record);
-      options.onClose(handle.close);
-      return;
-    }
-    if (outcome.kind === 'gone') {
-      toast(t('dashboard.record.gone'), { type: 'error' });
-      options.onClose(handle.close);
-      return;
-    }
-    if (outcome.kind === 'invalid') {
-      const leftover = form.value.setErrors(outcome.errors);
-      unplaced.value = leftover === '' ? '' : namedMessage(collection, outcome.errors, leftover);
-      form.value.focusError();
-      toast(t('dashboard.foundErrors', { count: Object.keys(outcome.errors).length }), {
-        type: 'error',
-      });
-      return;
-    }
-    toast(t(outcome.kind === 'unreachable' ? 'dashboard.unreachable' : 'dashboard.writeFailed'), {
-      type: 'error',
+    await write.run({
+      body: reading.value ?? {},
+      query: collection.translatable ? { locale: activeContentLocale() } : undefined,
     });
   };
 
   const guardedClose = async (): Promise<void> => {
-    if (!history.isDirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+    if (!history.isDirty.value || (await confirmLeave())) {
       options.onClose(handle.close);
     }
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: () => void guardedClose(),
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   // `save` guards re-entry itself, so Save carries no disabled state.
@@ -277,7 +269,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const handle = popup(
     h(
       'fieldset',
-      { class: 'o-edit-field-fields', disabled: () => busy.value },
+      { class: 'o-edit-field-fields', disabled: () => write.busy() },
       () => form.value.render(),
       when(
         () => unplaced.value !== '',
@@ -345,54 +337,10 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     }
   });
 
-  onCleanup(() => setEditQueryParam(null));
+  const route = untracked(useRoute);
+  onCleanup(() => setEditQueryParam(null, route));
 
   return handle;
-}
-
-type WriteOutcome =
-  | { kind: 'saved'; record: Record<string, unknown> }
-  | { kind: 'invalid'; errors: Readonly<Record<string, string>> }
-  | { kind: 'gone' }
-  | { kind: 'unreachable' }
-  | { kind: 'writeFailed' };
-
-/**
- * Sends the one-field `PATCH`, retrying once on a busy `503`.
- * A given `locale` rides the URL, so a translatable collection writes that locale's value.
- */
-async function writeField(
-  segment: string,
-  uuid: string,
-  body: Record<string, unknown>,
-  locale?: string,
-): Promise<WriteOutcome> {
-  const suffix = isUndefined(locale) ? '' : `?${stringifySearchParams({ locale })}`;
-  const send = (): Promise<Response> =>
-    api(`PATCH /collections/${segment}/${uuid}${suffix}`, {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  try {
-    let response = await send();
-    if (response.status === 503) {
-      await sleep(1000);
-      response = await send();
-    }
-    if (response.ok) {
-      return { kind: 'saved', record: (await response.json()) as Record<string, unknown> };
-    }
-    if (response.status === 422) {
-      const answer = (await response.json()) as { data?: { errors?: Record<string, string> } };
-      const errors = Object.create(null) as Record<string, string>;
-      Object.assign(errors, answer.data?.errors ?? {});
-      return { kind: 'invalid', errors };
-    }
-    if (response.status === 404) return { kind: 'gone' };
-    return { kind: 'writeFailed' };
-  } catch {
-    return { kind: 'unreachable' };
-  }
 }
 
 /**

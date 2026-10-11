@@ -13,6 +13,7 @@
   "addItem": "Dodaj stavku",
   "apply": "Primijeni",
   "applyCount": "Primijeni ({count})",
+  "back": "Nazad",
   "blocks": {
     "addNested": "Dodaj ugniježđeni blok",
     "addTopLevel": "Dodaj blok na najvišem nivou",
@@ -38,6 +39,7 @@
     "pasteInside": "Zalijepi unutra"
   },
   "close": "Zatvori",
+  "collapse": "Skupi",
   "collections": "Kolekcije",
   "columns": {
     "autoWidth": "Automatska širina",
@@ -47,6 +49,9 @@
   },
   "confirmDelete": "Potvrdi",
   "confirmDeleteCount": "Potvrdi ({count})",
+  "copied": "Kopirano",
+  "copy": "Kopiraj",
+  "copyFailed": "Kopiranje nije uspjelo",
   "create": "Kreiraj",
   "created": "Kreirano",
   "delete": "Obriši",
@@ -55,6 +60,7 @@
   "deselect": "Poništi odabir",
   "disable": "Onemogući",
   "dragToAdjust": "Povuci za podešavanje vrijednosti",
+  "dragToReorder": "Prevuci za promjenu redoslijeda",
   "dropItemsHere": "Ispustite stavke ovdje",
   "duplicate": "Dupliciraj",
   "edit": "Uredi",
@@ -64,6 +70,7 @@
     "body": "Ova kolekcija je prazna."
   },
   "enable": "Omogući",
+  "expand": "Proširi",
   "field": {
     "hideDescription": "Sakrij opis",
     "hidePassword": "Sakrij lozinku",
@@ -122,6 +129,7 @@
     "toggleRelation": "Promijeni vezu",
     "true": "Tačno"
   },
+  "forbidden": "Nemate pristup ovome",
   "foundErrors": "{count, plural, one {Pronađena # greška} few {Pronađene # greške} other {Pronađeno # grešaka}}",
   "goBackHome": "Nazad na početnu",
   "header": {
@@ -176,6 +184,8 @@
     "urlPlaceholder": "Unesi URL",
     "useURL": "Koristi URL"
   },
+  "loadFailed": "Učitavanje nije uspjelo",
+  "loading": "Učitavanje",
   "login": {
     "email": "E-mail",
     "failed": "Prijava nije uspjela",
@@ -198,12 +208,17 @@
   "no": "Ne",
   "noBlocksAllowed": "Ovdje se ne mogu dodati blokovi",
   "noBlocksMatchSearch": "Nijedan blok ne odgovara pretrazi",
+  "noData": "Još nema podataka",
   "noFieldsToDisplay": "Nema polja za prikaz",
+  "noItems": "Ovdje još nema ničega",
   "noMatches": "Nema rezultata",
   "noResultsFound": "Nema pronađenih rezultata",
   "notFound": "Nije pronađeno",
+  "ofFirst": "{share} od prvog",
+  "ofPrevious": "{share} od prethodnog",
   "ok": "OK",
   "open": "Otvori",
+  "other": "Ostalo",
   "overview": {
     "activity": "Aktivnost",
     "loadMore": "Učitaj još",
@@ -226,6 +241,7 @@
     "moreGroups": "Više povezanih grupa je skriveno. Dodaj riječ da suziš pretragu.",
     "via": "{collection} preko {target}"
   },
+  "points": "{points} bod.",
   "record": {
     "collectionOverview": "Pregled `{collection}`",
     "confirmDelete": "Da li zaista želite obrisati ovaj unos?",
@@ -236,6 +252,7 @@
   "recordNotFound": "Zapis nije pronađen",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
   "redirected": "Preusmjereno",
+  "removeChip": "Ukloni {label}",
   "richText": {
     "blockType": "Vrsta bloka",
     "bulletList": "Lista sa tačkama",
@@ -262,14 +279,19 @@
   "search": "Pretraga",
   "searchPlaceholder": "Pretraži...",
   "select": "Odaberi",
+  "selectAll": "Odaberi sve",
   "selectBlock": "Odaberi blok",
   "selectCollection": "Odaberite kolekciju",
+  "selectRow": "Odaberi red",
   "selected": "{count, plural, one {# odabran} few {# odabrana} other {# odabrano}}",
   "session": {
     "expired": "Sesija je istekla",
     "expiredBody": "Sesija je istekla zbog neaktivnosti. Prijavite se ponovo da nastavite.",
     "leave": "Napusti"
   },
+  "share": "Udio",
+  "showAll": "Prikaži sve",
+  "showFewer": "Prikaži manje",
   "signOut": "Odjava",
   "sort": {
     "addAfter": "Dodaj poslije",
@@ -281,6 +303,11 @@
     "moveUp": "Pomjeri gore",
     "none": "Sortiranje nije primijenjeno",
     "title": "Sortiranje"
+  },
+  "status": {
+    "idle": "Neaktivno",
+    "off": "Isključeno",
+    "on": "Uključeno"
   },
   "table": {
     "allCount": "Svi ({count})",
@@ -304,6 +331,7 @@
     "close": "Zatvori obavještenje",
     "label": "Obavještenja alt+T"
   },
+  "total": "Ukupno",
   "translations": {
     "confirmDelete": "Da li zaista želite obrisati prijevod `{locale}`?",
     "copied": "Kopirano",
@@ -328,7 +356,10 @@
   "unsavedChanges": {
     "body": "Izmjene koje ste napravili možda neće biti sačuvane."
   },
+  "value": "Vrijednost",
+  "versus": "naspram {value}",
   "view": "Pogledaj",
+  "viewAll": "Prikaži sve",
   "viewFieldValue": "Pogledaj vrijednost polja",
   "widget": {
     "dashboard": "Dashboard"

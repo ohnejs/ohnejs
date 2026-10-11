@@ -26,14 +26,15 @@ export function headerDropdownMenu(): HTMLElement {
     open.value = false;
   };
 
-  const trigger = button(icon('dots-vertical'), {
+  const trigger = button(() => t('dashboard.header.openUserMenu'), {
+    icon: 'dots-vertical',
+    iconOnly: true,
     variant: 'outline',
     onClick: () => {
       open.value = true;
     },
   });
   effect(() => {
-    trigger.title = t('dashboard.header.openUserMenu');
     trigger.classList.toggle('ohne-button-primary', open.value);
     trigger.classList.toggle('ohne-button-outline', !open.value);
   });

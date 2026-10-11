@@ -9,14 +9,13 @@ import type {
   RecordLabel,
   Router,
 } from 'ohnejs';
-import type { ConditionObject, HTTPMethod } from 'ohnejs/utils';
+import type { ConditionObject, HTTPMethod, ResolvedLayoutNode } from 'ohnejs/utils';
 
 import {
   createRouter,
   endpointOf,
   isExpandableDescription,
   isRecordLabelTemplate,
-  parseLayoutItem,
   queryMetadata,
   useCollections,
   useRoutes,
@@ -28,6 +27,7 @@ import {
   isPlainObject,
   isString,
   isUndefined,
+  resolveLayoutNodes,
   serializeCondition,
   templateFields,
   toKebabCase,
@@ -235,116 +235,11 @@ export interface DashboardTable {
 }
 
 /**
- * A field the layout places, by name.
- */
-export interface DashboardLayoutField {
-  /**
-   * The node kind.
-   */
-  kind: 'field';
-
-  /**
-   * The field name, one of the host's described fields.
-   */
-  name: string;
-
-  /**
-   * The declared width: a plain CSS length, a percentage, or `auto`; absent when the item declares none.
-   */
-  width?: string;
-}
-
-/**
- * Nodes side by side, sharing the container's width.
- */
-export interface DashboardLayoutRow {
-  /**
-   * The node kind.
-   */
-  kind: 'row';
-
-  /**
-   * The entries, left to right; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A bordered group of nodes.
- */
-export interface DashboardLayoutCard {
-  /**
-   * The node kind.
-   */
-  kind: 'card';
-
-  /**
-   * The header label, a message the dashboard translates; absent when the card declares none.
-   */
-  label?: Message;
-
-  /**
-   * Whether the viewer can collapse the card.
-   */
-  collapsible: boolean;
-
-  /**
-   * The nodes, top to bottom; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A set of tabs, one panel of nodes per tab.
- */
-export interface DashboardLayoutTabs {
-  /**
-   * The node kind.
-   */
-  kind: 'tabs';
-
-  /**
-   * The tabs, left to right; never empty.
-   */
-  tabs: DashboardLayoutTab[];
-}
-
-/**
- * One tab of a `DashboardLayoutTabs` node.
- */
-export interface DashboardLayoutTab {
-  /**
-   * The tab label, a message the dashboard translates.
-   */
-  label: Message;
-
-  /**
-   * The panel's nodes, top to bottom; never empty.
-   */
-  nodes: DashboardLayoutNode[];
-}
-
-/**
- * A horizontal rule between stacked nodes.
- */
-export interface DashboardLayoutRule {
-  /**
-   * The node kind.
-   */
-  kind: 'rule';
-}
-
-/**
  * One node of a resolved field layout, as the dashboard renders it.
  * Labels arrive as messages and widths split from their names, so the client parses nothing.
  * A name the host does not describe is already dropped, and so is any container that left empty.
  */
-export type DashboardLayoutNode =
-  | DashboardLayoutField
-  | DashboardLayoutRow
-  | DashboardLayoutCard
-  | DashboardLayoutTabs
-  | DashboardLayoutRule;
+export type DashboardLayoutNode = ResolvedLayoutNode<Message>;
 
 /**
  * One collection the signed-in user may work with over the collections API.
@@ -505,7 +400,7 @@ export function resolveLayout(
   fields: readonly DashboardField[],
 ): DashboardLayoutNode[] | undefined {
   if (isUndefined(layout)) return undefined;
-  const nodes = resolveNodes(layout, new Set(fields.map((field) => field.name)));
+  const nodes = resolveLayoutNodes(layout, new Set(fields.map((field) => field.name)));
   return isEmpty(nodes) ? undefined : nodes;
 }
 
@@ -611,49 +506,9 @@ function describeField(
 }
 
 /**
- * Resolves one node list, recursing into rows, cards, and tabs.
- */
-function resolveNodes(nodes: FieldLayout, names: ReadonlySet<string>): DashboardLayoutNode[] {
-  const resolved: DashboardLayoutNode[] = [];
-  for (const node of nodes) {
-    if (node === '---') {
-      resolved.push({ kind: 'rule' });
-    } else if (isString(node)) {
-      const { name, width } = parseLayoutItem(node);
-      if (!names.has(name)) continue;
-      const field: DashboardLayoutField = { kind: 'field', name };
-      if (!isUndefined(width)) field.width = width;
-      resolved.push(field);
-    } else if ('row' in node) {
-      const inner = resolveNodes(node.row, names);
-      if (!isEmpty(inner)) resolved.push({ kind: 'row', nodes: inner });
-    } else if ('card' in node) {
-      const options = 'fields' in node.card ? node.card : { fields: node.card };
-      const inner = resolveNodes(options.fields, names);
-      if (isEmpty(inner)) continue;
-      const card: DashboardLayoutCard = {
-        kind: 'card',
-        collapsible: options.collapsible ?? false,
-        nodes: inner,
-      };
-      if (!isUndefined(options.label)) card.label = options.label;
-      resolved.push(card);
-    } else {
-      const tabs = node.tabs
-        .map((tab) => ({
-          label: tab.label,
-          nodes: resolveNodes(tab.fields, names),
-        }))
-        .filter((tab) => !isEmpty(tab.nodes));
-      if (!isEmpty(tabs)) resolved.push({ kind: 'tabs', tabs });
-    }
-  }
-  return resolved;
-}
-
-/**
  * The declared options of one field as the wire carries them, or `undefined` when nothing ships.
- * Only options the field type declares ship; the common flags already ride as their own members.
+ * Only the options the field type declares ship, plus a static `default` the editor seeds a new record from.
+ * The common flags already ride as their own members.
  * Structural options other members describe - a composite's `fields`, a relation's target - stay out.
  * So does any value that is not plain JSON data, like a computed default.
  */
@@ -661,11 +516,9 @@ function wireOptions(
   meta: FieldQueryMeta,
   options: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> | undefined {
-  const declared = meta.fieldType?.options;
-  if (isUndefined(declared)) return undefined;
   const structural = STRUCTURAL_OPTIONS[meta.kind];
   const wire: Record<string, unknown> = {};
-  for (const name of Object.keys(declared)) {
+  for (const name of [...Object.keys(meta.fieldType?.options ?? {}), 'default']) {
     if (structural?.has(name)) continue;
     const value = options[name];
     if (!isUndefined(value) && isJSONValue(value)) wire[name] = value;

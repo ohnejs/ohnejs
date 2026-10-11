@@ -10,7 +10,7 @@ import {
   selectedCountOf,
 } from '../../../../src/base/dashboard/components/collection-table-selection.ts';
 
-const ROWS = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+const ROWS = [{ UUID: 'a' }, { UUID: 'b' }, { UUID: 'c' }];
 
 describe('pageUUIDs', () => {
   it('reads the UUIDs in page order', () => {
@@ -35,7 +35,7 @@ describe('admitsRow', () => {
 
 describe('deletableRows', () => {
   it('keeps the admitted rows in page order', () => {
-    deepStrictEqual(deletableRows(ROWS, new Set(['c', 'a'])), [{ id: 'a' }, { id: 'c' }]);
+    deepStrictEqual(deletableRows(ROWS, new Set(['c', 'a'])), [{ UUID: 'a' }, { UUID: 'c' }]);
   });
 
   it('keeps the row objects themselves', () => {
@@ -47,71 +47,77 @@ describe('deletableRows', () => {
   });
 
   it('drops a row without a UUID', () => {
-    deepStrictEqual(deletableRows([{ id: 0 }, { id: 'a' }], new Set(['0', 'a'])), [{ id: 'a' }]);
+    deepStrictEqual(deletableRows([{}, { UUID: 'a' }], new Set(['a'])), [{ UUID: 'a' }]);
   });
 });
 
 describe('deletableSelection', () => {
   it('drops the rows the verdict refuses', () => {
-    deepStrictEqual(deletableSelection({ a: true, b: true, c: true }, new Set(['a', 'c'])), {
-      a: true,
-      c: true,
-    });
+    deepStrictEqual(
+      deletableSelection(new Set(['a', 'b', 'c']), new Set(['a', 'c'])),
+      new Set(['a', 'c']),
+    );
   });
 
-  it('keeps a deselected entry as written', () => {
-    deepStrictEqual(deletableSelection({ a: false, b: true }, new Set(['a'])), { a: false });
+  it('keeps the selection order', () => {
+    deepStrictEqual(
+      [...deletableSelection(new Set(['c', 'a', 'b']), new Set(['a', 'b', 'c']))],
+      ['c', 'a', 'b'],
+    );
+  });
+
+  it('drops a page index key', () => {
+    deepStrictEqual(deletableSelection(new Set([0, 'a']), new Set(['0', 'a'])), new Set(['a']));
   });
 
   it('never selects a deletable row the selection does not carry', () => {
-    deepStrictEqual(deletableSelection({ a: true }, new Set(['a', 'b'])), { a: true });
+    deepStrictEqual(deletableSelection(new Set(['a']), new Set(['a', 'b'])), new Set(['a']));
   });
 
   it('answers an empty selection for an empty verdict', () => {
-    deepStrictEqual(deletableSelection({ a: true }, new Set()), {});
+    deepStrictEqual(deletableSelection(new Set(['a']), new Set()), new Set());
   });
 });
 
 describe('selectAllStateOf', () => {
   it('stays unchecked while a deletable row is unselected', () => {
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true }, false, 1), false);
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true, c: false }, false, 1), false);
+    strictEqual(selectAllStateOf(ROWS, new Set(['a', 'b']), false, 1), false);
   });
 
   it('checks a full lone page', () => {
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true, c: true }, false, 1), true);
+    strictEqual(selectAllStateOf(ROWS, new Set(['a', 'b', 'c']), false, 1), true);
   });
 
   it('reads a full page among several as indeterminate', () => {
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true, c: true }, false, 2), 'indeterminate');
+    strictEqual(selectAllStateOf(ROWS, new Set(['a', 'b', 'c']), false, 2), 'indeterminate');
   });
 
   it('checks a full page among several while every page is selected', () => {
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true, c: true }, true, 2), true);
+    strictEqual(selectAllStateOf(ROWS, new Set(['a', 'b', 'c']), true, 2), true);
   });
 
   it('never checks for every page once a page row is deselected', () => {
-    strictEqual(selectAllStateOf(ROWS, { a: true, b: true }, true, 2), false);
+    strictEqual(selectAllStateOf(ROWS, new Set(['a', 'b']), true, 2), false);
   });
 
   it('never checks a page without a deletable row', () => {
-    strictEqual(selectAllStateOf([], {}, false, 1), false);
-    strictEqual(selectAllStateOf([], {}, true, 2), false);
+    strictEqual(selectAllStateOf([], new Set(), false, 1), false);
+    strictEqual(selectAllStateOf([], new Set(), true, 2), false);
   });
 
   it('ignores rows outside the deletable ones', () => {
     const deletable = deletableRows(ROWS, new Set(['a', 'b']));
-    strictEqual(selectAllStateOf(deletable, { a: true, b: true }, false, 1), true);
+    strictEqual(selectAllStateOf(deletable, new Set(['a', 'b']), false, 1), true);
   });
 });
 
 describe('selectedCountOf', () => {
-  it('counts the selected entries of the map', () => {
-    strictEqual(selectedCountOf({ a: true, b: false, c: true }, false, 120), 2);
-    strictEqual(selectedCountOf({}, false, 120), 0);
+  it('counts the selected keys', () => {
+    strictEqual(selectedCountOf(new Set(['a', 'c']), false, 120), 2);
+    strictEqual(selectedCountOf(new Set(), false, 120), 0);
   });
 
   it('answers the count across the pages while every page is selected', () => {
-    strictEqual(selectedCountOf({ a: true }, true, 120), 120);
+    strictEqual(selectedCountOf(new Set(['a']), true, 120), 120);
   });
 });

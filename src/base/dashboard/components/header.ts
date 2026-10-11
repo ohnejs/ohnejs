@@ -1,4 +1,4 @@
-import { button, css, h, icon, useT } from 'ohnejs/dashboard';
+import { button, css, h, useT } from 'ohnejs/dashboard';
 import { effect } from 'ohnejs/utils';
 
 import { contentLanguageSwitcher } from './content-language-switcher.ts';
@@ -129,13 +129,12 @@ export function header(options: HeaderOptions): HTMLElement {
     mark.el,
   );
 
-  const menuButton = button(icon('menu-2'), {
+  const menuButton = button(() => t('dashboard.header.toggleSidebar'), {
+    icon: 'menu-2',
+    iconOnly: true,
     variant: 'outline',
     class: 'o-header-menu-button',
     onClick: () => options.onToggleSidebar(),
-  });
-  effect(() => {
-    menuButton.title = t('dashboard.header.toggleSidebar');
   });
   effect(() => {
     const expanded = options.sidebarExpanded();

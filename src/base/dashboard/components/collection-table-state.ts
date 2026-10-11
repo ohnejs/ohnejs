@@ -1,3 +1,5 @@
+import type { Text } from 'ohnejs/dashboard';
+
 import {
   type ConditionObject,
   isEmpty,
@@ -6,7 +8,6 @@ import {
   isPositiveInteger,
   isString,
   isUndefined,
-  type MessageData,
   parseSearchParams,
   type SearchParamValue,
   stringifySearchParams,
@@ -39,7 +40,7 @@ export interface TableFieldMeta {
   /**
    * The display label, a message the table translates where it renders.
    */
-  label: MessageData;
+  label: Text;
 
   /**
    * How the field stores and reads; only `column` and `record` back a sortable column.
@@ -69,7 +70,7 @@ export interface TableColumnSpec {
   /**
    * The column header label, a message the table translates where it renders.
    */
-  label: MessageData;
+  label: Text;
 
   /**
    * Whether the column sorts, and which sort icons it shows.
@@ -448,27 +449,6 @@ export function sortFromOrder(
   return first.startsWith('-')
     ? { column: first.slice(1), direction: 'desc' }
     : { column: first, direction: 'asc' };
-}
-
-/**
- * The ordered selection after a selection-map write.
- * Entries of `previous` still selected keep their order; newly selected keys append in map order.
- * The record picker maintains pick order with this, so applying never reshuffles linked records.
- *
- * @example
- * ```ts
- * orderedSelection(['a', 'b'], { a: true, b: true, c: true }) // -> ['a', 'b', 'c']
- * orderedSelection(['a', 'b'], { b: true })                   // -> ['b']
- * ```
- */
-export function orderedSelection(
-  previous: readonly string[],
-  selected: Readonly<Record<number | string, boolean>>,
-): string[] {
-  const kept = previous.filter((key) => selected[key] === true);
-  const seen = new Set(kept);
-  const added = Object.keys(selected).filter((key) => selected[key] === true && !seen.has(key));
-  return [...kept, ...added];
 }
 
 /**

@@ -1,20 +1,17 @@
 import { defineDashboardPage, logout, navigate, sessionUser } from 'ohnejs/dashboard';
 import { isNull } from 'ohnejs/utils';
 
-import { resetLayoutState } from '../components/shell.ts';
-
 /**
- * The logout page: a blank frame that renders nothing.
+ * The logout page: it renders nothing, outside the frame.
  * Construction fires the sign-out; once the session has ended it lands on the login page.
  * A visitor already signed out leaves at once instead of signing out again.
- * The persisted sidebar state resets.
+ * Rendering bare keeps the frame's own signed-out redirect from racing it with a `next` back here.
  */
-export default defineDashboardPage(() => {
-  const leave = (): void => {
-    resetLayoutState();
-    navigate('/login');
-  };
-  if (isNull(sessionUser())) leave();
-  else void logout().then(leave);
-  return null;
-});
+export default defineDashboardPage(
+  () => {
+    if (isNull(sessionUser())) navigate('/login');
+    else void logout().then(() => navigate('/login'));
+    return null;
+  },
+  { frame: false },
+);

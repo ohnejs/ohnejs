@@ -1,5 +1,6 @@
 import {
   button,
+  confirmLeave,
   css,
   type DashboardField,
   h,
@@ -13,7 +14,7 @@ import {
 import { computed, deepEqual, effect, ref } from 'ohnejs/utils';
 
 import { historyButtons } from './history-buttons.ts';
-import { History, unsavedChanges } from './history.ts';
+import { History } from './history.ts';
 import { tableColumnsConfigurator } from './table-columns-configurator.ts';
 
 /**
@@ -56,7 +57,7 @@ css`
 /**
  * The table columns popup: the `tableColumnsConfigurator` inside the apply-or-discard shell.
  * Every change pushes onto a `History`; undo and redo step through it by button or hotkey.
- * A dirty edit guards Escape and the overlay click through the `unsavedChanges` prompt.
+ * A dirty edit guards Escape and the overlay click through the leave prompt.
  * A restore button applies the defaults at once; Apply hands `undefined` when the edit equals them.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
@@ -81,20 +82,19 @@ export function columnsPopup(options: ColumnsPopupOptions): Popup {
 
   const guardedClose = (): void => {
     void (async () => {
-      if (!dirty.value || ((await unsavedChanges.prompt?.()) ?? true)) {
+      if (!dirty.value || (await confirmLeave())) {
         options.onClose(handle.close);
       }
     })();
   };
 
-  const closeButton = button(icon('x'), {
+  const closeButton = button(() => t('dashboard.close'), {
+    icon: 'x',
+    iconOnly: true,
     size: -2,
     variant: 'ghost',
     class: 'ohne-ml-auto',
     onClick: guardedClose,
-  });
-  effect(() => {
-    closeButton.title = t('dashboard.close');
   });
 
   const restoreButton = when(

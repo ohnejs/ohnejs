@@ -2,9 +2,8 @@ import {
   alert,
   button,
   type Child,
-  field,
+  formField,
   h,
-  icon,
   logout,
   popup,
   sessionUser,
@@ -46,16 +45,16 @@ export function loginPopup(): Child {
       });
       popup(
         loginForm({
-          header: field(() =>
+          header: formField(() =>
             alert(
               h('p', null, () => t('dashboard.session.expiredBody')),
               {
                 title: () => t('dashboard.session.expired'),
-                icon: icon('info-circle'),
+                icon: 'info-circle',
               },
             ),
           ),
-          footer: field(
+          footer: formField(
             button(() => t('dashboard.session.leave'), {
               variant: 'outline',
               class: 'ohne-w-full',

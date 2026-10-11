@@ -1,7 +1,7 @@
 import type { Hotkeys } from 'ohnejs/dashboard';
 
-import { attachTooltip, button, h, icon, useHotkeys, useT } from 'ohnejs/dashboard';
-import { isNull, isUndefined, onCleanup } from 'ohnejs/utils';
+import { button, h, useHotkeys, useT } from 'ohnejs/dashboard';
+import { isNull, isUndefined, stripCodeSpans } from 'ohnejs/utils';
 
 import type { History } from './history.ts';
 
@@ -37,29 +37,25 @@ export function historyButtons<T extends object>(
   hotkeys.listen('undo', undo);
   hotkeys.listen('redo', redo);
 
-  const undoButton = button(icon('arrow-back-up'), {
+  const undoLabel = (): string => `${t('dashboard.history.undo')} \`${history.undoCount.value}\``;
+  const undoButton = button(undoLabel, {
+    icon: 'arrow-back-up',
+    iconOnly: true,
     variant: 'outline',
     disabled: () => !history.canUndo.value,
+    ariaLabel: () => stripCodeSpans(undoLabel()),
     onClick: () => undo(),
   });
-  onCleanup(
-    attachTooltip(
-      undoButton,
-      () => `${t('dashboard.history.undo')} \`${history.undoCount.value}\``,
-    ),
-  );
 
-  const redoButton = button(icon('arrow-forward-up'), {
+  const redoLabel = (): string => `${t('dashboard.history.redo')} \`${history.redoCount.value}\``;
+  const redoButton = button(redoLabel, {
+    icon: 'arrow-forward-up',
+    iconOnly: true,
     variant: 'outline',
     disabled: () => !history.canRedo.value,
+    ariaLabel: () => stripCodeSpans(redoLabel()),
     onClick: () => redo(),
   });
-  onCleanup(
-    attachTooltip(
-      redoButton,
-      () => `${t('dashboard.history.redo')} \`${history.redoCount.value}\``,
-    ),
-  );
 
   return h('div', { class: 'o-history-buttons ohne-row' }, undoButton, redoButton);
 }

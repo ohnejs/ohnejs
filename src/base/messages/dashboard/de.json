@@ -13,6 +13,7 @@
   "addItem": "Eintrag hinzufügen",
   "apply": "Anwenden",
   "applyCount": "Anwenden ({count})",
+  "back": "Zurück",
   "blocks": {
     "addNested": "Verschachtelten Block hinzufügen",
     "addTopLevel": "Block auf oberster Ebene hinzufügen",
@@ -38,6 +39,7 @@
     "pasteInside": "Darin einsetzen"
   },
   "close": "Schließen",
+  "collapse": "Einklappen",
   "collections": "Sammlungen",
   "columns": {
     "autoWidth": "Automatische Breite",
@@ -47,6 +49,9 @@
   },
   "confirmDelete": "Bestätigen",
   "confirmDeleteCount": "Bestätigen ({count})",
+  "copied": "Kopiert",
+  "copy": "Kopieren",
+  "copyFailed": "Kopieren fehlgeschlagen",
   "create": "Erstellen",
   "created": "Erstellt",
   "delete": "Löschen",
@@ -55,6 +60,7 @@
   "deselect": "Abwählen",
   "disable": "Deaktivieren",
   "dragToAdjust": "Ziehen, um den Wert anzupassen",
+  "dragToReorder": "Zum Umsortieren ziehen",
   "dropItemsHere": "Elemente hier ablegen",
   "duplicate": "Duplizieren",
   "edit": "Bearbeiten",
@@ -64,6 +70,7 @@
     "body": "Diese Sammlung ist leer."
   },
   "enable": "Aktivieren",
+  "expand": "Ausklappen",
   "field": {
     "hideDescription": "Beschreibung ausblenden",
     "hidePassword": "Passwort verbergen",
@@ -122,6 +129,7 @@
     "toggleRelation": "Verknüpfung umschalten",
     "true": "Wahr"
   },
+  "forbidden": "Darauf haben Sie keinen Zugriff",
   "foundErrors": "{count, plural, one {# Fehler gefunden} other {# Fehler gefunden}}",
   "goBackHome": "Zur Startseite",
   "header": {
@@ -176,6 +184,8 @@
     "urlPlaceholder": "URL eingeben",
     "useURL": "URL verwenden"
   },
+  "loadFailed": "Laden fehlgeschlagen",
+  "loading": "Wird geladen",
   "login": {
     "email": "E-Mail",
     "failed": "Die Anmeldung ist fehlgeschlagen",
@@ -198,12 +208,17 @@
   "no": "Nein",
   "noBlocksAllowed": "Hier können keine Blöcke hinzugefügt werden",
   "noBlocksMatchSearch": "Keine Blöcke entsprechen der Suche",
+  "noData": "Noch keine Daten",
   "noFieldsToDisplay": "Keine Felder zum Anzeigen",
+  "noItems": "Noch nichts hier",
   "noMatches": "Keine Treffer",
   "noResultsFound": "Keine Ergebnisse gefunden",
   "notFound": "Nicht gefunden",
+  "ofFirst": "{share} des ersten",
+  "ofPrevious": "{share} des vorherigen",
   "ok": "OK",
   "open": "Öffnen",
+  "other": "Sonstige",
   "overview": {
     "activity": "Aktivität",
     "loadMore": "Mehr laden",
@@ -226,6 +241,7 @@
     "moreGroups": "Weitere verwandte Gruppen ausgeblendet. Gib ein weiteres Wort ein, um die Suche einzugrenzen.",
     "via": "{collection} über {target}"
   },
+  "points": "{points} Pkt.",
   "record": {
     "collectionOverview": "`{collection}`-Übersicht",
     "confirmDelete": "Diesen Eintrag wirklich löschen?",
@@ -236,6 +252,7 @@
   "recordNotFound": "Datensatz nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",
   "redirected": "Weitergeleitet",
+  "removeChip": "{label} entfernen",
   "richText": {
     "blockType": "Blocktyp",
     "bulletList": "Aufzählung",
@@ -262,14 +279,19 @@
   "search": "Suchen",
   "searchPlaceholder": "Suchen...",
   "select": "Auswählen",
+  "selectAll": "Alle auswählen",
   "selectBlock": "Block auswählen",
   "selectCollection": "Sammlung wählen",
+  "selectRow": "Zeile auswählen",
   "selected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
   "session": {
     "expired": "Sitzung abgelaufen",
     "expiredBody": "Die Sitzung ist wegen Inaktivität abgelaufen. Bitte erneut anmelden, um fortzufahren.",
     "leave": "Verlassen"
   },
+  "share": "Anteil",
+  "showAll": "Alle anzeigen",
+  "showFewer": "Weniger anzeigen",
   "signOut": "Abmelden",
   "sort": {
     "addAfter": "Danach einfügen",
@@ -281,6 +303,11 @@
     "moveUp": "Nach oben",
     "none": "Keine Sortierung angewendet",
     "title": "Sortierung"
+  },
+  "status": {
+    "idle": "Inaktiv",
+    "off": "Aus",
+    "on": "An"
   },
   "table": {
     "allCount": "Alle ({count})",
@@ -304,6 +331,7 @@
     "close": "Benachrichtigung schließen",
     "label": "Benachrichtigungen alt+T"
   },
+  "total": "Gesamt",
   "translations": {
     "confirmDelete": "Die Übersetzung `{locale}` wirklich löschen?",
     "copied": "Kopiert",
@@ -328,7 +356,10 @@
   "unsavedChanges": {
     "body": "Vorgenommene Änderungen werden möglicherweise nicht gespeichert."
   },
+  "value": "Wert",
+  "versus": "vs. {value}",
   "view": "Ansehen",
+  "viewAll": "Alle anzeigen",
   "viewFieldValue": "Feldwert ansehen",
   "widget": {
     "dashboard": "Dashboard"

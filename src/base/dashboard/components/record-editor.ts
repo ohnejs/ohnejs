@@ -1,8 +1,8 @@
 import {
   api,
-  attachTooltip,
   button,
   type Child,
+  confirmLeave,
   container,
   createFieldForm,
   css,
@@ -24,11 +24,11 @@ import {
   queueToast,
   type RowVerdicts,
   seedLabel,
-  setNavigationGuard,
   signInCount,
   toast,
   useDashboardLanguage,
   useHotkeys,
+  useRoute,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -41,12 +41,12 @@ import {
   isString,
   isUndefined,
   onCleanup,
-  parseSearchParams,
   recordHref,
   type Ref,
   ref,
   sleep,
   stringifySearchParams,
+  stripCodeSpans,
   untracked,
 } from 'ohnejs/utils';
 
@@ -58,7 +58,7 @@ import {
 } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
-import { History, unsavedChanges } from './history.ts';
+import { History } from './history.ts';
 import { translationsPopup } from './translations-popup.ts';
 
 /**
@@ -216,7 +216,7 @@ export interface RecordEditor {
  * Create and edit share this one editor; `uuid` absent means create.
  * A singleton never creates: `uuid` absent there edits its one record.
  * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
+ * Leaving dirty edits asks first, in-app and on tab close, through the history's unsaved-changes guard.
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
@@ -324,17 +324,15 @@ export function useRecordEditor(
     settleHash(form.value);
   };
   const applyLinkedLocale = (): void => {
-    const params = parseSearchParams(location.search);
+    const params = untracked(() => useRoute()?.query) ?? {};
     const linked = params.locale;
     if (!isString(linked)) return;
     const listed = untracked(dashboardMeta)?.locales.includes(linked) ?? false;
     if (listed && linked !== untracked(effectiveContentLocale)) contentLocale.value = linked;
     const query = stringifySearchParams({ ...params, locale: undefined });
-    window.history.replaceState(
-      null,
-      '',
-      location.pathname + (query === '' ? '' : `?${query}`) + location.hash,
-    );
+    navigate(location.pathname + (query === '' ? '' : `?${query}`) + location.hash, {
+      replace: true,
+    });
   };
 
   if (create) {
@@ -351,8 +349,7 @@ export function useRecordEditor(
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);
       const switchLocale = async (next: string | undefined): Promise<void> => {
-        const allowed =
-          !busy.value && (!history.isDirty.value || ((await unsavedChanges.prompt?.()) ?? true));
+        const allowed = !busy.value && (!history.isDirty.value || (await confirmLeave()));
         if (!allowed) {
           contentLocale.value = applied;
           return;
@@ -368,12 +365,6 @@ export function useRecordEditor(
       });
     }
   }
-
-  // The in-app leg of the leave guard: `unsavedChanges` owns the dialog and the tab-close leg.
-  setNavigationGuard(() =>
-    !history.isDirty.value || isUndefined(unsavedChanges.prompt) ? true : unsavedChanges.prompt(),
-  );
-  onCleanup(() => setNavigationGuard(null));
 
   const save = async (): Promise<void> => {
     const live = form.value;
@@ -555,15 +546,15 @@ export function recordEditorHeading(editor: RecordEditor): Child[] {
   const { collection } = editor;
   const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
   if (!collection.singleton) {
-    const backButton = button(icon('folder'), {
+    const backLabel = (): string =>
+      t('dashboard.record.collectionOverview', { collection: collection.label });
+    const backButton = button(backLabel, {
+      icon: 'folder',
+      iconOnly: true,
       variant: 'outline',
       href: `/collections/${collection.segment}`,
+      ariaLabel: () => stripCodeSpans(backLabel()),
     });
-    onCleanup(
-      attachTooltip(backButton, () =>
-        t('dashboard.record.collectionOverview', { collection: collection.label }),
-      ),
-    );
     heading.unshift(backButton);
     heading.push(
       editor.create
@@ -641,14 +632,15 @@ function recordMenu(editor: RecordEditor): Child {
   const close = (): void => {
     open.value = false;
   };
-  const trigger = button(icon('dots-vertical'), {
+  const trigger = button(() => t('dashboard.record.moreActions'), {
+    icon: 'dots-vertical',
+    iconOnly: true,
     variant: 'outline',
     onClick: () => {
       open.value = true;
     },
   });
   effect(() => {
-    trigger.title = t('dashboard.record.moreActions');
     trigger.classList.toggle('ohne-button-primary', open.value);
     trigger.classList.toggle('ohne-button-outline', !open.value);
   });

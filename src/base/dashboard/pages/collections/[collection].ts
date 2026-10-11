@@ -5,16 +5,16 @@ import {
   dashboardMeta,
   defineDashboardPage,
   h,
-  setDocumentTitle,
+  useDocumentTitle,
+  useFrame,
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { effect, isUndefined } from 'ohnejs/utils';
+import { isUndefined } from 'ohnejs/utils';
 
 import { collectionTable } from '../../components/collection-table.ts';
 import { recordEditor } from '../../components/record-editor.ts';
 import { recordViewOf } from '../../components/record-view.ts';
-import { shell } from '../../components/shell.ts';
 
 css`
   .pane-missing {
@@ -30,12 +30,10 @@ css`
  * A singleton's pane is its record editor.
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
-export default defineDashboardPage((route) =>
-  shell(() => pane(() => route.params.collection ?? ''), {
-    noMainPadding: true,
-    noMainScroll: true,
-  }),
-);
+export default defineDashboardPage((route) => {
+  useFrame({ fill: true });
+  return pane(() => route.params.collection ?? '');
+});
 
 /**
  * Renders the collection's table, or a singleton's editor, once the discovery read answers.
@@ -45,7 +43,7 @@ function pane(segment: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
-  effect(() => setDocumentTitle(entry()?.label));
+  useDocumentTitle(() => entry()?.label);
   return when(
     () => !isUndefined(dashboardMeta()),
     () =>

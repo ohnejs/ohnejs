@@ -13,6 +13,7 @@
   "addItem": "Add item",
   "apply": "Apply",
   "applyCount": "Apply ({count})",
+  "back": "Back",
   "blocks": {
     "addNested": "Add nested block",
     "addTopLevel": "Add top-level block",
@@ -38,6 +39,7 @@
     "pasteInside": "Paste inside"
   },
   "close": "Close",
+  "collapse": "Collapse",
   "collections": "Collections",
   "columns": {
     "autoWidth": "Auto width",
@@ -47,6 +49,9 @@
   },
   "confirmDelete": "Confirm",
   "confirmDeleteCount": "Confirm ({count})",
+  "copied": "Copied",
+  "copy": "Copy",
+  "copyFailed": "Copy failed",
   "create": "Create",
   "created": "Created",
   "delete": "Delete",
@@ -55,6 +60,7 @@
   "deselect": "Deselect",
   "disable": "Disable",
   "dragToAdjust": "Drag to adjust value",
+  "dragToReorder": "Drag to reorder",
   "dropItemsHere": "Drop items here",
   "duplicate": "Duplicate",
   "edit": "Edit",
@@ -64,6 +70,7 @@
     "body": "This collection is empty."
   },
   "enable": "Enable",
+  "expand": "Expand",
   "field": {
     "hideDescription": "Hide description",
     "hidePassword": "Hide password",
@@ -122,6 +129,7 @@
     "toggleRelation": "Toggle relation",
     "true": "True"
   },
+  "forbidden": "You do not have access to this",
   "foundErrors": "{count, plural, one {Found # error} other {Found # errors}}",
   "goBackHome": "Go back home",
   "header": {
@@ -176,6 +184,8 @@
     "urlPlaceholder": "Enter a URL",
     "useURL": "Use URL"
   },
+  "loadFailed": "Failed to load",
+  "loading": "Loading",
   "login": {
     "email": "Email",
     "failed": "The sign-in failed",
@@ -198,12 +208,17 @@
   "no": "No",
   "noBlocksAllowed": "No blocks can be added here",
   "noBlocksMatchSearch": "No blocks match your search criteria",
+  "noData": "No data yet",
   "noFieldsToDisplay": "No fields to display",
+  "noItems": "Nothing here yet",
   "noMatches": "No matches",
   "noResultsFound": "No results found",
   "notFound": "Not found",
+  "ofFirst": "{share} of first",
+  "ofPrevious": "{share} of previous",
   "ok": "OK",
   "open": "Open",
+  "other": "Other",
   "overview": {
     "activity": "Activity",
     "loadMore": "Load more",
@@ -226,6 +241,7 @@
     "moreGroups": "More related groups hidden. Add a word to narrow it down.",
     "via": "{collection} via {target}"
   },
+  "points": "{points} pts",
   "record": {
     "collectionOverview": "`{collection}` overview",
     "confirmDelete": "Are you sure you want to delete this entry?",
@@ -236,6 +252,7 @@
   "recordNotFound": "Record not found",
   "records": "{count, plural, one {# record} other {# records}}",
   "redirected": "Redirected",
+  "removeChip": "Remove {label}",
   "richText": {
     "blockType": "Block type",
     "bulletList": "Bulleted list",
@@ -262,14 +279,19 @@
   "search": "Search",
   "searchPlaceholder": "Search...",
   "select": "Select",
+  "selectAll": "Select all",
   "selectBlock": "Select block",
   "selectCollection": "Select a collection",
+  "selectRow": "Select row",
   "selected": "{count, plural, one {# selected} other {# selected}}",
   "session": {
     "expired": "Session expired",
     "expiredBody": "Your session has timed out due to inactivity. Please log in again to continue.",
     "leave": "Leave"
   },
+  "share": "Share",
+  "showAll": "Show all",
+  "showFewer": "Show fewer",
   "signOut": "Sign out",
   "sort": {
     "addAfter": "Add after",
@@ -281,6 +303,11 @@
     "moveUp": "Move up",
     "none": "No sorting applied",
     "title": "Sorting"
+  },
+  "status": {
+    "idle": "Idle",
+    "off": "Off",
+    "on": "On"
   },
   "table": {
     "allCount": "All ({count})",
@@ -304,6 +331,7 @@
     "close": "Close notification",
     "label": "Notifications alt+T"
   },
+  "total": "Total",
   "translations": {
     "confirmDelete": "Are you sure you want to delete the `{locale}` translation?",
     "copied": "Copied",
@@ -328,7 +356,10 @@
   "unsavedChanges": {
     "body": "Changes that you made may not be saved."
   },
+  "value": "Value",
+  "versus": "vs {value}",
   "view": "View",
+  "viewAll": "View all",
   "viewFieldValue": "View field value",
   "widget": {
     "dashboard": "Dashboard"

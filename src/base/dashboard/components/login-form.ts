@@ -2,16 +2,13 @@ import {
   button,
   checkbox,
   type Child,
-  field,
-  fieldLabel,
-  fieldMessage,
+  formField,
   h,
   icon,
   login,
   textInput,
   toast,
   useT,
-  when,
 } from 'ohnejs/dashboard';
 import { effect, isNull, isUndefined, ref } from 'ohnejs/utils';
 
@@ -103,6 +100,8 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     reveal.title = t(
       revealed.value ? 'dashboard.login.hidePassword' : 'dashboard.login.showPassword',
     );
+    reveal.setAttribute('aria-label', reveal.title);
+    reveal.setAttribute('aria-pressed', String(revealed.value));
   });
 
   const rememberRow = checkbox(remember, () => t('dashboard.login.rememberMe'));
@@ -121,39 +120,35 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
       },
     },
     options.header,
-    field([
-      fieldLabel(h('label', { for: 'email' }, () => t('dashboard.login.email'))),
+    formField(
       textInput(email, {
         autocomplete: 'email',
         // A browser refuses autofocus in a cross-origin frame and logs the refusal.
         autofocus: window.self === window.top,
         id: 'email',
         name: 'email',
-        error: () => emailError.value,
       }),
-      when(
-        () => emailError.value,
-        () => fieldMessage(() => t('validation.required'), { error: () => true }),
-      ),
-    ]),
-    field([
-      fieldLabel(h('label', { for: 'password' }, () => t('dashboard.login.password'))),
+      {
+        label: 'dashboard.login.email',
+        error: () => (emailError.value ? t('validation.required') : ''),
+      },
+    ),
+    formField(
       textInput(password, {
         type: () => (revealed.value ? 'text' : 'password'),
         autocomplete: 'current-password',
         id: 'password',
         name: 'password',
-        error: () => passwordError.value,
         suffix: reveal,
       }),
-      when(
-        () => passwordError.value,
-        () => fieldMessage(() => t('validation.required'), { error: () => true }),
-      ),
-    ]),
-    field(rememberRow),
+      {
+        label: 'dashboard.login.password',
+        error: () => (passwordError.value ? t('validation.required') : ''),
+      },
+    ),
+    formField(rememberRow),
     ...shellSlots('loginFields').map((render) => render()),
-    field(button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' })),
+    formField(button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' })),
     options.footer,
     ...shellSlots('login').map((render) => render()),
   );

@@ -4,11 +4,14 @@ import {
   container,
   css,
   FOCUSABLE,
+  type FrameOptions,
   h,
   isEditingText,
   navigate,
+  type PageFrameContext,
+  releaseUnsavedChanges,
   sessionUser,
-  setNavigationGuard,
+  useRoute,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -31,78 +34,40 @@ import { toasterLabels } from './toaster-labels.ts';
 import { unsavedChangesGuard } from './unsaved-changes.ts';
 import { wrapper } from './wrapper.ts';
 
-/**
- * Options for `shell`.
- */
-export interface ShellOptions {
-  /**
-   * Removes the main area's `0.5rem` padding.
-   *
-   * @default
-   * false
-   */
-  noMainPadding?: boolean;
-
-  /**
-   * Keeps the main area from scrolling, so the content manages its own scroll at full height.
-   *
-   * @default
-   * false
-   */
-  noMainScroll?: boolean;
-}
-
-interface LayoutState {
-  sidebarExpanded: boolean;
-  sidebarScrollY: number;
-}
-
-const layoutState = ref<LayoutState>({ sidebarExpanded: false, sidebarScrollY: 0 });
-const transition = ref(false);
-const wide = ref(0);
-let transitionTimeout: number | undefined;
-
-/**
- * Forgets the persisted sidebar state.
- */
-export function resetLayoutState(): void {
-  layoutState.value = { sidebarExpanded: false, sidebarScrollY: 0 };
-}
-
 const EDGE_ZONE_PX = 24;
+
+const expanded = ref(false);
+const transition = ref(false);
+let transitionTimeout: number | undefined;
 
 /**
  * Whether the sidebar is expanded.
  * Reactive.
  */
 export function sidebarExpanded(): boolean {
-  return layoutState.value.sidebarExpanded;
+  return expanded.value;
 }
 
 /**
  * Opens or closes the sidebar, animated.
- * A page that hides the shell's own menu button, as a wide page does on a wide screen, renders one calling this.
+ * A page can hide the shell's own menu button, as a wide page does on a wide screen.
+ * It then renders one calling this.
  */
 export function toggleSidebar(): void {
-  clearTimeout(transitionTimeout);
-  transition.value = true;
-  void nextTick().then(() => {
-    const state = untracked(() => layoutState.value);
-    layoutState.value = { ...state, sidebarExpanded: !state.sidebarExpanded };
-    transitionTimeout = window.setTimeout(() => {
-      transition.value = false;
-    }, overlayTransitionDuration());
-  });
+  moveSidebar(!untracked(() => expanded.value));
 }
 
 /**
- * Makes the shell wide while the calling render scope lives: full width, the sidebar an overlay at every width.
- * A page with its own columns, like a live editor, calls it from its render.
+ * Opens or closes the sidebar on the next tick, animated.
  */
-export function useWideShell(): void {
-  wide.value = untracked(() => wide.value) + 1;
-  onCleanup(() => {
-    wide.value = untracked(() => wide.value) - 1;
+function moveSidebar(open: boolean): void {
+  clearTimeout(transitionTimeout);
+  transition.value = true;
+  void nextTick().then(() => {
+    expanded.value = open;
+    transitionTimeout = window.setTimeout(() => {
+      transition.value = false;
+    }, overlayTransitionDuration());
   });
 }
 
@@ -174,11 +139,11 @@ css`
     padding: 0.5rem;
   }
 
-  .o-main-no-padding {
+  .o-main-fill {
     padding: 0;
   }
 
-  .o-main-no-scroll > .ohne-container-content {
+  .o-main-fill > .ohne-container-content {
     height: 100%;
   }
 
@@ -343,23 +308,29 @@ css`
 `;
 
 /**
- * The signed-in frame.
+ * The base layer's page frame, registered by `boot/shell.ts`.
  * It holds the header row, the sidebar menu column, and the scrollable main area between the rails.
- * While the session resolves it renders nothing, so the paper stays calm.
+ * While the session resolves it renders nothing, so the paper stays calm and no page builds.
  * A signed-out session redirects to the login page, carrying the current path as `next`.
  * Under `1024px` the sidebar becomes an overlay.
  * The hamburger, a left-edge swipe, Escape, and a click on the receded main area all toggle it.
+ * Every navigation closes it.
  * Tab cycles inside header and sidebar while it is open.
- * The sidebar's scroll position and expanded state persist across navigations.
+ * Each new page starts at the top of the main area; a query-only step keeps the scroll.
  * The `global` slot renderers mount beside the page column while signed in, so they never recede with it.
  */
-export function shell(content: () => Child, options: ShellOptions = {}): Child {
+export function shell({ content, options }: PageFrameContext): Child {
   effect(() => {
     if (isNull(sessionUser())) {
       // The session is gone: a dirty editor's guard would block this redirect and strand a blank page.
-      setNavigationGuard(null);
+      releaseUnsavedChanges();
       navigate(`/login?${stringifySearchParams({ next: location.pathname })}`);
     }
+  });
+  onCleanup(() => {
+    clearTimeout(transitionTimeout);
+    expanded.value = false;
+    transition.value = false;
   });
   const signedIn = (): boolean => !isNullish(sessionUser());
   const root = base(
@@ -378,25 +349,36 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
 /**
  * The layout grid proper: header, sidebar container, main container, and the overlay-sidebar behavior.
  */
-function layout(content: () => Child, options: ShellOptions): HTMLElement {
-  const expanded = sidebarExpanded;
-
+function layout(
+  content: () => Child,
+  options: () => Readonly<Required<FrameOptions>>,
+): HTMLElement {
   const headerEl = h(
     'div',
     { class: 'o-header' },
-    header({ sidebarExpanded: expanded, onToggleSidebar: toggleSidebar }),
+    header({ sidebarExpanded, onToggleSidebar: toggleSidebar }),
   );
 
   const sidebarEl = container(h('div', { class: 'o-sidebar-content' }, sidebar()));
   sidebarEl.classList.add('o-sidebar');
 
-  const mainEl = container(h('div', { class: 'o-main-content' }, content()));
+  const mainEl = container(h('div', { class: 'o-main-content' }, content));
   mainEl.classList.add('o-main');
-  if (options.noMainPadding === true) mainEl.classList.add('o-main-no-padding');
-  if (options.noMainScroll === true) mainEl.classList.add('o-main-no-scroll');
+  effect(() => mainEl.classList.toggle('o-main-fill', options().fill));
+  effect(() => {
+    void useRoute();
+    mainEl.scrollTop = 0;
+  });
   mainEl.addEventListener('click', () => {
     // A page's own menu button already toggled before its click bubbles here.
-    if (untracked(expanded) && !untracked(() => transition.value)) toggleSidebar();
+    if (untracked(sidebarExpanded) && !untracked(() => transition.value)) toggleSidebar();
+  });
+
+  effect(() => {
+    const route = useRoute();
+    void route?.path;
+    void route?.query;
+    if (untracked(sidebarExpanded)) moveSidebar(false);
   });
 
   let releaseTrap: (() => void) | undefined;
@@ -433,7 +415,7 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
     };
   };
   effect(() => {
-    if (expanded()) untracked(activateTrap);
+    if (sidebarExpanded()) untracked(activateTrap);
     else releaseTrap?.();
   });
 
@@ -451,23 +433,13 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
     const deltaX = touch.clientX - swipeStartX;
     const deltaY = touch.clientY - swipeStartY;
     if (Math.abs(deltaX) < 50 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
-    if (!untracked(expanded) && deltaX > 0 && swipeStartX <= EDGE_ZONE_PX) toggleSidebar();
-    else if (untracked(expanded) && deltaX < 0) toggleSidebar();
+    if (!untracked(sidebarExpanded) && deltaX > 0 && swipeStartX <= EDGE_ZONE_PX) toggleSidebar();
+    else if (untracked(sidebarExpanded) && deltaX < 0) toggleSidebar();
   };
   document.body.addEventListener('touchstart', onTouchStart, { passive: true });
   document.body.addEventListener('touchend', onTouchEnd, { passive: true });
 
-  queueMicrotask(() => {
-    sidebarEl.scrollTop = layoutState.value.sidebarScrollY;
-    queueMicrotask(() => {
-      // A persisted expanded overlay closes itself, animated, after a menu-item navigation.
-      if (layoutState.value.sidebarExpanded) toggleSidebar();
-    });
-  });
-
   onCleanup(() => {
-    layoutState.value = { ...layoutState.value, sidebarScrollY: sidebarEl.scrollTop };
-    clearTimeout(transitionTimeout);
     releaseTrap?.();
     document.body.removeEventListener('touchstart', onTouchStart);
     document.body.removeEventListener('touchend', onTouchEnd);
@@ -479,11 +451,12 @@ function layout(content: () => Child, options: ShellOptions): HTMLElement {
       tabindex: '-1',
       class: () =>
         'o-layout o-layout-sm' +
-        (wide.value > 0 ? ' o-layout-wide' : '') +
-        (expanded() ? ' o-sidebar-expanded' : '') +
+        (options().wide ? ' o-layout-wide' : '') +
+        (sidebarExpanded() ? ' o-sidebar-expanded' : '') +
         (transition.value ? ' o-layout-transition' : ''),
       onKeydown: (event: KeyboardEvent) => {
-        if (event.key === 'Escape' && untracked(expanded) && !isEditingText()) toggleSidebar();
+        if (event.key === 'Escape' && untracked(sidebarExpanded) && !isEditingText())
+          toggleSidebar();
       },
     },
     headerEl,

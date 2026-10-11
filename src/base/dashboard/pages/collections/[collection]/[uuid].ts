@@ -8,16 +8,16 @@ import {
   h,
   knownLabel,
   navigate,
-  setDocumentTitle,
+  useDocumentTitle,
+  useFrame,
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { effect, isUndefined, recordHref } from 'ohnejs/utils';
+import { isUndefined, recordHref } from 'ohnejs/utils';
 
 import { activeContentLocale } from '../../../components/content-language-switcher.ts';
 import { recordEditor } from '../../../components/record-editor.ts';
 import { recordViewOf } from '../../../components/record-view.ts';
-import { shell } from '../../../components/shell.ts';
 
 css`
   .o-record-page-missing {
@@ -36,16 +36,13 @@ css`
  * A collection that declares a `recordPath` opens its records there, so this page redirects to it.
  * An unknown segment renders a dim not-found line once the discovery read has answered.
  */
-export default defineDashboardPage((route) =>
-  shell(
-    () =>
-      pane(
-        () => route.params.collection ?? '',
-        () => route.params.uuid ?? '',
-      ),
-    { noMainPadding: true, noMainScroll: true },
-  ),
-);
+export default defineDashboardPage((route) => {
+  useFrame({ fill: true });
+  return pane(
+    () => route.params.collection ?? '',
+    () => route.params.uuid ?? '',
+  );
+});
 
 /**
  * Renders the editor once the discovery read answers, or the not-found line.
@@ -54,18 +51,15 @@ function pane(segment: () => string, uuid: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
-  effect(() => {
+  useDocumentTitle(() => {
     const collection = entry();
     const id = uuid();
-    if (isUndefined(collection)) {
-      setDocumentTitle(undefined);
-      return;
-    }
+    if (isUndefined(collection)) return undefined;
     const label =
       id === 'new'
         ? t('dashboard.new')
         : (knownLabel(collection.name, id, activeContentLocale()) ?? fallbackLabel(id));
-    setDocumentTitle(`${label} - ${collection.label}`);
+    return `${label} - ${collection.label}`;
   });
   return when(
     () => !isUndefined(dashboardMeta()),

@@ -1,11 +1,5 @@
-import {
-  applyHook,
-  type FieldLayout,
-  type FieldLayoutNode,
-  layoutFieldNames,
-  queryMetadata,
-} from 'ohnejs';
-import { isUndefined, jsonClone } from 'ohnejs/utils';
+import { applyHook, type FieldLayout, type FieldLayoutNode, queryMetadata } from 'ohnejs';
+import { isUndefined, jsonClone, layoutFieldNames } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 

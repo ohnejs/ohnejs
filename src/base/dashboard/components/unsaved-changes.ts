@@ -3,15 +3,13 @@ import {
   type Child,
   css,
   h,
-  isEditingText,
   isMac,
   popup,
+  registerLeavePrompt,
   useT,
   when,
 } from 'ohnejs/dashboard';
 import { isString, onCleanup, ref } from 'ohnejs/utils';
-
-import { unsavedChanges } from './history.ts';
 
 css`
   .o-unsaved-changes-row {
@@ -22,24 +20,20 @@ css`
 
 /**
  * The unsaved-changes dialog, mounted once by the shell.
- * It installs `unsavedChanges.prompt`: each call opens the dialog.
+ * It registers itself as the leave prompt: each call opens the dialog.
  * The promise resolves `true` to leave, discarding the edits, or `false` to stay.
  * OK, and a bare Enter while no button holds focus, leave.
  * Cancel, Escape, and the overlay click stay.
  * While the dialog is open, the platform undo and redo strokes are swallowed before any hotkey.
- * Independently, while any registered history is dirty, closing the tab raises the browser's leave prompt.
  */
 export function unsavedChangesGuard(): Child {
   const t = useT();
   const visible = ref(false);
   let resolvers: ((leave: boolean) => void)[] = [];
 
-  unsavedChanges.prompt = () => {
+  registerLeavePrompt(() => {
     visible.value = true;
     return new Promise<boolean>((resolve) => resolvers.push(resolve));
-  };
-  onCleanup(() => {
-    unsavedChanges.prompt = undefined;
   });
 
   const settle = (leave: boolean): void => {
@@ -57,18 +51,6 @@ export function unsavedChangesGuard(): Child {
     visible.value = false;
     settle(true);
   };
-
-  const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-    if (isEditingText() && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    if ([...unsavedChanges.histories].some((history) => history.isDirty.value)) {
-      event.preventDefault();
-      event.returnValue = '';
-    }
-  };
-  window.addEventListener('beforeunload', onBeforeUnload);
-  onCleanup(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
   // Hotkeys allowed in overlays still fire at the popup's depth, so undo and redo are swallowed here.
   const suppressHistoryKeys = (event: KeyboardEvent): void => {

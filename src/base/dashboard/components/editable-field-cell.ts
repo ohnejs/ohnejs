@@ -1,19 +1,15 @@
 import {
-  attachTooltip,
   button,
   type Child,
   css,
   type DashboardCollection,
   type DashboardField,
   h,
-  icon,
   type IconName,
-  type TableCell,
-  type TableColumns,
   useT,
   when,
 } from 'ohnejs/dashboard';
-import { effect, isNull, isUndefined, onCleanup, ref } from 'ohnejs/utils';
+import { effect, isNull, isUndefined, ref } from 'ohnejs/utils';
 
 import {
   editQueryParam,
@@ -26,9 +22,14 @@ import {
  */
 export interface EditableFieldCellOptions {
   /**
-   * The table cell payload carrying the row and column the cell renders.
+   * The record the row shows; the popup opens on its value of `field`.
    */
-  cell: TableCell<TableColumns>;
+  record: Record<string, unknown>;
+
+  /**
+   * The row's id in the `edit` query parameter: the record's `UUID`, or its page index.
+   */
+  rowID: string;
 
   /**
    * The collection the row belongs to; the edit popup writes through it.
@@ -163,7 +164,7 @@ export function editableFieldCell(
   const position = options.editButtonPosition ?? 'relative';
   const resolved = ref<'absolute' | 'relative'>(position === 'auto' ? 'relative' : position);
   const hidden = options.hideActions === true && options.force !== true;
-  const rowID = String(options.cell.row.id);
+  const { rowID } = options;
   const open = ref(false);
 
   if (isUndefined(action)) {
@@ -173,18 +174,19 @@ export function editableFieldCell(
     });
   }
 
-  const editButton = button(icon(action?.icon ?? (options.editable ? 'pencil' : 'list-search')), {
-    size: -3,
-    variant: 'outline',
-    onClick: () =>
-      isUndefined(action) ? setEditQueryParam([options.field.name, rowID]) : action.onClick(),
-  });
-  onCleanup(
-    attachTooltip(editButton, () =>
+  const editButton = button(
+    () =>
       isUndefined(action)
         ? t(options.editable ? 'dashboard.editFieldValue' : 'dashboard.viewFieldValue')
         : action.tooltip(),
-    ),
+    {
+      icon: action?.icon ?? (options.editable ? 'pencil' : 'list-search'),
+      iconOnly: true,
+      size: -3,
+      variant: 'outline',
+      onClick: () =>
+        isUndefined(action) ? setEditQueryParam([options.field.name, rowID]) : action.onClick(),
+    },
   );
 
   const root = h(
@@ -211,7 +213,7 @@ export function editableFieldCell(
           collection: options.collection,
           field: options.field,
           uuid: rowID,
-          value: (options.cell.row as Record<string, unknown>)[options.field.name],
+          value: options.record[options.field.name],
           disabled: !options.editable,
           onClose: (close) =>
             void close().then(() => {

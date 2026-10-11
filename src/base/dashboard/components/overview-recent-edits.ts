@@ -1,6 +1,5 @@
 import {
   api,
-  attachTooltip,
   badge,
   card,
   type Child,
@@ -10,11 +9,10 @@ import {
   dashboardMeta,
   each,
   fallbackLabel,
-  formatDateTime,
-  formatRelative,
   h,
   icon,
   joinLabel,
+  relativeTime,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -302,14 +300,12 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
  * The badge caps at a share of the row, so a long collection name truncates before it pushes the time off.
  */
 function recentRow(entry: () => RecentEdit): Child {
-  const time = h('span', { class: 'o-overview-recent-time' }, () =>
-    formatRelative(entry().updatedAt),
-  );
-  onCleanup(attachTooltip(time, () => formatDateTime(entry().updatedAt)));
+  const time = relativeTime(() => entry().updatedAt);
+  time.classList.add('o-overview-recent-time');
   return h(
     'li',
     { class: 'o-overview-recent-row' },
-    badge(() => entry().collectionLabel, { size: -2, color: 'secondary' }),
+    badge(() => entry().collectionLabel, { size: -2, tone: 'secondary' }),
     h(
       'a',
       {

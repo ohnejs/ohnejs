@@ -1,8 +1,12 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { History, unsavedChanges } from '../../../../src/base/dashboard/components/history.ts';
 import { effectScope } from '../../../../src/utils/index.ts';
+import { baseBrowser } from '../_browser.ts';
+
+baseBrowser('/');
+const { History } = await import('../../../../src/base/dashboard/components/history.ts');
+const { hasUnsavedChanges } = await import('../../../../src/dashboard/router/unsaved-changes.ts');
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -129,22 +133,26 @@ describe('History', () => {
     strictEqual(history.size.value, 0);
   });
 
-  it('registers on the unsavedChanges global until its scope is disposed, unless opted out', () => {
+  it('guards its dirty state until its scope is disposed, unless opted out', () => {
     const scope = effectScope();
-    const watching = scope.run(() => new History());
-    scope.run(() => new History({ watchUnsavedChanges: false }));
-    deepStrictEqual([...unsavedChanges.histories], [watching]);
+    scope.run(() => new History({ watchUnsavedChanges: false }).push({ a: 1 }).push({ a: 2 }));
+    strictEqual(hasUnsavedChanges(), false);
+    const watching = scope.run(() => new History().push({ a: 1 }));
+    strictEqual(hasUnsavedChanges(), false);
+    watching.push({ a: 2 });
+    strictEqual(hasUnsavedChanges(), true);
     scope.dispose();
-    strictEqual(unsavedChanges.histories.size, 0);
+    strictEqual(hasUnsavedChanges(), false);
   });
 
-  it('keeps an outer history registered when a nested one is disposed', () => {
+  it('keeps an outer history guarded when a nested one is disposed', () => {
     const page = effectScope();
-    const record = page.run(() => new History().push({ a: 1 }).push({ a: 2 }));
+    page.run(() => new History().push({ a: 1 }).push({ a: 2 }));
     const popup = page.run(() => effectScope());
-    popup.run(() => new History().push({ b: 1 }).push({ b: 2 }));
+    popup.run(() => new History().push({ b: 1 }));
     popup.dispose();
-    deepStrictEqual([...unsavedChanges.histories], [record]);
+    strictEqual(hasUnsavedChanges(), true);
     page.dispose();
+    strictEqual(hasUnsavedChanges(), false);
   });
 });

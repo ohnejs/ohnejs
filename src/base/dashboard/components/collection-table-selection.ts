@@ -1,4 +1,4 @@
-import { isString, pick } from 'ohnejs/utils';
+import { isString } from 'ohnejs/utils';
 
 /**
  * The slice of a table row the selection reads.
@@ -6,15 +6,10 @@ import { isString, pick } from 'ohnejs/utils';
  */
 export interface SelectionRow {
   /**
-   * The row id: the record's `UUID`, or its page index when the record carries none.
+   * The record's `UUID`, which keys its row; a row without one keys by its page index and never selects.
    */
-  id: number | string;
+  UUID?: unknown;
 }
-
-/**
- * The table's selection map, from row id to selection state.
- */
-export type TableSelection = Readonly<Record<number | string, boolean>>;
 
 /**
  * The `UUID`s a page of records carries, in page order: the rows a surface asks verdicts about.
@@ -39,7 +34,7 @@ export function pageUUIDs(records: readonly Record<string, unknown>[]): string[]
  * admitsRow(new Set(['0']), 0)   // -> false
  * ```
  */
-export function admitsRow(verdict: ReadonlySet<string>, id: number | string): boolean {
+export function admitsRow(verdict: ReadonlySet<string>, id: unknown): boolean {
   return isString(id) && verdict.has(id);
 }
 
@@ -49,29 +44,29 @@ export function admitsRow(verdict: ReadonlySet<string>, id: number | string): bo
  *
  * @example
  * ```ts
- * deletableRows([{ id: 'a' }, { id: 'b' }], new Set(['b'])) // -> [{ id: 'b' }]
+ * deletableRows([{ UUID: 'a' }, { UUID: 'b' }], new Set(['b'])) // -> [{ UUID: 'b' }]
  * ```
  */
 export function deletableRows<R extends SelectionRow>(
   rows: readonly R[],
   deletable: ReadonlySet<string>,
 ): R[] {
-  return rows.filter((row) => admitsRow(deletable, row.id));
+  return rows.filter((row) => admitsRow(deletable, row.UUID));
 }
 
 /**
- * The selection without the rows the `deletable` verdict refuses.
+ * The selection without the rows the `deletable` verdict refuses, in selection order.
  *
  * @example
  * ```ts
- * deletableSelection({ a: true, b: true }, new Set(['b'])) // -> { b: true }
+ * deletableSelection(new Set(['a', 'b']), new Set(['b'])) // -> Set { 'b' }
  * ```
  */
 export function deletableSelection(
-  selected: TableSelection,
+  selected: ReadonlySet<number | string>,
   deletable: ReadonlySet<string>,
-): Record<string, boolean> {
-  return pick(selected, [...deletable]);
+): Set<string> {
+  return new Set([...selected].filter((id): id is string => admitsRow(deletable, id)));
 }
 
 /**
@@ -82,19 +77,19 @@ export function deletableSelection(
  *
  * @example
  * ```ts
- * selectAllStateOf([{ id: 'a' }], { a: true }, false, 1) // -> true
- * selectAllStateOf([{ id: 'a' }], { a: true }, false, 3) // -> 'indeterminate'
- * selectAllStateOf([{ id: 'a' }], { a: true }, true, 3)  // -> true
- * selectAllStateOf([{ id: 'a' }], {}, true, 3)           // -> false
+ * selectAllStateOf([{ UUID: 'a' }], new Set(['a']), false, 1) // -> true
+ * selectAllStateOf([{ UUID: 'a' }], new Set(['a']), false, 3) // -> 'indeterminate'
+ * selectAllStateOf([{ UUID: 'a' }], new Set(['a']), true, 3)  // -> true
+ * selectAllStateOf([{ UUID: 'a' }], new Set(), true, 3)       // -> false
  * ```
  */
 export function selectAllStateOf(
   rows: readonly SelectionRow[],
-  selected: TableSelection,
+  selected: ReadonlySet<unknown>,
   allSelected: boolean,
   lastPage: number,
 ): boolean | 'indeterminate' {
-  if (rows.length === 0 || !rows.every((row) => selected[row.id] === true)) return false;
+  if (rows.length === 0 || !rows.every((row) => selected.has(row.UUID))) return false;
   return allSelected || lastPage === 1 ? true : 'indeterminate';
 }
 
@@ -104,14 +99,14 @@ export function selectAllStateOf(
  *
  * @example
  * ```ts
- * selectedCountOf({ a: true, b: false }, false, 120) // -> 1
- * selectedCountOf({ a: true, b: false }, true, 120)  // -> 120
+ * selectedCountOf(new Set(['a']), false, 120) // -> 1
+ * selectedCountOf(new Set(['a']), true, 120)  // -> 120
  * ```
  */
 export function selectedCountOf(
-  selected: TableSelection,
+  selected: ReadonlySet<unknown>,
   allSelected: boolean,
   allCount: number,
 ): number {
-  return allSelected ? allCount : Object.values(selected).filter(Boolean).length;
+  return allSelected ? allCount : selected.size;
 }
