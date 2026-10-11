@@ -523,10 +523,11 @@ export default defineCollection({
 });
 ```
 
-Two options change only the editor, never what is stored:
+Some options change only the editor, never what is stored:
 
 - A `boolean` is edited as a checkbox, as a switch with `display: 'switch'`, or as two buttons with
   `display: 'buttons'`, labeled by `trueLabel` and `falseLabel`.
+- A `select` is edited as a dropdown, or as a button group with `display: 'buttons'`.
 - A `text` field with `multiline: true` is edited as a text area.
 
 ## The collection in the dashboard

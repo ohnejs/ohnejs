@@ -22,6 +22,16 @@ export const select = defineField({
      * The object form pairs the stored value with a translatable display label.
      */
     choices: option<readonly FieldChoice[]>({ required: true }),
+
+    /**
+     * The control the dashboard edits the value with.
+     * `'buttons'` renders the choices as a button group, for a short list that reads at a glance.
+     * Presentation only: the stored value is the same either way.
+     *
+     * @default
+     * 'dropdown'
+     */
+    display: option<'dropdown' | 'buttons'>({ default: 'dropdown' }),
   },
   emitType: (ctx) => literalUnion(choiceValues(ctx.options.choices)),
   validators: [

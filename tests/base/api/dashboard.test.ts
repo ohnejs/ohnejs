@@ -651,6 +651,7 @@ describe('fields', () => {
     const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
     deepStrictEqual(kinds.status?.options, {
       choices: ['draft', { value: 'live', label: 'Published' }],
+      display: 'dropdown',
     });
     deepStrictEqual(kinds.tags?.options, { choices: ['a', 'b'], max: 2 });
     deepStrictEqual(kinds.day?.options, { min: '2024-01-01' });

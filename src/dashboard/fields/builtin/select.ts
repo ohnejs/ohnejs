@@ -12,6 +12,7 @@ import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
 import { translateMessage } from '../../runtime/use-t.ts';
+import { buttonGroup } from '../../ui/button-group.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
@@ -20,8 +21,8 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * The `select` field type: cell display, form control, and filter.
  * The cell shows the stored value's resolved choice label, or the raw value when no choice matches.
  * A nullish value shows as a dim hyphen.
- * The control is the select combobox over the declared choices.
- * A nullable field leads with a muted `-` choice that writes `null`.
+ * The control is the select combobox over the declared choices, or a button group under `display: 'buttons'`.
+ * A nullable field leads with a `-` choice that writes `null`.
  * It stays pristine until touched, so an untouched control reads back the stored value unchanged.
  * The edit popup owns editing, so the cell offers no inline editor.
  * The filter compares by identity over the same choices.
@@ -49,21 +50,44 @@ export const selectType: FieldType = {
       return field.nullable ? [{ value: null, label: '-', muted: true }, ...pairs] : pairs;
     };
 
-    const element = select(model, entries, {
-      disabled: () => disabled === true,
-      error: () => routed.value !== '',
-      name: path,
-      placeholder: fieldPlaceholder(field),
-      // `onCommit` runs before the select writes the model; writing here lets the history push see it.
-      onCommit: (next) => {
-        model.value = isString(next) ? next : null;
-        touched.value = true;
-        routed.value = '';
-        onInput();
-      },
-    });
-    const combobox = element.querySelector<HTMLElement>('[role="combobox"]');
-    if (!isNull(combobox)) describeControl(combobox, field, path, error);
+    const commit = (next: Primitive): void => {
+      model.value = isString(next) ? next : null;
+      touched.value = true;
+      routed.value = '';
+      onInput();
+    };
+
+    let element: HTMLElement;
+    let proxy: HTMLElement | null;
+    if (field.options?.display === 'buttons') {
+      const bridged: Ref<Primitive> = {
+        get value() {
+          return model.value;
+        },
+        set value(next) {
+          commit(next);
+        },
+      };
+      element = buttonGroup(bridged, {
+        choices: entries,
+        variant: 'accent',
+        disabled: () => disabled === true,
+        error: () => routed.value !== '',
+        name: path,
+      });
+      proxy = element;
+    } else {
+      element = select(model, entries, {
+        disabled: () => disabled === true,
+        error: () => routed.value !== '',
+        name: path,
+        placeholder: fieldPlaceholder(field),
+        // `onCommit` runs before the select writes the model; writing here lets the history push see it.
+        onCommit: commit,
+      });
+      proxy = element.querySelector<HTMLElement>('[role="combobox"]');
+    }
+    if (!isNull(proxy)) describeControl(proxy, field, path, error);
 
     const wire = (): unknown => {
       const value = touched.value ? current() : isNullish(base) ? null : String(base as string);
@@ -88,7 +112,7 @@ export const selectType: FieldType = {
         return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
       },
       focus() {
-        combobox?.focus();
+        proxy?.focus();
       },
       revert() {
         model.value = isString(base) ? base : null;
