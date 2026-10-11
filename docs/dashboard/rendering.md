@@ -164,6 +164,28 @@ when(
 
 Written as `` `Clicked ${count.value} times` `` without the arrow, the text would stay at `0`.
 
+## Rebuilding on a key
+
+`keyed` rebuilds a part of the view whenever a key changes:
+
+```ts
+import { h, keyed, useRoute } from 'ohnejs/dashboard';
+
+const route = useRoute()!;
+
+h('main', null, keyed(
+  () => route.query.view,
+  () => report(route.query.view),
+));
+```
+
+- The key is a function. The part rebuilds only when it returns a different value, compared with
+  `Object.is`.
+- The build runs untracked, like a `when` branch, so a ref it reads does not rebuild it.
+
+Reach for it when a part reads its input once and must start over when that input changes. Anything
+finer-grained stays a [function child](#children).
+
 ## Mounting
 
 `mount(view, container)` clears the container and renders a view into it. The router mounts your

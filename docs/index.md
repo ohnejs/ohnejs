@@ -93,6 +93,11 @@ the browser as type-stripped JavaScript.
 - [Rendering](./dashboard/rendering.md) - `h`, `mount`, `each`, and `when`.
 - [Reactivity](./dashboard/reactivity.md) - `ref`, `computed`, and `effect`.
 - [Data in the dashboard](./dashboard/data.md) - the typed `api()` fetch helper and translations.
+- [Tables](./dashboard/tables.md) - typed rows with sorting, paging, selection, and row actions.
+- [Stats and charts](./dashboard/charts.md) - stat tiles, line, bar and donut charts, bar lists,
+  and funnels.
+- [Forms](./dashboard/forms.md) - typed page forms with `form`, `field`, `fieldInput`, and
+  `formField`.
 - [Field layouts](./dashboard/field-layouts.md) - rows, cards, tabs, and rules for every form the
   dashboard renders.
 - [Account settings](./dashboard/account.md) - each user's language, time zone, date and time

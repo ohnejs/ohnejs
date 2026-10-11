@@ -106,6 +106,7 @@ layout: ['title', 'body', '---', 'notes']
   [`repeater`](../database/field-types.md#repeater), through its `layout` option over its own
   subfields.
 - The [account page](./account.md#extending-the-page), through the `auth:account-layout` hook.
+- A page [form](./forms.md#arranging-the-fields), through `form({ layout })`.
 
 When the editor does not show a field, like a write-only field for a viewer who cannot write, the
 layout leaves it out. A row, card, or tab that becomes empty is left out too.

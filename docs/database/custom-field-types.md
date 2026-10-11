@@ -297,3 +297,5 @@ A type with a `text`, `integer`, `real`, or `boolean` column and no `schema` is 
 dashboard like the matching built-in type, and you do not need to register anything. Any other type
 shows a notice instead of its form control until a
 [dashboard boot file](../dashboard/pages.md#boot-files) registers one with `registerFieldType`.
+The registration names the type in `KnownFieldTypes` beside it, as
+[typing a custom field type](../dashboard/forms.md#typing-a-custom-field-type) shows.

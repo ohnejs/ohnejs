@@ -145,42 +145,37 @@ Pages follow the same file convention as routes, under
 import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
 import { ref } from 'ohnejs/utils';
 
-import { shell } from 'app/components/shell.ts';
-
 interface Post {
   UUID: string;
   title: string;
   body: string;
 }
 
-export default defineDashboardPage(() =>
-  shell(() => {
-    const posts = ref<Post[]>([]);
+export default defineDashboardPage(() => {
+  const posts = ref<Post[]>([]);
 
-    void api('GET /posts')
-      .then((response) => response.json())
-      .then((list: Post[]) => (posts.value = list));
+  void api('GET /posts')
+    .then((response) => response.json())
+    .then((list: Post[]) => (posts.value = list));
 
-    return h(
-      'div',
-      null,
-      h('h1', null, 'Posts'),
-      each(
-        () => posts.value,
-        (post) => post.UUID,
-        (post) =>
-          h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
-      ),
-    );
-  }),
-);
+  return h(
+    'div',
+    null,
+    h('h1', null, 'Posts'),
+    each(
+      () => posts.value,
+      (post) => post.UUID,
+      (post) =>
+        h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
+    ),
+  );
+});
 ```
 
-`posts.ts` is the dashboard's `/posts`. `shell` is the frame the built-in pages use: the header, the
-sidebar, and a redirect to the login page when nobody is signed in. It comes from the `ohnejs/base`
-layer, and you reach it through the [`app/` import](../dashboard/pages.md#what-a-page-may-import).
+`posts.ts` is the dashboard's `/posts`. `ohnejs/base` wraps every page in its
+[frame](../dashboard/pages.md#the-frame), so the file holds only content.
 
-[`api`](../dashboard/data.md#fetching-from-the-api) is a typed `fetch` against the API. It
+[`api`](../dashboard/data.md#calling-the-api-directly) is a typed `fetch` against the API. It
 [autocompletes your routes](../dashboard/data.md#typed-route-ids), like `'GET /posts'`, and returns
 the raw `Response`.
 
@@ -289,35 +284,31 @@ export default defineHandler(async () => {
 import { api, defineDashboardPage, each, h } from 'ohnejs/dashboard';
 import { ref } from 'ohnejs/utils';
 
-import { shell } from 'app/components/shell.ts';
-
 interface Post {
   UUID: string;
   title: string;
   body: string;
 }
 
-export default defineDashboardPage(() =>
-  shell(() => {
-    const posts = ref<Post[]>([]);
+export default defineDashboardPage(() => {
+  const posts = ref<Post[]>([]);
 
-    void api('GET /posts')
-      .then((response) => response.json())
-      .then((list: Post[]) => (posts.value = list));
+  void api('GET /posts')
+    .then((response) => response.json())
+    .then((list: Post[]) => (posts.value = list));
 
-    return h(
-      'div',
-      null,
-      h('h1', null, 'Posts'),
-      each(
-        () => posts.value,
-        (post) => post.UUID,
-        (post) =>
-          h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
-      ),
-    );
-  }),
-);
+  return h(
+    'div',
+    null,
+    h('h1', null, 'Posts'),
+    each(
+      () => posts.value,
+      (post) => post.UUID,
+      (post) =>
+        h('article', null, h('h2', null, () => post().title), h('p', null, () => post().body)),
+    ),
+  );
+});
 ```
 
 `dashboard/tsconfig.json`

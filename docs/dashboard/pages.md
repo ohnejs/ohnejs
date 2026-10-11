@@ -14,7 +14,8 @@ export default defineDashboardPage(() => h('h1', null, 'Hello'));
 ```
 
 [`npx ohne dev`](../project/cli.md#ohne-dev) serves it at `http://localhost:9000`, alongside the
-API.
+API. With `ohnejs/base` in your layers, it renders inside the dashboard's [frame](#the-frame): the
+header, the sidebar, and the sign-in redirect.
 
 ## From file to route
 
@@ -40,6 +41,7 @@ When several routes match a URL, the most specific one wins.
 
 - `params` - the matched route's params, already URI-decoded.
 - `path` - the matched location path.
+- `query` - the search params, decoded to strings, numbers, booleans, arrays, and objects.
 
 ```ts
 // dashboard/pages/authors/[id].ts
@@ -53,34 +55,87 @@ The runtime defines what the component returns and how it updates:
 - [`h`](./rendering.md#elements), [`each`](./rendering.md#lists), and
   [`when`](./rendering.md#conditionals) build the view.
 - [`ref`](./reactivity.md#ref) holds state.
-- [`api`](./data.md#loading-into-a-ref) loads data from your API.
+- [`useResource`](./data.md) loads data from your API.
 
-The page component runs once per visit. It runs again when you navigate, never when a ref it read
-changes or the [dashboard language](./data.md#switching-the-language) switches. Bind a live value, and
-every `t` call, with a [function child](./rendering.md#children) instead.
+The page component runs once per visit:
+
+- It runs again when the path changes.
+- A navigation that changes only the query keeps the page. `route.query` updates in place.
+- A ref it read, or a [dashboard language](./data.md#switching-the-language) switch, never reruns it.
+
+Bind a live value, and every `t` call, with a [function child](./rendering.md#children) instead.
 
 ## The page title
 
-Every page starts with the bare `ohne` title. To name it, call `setDocumentTitle` in the page:
+Every page starts with the bare `ohne` title. To name it, call `useDocumentTitle` in the page:
 
 ```ts
 // dashboard/pages/posts.ts
-import { defineDashboardPage, h, setDocumentTitle } from 'ohnejs/dashboard';
+import { defineDashboardPage, h, useDocumentTitle } from 'ohnejs/dashboard';
 
 export default defineDashboardPage(() => {
-  setDocumentTitle('Posts');
+  useDocumentTitle('Posts');
   return h('h1', null, 'Posts');
 });
 ```
 
-The tab now reads `Posts - ohne`. A page that sets no title shows `ohne`, however you got there.
+The tab now reads `Posts - ohne`.
 
-When the title comes from data that loads later, call it inside an [`effect`](./reactivity.md#effect)
-so it follows the data:
+- A [message key](../i18n/messages.md#catalogs) translates, and follows a language switch.
+- A function follows its data, with no `effect`: `useDocumentTitle(() => post.value?.title)`.
+- The title lasts while the page or component that set it lives. The newest live one wins.
+
+## The frame
+
+The frame is the chrome around every page: with `ohnejs/base`, the header, the sidebar, and the
+redirect to the login page while nobody is signed in. It mounts once and stays across navigations,
+so your page holds only content.
+
+A sign-in or redirect-only page opts out:
 
 ```ts
-effect(() => setDocumentTitle(post.value?.title));
+// dashboard/pages/welcome.ts
+import { defineDashboardPage, h } from 'ohnejs/dashboard';
+
+export default defineDashboardPage(() => h('h1', null, 'Welcome'), { frame: false });
 ```
+
+A page asks the frame for more room with `useFrame`, while it lives:
+
+- `useFrame({ fill: true })` hands it the main area edge to edge at full height. The page scrolls
+  itself.
+- `useFrame({ wide: true })` gives it the full window width. The sidebar becomes an overlay.
+
+To replace the frame, add a `dashboard/boot/shell.ts` that calls `registerPageFrame`. It
+[replaces](#boot-files) the base layer's file of that name. The frame receives `content`, the page
+as a function child, and `options()`, what the live `useFrame` calls ask for:
+
+```ts
+// dashboard/boot/shell.ts
+import { h, registerPageFrame } from 'ohnejs/dashboard';
+
+registerPageFrame(({ content, options }) =>
+  h('main', { class: () => (options().fill ? 'fill' : 'padded') }, content),
+);
+```
+
+## State in the URL
+
+`useSearchParam` binds one query param to a ref, so a view survives a reload and a shared link:
+
+```ts
+const view = useSearchParam('view', { fallback: 'grid', choices: ['grid', 'list'] });
+
+view.value = 'list'; // -> the URL gains `?view=list`, the page stays
+```
+
+- `fallback` types the ref. It is the value while the param is absent or does not fit, and writing
+  it removes the param.
+- `choices` narrows the type to its members. Any other value reads as the fallback.
+- A write replaces the history entry. Pass `history: 'push'` so back undoes it.
+
+Read the URL through `route.query` or `useSearchParam`, never `location.search`. Only those follow a
+navigation that keeps the page.
 
 ## Navigation
 
@@ -111,8 +166,32 @@ renders the dashboard's not-found page.
 - `navigate` - a `navigate` call or a clicked link.
 - `popstate` - the back or forward button.
 
-Some pages remember a view and restore it when their URL arrives bare, with no query string. Such a
-page checks `lastNavigation()` first, so going back still lands on the bare view.
+Some pages remember a view and restore it whenever their query arrives bare. Such a page watches
+`route.query` and checks `lastNavigation()` first, so going back still lands on the bare view:
+
+```ts
+effect(() => {
+  if (isEmpty(route.query) && remembered !== '' && lastNavigation() !== 'popstate') {
+    navigate(route.path + remembered, { replace: true });
+  }
+});
+```
+
+## Unsaved changes
+
+`useUnsavedChanges` guards edits a page holds. While its getter reports dirty edits, leaving asks
+first:
+
+```ts
+const draft = ref('');
+useUnsavedChanges(() => draft.value !== '');
+```
+
+- A navigation that leaves the path waits on the leave prompt. With `ohnejs/base` that is the
+  unsaved-changes dialog. A step that changes only the query never asks.
+- Closing the tab raises the browser's own prompt.
+- The guard lasts as long as the page, or the reactive scope that called it.
+- A surface with its own edits, like a popup closing on Escape, asks through `confirmLeave()`.
 
 ## The sidebar
 
@@ -175,10 +254,19 @@ UI mounted for the whole dashboard.
 // dashboard/boot/rating.ts
 import { registerFieldType } from 'ohnejs/dashboard';
 
+declare module 'ohnejs/dashboard' {
+  interface KnownFieldTypes {
+    rating: { options: { max?: number }; value: number };
+  }
+}
+
 registerFieldType('rating', {
   display: ({ value }) => () => '★'.repeat(Number(value() ?? 0)),
 });
 ```
+
+The `KnownFieldTypes` entry names the type's options and value, so
+[`field('rating')`](./forms.md#typing-a-custom-field-type) type-checks in a page form.
 
 Files run in the same order as [server boot files](../project/boot.md#ordering).
 
@@ -204,13 +292,13 @@ Relative imports work too.
 - `app/` merges every layer's dashboard directory, closest layer first, so an app file replaces a
   layer's file at the same path.
 - The same merge lets a layer import another layer's dashboard files by their `app/` path:
-  `app/components/shell.ts` resolves wherever in the stack the file lives. To make the editor
+  `app/components/shell-slots.ts` resolves wherever in the stack the file lives. To make the editor
   resolve these imports too, see [type checking](#type-checking).
 
 That map is the whole boundary between browser and server. The server serves only the dashboard
 runtime and the utils, never the Node framework, so browser code cannot import server code.
 `ohnejs` is not in the map, and you cannot use `useDatabase` in a page. Data crosses over HTTP,
-through [`api`](./data.md#fetching-from-the-api).
+through [`api`](./data.md#calling-the-api-directly).
 
 ## Serving
 
