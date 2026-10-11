@@ -202,6 +202,27 @@ describe('generateDatabase', () => {
     ok(shared.includes('    title: string | null;'));
   });
 
+  it('aliases a field type import named like a type the shared bucket declares', async () => {
+    const app = join(root, 'clash');
+    writePackage(app, 'clash');
+    write(
+      app,
+      'fields/locales.ts',
+      "export default { columnType: 'text', emitType: (ctx) => ctx.importType('@acme/i18n', 'GeneratedLocales') };\n",
+    );
+    write(
+      app,
+      'collections/Posts.ts',
+      "export default { fields: { locale: { type: 'locales', options: {} } } };\n",
+    );
+
+    await loadLayers(app);
+    const shared = readFileSync((await generateDatabase(app))[0] ?? '', 'utf8');
+
+    ok(shared.includes("import type { GeneratedLocales as GeneratedLocales2 } from '@acme/i18n';"));
+    ok(shared.includes('    locale: GeneratedLocales2;'));
+  });
+
   it('types rich text and link values by the collections they may link', async () => {
     const app = join(root, 'rich-text');
     writePackage(app, 'rich-text');

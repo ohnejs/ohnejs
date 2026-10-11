@@ -98,6 +98,25 @@ const UPDATED_AT_QUERY_ENTRY = '{ scalar: number }';
 const TRANSLATIONS_QUERY_ENTRY = '{ translations: true }';
 
 /**
+ * The types `shared/database.ts` declares, reserved so a field type's import never shadows one.
+ */
+const DECLARED = [
+  'GeneratedCollections',
+  'GeneratedRelations',
+  'GeneratedQueryFields',
+  'GeneratedBlocks',
+  'GeneratedBlockQueryFields',
+  'GeneratedInserts',
+  'GeneratedBlockInserts',
+  'GeneratedUpdates',
+  'GeneratedBlockUpdates',
+  'GeneratedDatabases',
+  'GeneratedCapabilities',
+  'GeneratedSingletons',
+  'GeneratedLocales',
+];
+
+/**
  * The operations every collection contributes a `collection.<Name>.<operation>` capability for.
  */
 const CAPABILITY_OPERATIONS = ['read', 'create', 'update', 'delete'] as const;
@@ -219,7 +238,7 @@ async function writeShared(
   locales: readonly string[],
   resolveText: MessageResolver,
 ): Promise<string> {
-  const imports = createTypeImports(dir);
+  const imports = createTypeImports(dir, DECLARED);
   const context: EmissionContext = {
     types: emittableFieldTypes(fields, disabledFields),
     blocks: blocks.map((block) => block.name),
