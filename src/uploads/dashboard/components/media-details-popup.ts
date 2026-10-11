@@ -242,6 +242,10 @@ css`
     margin-top: 1rem;
   }
 
+  .o-media-details-fields .ohne-tabs-content > .ohne-field-message {
+    margin-top: 0.5em;
+  }
+
   .o-media-details-field .ohne-field-label {
     margin-bottom: 0.25em;
     color: hsl(var(--ohne-muted-foreground));
